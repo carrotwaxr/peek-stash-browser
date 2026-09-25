@@ -36,6 +36,7 @@ import type {
 } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
+import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { entityImageCountService } from "../../services/EntityImageCountService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
@@ -74,6 +75,9 @@ const USERS = {
   b: "postsync_it_b",
   ab: "postsync_it_ab",
   api: "postsync_it_api",
+  restricted: "postsync_it_restricted",
+  hidden: "postsync_it_hidden",
+  admin: "postsync_it_admin",
 } as const;
 const API_PASSWORD = "PostSync-IT-password-1";
 
@@ -1879,6 +1883,346 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       });
       // pc-b had no change, and its counts were rebuilt all the same
       expect(await imageCountsOf(PC_B)).toEqual(SEEDED_COUNTS);
+    }, 60_000);
+  });
+
+  describe("holds until the recompute", () => {
+    /** A scene Stash added, on LATER_AT. */
+    const sceneRow = (
+      id: string,
+      { tags = [], performers = [] }: { tags?: string[]; performers?: string[] }
+    ): SyncScene => ({
+      ...must(library().scene[0]),
+      id,
+      title: `PostSync IT scene ${id}`,
+      performers: performers.map((p) => partialRow({ id: p })),
+      tags: tags.map((t) => partialRow({ id: t })),
+      galleries: [],
+      updated_at: LATER_AT,
+    });
+
+    /** The library with `added` in Stash, listed whole and as the update. */
+    const withAdded = (...added: SyncScene[]): StashAnswer => ({
+      all: { ...library(), scene: [...library().scene, ...added] },
+      updated: { scene: added },
+    });
+
+    /** Tag 2 on `instanceId`, stored as sync stores it; nothing links to it. */
+    async function seedTag2(instanceId: string): Promise<void> {
+      await prisma.stashTag.create({
+        data: {
+          id: "2",
+          stashInstanceId: instanceId,
+          stashUpdatedAt: UPDATED_AT,
+          name: "PostSync IT tag 2",
+        },
+      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "StashTag" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
+        UPDATED_AT,
+        instanceId
+      );
+    }
+
+    /** The library with tag 2 beside tag 1. */
+    const tag2Library = (): Library => ({
+      ...library(),
+      tag: [
+        ...library().tag,
+        { ...must(library().tag[0]), id: "2", name: "PostSync IT tag 2" },
+      ],
+    });
+
+    /** A user with a tag restriction on pc-a, their exclusions computed. */
+    async function restrictedUser(
+      username: string,
+      mode: "INCLUDE" | "EXCLUDE",
+      tagIds: string[],
+      role: "USER" | "ADMIN" = "USER"
+    ): Promise<number> {
+      const user = await prisma.user.create({
+        data: { username, password: "not-a-real-hash", role },
+      });
+      await prisma.userContentRestriction.create({
+        data: {
+          userId: user.id,
+          entityType: "tags",
+          mode,
+          entityIds: JSON.stringify(tagIds.map((id) => `${id}:${PC_A}`)),
+          restrictEmpty: mode === "INCLUDE",
+        },
+      });
+      await exclusionComputationService.recomputeForUser(user.id);
+      return user.id;
+    }
+
+    /** A user who hid one entity on pc-a, their exclusions computed. */
+    async function hidingUser(
+      username: string,
+      entityType: "performer" | "tag",
+      entityId: string,
+      role: "USER" | "ADMIN" = "USER"
+    ): Promise<number> {
+      const user = await prisma.user.create({
+        data: { username, password: "not-a-real-hash", role },
+      });
+      await prisma.userHiddenEntity.create({
+        data: { userId: user.id, entityType, entityId, instanceId: PC_A },
+      });
+      await exclusionComputationService.recomputeForUser(user.id);
+      return user.id;
+    }
+
+    /** Whether the by-id access check lets `userId` see the pc-a scene. */
+    const sees = (userId: number, sceneId: string): Promise<boolean> =>
+      canUserAccessEntity(userId, "scene", sceneId, PC_A);
+
+    /** Whether the scene list answers the pc-a scene to `client`. */
+    async function listedTo(
+      client: { post: typeof adminClient.post },
+      sceneId: string
+    ): Promise<boolean> {
+      const response = await client.post<{
+        findScenes?: { scenes?: Array<{ id: string }> };
+      }>("/api/library/scenes", {
+        filter: { per_page: 50 },
+        ids: [`${sceneId}:${PC_A}`],
+      });
+      expect(response.status).toBe(200);
+      return (response.data.findScenes?.scenes ?? []).some(
+        (scene) => scene.id === sceneId
+      );
+    }
+
+    /** The user's exclusion rows on pc-a, with their reasons. */
+    async function rowsOf(
+      userId: number
+    ): Promise<
+      Array<{ entityType: string; entityId: string; reason: string }>
+    > {
+      return prisma.userExcludedEntity.findMany({
+        where: { userId, instanceId: PC_A },
+        select: { entityType: true, entityId: true, reason: true },
+        orderBy: [{ entityType: "asc" }, { entityId: "asc" }],
+      });
+    }
+
+    const pendingOf = async (userId: number) =>
+      (await rowsOf(userId)).filter((row) => row.reason === "pending");
+
+    beforeEach(() => {
+      // The recompute runs for real here: the holds are what it replaces
+      recompute.mockRestore();
+      recompute = vi.spyOn(exclusionComputationService, "recomputeForUser");
+    });
+
+    it("a scene added in Stash with an Always-hidden tag is never listed to the restricted user: not after its batch is written, not after the recompute", async () => {
+      const { id: userId, client } = await createApiUser(
+        USERS.api,
+        API_PASSWORD
+      );
+      await prisma.userContentRestriction.create({
+        data: {
+          userId,
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: JSON.stringify([`${ID}:${PC_A}`]),
+        },
+      });
+      await exclusionComputationService.recomputeForUser(userId);
+      stubInstances({ [PC_A]: withAdded(sceneRow("2", { tags: [ID] })) });
+      // Between the batch and the recompute: the steps before it
+      const listedBeforeRecompute: boolean[] = [];
+      const heldBeforeRecompute: string[][] = [];
+      steps.stats.mockImplementation(async () => {
+        listedBeforeRecompute.push(await listedTo(client, "2"));
+        heldBeforeRecompute.push(
+          (await pendingOf(userId)).map((row) => row.entityId)
+        );
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(listedBeforeRecompute).toEqual([false]);
+      expect(heldBeforeRecompute).toEqual([["2"]]);
+      expect(await listedTo(client, "2")).toBe(false);
+      // The recompute replaced the hold with the cascade of the hidden tag
+      expect(await rowsOf(userId)).toContainEqual({
+        entityType: "scene",
+        entityId: "2",
+        reason: "cascade",
+      });
+      expect(await pendingOf(userId)).toEqual([]);
+    }, 60_000);
+
+    it("an INCLUDE user does not see a new scene outside their Show-only list at any point", async () => {
+      const userId = await restrictedUser(USERS.restricted, "INCLUDE", [ID]);
+      expect(await sees(userId, ID)).toBe(true);
+      stubInstances({ [PC_A]: withAdded(sceneRow("2", {})) });
+      const seenBeforeRecompute: boolean[] = [];
+      steps.stats.mockImplementation(async () => {
+        seenBeforeRecompute.push(await sees(userId, "2"));
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(seenBeforeRecompute).toEqual([false]);
+      expect(await sees(userId, "2")).toBe(false);
+      expect(await sees(userId, ID)).toBe(true);
+      expect(await pendingOf(userId)).toEqual([]);
+    }, 60_000);
+
+    it("a user with no restriction and no hide gets no pending row", async () => {
+      const restricted = await restrictedUser(USERS.restricted, "EXCLUDE", [
+        ID,
+      ]);
+      stubInstances({ [PC_A]: withAdded(sceneRow("2", { tags: [ID] })) });
+      const pendingBeforeRecompute: Array<[number, number]> = [];
+      steps.stats.mockImplementation(async () => {
+        pendingBeforeRecompute.push([
+          await pendingRows(Object.values(users)),
+          await pendingRows([restricted]),
+        ]);
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      // The three unrestricted users held nothing while the restricted one did
+      expect(pendingBeforeRecompute).toEqual([[0, 1]]);
+      expect(await pendingRows(Object.values(users))).toBe(0);
+    }, 60_000);
+
+    it("an admin with a hidden performer does not see that performer's new scene before the recompute", async () => {
+      const admin = await hidingUser(USERS.admin, "performer", ID, "ADMIN");
+      expect(await sees(admin, ID)).toBe(false);
+      stubInstances({
+        [PC_A]: withAdded(sceneRow("2", { performers: [ID] })),
+      });
+      const seenBeforeRecompute: boolean[] = [];
+      steps.stats.mockImplementation(async () => {
+        seenBeforeRecompute.push(await sees(admin, "2"));
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(seenBeforeRecompute).toEqual([false]);
+      expect(await sees(admin, "2")).toBe(false);
+      expect(await rowsOf(admin)).toContainEqual({
+        entityType: "scene",
+        entityId: "2",
+        reason: "cascade",
+      });
+      expect(await pendingOf(admin)).toEqual([]);
+    }, 60_000);
+
+    it("a tag renamed in Stash holds its scenes for restricted users until the recompute, then releases the allowed ones", async () => {
+      await seedTag2(PC_A);
+      // Tag 2 is hidden from the user; scene 1 carries only tag 1
+      const userId = await restrictedUser(USERS.restricted, "EXCLUDE", ["2"]);
+      expect(await sees(userId, ID)).toBe(true);
+      const renamed: SyncTag = {
+        ...must(library().tag[0]),
+        name: "PostSync IT tag, renamed",
+        updated_at: LATER_AT,
+      };
+      const lib = tag2Library();
+      stubInstances({
+        [PC_A]: {
+          all: { ...lib, tag: [renamed, ...lib.tag.slice(1)] },
+          updated: { tag: [renamed] },
+        },
+      });
+      const beforeRecompute: Array<{ seen: boolean; held: string[] }> = [];
+      steps.stats.mockImplementation(async () => {
+        beforeRecompute.push({
+          seen: await sees(userId, ID),
+          held: (await pendingOf(userId)).map(
+            (row) => `${row.entityType}:${row.entityId}`
+          ),
+        });
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      // The tag and its first-order content: the scene and gallery tagged
+      // with it, the image the gallery passed it to, the clip it is the
+      // primary tag of
+      expect(beforeRecompute).toEqual([
+        {
+          seen: false,
+          held: ["clip:1", "gallery:1", "image:1", "scene:1", "tag:1"],
+        },
+      ]);
+      expect(await sees(userId, ID)).toBe(true);
+      expect(await pendingOf(userId)).toEqual([]);
+    }, 60_000);
+
+    it("an aborted sync's pending rows are cleared by the next sync's recompute even when that sync changes nothing", async () => {
+      const userId = await restrictedUser(USERS.restricted, "EXCLUDE", [ID]);
+      const added = sceneRow("2", { tags: [ID] });
+      stubInstances({ [PC_A]: withAdded(added) });
+      steps.stats.mockRejectedValueOnce(new Error("PostSync IT step failed"));
+
+      await expect(stashSyncService.smartIncrementalSync(PC_A)).rejects.toThrow(
+        "PostSync IT step failed"
+      );
+
+      // The batch's hold stayed: no recompute ran
+      expect((await pendingOf(userId)).map((row) => row.entityId)).toEqual([
+        "2",
+      ]);
+      expect(await sees(userId, "2")).toBe(false);
+
+      // As after a restart: the run's change set is gone, and Stash has
+      // nothing newer than what the first run stored
+      stashSyncService["carriedChanges"] = null;
+      stubInstances({ [PC_A]: { all: withAdded(added).all } });
+      recompute.mockClear();
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(recompute.mock.calls.map((call) => call[0])).toEqual([userId]);
+      expect(await pendingOf(userId)).toEqual([]);
+      expect(await sees(userId, "2")).toBe(false);
+    }, 60_000);
+
+    it("a performer that gains a hidden tag holds its scenes until the recompute", async () => {
+      await seedTag2(PC_A);
+      const userId = await hidingUser(USERS.hidden, "tag", "2");
+      expect(await sees(userId, ID)).toBe(true);
+      // Inheritance runs for real: it is what carries tag 2 to scene 1
+      steps.sceneTags.mockRestore();
+      const lib = tag2Library();
+      stubInstances({
+        [PC_A]: {
+          all: { ...lib, performer: [performerRow(ID, ["2"])] },
+          updated: { performer: [performerRow(ID, ["2"])] },
+        },
+      });
+      const beforeRecompute: Array<{ seen: boolean; held: string[] }> = [];
+      steps.stats.mockImplementation(async () => {
+        beforeRecompute.push({
+          seen: await sees(userId, ID),
+          held: (await pendingOf(userId)).map(
+            (row) => `${row.entityType}:${row.entityId}`
+          ),
+        });
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(beforeRecompute).toEqual([
+        { seen: false, held: ["performer:1", "scene:1"] },
+      ]);
+      // Scene 1 now inherits the hidden tag through its performer
+      expect(await inheritedTagsOf(PC_A, ID)).toEqual(["2"]);
+      expect(await sees(userId, ID)).toBe(false);
+      expect(await rowsOf(userId)).toContainEqual({
+        entityType: "scene",
+        entityId: ID,
+        reason: "cascade",
+      });
+      expect(await pendingOf(userId)).toEqual([]);
     }, 60_000);
   });
 });

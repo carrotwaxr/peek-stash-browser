@@ -97,6 +97,9 @@ Admins can see that you have hidden items (via database access) but the hidden i
 ### What happens if content I've hidden is updated in Stash?
 Hidden items remain hidden even if the underlying content is modified in Stash. The hiding is based on entity ID, not content characteristics.
 
+### When do new or changed items appear?
+If you have hidden anything, items a sync adds or changes (a new scene of a performer you hid, say) stay out of sight until that sync finishes and your hidden items have been applied to them, so nothing you hid shows up in between.
+
 ---
 
 ## Related
