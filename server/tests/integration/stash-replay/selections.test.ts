@@ -58,10 +58,15 @@ describe("selections", () => {
     expect(must(group.id).operations).toEqual([
       "FindGroup",
       "FindGroupIDs",
+      "FindGroupRelations",
       "FindGroups",
     ]);
     expect(must(group.containing_groups).operations).toEqual(["FindGroup"]);
-    expect(must(group.sub_groups).operations).toEqual(["FindGroup"]);
+    // The sync's hierarchy pass reads sub_groups alone
+    expect(must(group.sub_groups).operations).toEqual([
+      "FindGroup",
+      "FindGroupRelations",
+    ]);
     expect(must(gallery.id).operations).toEqual([
       "FindGalleries",
       "FindGallery",

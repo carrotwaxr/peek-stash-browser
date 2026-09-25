@@ -7158,12 +7158,92 @@
         ],
         "created_at": "2003-11-28T09:45:58+00:00",
         "updated_at": "2004-05-01T13:49:59+00:00",
-        "containing_groups": [],
-        "sub_groups": [],
+        "containing_groups": [
+          {
+            "group": {
+              "id": "100002",
+              "name": "Group 100002"
+            },
+            "description": "Box set"
+          }
+        ],
+        "sub_groups": [
+          {
+            "group": {
+              "id": "100003",
+              "name": "Group 100003"
+            },
+            "description": "Part 2"
+          }
+        ],
         "front_image_path": "{{STASH_ORIGIN}}/group/100001/frontimage?t=1083419399&default=true",
         "back_image_path": null,
         "scene_count": 4,
         "performer_count": 2,
+        "sub_group_count": 1
+      },
+      {
+        "id": "100002",
+        "name": "Group 100002",
+        "aliases": "Group 100002 aliases",
+        "duration": 7039,
+        "date": "2008-05-06",
+        "rating100": 60,
+        "studio": null,
+        "director": "Group 100002 director",
+        "synopsis": "Group 100002 synopsis",
+        "urls": [
+          "https://example.invalid/group/100002/1"
+        ],
+        "tags": [],
+        "created_at": "2003-04-14T19:54:19+00:00",
+        "updated_at": "2004-02-04T03:24:16+00:00",
+        "containing_groups": [],
+        "sub_groups": [
+          {
+            "group": {
+              "id": "100001",
+              "name": "Group 100001"
+            },
+            "description": "Box set"
+          }
+        ],
+        "front_image_path": "{{STASH_ORIGIN}}/group/100002/frontimage?t=1075865056&default=true",
+        "back_image_path": "{{STASH_ORIGIN}}/group/100002/backimage?t=1075865056&default=true",
+        "scene_count": 0,
+        "performer_count": 0,
+        "sub_group_count": 1
+      },
+      {
+        "id": "100003",
+        "name": "Group 100003",
+        "aliases": "Group 100003 aliases",
+        "duration": 2481,
+        "date": "2009-08-01",
+        "rating100": 60,
+        "studio": null,
+        "director": "Group 100003 director",
+        "synopsis": "Group 100003 synopsis",
+        "urls": [
+          "https://example.invalid/group/100003/1"
+        ],
+        "tags": [],
+        "created_at": "2003-03-25T05:22:53+00:00",
+        "updated_at": "2004-04-19T13:41:18+00:00",
+        "containing_groups": [
+          {
+            "group": {
+              "id": "100001",
+              "name": "Group 100001"
+            },
+            "description": "Part 2"
+          }
+        ],
+        "sub_groups": [],
+        "front_image_path": "{{STASH_ORIGIN}}/group/100003/frontimage?t=1082382078&default=true",
+        "back_image_path": "{{STASH_ORIGIN}}/group/100003/backimage?t=1082382078&default=true",
+        "scene_count": 0,
+        "performer_count": 0,
         "sub_group_count": 0
       }
     ],

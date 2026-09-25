@@ -431,6 +431,14 @@ function stubClient(answer: StashAnswer): StashClient {
       );
       return Promise.resolve({ findImages: { count, images: items } });
     },
+    // The collection hierarchy, read on every sync: none
+    findGroupRelations: () =>
+      Promise.resolve({
+        findGroups: {
+          count: answer.all.group.length,
+          groups: answer.all.group.map(({ id }) => ({ id, sub_groups: [] })),
+        },
+      }),
     // The sync scopes its client to its abort signal
     withSignal: () => client,
   });

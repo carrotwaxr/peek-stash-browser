@@ -882,6 +882,60 @@ async function missingReferences(
   return missing;
 }
 
+// ==================== Collection hierarchy ====================
+
+/**
+ * One link of Stash's collection hierarchy on one instance, a
+ * `GroupRelation` row: a containing group, one of its sub-groups, the
+ * sub-group's place in the containing group's list, and Stash's description
+ * of the link ("Part 2").
+ */
+interface GroupLink {
+  containingId: string;
+  subId: string;
+  orderIndex: number;
+  description: string | null;
+}
+
+/** A link's key within its instance. */
+function groupLinkKey(link: { containingId: string; subId: string }): string {
+  return `${link.containingId}\0${link.subId}`;
+}
+
+/**
+ * Deletes links of one instance, each by primary key. Binds a JSON array of
+ * `[containingId, subId]` pairs, then the instance twice.
+ */
+const DELETE_GROUP_LINKS_SQL = `
+  DELETE FROM "GroupRelation" WHERE rowid IN (
+    SELECT r.rowid FROM json_each(?) j
+    CROSS JOIN "GroupRelation" r
+      ON r."containingId" = json_extract(j.value, '$[0]')
+     AND r."containingInstanceId" = ?
+     AND r."subId" = json_extract(j.value, '$[1]')
+     AND r."subInstanceId" = ?
+  )`;
+
+/**
+ * Writes links of one instance, a stored one taking its new place and
+ * description. Binds the instance twice, then a JSON array of
+ * `[containingId, subId, orderIndex, description]`. The `WHERE true` is
+ * SQLite's: an upsert after a SELECT with a FROM needs a WHERE, or the
+ * parser reads ON CONFLICT as a join constraint.
+ */
+const UPSERT_GROUP_LINKS_SQL = `
+  INSERT INTO "GroupRelation" (
+    "containingId", "containingInstanceId", "subId", "subInstanceId",
+    "orderIndex", "description"
+  )
+  SELECT json_extract(j.value, '$[0]'), ?, json_extract(j.value, '$[1]'), ?,
+         json_extract(j.value, '$[2]'), json_extract(j.value, '$[3]')
+  FROM json_each(?) j
+  WHERE true
+  ON CONFLICT ("containingId", "containingInstanceId", "subId", "subInstanceId")
+  DO UPDATE SET "orderIndex" = excluded."orderIndex",
+                "description" = excluded."description"`;
+
 // ==================== Entities linked to deleted ones ====================
 
 /**
@@ -2768,7 +2822,9 @@ class StashSyncService extends EventEmitter {
    * or deletion in Stash rewrites those links without moving updated_at;
    * then the scenes and images of the galleries that changed or went
    * (`refetchGalleryMembers`): a gallery's members edited from the gallery
-   * move only its updated_at. Each type's state is saved at once, so a
+   * move only its updated_at. Last, in every mode, the collection hierarchy
+   * (`syncGroupRelations`), a failure of which joins the group type's
+   * `lastError`. Each type's state is saved at once, so a
    * restart does not sync completed types again; a type that fails is
    * recorded and the next one runs. What changed goes into the run's change set; the post-sync steps
    * run once per run, after every instance (runSync). The caller holds the
@@ -2831,6 +2887,25 @@ class StashSyncService extends EventEmitter {
           run,
           seenIds
         );
+      }
+
+      // The collection hierarchy, in every mode: Stash's sub-group edits
+      // move no updated_at. A failure is the group type's, and the sync
+      // goes on
+      try {
+        await this.syncGroupRelations(stashInstanceId, run);
+      } catch (error) {
+        if (this.isAbort(error)) throw new Error("Sync aborted");
+        const message = describeStashError(error);
+        logger.error("Failed to sync the collection hierarchy", {
+          stashInstanceId,
+          error: message,
+        });
+        const problem = `Could not sync the collection hierarchy: ${message}`;
+        const result = results.find((r) => r.entityType === "group");
+        const lastError = joinProblems(result?.error, problem) ?? problem;
+        if (result) result.error = lastError;
+        await this.recordEntityError(stashInstanceId, "group", lastError);
       }
 
       const duration = Date.now() - startTime;
@@ -3841,6 +3916,139 @@ class StashSyncService extends EventEmitter {
         await this.recordEntityError(stashInstanceId, entityType, lastError);
       }
     }
+  }
+
+  /**
+   * The collection hierarchy of one instance (item 58): the groups each
+   * group contains, in Stash's order, with Stash's description of each
+   * link. Stash's sub-group edits (adding, removing or reordering
+   * sub-groups, a link's description) move no group's updated_at, so every
+   * sync runs this, whatever its mode: one request lists every group's
+   * sub-groups (FindGroupRelations, per_page -1; 178 groups on the owner's
+   * library, a few MB at 10,000). A link is read from its containing side
+   * alone: it is in exactly one `sub_groups` list, which Stash returns in
+   * its order_index order, so the list position is the order. The links are
+   * diffed in memory against the instance's `GroupRelation` rows, and only
+   * the differences are deleted and upserted, in one short transaction; no
+   * difference, no write. A link to a group Peek holds no row for on the
+   * instance (created in Stash after this run's group pages, or its type
+   * failed) is skipped and logged, since the foreign keys would fail the
+   * transaction; a later sync writes it. Nothing here enters the run's
+   * change set: nothing downstream reads the hierarchy. A failure throws,
+   * for the caller to record, and so does an abort.
+   */
+  private async syncGroupRelations(
+    stashInstanceId: string,
+    run: SyncRunContext
+  ): Promise<void> {
+    const stash = this.getStashClient(stashInstanceId);
+    const { findGroups } = await stash.findGroupRelations(
+      { filter: { per_page: -1 } },
+      undefined,
+      run.signal
+    );
+    throwIfAborted(run.signal);
+
+    const listed = new Map<string, GroupLink>();
+    for (const group of findGroups.groups) {
+      if (!validateEntityId(group.id)) continue;
+      group.sub_groups.forEach((link, orderIndex) => {
+        const entry: GroupLink = {
+          containingId: group.id,
+          subId: link.group.id,
+          orderIndex,
+          description: link.description ?? null,
+        };
+        const key = groupLinkKey(entry);
+        if (validateEntityId(entry.subId) && !listed.has(key)) {
+          listed.set(key, entry);
+        }
+      });
+    }
+
+    const groupIds = new Set<string>();
+    for (const link of listed.values()) {
+      groupIds.add(link.containingId);
+      groupIds.add(link.subId);
+    }
+    const missing = new Set(
+      (await missingReferences(stashInstanceId, { group: [...groupIds] })).get(
+        "group"
+      ) ?? []
+    );
+    const links = [...listed.values()].filter(
+      (link) => !missing.has(link.containingId) && !missing.has(link.subId)
+    );
+    if (links.length < listed.size) {
+      logger.warn(
+        `Skipped ${listed.size - links.length} collection hierarchy links to groups Peek holds no row for yet; a later sync adds them`,
+        {
+          instanceId: stashInstanceId,
+          groupIds: [...missing].slice(0, LOGGED_IDS),
+        }
+      );
+    }
+
+    const stored = await prisma.groupRelation.findMany({
+      where: {
+        containingInstanceId: stashInstanceId,
+        subInstanceId: stashInstanceId,
+      },
+      select: {
+        containingId: true,
+        subId: true,
+        orderIndex: true,
+        description: true,
+      },
+    });
+    const wanted = new Set(links.map(groupLinkKey));
+    const storedByKey = new Map(stored.map((row) => [groupLinkKey(row), row]));
+    const removed = stored.filter((row) => !wanted.has(groupLinkKey(row)));
+    const upserted = links.filter((link) => {
+      const row = storedByKey.get(groupLinkKey(link));
+      return (
+        row === undefined ||
+        row.orderIndex !== link.orderIndex ||
+        row.description !== link.description
+      );
+    });
+    if (removed.length === 0 && upserted.length === 0) return;
+    throwIfAborted(run.signal);
+
+    await dbWriteTransaction("sync.groupRelations", async (tx) => {
+      if (removed.length > 0) {
+        await tx.$executeRawUnsafe(
+          DELETE_GROUP_LINKS_SQL,
+          JSON.stringify(removed.map((row) => [row.containingId, row.subId])),
+          stashInstanceId,
+          stashInstanceId
+        );
+      }
+      if (upserted.length > 0) {
+        await tx.$executeRawUnsafe(
+          UPSERT_GROUP_LINKS_SQL,
+          stashInstanceId,
+          stashInstanceId,
+          JSON.stringify(
+            upserted.map((link) => [
+              link.containingId,
+              link.subId,
+              link.orderIndex,
+              link.description,
+            ])
+          )
+        );
+      }
+    });
+    const added = upserted.filter(
+      (link) => !storedByKey.has(groupLinkKey(link))
+    ).length;
+    logger.info("Collection hierarchy updated", {
+      instanceId: stashInstanceId,
+      added,
+      changed: upserted.length - added,
+      removed: removed.length,
+    });
   }
 
   /**

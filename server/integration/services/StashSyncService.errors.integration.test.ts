@@ -224,6 +224,11 @@ function stubClient(): StashClient {
       Promise.resolve({ findScenes: { count: 1, scenes: [{ id: ID }] } }),
     findImageIDs: () =>
       Promise.resolve({ findImages: { count: 1, images: [{ id: ID }] } }),
+    // The collection hierarchy, read on every sync: none
+    findGroupRelations: () =>
+      Promise.resolve({
+        findGroups: { count: 1, groups: [{ id: ID, sub_groups: [] }] },
+      }),
     // The sync scopes its client to its abort signal
     withSignal: () => client,
   });

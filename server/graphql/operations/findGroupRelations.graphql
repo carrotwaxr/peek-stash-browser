@@ -1,0 +1,14 @@
+query FindGroupRelations($filter: FindFilterType) {
+  findGroups(filter: $filter) {
+    count
+    groups {
+      id
+      sub_groups {
+        group {
+          id
+        }
+        description
+      }
+    }
+  }
+}

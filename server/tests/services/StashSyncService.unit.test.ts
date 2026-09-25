@@ -126,6 +126,10 @@ const mockStashClient = {
   findImageIDs: vi
     .fn<StashClient["findImageIDs"]>()
     .mockResolvedValue({ findImages: { images: [], count: 0 } }),
+  // The collection hierarchy, read on every sync
+  findGroupRelations: vi
+    .fn<StashClient["findGroupRelations"]>()
+    .mockResolvedValue({ findGroups: { groups: [], count: 0 } }),
   // A sync scopes its client to its abort signal
   withSignal: vi.fn(),
 };
@@ -281,6 +285,8 @@ describe("StashSyncService", () => {
     mockPrisma.user.findMany.mockResolvedValue([]);
     // No instance is on its first sync
     mockPrisma.stashInstance.findMany.mockResolvedValue([]);
+    // No collection hierarchy stored
+    mockPrisma.groupRelation.findMany.mockResolvedValue([]);
   });
 
   describe("incrementalSync", () => {
@@ -1373,6 +1379,7 @@ describe("StashSyncService queued full syncs", () => {
     stashAnswersNothing();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.stashInstance.findMany.mockResolvedValue([]);
+    mockPrisma.groupRelation.findMany.mockResolvedValue([]);
   });
 
   afterEach(async () => {
