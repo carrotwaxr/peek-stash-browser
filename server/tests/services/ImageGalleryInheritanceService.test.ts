@@ -85,6 +85,51 @@ describe("ImageGalleryInheritanceService", () => {
       expect(image?.studioId).toBe(`${PREFIX}studio-1`);
     });
 
+    it("records the inherited studio's instance, the image's own", async () => {
+      await prisma.stashStudio.create({
+        data: {
+          id: `${PREFIX}studio-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Studio",
+        },
+      });
+      await prisma.stashGallery.create({
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          studioId: `${PREFIX}studio-1`,
+          studioInstanceId: INSTANCE_ID,
+        },
+      });
+      // No studio, as sync stores a studio-less image
+      await prisma.stashImage.create({
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          studioInstanceId: null,
+        },
+      });
+      await prisma.imageGallery.create({
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
+      });
+
+      await imageGalleryInheritanceService.applyGalleryInheritance();
+
+      const image = must(
+        await prisma.stashImage.findFirst({
+          where: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID },
+        }),
+        "image"
+      );
+      expect(image.studioId).toBe(`${PREFIX}studio-1`);
+      expect(image.studioInstanceId).toBe(INSTANCE_ID);
+    });
+
     it("should NOT overwrite image studio when image already has one", async () => {
       // Create two studios
       await prisma.stashStudio.createMany({

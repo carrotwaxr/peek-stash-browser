@@ -55,7 +55,8 @@ class ImageGalleryInheritanceService {
     // 1. Have no value for that field
     // 2. Are in a gallery that has a value
 
-    // StudioId inheritance
+    // StudioId inheritance. The gallery is on the image's instance, and so is
+    // its studio.
     await prisma.$executeRaw`
       UPDATE StashImage
       SET studioId = (
@@ -67,7 +68,8 @@ class ImageGalleryInheritanceService {
           AND g.deletedAt IS NULL
         ORDER BY ig.galleryId
         LIMIT 1
-      )
+      ),
+      studioInstanceId = StashImage.stashInstanceId
       WHERE studioId IS NULL
         AND deletedAt IS NULL
         AND (id, stashInstanceId) IN (

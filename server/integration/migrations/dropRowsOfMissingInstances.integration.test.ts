@@ -9,6 +9,8 @@
  * The migration runs on a sandbox database built at the migration before it.
  */
 import { PrismaClient } from "@prisma/client";
+import { cpSync } from "fs";
+import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runPrismaCli } from "../../initializers/migrations.js";
 import {
@@ -19,6 +21,7 @@ import {
 
 /** The newest migration before this one */
 const BEFORE = "20260925000200_drop_scene_streams_and_recovery_key";
+const MIGRATION = "20260925000300_drop_rows_of_missing_instances";
 
 type Client = MigrationSandbox["client"];
 type Row = Record<string, unknown>;
@@ -147,10 +150,19 @@ function ownInstances(table: string, row: Row): unknown[] {
   return [row[`${a}InstanceId`], row[`${b}InstanceId`]];
 }
 
+/**
+ * Applies this migration alone: later ones also rewrite rows the snapshots
+ * compare (20260925000400 nulls a studio-less gallery's studioInstanceId).
+ */
 async function migrate(db: MigrationSandbox): Promise<void> {
   await db.client.$disconnect();
+  cpSync(
+    path.join(PRISMA_DIR, "migrations", MIGRATION),
+    path.join(db.prismaDir, "migrations", MIGRATION),
+    { recursive: true }
+  );
   await runPrismaCli(["migrate", "deploy"], {
-    prismaDir: PRISMA_DIR,
+    prismaDir: db.prismaDir,
     databaseUrl: db.url,
   });
 }

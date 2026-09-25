@@ -2961,12 +2961,15 @@ class StashSyncService extends EventEmitter {
         const fileBasename = gallery.files?.[0]?.basename || null;
         // Cover image ID for dimension lookup
         const coverImageId = gallery.cover?.id || null;
+        // A gallery's studio is on the gallery's own Stash, so it takes the
+        // gallery's instance (as does an image's, below)
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
       ${this.escapeNullable(gallery.title)},
       ${this.escapeNullable(gallery.date)},
       ${gallery.studio?.id ? `'${this.escape(gallery.studio.id)}'` : "NULL"},
+      ${gallery.studio?.id ? `'${this.escape(stashInstanceId)}'` : "NULL"},
       ${gallery.rating100 ?? "NULL"},
       ${coverImageId ? `'${this.escape(coverImageId)}'` : "NULL"},
       ${gallery.image_count ?? 0},
@@ -2988,7 +2991,7 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
-      id, stashInstanceId, title, date, studioId, rating100, coverImageId, imageCount,
+      id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
       details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
@@ -2996,6 +2999,7 @@ class StashSyncService extends EventEmitter {
       title = excluded.title,
       date = excluded.date,
       studioId = excluded.studioId,
+      studioInstanceId = excluded.studioInstanceId,
       rating100 = excluded.rating100,
       coverImageId = excluded.coverImageId,
       imageCount = excluded.imageCount,
@@ -3423,6 +3427,7 @@ class StashSyncService extends EventEmitter {
         ${this.escapeNullable(image.urls ? JSON.stringify(image.urls) : null)},
         ${this.escapeNullable(image.date)},
         ${image.studio?.id ? `'${this.escape(image.studio.id)}'` : "NULL"},
+        ${image.studio?.id ? `'${this.escape(stashInstanceId)}'` : "NULL"},
         ${image.rating100 ?? "NULL"},
         ${image.o_counter ?? 0},
         ${image.organized ? 1 : 0},
@@ -3443,7 +3448,7 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
       INSERT INTO StashImage (
-        id, stashInstanceId, title, code, details, photographer, urls, date, studioId, rating100, oCounter, organized,
+        id, stashInstanceId, title, code, details, photographer, urls, date, studioId, studioInstanceId, rating100, oCounter, organized,
         filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
         stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
       ) VALUES ${values}
@@ -3455,6 +3460,7 @@ class StashSyncService extends EventEmitter {
         urls = excluded.urls,
         date = excluded.date,
         studioId = excluded.studioId,
+        studioInstanceId = excluded.studioInstanceId,
         rating100 = excluded.rating100,
         oCounter = excluded.oCounter,
         organized = excluded.organized,

@@ -89,6 +89,11 @@ describe("DataMigrationService", () => {
           name: "004_recompute_exclusions_reason_precedence",
           appliedAt: new Date(),
         },
+        {
+          id: 5,
+          name: "005_recompute_exclusions_studio_instance",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -122,8 +127,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All four migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(4);
+      // All five migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(5);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -136,10 +141,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "004_recompute_exclusions_reason_precedence" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "005_recompute_exclusions_studio_instance" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002, 003 and 004 pending
+      // 001 already applied, 002 to 005 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -158,8 +166,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002, 003 and 004 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(3);
+      // 001 is skipped; 002 to 005 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(4);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -186,6 +194,11 @@ describe("DataMigrationService", () => {
         {
           id: 4,
           name: "004_recompute_exclusions_reason_precedence",
+          appliedAt: new Date(),
+        },
+        {
+          id: 5,
+          name: "005_recompute_exclusions_studio_instance",
           appliedAt: new Date(),
         },
       ]);
@@ -223,6 +236,11 @@ describe("DataMigrationService", () => {
           name: "003_recompute_exclusions_restriction_semantics",
           appliedAt: new Date(),
         },
+        {
+          id: 5,
+          name: "005_recompute_exclusions_studio_instance",
+          appliedAt: new Date(),
+        },
       ]);
       mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
@@ -233,6 +251,27 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(1);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "004_recompute_exclusions_reason_precedence" },
+      });
+    });
+
+    it("recomputes every user's exclusions in migration 005 (studio instance of galleries and images)", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        [
+          "001_rebuild_user_stats",
+          "002_rebuild_stats_multi_instance",
+          "003_recompute_exclusions_restriction_semantics",
+          "004_recompute_exclusions_reason_precedence",
+        ].map((name, i) => ({ id: i + 1, name, appliedAt: new Date() }))
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      expect(mockExclusionService.recomputeAllUsers).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "005_recompute_exclusions_studio_instance" },
       });
     });
 
