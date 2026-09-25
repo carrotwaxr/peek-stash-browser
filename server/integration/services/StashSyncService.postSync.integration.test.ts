@@ -1360,8 +1360,13 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
 
     it("an instance whose clip type is empty runs an incremental sync on the next tick", async () => {
       // pc-a has no clips, and its clip state has never recorded a full
-      // sync: until now an empty type never did
+      // sync (until now an empty type never did); its last pass of the
+      // other types was 25 hours ago, so a pass is due
       await prisma.stashClip.deleteMany({ where: { stashInstanceId: PC_A } });
+      await prisma.syncState.updateMany({
+        where: { stashInstanceId: PC_A },
+        data: { lastFullSyncActual: new Date(Date.now() - 25 * HOUR) },
+      });
       await prisma.syncState.updateMany({
         where: { stashInstanceId: PC_A, entityType: "clip" },
         data: { lastFullSyncTimestamp: null, lastFullSyncActual: null },
