@@ -19,6 +19,7 @@ import {
   type SyncRunContext,
   stashSyncService,
 } from "../../services/StashSyncService.js";
+import { SyncChangeSet, noChanges } from "../../services/SyncChangeSet.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -168,7 +169,10 @@ function request(
 /** A run whose abort the test controls. */
 function newRun(): { run: SyncRunContext; controller: AbortController } {
   const controller = new AbortController();
-  return { run: { signal: controller.signal }, controller };
+  return {
+    run: { signal: controller.signal, changes: new SyncChangeSet() },
+    controller,
+  };
 }
 
 /** Tags `from` to `to`, each updated at `updatedAt(id)` (none: undefined). */
@@ -198,7 +202,7 @@ function tagPages(pages: Array<Array<SyncEntityOf<"tag">>>, count: number) {
     );
   const processBatch = vi
     .spyOn(ENTITY_SYNC.tag, "processBatch")
-    .mockImplementation((items) => Promise.resolve({ written: items.length }));
+    .mockImplementation(() => Promise.resolve(noChanges()));
   return { fetchPage, processBatch };
 }
 
@@ -352,9 +356,9 @@ describe("StashSyncService.paginate", () => {
     );
     const { run, controller } = newRun();
     // The run is aborted while the first page is written
-    processBatch.mockImplementation((items) => {
+    processBatch.mockImplementation(() => {
       controller.abort();
-      return Promise.resolve({ written: items.length });
+      return Promise.resolve(noChanges());
     });
 
     await expect(paginate("tag", {}, run)).rejects.toThrow("Sync aborted");

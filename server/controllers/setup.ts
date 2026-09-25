@@ -3,11 +3,13 @@ import type { Request } from "express";
 import { StashClient } from "../graphql/StashClient.js";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import {
   SyncBusyError,
   stashSyncService,
 } from "../services/StashSyncService.js";
+import { getUsersSelecting } from "../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
   CarouselPreference,
@@ -657,6 +659,9 @@ export const updateStashInstance = async (
     // Track if connection details changed (requires re-sync)
     const connectionChanged =
       (url && url !== existing.url) || (apiKey && apiKey !== existing.apiKey);
+    // Enabling or disabling changes what its users can see
+    const enabledChanged =
+      enabled !== undefined && enabled !== existing.enabled;
 
     // If URL or API key changed, test connection
     if (url || apiKey) {
@@ -725,6 +730,17 @@ export const updateStashInstance = async (
 
     // Reload the StashInstanceManager to pick up changes
     await stashInstanceManager.reload();
+
+    // The users whose scope holds the instance (no selection, or one naming
+    // it) see a different library now: their exclusion rows must match
+    // before anyone lists it, so the recompute runs in this request
+    if (enabledChanged) {
+      await exclusionComputationService.recomputeUsers(
+        await getUsersSelecting(id),
+        "recomputeUsersAfterInstanceToggle",
+        { instanceId: id, enabled }
+      );
+    }
 
     // If connection details changed, re-sync this instance to refresh cached
     // data, once a running sync ends

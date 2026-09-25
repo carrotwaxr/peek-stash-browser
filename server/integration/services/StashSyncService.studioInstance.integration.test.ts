@@ -19,6 +19,7 @@ import {
   type SyncEntityOf,
   type SyncRunContext,
 } from "../../services/StashSyncService.js";
+import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 
@@ -80,7 +81,10 @@ async function syncOnto(
   galleries: SyncGallery[],
   images: SyncImage[]
 ): Promise<void> {
-  const run: SyncRunContext = { signal: new AbortController().signal };
+  const run: SyncRunContext = {
+    signal: new AbortController().signal,
+    changes: new SyncChangeSet(),
+  };
   await ENTITY_SYNC.gallery.processBatch(galleries, instanceId, run);
   await ENTITY_SYNC.image.processBatch(images, instanceId, run);
 }

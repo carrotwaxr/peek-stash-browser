@@ -3378,6 +3378,10 @@ export const updateUserStashInstances = async (
       });
     }
 
+    // The user's scope changed: their exclusion rows must cover it before
+    // anything on the added instances is listed to them
+    await exclusionComputationService.recomputeForUser(userId);
+
     res.json({
       success: true,
       selectedInstanceIds: instanceIds,
@@ -3518,6 +3522,10 @@ export const completeSetup = async (
           instanceId,
         })),
       });
+
+      // The user's scope changed with the selection (see
+      // updateUserStashInstances)
+      await exclusionComputationService.recomputeForUser(userId);
     }
 
     // Mark setup as complete and issue the first recovery key. The

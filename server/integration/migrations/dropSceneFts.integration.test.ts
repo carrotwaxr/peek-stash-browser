@@ -14,6 +14,7 @@ import {
   ENTITY_SYNC,
   type SyncEntityOf,
 } from "../../services/StashSyncService.js";
+import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { arrayContaining } from "../../tests/helpers/matchers.js";
 import {
   type MigrationSandbox,
@@ -140,7 +141,7 @@ describeWithDb("scene sync without scene_fts (integration)", () => {
     await ENTITY_SYNC.scene.processBatch(
       [stashScene("1", "Synced after"), stashScene("2", "New scene")],
       TEST_INSTANCE,
-      { signal: new AbortController().signal }
+      { signal: new AbortController().signal, changes: new SyncChangeSet() }
     );
 
     const rows = await prisma.stashScene.findMany({

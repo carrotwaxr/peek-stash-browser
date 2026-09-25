@@ -10,6 +10,8 @@ import prisma from "../../prisma/singleton.js";
 import {
   buildInstanceFilterClause,
   getUserAllowedInstanceIds,
+  getUserInstanceScope,
+  getUsersSelecting,
 } from "../../services/UserInstanceService.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -142,6 +144,68 @@ describe("UserInstanceService", () => {
       expect(mockPrisma.userStashInstance.findMany).toHaveBeenCalledWith({
         where: { userId: 42 },
         select: { instanceId: true },
+      });
+    });
+  });
+
+  describe("getUserInstanceScope", () => {
+    it("an empty selection means every enabled instance", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-b" }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserInstanceScope(1)).toEqual([
+        "instance-a",
+        "instance-b",
+      ]);
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { enabled: true },
+        select: { id: true },
+      });
+    });
+
+    it("a selection is narrowed to the enabled instances", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-b" }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "instance-b" }),
+        partialRow({ instanceId: "disabled-c" }),
+      ]);
+
+      expect(await getUserInstanceScope(1)).toEqual(["instance-b"]);
+    });
+
+    it("throws on a database error, where getUserAllowedInstanceIds answers none", async () => {
+      mockPrisma.stashInstance.findMany.mockRejectedValue(
+        new Error("SQLITE_BUSY")
+      );
+
+      await expect(getUserInstanceScope(1)).rejects.toThrow("SQLITE_BUSY");
+      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
+    });
+  });
+
+  describe("getUsersSelecting", () => {
+    it("lists the users with no selection or a selection naming the instance, whatever its enabled state", async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        partialRow({ id: 1 }),
+        partialRow({ id: 3 }),
+      ]);
+
+      expect(await getUsersSelecting("instance-a")).toEqual([1, 3]);
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { stashInstances: { none: {} } },
+            { stashInstances: { some: { instanceId: "instance-a" } } },
+          ],
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
       });
     });
   });

@@ -64,6 +64,7 @@ import { logger } from "../utils/logger.js";
 import {
   buildInstanceFilterClause,
   getUserAllowedInstanceIds,
+  getUserInstanceScope,
 } from "./UserInstanceService.js";
 import {
   RESTRICTABLE_ENTITY_TYPES,
@@ -409,9 +410,9 @@ function refKey(ref: Ref): string {
 }
 
 /**
- * Result of recomputing exclusions for all users.
+ * Result of recomputing exclusions for a set of users.
  */
-interface RecomputeAllResult {
+export interface RecomputeAllResult {
   success: number;
   failed: number;
   errors: Array<{ userId: number; error: string }>;
@@ -704,42 +705,113 @@ class ExclusionComputationService {
   }
 
   /**
-   * Recompute exclusions for all users.
-   * Called after Stash sync completes.
+   * Recompute exclusions for all users: a full sync (every step whole
+   * library), saving restrictions from the admin pages, and the data
+   * migrations. An incremental sync recomputes only the users a changed
+   * instance affects (recomputeUsersForInstances).
    * @returns Result with success/failure counts and error details
    */
   async recomputeAllUsers(): Promise<RecomputeAllResult> {
-    logger.info("ExclusionComputationService.recomputeAllUsers starting");
-
     const users = await prisma.user.findMany({
       select: { id: true },
     });
+    return this.recomputeUsers(
+      users.map((u) => u.id),
+      "recomputeAllUsers"
+    );
+  }
 
-    const result = {
+  /**
+   * Recompute the users a sync's changes affect: every user whose instance
+   * scope (enabled instances, narrowed by the user's selection) holds one
+   * of `instanceIds`, plus every user with a `pending` hold, whatever they
+   * can see. A restriction's outputs and a non-admin's empty-entity phase
+   * depend on the whole library of the user's scope, so a change on an
+   * instance can alter any of its users; skipping the users who cannot see
+   * it, and skipping no-op syncs, is where the time goes.
+   */
+  async recomputeUsersForInstances(
+    instanceIds: string[]
+  ): Promise<RecomputeAllResult> {
+    const wanted = new Set(instanceIds);
+    const pending = new Set(await this.usersWithPendingHolds());
+    const users = await prisma.user.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    const targets: number[] = [];
+    for (const { id } of users) {
+      if (pending.has(id)) {
+        targets.push(id);
+        continue;
+      }
+      if (wanted.size === 0) continue;
+      const scope = await getUserInstanceScope(id);
+      if (scope.some((instanceId) => wanted.has(instanceId))) {
+        targets.push(id);
+      }
+    }
+    return this.recomputeUsers(targets, "recomputeUsersForInstances", {
+      instanceIds,
+      pending: pending.size,
+    });
+  }
+
+  /**
+   * The users with a `pending` hold: a sync batch wrote rows for a changed
+   * entity that their next recompute replaces (C18). They are recomputed
+   * at the end of every sync, even one that found nothing.
+   */
+  async usersWithPendingHolds(): Promise<number[]> {
+    const rows = await prisma.userExcludedEntity.findMany({
+      where: { reason: "pending" },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return rows.map((row) => row.userId);
+  }
+
+  /**
+   * Recompute the given users one after another; a failure is logged and
+   * counted, and the next user still runs. `what` names the caller in the
+   * two log lines, with `context`.
+   */
+  async recomputeUsers(
+    userIds: number[],
+    what = "recomputeUsers",
+    context: Record<string, unknown> = {}
+  ): Promise<RecomputeAllResult> {
+    logger.info(`ExclusionComputationService.${what} starting`, {
+      ...context,
+      userCount: userIds.length,
+    });
+
+    const result: RecomputeAllResult = {
       success: 0,
       failed: 0,
-      errors: [] as Array<{ userId: number; error: string }>,
+      errors: [],
     };
 
-    for (const user of users) {
+    for (const userId of userIds) {
       try {
-        await this.recomputeForUser(user.id);
+        await this.recomputeForUser(userId);
         result.success++;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         logger.error("Failed to recompute exclusions for user", {
-          userId: user.id,
+          userId,
           error: errorMessage,
         });
         result.failed++;
-        result.errors.push({ userId: user.id, error: errorMessage });
+        result.errors.push({ userId, error: errorMessage });
         // Continue with other users even if one fails
       }
     }
 
-    logger.info("ExclusionComputationService.recomputeAllUsers completed", {
-      userCount: users.length,
+    logger.info(`ExclusionComputationService.${what} completed`, {
+      ...context,
+      userCount: userIds.length,
       success: result.success,
       failed: result.failed,
     });

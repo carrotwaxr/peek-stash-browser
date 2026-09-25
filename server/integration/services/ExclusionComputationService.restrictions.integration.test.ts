@@ -18,6 +18,7 @@ import {
   type SyncEntityOf,
   type SyncRunContext,
 } from "../../services/StashSyncService.js";
+import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { defaultRestrictEmpty } from "../../services/exclusionPolicy.js";
 import { must } from "../../tests/helpers/must.js";
@@ -692,7 +693,10 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     });
     try {
       for (const instanceId of INSTANCES) {
-        const run: SyncRunContext = { signal: new AbortController().signal };
+        const run: SyncRunContext = {
+          signal: new AbortController().signal,
+          changes: new SyncChangeSet(),
+        };
         await ENTITY_SYNC.gallery.processBatch([gallery], instanceId, run);
         await ENTITY_SYNC.image.processBatch([image], instanceId, run);
       }

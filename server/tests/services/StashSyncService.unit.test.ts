@@ -215,6 +215,13 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
+    recomputeUsers: vi
+      .fn()
+      .mockResolvedValue({ success: 0, failed: 0, errors: [] }),
+    recomputeUsersForInstances: vi
+      .fn()
+      .mockResolvedValue({ success: 0, failed: 0, errors: [] }),
+    usersWithPendingHolds: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -255,6 +262,8 @@ describe("StashSyncService", () => {
     stashAnswersNothing();
     // Cleanup's live counts and delete sets: nothing cached
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    // The users an instance's deletion recomputes: none
+    mockPrisma.user.findMany.mockResolvedValue([]);
   });
 
   describe("incrementalSync", () => {

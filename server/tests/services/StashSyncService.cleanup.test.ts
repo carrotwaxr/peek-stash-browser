@@ -41,14 +41,22 @@ vi.mock("../../services/MergeReconciliationService.js", () => ({
   },
 }));
 
+// The post-sync steps an admin's cleanup runs for what it soft-deleted
 vi.mock("../../services/UserStatsService.js", () => ({
-  userStatsService: {},
+  userStatsService: { rebuildAllStats: vi.fn().mockResolvedValue(undefined) },
 }));
 vi.mock("../../services/EntityImageCountService.js", () => ({
-  entityImageCountService: {},
+  entityImageCountService: {
+    rebuildAllImageCounts: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 vi.mock("../../services/ExclusionComputationService.js", () => ({
-  exclusionComputationService: {},
+  exclusionComputationService: {
+    usersWithPendingHolds: vi.fn().mockResolvedValue([]),
+    recomputeUsersForInstances: vi
+      .fn()
+      .mockResolvedValue({ success: 0, failed: 0, errors: [] }),
+  },
 }));
 vi.mock("../../services/ClipPreviewProber.js", () => ({
   clipPreviewProber: {},
@@ -651,12 +659,27 @@ describe("StashSyncService.cleanupDeletedEntities", () => {
       });
     });
 
-    it("a database error returns { deleted: 0, error }", async () => {
+    it("a database error in the soft-delete returns the error with the delete set it attempted", async () => {
       stashHas("clip", ids(1, 9));
       cacheHas(10, [{ id: "10" }]);
       mockPrisma.$executeRawUnsafe.mockRejectedValue(
         new Error("disk I/O error")
       );
+
+      const outcome = await cleanup("clip");
+
+      // Nothing is known to have changed, but the ids feed the run's change
+      // set, since an earlier unit of the soft-delete may have committed
+      expect(outcome).toEqual({
+        deleted: 0,
+        deletedIds: ["10"],
+        error: "disk I/O error",
+      });
+    });
+
+    it("a database error before the soft-delete returns no ids", async () => {
+      stashHas("clip", ids(1, 9));
+      mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error("disk I/O error"));
 
       const outcome = await cleanup("clip");
 

@@ -22,6 +22,7 @@ import {
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
+  updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
@@ -1100,6 +1101,68 @@ describe("User Controller", () => {
   });
 
   // ─── updateUserRestrictions ───
+
+  describe("updateUserStashInstances", () => {
+    beforeEach(() => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A" }),
+        partialRow({ id: "B" }),
+      ]);
+      mockPrisma.userStashInstance.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userStashInstance.createMany.mockResolvedValue({ count: 2 });
+      mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("recomputes the user's exclusions in the same request, after the selection is stored", async () => {
+      const req = reqFor(updateUserStashInstances, {
+        user: USER,
+        body: { instanceIds: ["A", "B"] },
+      });
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(req, res);
+
+      expect(res._getOkBody()).toEqual({
+        success: true,
+        selectedInstanceIds: ["A", "B"],
+      });
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledExactlyOnceWith(
+        USER.id
+      );
+      // The rows were written before the recompute read them
+      const [written] =
+        mockPrisma.userStashInstance.createMany.mock.invocationCallOrder;
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      expect(must(written)).toBeLessThan(must(recomputed));
+    });
+
+    it("an empty selection (every enabled instance) recomputes too", async () => {
+      const req = reqFor(updateUserStashInstances, {
+        user: USER,
+        body: { instanceIds: [] },
+      });
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(req, res);
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(mockPrisma.userStashInstance.createMany).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledExactlyOnceWith(
+        USER.id
+      );
+    });
+
+    it("an invalid instance id answers 400 and recomputes nothing", async () => {
+      const req = reqFor(updateUserStashInstances, {
+        user: USER,
+        body: { instanceIds: ["A", "nope"] },
+      });
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+    });
+  });
 
   describe("updateUserRestrictions", () => {
     const TARGET = userRow({ id: 3, username: "user3" });

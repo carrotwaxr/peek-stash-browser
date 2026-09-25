@@ -19,8 +19,10 @@ import {
   updateStashInstance,
 } from "../../controllers/setup.js";
 import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { getUsersSelecting } from "../../services/UserInstanceService.js";
 import { logger } from "../../utils/logger.js";
 import {
   malformed,
@@ -29,6 +31,7 @@ import {
   testUser,
 } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -91,8 +94,22 @@ vi.mock("bcryptjs", () => ({
   },
 }));
 
+// Enabling or disabling an instance recomputes the users who select it
+vi.mock("../../services/ExclusionComputationService.js", () => ({
+  exclusionComputationService: {
+    recomputeUsers: vi
+      .fn()
+      .mockResolvedValue({ success: 0, failed: 0, errors: [] }),
+  },
+}));
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUsersSelecting: vi.fn().mockResolvedValue([]),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
 const mockSync = vi.mocked(stashSyncService, true);
+const mockExclusions = vi.mocked(exclusionComputationService, true);
+const mockUsersSelecting = vi.mocked(getUsersSelecting);
 
 describe("Setup Controller", () => {
   beforeEach(() => {
@@ -768,6 +785,78 @@ describe("Setup Controller", () => {
 
       expect(res._getOkBody().sync).toBe("none");
       expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeUsers).not.toHaveBeenCalled();
+    });
+
+    it("re-enabling an instance recomputes the users who can see it", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: false,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", enabled: true })
+      );
+      mockUsersSelecting.mockResolvedValue([1, 4]);
+
+      const res = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: true },
+          params: { id: "inst-a" },
+        }),
+        res
+      );
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(mockUsersSelecting).toHaveBeenCalledExactlyOnceWith("inst-a");
+      expect(mockExclusions.recomputeUsers).toHaveBeenCalledOnce();
+      expect(must(mockExclusions.recomputeUsers.mock.calls[0])[0]).toEqual([
+        1, 4,
+      ]);
+      // After the instance manager knows the change, before the answer
+      const [reloaded] =
+        vi.mocked(stashInstanceManager).reload.mock.invocationCallOrder;
+      const [recomputed] =
+        mockExclusions.recomputeUsers.mock.invocationCallOrder;
+      expect(must(reloaded)).toBeLessThan(must(recomputed));
+    });
+
+    it("disabling an instance recomputes them too; the same state again does not", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", enabled: false })
+      );
+      mockUsersSelecting.mockResolvedValue([2]);
+
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: false },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+      expect(mockExclusions.recomputeUsers).toHaveBeenCalledOnce();
+
+      mockExclusions.recomputeUsers.mockClear();
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: true },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+      expect(mockExclusions.recomputeUsers).not.toHaveBeenCalled();
     });
 
     it("returns 404 when instance not found", async () => {
