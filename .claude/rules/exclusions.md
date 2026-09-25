@@ -38,6 +38,13 @@ paths:
 - An instance on its first sync (new, or its URL changed) is hidden from everyone, admins included, until that run's recompute has succeeded for every user whose scope covers it; `runPostSyncSteps` then sets `firstSyncedAt` (`markFirstSynced`). A failed recompute of one of those users leaves it NULL and the next sync retries.
 - A scope change recomputes in the same request: `PUT /user/stash-instances` and the first-login wizard recompute that user; `updateStashInstance` with a changed `enabled`, and `deleteInstance` (before its purge), recompute `getUsersSelecting(instanceId)`, the users with no selection or one naming the instance, through `recomputeUsers`.
 
+## Holds during sync
+
+- A sync batch holds what it changed from the users with exclusion inputs until their recompute: inside its transaction, after the upsert and the junction rows, `holdForRecompute` writes a `pending` row per user for each changed entity, for the first-order `EDGES` content of a changed tag, studio, group or gallery, and for the scenes of a performer, studio or group whose tag set changed (the scene edges). `INSERT OR IGNORE`, so an existing row keeps its reason; a failed batch rolls its holds back with it.
+- The users: `usersWithExclusionInputs(instanceId)`, non-admins with a `UserContentRestriction` row plus everyone with a `UserHiddenEntity` row (admins' own hides apply to them), among the users whose scope holds the instance; none while the instance is disabled or on its first sync (C17 hides it whole). The sync reads it once per run and instance (`usersToHold`), before the batch's transaction opens.
+- A `pending` row excludes on every surface like any other reason, the Hidden Items list included (`resolveVisibleApartFromOwnHides` ignores only `hidden`). The recompute's swap replaces them: its `DELETE` keeps only holds written after its snapshot began, and `recomputeUsersForInstances` recomputes every user with a `pending` row, so a sync that finds nothing still clears the holds an aborted run left. A failed recompute leaves the user's holds in place, and they see less until the next one succeeds.
+- Residual: content reached only through the closure of a changed hierarchy (a moved tag's grandchildren's scenes) shows until the same sync's recompute, seconds later. `pending.computedAt` is written as integer epoch milliseconds, as Prisma stores `DateTime` and the swap's `DELETE` compares.
+
 ## Reading exclusions
 
 A new endpoint filters through one of three paths. An endpoint with none of them shows restricted content.

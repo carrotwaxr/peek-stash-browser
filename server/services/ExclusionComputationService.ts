@@ -59,11 +59,14 @@ import {
   withComputeConnection,
 } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
+import type { SyncEntityType } from "../types/api/sync.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
+import type { BatchChanges } from "./SyncChangeSet.js";
 import {
   buildInstanceFilterClause,
   getUserInstanceScope,
+  getUsersSelecting,
 } from "./UserInstanceService.js";
 import {
   RESTRICTABLE_ENTITY_TYPES,
@@ -195,6 +198,37 @@ const INSERT_FROM_RESULT_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId
  * starts after every batch, is the one that clears them.
  */
 const DELETE_BEFORE_SWAP_SQL = `DELETE FROM UserExcludedEntity WHERE userId = ? AND NOT (reason = 'pending' AND computedAt >= ?)`;
+
+/**
+ * A hold (C18): one `pending` row per user of the JSON list `u` for each
+ * id of the JSON list `j`, of one entity type on one instance, written by a
+ * sync batch on its own transaction. OR IGNORE keeps an existing row's
+ * reason. Binds entityType, instanceId, computedAt (epoch milliseconds, as
+ * Prisma stores DateTime and DELETE_BEFORE_SWAP_SQL compares), ids, users.
+ */
+const HOLD_IDS_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId, entityType, entityId, instanceId, reason, computedAt)
+  SELECT CAST(u.value AS INTEGER), ?, j.value, ?, 'pending', ?
+  FROM json_each(?) j CROSS JOIN json_each(?) u`;
+
+/** The head every hold along an edge shares: binds the target entityType. */
+const HOLD_EDGE_HEAD = `INSERT OR IGNORE INTO UserExcludedEntity (userId, entityType, entityId, instanceId, reason, computedAt)
+  SELECT CAST(u.value AS INTEGER), ?, `;
+
+/** The client a hold is written on: the sync batch's transaction. */
+type HoldClient = Pick<PrismaClient, "$executeRawUnsafe">;
+
+/**
+ * The types whose changed entities hold their first-order content along
+ * EDGES: a tag moved under a hidden parent, a studio or group whose tags
+ * changed, a gallery that gained images. A performer's own change reaches
+ * its scenes only through its tags (the scene edges of `tagSetChanged`).
+ */
+const HELD_SOURCES: ReadonlySet<SyncEntityType> = new Set([
+  "tag",
+  "studio",
+  "group",
+  "gallery",
+]);
 
 const STATS_ENTITY_TYPES = [
   "scene",
@@ -770,6 +804,178 @@ class ExclusionComputationService {
       distinct: ["userId"],
     });
     return rows.map((row) => row.userId);
+  }
+
+  // ─── Holds during sync (C18) ───
+
+  /**
+   * The users a sync batch on `instanceId` holds its changes from: the
+   * non-admins with a restriction row (restrictions never apply to admins)
+   * and everyone with a hidden item, admins included, among the users whose
+   * scope holds the instance (no selection, or one naming it). None while
+   * the instance is disabled or still on its first sync: nobody sees it yet
+   * (C17), so there is nothing to hold. The sync reads it once per run and
+   * instance, before any batch transaction opens.
+   */
+  async usersWithExclusionInputs(instanceId: string): Promise<number[]> {
+    const instance = await prisma.stashInstance.findUnique({
+      where: { id: instanceId },
+      select: { enabled: true, firstSyncedAt: true },
+    });
+    if (!instance?.enabled || instance.firstSyncedAt === null) return [];
+    const selecting = await getUsersSelecting(instanceId);
+    if (selecting.length === 0) return [];
+    const users = await prisma.user.findMany({
+      where: { id: { in: selecting } },
+      select: {
+        id: true,
+        role: true,
+        contentRestrictions: { select: { id: true }, take: 1 },
+        hiddenEntities: { select: { id: true }, take: 1 },
+      },
+      orderBy: { id: "asc" },
+    });
+    return users
+      .filter(
+        (user) =>
+          (restrictionsApplyTo(user.role) &&
+            user.contentRestrictions.length > 0) ||
+          user.hiddenEntities.length > 0
+      )
+      .map((user) => user.id);
+  }
+
+  /**
+   * Hold a sync batch's changes from `userIds` until their recompute
+   * (item 42, invariant 3): a `pending` row per user for every changed
+   * entity of the batch; for a changed tag, studio, group or gallery, for
+   * the content it links to along the first-order EDGES (HELD_SOURCES); and
+   * for a performer, studio or group whose tag set changed, for its scenes
+   * along the scene edges (ScenePerformer, StashScene.studioId, SceneGroup),
+   * which inherit its tags. Written on the batch's transaction, so a hold
+   * rolls back with its batch and costs no lock of its own. A `pending` row
+   * excludes like any other until the recompute's swap replaces it
+   * (DELETE_BEFORE_SWAP_SQL keeps only holds newer than its snapshot).
+   *
+   * Residual: content reached only through the closure of a changed
+   * hierarchy (a grandchild tag's scenes) shows until the same sync's
+   * recompute, seconds later. Returns the rows written.
+   */
+  async holdForRecompute(
+    tx: HoldClient,
+    entityType: SyncEntityType,
+    instanceId: string,
+    changes: BatchChanges,
+    userIds: readonly number[]
+  ): Promise<number> {
+    if (userIds.length === 0) return 0;
+    const users = JSON.stringify(userIds);
+    const now = Date.now();
+    let written = 0;
+
+    const changed = changes.changed.map((ref) => ref.id);
+    if (changed.length > 0) {
+      const ids = JSON.stringify(changed);
+      written += await tx.$executeRawUnsafe(
+        HOLD_IDS_SQL,
+        entityType,
+        instanceId,
+        now,
+        ids,
+        users
+      );
+      if (HELD_SOURCES.has(entityType)) {
+        for (const edge of EDGES) {
+          if (edge.source !== entityType) continue;
+          written += await this.holdAlongEdge(
+            tx,
+            edge,
+            instanceId,
+            ids,
+            users,
+            now
+          );
+        }
+      }
+    }
+
+    if (changes.tagSetChanged.length > 0) {
+      const ids = JSON.stringify(changes.tagSetChanged.map((ref) => ref.id));
+      for (const edge of EDGES) {
+        if (edge.source !== entityType || edge.target !== "scene") continue;
+        written += await this.holdAlongEdge(
+          tx,
+          edge,
+          instanceId,
+          ids,
+          users,
+          now
+        );
+      }
+    }
+    return written;
+  }
+
+  /**
+   * One hold along `edge`: a `pending` row per user of `usersJson` for
+   * every target on `instanceId` linked to one of the sources in `idsJson`.
+   * The same three shapes as `edgeQuery`, driven from the bound id list
+   * (`json_each(?) j CROSS JOIN ...`, so each source is looked up by its
+   * junction's or column's index); the inherited-tag shape scans the
+   * instance's scenes with the ids as one IN list (107 ms for 500 tags on
+   * the prod copy).
+   */
+  private holdAlongEdge(
+    tx: HoldClient,
+    edge: Edge,
+    instanceId: string,
+    idsJson: string,
+    usersJson: string,
+    now: number
+  ): Promise<number> {
+    switch (edge.kind) {
+      case "junction":
+        return tx.$executeRawUnsafe(
+          `${HOLD_EDGE_HEAD}x.${edge.targetId}, x.${edge.targetInst}, 'pending', ?
+           FROM json_each(?) j
+           CROSS JOIN ${edge.junction} x ON x.${edge.srcId} = j.value AND x.${edge.srcInst} = ?
+           CROSS JOIN json_each(?) u`,
+          edge.target,
+          now,
+          idsJson,
+          instanceId,
+          usersJson
+        );
+      case "column":
+        // The + keeps the planner on the column's index: the instance's
+        // value matches every row of the instance
+        return tx.$executeRawUnsafe(
+          `${HOLD_EDGE_HEAD}x.id, x.stashInstanceId, 'pending', ?
+           FROM json_each(?) j
+           CROSS JOIN ${edge.table} x ON x.${edge.col} = j.value AND +${edge.instCol} = ?
+           CROSS JOIN json_each(?) u
+           WHERE x.deletedAt IS NULL`,
+          edge.target,
+          now,
+          idsJson,
+          instanceId,
+          usersJson
+        );
+      case "inherited":
+        return tx.$executeRawUnsafe(
+          `${HOLD_EDGE_HEAD}s.id, s.stashInstanceId, 'pending', ?
+           FROM StashScene s
+           CROSS JOIN json_each(?) u
+           WHERE s.stashInstanceId = ? AND s.deletedAt IS NULL
+             AND EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')) it
+                         WHERE it.value IN (SELECT value FROM json_each(?)))`,
+          edge.target,
+          now,
+          usersJson,
+          instanceId,
+          idsJson
+        );
+    }
   }
 
   /**

@@ -52,7 +52,9 @@ vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {},
 }));
 vi.mock("../../services/ExclusionComputationService.js", () => ({
-  exclusionComputationService: {},
+  exclusionComputationService: {
+    usersWithExclusionInputs: vi.fn().mockResolvedValue([]),
+  },
 }));
 vi.mock("../../services/SceneTagInheritanceService.js", () => ({
   sceneTagInheritanceService: {},

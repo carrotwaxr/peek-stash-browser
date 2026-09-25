@@ -744,6 +744,7 @@ async function insertJunctionRows(
 interface BatchWrite {
   /** The unit's name in the writer queue's logs, "sync.<plural>" */
   label: string;
+  type: EntityType;
   instanceId: string;
   /** The batch's entity ids: their junction rows are replaced */
   ids: readonly string[];
@@ -753,28 +754,35 @@ interface BatchWrite {
   upsert(tx: Prisma.TransactionClient): Promise<unknown>;
   /** Each junction the batch rewrites, with its new rows */
   junctions: ReadonlyArray<readonly [JunctionName, readonly JunctionRow[]]>;
-}
-
-/** What a batch's rows and links were before its write. */
-interface StoredBatch {
-  stored: Map<string, StoredEntity>;
-  oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>>;
+  /** The change diff, from the rows and links as they were before the write */
+  detect(
+    stored: Map<string, StoredEntity>,
+    oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>>
+  ): BatchChanges;
+  /** The users the batch's changes are held from (`usersToHold`) */
+  holdFrom: readonly number[];
 }
 
 /**
  * Writes one batch in one transaction, one statement after another on its
  * connection (item 42, SYNC-11): the rows' stored state, the old junction
- * rows (deleted and returned, for the change diff), the rows, then the new
- * junction rows. A failure rolls the whole batch back, so no row keeps a new
- * updated_at with its links gone: the type records the error, its watermark
- * stays, and the next sync writes the batch again. Everything is built
- * before the transaction opens, and no Stash request runs inside it (a
- * page's missing references are fetched first, `ensureReferenced`).
+ * rows (deleted and returned, for the change diff), the rows, the new
+ * junction rows, then the holds: once the diff says what changed, a
+ * `pending` exclusion row per user of `holdFrom` for each changed entity and
+ * what it links to (`holdForRecompute`), so a user with restrictions or
+ * hidden items never sees a change before their recompute at the end of
+ * the run. A failure rolls the whole batch back, holds included, so no row
+ * keeps a new updated_at with its links gone: the type records the error,
+ * its watermark stays, and the next sync writes the batch again. Everything
+ * is built before the transaction opens, and no Stash request runs inside
+ * it (a page's missing references are fetched first, `ensureReferenced`).
+ * Returns the batch's changes.
  */
-function writeBatch(batch: BatchWrite): Promise<StoredBatch> {
+function writeBatch(batch: BatchWrite): Promise<BatchChanges> {
   return dbWriteTransaction(batch.label, async (tx) => {
     const stored = await batch.readStored(tx);
-    const oldLinks: StoredBatch["oldLinks"] = {};
+    const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> =
+      {};
     for (const [junction] of batch.junctions) {
       oldLinks[junction] = await deleteJunctionRows(
         tx,
@@ -787,8 +795,38 @@ function writeBatch(batch: BatchWrite): Promise<StoredBatch> {
     for (const [junction, rows] of batch.junctions) {
       await insertJunctionRows(tx, junction, rows, batch.instanceId);
     }
-    return { stored, oldLinks };
+    const changes = batch.detect(stored, oldLinks);
+    if (batch.holdFrom.length > 0) {
+      await exclusionComputationService.holdForRecompute(
+        tx,
+        batch.type,
+        batch.instanceId,
+        changes,
+        batch.holdFrom
+      );
+    }
+    return changes;
   });
+}
+
+/**
+ * The users the batches on `instanceId` hold their changes from: the
+ * users with exclusion inputs whose scope holds the instance
+ * (`usersWithExclusionInputs`), none while the instance is on its first
+ * sync. Read once per run and instance (`run.holdUsers`), before the
+ * batch's transaction opens.
+ */
+async function usersToHold(
+  run: SyncRunContext,
+  instanceId: string
+): Promise<readonly number[]> {
+  run.holdUsers ??= new Map();
+  const cached = run.holdUsers.get(instanceId);
+  if (cached) return cached;
+  const users =
+    await exclusionComputationService.usersWithExclusionInputs(instanceId);
+  run.holdUsers.set(instanceId, users);
+  return users;
 }
 
 // ==================== Referenced entities ====================
@@ -1019,6 +1057,12 @@ export interface SyncRunContext {
    * (`markFirstSynced`)
    */
   synced?: Set<string>;
+  /**
+   * The users each instance's batches hold their changes from
+   * (`usersWithExclusionInputs`), read once per run and instance by
+   * `usersToHold`
+   */
+  holdUsers?: Map<string, readonly number[]>;
 }
 
 /**
@@ -1274,7 +1318,7 @@ export const ENTITY_SYNC: {
 async function processScenesBatch(
   scenes: SyncScene[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (scenes.length === 0) return noChanges();
@@ -1448,8 +1492,9 @@ async function processScenesBatch(
     });
   }
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.scenes",
+    type: "scene",
     instanceId,
     ids: sceneIds,
     readStored: (tx) =>
@@ -1461,15 +1506,16 @@ async function processScenesBatch(
       ["SceneGroup", groupRows],
       ["SceneGallery", galleryRows],
     ],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming,
-    oldLinks,
-    compareStudio: true,
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming,
+        oldLinks,
+        compareStudio: true,
+      }),
   });
 }
 
@@ -1478,7 +1524,7 @@ async function processScenesBatch(
 async function processPerformersBatch(
   performers: SyncPerformer[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (performers.length === 0) return noChanges();
@@ -1610,23 +1656,25 @@ async function processPerformersBatch(
 
   // Every performer of the batch loses its old tag rows (kept for the
   // change diff) and gets Stash's
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.performers",
+    type: "performer",
     instanceId,
     ids: performerIds,
     readStored: (tx) =>
       readStored(tx, "StashPerformer", instanceId, performerIds, false),
     upsert: (tx) => tx.$executeRawUnsafe(upsertPerformers),
     junctions: [["PerformerTag", tagRows]],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming,
-    oldLinks,
-    tagJunction: "PerformerTag",
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming,
+        oldLinks,
+        tagJunction: "PerformerTag",
+      }),
   });
 }
 
@@ -1635,7 +1683,7 @@ async function processPerformersBatch(
 async function processStudiosBatch(
   studios: SyncStudio[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (studios.length === 0) return noChanges();
@@ -1729,23 +1777,25 @@ async function processStudiosBatch(
     });
   }
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.studios",
+    type: "studio",
     instanceId,
     ids: studioIds,
     readStored: (tx) =>
       readStored(tx, "StashStudio", instanceId, studioIds, false),
     upsert: (tx) => tx.$executeRawUnsafe(upsertStudios),
     junctions: [["StudioTag", tagRows]],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming,
-    oldLinks,
-    tagJunction: "StudioTag",
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming,
+        oldLinks,
+        tagJunction: "StudioTag",
+      }),
   });
 }
 
@@ -1754,7 +1804,7 @@ async function processStudiosBatch(
 async function processTagsBatch(
   tags: SyncTag[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (tags.length === 0) return noChanges();
@@ -1840,24 +1890,26 @@ async function processTagsBatch(
   // Tags have no junction of their own: a parent change moves the tag's
   // updated_at
   const tagIds = validTags.map((t) => t.id);
-  const { stored } = await writeBatch({
+  return writeBatch({
     label: "sync.tags",
+    type: "tag",
     instanceId: stashInstanceId,
     ids: tagIds,
     readStored: (tx) =>
       readStored(tx, "StashTag", stashInstanceId, tagIds, false),
     upsert: (tx) => tx.$executeRawUnsafe(upsertTags),
     junctions: [],
-  });
-
-  return detectChanges({
-    instanceId: stashInstanceId,
-    stored,
-    markChanged,
-    incoming: validTags.map((tag) => ({
-      id: tag.id,
-      updatedAt: tag.updated_at,
-    })),
+    holdFrom: await usersToHold(run, stashInstanceId),
+    detect: (stored) =>
+      detectChanges({
+        instanceId: stashInstanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming: validTags.map((tag) => ({
+          id: tag.id,
+          updatedAt: tag.updated_at,
+        })),
+      }),
   });
 }
 
@@ -1866,7 +1918,7 @@ async function processTagsBatch(
 async function processGroupsBatch(
   groups: SyncGroup[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (groups.length === 0) return noChanges();
@@ -1947,23 +1999,25 @@ async function processGroupsBatch(
     });
   }
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.groups",
+    type: "group",
     instanceId,
     ids: groupIds,
     readStored: (tx) =>
       readStored(tx, "StashGroup", instanceId, groupIds, false),
     upsert: (tx) => tx.$executeRawUnsafe(upsertGroups),
     junctions: [["GroupTag", tagRows]],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming,
-    oldLinks,
-    tagJunction: "GroupTag",
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming,
+        oldLinks,
+        tagJunction: "GroupTag",
+      }),
   });
 }
 
@@ -1972,7 +2026,7 @@ async function processGroupsBatch(
 async function processGalleriesBatch(
   galleries: SyncGallery[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (galleries.length === 0) return noChanges();
@@ -2075,8 +2129,9 @@ async function processGalleriesBatch(
     }
   }
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.galleries",
+    type: "gallery",
     instanceId,
     ids: galleryIds,
     readStored: (tx) =>
@@ -2086,20 +2141,21 @@ async function processGalleriesBatch(
       ["GalleryPerformer", performerRows],
       ["GalleryTag", tagRows],
     ],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming: validGalleries.map((gallery) => ({
-      id: gallery.id,
-      updatedAt: gallery.updated_at,
-      studioId: gallery.studio?.id ?? null,
-      links: linksOf.get(gallery.id),
-    })),
-    oldLinks,
-    compareStudio: true,
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming: validGalleries.map((gallery) => ({
+          id: gallery.id,
+          updatedAt: gallery.updated_at,
+          studioId: gallery.studio?.id ?? null,
+          links: linksOf.get(gallery.id),
+        })),
+        oldLinks,
+        compareStudio: true,
+      }),
   });
 }
 
@@ -2108,7 +2164,7 @@ async function processGalleriesBatch(
 async function processImagesBatch(
   images: SyncImage[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (images.length === 0) return noChanges();
@@ -2224,8 +2280,9 @@ async function processImagesBatch(
     });
   }
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.images",
+    type: "image",
     instanceId,
     ids: imageIds,
     readStored: (tx) =>
@@ -2236,18 +2293,19 @@ async function processImagesBatch(
       ["ImageTag", tagRows],
       ["ImageGallery", galleryRows],
     ],
-  });
-
-  // An image's junction rows and studio are not compared: gallery
-  // inheritance writes into them (lead decision, 2026-09-24)
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming,
-    oldLinks,
-    compareLinks: false,
-    compareStudio: false,
+    holdFrom: await usersToHold(run, instanceId),
+    // An image's junction rows and studio are not compared: gallery
+    // inheritance writes into them (lead decision, 2026-09-24)
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming,
+        oldLinks,
+        compareLinks: false,
+        compareStudio: false,
+      }),
   });
 }
 
@@ -2266,7 +2324,7 @@ async function processImagesBatch(
 async function processClipsBatch(
   markers: SyncClip[],
   stashInstanceId: string,
-  { markChanged }: SyncRunContext
+  run: SyncRunContext
 ): Promise<BatchChanges> {
   if (markers.length === 0) return noChanges();
 
@@ -2370,25 +2428,27 @@ async function processClipsBatch(
     marker.tags.map((tag) => [marker.id, tag.id] as const)
   );
 
-  const { stored, oldLinks } = await writeBatch({
+  return writeBatch({
     label: "sync.clips",
+    type: "clip",
     instanceId,
     ids: markerIds,
     readStored: readStoredClips,
     upsert: upsertClips,
     junctions: [["ClipTag", clipTags]],
-  });
-
-  return detectChanges({
-    instanceId,
-    stored,
-    markChanged,
-    incoming: markers.map((marker) => ({
-      id: marker.id,
-      updatedAt: epochMs(marker.updated_at),
-      links: { ClipTag: marker.tags.map((t) => t.id) },
-    })),
-    oldLinks,
+    holdFrom: await usersToHold(run, instanceId),
+    detect: (stored, oldLinks) =>
+      detectChanges({
+        instanceId,
+        stored,
+        markChanged: run.markChanged,
+        incoming: markers.map((marker) => ({
+          id: marker.id,
+          updatedAt: epochMs(marker.updated_at),
+          links: { ClipTag: marker.tags.map((t) => t.id) },
+        })),
+        oldLinks,
+      }),
   });
 }
 
@@ -2622,6 +2682,7 @@ class StashSyncService extends EventEmitter {
       changes: this.takeChanges(),
       fullPasses: new Set(),
       synced: new Set(),
+      holdUsers: new Map(),
     };
   }
 

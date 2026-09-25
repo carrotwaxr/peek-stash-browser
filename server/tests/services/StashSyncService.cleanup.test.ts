@@ -55,6 +55,7 @@ vi.mock("../../services/EntityImageCountService.js", () => ({
 }));
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
+    usersWithExclusionInputs: vi.fn().mockResolvedValue([]),
     usersWithPendingHolds: vi.fn().mockResolvedValue([]),
     recomputeUsersForInstances: vi
       .fn()

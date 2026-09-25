@@ -104,7 +104,11 @@ const LIVE_AND_ALLOWED_WHERE = `x.deletedAt IS NULL
   AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ?)
        OR EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ? AND usi.instanceId = x.stashInstanceId))`;
 
-/** Rule 4's probe for the row aliased `x`. Binds userId, entityType. */
+/**
+ * Rule 4's probe for the row aliased `x`. Binds userId, entityType. Any
+ * reason excludes, `pending` included: a hold a sync batch wrote for a
+ * changed entity, replaced by the user's next recompute.
+ */
 const EXCLUSION_PROBE = `SELECT 1 FROM UserExcludedEntity e
                   WHERE e.userId = ? AND e.entityType = ? AND e.entityId = x.id
                     AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)`;
@@ -132,7 +136,10 @@ const ACCESS_WHERE = `${LIVE_AND_ALLOWED_WHERE}
  * hidden nothing. Any other row still excludes, including a 'cascade' or
  * 'empty' row that the user's own hides produced for an entity they never
  * hid themselves: at worst a visible entity reads as not visible, never the
- * reverse.
+ * reverse. A `pending` row is such a row too: a sync batch wrote it to hold
+ * a changed entity from the user until their recompute (C18), so the entity
+ * is not visible, on the Hidden Items list included, until the recompute
+ * settles what it is.
  */
 const ACCESS_WHERE_APART_FROM_OWN_HIDES = `${LIVE_AND_ALLOWED_WHERE}
   AND NOT EXISTS (${EXCLUSION_PROBE}
