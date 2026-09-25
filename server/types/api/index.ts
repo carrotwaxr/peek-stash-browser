@@ -247,6 +247,15 @@ export type {
   RefreshCacheResponse,
 } from "@peek/shared-types/api/stats.js";
 
+// Database backup endpoint types
+export type {
+  DatabaseBackupKind,
+  DatabaseBackup,
+  ListDatabaseBackupsResponse,
+  CreateDatabaseBackupResponse,
+  DeleteDatabaseBackupResponse,
+} from "@peek/shared-types/api/databaseBackup.js";
+
 // ---------------------------------------------------------------------------
 // Server-local API types (dependencies on Express, Prisma, GraphQL)
 // ---------------------------------------------------------------------------

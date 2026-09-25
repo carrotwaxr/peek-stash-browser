@@ -520,6 +520,8 @@ describe("migrateDatabase with a migration an earlier start left unfinished", ()
     const filename = `peek-stash-browser.db.backup-20260924-101112-pre-${version}`;
     return {
       filename,
+      kind: "preMigration",
+      version,
       path: `/app/data/${filename}`,
       size: 1024,
       createdAt: STARTED,

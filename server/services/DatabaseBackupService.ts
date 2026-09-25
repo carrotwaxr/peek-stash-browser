@@ -2,20 +2,23 @@
  * DatabaseBackupService
  *
  * Handles database backup operations:
- * - List existing backups
+ * - List existing backups of every kind (see `BACKUP_PATTERNS`)
  * - Create new backups using VACUUM INTO
  * - Delete backup files
  * - Back up the database before the server applies pending migrations, and
  *   list those backups
+ *
+ * Nothing here sends a backup to the browser: a backup holds every user's
+ * password hash and history and the Stash API keys, so it stays on the data
+ * volume.
  */
+import type { DatabaseBackupKind } from "@peek/shared-types/api/databaseBackup.js";
 import type { PrismaClient } from "@prisma/client";
 import fs from "fs/promises";
 import path from "path";
 import prisma from "../prisma/singleton.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
-
-const BACKUP_PATTERN = /^peek-stash-browser\.db\.backup-\d{8}-\d{6}$/;
 
 /** How many pre-migration backups are kept; older ones are deleted. */
 export const PRE_MIGRATION_BACKUPS_KEPT = 3;
@@ -40,15 +43,25 @@ const DIRECTORY_SYNC_UNSUPPORTED = new Set([
   "EPERM",
 ]);
 
+export type BackupKind = DatabaseBackupKind;
+
 export interface BackupInfo {
   filename: string;
+  kind: BackupKind;
+  /**
+   * The version a pre-migration backup was taken before migrating to; null
+   * for the other kinds.
+   */
+  version: string | null;
+  /** The backup's full path. */
+  path: string;
   size: number;
   createdAt: Date;
 }
 
 export interface PreMigrationBackup extends BackupInfo {
-  /** The backup's full path. */
-  path: string;
+  kind: "preMigration";
+  version: string;
 }
 
 export interface PreMigrationBackupOptions {
@@ -102,14 +115,48 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * The pre-migration backups of the database named `base`:
- * `<base>.backup-<YYYYMMDD-HHMMSS>-pre-<version>`, not SQLite's `-wal`,
- * `-shm` or `-journal` files beside one.
+ * The file names of each kind of backup of the database named `base`, which
+ * never match SQLite's `-wal`, `-shm` or `-journal` files beside one:
+ * - `manual`, from Settings → Backup: `<base>.backup-<YYYYMMDD-HHMMSS>`,
+ *   then `-2`, `-3`... for more in the same second;
+ * - `preMigration`, from the server before it applies a version's
+ *   migrations: `<base>.backup-<YYYYMMDD-HHMMSS>-pre-<version>`, the
+ *   version captured;
+ * - `legacy`, from `start.sh` before 3.4.0, before it baselined a
+ *   `db push` database: `<base>.backup.<YYYYMMDD_HHMMSS>`.
  */
-function preMigrationPattern(base: string): RegExp {
-  return new RegExp(
-    `^${escapeRegExp(base)}\\.backup-\\d{8}-\\d{6}-pre-[0-9A-Za-z.+_-]+(?<!-wal|-shm|-journal)$`
-  );
+export const BACKUP_PATTERNS: Readonly<
+  Record<BackupKind, (base: string) => RegExp>
+> = {
+  manual: (base) =>
+    new RegExp(`^${escapeRegExp(base)}\\.backup-\\d{8}-\\d{6}(?:-\\d+)?$`),
+  preMigration: (base) =>
+    new RegExp(
+      `^${escapeRegExp(base)}\\.backup-\\d{8}-\\d{6}-pre-([0-9A-Za-z.+_-]+)(?<!-wal|-shm|-journal)$`
+    ),
+  legacy: (base) =>
+    new RegExp(`^${escapeRegExp(base)}\\.backup\\.\\d{8}_\\d{6}$`),
+};
+
+const BACKUP_KINDS: readonly BackupKind[] = [
+  "manual",
+  "preMigration",
+  "legacy",
+];
+
+/**
+ * What `filename` is as a backup of the database named `base`, or null when
+ * it is not one.
+ */
+export function parseBackupName(
+  filename: string,
+  base: string
+): { kind: BackupKind; version: string | null } | null {
+  for (const kind of BACKUP_KINDS) {
+    const match = BACKUP_PATTERNS[kind](base).exec(filename);
+    if (match) return { kind, version: match[1] ?? null };
+  }
+  return null;
 }
 
 /**
@@ -120,7 +167,7 @@ async function preMigrationBackupNames(
   dir: string,
   base: string
 ): Promise<string[]> {
-  const pattern = preMigrationPattern(base);
+  const pattern = BACKUP_PATTERNS.preMigration(base);
   return (await fs.readdir(dir)).filter((name) => pattern.test(name)).sort();
 }
 
@@ -137,6 +184,28 @@ export async function getDatabaseBaseName(
   >`SELECT file FROM pragma_database_list WHERE name = 'main'`;
   const file = rows[0]?.file ?? "";
   return file === "" ? "peek-stash-browser.db" : path.basename(file);
+}
+
+/** More manual backups than this in one second is a loop, not a person. */
+const MAX_BACKUPS_PER_SECOND = 100;
+
+/**
+ * Creates an empty file named `stem` in `dir`, or `stem-2`, `stem-3`... when
+ * the name is taken, and returns its name. `VACUUM INTO` writes into an
+ * empty file, and creating it first claims the name, so a failed backup's
+ * cleanup deletes only a file this call made.
+ */
+async function claimBackupName(dir: string, stem: string): Promise<string> {
+  for (let n = 1; n <= MAX_BACKUPS_PER_SECOND; n++) {
+    const filename = n === 1 ? stem : `${stem}-${n}`;
+    try {
+      await (await fs.open(path.join(dir, filename), "wx")).close();
+      return filename;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  }
+  throw new Error(`Too many backups named ${stem} in ${dir}`);
 }
 
 /** Bytes in the pages the database uses (its freelist left out). */
@@ -172,17 +241,21 @@ async function syncToDisk(file: string): Promise<void> {
 }
 
 class DatabaseBackupService {
+  /** Settles when the manual backup running now does; the next waits. */
+  private manualBackups: Promise<unknown> = Promise.resolve();
+
   /** Where backups are written and listed: the config directory. */
   getBackupDir(): string {
     return getConfigDir();
   }
 
   /**
-   * List all backup files with metadata.
-   * Returns sorted by date descending (newest first).
+   * The backups of this database of every kind (`BACKUP_PATTERNS`) in the
+   * backup directory, newest first.
    */
   async listBackups(): Promise<BackupInfo[]> {
     const dataDir = this.getBackupDir();
+    const base = await getDatabaseBaseName();
 
     let files: string[];
     try {
@@ -195,46 +268,68 @@ class DatabaseBackupService {
       throw error;
     }
 
-    const backupFiles = files.filter((f) => BACKUP_PATTERN.test(f));
-
-    const backupPromises = backupFiles.map(async (filename) => {
-      const filePath = path.join(dataDir, filename);
-      try {
-        const stat = await fs.stat(filePath);
-        return {
-          filename,
-          size: stat.size,
-          createdAt: stat.mtime,
-        };
-      } catch {
-        // File was deleted between readdir and stat - skip it
-        return null;
-      }
-    });
-
-    const results = await Promise.all(backupPromises);
+    const results = await Promise.all(
+      files.map(async (filename): Promise<BackupInfo | null> => {
+        const parsed = parseBackupName(filename, base);
+        if (!parsed) return null;
+        const filePath = path.join(dataDir, filename);
+        try {
+          const stat = await fs.stat(filePath);
+          return {
+            filename,
+            ...parsed,
+            path: filePath,
+            size: stat.size,
+            createdAt: stat.mtime,
+          };
+        } catch {
+          // File was deleted between readdir and stat - skip it
+          return null;
+        }
+      })
+    );
     const backups = results.filter((b): b is BackupInfo => b !== null);
 
-    // Sort by date descending (newest first)
-    backups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Newest first; a same-second `-2` before the one it follows
+    backups.sort(
+      (a, b) =>
+        b.createdAt.getTime() - a.createdAt.getTime() ||
+        b.filename.localeCompare(a.filename)
+    );
 
     return backups;
   }
 
   /**
-   * Create a new backup using SQLite VACUUM INTO.
-   * Returns info about the created backup.
+   * Creates a backup with SQLite's `VACUUM INTO`, named after the database
+   * file: `<base>.backup-<YYYYMMDD-HHMMSS>`, or with `-2`, `-3`... when a
+   * backup of that second exists. Backups run one at a time, each after the
+   * one before it; a failed one leaves no file behind.
    */
-  async createBackup(): Promise<BackupInfo> {
+  createBackup(): Promise<BackupInfo> {
+    const backup = this.manualBackups.then(() => this.writeManualBackup());
+    this.manualBackups = backup.catch(() => undefined);
+    return backup;
+  }
+
+  private async writeManualBackup(): Promise<BackupInfo> {
     const dataDir = this.getBackupDir();
-    const timestamp = this.formatTimestamp(new Date());
-    const filename = `peek-stash-browser.db.backup-${timestamp}`;
+    const base = await getDatabaseBaseName();
+    const filename = await claimBackupName(
+      dataDir,
+      `${base}.backup-${this.formatTimestamp(new Date())}`
+    );
     const backupPath = path.join(dataDir, filename);
 
     logger.info(`Creating database backup: ${filename}`);
 
     // Use VACUUM INTO for atomic, consistent backup
-    await prisma.$executeRaw`VACUUM INTO ${backupPath}`;
+    try {
+      await prisma.$executeRaw`VACUUM INTO ${backupPath}`;
+    } catch (error) {
+      await fs.unlink(backupPath).catch(() => undefined);
+      throw error;
+    }
 
     const stat = await fs.stat(backupPath);
 
@@ -244,6 +339,9 @@ class DatabaseBackupService {
 
     return {
       filename,
+      kind: "manual",
+      version: null,
+      path: backupPath,
       size: stat.size,
       createdAt: stat.mtime,
     };
@@ -276,7 +374,8 @@ class DatabaseBackupService {
     );
     if (free < needed) throw new InsufficientSpaceError(dir, free, needed);
 
-    const filename = `${base}.backup-${this.formatTimestamp(new Date())}-pre-${fileNamePart(targetVersion)}`;
+    const version = fileNamePart(targetVersion);
+    const filename = `${base}.backup-${this.formatTimestamp(new Date())}-pre-${version}`;
     const backupPath = path.join(dir, filename);
     const started = performance.now();
     // VACUUM INTO writes into an empty file. Creating it here claims the
@@ -299,6 +398,8 @@ class DatabaseBackupService {
     await this.prunePreMigrationBackups(dir, base);
     return {
       filename,
+      kind: "preMigration",
+      version,
       path: backupPath,
       size: stat.size,
       createdAt: stat.mtime,
@@ -319,6 +420,7 @@ class DatabaseBackupService {
     const names = (await preMigrationBackupNames(dir, base)).filter((name) =>
       name.endsWith(suffix)
     );
+    const pattern = BACKUP_PATTERNS.preMigration(base);
     const backups: PreMigrationBackup[] = [];
     for (const filename of names) {
       const backupPath = path.join(dir, filename);
@@ -326,6 +428,8 @@ class DatabaseBackupService {
         const stat = await fs.stat(backupPath);
         backups.push({
           filename,
+          kind: "preMigration",
+          version: pattern.exec(filename)?.[1] ?? "",
           path: backupPath,
           size: stat.size,
           createdAt: stat.mtime,
@@ -359,12 +463,12 @@ class DatabaseBackupService {
   }
 
   /**
-   * Delete a backup file.
+   * Delete a backup file of any kind.
    * Validates filename to prevent path traversal attacks.
    */
   async deleteBackup(filename: string): Promise<void> {
-    // Security: validate filename matches expected pattern
-    if (!BACKUP_PATTERN.test(filename)) {
+    // Security: only a backup of this database, by the patterns
+    if (!parseBackupName(filename, await getDatabaseBaseName())) {
       throw new Error("Invalid backup filename");
     }
 
