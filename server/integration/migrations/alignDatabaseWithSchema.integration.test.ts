@@ -81,10 +81,19 @@ async function insert(client: Client, table: string, row: Row): Promise<void> {
   );
 }
 
+// Raw SQL: the client follows the current schema, whose StashInstance has
+// columns later migrations add (lastFullPassAt, 20260925000850)
 async function addInstance(client: Client, id: string): Promise<void> {
-  await client.stashInstance.create({
-    data: { id, name: id, url: `http://${id}:9999/graphql`, apiKey: "k" },
-  });
+  const now = Date.now();
+  await client.$executeRawUnsafe(
+    `INSERT INTO "StashInstance" ("id", "name", "url", "apiKey", "createdAt", "updatedAt")
+     VALUES (?, ?, ?, 'k', ?, ?)`,
+    id,
+    id,
+    `http://${id}:9999/graphql`,
+    now,
+    now
+  );
 }
 
 /**

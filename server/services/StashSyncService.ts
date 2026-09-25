@@ -1003,6 +1003,12 @@ export interface SyncRunContext {
    * come back with the same updated_at (`refetchLinkedToDeleted`)
    */
   markChanged?: boolean;
+  /**
+   * The instances whose full-mode type loop ran to the end in this run (a
+   * type that failed counts): `runSync` records their last full pass once
+   * the post-sync steps are done
+   */
+  fullPasses?: Set<string>;
 }
 
 /**
@@ -2601,15 +2607,21 @@ class StashSyncService extends EventEmitter {
     if (this.abortController === null) {
       throw new Error("A sync runs only while it holds the lock");
     }
-    return { signal: this.abortController.signal, changes: this.takeChanges() };
+    return {
+      signal: this.abortController.signal,
+      changes: this.takeChanges(),
+      fullPasses: new Set(),
+    };
   }
 
   /**
    * One sync run in `mode`: the instance given, or every enabled instance in
    * turn, then the post-sync steps once for what the whole run changed. An
    * instance that fails is logged and the next one syncs; an abort ends the
-   * whole run, and its changes carry into the next run. The caller holds the
-   * lock.
+   * whole run, and its changes carry into the next run. A full run then
+   * records the last full pass of each instance whose type loop ran to the
+   * end (`recordFullPasses`); an abort or a failure before that records
+   * none, so the daily pass is still due. The caller holds the lock.
    */
   private async runSync(
     mode: SyncMode,
@@ -2621,6 +2633,7 @@ class StashSyncService extends EventEmitter {
         ? await this.syncInstance(stashInstanceId, mode, run)
         : await this.syncEveryInstance(mode, run);
       await this.runPostSyncSteps(run.changes, { full: mode === "full" });
+      await this.recordFullPasses(run.fullPasses);
       return results;
     } catch (error) {
       // What this run wrote still needs its post-sync steps
@@ -2711,6 +2724,9 @@ class StashSyncService extends EventEmitter {
           )
         );
       }
+      // Every type was tried (a failed one keeps its lastError and its
+      // watermark): the full pass counts once the run's steps are done
+      if (mode === "full") run.fullPasses?.add(stashInstanceId);
 
       // Cleanup deleted entities (detect deletions/merges in Stash), then
       // what linked to them, then the members of the galleries that changed
@@ -2912,6 +2928,25 @@ class StashSyncService extends EventEmitter {
       }
     }
     // D8: PRAGMA optimize goes here, at the end of every run's steps
+  }
+
+  /**
+   * Records now as the last full pass of `instanceIds`
+   * (`StashInstance.lastFullPassAt`), which the daily full pass reads
+   * (SyncScheduler).
+   */
+  private async recordFullPasses(
+    instanceIds: ReadonlySet<string> | undefined
+  ): Promise<void> {
+    if (!instanceIds || instanceIds.size === 0) return;
+    const ids = [...instanceIds];
+    await dbWrite("sync.fullPass", () =>
+      prisma.stashInstance.updateMany({
+        where: { id: { in: ids } },
+        data: { lastFullPassAt: new Date() },
+      })
+    );
+    logger.info("Full pass recorded", { instanceIds: ids });
   }
 
   /**
@@ -4033,11 +4068,11 @@ class StashSyncService extends EventEmitter {
    * Without maxUpdatedAt from synced entities, we have no reliable timestamp to store.
    * A type that failed has none either, so the next sync retries it from its old time.
    *
-   * `lastFullSyncActual` is when the type was last fetched whole: written whenever a
-   * "full" type's pages all came back and were written (`fetched`), even when Stash
-   * holds none of the type. The daily full pass (SyncScheduler) reads it, so an empty
-   * type must not look as if it never had one. A cleanup's skip or refusal does not
-   * undo it: the type's rows were all fetched.
+   * `lastFullSyncActual` is when the type was last fetched whole (the sync status's
+   * "last full sync"): written whenever a "full" type's pages all came back and were
+   * written (`fetched`), even when Stash holds none of the type. A cleanup's skip or
+   * refusal does not undo it: the type's rows were all fetched. The daily full pass
+   * reads the instance's own `lastFullPassAt` (`recordFullPasses`), not this.
    *
    * `lastError` is this run's problem with the type (runEntityType), or null when it
    * synced cleanly, so a type that recovers clears its earlier error.

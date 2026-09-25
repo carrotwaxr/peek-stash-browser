@@ -601,6 +601,9 @@ model StashInstance {
   priority    Int      @default(0) // For ordering (lower = higher priority)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  // When the instance's last full pass ran to the end (every type tried, the
+  // post-sync steps done); the daily full pass reads it
+  lastFullPassAt DateTime?
 
   // Relations
   userSelections UserStashInstance[]

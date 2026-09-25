@@ -5,13 +5,14 @@
  * - Startup sync (full if first run, incremental otherwise)
  * - Polling interval (configurable, default 60 min)
  * - The daily full pass: the startup sync or a scheduled one is a full sync
- *   when an enabled instance has had none in 24 hours
+ *   when an enabled instance's last full pass that ran to the end is over
+ *   24 hours old, or it has none
  * - Manual trigger support
  *
  * Note: Stash scan completion subscription is a future enhancement
  * that would require WebSocket connection to Stash GraphQL.
  */
-import type { SyncState } from "@prisma/client";
+import type { StashInstance } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { logSyncFailure } from "../utils/syncLog.js";
@@ -41,45 +42,33 @@ interface SyncSchedulerSettings {
  */
 const FULL_PASS_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-type FullPassState = Pick<
-  SyncState,
-  "stashInstanceId" | "entityType" | "lastFullSyncActual"
->;
+type FullPassState = Pick<StashInstance, "id" | "lastFullPassAt">;
 
 /** The instance that makes the full pass due, and its last full pass. */
 type FullPassDue = {
   instanceId: string;
-  lastFullPass: string | null;
+  lastFullPassAt: string | null;
 };
 
 /**
- * The first of `instanceIds` whose last full pass is older than
+ * The first of `instanceIds` whose last full pass (`lastFullPassAt`, set
+ * when a full sync of the instance ran to the end) is older than
  * FULL_PASS_INTERVAL_MS before `now`, or that has none (the pass is due),
- * else null. An instance's last full pass is the newest `lastFullSyncActual`
- * among its types: a pass that fetched some types counts, so a type that
- * fails on every pass (it keeps its `lastError` and its old watermark, and
- * each incremental sync tries it again) does not make every scheduled sync
- * a full one.
+ * else null. A pass cut off by an abort or a restart never set it; a type
+ * that failed in a pass that ran to the end keeps its `lastError` and its
+ * old watermark, so the incremental syncs keep trying it, and does not make
+ * every scheduled sync a full one.
  */
 function fullPassDue(
   instanceIds: readonly string[],
-  states: readonly FullPassState[],
+  instances: readonly FullPassState[],
   now: number
 ): FullPassDue | null {
   for (const instanceId of instanceIds) {
-    let newest: Date | null = null;
-    for (const state of states) {
-      const at = state.lastFullSyncActual;
-      if (
-        state.stashInstanceId === instanceId &&
-        at &&
-        (!newest || at > newest)
-      ) {
-        newest = at;
-      }
-    }
-    if (!newest || newest.getTime() < now - FULL_PASS_INTERVAL_MS) {
-      return { instanceId, lastFullPass: newest?.toISOString() ?? null };
+    const at =
+      instances.find((i) => i.id === instanceId)?.lastFullPassAt ?? null;
+    if (!at || at.getTime() < now - FULL_PASS_INTERVAL_MS) {
+      return { instanceId, lastFullPassAt: at?.toISOString() ?? null };
     }
   }
   return null;
@@ -265,7 +254,9 @@ class SyncScheduler {
    */
   private async runScheduledSync(): Promise<void> {
     try {
-      const due = await this.isFullPassDue();
+      const due = await this.isFullPassDue(
+        stashInstanceManager.getAllEnabled().map((i) => i.id)
+      );
       // Checked after the read, so the sync below takes the lock at once
       if (stashSyncService.isSyncing()) {
         logger.debug("Scheduled sync skipped - sync already in progress");
@@ -288,24 +279,20 @@ class SyncScheduler {
   }
 
   /**
-   * Whether the daily full pass is due: an enabled instance has had no full
-   * pass (no type with a `lastFullSyncActual`) or none in
-   * FULL_PASS_INTERVAL_MS (`fullPassDue`). The time is stored per type, so
-   * it survives restarts; a manual Full Sync resets it. Returns the instance
-   * that makes it due, else null.
+   * Whether the daily full pass is due for one of the enabled instances
+   * (`fullPassDue`). The time is stored, so it survives restarts; a manual
+   * Full Sync that runs to the end resets it. Returns the instance that
+   * makes it due, else null.
    */
-  private async isFullPassDue(): Promise<FullPassDue | null> {
-    const instanceIds = stashInstanceManager.getAllEnabled().map((i) => i.id);
+  private async isFullPassDue(
+    instanceIds: readonly string[]
+  ): Promise<FullPassDue | null> {
     if (instanceIds.length === 0) return null;
-    const states = await prisma.syncState.findMany({
-      where: { stashInstanceId: { in: instanceIds } },
-      select: {
-        stashInstanceId: true,
-        entityType: true,
-        lastFullSyncActual: true,
-      },
+    const instances = await prisma.stashInstance.findMany({
+      where: { id: { in: [...instanceIds] } },
+      select: { id: true, lastFullPassAt: true },
     });
-    return fullPassDue(instanceIds, states, Date.now());
+    return fullPassDue(instanceIds, instances, Date.now());
   }
 
   private async performStartupSync(): Promise<void> {
@@ -343,9 +330,7 @@ class SyncScheduler {
     // the daily full pass is due (an instance never synced, beside one that
     // has, makes it due too)
     const neverSynced = instances.every((i) => i.completedTypes.length === 0);
-    const due = neverSynced
-      ? null
-      : fullPassDue(instanceIds, syncStates, Date.now());
+    const due = neverSynced ? null : await this.isFullPassDue(instanceIds);
     if (neverSynced || due) {
       if (due) {
         logger.info("The daily full pass is due, performing full sync", due);

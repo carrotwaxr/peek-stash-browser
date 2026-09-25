@@ -4,8 +4,8 @@
  * sync fetches it whole; the other types sync incrementally.
  *
  * Once a day the startup sync or the scheduled tick is a full sync instead:
- * when an enabled instance has had no full pass in 24 hours (the newest
- * `lastFullSyncActual` of its types).
+ * when an enabled instance's last full pass that ran to the end
+ * (`StashInstance.lastFullPassAt`) is over 24 hours old, or it has none.
  *
  * The scheduler starts once an instance exists (the setup wizard starts it),
  * and a new sync interval only re-arms the timer: it never starts a sync.
@@ -135,6 +135,33 @@ function withFullPassAt(
   );
 }
 
+type InstanceRow = Awaited<
+  ReturnType<typeof mockPrisma.stashInstance.findMany>
+>[number];
+
+/**
+ * Each instance's last full pass (`StashInstance.lastFullPassAt`); an
+ * instance left out has no row. The mock answers the query's id filter.
+ */
+function storePasses(passes: Record<string, Date | null>): void {
+  mockPrisma.stashInstance.findMany.mockImplementation(
+    prismaImpl((args) => {
+      const filter = args?.where?.id;
+      const ids = typeof filter === "object" ? filter.in : undefined;
+      return Object.entries(passes)
+        .filter(([id]) => !ids || ids.includes(id))
+        .map(([id, lastFullPassAt]) =>
+          partialRow<InstanceRow>({ id, lastFullPassAt })
+        );
+    })
+  );
+}
+
+/** Both enabled instances ran a full pass `hours` ago. */
+function bothPassed(hours = 1): Record<string, Date | null> {
+  return { default: hoursAgo(hours), second: hoursAgo(hours) };
+}
+
 /** SyncState holds `rows`; the mock answers the query's instance filter. */
 function storeSyncStates(rows: SyncStateRow[]): void {
   mockPrisma.syncState.findMany.mockImplementation(
@@ -151,6 +178,7 @@ function storeSyncStates(rows: SyncStateRow[]): void {
 describe("performStartupSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storePasses(bothPassed());
   });
 
   it("a type whose sync timestamps are cleared is fetched whole by the startup sync while the others sync incrementally", async () => {
@@ -188,6 +216,7 @@ describe("performStartupSync", () => {
 
   it("logs each instance's completed and missing types: an instance never synced beside a synced one makes the startup sync a full pass", async () => {
     storeSyncStates(syncStates([], "default", SCHEDULER_TYPES));
+    storePasses({ default: hoursAgo(1), second: null });
 
     await syncScheduler["performStartupSync"]();
 
@@ -206,7 +235,7 @@ describe("performStartupSync", () => {
       ],
       totalSyncStates: SCHEDULER_TYPES.length,
     });
-    // The second instance has had no full sync
+    // The second instance has had no full pass
     expect(mockSync.fullSync).toHaveBeenCalledOnce();
     expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
   });
@@ -217,6 +246,7 @@ describe("an admin's abort is not a failure", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    storePasses(bothPassed());
   });
 
   afterEach(() => {
@@ -325,6 +355,7 @@ describe("start and the sync interval", () => {
     );
     // Every type synced before: the startup sync is the smart one
     storeSyncStates(everyInstanceSynced());
+    storePasses(bothPassed());
   });
 
   afterEach(() => {
@@ -427,81 +458,58 @@ describe("the daily full pass", () => {
   const MINUTE = 60_000;
 
   /**
-   * The state at the check, and whether a full pass is due. The ages are
-   * taken when the rows are stored, right before the check.
+   * Each instance's last full pass and its types' states at the check, and
+   * whether a full pass is due. The ages are taken when they are stored,
+   * right before the check.
    */
   const cases: Array<{
     name: string;
-    rows: () => SyncStateRow[];
+    passes: () => Record<string, Date | null>;
+    rows?: () => SyncStateRow[];
     full: boolean;
   }> = [
     {
-      name: "every type of both instances had its last full sync 23 hours ago",
-      rows: () => everyInstanceSynced(23),
+      name: "both instances' last full pass was 23 hours ago",
+      passes: () => bothPassed(23),
       full: false,
     },
     {
-      name: "every type of the second instance had its last 24 hours and a minute ago",
-      rows: () => [
-        ...syncStates([], "default", TYPES, hoursAgo(23)),
-        ...syncStates(
-          [],
-          "second",
-          TYPES,
-          new Date(Date.now() - 24 * HOUR - MINUTE)
-        ),
-      ],
+      name: "the second instance's last full pass was 24 hours and a minute ago",
+      passes: () => ({
+        default: hoursAgo(23),
+        second: new Date(Date.now() - 24 * HOUR - MINUTE),
+      }),
       full: true,
     },
     {
-      name: "the second instance's newest full sync is 24 hours and a minute old, its others older",
-      rows: () =>
-        withFullPassAt(
-          [
-            ...syncStates([], "default", TYPES, hoursAgo(23)),
-            ...syncStates([], "second", TYPES, hoursAgo(30)),
-          ],
-          "second",
-          "clip",
-          new Date(Date.now() - 24 * HOUR - MINUTE)
-        ),
+      name: "the second instance has never had a full pass",
+      passes: () => ({ default: hoursAgo(23), second: null }),
       full: true,
     },
     {
-      name: "no type of the second instance recorded one",
+      name: "the second instance has no row",
+      passes: () => ({ default: hoursAgo(23) }),
+      full: true,
+    },
+    {
+      name: "only an instance that is not enabled had its last three days ago",
+      passes: () => ({ ...bothPassed(23), disabled: hoursAgo(72) }),
+      full: false,
+    },
+    {
+      name: "the second instance's last pass was 23 hours ago and none of its types recorded a full sync there (every type failed)",
+      passes: () => bothPassed(23),
       rows: () => [
         ...syncStates([], "default", TYPES, hoursAgo(23)),
         ...syncStates([], "second", TYPES, null),
       ],
+      full: false,
+    },
+    {
+      name: "every type recorded a full sync an hour ago, but the second instance's last pass to the end was 25 hours ago (the one since was cut off)",
+      passes: () => ({ default: hoursAgo(23), second: hoursAgo(25) }),
+      rows: () => everyInstanceSynced(1),
       full: true,
-    },
-    {
-      name: "the second instance has no rows",
-      rows: () => syncStates([], "default", TYPES, hoursAgo(23)),
-      full: true,
-    },
-    {
-      name: "one type of the second instance had its last 30 hours ago, the others 23",
-      rows: () =>
-        withFullPassAt(everyInstanceSynced(23), "second", "clip", hoursAgo(30)),
-      full: false,
-    },
-    {
-      name: "the default instance has no image row",
-      rows: () =>
-        everyInstanceSynced(23).filter(
-          (row) =>
-            !(row.stashInstanceId === "default" && row.entityType === "image")
-        ),
-      full: false,
-    },
-    {
-      name: "only an instance that is not enabled had its last three days ago",
-      rows: () => [
-        ...everyInstanceSynced(23),
-        ...syncStates([], "disabled", TYPES, hoursAgo(72)),
-      ],
-      full: false,
     },
   ];
 
@@ -516,11 +524,12 @@ describe("the daily full pass", () => {
   });
 
   it.each(cases)(
-    "a scheduled tick runs a full sync when an enabled instance's newest lastFullSyncActual is older than 24 hours or missing, else an incremental one: $name",
-    async ({ rows, full }) => {
+    "a scheduled tick runs a full sync when an enabled instance's last full pass is older than 24 hours or missing, else an incremental one: $name",
+    async ({ passes, rows = () => everyInstanceSynced(23), full }) => {
       vi.useFakeTimers();
       syncScheduler["startPollingInterval"](60);
       await vi.advanceTimersByTimeAsync(60 * MINUTE - 1);
+      storePasses(passes());
       storeSyncStates(rows());
 
       await vi.advanceTimersByTimeAsync(1);
@@ -539,7 +548,8 @@ describe("the daily full pass", () => {
 
   it.each(cases)(
     "the startup sync does the same: $name",
-    async ({ rows, full }) => {
+    async ({ passes, rows = () => everyInstanceSynced(23), full }) => {
+      storePasses(passes());
       storeSyncStates(rows());
 
       await syncScheduler["performStartupSync"]();
@@ -551,8 +561,9 @@ describe("the daily full pass", () => {
 
   it("an instance whose studio type fails every pass still runs incremental syncs between daily passes", async () => {
     vi.useFakeTimers();
-    // The last pass fetched every other type an hour ago; studios failed
+    // The last pass, an hour ago, fetched every other type; studios failed
     // there and on every pass before, so they never recorded one
+    storePasses(bothPassed(1));
     storeSyncStates(
       withFullPassAt(everyInstanceSynced(1), "default", "studio", null)
     );
@@ -572,6 +583,7 @@ describe("the daily full pass", () => {
 
   it("a tick while a sync runs starts nothing", async () => {
     vi.useFakeTimers();
+    storePasses(bothPassed(30));
     storeSyncStates(everyInstanceSynced(30));
     mockSync.isSyncing.mockReturnValue(true);
     syncScheduler["startPollingInterval"](60);

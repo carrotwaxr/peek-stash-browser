@@ -86,6 +86,7 @@ export function stashInstanceRow(
     priority: 0,
     createdAt: EPOCH,
     updatedAt: EPOCH,
+    lastFullPassAt: null,
     ...overrides,
   };
 }

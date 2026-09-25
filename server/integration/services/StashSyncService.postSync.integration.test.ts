@@ -435,12 +435,19 @@ function stubClient(answer: StashAnswer): StashClient {
 
 /** Route `stashInstanceManager.get` to a stub per made-up instance. */
 function stubInstances(answers: Record<string, StashAnswer>): void {
+  stubClients(
+    Object.fromEntries(
+      Object.entries(answers).map(([id, answer]) => [id, stubClient(answer)])
+    )
+  );
+}
+
+/** Route `stashInstanceManager.get` to these clients per made-up instance. */
+function stubClients(byInstance: Record<string, StashClient>): void {
   const realGet = stashInstanceManager.get.bind(stashInstanceManager);
   const realCredentials =
     stashInstanceManager.getCredentials.bind(stashInstanceManager);
-  const clients = new Map(
-    Object.entries(answers).map(([id, answer]) => [id, stubClient(answer)])
-  );
+  const clients = new Map(Object.entries(byInstance));
   vi.spyOn(stashInstanceManager, "get").mockImplementation(
     (id) => clients.get(id) ?? realGet(id)
   );
@@ -1391,6 +1398,94 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
 
       expect(full).toHaveBeenCalledOnce();
       expect(incremental).toHaveBeenCalledOnce();
+    }, 60_000);
+
+    /** pc-a's last full pass that ran to the end. */
+    async function lastFullPassOfA(): Promise<number | null> {
+      const instance = await prisma.stashInstance.findUnique({
+        where: { id: PC_A },
+        select: { lastFullPassAt: true },
+      });
+      return instance?.lastFullPassAt?.getTime() ?? null;
+    }
+
+    it("a full pass cut off by an abort after the first type is still due at the next tick", async () => {
+      // pc-a has had no full pass; its types' last were 25 hours ago
+      await prisma.syncState.updateMany({
+        where: { stashInstanceId: PC_A },
+        data: { lastFullSyncActual: new Date(Date.now() - 25 * HOUR) },
+      });
+      // The admin aborts the first pass once tags are done, as studios load
+      const client = stubClient({ all: library() });
+      const findStudios = client.findStudios.bind(client);
+      let aborted = false;
+      client.findStudios = (vars) => {
+        if (aborted) return findStudios(vars);
+        aborted = true;
+        stashSyncService.abort();
+        return Promise.reject(new Error("Sync aborted"));
+      };
+      stubClients({ [PC_A]: client });
+      const full = vi.spyOn(stashSyncService, "fullSync");
+      const before = Date.now();
+
+      await syncScheduler["performStartupSync"]();
+
+      expect(full).toHaveBeenCalledOnce();
+      expect(info).toHaveBeenCalledWith("Sync aborted", {});
+      // The tags recorded their full sync; the pass did not end
+      const tag = must((await statesOfA()).tag);
+      expect(tag.lastFullSyncActual?.getTime() ?? 0).toBeGreaterThanOrEqual(
+        before
+      );
+
+      await syncScheduler["runScheduledSync"]();
+
+      // Still due: the tick runs the pass again, to the end this time
+      expect(full).toHaveBeenCalledTimes(2);
+      expect(await lastFullPassOfA()).toBeGreaterThanOrEqual(before);
+    }, 60_000);
+
+    it("a full pass in which one type fails is not due again for 24 hours", async () => {
+      await prisma.syncState.updateMany({
+        where: { stashInstanceId: PC_A },
+        data: { lastFullSyncActual: new Date(Date.now() - 25 * HOUR) },
+      });
+      // Stash fails on studios, every time
+      const client = stubClient({ all: library() });
+      client.findStudios = () =>
+        Promise.reject(
+          new Error("runtime error: invalid memory address or nil pointer")
+        );
+      stubClients({ [PC_A]: client });
+      const full = vi.spyOn(stashSyncService, "fullSync");
+      const incremental = vi.spyOn(stashSyncService, "incrementalSync");
+      const before = Date.now();
+
+      await syncScheduler["performStartupSync"]();
+
+      expect(full).toHaveBeenCalledOnce();
+      const states = await statesOfA();
+      expect(
+        must(states.studio).lastFullSyncActual?.getTime() ?? 0
+      ).toBeLessThan(before);
+      const passedAt = must(await lastFullPassOfA());
+      expect(passedAt).toBeGreaterThanOrEqual(before);
+
+      // Only the clock moves (the sync's timers stay real)
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(passedAt + 23 * HOUR);
+        await syncScheduler["runScheduledSync"]();
+        expect(incremental).toHaveBeenCalledOnce();
+        expect(full).toHaveBeenCalledOnce();
+
+        vi.setSystemTime(passedAt + 24 * HOUR + 60_000);
+        await syncScheduler["runScheduledSync"]();
+        expect(full).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
     }, 60_000);
 
     it("a full pass over an unchanged library writes no pending row and keeps gallery-inherited rows", async () => {
