@@ -208,11 +208,49 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
+  # The image smoke test's upgrade check boots the latest release first and
+  # adds about 2 minutes, so it runs only when a change can affect upgrading:
+  # the schema and migrations, the startup code that applies them, the image,
+  # and the workflows that run the check
+  changes:
+    name: Changed Paths
+    runs-on: ubuntu-latest
+    outputs:
+      upgrade-check: ${{ steps.paths.outputs.upgrade-check }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A pull request's checkout is its merge commit, whose first parent is
+      # the base it merges into; a push compares with the commit it replaced.
+      # When the base is unknown (a new branch), the check runs.
+      - name: Does the change touch the upgrade path?
+        id: paths
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
+        run: |
+          pattern='^(server/prisma/|server/initializers/|docker/|\.github/workflows/(image-smoke|docker-build)\.yml$)'
+          if changed=$(git diff --name-only "$BASE" HEAD 2>/dev/null); then
+            if grep -qE "$pattern" <<< "$changed"; then
+              result=true
+            else
+              result=false
+            fi
+          else
+            result=true
+          fi
+          echo "upgrade-check=$result" >> "$GITHUB_OUTPUT"
+          echo "Upgrade check: $result"
+
   image:
     name: Image Smoke Test
+    needs: changes
     uses: ./.github/workflows/image-smoke.yml
     with:
       browser-checks: true
+      upgrade-check: ${{ needs.changes.outputs.upgrade-check == 'true' }}
 
   # Integration tests run against a synthetic replay of the test Stash
   # (server/integration/stash-replay), served on localhost: no secrets and no

@@ -8,7 +8,21 @@ See [Installation - Update Procedure](installation.md#update-procedure) for step
 
 ## Backup Procedure
 
-Before major upgrades, back up your database. Your Peek database is a single SQLite file.
+### Automatic backup before migrations
+
+When an upgrade has database migrations to apply, Peek copies the database before it changes anything. The copy is in the data directory (`/app/data`, or `CONFIG_DIR` if you set it), beside the database, named with the time (UTC) and the version that made it:
+
+```
+peek-stash-browser.db.backup-20260924-101112-pre-3.4.0
+```
+
+Peek keeps the 3 newest of these and deletes older ones. It never deletes a backup you made yourself. A new install, and an upgrade with no migrations, take no backup. This backup is the way back to the version you ran before: see [Downgrading](#downgrading).
+
+Before copying, Peek checks that the data directory has room for the copy and the migrations: about 2.2 times the space the database uses, plus 64 MB. If it has less, Peek stops and changes nothing (see [Migration failed](#migration-failed)).
+
+### Manual backup
+
+You can also back up the database yourself, for example before a major upgrade. Your Peek database is a single SQLite file.
 
 === "unRAID"
 
@@ -56,13 +70,36 @@ Before major upgrades, back up your database. Your Peek database is a single SQL
 # Stop Peek
 docker stop peek-stash-browser
 
-# Replace database with backup
+# Delete the old database's WAL files, which belong to it and not to the backup,
+# then replace the database with the backup
 # (adjust paths for your setup)
+rm -f /path/to/data/peek-stash-browser.db-wal /path/to/data/peek-stash-browser.db-shm
 cp ./peek-stash-browser.db.backup /path/to/data/peek-stash-browser.db
 
 # Restart
 docker start peek-stash-browser
 ```
+
+## Downgrading
+
+After an upgrade that applied migrations, the database is in the new version's format, and older versions cannot use it: 3.4.0-beta.1 and 3.3.8, for example, crash-loop on a database a later version migrated, logging `The column main.User.recoveryKey does not exist`. Restoring the backup Peek took before migrating is the only way back:
+
+1. Stop Peek.
+2. In the data directory, delete `peek-stash-browser.db-wal` and `peek-stash-browser.db-shm` if they exist.
+3. Copy the pre-migration backup of the upgrade you are undoing (`peek-stash-browser.db.backup-<time>-pre-<new version>`) over `peek-stash-browser.db`.
+4. Set the image back to the version you ran before, and start it.
+
+```bash
+docker stop peek-stash-browser
+cd /path/to/data
+rm -f peek-stash-browser.db-wal peek-stash-browser.db-shm
+cp peek-stash-browser.db.backup-20260924-101112-pre-3.4.0 peek-stash-browser.db
+# then start the previous image, e.g. carrotwaxr/peek-stash-browser:3.3.8
+```
+
+Everything written after the upgrade is lost: ratings, favorites, watch history, playlists, users and settings changed since then. The backup is the database as it was just before the upgrade. The library cache catches up with Stash at the next sync.
+
+An upgrade that applied no migrations took no backup and needs none: the older version starts on the database as it is.
 
 ---
 
@@ -150,7 +187,15 @@ docker logs peek-stash-browser | grep -i migration
 ```
 
 Common causes:
-- **Disk full**: Free up space and restart
+
+- **Not enough disk space**: before it backs up and migrates the database, Peek checks for room, and stops without changing anything when there is too little:
+
+    ```
+    Fatal error: Not enough disk space to upgrade the database: the upgrade needs 790.3 MB free in /app/data, which has 512.0 MB (a backup of the database, then room for the migrations to run). Free at least 278.3 MB there, for example by deleting old *.backup-* files, then start Peek again. Nothing was changed.
+    ```
+
+    Free at least the amount it names on the volume holding the data directory, then start Peek again. Old backups in the data directory (`*.backup-*`, including older pre-migration backups) are usually the easiest to move off the server or delete. The upgrade needs about 2.2 times the space the database uses, plus 64 MB.
+- **Disk full** during the migration itself: free up space and restart.
 - **Permission denied**: Check volume mount permissions
 
 ### Sync is slow

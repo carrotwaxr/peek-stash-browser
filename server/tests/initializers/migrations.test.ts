@@ -15,7 +15,9 @@ import {
   runPrismaCli,
 } from "../../initializers/migrations.js";
 import prisma from "../../prisma/singleton.js";
+import { databaseBackupService } from "../../services/DatabaseBackupService.js";
 import { logger } from "../../utils/logger.js";
+import { getServerVersion } from "../../utils/serverVersion.js";
 import {
   anyOf,
   arrayContaining,
@@ -50,7 +52,12 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock("../../services/DatabaseBackupService.js", () => ({
+  databaseBackupService: { createPreMigrationBackup: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockBackup = vi.mocked(databaseBackupService.createPreMigrationBackup);
 
 // The repo's migration folders, which the server reads at startup
 const FOLDERS = readdirSync(
@@ -91,6 +98,13 @@ function databaseWith(
       if (sql.includes("_prisma_migrations")) return applied.map(appliedRow);
       throw new Error(`unexpected query: ${sql}`);
     })
+  );
+}
+
+/** The SQL of every `$queryRaw` call, placeholders as `?`. */
+function rawQueries(): string[] {
+  return mockPrisma.$queryRaw.mock.calls.map(([query]) =>
+    "sql" in query ? query.sql : query.join("?")
   );
 }
 
@@ -205,6 +219,7 @@ describe("initializeDatabase", () => {
     expect(vi.mocked(execFile)).not.toHaveBeenCalled();
     expect(vi.mocked(exec)).not.toHaveBeenCalled();
     expect(mockPrisma.$disconnect).not.toHaveBeenCalled();
+    expect(mockBackup).not.toHaveBeenCalled();
   });
 
   it("runs one migrate deploy after closing the pool when a migration is pending", async () => {
@@ -236,6 +251,45 @@ describe("initializeDatabase", () => {
     expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
       `Applying 1 pending migration: ${last}`
     );
+    // The backup is taken first, through the client that read the plan
+    expect(mockBackup).toHaveBeenCalledExactlyOnceWith(
+      getServerVersion(),
+      objectContaining({ client: mockPrisma })
+    );
+    expect(must(mockBackup.mock.invocationCallOrder[0])).toBeLessThan(
+      must(mockPrisma.$disconnect.mock.invocationCallOrder[0])
+    );
+  });
+
+  it("takes no backup of a new database", async () => {
+    databaseWith([], []);
+
+    await initializeDatabase();
+
+    expect(cliCalls()).toEqual([["migrate", "deploy"]]);
+    expect(mockBackup).not.toHaveBeenCalled();
+  });
+
+  it("stops before any CLI when the backup fails", async () => {
+    databaseWith(FOLDERS.slice(0, -1));
+    const refusal = new Error("not enough space");
+    mockBackup.mockRejectedValueOnce(refusal);
+
+    await expect(initializeDatabase()).rejects.toBe(refusal);
+    expect(vi.mocked(execFile)).not.toHaveBeenCalled();
+  });
+
+  it("checkpoints and truncates the WAL after a failed deploy, then rethrows", async () => {
+    databaseWith(FOLDERS.slice(0, -1));
+    child.error = new Error("Command failed");
+    child.stderr = "Error: P3018 A migration failed to apply";
+
+    await expect(initializeDatabase()).rejects.toThrow("P3018");
+    const checkpoint = rawQueries().indexOf("PRAGMA wal_checkpoint(TRUNCATE)");
+    expect(checkpoint).toBeGreaterThan(-1);
+    expect(
+      must(mockPrisma.$queryRaw.mock.invocationCallOrder[checkpoint])
+    ).toBeGreaterThan(must(vi.mocked(execFile).mock.invocationCallOrder[0]));
   });
 });
 
@@ -252,6 +306,11 @@ describe("initializeDatabase on a db push database", () => {
     expect(
       must(mockPrisma.$disconnect.mock.invocationCallOrder[0])
     ).toBeLessThan(must(vi.mocked(execFile).mock.invocationCallOrder[0]));
+    // Marking the baseline is the first write: the backup comes before it
+    expect(mockBackup).toHaveBeenCalledOnce();
+    expect(must(mockBackup.mock.invocationCallOrder[0])).toBeLessThan(
+      must(vi.mocked(execFile).mock.invocationCallOrder[0])
+    );
   });
 
   it("stops a database from before v2.0.0 before starting any CLI", async () => {
@@ -265,6 +324,7 @@ describe("initializeDatabase on a db push database", () => {
     await expect(initializeDatabase()).rejects.toThrow(LegacyDatabaseError);
     expect(vi.mocked(execFile)).not.toHaveBeenCalled();
     expect(vi.mocked(exec)).not.toHaveBeenCalled();
+    expect(mockBackup).not.toHaveBeenCalled();
   });
 });
 

@@ -9,15 +9,18 @@ env:
   IMAGE_NAME: carrotwaxr/peek-stash-browser
 
 # Each architecture is built on its own native runner, booted against an empty
-# volume and pushed by digest (image-smoke.yml). Only when both pass does the
-# publish job point the release tags at the two digests. There is no QEMU
-# build: arm64 is built on GitHub's arm64 runner.
+# volume and pushed by digest (image-smoke.yml); amd64 also upgrades a
+# database the latest release created, then restores its pre-migration backup
+# on that release. Only when both pass does the publish job point the release
+# tags at the two digests. There is no QEMU build: arm64 is built on GitHub's
+# arm64 runner.
 jobs:
   smoke:
     name: Image Smoke Test
     uses: ./.github/workflows/image-smoke.yml
     with:
       publish: true
+      upgrade-check: true
       build-date: ${{ github.event.head_commit.timestamp }}
     secrets: inherit
 
