@@ -59,5 +59,6 @@ Every release from v2.0.0 on upgrades through this path, so a migration must wor
 ## Schema conventions
 
 - A cached Stash entity table has `@@id([id, stashInstanceId])` and `deletedAt DateTime?`, since sync soft-deletes. `stashInstanceId` is NOT NULL; an old migration backfilled every NULL.
-- A junction table keys on both IDs and both instances, e.g. `@@id([sceneId, sceneInstanceId, tagId, tagInstanceId])`.
+- A junction table keys on both IDs and both instances, e.g. `@@id([sceneId, sceneInstanceId, tagId, tagInstanceId])`. Besides its primary key it carries one index, the reverse direction (`@@index([tagId, tagInstanceId])`): the key already serves lookups by the first side, so an index on it only costs writes. `integration/services/schemaIndexes.integration.test.ts` checks every junction, `GroupRelation` included.
+- A scene sort that must use an index gets a stored column and a `(deletedAt, X, id)` index (`StashScene_browse_titleSort_idx` and the like), which serves the `ORDER BY X, id` of the list query as is. Soft-delete filters use these composites: `StashScene` has no single-column `deletedAt` index. `StashImage_deletedAt_idx` stays, since gallery inheritance's scoped `rowid IN (...)` UPDATEs read it as `(deletedAt, rowid)`.
 - Peek's own per-user tables call the column `instanceId`. In the exclusion tables an empty string means every instance.

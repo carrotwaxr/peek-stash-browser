@@ -99,7 +99,7 @@ Every sync type processes entities in the same dependency order, and runs its cl
 
 This order ensures foreign key relationships are satisfied: a junction row such as a studio's tag has a foreign key to the tag, which must already be stored.
 
-A page can still point at something Peek has not stored: an entity created in Stash after its own type's pages ran, or of a type whose sync failed. Before writing a page, Peek looks up what the page references, fetches the missing entities by id, and writes them first. Then the page is written in one transaction: its rows and their links are replaced together, so a failure midway (a crash, a stop, a database error) leaves the page as it was, and the next sync writes it again. No request to Stash runs while that transaction holds the database's write lock (about 0.1 s for a page of 500 scenes).
+A page can still point at something Peek has not stored: an entity created in Stash after its own type's pages ran, or of a type whose sync failed. Before writing a page, Peek looks up what the page references, fetches the missing entities by id, and writes them first. Then the page is written in one transaction: its rows and their links are replaced together, so a failure midway (a crash, a stop, a database error) leaves the page as it was, and the next sync writes it again. No request to Stash runs while that transaction holds the database's write lock (about 0.1 s for a page of 500 scenes). A scene page also stores, in the same transaction, the columns the scene list sorts by (`titleSort`, `performerCount`, `tagCount`), from its scenes' titles and new links.
 
 **One failing type does not stop the rest.** When Stash (or the database) fails on one type, Peek records the error in that type's sync state, leaves its timestamps where they were so the next sync retries it, and goes on with the next type. The post-sync steps still run. Aborting a sync is different: it stops the whole run, every instance, and records nothing.
 
@@ -199,6 +199,10 @@ A gallery's own image count is Stash's, stored as synced. Sync writes a new perf
 - Incremental and smart sync: Runs after any sync that changed or soft-deleted something, for the performers, studios and tags the change set reaches: the old and new performers, tags and studios of changed images and galleries; the performers, tags and studio of every gallery a changed image joined or left; those of soft-deleted images (with their galleries') and galleries; and every changed performer, studio and tag. Past the change set's limit it runs for every one
 
 The user stats rebuild and the tag counts via performers follow it.
+
+### Database Upkeep
+
+Last, unless the steps were skipped, Peek refreshes SQLite's planner statistics (`PRAGMA optimize`, which analyzes a table that has none or whose size changed about 25-fold since: 0.3 s the first time on a 26,000-scene library, 0.65 s with 200,000 scenes, under a millisecond after) and moves the write-ahead log into the database file (`wal_checkpoint(TRUNCATE)`). Each is one unit of the writer queue (`refreshPlannerStatistics` and `checkpointWal` in `utils/databaseMaintenance.ts`); a failure, or a checkpoint that open reads keep busy, is only logged. The shutdown runs both too.
 
 ---
 

@@ -95,15 +95,23 @@ Cascades are first order only (a performer excluded through a tag does not casca
 
 ### Processing Order
 
-`ExclusionComputationService.recomputeForUser` runs raw SQL end to end on a dedicated single-connection Prisma client, one recompute at a time, inside a deferred `BEGIN` that reads one snapshot and takes no write lock (TEMP tables hold the closures and exclusion sets, so every membership test is an indexed lookup). It then swaps the rows in one short write transaction:
+`ExclusionComputationService.recomputeForUser` runs raw SQL end to end on a dedicated single-connection Prisma client (`prisma/computeClient.ts`), one recompute at a time, inside a deferred `BEGIN` that reads one snapshot and takes no write lock (TEMP tables hold the closures and exclusion sets, so every membership test is an indexed lookup). It computes the rows in these steps:
 
-1. **Resolve** the lists and hides on the allowed instances (recursive CTE for tags and studios)
+1. **Resolve** the lists and hides on the user's instance scope, the enabled instances narrowed by their selection, including one still on its first sync so that its rows exist before it shows (recursive CTE for tags and studios)
 2. **Direct rows**: EXCLUDE closures (`restricted`), INCLUDE inversion (`restricted`), hides (`hidden`)
 3. **Cascades** from the EXCLUDE closures and hides only
 4. **Content rules**: INCLUDE admission and `restrictEmpty` for scenes, galleries and images
 5. **Empty phase**, per instance: galleries with no visible image; performers, studios and groups with no visible content; tags attached to no visible scene, performer, studio, group, gallery or image and with no live child tag on the same instance. Skipped for admins
 
 Every restriction-derived row carries a real `stashInstanceId`. When an entity qualifies twice, the first reason in that order is the one stored. Types AND together: content is hidden if any EXCLUDE or hide rule hits it, any INCLUDE rule does not admit it, or it is empty under `restrictEmpty`.
+
+The rows are then written, taking the database's write lock once:
+
+- **Fill**: the deduplicated rows go into the TEMP table `_peek_result` on the same connection, still without the lock.
+- **Swap**: one short `BEGIN IMMEDIATE` on that connection, as one unit of the writer queue (`exclusions.swap`, see [Database writes](#database-writes)), deletes the user's rows and copies `_peek_result` in with one `INSERT OR IGNORE ... SELECT`. The delete keeps the `pending` rows a sync wrote after the snapshot began, so those holds survive. For a user with 180,000 rows the swap holds the lock about 0.7 s, where the old single transaction (delete, insert, stats) held it 3.3 s.
+- **Stats**: `UserEntityStats` is updated afterwards, in its own short batch.
+
+Hiding an entity (`addHiddenEntity`) computes its rows the same way and merges them in (`INSERT OR IGNORE`), never overwriting a row already there.
 
 ---
 
@@ -415,7 +423,36 @@ const result = await sceneQueryBuilder
 
 This replaces the old pattern of loading all entities into memory and filtering in JavaScript.
 
+### Scene list indexes
+
+`StashScene` has a `(deletedAt, X)` index for each sort the scene list reads in index order, so the first page of a 200,000-scene library comes back without sorting every scene:
+
+| Sort | Column | Index |
+|------|--------|-------|
+| Created at | `stashCreatedAt` | `StashScene_browse_idx` (`deletedAt`, `stashCreatedAt` DESC) |
+| Updated at | `stashUpdatedAt` | `StashScene_browse_updated_idx` |
+| Date | `date` | `StashScene_browse_date_idx` |
+| Duration | `duration` | `StashScene_browse_duration_idx` |
+| Title | `titleSort` | `StashScene_browse_titleSort_idx` (`deletedAt`, `titleSort`, `id`) |
+| Performer count | `performerCount` | `StashScene_browse_performerCount_idx` |
+| Tag count | `tagCount` | `StashScene_browse_tagCount_idx` |
+
+Sync stores `titleSort`, `performerCount` and `tagCount`: each scene page writes them after the page's performer and tag links, in the same transaction (`refreshSceneDerivedColumns` in `StashSyncService.ts`). `titleSort` is the title the card shows (the title, else the file name without its extension), lower-cased for ASCII letters; the two counts are the scene's `ScenePerformer` and `SceneTag` rows, and the performer and tag count filters read them too. On a 207,000-scene copy the first page by title takes 1 ms instead of 0.5 s, and by performer or tag count 1 ms instead of 0.6 to 0.7 s. The per-user sorts (rating, plays, O count) and the random order still sort the filtered rows: about 0.4 s by rating at that size.
+
+`server/scripts/db-bench/` builds such a copy from a Peek database and times each list query with its plan: see its README.
+
+### Database writes
+
+SQLite lets one connection write at a time. Peek orders its own writers in Node, in the writer queue `server/utils/dbWrite.ts`:
+
+- Every transaction, every statement that writes many rows, and every single-row write on a user's path (ratings, favorites, O counts, plays, image views, hides, stats, playlists, restrictions) runs as one unit: `dbWrite(label, fn)`, `dbWriteTransaction(label, fn)` or `dbWriteBatch(label, [...])`. Units run one at a time, in arrival order. Lint rejects `prisma.$transaction` anywhere else.
+- No unit holds the write lock longer than 1 s on a 200,000-scene library. Longer work is split: a sync writes each page of 500 in its own unit (about 0.1 s for scenes), a recompute swaps one user's rows at a time, and cleanups, purges and gallery inheritance write 500 to 5,000 rows a unit. So a user's rating waits behind at most one such unit. A unit that holds the lock longer logs `Database write held the lock` with its label.
+- Reads never queue: under WAL a read does not wait for a writer.
+- The single-row writes off those paths (settings, setup, auth and the like) stay outside the queue: SQLite makes each wait for the lock up to 5 s, which the 1 s bound keeps safe.
+
+Why not let SQLite's busy timeout order the writers: Prisma's SQLite driver waits for the lock on the query engine's worker threads, one per CPU, and a handful of waiting writers leave the lock holder no thread to finish on, so they all time out together (32 of 40 simultaneous hides failed on a 16-CPU machine; through the queue all 40 succeed). The full rule, with nesting and retries, is in `.claude/rules/server-sql.md`, "Writes".
+
 ---
 
-*Document Version: 3.2*
-*Last Updated: 2026-01-17*
+*Document Version: 3.4*
+*Last Updated: 2026-09-25*

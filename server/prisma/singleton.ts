@@ -37,8 +37,10 @@ function isPooled(databaseUrl = process.env.DATABASE_URL ?? ""): boolean {
  *   by another writer waits; after it, the statement fails with "database is
  *   locked". `?socket_timeout=N` on DATABASE_URL would change it pool-wide.
  *   It is not raised: a longer wait is not what keeps Peek's own writers
- *   apart. They queue in-process through `dbWrite`, so they never contend
- *   for the lock.
+ *   apart. Its transactions, multi-row writes and user-path writes queue
+ *   in-process through `dbWrite`, so they never contend for the lock; the
+ *   single-row writes left outside the queue (settings, setup, auth) wait
+ *   here, behind units the writer rule keeps under 1 s.
  * - The performance PRAGMAs reach only the connection that runs them. One
  *   that fails is a warning naming it, not a startup failure.
  *
