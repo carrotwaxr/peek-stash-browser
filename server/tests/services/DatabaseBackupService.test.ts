@@ -319,6 +319,44 @@ describe("DatabaseBackupService", () => {
     });
   });
 
+  describe("listPreMigrationBackups", () => {
+    it("lists this database's pre-migration backups oldest first, or those of one version", async () => {
+      databaseOf("/app/data/peek-stash-browser.db", MIB);
+      mockReaddir.mockResolvedValue([
+        "peek-stash-browser.db.backup-20260102-000000-pre-3.4.0",
+        "peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
+        "peek-stash-browser.db.backup-20260102-000000-pre-3.4.0-wal",
+        "peek-stash-browser.db.backup-20260103-000000-pre-3.4.0-beta.1",
+        "peek-stash-browser.db.backup-20250101-000000",
+        "other.db.backup-20260101-000000-pre-3.4.0",
+      ]);
+      const mtime = new Date("2026-01-02T00:00:00Z");
+      mockStat.mockResolvedValue(partialRow({ size: 4096, mtime }));
+
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
+
+      const all = await databaseBackupService.listPreMigrationBackups();
+      expect(all.map((backup) => backup.path)).toEqual([
+        "/app/data/peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
+        "/app/data/peek-stash-browser.db.backup-20260102-000000-pre-3.4.0",
+        "/app/data/peek-stash-browser.db.backup-20260103-000000-pre-3.4.0-beta.1",
+      ]);
+      expect(must(all[0])).toEqual({
+        filename: "peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
+        path: "/app/data/peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
+        size: 4096,
+        createdAt: mtime,
+      });
+      const ofVersion = await databaseBackupService.listPreMigrationBackups({
+        version: "3.4.0",
+      });
+      expect(ofVersion.map((backup) => backup.filename)).toEqual([
+        "peek-stash-browser.db.backup-20260102-000000-pre-3.4.0",
+      ]);
+    });
+  });
+
   describe("deleteBackup", () => {
     it("should delete a valid backup file", async () => {
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
