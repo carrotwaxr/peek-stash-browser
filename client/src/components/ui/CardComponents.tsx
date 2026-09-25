@@ -572,6 +572,7 @@ export const CardDescription = ({
 interface IndicatorItem {
   type: string;
   count?: number;
+  countLabel?: (count: number) => string;
   tooltipContent?: ReactNode;
   onClick?: (e: React.MouseEvent) => void;
 }

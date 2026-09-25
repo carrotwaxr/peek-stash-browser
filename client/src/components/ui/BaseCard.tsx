@@ -23,6 +23,8 @@ export interface CardIndicator {
   type: string;
   count?: number;
   label?: string;
+  /** The count's tooltip text, in place of its type's label ("3 scenes") */
+  countLabel?: (count: number) => string;
   tooltipContent?: ReactNode;
   onClick?: () => void;
 }

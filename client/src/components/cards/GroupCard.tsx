@@ -78,6 +78,8 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
 
       return [
         {
+          // The singular groupId: urlParamsToFilters joins it with the
+          // instance param into "id:instance"; a plural groupIds drops it
           type: "SCENES",
           count: group.scene_count,
           onClick:
@@ -85,7 +87,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
               ? () =>
                   navigate(
                     appendInstanceParam(
-                      `/scenes?groupIds=${group.id}`,
+                      `/scenes?groupId=${group.id}`,
                       group,
                       hasMultipleInstances
                     )
@@ -97,6 +99,8 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           // becomes the "Parent collection" filter's "id:instance" value
           type: "GROUPS",
           count: group.sub_group_count,
+          countLabel: (count: number) =>
+            count === 1 ? "1 sub-collection" : `${count} sub-collections`,
           onClick:
             group.sub_group_count > 0
               ? () =>
