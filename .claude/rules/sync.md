@@ -48,6 +48,11 @@ Merges (`MergeReconciliationService`): the scene branch soft-deletes first and t
 - Chunked purge: `purgeInstanceCache` deletes 1,000 rows per `dbWrite` unit, `UserExcludedEntity` first (by id, since it has no `instanceId` index), then the eight entity tables, clips to tags, then `SyncState`. It checks the abort flag before every chunk and stops there.
 - Startup sweep: `purgeUnknownInstanceCaches`, called by `initializeCache` before the scheduler starts, purges every instance id in the eight tables or `SyncState` without a `StashInstance` row, so a failed or aborted purge finishes at the next start. It does nothing when no instance exists.
 
+## Stash requests
+
+- Every `StashClient` request fails after `STASH_REQUEST_TIMEOUT_MS` (120 s) with `StashRequestTimeoutError`. While a job holds the lock, `getStashClient` returns `client.withSignal(abortController.signal)`, so `abort()` ends a request in flight with `Error("Sync aborted")`. A test's stub client used under the lock needs `withSignal` (returning the stub).
+- Report a Stash failure through `describeStashError`: a graphql-request `ClientError`'s own message embeds the query and its variables.
+
 ## Raw SQL
 
 Several junction writes build SQL with `this.escape()` and string interpolation. Keep the escaping when touching them, and use `?` parameters in new code.
