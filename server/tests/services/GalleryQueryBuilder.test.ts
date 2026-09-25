@@ -176,4 +176,25 @@ describe("GalleryQueryBuilder", () => {
       expect(mainQuerySql).toContain("LOWER(g.details) LIKE");
     });
   });
+
+  describe("count query", () => {
+    it("the count query with exclusions applied counts rows, not distinct composite ids", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+      });
+
+      // Second call is the count query. The other LEFT JOINs are on unique
+      // keys and e.id IS NULL drops every excluded gallery, so each row left
+      // is one gallery.
+      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
+
+      expect(countQuerySql).toMatch(/SELECT COUNT\(\*\) as total/);
+      expect(countQuerySql).not.toMatch(/COUNT\(DISTINCT/);
+      expect(countQuerySql).toContain("LEFT JOIN UserExcludedEntity e");
+    });
+  });
 });

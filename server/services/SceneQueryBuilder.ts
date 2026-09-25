@@ -1377,9 +1377,12 @@ class SceneQueryBuilder {
 
     // Need full JOINs if user data filters OR exclusions are applied
     if (hasUserDataFilters || applyExclusions) {
-      // Need full JOINs for accurate count with user data filters or exclusions
+      // COUNT(*) counts each scene once: the other LEFT JOINs in
+      // buildFromClause match at most one row each (a unique key), and the
+      // exclusion join, which can match two (global and per-instance), keeps a
+      // scene only when it matched none (e.id IS NULL).
       const countSql = `
-        SELECT COUNT(DISTINCT s.id || ':' || s.stashInstanceId) as total
+        SELECT COUNT(*) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;
@@ -1388,7 +1391,7 @@ class SceneQueryBuilder {
         countSql,
         ...countParams
       );
-      total = Number(countResult[0]?.total || 0);
+      total = Number(countResult[0]?.total ?? 0n);
     } else {
       // Fast path: count without JOINs (no user data filters and no exclusions)
       // Build WHERE clause without user data conditions
