@@ -1395,48 +1395,47 @@ async function processStudiosBatch(
     deletedAt = NULL
 `);
 
-  // Sync studio tags to StudioTag junction table
+  // Sync studio tags to the StudioTag junction table: every studio of the
+  // batch is rewritten, so one whose tags were all removed in Stash loses
+  // its rows
   const instanceId = stashInstanceId;
-  const oldLinks = { StudioTag: new Map<string, EntityRef[]>() };
+  const tagInserts: { studioId: string; tagId: string }[] = [];
   const incoming: IncomingEntity[] = [];
   for (const studio of validStudios) {
-    const entity: IncomingEntity = {
+    const tagIds = (studio.tags ?? [])
+      .filter((t: TagRef) => t?.id && validateEntityId(t.id))
+      .map((t: TagRef) => t.id);
+    for (const tagId of tagIds) tagInserts.push({ studioId: studio.id, tagId });
+    incoming.push({
       id: studio.id,
       updatedAt: studio.updated_at,
-    };
-    incoming.push(entity);
-    if (studio.tags && studio.tags.length > 0) {
-      const studioId = studio.id;
+      links: { StudioTag: tagIds },
+    });
+  }
 
-      // Delete existing tags for this studio, keeping the rows for the
-      // change diff
-      for (const [nearId, refs] of await deleteJunctionRows(
-        prisma,
-        "StudioTag",
-        [studioId],
-        instanceId
-      )) {
-        oldLinks.StudioTag.set(nearId, refs);
-      }
+  // Bulk delete existing tags for all studios in this batch, keeping the
+  // rows for the change diff
+  const oldLinks = {
+    StudioTag: await deleteJunctionRows(
+      prisma,
+      "StudioTag",
+      validStudios.map((s) => s.id),
+      instanceId
+    ),
+  };
 
-      // Insert new tags (filter to valid tag IDs)
-      const validTags = studio.tags.filter(
-        (t: TagRef) => t?.id && validateEntityId(t.id)
-      );
-      entity.links = { StudioTag: validTags.map((t: TagRef) => t.id) };
-      if (validTags.length > 0) {
-        const tagValues = validTags
-          .map(
-            (t: TagRef) =>
-              `('${escapeSql(studioId)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
-          )
-          .join(", ");
+  // Bulk insert all new tags
+  if (tagInserts.length > 0) {
+    const tagValues = tagInserts
+      .map(
+        (t) =>
+          `('${escapeSql(t.studioId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
+      )
+      .join(", ");
 
-        await prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-        );
-      }
-    }
+    await prisma.$executeRawUnsafe(
+      `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+    );
   }
 
   return detectChanges({
@@ -1628,48 +1627,46 @@ async function processGroupsBatch(
     deletedAt = NULL
 `);
 
-  // Sync group tags to GroupTag junction table
+  // Sync group tags to the GroupTag junction table: every group of the batch
+  // is rewritten, so one whose tags were all removed in Stash loses its rows
   const instanceId = stashInstanceId;
-  const oldLinks = { GroupTag: new Map<string, EntityRef[]>() };
+  const tagInserts: { groupId: string; tagId: string }[] = [];
   const incoming: IncomingEntity[] = [];
   for (const group of validGroups) {
-    const entity: IncomingEntity = {
+    const tagIds = (group.tags ?? [])
+      .filter((t: TagRef) => t?.id && validateEntityId(t.id))
+      .map((t: TagRef) => t.id);
+    for (const tagId of tagIds) tagInserts.push({ groupId: group.id, tagId });
+    incoming.push({
       id: group.id,
       updatedAt: group.updated_at,
-    };
-    incoming.push(entity);
-    if (group.tags && group.tags.length > 0) {
-      const groupId = group.id;
+      links: { GroupTag: tagIds },
+    });
+  }
 
-      // Delete existing tags for this group, keeping the rows for the
-      // change diff
-      for (const [nearId, refs] of await deleteJunctionRows(
-        prisma,
-        "GroupTag",
-        [groupId],
-        instanceId
-      )) {
-        oldLinks.GroupTag.set(nearId, refs);
-      }
+  // Bulk delete existing tags for all groups in this batch, keeping the rows
+  // for the change diff
+  const oldLinks = {
+    GroupTag: await deleteJunctionRows(
+      prisma,
+      "GroupTag",
+      validGroups.map((g) => g.id),
+      instanceId
+    ),
+  };
 
-      // Insert new tags (filter to valid tag IDs)
-      const validTags = group.tags.filter(
-        (t: TagRef) => t?.id && validateEntityId(t.id)
-      );
-      entity.links = { GroupTag: validTags.map((t: TagRef) => t.id) };
-      if (validTags.length > 0) {
-        const tagValues = validTags
-          .map(
-            (t: TagRef) =>
-              `('${escapeSql(groupId)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
-          )
-          .join(", ");
+  // Bulk insert all new tags
+  if (tagInserts.length > 0) {
+    const tagValues = tagInserts
+      .map(
+        (t) =>
+          `('${escapeSql(t.groupId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
+      )
+      .join(", ");
 
-        await prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-        );
-      }
-    }
+    await prisma.$executeRawUnsafe(
+      `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+    );
   }
 
   return detectChanges({

@@ -192,7 +192,7 @@ describe("detectChanges", () => {
   });
 
   it("a junction left out of an entity's links is not compared", () => {
-    // A studio with no incoming tags does not rewrite StudioTag today
+    // No StudioTag in the links: the batch did not rewrite it for this entity
     const changes = detectChanges({
       instanceId: INSTANCE,
       stored: stored({ "1": { updatedAt: UPDATED, deleted: false } }),
