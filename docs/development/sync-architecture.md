@@ -202,7 +202,7 @@ The user stats rebuild and the tag counts via performers follow it.
 
 ### Database Upkeep
 
-Last, unless the steps were skipped, Peek refreshes SQLite's planner statistics (`PRAGMA optimize`, which analyzes a table that has none or whose size changed about 25-fold since: 0.3 s the first time on a 26,000-scene library, 0.65 s with 200,000 scenes, under a millisecond after) and moves the write-ahead log into the database file (`wal_checkpoint(TRUNCATE)`). Each is one unit of the writer queue (`refreshPlannerStatistics` and `checkpointWal` in `utils/databaseMaintenance.ts`); a failure, or a checkpoint that open reads keep busy, is only logged. The shutdown runs both too.
+Last, unless the steps were skipped, Peek refreshes SQLite's planner statistics (`PRAGMA optimize`, which analyzes a table that has none or whose size changed about 25-fold since: 0.3 s the first time on a 26,000-scene library, 0.65 s with 200,000 scenes, under a millisecond after) and moves the write-ahead log into the database file (`wal_checkpoint(TRUNCATE)`). Each is one unit of the writer queue (`refreshPlannerStatistics` and `checkpointWal` in `utils/databaseMaintenance.ts`); a failure, or a checkpoint that open reads keep busy, is only logged. The shutdown runs both too, through the same queue.
 
 ---
 

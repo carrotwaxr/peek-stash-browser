@@ -43,8 +43,9 @@ export async function refreshPlannerStatistics(label: string): Promise<void> {
  * Moves the WAL's pages into the database file and empties it. It holds the
  * write lock while it waits (up to busy_timeout, 5 s) for readers of older
  * pages, such as a recompute's snapshot, to finish; one that outlasts the
- * wait leaves it unfinished, which SQLite reports as busy. The sync runs it
- * as a writer-queue unit, so user writes wait in the queue meanwhile.
+ * wait leaves it unfinished, which SQLite reports as busy. The sync and the
+ * shutdown run it as a writer-queue unit, so writes wait in the queue
+ * meanwhile.
  */
 export async function checkpointWal(): Promise<void> {
   try {
