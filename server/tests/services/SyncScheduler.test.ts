@@ -3,6 +3,10 @@
  * Peek to refetch a type clears that type's `SyncState` timestamps, and the
  * sync fetches it whole; the other types sync incrementally.
  *
+ * Once a day the startup sync or the scheduled tick is a full sync instead:
+ * when some type of an enabled instance has had no full sync in 24 hours
+ * (`lastFullSyncActual`).
+ *
  * The scheduler starts once an instance exists (the setup wizard starts it),
  * and a new sync interval only re-arms the timer: it never starts a sync.
  */
@@ -25,6 +29,16 @@ vi.mock("../../initializers/database.js", () => ({
 }));
 
 vi.mock("../../services/StashSyncService.js", () => ({
+  SYNC_ORDER: [
+    "tag",
+    "studio",
+    "performer",
+    "group",
+    "gallery",
+    "scene",
+    "clip",
+    "image",
+  ],
   stashSyncService: {
     fullSync: vi.fn(),
     smartIncrementalSync: vi.fn(),
@@ -53,9 +67,34 @@ const mockSync = vi.mocked(stashSyncService, true);
 const mockManager = vi.mocked(stashInstanceManager, true);
 const mockLogger = vi.mocked(logger, true);
 
-const TYPES = ["studio", "tag", "performer", "group", "gallery", "scene"];
+/** Every synced type, in sync order */
+const TYPES = [
+  "tag",
+  "studio",
+  "performer",
+  "group",
+  "gallery",
+  "scene",
+  "clip",
+  "image",
+];
 /** The types the startup check lists as missing when a row is absent */
-const SCHEDULER_TYPES = [...TYPES, "image"];
+const SCHEDULER_TYPES = [
+  "studio",
+  "tag",
+  "performer",
+  "group",
+  "gallery",
+  "scene",
+  "image",
+];
+
+const HOUR = 60 * 60_000;
+
+/** The time `hours` hours before now (the fake clock's, under fake timers). */
+function hoursAgo(hours: number): Date {
+  return new Date(Date.now() - hours * HOUR);
+}
 
 type SyncStateRow = Awaited<
   ReturnType<typeof mockPrisma.syncState.findMany>
@@ -63,12 +102,14 @@ type SyncStateRow = Awaited<
 
 /**
  * A `SyncState` row per type of `instance`, with the timestamps of `cleared`
- * set to null.
+ * set to null. Every type had its last full sync at `fullPassAt`, an hour
+ * ago by default: a migration clears only the timestamps.
  */
 function syncStates(
   cleared: readonly string[],
   instance = "default",
-  types: readonly string[] = TYPES
+  types: readonly string[] = TYPES,
+  fullPassAt: Date | null = hoursAgo(1)
 ): SyncStateRow[] {
   return types.map((entityType) => {
     const synced = !cleared.includes(entityType);
@@ -77,8 +118,31 @@ function syncStates(
       entityType,
       lastFullSyncTimestamp: synced ? "2026-09-20T10:00:00-07:00" : null,
       lastIncrementalSyncTimestamp: synced ? "2026-09-24T10:00:00-07:00" : null,
+      lastFullSyncActual: fullPassAt,
     });
   });
+}
+
+/** Both enabled instances synced every type, the full pass `hours` ago. */
+function everyInstanceSynced(hours = 1): SyncStateRow[] {
+  return [
+    ...syncStates([], "default", TYPES, hoursAgo(hours)),
+    ...syncStates([], "second", TYPES, hoursAgo(hours)),
+  ];
+}
+
+/** `rows` with one type's last full sync of one instance set to `at`. */
+function withFullPassAt(
+  rows: SyncStateRow[],
+  instance: string,
+  entityType: string,
+  at: Date | null
+): SyncStateRow[] {
+  return rows.map((row) =>
+    row.stashInstanceId === instance && row.entityType === entityType
+      ? { ...row, lastFullSyncActual: at }
+      : row
+  );
 }
 
 /** SyncState holds `rows`; the mock answers the query's instance filter. */
@@ -100,7 +164,7 @@ describe("performStartupSync", () => {
   });
 
   it("a type whose sync timestamps are cleared is fetched whole by the startup sync while the others sync incrementally", async () => {
-    storeSyncStates(syncStates(["group"]));
+    storeSyncStates([...syncStates(["group"]), ...syncStates([], "second")]);
 
     await syncScheduler["performStartupSync"]();
 
@@ -132,7 +196,7 @@ describe("performStartupSync", () => {
     expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
   });
 
-  it("logs each instance's completed and missing types: an instance never synced beside a synced one is fetched whole by the smart sync", async () => {
+  it("logs each instance's completed and missing types: an instance never synced beside a synced one makes the startup sync a full pass", async () => {
     storeSyncStates(syncStates([], "default", SCHEDULER_TYPES));
 
     await syncScheduler["performStartupSync"]();
@@ -152,8 +216,9 @@ describe("performStartupSync", () => {
       ],
       totalSyncStates: SCHEDULER_TYPES.length,
     });
-    expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
-    expect(mockSync.fullSync).not.toHaveBeenCalled();
+    // The second instance has had no full sync
+    expect(mockSync.fullSync).toHaveBeenCalledOnce();
+    expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
   });
 });
 
@@ -181,7 +246,7 @@ describe("an admin's abort is not a failure", () => {
     {
       caller: "the startup smart sync",
       run: async () => {
-        storeSyncStates(syncStates([]));
+        storeSyncStates(everyInstanceSynced());
         mockSync.smartIncrementalSync.mockImplementationOnce(aborted);
         await syncScheduler["performStartupSync"]();
       },
@@ -204,6 +269,7 @@ describe("an admin's abort is not a failure", () => {
       caller: "a scheduled sync",
       run: async () => {
         vi.useFakeTimers();
+        storeSyncStates(everyInstanceSynced());
         mockSync.incrementalSync.mockImplementationOnce(aborted);
         syncScheduler["startPollingInterval"](1);
         await vi.advanceTimersByTimeAsync(60_000);
@@ -228,7 +294,7 @@ describe("an admin's abort is not a failure", () => {
   });
 
   it("a sync that fails is still logged at error level", async () => {
-    storeSyncStates(syncStates([]));
+    storeSyncStates(everyInstanceSynced());
     mockSync.smartIncrementalSync.mockRejectedValueOnce(
       new Error("Stash is down")
     );
@@ -268,7 +334,7 @@ describe("start and the sync interval", () => {
       })
     );
     // Every type synced before: the startup sync is the smart one
-    storeSyncStates(syncStates([]));
+    storeSyncStates(everyInstanceSynced());
   });
 
   afterEach(() => {
@@ -292,6 +358,8 @@ describe("start and the sync interval", () => {
 
     expect(syncScheduler.isRunning()).toBe(true);
     expect(mockSync.fullSync).toHaveBeenCalledOnce();
+    // The startup full sync stored every type's state
+    storeSyncStates(everyInstanceSynced(0));
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
     expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
   });
@@ -362,5 +430,120 @@ describe("start and the sync interval", () => {
     // after it, 30 after the update
     await vi.advanceTimersByTimeAsync(30 * MINUTE);
     expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
+  });
+});
+
+describe("the daily full pass", () => {
+  const MINUTE = 60_000;
+
+  /**
+   * The state at the check, and whether a full pass is due. The ages are
+   * taken when the rows are stored, right before the check.
+   */
+  const cases: Array<{
+    name: string;
+    rows: () => SyncStateRow[];
+    full: boolean;
+  }> = [
+    {
+      name: "every type of both instances had its last full sync 23 hours ago",
+      rows: () => everyInstanceSynced(23),
+      full: false,
+    },
+    {
+      name: "the second instance's clip type had its last 24 hours and a minute ago",
+      rows: () =>
+        withFullPassAt(
+          everyInstanceSynced(23),
+          "second",
+          "clip",
+          new Date(Date.now() - 24 * HOUR - MINUTE)
+        ),
+      full: true,
+    },
+    {
+      name: "the second instance's clip type never recorded one",
+      rows: () =>
+        withFullPassAt(everyInstanceSynced(23), "second", "clip", null),
+      full: true,
+    },
+    {
+      name: "the default instance has no image row",
+      rows: () =>
+        everyInstanceSynced(23).filter(
+          (row) =>
+            !(row.stashInstanceId === "default" && row.entityType === "image")
+        ),
+      full: true,
+    },
+    {
+      name: "only an instance that is not enabled had its last three days ago",
+      rows: () => [
+        ...everyInstanceSynced(23),
+        ...syncStates([], "disabled", TYPES, hoursAgo(72)),
+      ],
+      full: false,
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    syncScheduler.stop();
+    vi.useRealTimers();
+    mockSync.isSyncing.mockReturnValue(false);
+  });
+
+  it.each(cases)(
+    "a scheduled tick runs a full sync when any enabled instance's oldest lastFullSyncActual is older than 24 hours, else an incremental one: $name",
+    async ({ rows, full }) => {
+      vi.useFakeTimers();
+      syncScheduler["startPollingInterval"](60);
+      await vi.advanceTimersByTimeAsync(60 * MINUTE - 1);
+      storeSyncStates(rows());
+
+      await vi.advanceTimersByTimeAsync(1);
+
+      await vi.waitFor(() => {
+        expect(
+          mockSync.fullSync.mock.calls.length +
+            mockSync.incrementalSync.mock.calls.length
+        ).toBe(1);
+      });
+      expect(mockSync.fullSync).toHaveBeenCalledTimes(full ? 1 : 0);
+      expect(mockSync.incrementalSync).toHaveBeenCalledTimes(full ? 0 : 1);
+      expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(cases)(
+    "the startup sync does the same: $name",
+    async ({ rows, full }) => {
+      storeSyncStates(rows());
+
+      await syncScheduler["performStartupSync"]();
+
+      expect(mockSync.fullSync).toHaveBeenCalledTimes(full ? 1 : 0);
+      expect(mockSync.smartIncrementalSync).toHaveBeenCalledTimes(full ? 0 : 1);
+    }
+  );
+
+  it("a tick while a sync runs starts nothing", async () => {
+    vi.useFakeTimers();
+    storeSyncStates(everyInstanceSynced(30));
+    mockSync.isSyncing.mockReturnValue(true);
+    syncScheduler["startPollingInterval"](60);
+
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+
+    await vi.waitFor(() => {
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Scheduled sync skipped - sync already in progress"
+      );
+    });
+    expect(mockSync.fullSync).not.toHaveBeenCalled();
+    expect(mockSync.incrementalSync).not.toHaveBeenCalled();
   });
 });

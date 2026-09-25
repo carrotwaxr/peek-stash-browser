@@ -10,8 +10,8 @@ Peek provides three sync strategies, each optimized for different use cases:
 
 | Sync Type | When Used | Performance | Data Freshness |
 |-----------|-----------|-------------|----------------|
-| **Full Sync** | Initial setup, manual trigger | Slowest | Complete |
-| **Incremental Sync** | Manual trigger with "since" parameter | Medium | Partial |
+| **Full Sync** | Initial setup, manual trigger, once a day | Slowest | Complete |
+| **Incremental Sync** | Scheduled interval, manual trigger | Medium | Partial |
 | **Smart Incremental Sync** | Automatic on startup | Fastest | Optimal |
 
 ---
@@ -25,7 +25,10 @@ Peek provides three sync strategies, each optimized for different use cases:
 **Triggered by:**
 - Initial setup (first sync)
 - Manual "Full Sync" button in UI
+- The daily full pass: once a day, automatically (see below)
 - Recovery from corrupted state
+
+**The daily full pass:** the startup sync, or a scheduled sync, is a full sync instead when some entity type of an enabled instance has had no full sync in the last 24 hours: its `lastFullSyncActual` is older, null, or it has no `SyncState` row. Every type fetched whole without an error records the time, an empty one included (a cleanup's skip or refusal does not stop it), and a full sync from the button counts too. The time is stored, so a restart does not start another pass, and the pass needs no setting. It is the catch-all for what the incremental syncs cannot see: edits Stash makes without moving `updated_at` that no refetch covers (a deleted studio on the collections and studios that named it, a merged tag's parent and child tags), a refetch that failed, an entity an incremental sync skipped while Stash was edited under it, and changes from a sync whose post-sync steps never ran before a restart. On a library of 100k scenes and 500k images it costs a few minutes of Stash reads and row writes once a day, in short batch transactions. A type whose sync keeps failing records no pass, so every scheduled sync is a full one until it syncs again (its error is in the sync status).
 
 An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
@@ -43,6 +46,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 **Purpose:** Sync only entities that changed since a given timestamp.
 
 **Triggered by:**
+- Scheduled sync intervals, when the daily full pass is not due
 - Manual "Incremental Sync" button with date/time parameter
 
 **Process:**
@@ -59,8 +63,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 **Purpose:** Efficiently sync only what's needed, per-entity-type.
 
 **Triggered by:**
-- Automatic on server startup
-- Scheduled sync intervals
+- Automatic on server startup, when the daily full pass is not due
 - Manual "Smart Sync" button
 
 **Process:**
@@ -208,6 +211,7 @@ CREATE TABLE SyncState (
   entityType TEXT,              -- 'scene', 'performer', 'studio', etc.
   lastFullSyncTimestamp TEXT,   -- RFC3339 timestamp from Stash
   lastIncrementalSyncTimestamp TEXT,
+  lastFullSyncActual DATETIME,  -- when the type was last fetched whole (the daily full pass reads it)
   lastError TEXT                -- what went wrong with this type in the last sync, or NULL
 );
 ```
@@ -238,9 +242,9 @@ An `updated_at` more than 5 minutes ahead of Peek's clock (clock skew allowance)
 
 **Symptom:** Changes made in Stash don't appear in Peek.
 
-**Cause:** Incremental and smart syncs fetch what Stash marks updated. Merging or deleting tags and performers, and deleting a studio, reach Peek on the next sync anyway: the entities that linked to them are fetched again (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at)). So do images and scenes added to or removed from a gallery from the gallery's side, and a deleted gallery's: the gallery's members are fetched again. Other edits that leave `updated_at` alone, such as deleting a studio that collections or other studios name, wait for a full sync, and so do the entities of a refetch that failed (its error is in the type's sync status).
+**Cause:** Incremental and smart syncs fetch what Stash marks updated. Merging or deleting tags and performers, and deleting a studio, reach Peek on the next sync anyway: the entities that linked to them are fetched again (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at)). So do images and scenes added to or removed from a gallery from the gallery's side, and a deleted gallery's: the gallery's members are fetched again. Other edits that leave `updated_at` alone, such as deleting a studio that collections or other studios name, wait for the next full sync, and so do the entities of a refetch that failed (its error is in the type's sync status). Peek runs one once a day on its own (see [the daily full pass](#full-sync)).
 
-**Solution:** Run a full sync.
+**Solution:** Wait for the daily full pass, or run a full sync.
 
 ### Sync appears stuck
 

@@ -685,6 +685,38 @@ describe("StashSyncService", () => {
       }
     );
 
+    it("fullSync records when each type was fetched whole, an empty one included, and not for a type whose pages failed", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      // Stash holds none of any type, and the studio pages fail
+      everyTypeSynced();
+      mockStashClient.findStudios.mockRejectedValue(
+        new StashRequestTimeoutError("FindStudios", 120_000)
+      );
+
+      await stashSyncService.fullSync(INSTANCE);
+
+      const typeById = new Map([...STATE_IDS].map(([type, id]) => [id, type]));
+      const recorded = Object.fromEntries(
+        mockPrisma.syncState.update.mock.calls.map(([args]) => [
+          String(typeById.get(Number(args.where.id))),
+          {
+            fullPass: args.data.lastFullSyncActual instanceof Date,
+            watermark: "lastFullSyncTimestamp" in args.data,
+          },
+        ])
+      );
+      // No entity came back, so no type's watermark moves
+      expect(recorded).toEqual(
+        Object.fromEntries(
+          TYPES.map((type) => [
+            type,
+            { fullPass: type !== "studio", watermark: false },
+          ])
+        )
+      );
+    });
+
     it("an abort during a type ends the sync and records no lastError", async () => {
       const { stashSyncService } =
         await import("../../services/StashSyncService.js");

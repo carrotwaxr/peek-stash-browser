@@ -4,16 +4,19 @@
  * Handles automatic sync triggers:
  * - Startup sync (full if first run, incremental otherwise)
  * - Polling interval (configurable, default 60 min)
+ * - The daily full pass: the startup sync or a scheduled one is a full sync
+ *   when some type of an enabled instance has had none in 24 hours
  * - Manual trigger support
  *
  * Note: Stash scan completion subscription is a future enhancement
  * that would require WebSocket connection to Stash GraphQL.
  */
+import type { SyncState } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { stashSyncService } from "./StashSyncService.js";
+import { SYNC_ORDER, stashSyncService } from "./StashSyncService.js";
 
 /** The types the startup check reports as never synced when a row is absent */
 const STARTUP_TYPES = [
@@ -29,6 +32,57 @@ const STARTUP_TYPES = [
 interface SyncSchedulerSettings {
   syncIntervalMinutes: number;
   enableScanSubscription: boolean;
+}
+
+/**
+ * How often every type of every enabled instance is fetched whole: the
+ * catch-all for what Stash changes without moving updated_at and what an
+ * incremental sync cannot see (see .claude/rules/sync.md).
+ */
+const FULL_PASS_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+type FullPassState = Pick<
+  SyncState,
+  "stashInstanceId" | "entityType" | "lastFullSyncActual"
+>;
+
+/** The type that makes the full pass due, and when it last had one. */
+type FullPassDue = {
+  instanceId: string;
+  entityType: string;
+  lastFullSyncActual: string | null;
+};
+
+/**
+ * The oldest full sync among the types of `instanceIds` in `states` when it
+ * is null, missing or older than FULL_PASS_INTERVAL_MS before `now` (the
+ * pass is due), else null.
+ */
+function fullPassDue(
+  instanceIds: readonly string[],
+  states: readonly FullPassState[],
+  now: number
+): FullPassDue | null {
+  let oldest: FullPassDue | null = null;
+  let oldestAt = Infinity;
+  for (const instanceId of instanceIds) {
+    for (const entityType of SYNC_ORDER) {
+      const at =
+        states.find(
+          (s) => s.stashInstanceId === instanceId && s.entityType === entityType
+        )?.lastFullSyncActual ?? null;
+      const time = at?.getTime() ?? -Infinity;
+      if (time < oldestAt) {
+        oldestAt = time;
+        oldest = {
+          instanceId,
+          entityType,
+          lastFullSyncActual: at?.toISOString() ?? null,
+        };
+      }
+    }
+  }
+  return oldestAt < now - FULL_PASS_INTERVAL_MS ? oldest : null;
 }
 
 class SyncScheduler {
@@ -198,24 +252,60 @@ class SyncScheduler {
     const intervalMs = intervalMinutes * 60 * 1000;
 
     this.intervalId = setInterval(
-      () =>
-        void (async () => {
-          if (stashSyncService.isSyncing()) {
-            logger.debug("Scheduled sync skipped - sync already in progress");
-            return;
-          }
-
-          logger.info("Scheduled incremental sync triggered");
-          try {
-            await stashSyncService.incrementalSync();
-          } catch (error) {
-            logSyncFailure("Scheduled sync failed", error);
-          }
-        })(),
+      () => void this.runScheduledSync(),
       intervalMs
     );
 
     logger.info(`Sync polling interval started: ${intervalMinutes} minutes`);
+  }
+
+  /**
+   * One scheduled tick: the daily full pass when it is due
+   * (`isFullPassDue`), else an incremental sync. Nothing while a sync runs.
+   */
+  private async runScheduledSync(): Promise<void> {
+    try {
+      const due = await this.isFullPassDue();
+      // Checked after the read, so the sync below takes the lock at once
+      if (stashSyncService.isSyncing()) {
+        logger.debug("Scheduled sync skipped - sync already in progress");
+        return;
+      }
+
+      if (due) {
+        logger.info(
+          "Scheduled full sync triggered: the daily full pass is due",
+          due
+        );
+        await stashSyncService.fullSync();
+      } else {
+        logger.info("Scheduled incremental sync triggered");
+        await stashSyncService.incrementalSync();
+      }
+    } catch (error) {
+      logSyncFailure("Scheduled sync failed", error);
+    }
+  }
+
+  /**
+   * Whether the daily full pass is due: some type of an enabled instance
+   * has had no full sync (`lastFullSyncActual` null, or no row) or none in
+   * FULL_PASS_INTERVAL_MS. The time is stored per type, so it survives
+   * restarts; a manual Full Sync resets it. Returns the type that makes it
+   * due, else null.
+   */
+  private async isFullPassDue(): Promise<FullPassDue | null> {
+    const instanceIds = stashInstanceManager.getAllEnabled().map((i) => i.id);
+    if (instanceIds.length === 0) return null;
+    const states = await prisma.syncState.findMany({
+      where: { stashInstanceId: { in: instanceIds } },
+      select: {
+        stashInstanceId: true,
+        entityType: true,
+        lastFullSyncActual: true,
+      },
+    });
+    return fullPassDue(instanceIds, states, Date.now());
   }
 
   private async performStartupSync(): Promise<void> {
@@ -249,13 +339,21 @@ class SyncScheduler {
       totalSyncStates: syncStates.length,
     });
 
-    // If no instance has ever synced any entity type, do a full sync. An
-    // instance that has not, beside one that has, is fetched whole by the
-    // smart sync below (its types have no timestamp).
-    if (instances.every((i) => i.completedTypes.length === 0)) {
-      logger.info(
-        "No previous sync found for any entity type, performing full sync"
-      );
+    // A full sync when no instance has ever synced any entity type, or when
+    // the daily full pass is due (an instance never synced, beside one that
+    // has, makes it due too)
+    const neverSynced = instances.every((i) => i.completedTypes.length === 0);
+    const due = neverSynced
+      ? null
+      : fullPassDue(instanceIds, syncStates, Date.now());
+    if (neverSynced || due) {
+      if (due) {
+        logger.info("The daily full pass is due, performing full sync", due);
+      } else {
+        logger.info(
+          "No previous sync found for any entity type, performing full sync"
+        );
+      }
       try {
         await stashSyncService.fullSync();
       } catch (error) {

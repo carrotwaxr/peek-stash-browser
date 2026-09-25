@@ -46,6 +46,7 @@ import {
   stashSyncService,
 } from "../../services/StashSyncService.js";
 import { SCOPE_LIMIT } from "../../services/SyncChangeSet.js";
+import { syncScheduler } from "../../services/SyncScheduler.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
@@ -1323,6 +1324,106 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
     expect(rows).toContainEqual({ entityType: "scene", entityId: ID });
     expect(rows).toContainEqual({ entityType: "image", entityId: ID });
   }, 60_000);
+
+  describe("the daily full pass", () => {
+    const HOUR = 60 * 60_000;
+
+    /** pc-a's SyncState rows, by type. */
+    async function statesOfA(): Promise<
+      Record<
+        string,
+        {
+          lastFullSyncTimestamp: string | null;
+          lastFullSyncActual: Date | null;
+        }
+      >
+    > {
+      const rows = await prisma.syncState.findMany({
+        where: { stashInstanceId: PC_A },
+        select: {
+          entityType: true,
+          lastFullSyncTimestamp: true,
+          lastFullSyncActual: true,
+        },
+      });
+      return Object.fromEntries(
+        rows.map(({ entityType, ...state }) => [entityType, state])
+      );
+    }
+
+    beforeEach(() => {
+      // pc-a is the only enabled instance the scheduler reads
+      vi.spyOn(stashInstanceManager, "getAllEnabled").mockReturnValue([
+        { id: PC_A, name: PC_A },
+      ]);
+    });
+
+    it("an instance whose clip type is empty runs an incremental sync on the next tick", async () => {
+      // pc-a has no clips, and its clip state has never recorded a full
+      // sync: until now an empty type never did
+      await prisma.stashClip.deleteMany({ where: { stashInstanceId: PC_A } });
+      await prisma.syncState.updateMany({
+        where: { stashInstanceId: PC_A, entityType: "clip" },
+        data: { lastFullSyncTimestamp: null, lastFullSyncActual: null },
+      });
+      stubInstances({ [PC_A]: { all: { ...library(), clip: [] } } });
+      const full = vi.spyOn(stashSyncService, "fullSync");
+      const incremental = vi.spyOn(stashSyncService, "incrementalSync");
+      const before = Date.now();
+
+      await syncScheduler["performStartupSync"]();
+
+      // The pass recorded the empty type's full sync; with nothing fetched
+      // its watermark stays empty
+      const clip = must((await statesOfA()).clip);
+      expect(clip.lastFullSyncActual?.getTime() ?? 0).toBeGreaterThanOrEqual(
+        before
+      );
+      expect(clip.lastFullSyncTimestamp).toBeNull();
+      expect(full).toHaveBeenCalledOnce();
+
+      await syncScheduler["runScheduledSync"]();
+
+      expect(full).toHaveBeenCalledOnce();
+      expect(incremental).toHaveBeenCalledOnce();
+    }, 60_000);
+
+    it("a full pass over an unchanged library writes no pending row and keeps gallery-inherited rows", async () => {
+      // pc-a's last full sync was 25 hours ago; Stash still holds what Peek does
+      await prisma.syncState.updateMany({
+        where: { stashInstanceId: PC_A },
+        data: { lastFullSyncActual: new Date(Date.now() - 25 * HOUR) },
+      });
+      stubInstances({ [PC_A]: { all: library() } });
+      const full = vi.spyOn(stashSyncService, "fullSync");
+      const before = Date.now();
+
+      await syncScheduler["performStartupSync"]();
+
+      // A full pass: every step, whole library, every user recomputed
+      expect(full).toHaveBeenCalledOnce();
+      expect(stepCalls()).toEqual({
+        sceneTags: 1,
+        gallery: 1,
+        imageCounts: 1,
+        stats: 1,
+        tagCounts: 1,
+      });
+      expect(recomputedRoles()).toEqual(["ab", "all", "b"]);
+      expect(await inheritedRows(PC_A)).toEqual({ performers: 1, tags: 1 });
+      expect(await pendingRows(Object.values(users))).toBe(0);
+      // Every type recorded the pass, so the next one is a day away
+      const recorded = Object.fromEntries(
+        Object.entries(await statesOfA()).map(([entityType, state]) => [
+          entityType,
+          (state.lastFullSyncActual?.getTime() ?? 0) >= before,
+        ])
+      );
+      expect(recorded).toEqual(
+        Object.fromEntries(SYNC_TYPES.map((entityType) => [entityType, true]))
+      );
+    }, 60_000);
+  });
 
   describe("scene tag inheritance", () => {
     beforeEach(async () => {

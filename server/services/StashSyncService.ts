@@ -3327,6 +3327,8 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     const startTime = Date.now();
     let result: SyncResult;
+    // Every page came back and was written
+    let fetched = true;
     try {
       result = await this.paginate(
         entityType,
@@ -3336,6 +3338,7 @@ class StashSyncService extends EventEmitter {
       );
     } catch (error) {
       if (this.isAbort(error)) throw new Error("Sync aborted");
+      fetched = false;
       const message = describeStashError(error);
       logger.error(`Failed to sync ${ENTITY_TABLES[entityType].plural}`, {
         stashInstanceId,
@@ -3376,7 +3379,7 @@ class StashSyncService extends EventEmitter {
       );
     }
 
-    await this.saveSyncState(stashInstanceId, syncType, result);
+    await this.saveSyncState(stashInstanceId, syncType, result, fetched);
     return result;
   }
 
@@ -4030,24 +4033,33 @@ class StashSyncService extends EventEmitter {
    * Without maxUpdatedAt from synced entities, we have no reliable timestamp to store.
    * A type that failed has none either, so the next sync retries it from its old time.
    *
+   * `lastFullSyncActual` is when the type was last fetched whole: written whenever a
+   * "full" type's pages all came back and were written (`fetched`), even when Stash
+   * holds none of the type. The daily full pass (SyncScheduler) reads it, so an empty
+   * type must not look as if it never had one. A cleanup's skip or refusal does not
+   * undo it: the type's rows were all fetched.
+   *
    * `lastError` is this run's problem with the type (runEntityType), or null when it
    * synced cleanly, so a type that recovers clears its earlier error.
    */
   private async saveSyncState(
     stashInstanceId: string,
     syncType: "full" | "incremental",
-    result: SyncResult
+    result: SyncResult,
+    fetched: boolean
   ): Promise<void> {
     const instanceId = stashInstanceId;
 
     // Actual time (real UTC) for display purposes
     const actualTime = new Date();
+    const fetchedWhole = syncType === "full" && fetched;
 
     // Build update data - only include sync timestamp if we have one
     const updateData: Record<string, unknown> = {
       lastSyncCount: result.synced,
       lastSyncDurationMs: result.durationMs,
       lastError: result.error ?? null,
+      ...(fetchedWhole ? { lastFullSyncActual: actualTime } : {}),
     };
 
     // Only update timestamp fields if we have a valid timestamp from synced entities
@@ -4055,7 +4067,6 @@ class StashSyncService extends EventEmitter {
       if (syncType === "full") {
         // Store raw timestamp string (new field)
         updateData.lastFullSyncTimestamp = result.maxUpdatedAt;
-        updateData.lastFullSyncActual = actualTime;
       } else {
         // Store raw timestamp string (new field)
         updateData.lastIncrementalSyncTimestamp = result.maxUpdatedAt;
@@ -4086,15 +4097,13 @@ class StashSyncService extends EventEmitter {
           entityType: result.entityType,
           ...(result.maxUpdatedAt
             ? syncType === "full"
-              ? {
-                  lastFullSyncTimestamp: result.maxUpdatedAt,
-                  lastFullSyncActual: actualTime,
-                }
+              ? { lastFullSyncTimestamp: result.maxUpdatedAt }
               : {
                   lastIncrementalSyncTimestamp: result.maxUpdatedAt,
                   lastIncrementalSyncActual: actualTime,
                 }
             : {}),
+          ...(fetchedWhole ? { lastFullSyncActual: actualTime } : {}),
           lastSyncCount: result.synced,
           lastSyncDurationMs: result.durationMs,
           lastError: result.error ?? null,
