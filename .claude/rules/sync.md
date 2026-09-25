@@ -38,6 +38,8 @@ paths:
 
 Keep all three when changing cleanup. The other entity types lack the ratio guard so far.
 
+Merges (`MergeReconciliationService`): the scene branch soft-deletes first and then calls `reconcileDeletedScenes(instanceId, deleted)`, so scenes that leave Stash together are never each other's target. A scene merges only into the one live scene of its own instance sharing its phash; with several it waits in Merge Recovery. Each scene cleanup starts with `reconcileRecentDeletions`, the catch-up for scenes soft-deleted in the last 24 hours with activity and no `MergeRecord` as source.
+
 ## Deleting an instance
 
 - Lock: the service runs one job at a time, `activeJob` (`"sync"` or `"instance-delete"`). `isSyncing()` is true while either holds it; `getSyncStatus().inProgress` only for a sync. `deleteInstance` throws `SyncBusyError` when the lock is held, and `deleteStashInstance` answers 409.

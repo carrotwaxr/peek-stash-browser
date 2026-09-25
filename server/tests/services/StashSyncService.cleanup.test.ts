@@ -156,8 +156,14 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 
 vi.mock("../../services/MergeReconciliationService.js", () => ({
   mergeReconciliationService: {
-    findPhashMatches: vi.fn().mockResolvedValue([]),
-    reconcileScene: vi.fn().mockResolvedValue(undefined),
+    reconcileDeletedScenes: vi.fn().mockResolvedValue({
+      merged: 0,
+      ambiguous: 0,
+    }),
+    reconcileRecentDeletions: vi.fn().mockResolvedValue({
+      merged: 0,
+      ambiguous: 0,
+    }),
   },
 }));
 
@@ -483,7 +489,9 @@ describe("StashSyncService Cleanup", () => {
       expect(result).toBe(0);
       // Mass deletion blocked: no soft-deletes, and no merge reconciliation either.
       expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
-      expect(mergeReconciliationService.reconcileScene).not.toHaveBeenCalled();
+      expect(
+        mergeReconciliationService.reconcileDeletedScenes
+      ).not.toHaveBeenCalled();
     });
 
     it("should proceed with scene cleanup when the delete ratio is under the threshold", async () => {
@@ -505,6 +513,23 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(2);
       expect(prisma.stashScene.updateMany).toHaveBeenCalled();
+      const reconcile = vi.mocked(
+        mergeReconciliationService.reconcileDeletedScenes
+      );
+      expect(reconcile).toHaveBeenCalledWith("test-instance", [
+        { id: "4", phash: null },
+        { id: "5", phash: null },
+      ]);
+      // Soft-deleted first, so scenes deleted together are never targets
+      expect(
+        must(
+          vi.mocked(prisma.stashScene.updateMany).mock.invocationCallOrder[0]
+        )
+      ).toBeLessThan(must(reconcile.mock.invocationCallOrder[0]));
+      // The catch-up for earlier cleanups runs before anything else
+      expect(
+        mergeReconciliationService.reconcileRecentDeletions
+      ).toHaveBeenCalledWith("test-instance");
     });
 
     it("should not apply the threshold when there are no live scenes locally", async () => {

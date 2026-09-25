@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { apiGet, apiPost } from "../../../api";
+import { makeCompositeKey } from "../../../utils/compositeKey";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
+/** A deleted scene with activity; its id is meaningful on its instance only */
 interface OrphanScene {
   id: string;
+  instanceId: string;
+  instanceName: string;
   title: string | null;
   deletedAt: string;
   phash: string | null;
@@ -14,18 +18,30 @@ interface OrphanScene {
   hasFavorites: boolean;
 }
 
+/** A live scene of the orphan's instance with the same phash */
 interface MatchResult {
   sceneId: string;
+  instanceId: string;
+  instanceName: string;
   title: string | null;
   similarity: string;
   recommended: boolean;
 }
 
+/** The orphan as "id:instanceId": its row key and its ref in the API paths */
+const orphanKey = (orphan: OrphanScene) =>
+  makeCompositeKey(orphan.id, orphan.instanceId);
+
+const orphanPath = (orphan: OrphanScene) =>
+  `/admin/orphaned-scenes/${encodeURIComponent(orphanKey(orphan))}`;
+
 const MergeRecoveryTab = () => {
   const [orphans, setOrphans] = useState<OrphanScene[]>([]);
   const [loading, setLoading] = useState(true);
+  // The orphan key being processed, or "all"
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedOrphan, setExpandedOrphan] = useState<string | null>(null);
+  // Matches and manual target ids by orphan key
   const [matches, setMatches] = useState<Record<string, MatchResult[]>>({});
   const [manualTargetId, setManualTargetId] = useState<Record<string, string>>(
     {}
@@ -49,31 +65,34 @@ const MergeRecoveryTab = () => {
     void fetchOrphans();
   }, [fetchOrphans]);
 
-  const fetchMatches = async (sceneId: string) => {
-    if (matches[sceneId]) return;
+  const fetchMatches = async (orphan: OrphanScene) => {
+    const key = orphanKey(orphan);
+    if (matches[key]) return;
     try {
       const data = await apiGet<{ matches: MatchResult[] }>(
-        `/admin/orphaned-scenes/${sceneId}/matches`
+        `${orphanPath(orphan)}/matches`
       );
-      setMatches((prev) => ({ ...prev, [sceneId]: data.matches }));
+      setMatches((prev) => ({ ...prev, [key]: data.matches }));
     } catch {
       showError("Failed to load matches");
     }
   };
 
-  const handleExpand = (sceneId: string) => {
-    if (expandedOrphan === sceneId) {
+  const handleExpand = (orphan: OrphanScene) => {
+    const key = orphanKey(orphan);
+    if (expandedOrphan === key) {
       setExpandedOrphan(null);
     } else {
-      setExpandedOrphan(sceneId);
-      void fetchMatches(sceneId);
+      setExpandedOrphan(key);
+      void fetchMatches(orphan);
     }
   };
 
-  const handleReconcile = async (sourceId: string, targetId: string) => {
+  /** Transfer to `targetId`, a scene id on the orphan's instance */
+  const handleReconcile = async (orphan: OrphanScene, targetId: string) => {
     try {
-      setProcessing(sourceId);
-      await apiPost(`/admin/orphaned-scenes/${sourceId}/reconcile`, {
+      setProcessing(orphanKey(orphan));
+      await apiPost(`${orphanPath(orphan)}/reconcile`, {
         targetSceneId: targetId,
       });
       showSuccess("Activity transferred successfully");
@@ -85,7 +104,7 @@ const MergeRecoveryTab = () => {
     }
   };
 
-  const handleDiscard = async (sceneId: string) => {
+  const handleDiscard = async (orphan: OrphanScene) => {
     if (
       !confirm(
         "Are you sure you want to discard this orphaned data? This cannot be undone."
@@ -94,8 +113,8 @@ const MergeRecoveryTab = () => {
       return;
     }
     try {
-      setProcessing(sceneId);
-      await apiPost(`/admin/orphaned-scenes/${sceneId}/discard`);
+      setProcessing(orphanKey(orphan));
+      await apiPost(`${orphanPath(orphan)}/discard`);
       showSuccess("Orphaned data discarded");
       void fetchOrphans();
     } catch {
@@ -108,7 +127,7 @@ const MergeRecoveryTab = () => {
   const handleReconcileAll = async () => {
     if (
       !confirm(
-        "This will auto-reconcile all orphans with exact PHASH matches. Continue?"
+        "This transfers the activity of every orphan with exactly one PHASH match on its instance. Orphans with several matches stay here for you to choose. Continue?"
       )
     ) {
       return;
@@ -175,11 +194,13 @@ const MergeRecoveryTab = () => {
             </p>
 
             {orphans.map((orphan) => {
-              const orphanMatches = matches[orphan.id];
-              const manualTarget = manualTargetId[orphan.id];
+              const key = orphanKey(orphan);
+              const orphanMatches = matches[key];
+              const manualTarget = manualTargetId[key];
+              const expanded = expandedOrphan === key;
               return (
                 <div
-                  key={orphan.id}
+                  key={key}
                   className="p-4 rounded-lg border"
                   style={{
                     backgroundColor: "var(--bg-secondary)",
@@ -188,14 +209,20 @@ const MergeRecoveryTab = () => {
                 >
                   <div
                     className="flex justify-between items-start cursor-pointer"
-                    onClick={() => handleExpand(orphan.id)}
+                    onClick={() => handleExpand(orphan)}
                   >
                     <div>
                       <h4
                         className="font-medium"
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {orphan.title || orphan.id}
+                        <span>{orphan.title || orphan.id}</span>{" "}
+                        <span
+                          className="text-sm font-normal"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          on {orphan.instanceName}
+                        </span>
                       </h4>
                       <p
                         className="text-sm"
@@ -216,7 +243,7 @@ const MergeRecoveryTab = () => {
                         {orphan.hasFavorites && " | Favorited"}
                       </p>
                     </div>
-                    {expandedOrphan === orphan.id ? (
+                    {expanded ? (
                       <ChevronDown
                         size={20}
                         style={{ color: "var(--text-secondary)" }}
@@ -229,7 +256,7 @@ const MergeRecoveryTab = () => {
                     )}
                   </div>
 
-                  {expandedOrphan === orphan.id && (
+                  {expanded && (
                     <div
                       className="mt-4 pt-4 border-t"
                       style={{ borderColor: "var(--border-color)" }}
@@ -259,7 +286,10 @@ const MergeRecoveryTab = () => {
                         <div className="space-y-2">
                           {orphanMatches.map((match) => (
                             <div
-                              key={match.sceneId}
+                              key={makeCompositeKey(
+                                match.sceneId,
+                                match.instanceId
+                              )}
                               className="flex justify-between items-center p-2 rounded"
                               style={{ backgroundColor: "var(--bg-card)" }}
                             >
@@ -277,9 +307,9 @@ const MergeRecoveryTab = () => {
                               </div>
                               <Button
                                 onClick={() =>
-                                  void handleReconcile(orphan.id, match.sceneId)
+                                  void handleReconcile(orphan, match.sceneId)
                                 }
-                                disabled={processing === orphan.id}
+                                disabled={processing === key}
                                 variant="primary"
                                 size="sm"
                               >
@@ -293,12 +323,12 @@ const MergeRecoveryTab = () => {
                       <div className="mt-4 flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="Manual scene ID"
+                          placeholder={`Scene ID on ${orphan.instanceName}`}
                           value={manualTarget || ""}
                           onChange={(e) =>
                             setManualTargetId((prev) => ({
                               ...prev,
-                              [orphan.id]: e.target.value,
+                              [key]: e.target.value,
                             }))
                           }
                           className="flex-1 p-2 rounded border"
@@ -311,10 +341,10 @@ const MergeRecoveryTab = () => {
                         <Button
                           onClick={() => {
                             if (manualTarget) {
-                              void handleReconcile(orphan.id, manualTarget);
+                              void handleReconcile(orphan, manualTarget);
                             }
                           }}
-                          disabled={!manualTarget || processing === orphan.id}
+                          disabled={!manualTarget || processing === key}
                           variant="primary"
                           size="sm"
                         >
@@ -324,8 +354,8 @@ const MergeRecoveryTab = () => {
 
                       <div className="mt-4">
                         <Button
-                          onClick={() => void handleDiscard(orphan.id)}
-                          disabled={processing === orphan.id}
+                          onClick={() => void handleDiscard(orphan)}
+                          disabled={processing === key}
                           variant="destructive"
                           size="sm"
                         >
