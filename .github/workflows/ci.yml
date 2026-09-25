@@ -96,6 +96,11 @@ jobs:
         env:
           DATABASE_URL: file:./test.db
 
+      # Replays every migration into a shadow database and diffs it against
+      # schema.prisma: a migration that leaves the two apart fails here
+      - name: Schema matches the migrations
+        run: npm run db:drift
+
       - name: Build shared types
         working-directory: shared
         run: npm ci && npm run build

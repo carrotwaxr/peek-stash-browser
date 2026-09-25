@@ -127,6 +127,7 @@ If the message names `carrotwaxr/peek-stash-browser:3.2.2` instead, your databas
 **Migration:** Automatic.
 
 - Two columns kept only so that a downgrade to 3.3.6 could still run are removed: the scene stream list, empty since 3.3.7, and the plaintext recovery key. A recovery key that 3.3.6 created after such a downgrade keeps working. Downgrading from this version needs the pre-migration backup Peek takes before upgrading: see [Downgrading](#downgrading).
+- The upgrade rebuilds the library tables once, so that the database matches Peek's schema exactly: about 3 seconds per 25,000 scenes plus their images, before the server starts listening. It needs about twice the database's size free on the data volume, for the backup and the rebuild.
 
 ### Version 3.3.7
 

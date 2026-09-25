@@ -734,6 +734,7 @@ model StashScene {
   @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
   @@index([deletedAt, title], map: "StashScene_browse_title_idx")
   @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -795,6 +796,7 @@ model StashPerformer {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -841,6 +843,7 @@ model StashStudio {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -897,6 +900,7 @@ model StashTag {
   @@index([favorite])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -939,6 +943,7 @@ model StashGroup {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -990,6 +995,8 @@ model StashGallery {
   @@index([stashUpdatedAt])
   @@index([deletedAt])
   @@index([coverImageId])
+  @@index([stashInstanceId])
+  @@index([studioId, deletedAt])
   @@id([id, stashInstanceId])
 }
 
@@ -1038,7 +1045,8 @@ model StashImage {
   @@index([stashUpdatedAt])
   @@index([deletedAt])
   @@index([title])
-  @@index([deletedAt, stashCreatedAt(sort: Desc)])
+  @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashImage_browse_idx")
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 
@@ -1079,6 +1087,7 @@ model StashClip {
   @@index([primaryTagId])
   @@index([isGenerated, deletedAt])
   @@index([deletedAt, stashCreatedAt(sort: Desc)])
+  @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
 

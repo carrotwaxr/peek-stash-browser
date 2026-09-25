@@ -40,6 +40,7 @@ Invariants:
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
 - Types: `cd server && npm run typecheck` (source, then tests) and `cd client && npm run typecheck` (CI runs both)
+- Schema: `cd server && npm run db:drift` after any change to `schema.prisma` or a migration; it must print an empty migration (CI checks it)
 - Build: `cd client && npm run build`
 - Release: `/pre-release`, then `/release-beta` or `/release-stable`
 
