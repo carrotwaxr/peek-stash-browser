@@ -280,11 +280,6 @@
       "count": 2
     }
   },
-  "routes/sync.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
   "scripts/generate-api-docs.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 3

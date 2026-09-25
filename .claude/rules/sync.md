@@ -16,7 +16,6 @@ paths:
 
 - `fullSync`: every entity, then every post-sync step.
 - `incrementalSync` and `smartIncrementalSync` (the startup path, from `SyncScheduler`): entities changed since the last sync, then the post-sync steps below.
-- `syncSingleEntity`, from the plugin webhook in `routes/sync.ts`: one entity, and no post-sync steps at all.
 
 ## Ordering
 

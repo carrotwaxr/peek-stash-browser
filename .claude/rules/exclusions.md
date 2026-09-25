@@ -34,7 +34,7 @@ paths:
 
 - Saving restrictions (`updateUserRestrictions` in `controllers/user.ts`) runs a full recompute for that user.
 - Hiding requires visibility: `checkHideTarget` in `controllers/user.ts` answers 404 for anything the user can't see; a repeat hide succeeds without writing. It then calls `addHiddenEntity`, which adds that entity and its cascades but skips the empty-entity phase and the stats update, and never overwrites an existing row. Unhiding queues a full recompute in the background without awaiting it.
-- `fullSync`, `incrementalSync` and `smartIncrementalSync` end with `recomputeAllUsers`. The plugin webhook's `syncSingleEntity` does not.
+- `fullSync`, `incrementalSync` and `smartIncrementalSync` end with `recomputeAllUsers`.
 
 ## Reading exclusions
 

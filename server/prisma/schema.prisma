@@ -1305,7 +1305,6 @@ model SyncSettings {
   id                     Int     @id @default(1) // Singleton
   syncIntervalMinutes    Int     @default(60) // Default 60 min (current behavior)
   enableScanSubscription Boolean @default(true) // Subscribe to scanCompleteSubscribe
-  enablePluginWebhook    Boolean @default(false) // Accept webhook from Stash plugin
 
   updatedAt DateTime @updatedAt
 }

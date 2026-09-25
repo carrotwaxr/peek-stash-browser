@@ -1084,125 +1084,6 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  /**
-   * Sync a single entity (for webhook updates)
-   * Note: For entity types without singular find methods, we use findXxx with ids filter
-   */
-  async syncSingleEntity(
-    entityType: EntityType,
-    entityId: string,
-    action: "create" | "update" | "delete",
-    stashInstanceId?: string
-  ): Promise<void> {
-    // Resolve instance ID - use first enabled instance if not specified
-    const instanceId = stashInstanceId ?? this.getFirstEnabledInstanceId();
-    if (!instanceId) {
-      logger.warn("Cannot sync single entity: no enabled Stash instances");
-      return;
-    }
-
-    logger.info("Single entity sync", {
-      entityType,
-      entityId,
-      action,
-      instanceId,
-    });
-
-    if (action === "delete") {
-      // Soft delete the entity
-      await this.softDeleteEntity(entityType, entityId, instanceId);
-      return;
-    }
-
-    // Fetch and upsert the entity
-    const stash = this.getStashClient(instanceId);
-
-    switch (entityType) {
-      case "scene": {
-        // Use findScenes with ids filter for single scene
-        // findScenes returns SyncSceneFull, which is structurally compatible with SyncScene
-        // (missing fields like urls/captions are handled by || [] fallbacks in processScenesBatch)
-        const result = await stash.findScenes({ ids: [entityId] });
-        if (result.findScenes.scenes.length > 0) {
-          await this.processScenesBatch(
-            result.findScenes.scenes as unknown as SyncScene[],
-            instanceId,
-            0,
-            1
-          );
-        }
-        break;
-      }
-      case "performer": {
-        const result = await stash.findPerformers({ ids: [entityId] });
-        if (result.findPerformers.performers.length > 0) {
-          await this.processPerformersBatch(
-            result.findPerformers.performers,
-            instanceId
-          );
-        }
-        break;
-      }
-      case "studio": {
-        const result = await stash.findStudios({ ids: [entityId] });
-        if (result.findStudios.studios.length > 0) {
-          await this.processStudiosBatch(
-            result.findStudios.studios,
-            instanceId
-          );
-        }
-        break;
-      }
-      case "tag": {
-        const result = await stash.findTags({ ids: [entityId] });
-        if (result.findTags.tags.length > 0) {
-          await this.processTagsBatch(result.findTags.tags, instanceId);
-        }
-        break;
-      }
-      case "group": {
-        const result = await stash.findGroup({ id: entityId });
-        if (result.findGroup) {
-          await this.processGroupsBatch(
-            [result.findGroup as SyncGroup],
-            instanceId
-          );
-        }
-        break;
-      }
-      case "gallery": {
-        const result = await stash.findGallery({ id: entityId });
-        if (result.findGallery) {
-          await this.processGalleriesBatch(
-            [result.findGallery as SyncGallery],
-            instanceId
-          );
-        }
-        break;
-      }
-      case "image": {
-        const result = await stash.findImages({
-          image_ids: [parseInt(entityId, 10)],
-        });
-        if (result.findImages.images.length > 0) {
-          await this.processImagesBatch(result.findImages.images, instanceId);
-        }
-        break;
-      }
-      case "clip":
-        // The webhook route (routes/sync.ts) rejects clips
-        break;
-    }
-  }
-
-  /**
-   * Get the ID of the first enabled Stash instance
-   */
-  private getFirstEnabledInstanceId(): string | undefined {
-    const enabledInstances = stashInstanceManager.getAllEnabled();
-    return enabledInstances.length > 0 ? enabledInstances[0]?.id : undefined;
-  }
-
   // ==================== Scene Sync ====================
 
   private async syncScenes(
@@ -3545,82 +3426,6 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async softDeleteEntity(
-    entityType: EntityType,
-    entityId: string,
-    stashInstanceId: string
-  ): Promise<void> {
-    const now = new Date();
-    const instanceId = stashInstanceId;
-
-    switch (entityType) {
-      case "scene":
-        await prisma.stashScene.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "performer":
-        await prisma.stashPerformer.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "studio":
-        await prisma.stashStudio.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "tag":
-        await prisma.stashTag.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "group":
-        await prisma.stashGroup.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "gallery":
-        await prisma.stashGallery.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "image":
-        await prisma.stashImage.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-      case "clip":
-        await prisma.stashClip.update({
-          where: {
-            id_stashInstanceId: { id: entityId, stashInstanceId: instanceId },
-          },
-          data: { deletedAt: now },
-        });
-        break;
-    }
-  }
-
   /**
    * Save sync state for a single entity type immediately after sync completes.
    *
@@ -3785,7 +3590,6 @@ class StashSyncService extends EventEmitter {
       | {
           syncIntervalMinutes: number;
           enableScanSubscription: boolean;
-          enablePluginWebhook: boolean;
         };
     inProgress: boolean;
   }> {
@@ -3800,7 +3604,6 @@ class StashSyncService extends EventEmitter {
       settings: settings ?? {
         syncIntervalMinutes: 60,
         enableScanSubscription: true,
-        enablePluginWebhook: false,
       },
       inProgress: this.syncInProgress,
     };
