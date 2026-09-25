@@ -1779,13 +1779,12 @@ class StashSyncService extends EventEmitter {
           // 2. Exceeding SQLite's parameter limit (~32k)
           //
           // The CREATE TEMP TABLE -> INSERT -> SELECT (NOT IN) -> DROP sequence MUST run on a
-          // single connection: a TEMP table is connection-scoped, so if the SELECT landed on a
-          // different pooled connection it would see an empty table and mark the entire library
-          // for deletion (#526). Peek pins connection_limit=1 today, but we run the whole
-          // sequence inside one interactive transaction so the guarantee holds explicitly
-          // regardless of pool/adapter configuration. The transaction is kept short - it only
-          // computes the delete-set; reconciliation and the soft-delete writes happen outside,
-          // after the safety threshold check below.
+          // single connection: a TEMP table is connection-scoped, and Prisma pools several
+          // connections, so a SELECT on another one would see an empty table and mark the entire
+          // library for deletion (#526). The TEMP table lives on one connection inside this
+          // interactive transaction, which holds that connection from CREATE to DROP. The
+          // transaction is kept short - it only computes the delete-set; reconciliation and the
+          // soft-delete writes happen outside, after the safety threshold check below.
           const sceneBatchSize = 500;
           const scenesToDelete = await prisma.$transaction(
             async (tx) => {
