@@ -27,6 +27,7 @@ Write migrations by hand:
    - Foreign keys go off before `BEGIN`: inside a transaction the pragma does nothing, and a rebuild's `DROP TABLE` would cascade.
    - No other `BEGIN`, `COMMIT`, `PRAGMA foreign_keys` or `PRAGMA defer_foreign_keys` in between: strip the pairs Prisma generates.
    - SQLite cannot change a column or a primary key in place: build `new_X`, copy the rows, drop `X`, rename `new_X` to `X`. `20260126000000_composite_entity_keys` shows the steps (in the older form, without the transaction; leave out its `scene_fts` triggers, which `20260925000100_drop_scene_fts` dropped with their table).
+   - A rebuild copies a junction row only where both parents exist (`WHERE EXISTS` on each composite key), and `PRAGMA foreign_key_check` is empty afterwards on a copy of the prod snapshot. Rows without a parent come from deletes run with foreign keys off: the `sqlite3` CLI starts with `foreign_keys=OFF`, so run `PRAGMA foreign_keys=ON;` before deleting rows by hand. The integration run checks the same at teardown (`findForeignKeyViolations`, `server/integration/helpers/foreignKeyCheck.ts`): a replay run fails on any violation, a live run logs them.
    - A migration that rebuilds tables ends, before `COMMIT`, with the foreign-key guard over the tables it rebuilt. A row whose parent is missing aborts the migration (SQLite error 275), and it rolls back:
 
      ```sql
