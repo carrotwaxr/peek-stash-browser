@@ -10,7 +10,7 @@ paths:
 
 ## Writing a migration
 
-`prisma migrate dev` reads the `scene_fts` FTS5 table and its triggers as drift and offers to reset the database. Write migrations by hand:
+Write migrations by hand:
 
 1. Create `server/prisma/migrations/YYYYMMDD000000_short_name/migration.sql`, dated after the newest folder.
 2. Write the SQL in one transaction, so a failure rolls back every statement and the next start can retry it:
@@ -26,7 +26,7 @@ paths:
    - Prisma runs a migration statement by statement; the wrapper is what makes it atomic. `isAtomicMigration` (`server/initializers/migrations.ts`) checks the form, and `tests/prisma/migrationFiles.test.ts` holds every folder from `20260925000000` on to it.
    - Foreign keys go off before `BEGIN`: inside a transaction the pragma does nothing, and a rebuild's `DROP TABLE` would cascade.
    - No other `BEGIN`, `COMMIT`, `PRAGMA foreign_keys` or `PRAGMA defer_foreign_keys` in between: strip the pairs Prisma generates.
-   - SQLite cannot change a column or a primary key in place: build `new_X`, copy the rows, drop `X`, rename `new_X` to `X`. `20260126000000_composite_entity_keys` shows the steps (in the older form, without the transaction).
+   - SQLite cannot change a column or a primary key in place: build `new_X`, copy the rows, drop `X`, rename `new_X` to `X`. `20260126000000_composite_entity_keys` shows the steps (in the older form, without the transaction; leave out its `scene_fts` triggers, which `20260925000100_drop_scene_fts` dropped with their table).
    - A migration that rebuilds tables ends, before `COMMIT`, with the foreign-key guard over the tables it rebuilt. A row whose parent is missing aborts the migration (SQLite error 275), and it rolls back:
 
      ```sql
@@ -35,10 +35,9 @@ paths:
      DROP TABLE "_fk_guard";
      ```
 
-3. Rebuilding `StashScene` drops the `scene_fts_insert`, `scene_fts_delete` and `scene_fts_update` triggers. Create them again in the same migration, as that example does.
-4. A migration that changes what sync stores, so the cached rows must be fetched again, says so in its own SQL: `UPDATE "SyncState" SET "lastFullSyncTimestamp" = NULL, "lastIncrementalSyncTimestamp" = NULL WHERE "entityType" IN ('scene', ...);`. Name only the types it affects.
-5. Update `schema.prisma` to match the SQL exactly.
-6. `cd server && npx prisma generate`, then apply with `npx prisma migrate deploy` against a scratch database. Then `docker compose restart peek-server`: the dev container has its own `node_modules`, and its start regenerates the client and applies the migration.
+3. A migration that changes what sync stores, so the cached rows must be fetched again, says so in its own SQL: `UPDATE "SyncState" SET "lastFullSyncTimestamp" = NULL, "lastIncrementalSyncTimestamp" = NULL WHERE "entityType" IN ('scene', ...);`. Name only the types it affects.
+4. Update `schema.prisma` to match the SQL exactly.
+5. `cd server && npx prisma generate`, then apply with `npx prisma migrate deploy` against a scratch database. Then `docker compose restart peek-server`: the dev container has its own `node_modules`, and its start regenerates the client and applies the migration.
 
 ## How migrations run
 

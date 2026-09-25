@@ -733,68 +733,6 @@ describe("StashEntityService", () => {
     });
   });
 
-  describe("FTS Search", () => {
-    it("searchScenes returns transformed results from FTS5", async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([
-        { ...mockCachedScene, id: "scene-fts-1", title: "FTS Match" },
-      ]);
-
-      const results = await stashEntityService.searchScenes("test query");
-
-      expect(results).toHaveLength(1);
-      expect(must(results[0]).id).toBe("scene-fts-1");
-      expect(must(results[0]).title).toBe("FTS Match");
-    });
-
-    it("searchScenes falls back to LIKE on FTS error", async () => {
-      // FTS fails
-      mockPrisma.$queryRaw.mockRejectedValue(new Error("fts5 syntax error"));
-      // LIKE fallback
-      mockPrisma.stashScene.findMany.mockResolvedValue([
-        { ...mockCachedScene, id: "scene-like-1", title: "LIKE Match" },
-      ]);
-
-      const results = await stashEntityService.searchScenes("test");
-
-      expect(results).toHaveLength(1);
-      expect(must(results[0]).id).toBe("scene-like-1");
-    });
-
-    it("searchPerformers returns transformed results from FTS5", async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([
-        {
-          ...mockCachedPerformer,
-          id: "perf-fts-1",
-          name: "FTS Performer",
-          stashInstanceId: "test-instance",
-        },
-      ]);
-
-      const results = await stashEntityService.searchPerformers("test");
-
-      expect(results).toHaveLength(1);
-      expect(must(results[0]).id).toBe("perf-fts-1");
-      expect(must(results[0]).name).toBe("FTS Performer");
-    });
-
-    it("searchPerformers falls back to LIKE on FTS error", async () => {
-      mockPrisma.$queryRaw.mockRejectedValue(new Error("fts5 error"));
-      mockPrisma.stashPerformer.findMany.mockResolvedValue([
-        {
-          ...mockCachedPerformer,
-          id: "perf-like-1",
-          name: "LIKE Performer",
-          stashInstanceId: "test-instance",
-        },
-      ]);
-
-      const results = await stashEntityService.searchPerformers("query");
-
-      expect(results).toHaveLength(1);
-      expect(must(results[0]).id).toBe("perf-like-1");
-    });
-  });
-
   describe("Image Queries", () => {
     const mockCachedImage = partialRow<
       Prisma.StashImageGetPayload<{
