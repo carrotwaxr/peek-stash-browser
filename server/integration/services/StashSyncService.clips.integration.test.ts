@@ -176,6 +176,7 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
           enabled: true,
           // After the test Stash, which stays the highest-priority instance
           priority: 970 + i,
+          firstSyncedAt: new Date(),
         },
       });
     }

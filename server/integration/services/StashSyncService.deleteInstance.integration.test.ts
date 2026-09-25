@@ -341,6 +341,7 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
           apiKey: "delete-it-key",
           enabled: false,
           priority: 950 + priority,
+          firstSyncedAt: new Date(),
         },
       });
       await seedLibrary(id);

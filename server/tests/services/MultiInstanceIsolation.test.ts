@@ -29,9 +29,9 @@ vi.mock(
 );
 
 // Mock UserInstanceService: the exclusion compute resolves hides on the
-// user's allowed instances
+// user's instance scope
 vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["inst-a", "inst-b"]),
+  getUserInstanceScope: vi.fn().mockResolvedValue(["inst-a", "inst-b"]),
   buildInstanceFilterClause: vi
     .fn()
     .mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {

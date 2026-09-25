@@ -71,6 +71,7 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
         url: `http://${TEST_INSTANCE}.invalid/graphql`,
         apiKey: "x",
         enabled: true,
+        firstSyncedAt: new Date(),
       },
     });
     await prisma.stashTag.createMany({

@@ -63,7 +63,6 @@ import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import {
   buildInstanceFilterClause,
-  getUserAllowedInstanceIds,
   getUserInstanceScope,
 } from "./UserInstanceService.js";
 import {
@@ -515,8 +514,10 @@ class ExclusionComputationService {
     // Rule 7: restriction rows stay inert for admins; hides still apply.
     const applyRestrictions = restrictionsApplyTo(user.role);
 
-    // Fetch allowed instance IDs for this user, scopes all phases
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+    // The user's instance scope bounds every phase. It keeps an instance on
+    // its first sync, which nobody sees yet, so its rows exist before it
+    // shows; a failed read fails the recompute and keeps the stored rows
+    const allowedInstanceIds = await getUserInstanceScope(userId);
 
     const written = await withComputeConnection(async (db) => {
       // The swap keeps `pending` holds written from here on. Taken before the
@@ -1971,7 +1972,9 @@ class ExclusionComputationService {
       instanceId,
     });
 
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+    // The scope, as the full recompute uses: an instance on its first sync
+    // gets the hide's rows before it shows
+    const allowedInstanceIds = await getUserInstanceScope(userId);
 
     await withComputeConnection(async (db) => {
       try {

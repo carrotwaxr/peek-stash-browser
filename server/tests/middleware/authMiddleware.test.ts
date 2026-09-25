@@ -2,7 +2,7 @@
  * Unit Tests for Auth Middleware Functions
  *
  * Tests authenticate, authenticateToken, requireAdmin, and requireCacheReady
- * middleware functions with mocked Prisma and StashEntityService.
+ * middleware functions with mocked Prisma and UserInstanceService.
  * Covers proxy auth flow, JWT token validation, token refresh, role checks,
  * and cache readiness.
  */
@@ -29,7 +29,7 @@ import {
   setTokenCookie,
 } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   _resetJwtSecretForTesting,
   getJwtSecret,
@@ -50,11 +50,9 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-// Mock StashEntityService
-vi.mock("../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    isReady: vi.fn(),
-  },
+// The instances each user sees (enabled, selected, first sync done)
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(),
 }));
 
 // Mock logger
@@ -69,7 +67,7 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockEntityService = vi.mocked(stashEntityService);
+const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 /** The fields the middleware's user lookup selects. */
 const MOCK_USER: User = partialRow({
@@ -725,29 +723,48 @@ describe("Auth Middleware", () => {
   });
 
   describe("requireCacheReady", () => {
-    it("calls next when cache is ready", async () => {
-      mockEntityService.isReady.mockResolvedValue(true);
-      const req = createMockReq();
-      const { res } = createMockRes();
+    it("requireCacheReady uses the user's allowed instances", async () => {
+      mockAllowedInstances.mockResolvedValue(["inst-a"]);
+      const req = createMockReq({ user: MOCK_USER });
+      const { res, statusFn } = createMockRes();
 
       await requireCacheReady(req, res, nextFn);
 
-      expect(nextFn).toHaveBeenCalled();
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_USER.id
+      );
+      expect(nextFn).toHaveBeenCalledOnce();
+      expect(statusFn).not.toHaveBeenCalled();
     });
 
-    it("returns 503 when cache is not ready", async () => {
-      mockEntityService.isReady.mockResolvedValue(false);
-      const req = createMockReq();
+    it("answers 503 ready:false when none of the user's instances has finished its first sync", async () => {
+      // A fresh install, or a user whose every instance is on its first sync
+      mockAllowedInstances.mockResolvedValue([]);
+      const req = createMockReq({ user: MOCK_ADMIN });
       const { res, statusFn, jsonFn } = createMockRes();
 
       await requireCacheReady(req, res, nextFn);
 
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_ADMIN.id
+      );
       expect(statusFn).toHaveBeenCalledWith(503);
       expect(jsonFn).toHaveBeenCalledWith({
         error: "Server is initializing",
         message: "Cache is still loading. Please wait a moment and try again.",
         ready: false,
       });
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("answers 401 without a signed-in user", async () => {
+      const req = createMockReq();
+      const { res, statusFn } = createMockRes();
+
+      await requireCacheReady(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(mockAllowedInstances).not.toHaveBeenCalled();
       expect(nextFn).not.toHaveBeenCalled();
     });
   });

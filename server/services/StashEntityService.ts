@@ -1816,15 +1816,17 @@ class StashEntityService {
   }
 
   /**
-   * The cache is ready once some enabled instance has synced its scenes.
+   * The cache is ready once some enabled instance has finished its first
+   * sync, its users' exclusions computed (`StashInstance.firstSyncedAt`),
+   * for `/api/stats`. The library routes check each user's own instances
+   * instead (requireCacheReady).
    */
   async isReady(): Promise<boolean> {
-    const states = await this.enabledSceneSyncStates();
-    return states.some(
-      (state) =>
-        (state.lastFullSyncTimestamp ?? state.lastIncrementalSyncTimestamp) !==
-        null
-    );
+    const ready = await prisma.stashInstance.findFirst({
+      where: { enabled: true, firstSyncedAt: { not: null } },
+      select: { id: true },
+    });
+    return ready !== null;
   }
 
   /**

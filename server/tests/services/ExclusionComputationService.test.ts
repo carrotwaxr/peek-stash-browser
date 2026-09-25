@@ -29,18 +29,15 @@ import {
 } from "../../prisma/computeClient.js";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import {
-  getUserAllowedInstanceIds,
-  getUserInstanceScope,
-} from "../../services/UserInstanceService.js";
+import { getUserInstanceScope } from "../../services/UserInstanceService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
-// Mock UserInstanceService before importing service
+// Mock UserInstanceService before importing service. The compute runs over
+// the user's instance scope, first-syncing instances included
 vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["A"]),
   getUserInstanceScope: vi.fn().mockResolvedValue(["A"]),
   buildInstanceFilterClause: vi
     .fn()
@@ -74,7 +71,7 @@ vi.mock("../../utils/dbWrite.js", async (importOriginal) => {
 });
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
+const mockInstanceScope = vi.mocked(getUserInstanceScope);
 const mockDbWrite = vi.mocked(dbWrite);
 const mockWithComputeConnection = vi.mocked(withComputeConnection);
 
@@ -164,7 +161,7 @@ function sqlFrom(from: RegExp): string[] {
 /** Default mocks for a full, empty recompute of a USER on instance A. */
 function setupPipeline(allowed: string[] = ["A"]) {
   vi.clearAllMocks();
-  mockAllowedInstances.mockResolvedValue(allowed);
+  mockInstanceScope.mockResolvedValue(allowed);
   mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
   mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
   mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
@@ -2055,7 +2052,7 @@ describe("recomputeAllUsers", () => {
 });
 
 describe("recomputeUsersForInstances", () => {
-  const mockScope = vi.mocked(getUserInstanceScope);
+  const mockScope = mockInstanceScope;
   let recomputeForUser: MockInstance<
     typeof exclusionComputationService.recomputeForUser
   >;

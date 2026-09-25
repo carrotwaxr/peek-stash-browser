@@ -147,33 +147,73 @@ describeWithDb("EntityAccessService (integration)", () => {
     }
   });
 
+  it("denies an instance on its first sync, whatever the user", async () => {
+    await prisma.stashInstance.update({
+      where: { id: FX.B },
+      data: { firstSyncedAt: null },
+    });
+    try {
+      for (const user of [u, v, w]) {
+        expect(
+          await canUserAccessEntity(user, "scene", FX_ID.B_ONLY, FX.B)
+        ).toBe(false);
+        expect(
+          await getVisibleEntityKeys(user, "scene", [
+            { id: FX_ID.SAME, instanceId: FX.A },
+            { id: FX_ID.SAME, instanceId: FX.B },
+          ])
+        ).toEqual(new Set([entityRefKey(FX_ID.SAME, FX.A)]));
+      }
+      // The legacy guess skips it too
+      expect(
+        await resolveAccessibleInstanceId(v, "scene", FX_ID.B_ONLY, undefined)
+      ).toBeNull();
+    } finally {
+      await prisma.stashInstance.update({
+        where: { id: FX.B },
+        data: { firstSyncedAt: new Date() },
+      });
+    }
+  });
+
   it("agrees with getUserAllowedInstanceIds", async () => {
     const probes: [string, string][] = [
       [FX_ID.SAME, FX.A],
       [FX_ID.B_ONLY, FX.B],
       [FX_ID.ON_OFF, FX.OFF],
     ];
-    const selections: string[][] = [[], [FX.A], [FX.OFF]];
+    const selections: string[][] = [[], [FX.A], [FX.B], [FX.OFF]];
 
     try {
-      for (const selection of selections) {
-        await prisma.userStashInstance.deleteMany({ where: { userId: w } });
-        for (const instanceId of selection) {
-          await prisma.userStashInstance.create({
-            data: { userId: w, instanceId },
-          });
-        }
-        const allowed = await getUserAllowedInstanceIds(w);
+      // B synced, then B on its first sync
+      for (const bFirstSyncedAt of [new Date(), null]) {
+        await prisma.stashInstance.update({
+          where: { id: FX.B },
+          data: { firstSyncedAt: bFirstSyncedAt },
+        });
+        for (const selection of selections) {
+          await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+          for (const instanceId of selection) {
+            await prisma.userStashInstance.create({
+              data: { userId: w, instanceId },
+            });
+          }
+          const allowed = await getUserAllowedInstanceIds(w);
 
-        for (const [id, inst] of probes) {
-          expect(
-            await canUserAccessEntity(w, "scene", id, inst),
-            `selection [${selection.join(",")}], ${id}@${inst}`
-          ).toBe(allowed.includes(inst));
+          for (const [id, inst] of probes) {
+            expect(
+              await canUserAccessEntity(w, "scene", id, inst),
+              `B synced ${String(bFirstSyncedAt !== null)}, selection [${selection.join(",")}], ${id}@${inst}`
+            ).toBe(allowed.includes(inst));
+          }
         }
       }
     } finally {
       await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+      await prisma.stashInstance.update({
+        where: { id: FX.B },
+        data: { firstSyncedAt: new Date() },
+      });
     }
   });
 

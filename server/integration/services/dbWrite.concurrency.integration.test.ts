@@ -68,6 +68,7 @@ describe("dbWrite concurrency (integration)", () => {
         url: `http://${INSTANCE}.invalid/graphql`,
         apiKey: "x",
         enabled: true,
+        firstSyncedAt: new Date(),
       },
     });
     await prisma.stashScene.create({

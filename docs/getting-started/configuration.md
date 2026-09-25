@@ -33,6 +33,8 @@ Peek can connect to **multiple Stash servers** simultaneously. This is useful wh
 
 Peek automatically triggers a full sync for new instances in the background. If a sync is already running, the new instance syncs right after it.
 
+A new instance appears in users' libraries once its first sync has finished, so every user's restrictions and hidden items apply to its content from the first item shown. Until then it is hidden from everyone, admins included, and the instance list shows it as **First sync running, hidden from users**; a user who selected only that instance sees the "syncing" notice meanwhile. Changing an instance's URL makes it new again: it is hidden until its resync has finished. An instance you add disabled starts its first sync when you enable it.
+
 ### Managing Instances
 
 Each instance can be:

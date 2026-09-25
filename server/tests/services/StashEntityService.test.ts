@@ -626,70 +626,22 @@ describe("StashEntityService", () => {
       });
     }
 
-    it("should return true for isReady when sync state exists with lastFullSyncTimestamp", async () => {
-      storeSyncStates([
-        sceneState("inst-a", {
-          lastFullSyncTimestamp: "2024-01-01T00:00:00-08:00",
-        }),
-      ]);
-
-      const ready = await stashEntityService.isReady();
-
-      expect(ready).toBe(true);
-    });
-
-    it("should return true for isReady when sync state exists with lastIncrementalSyncTimestamp", async () => {
-      storeSyncStates([
-        sceneState("inst-a", {
-          lastIncrementalSyncTimestamp: "2024-01-02T00:00:00-08:00",
-        }),
-      ]);
-
-      const ready = await stashEntityService.isReady();
-
-      expect(ready).toBe(true);
-    });
-
-    it("should return false for isReady when no sync state exists", async () => {
-      storeSyncStates([]);
-
-      const ready = await stashEntityService.isReady();
-
-      expect(ready).toBe(false);
-    });
-
-    it("should return false for isReady when sync state has no timestamps", async () => {
-      storeSyncStates([sceneState("inst-a", {})]);
-
-      const ready = await stashEntityService.isReady();
-
-      expect(ready).toBe(false);
-    });
-
-    it("isReady reads the scene state of each enabled instance: one synced instance is enough, another instance's row never counts", async () => {
-      // inst-a has not synced its scenes; an instance that is not loaded
-      // (disabled or deleted) has
-      const unsynced = sceneState("inst-a", {});
-      const other = sceneState("gone", {
-        lastFullSyncTimestamp: "2024-01-01T00:00:00-08:00",
-      });
-      storeSyncStates([unsynced, other]);
-
-      expect(await stashEntityService.isReady()).toBe(false);
-      expect(mockPrisma.syncState.findMany).toHaveBeenCalledWith({
-        where: { entityType: "scene", stashInstanceId: { in: INSTANCES } },
-      });
-
-      // inst-b has
-      storeSyncStates([
-        unsynced,
-        other,
-        sceneState("inst-b", {
-          lastIncrementalSyncTimestamp: "2024-01-02T00:00:00-08:00",
-        }),
-      ]);
+    it("isReady is true once some enabled instance has finished its first sync", async () => {
+      mockPrisma.stashInstance.findFirst.mockResolvedValue(
+        partialRow({ id: "inst-a" })
+      );
 
       expect(await stashEntityService.isReady()).toBe(true);
+      expect(mockPrisma.stashInstance.findFirst).toHaveBeenCalledWith({
+        where: { enabled: true, firstSyncedAt: { not: null } },
+        select: { id: true },
+      });
+    });
+
+    it("isReady is false while every enabled instance is on its first sync, or none is enabled", async () => {
+      mockPrisma.stashInstance.findFirst.mockResolvedValue(null);
+
+      expect(await stashEntityService.isReady()).toBe(false);
     });
 
     it("should get last refreshed time", async () => {
@@ -720,6 +672,9 @@ describe("StashEntityService", () => {
       const lastRefreshed = await stashEntityService.getLastRefreshed();
 
       expect(lastRefreshed).toEqual(new Date("2024-01-15T12:00:00Z"));
+      expect(mockPrisma.syncState.findMany).toHaveBeenCalledWith({
+        where: { entityType: "scene", stashInstanceId: { in: INSTANCES } },
+      });
     });
 
     it("should return null for last refreshed when no sync state", async () => {

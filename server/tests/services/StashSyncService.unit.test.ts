@@ -223,7 +223,9 @@ vi.mock("../../services/EntityImageCountService.js", () => ({
 // Mock exclusion computation service
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
-    recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
+    recomputeAllUsers: vi
+      .fn()
+      .mockResolvedValue({ success: 0, failed: 0, errors: [] }),
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
     recomputeUsers: vi
       .fn()
@@ -276,6 +278,8 @@ describe("StashSyncService", () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     // The users an instance's deletion recomputes: none
     mockPrisma.user.findMany.mockResolvedValue([]);
+    // No instance is on its first sync
+    mockPrisma.stashInstance.findMany.mockResolvedValue([]);
   });
 
   describe("incrementalSync", () => {
@@ -1010,6 +1014,105 @@ describe("StashSyncService", () => {
     });
   });
 
+  describe("an instance on its first sync", () => {
+    const INSTANCE = "test-instance-uuid";
+
+    /** The instance has no firstSyncedAt yet */
+    function onFirstSync(): void {
+      mockPrisma.stashInstance.findMany.mockImplementation(
+        prismaImpl((args) =>
+          args?.where?.firstSyncedAt === null
+            ? [partialRow({ id: INSTANCE })]
+            : []
+        )
+      );
+      mockPrisma.stashInstance.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    const markedFirstSynced = () =>
+      mockPrisma.stashInstance.updateMany.mock.calls.filter(
+        ([args]) => args.data.firstSyncedAt instanceof Date
+      );
+
+    it("an incremental sync that finds nothing still recomputes the instance's users, then makes it visible", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      const { exclusionComputationService } =
+        await import("../../services/ExclusionComputationService.js");
+      onFirstSync();
+
+      await stashSyncService.smartIncrementalSync();
+
+      expect(
+        exclusionComputationService.recomputeUsersForInstances
+      ).toHaveBeenCalledExactlyOnceWith([INSTANCE]);
+      const marked = markedFirstSynced();
+      expect(marked).toHaveLength(1);
+      expect(must(marked[0])[0].where).toEqual({
+        id: { in: [INSTANCE] },
+        firstSyncedAt: null,
+      });
+    });
+
+    it("a full sync makes it visible after recomputing every user", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      const { exclusionComputationService } =
+        await import("../../services/ExclusionComputationService.js");
+      onFirstSync();
+
+      await stashSyncService.fullSync(INSTANCE);
+
+      expect(exclusionComputationService.recomputeAllUsers).toHaveBeenCalled();
+      expect(markedFirstSynced()).toHaveLength(1);
+    });
+
+    it("stays hidden while the recompute of a user who can see it fails, and is not held back by one who cannot", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      const { exclusionComputationService } =
+        await import("../../services/ExclusionComputationService.js");
+      onFirstSync();
+      vi.mocked(
+        exclusionComputationService.recomputeUsersForInstances
+      ).mockResolvedValue({
+        success: 1,
+        failed: 1,
+        errors: [{ userId: 7, error: "broke" }],
+      });
+      // getUsersSelecting: user 7 has no selection, so it sees the instance
+      mockPrisma.user.findMany.mockResolvedValue([partialRow({ id: 7 })]);
+      const warn = vi.spyOn(logger, "warn");
+
+      await stashSyncService.smartIncrementalSync();
+
+      expect(markedFirstSynced()).toHaveLength(0);
+      expect(warn).toHaveBeenCalledWith(
+        stringContaining("The instance stays hidden"),
+        { instanceId: INSTANCE, userIds: [7] }
+      );
+
+      // User 7 selected another instance only
+      mockPrisma.user.findMany.mockResolvedValue([partialRow({ id: 3 })]);
+
+      await stashSyncService.smartIncrementalSync();
+
+      expect(markedFirstSynced()).toHaveLength(1);
+    });
+
+    it("Apply deletions makes no instance visible", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      onFirstSync();
+
+      await stashSyncService.runCleanup("scene", INSTANCE, {
+        ignoreRatioGuard: true,
+      });
+
+      expect(markedFirstSynced()).toHaveLength(0);
+    });
+  });
+
   describe("smart sync of clips", () => {
     const INSTANCE = "test-instance-uuid";
     const SINCE = "2025-12-27T16:00:00-08:00";
@@ -1093,8 +1196,18 @@ describe("StashSyncService getSyncStatus", () => {
     const { stashSyncService } =
       await import("../../services/StashSyncService.js");
     mockPrisma.stashInstance.findMany.mockResolvedValue([
-      partialRow({ id: "inst-a", name: "Main", enabled: true }),
-      partialRow({ id: "inst-b", name: "Archive", enabled: false }),
+      partialRow({
+        id: "inst-a",
+        name: "Main",
+        enabled: true,
+        firstSyncedAt: new Date("2026-09-20T08:00:00Z"),
+      }),
+      partialRow({
+        id: "inst-b",
+        name: "Archive",
+        enabled: false,
+        firstSyncedAt: null,
+      }),
     ]);
     const synced = new Date("2026-09-24T17:00:00Z");
     const state = (
@@ -1161,6 +1274,7 @@ describe("StashSyncService getSyncStatus", () => {
           instanceId: "inst-a",
           name: "Main",
           enabled: true,
+          firstSyncedAt: "2026-09-20T08:00:00.000Z",
           // In sync order: tags first
           states: [expected("tag"), expected("scene")],
         },
@@ -1168,6 +1282,7 @@ describe("StashSyncService getSyncStatus", () => {
           instanceId: "inst-b",
           name: "Archive",
           enabled: false,
+          firstSyncedAt: null,
           states: [expected("studio", "FindStudios: broke (HTTP 200)")],
         },
       ],
@@ -1256,6 +1371,7 @@ describe("StashSyncService queued full syncs", () => {
     vi.clearAllMocks();
     stashAnswersNothing();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.stashInstance.findMany.mockResolvedValue([]);
   });
 
   afterEach(async () => {

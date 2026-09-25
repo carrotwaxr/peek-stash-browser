@@ -71,7 +71,7 @@ export function userRow(overrides: Partial<User> = {}): User {
   };
 }
 
-/** A `StashInstance` row: enabled, priority 0. */
+/** A `StashInstance` row: enabled, priority 0, its first sync done. */
 export function stashInstanceRow(
   overrides: Partial<StashInstance> = {}
 ): StashInstance {
@@ -87,6 +87,7 @@ export function stashInstanceRow(
     createdAt: EPOCH,
     updatedAt: EPOCH,
     lastFullPassAt: null,
+    firstSyncedAt: EPOCH,
     ...overrides,
   };
 }

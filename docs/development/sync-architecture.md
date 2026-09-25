@@ -146,6 +146,8 @@ The steps below run once per sync, after every instance has synced, not once per
 
 A change to a user's instance scope recomputes exclusions in the same request: a user changing their instance selection (their own recompute), and an admin enabling, disabling or deleting an instance (every user with no selection or a selection naming it).
 
+An instance on its first sync (just added, or its URL changed: `StashInstance.firstSyncedAt` is NULL) is hidden from every user, admins included, while its rows arrive: the allowed instances (`getUserAllowedInstanceIds`) and the by-id access checks (`EntityAccessService`) leave it out, and the exclusion compute already covers it. In a run that synced it, it counts as a change, so its users are recomputed even when nothing else changed (a URL changed to the same Stash, say); after that recompute Peek sets `firstSyncedAt` and the instance shows. When the recompute of a user who can see it fails, it stays hidden and the next sync retries. A user whose every instance is on its first sync gets `503 ready: false` from the library routes (the client shows its syncing notice).
+
 ### Gallery Inheritance
 
 Images can inherit metadata from their parent galleries:
@@ -224,7 +226,7 @@ An `updated_at` more than 5 minutes ahead of Peek's clock (clock skew allowance)
 
 `lastError` holds the last sync's problem with the type: Stash's error when fetching it failed (the operation, each GraphQL message with the field it broke on, and the HTTP status, as in `FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.parent_studio) (HTTP 200)`; a timeout; or "Could not reach Stash"; never the query or its variables), then any cleanup skip, refusal or failure, joined with "; ". A type that syncs cleanly, or that a smart sync skips because nothing changed, clears it. A failed type keeps its timestamps, so the next sync fetches it again from the same point.
 
-`GET /api/sync/status` (admins only) reports every configured instance, enabled or not, in priority order: its id, name, whether it is enabled, and its entity types' states in sync order (the row above without `id` and `stashInstanceId`). It never includes an instance's address or API key. It also says whether a sync runs (`inProgress`), what holds the sync lock (`activeJob`: `sync`, `instance-delete` or null) and the sync settings. Rows of an instance that is no longer configured are left out until the startup sweep removes them. The readiness check (`isReady`), the "last refreshed" time and the startup sync's choice between a full and a smart sync read only the enabled instances' own rows.
+`GET /api/sync/status` (admins only) reports every configured instance, enabled or not, in priority order: its id, name, whether it is enabled, and its entity types' states in sync order (the row above without `id` and `stashInstanceId`). It also gives `firstSyncedAt` per instance (null while its first sync runs). It never includes an instance's address or API key. It also says whether a sync runs (`inProgress`), what holds the sync lock (`activeJob`: `sync`, `instance-delete` or null) and the sync settings. Rows of an instance that is no longer configured are left out until the startup sweep removes them. The readiness check (`isReady`: some enabled instance has finished its first sync), the "last refreshed" time and the startup sync's choice between a full and a smart sync read only the enabled instances.
 
 ---
 

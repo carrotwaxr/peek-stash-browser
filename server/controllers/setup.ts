@@ -499,6 +499,7 @@ export const getAllStashInstances = async (
         priority: true,
         createdAt: true,
         updatedAt: true,
+        firstSyncedAt: true,
       },
       orderBy: { priority: "asc" },
     });
@@ -609,6 +610,7 @@ export const createStashInstance = async (
         priority: true,
         createdAt: true,
         updatedAt: true,
+        firstSyncedAt: true,
       },
     });
 
@@ -665,8 +667,9 @@ export const updateStashInstance = async (
     }
 
     // Track if connection details changed (requires re-sync)
+    const urlChanged = Boolean(url) && url !== existing.url;
     const connectionChanged =
-      (url && url !== existing.url) || (apiKey && apiKey !== existing.apiKey);
+      urlChanged || (Boolean(apiKey) && apiKey !== existing.apiKey);
     // Enabling or disabling changes what its users can see
     const enabledChanged =
       enabled !== undefined && enabled !== existing.enabled;
@@ -716,6 +719,9 @@ export const updateStashInstance = async (
         ...(apiKey !== undefined && { apiKey }),
         ...(enabled !== undefined && { enabled }),
         ...(priority !== undefined && { priority }),
+        // Another address may be another Stash: the instance is new again,
+        // hidden from users until its resync's exclusions are computed
+        ...(urlChanged && { firstSyncedAt: null }),
       },
       select: {
         id: true,
@@ -727,6 +733,7 @@ export const updateStashInstance = async (
         priority: true,
         createdAt: true,
         updatedAt: true,
+        firstSyncedAt: true,
       },
     });
 
@@ -751,9 +758,12 @@ export const updateStashInstance = async (
     }
 
     // If connection details changed, re-sync this instance to refresh cached
-    // data, once a running sync ends
+    // data, once a running sync ends. An instance enabled before its first
+    // sync ever finished (added disabled, say) syncs now too: it is hidden
+    // from users until then
+    const firstSyncPending = enabledChanged && instance.firstSyncedAt === null;
     const sync =
-      connectionChanged && instance.enabled
+      (connectionChanged || firstSyncPending) && instance.enabled
         ? stashSyncService.queueFullSync(instance.id)
         : "none";
 

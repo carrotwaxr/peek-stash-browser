@@ -53,6 +53,12 @@ export interface SyncInstanceStatus {
   instanceId: string;
   name: string;
   enabled: boolean;
+  /**
+   * When the instance's first sync finished with its users' exclusions
+   * computed (ISO timestamp), or null while it runs: until then the
+   * instance is hidden from every user, admins included.
+   */
+  firstSyncedAt: string | null;
   /** In sync order: tags first, images last. */
   states: SyncEntityState[];
 }

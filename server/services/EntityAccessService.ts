@@ -11,11 +11,13 @@
  * hold:
  * 1. Its cached row exists with that id and stashInstanceId, and deletedAt
  *    IS NULL.
- * 2. StashInstance.enabled = 1 for that instance.
+ * 2. StashInstance.enabled = 1 for that instance, and its first sync has
+ *    finished with its users' exclusions computed (firstSyncedAt IS NOT
+ *    NULL): until then nobody, admins included, is served its content.
  * 3. The instance is allowed: a user with no UserStashInstance rows may use
- *    every enabled instance, otherwise only their selected ones. This clause
- *    mirrors UserInstanceService.getUserAllowedInstanceIds and must change
- *    with it (item 12); the integration test "agrees with
+ *    every enabled instance, otherwise only their selected ones. Rules 2
+ *    and 3 mirror UserInstanceService.getUserAllowedInstanceIds and must
+ *    change with it (item 12); the integration test "agrees with
  *    getUserAllowedInstanceIds" fails when one side changes alone.
  * 4. No UserExcludedEntity row for (userId, entityType, entityId) has an
  *    instanceId of '' or the entity's instance.
@@ -92,8 +94,13 @@ const ENTITY_SOURCES: Record<AccessEntityType, EntitySource> = {
   },
 };
 
-/** Rules 1 and 3 for the row aliased `x`. Binds userId, userId. */
+/**
+ * Rules 1, 2 and 3 for the row aliased `x`. Binds userId, userId. The
+ * queries' own JOIN on StashInstance checks rule 2's enabled part too; the
+ * probe here keeps every query that uses the clause on both parts.
+ */
 const LIVE_AND_ALLOWED_WHERE = `x.deletedAt IS NULL
+  AND EXISTS (SELECT 1 FROM StashInstance ri WHERE ri.id = x.stashInstanceId AND ri.enabled = 1 AND ri.firstSyncedAt IS NOT NULL)
   AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ?)
        OR EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ? AND usi.instanceId = x.stashInstanceId))`;
 
@@ -103,11 +110,11 @@ const EXCLUSION_PROBE = `SELECT 1 FROM UserExcludedEntity e
                     AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)`;
 
 /**
- * Rules 1, 3 and 4 for the row aliased `x`, shared by every query here so the
+ * Rules 1 to 4 for the row aliased `x`, shared by every query here so the
  * single, batch and guess checks can't drift. Binds userId, userId, userId,
- * entityType. Each probe hits an index: UserStashInstance (userId,
- * instanceId) and UserExcludedEntity (userId, entityType, entityId,
- * instanceId).
+ * entityType. Each probe hits an index: StashInstance's primary key,
+ * UserStashInstance (userId, instanceId) and UserExcludedEntity (userId,
+ * entityType, entityId, instanceId).
  */
 const ACCESS_WHERE = `${LIVE_AND_ALLOWED_WHERE}
   AND NOT EXISTS (${EXCLUSION_PROBE})`;

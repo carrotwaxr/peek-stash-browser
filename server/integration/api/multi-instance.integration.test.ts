@@ -16,6 +16,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
+import type { SyncStatusResponse } from "../../types/api/sync.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -89,25 +90,23 @@ describe("Multi-Instance Support", () => {
         // count every instance while waiting
         await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
-        // Wait for sync to complete (poll for up to 2 minutes)
+        // Wait for its first sync to finish (poll for up to 2 minutes): the
+        // instance shows once its exclusions are computed (firstSyncedAt)
         const maxWait = 120000;
         const startTime = Date.now();
         let syncComplete = false;
+        const secondId = productionInstanceId;
 
         while (Date.now() - startTime < maxWait && !syncComplete) {
-          await new Promise((r) => setTimeout(r, 5000));
+          await new Promise((r) => setTimeout(r, 1000));
 
-          // Check if we have scenes from production
-          const scenesResponse = await adminClient.post<{
-            findScenes: { count: number };
-          }>("/api/library/scenes", {
-            filter: { per_page: 1 },
-          });
-
-          if (scenesResponse.ok && scenesResponse.data.findScenes.count > 20) {
-            // Production has many more scenes than test instance
-            syncComplete = true;
-          }
+          const status =
+            await adminClient.get<SyncStatusResponse>("/api/sync/status");
+          syncComplete =
+            status.ok &&
+            status.data.instances.some(
+              (i) => i.instanceId === secondId && i.firstSyncedAt !== null
+            );
         }
 
         if (!syncComplete) {
