@@ -95,6 +95,8 @@ const client = {
   findGalleryIDs: vi.fn<StashClient["findGalleryIDs"]>(),
   findImageIDs: vi.fn<StashClient["findImageIDs"]>(),
   findSceneMarkers: vi.fn<StashClient["findSceneMarkers"]>(),
+  // A job scopes the client to its abort signal: the stub stays itself
+  withSignal: vi.fn<StashClient["withSignal"]>(),
 };
 
 const ids = (from: number, to: number): string[] =>
@@ -257,6 +259,7 @@ describe("StashSyncService.cleanupDeletedEntities", () => {
     vi.mocked(stashInstanceManager.get).mockReturnValue(
       partialRow<StashClient>(client)
     );
+    client.withSignal.mockReturnValue(partialRow<StashClient>(client));
     mockReconcile.reconcileDeletedScenes.mockResolvedValue({
       merged: 0,
       ambiguous: 0,

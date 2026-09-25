@@ -1,3 +1,4 @@
+import { type AddressInfo, createServer } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TEST_CONFIG } from "../helpers/config.js";
@@ -19,6 +20,18 @@ const STASH_ROUTES = [
   "/api/setup/create-stash-instance",
 ];
 const UNREACHABLE_STASH = { url: "http://127.0.0.1:9/graphql", apiKey: "x" };
+
+/**
+ * A Stash URL on a local port nothing listens on, so connecting is refused.
+ * Not port 9: fetch refuses the ports it blocks ("bad port") without trying.
+ */
+async function refusingStash(): Promise<{ url: string; apiKey: string }> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  return { url: `http://127.0.0.1:${port}/graphql`, apiKey: "x" };
+}
 
 async function anonymousCreateAdmin(address: string): Promise<number> {
   const response = await fetch(
@@ -96,7 +109,7 @@ describe("Setup routes once setup is complete", () => {
   it("the admin gets the connection error reason without details, and cannot add a second first instance", async () => {
     const tested = await adminClient.post<Record<string, unknown>>(
       "/api/setup/test-stash-connection",
-      UNREACHABLE_STASH
+      await refusingStash()
     );
     expect(tested.status).toBe(400);
     expect(tested.data.error).toContain("Connection refused");

@@ -3,9 +3,12 @@
  *
  * Tests the incremental sync logic without requiring a real Stash instance.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StashClient } from "../../graphql/StashClient.js";
+import { type Server, createServer } from "http";
+import type { AddressInfo } from "net";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { StashClient } from "../../graphql/StashClient.js";
 import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -109,7 +112,10 @@ const mockStashClient = {
   findImageIDs: vi
     .fn<StashClient["findImageIDs"]>()
     .mockResolvedValue({ findImages: { images: [], count: 0 } }),
+  // A sync scopes its client to its abort signal
+  withSignal: vi.fn(),
 };
+mockStashClient.withSignal.mockReturnValue(mockStashClient);
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -439,5 +445,48 @@ describe("StashSyncService", () => {
         JSON.stringify(["10"]),
       ]);
     });
+  });
+});
+
+describe("StashSyncService abort", () => {
+  let hanging: Server;
+  let url: string;
+
+  beforeEach(async () => {
+    // Accepts every request and never answers
+    hanging = createServer(() => undefined);
+    await new Promise<void>((resolve) =>
+      hanging.listen(0, "127.0.0.1", resolve)
+    );
+    url = `http://127.0.0.1:${(hanging.address() as AddressInfo).port}/graphql`;
+  });
+
+  afterAll(async () => {
+    hanging.closeAllConnections();
+    await new Promise<void>((resolve) => hanging.close(() => resolve()));
+  });
+
+  it("abort() cancels an in-flight Stash request and ends the sync", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.get).mockReturnValueOnce(
+      new StashClient({ url, apiKey: "key" })
+    );
+
+    const sync = stashSyncService.fullSync("inst");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    stashSyncService.abort();
+
+    await expect(
+      Promise.race([
+        sync,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => {
+            reject(new Error("the sync still runs 1 s after abort()"));
+          }, 1000)
+        ),
+      ])
+    ).rejects.toThrow("Sync aborted");
+    expect(stashSyncService.isSyncing()).toBe(false);
   });
 });

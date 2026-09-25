@@ -3,13 +3,107 @@
  *
  * Replaces the external stashapp-api package with an internal implementation.
  * Uses graphql-request and generated SDK from codegen.
+ *
+ * Every request is bounded: it fails after `requestTimeoutMs`, and a client
+ * from `withSignal(signal)` also ends its requests in flight when the signal
+ * aborts, so a Stash that never answers cannot hold a sync forever.
  */
-import { GraphQLClient } from "graphql-request";
-import { getSdk } from "./generated/graphql.js";
+import { ClientError, GraphQLClient } from "graphql-request";
+import { type SdkFunctionWrapper, getSdk } from "./generated/graphql.js";
+
+/**
+ * How long one Stash request may take. Generous against the largest sync
+ * request (a 500-scene page or a 5,000-id page), and the bound on how long a
+ * Stash that stops answering can hold a sync.
+ */
+export const STASH_REQUEST_TIMEOUT_MS = 120_000;
+
+/** Longest text `describeStashError` returns. */
+const MAX_ERROR_DESCRIPTION = 500;
+
+/**
+ * What a request cut short by a `withSignal` client's signal rejects with:
+ * the message the sync's own abort check throws, so the sync treats both the
+ * same way.
+ */
+const ABORTED_MESSAGE = "Sync aborted";
 
 export interface StashClientConfig {
   url: string;
   apiKey: string;
+  /** Per request; defaults to STASH_REQUEST_TIMEOUT_MS. */
+  requestTimeoutMs?: number;
+}
+
+/** A Stash request that got no complete answer within its time limit. */
+export class StashRequestTimeoutError extends Error {
+  constructor(
+    readonly operationName: string,
+    readonly timeoutMs: number
+  ) {
+    super(
+      `Stash request ${operationName} timed out after ${timeoutMs / 1000} s`
+    );
+    this.name = "StashRequestTimeoutError";
+  }
+}
+
+/**
+ * A Stash request's failure in words fit for a log line or an admin's status
+ * page: GraphQL error messages and the HTTP status, a timeout's message, a
+ * network error's code, or the error's message, cut to 500 characters. Never
+ * the query, its variables or the headers: a graphql-request `ClientError`'s
+ * own message embeds the query and variables.
+ */
+export function describeStashError(error: unknown): string {
+  const text = describe(error);
+  return text.length > MAX_ERROR_DESCRIPTION
+    ? `${text.slice(0, MAX_ERROR_DESCRIPTION - 3)}...`
+    : text;
+}
+
+function describe(error: unknown): string {
+  if (error instanceof ClientError) {
+    const { errors, status } = error.response;
+    const messages = (errors ?? [])
+      .map((e) => e.message)
+      .filter((message) => message.length > 0);
+    return messages.length > 0
+      ? `${messages.join("; ")} (HTTP ${status})`
+      : `Stash answered HTTP ${status}`;
+  }
+  if (error instanceof StashRequestTimeoutError) return error.message;
+  const code = networkErrorCode(error);
+  if (code) return `Could not reach Stash (${code})`;
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The system error code under a failed fetch (`ECONNREFUSED`, `ENOTFOUND`,
+ * ...), from its cause or, when Node tried several addresses, the first of
+ * the cause's errors.
+ */
+function networkErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error) || !("cause" in error)) return undefined;
+  const { cause } = error;
+  if (typeof cause !== "object" || cause === null) return undefined;
+  if ("code" in cause && typeof cause.code === "string") return cause.code;
+  if ("errors" in cause && Array.isArray(cause.errors)) {
+    const first: unknown = cause.errors[0];
+    if (
+      typeof first === "object" &&
+      first !== null &&
+      "code" in first &&
+      typeof first.code === "string"
+    ) {
+      return first.code;
+    }
+  }
+  return undefined;
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && error.name === "TimeoutError";
 }
 
 /**
@@ -20,11 +114,45 @@ export class StashClient {
   private client: GraphQLClient;
   private sdk: ReturnType<typeof getSdk>;
 
-  constructor(config: StashClientConfig) {
+  /**
+   * `scopeSignal`, which `withSignal` sets, ends every request of this client
+   * when it aborts.
+   */
+  constructor(
+    private readonly config: StashClientConfig,
+    scopeSignal?: AbortSignal
+  ) {
+    const timeoutMs = config.requestTimeoutMs ?? STASH_REQUEST_TIMEOUT_MS;
     this.client = new GraphQLClient(config.url, {
       headers: { ApiKey: config.apiKey },
+      fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+        const signals = [AbortSignal.timeout(timeoutMs)];
+        if (init?.signal) signals.push(init.signal);
+        if (scopeSignal) signals.push(scopeSignal);
+        return fetch(input, { ...init, signal: AbortSignal.any(signals) });
+      },
     });
-    this.sdk = getSdk(this.client);
+    const wrapper: SdkFunctionWrapper = async (action, operationName) => {
+      try {
+        return await action();
+      } catch (error) {
+        if (scopeSignal?.aborted) throw new Error(ABORTED_MESSAGE);
+        if (isTimeout(error)) {
+          throw new StashRequestTimeoutError(operationName, timeoutMs);
+        }
+        throw error;
+      }
+    };
+    this.sdk = getSdk(this.client, wrapper);
+  }
+
+  /**
+   * The same client, whose requests also end when `signal` aborts: one in
+   * flight rejects at once, and a later one is not sent. Either rejects with
+   * Error("Sync aborted").
+   */
+  withSignal(signal: AbortSignal): StashClient {
+    return new StashClient(this.config, signal);
   }
 
   // Find operations
