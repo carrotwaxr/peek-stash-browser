@@ -852,6 +852,130 @@ describe("StashSyncService", () => {
           "Cleanup failed: Stash request FindStudioIDs timed out after 120 s",
       ]);
     });
+
+    describe("completeness check", () => {
+      /** A tag as Stash's sync query returns it */
+      const tag = (id: string) => ({
+        id,
+        name: `Tag ${id}`,
+        aliases: [],
+        parents: [],
+        stash_ids: [],
+        created_at: SINCE,
+        updated_at: SINCE,
+      });
+
+      /**
+       * Stash holds tags 1 and 2: its pages return only tag 1 (as an offset
+       * shift can), its id list (the cleanup's) both, and a request narrowed
+       * by ids gets them unless `byIds` answers it.
+       */
+      function tagTwoOnNoPage(byIds?: () => Promise<unknown>): void {
+        mockStashClient.findTags.mockImplementation(
+          (vars: { ids?: string[] | null } | undefined) => {
+            if (vars?.ids && byIds) return byIds();
+            const tags = vars?.ids ? vars.ids.map(tag) : [tag("1")];
+            return Promise.resolve({ findTags: { tags, count: tags.length } });
+          }
+        );
+        mockStashClient.findTagIDs.mockResolvedValue({
+          findTags: { tags: [{ id: "1" }, { id: "2" }], count: 2 },
+        });
+      }
+
+      afterEach(() => {
+        mockStashClient.findTagIDs.mockResolvedValue({
+          findTags: { tags: [], count: 0 },
+        });
+      });
+
+      /** The id lists tag requests were narrowed to */
+      function tagIdRequests(): unknown[] {
+        const calls: unknown[][] = mockStashClient.findTags.mock.calls;
+        return calls
+          .map(([vars]) => (vars as { ids?: unknown } | undefined)?.ids)
+          .filter((ids) => ids !== undefined && ids !== null);
+      }
+
+      it("an incremental sync fetches by id what the pages of a never-synced type missed, after every type synced and its cleanup read the list", async () => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        // Tags never synced (fetched whole), the others at SINCE
+        mockPrisma.syncState.findFirst.mockImplementation(
+          prismaImpl((args) => {
+            const entityType = args?.where?.entityType;
+            if (typeof entityType !== "string" || entityType === "tag") {
+              return null;
+            }
+            return partialRow({
+              id: STATE_IDS.get(entityType),
+              entityType,
+              lastFullSyncTimestamp: null,
+              lastIncrementalSyncTimestamp: SINCE,
+              lastError: null,
+            });
+          })
+        );
+        tagTwoOnNoPage();
+
+        const results = await stashSyncService.incrementalSync(INSTANCE);
+
+        expect(tagIdRequests()).toEqual([["2"]]);
+        const lastCall = (fn: { mock: { invocationCallOrder: number[] } }) =>
+          must(
+            fn.mock.invocationCallOrder[fn.mock.invocationCallOrder.length - 1]
+          );
+        const refetch = lastCall(mockStashClient.findTags);
+        expect(lastCall(mockStashClient.findImages)).toBeLessThan(refetch);
+        expect(
+          must(mockStashClient.findTagIDs.mock.invocationCallOrder[0])
+        ).toBeLessThan(refetch);
+        expect(must(results.find((r) => r.entityType === "tag")).synced).toBe(
+          2
+        );
+        expect(lastErrorsWritten().tag).toEqual([null]);
+      });
+
+      it("a type whose pages failed is not completed by id", async () => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        everyTypeSynced();
+        tagTwoOnNoPage();
+        mockStashClient.findTags.mockRejectedValue(
+          new StashRequestTimeoutError("FindTags", 120_000)
+        );
+
+        await stashSyncService.fullSync(INSTANCE);
+
+        // Its pages stopped early: the id list would name most of the type
+        expect(tagIdRequests()).toEqual([]);
+        expect(lastErrorsWritten().tag).toEqual([
+          "Stash request FindTags timed out after 120 s",
+        ]);
+      });
+
+      it("a failed fetch of what the pages missed is stored in lastError and keeps the pages' watermark", async () => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        everyTypeSynced();
+        tagTwoOnNoPage(() =>
+          Promise.reject(new StashRequestTimeoutError("FindTags", 120_000))
+        );
+
+        await stashSyncService.fullSync(INSTANCE);
+
+        expect(tagIdRequests()).toEqual([["2"]]);
+        expect(lastErrorsWritten().tag).toEqual([
+          "Could not fetch 1 tags the pages missed: Stash request FindTags timed out after 120 s",
+        ]);
+        const tagState = mockPrisma.syncState.update.mock.calls.find(
+          ([args]) => args.where.id === STATE_IDS.get("tag")
+        );
+        expect(must(tagState)[0].data).toEqual(
+          objectContaining({ lastFullSyncTimestamp: SINCE })
+        );
+      });
+    });
   });
 
   describe("smart sync of clips", () => {

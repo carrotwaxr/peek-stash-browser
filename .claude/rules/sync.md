@@ -37,6 +37,8 @@ paths:
 
 - Stash stores sub-second timestamps but returns whole seconds. `formatTimestampForStash` appends `.999`; without it, incremental sync fetches the entities from the last second again, forever.
 - The "since" time is the newer of the last full and the last incremental sync (`getMostRecentSyncTime`).
+- Every page asks for `sort: "updated_at", direction: ASC` (`pageFilter`), so an entity edited mid-sync moves to the end and is fetched again. The watermark (`newestUpdatedAt`) leaves out values more than `WATERMARK_MAX_SKEW_MS` (5 minutes) past the server's clock and `paginate` logs them once per type: a future-dated import would otherwise freeze incremental sync.
+- Completeness: a type fetched whole (full sync, or never synced) collects the ids its pages returned (`seen`); after its cleanup, `fetchMissedIds` pages in by id the ones in the cleanup's `stashIds` that no page returned (an offset shift, or created mid-sync), into the change set. Not after a failed type or a cleanup without `stashIds`; a failure of it joins the type's `lastError`; the pages' watermark stays. The incremental paths do it in `cleanupEveryType` for their never-synced types (`seenIds` from `syncInstance`).
 - `SyncState` is one row per instance and type (`stashInstanceId` NOT NULL). Every reader names its instances: `getSyncStatus` lists the configured instances (`GET /api/sync/status`, no address), and `isReady`, `getLastRefreshed` and the startup sync's full-or-smart choice read only the enabled instances' rows.
 
 ## Cleanup

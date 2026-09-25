@@ -137,8 +137,13 @@ interface RunEntityTypeOptions {
   /** A "full" type fetches everything; "incremental" what changed since. */
   syncType: "full" | "incremental";
   since?: string;
-  /** Run the type's cleanup right after it (the full sync path). */
+  /**
+   * Run the type's cleanup right after it (the full sync path), then fetch
+   * by id what Stash lists and no page returned (`fetchMissedIds`).
+   */
   withCleanup: boolean;
+  /** Collects the ids the pages returned (a "full" type) */
+  seen?: Set<string>;
 }
 
 /**
@@ -162,6 +167,11 @@ interface PaginateOptions {
   since?: string;
   /** Only these ids, fetched a page of ids at a time */
   ids?: string[];
+  /**
+   * Collects the ids the pages returned: a type fetched whole, for the
+   * completeness check after its cleanup (`fetchMissedIds`)
+   */
+  seen?: Set<string>;
 }
 
 // Constants for sync configuration
@@ -399,17 +409,51 @@ function getMostRecentTimestamp(
 }
 
 /**
+ * How far past this server's clock an updated_at still counts for the
+ * watermark (clock skew between Peek and Stash). A later one, such as a
+ * Stash JSON import with future dates, would make every incremental sync
+ * ask for changes after it and see none until that date.
+ */
+const WATERMARK_MAX_SKEW_MS = 5 * 60 * 1000;
+
+/** How many ids a log line names at most. */
+const LOGGED_IDS = 20;
+
+/** The entities a type's watermark left out as future-dated, for the log. */
+interface FutureDated {
+  count: number;
+  /** The first LOGGED_IDS of them */
+  ids: string[];
+  /** The newest of their updated_at values */
+  newest?: string;
+}
+
+/**
  * The newest of `current` and the `updated_at` values of `entities`, by
  * time: the watermark the next incremental sync starts from. Kept as Stash
- * wrote it, with its timezone.
+ * wrote it, with its timezone. A value more than WATERMARK_MAX_SKEW_MS past
+ * `now` is left out and counted in `future`.
  */
 function newestUpdatedAt(
   current: string | undefined,
-  entities: ReadonlyArray<{ updated_at?: string | null }>
+  entities: ReadonlyArray<{ id: string; updated_at?: string | null }>,
+  future: FutureDated,
+  now = Date.now()
 ): string | undefined {
   let newest = current;
-  for (const { updated_at: updatedAt } of entities) {
+  for (const { id, updated_at: updatedAt } of entities) {
     if (!updatedAt) continue;
+    if (new Date(updatedAt).getTime() > now + WATERMARK_MAX_SKEW_MS) {
+      future.count++;
+      if (future.ids.length < LOGGED_IDS) future.ids.push(id);
+      if (
+        future.newest === undefined ||
+        compareTimestamps(updatedAt, future.newest) > 0
+      ) {
+        future.newest = updatedAt;
+      }
+      continue;
+    }
     if (newest === undefined || compareTimestamps(updatedAt, newest) > 0) {
       newest = updatedAt;
     }
@@ -860,9 +904,19 @@ interface SyncEntities {
 
 export type SyncEntityOf<K extends EntityType> = SyncEntities[K];
 
-/** A sync page's FindFilterType. */
+/**
+ * A sync page's FindFilterType, in updated_at order for every type: an
+ * entity edited in Stash while a sync pages moves to the end, where a later
+ * page fetches it again, instead of keeping its place on a page already
+ * fetched.
+ */
 function pageFilter(q: SyncPageQuery): FindFilterType {
-  return { page: q.page, per_page: q.perPage };
+  return {
+    page: q.page,
+    per_page: q.perPage,
+    sort: "updated_at",
+    direction: SortDirectionEnum.Asc,
+  };
 }
 
 /**
@@ -883,9 +937,9 @@ function updatedSince(
 }
 
 /**
- * Every synced type's spec. Each request carries the run's abort signal.
- * Images narrow by Stash's integer id list, the others by `ids`; clips page
- * in updated_at order.
+ * Every synced type's spec. Each request carries the run's abort signal and
+ * pages in updated_at order (`pageFilter`). Images narrow by Stash's
+ * integer id list, the others by `ids`.
  */
 export const ENTITY_SYNC: {
   readonly [K in EntityType]: EntitySyncSpec<SyncEntityOf<K>>;
@@ -1014,11 +1068,7 @@ export const ENTITY_SYNC: {
     async fetchPage(client, q) {
       const { findSceneMarkers } = await client.findSceneMarkers(
         {
-          filter: {
-            ...pageFilter(q),
-            sort: "updated_at",
-            direction: SortDirectionEnum.Asc,
-          },
+          filter: pageFilter(q),
           ids: q.ids,
           scene_marker_filter: updatedSince(q.since),
         },
@@ -2461,7 +2511,9 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Syncs one instance in `mode`: every type in SYNC_ORDER, then the
-   * cleanups (on the full path each type's runs right after it). Each
+   * cleanups (on the full path each type's runs right after it). A type
+   * fetched whole is then completed from Stash's id list, which its cleanup
+   * reads: what no page returned is fetched by id (`fetchMissedIds`). Each
    * type's state is saved at once, so a restart does not sync completed
    * types again; a type that fails is recorded and the next one runs. What
    * changed goes into the run's change set; the post-sync steps run once
@@ -2475,6 +2527,9 @@ class StashSyncService extends EventEmitter {
     const { name, title } = SYNC_MODE_NAMES[mode];
     const startTime = Date.now();
     const results: SyncResult[] = [];
+    // The ids the pages of each type fetched whole returned, for the
+    // completeness check after the cleanups of the incremental paths
+    const seenIds = new Map<EntityType, Set<string>>();
 
     try {
       logger.info(`Starting ${name}...`, { stashInstanceId });
@@ -2482,13 +2537,19 @@ class StashSyncService extends EventEmitter {
       for (const entityType of SYNC_ORDER) {
         this.checkAbort();
         results.push(
-          await this.syncEntityType(entityType, stashInstanceId, mode, run)
+          await this.syncEntityType(
+            entityType,
+            stashInstanceId,
+            mode,
+            run,
+            seenIds
+          )
         );
       }
 
       // Cleanup deleted entities (detect deletions/merges in Stash)
       if (mode !== "full") {
-        await this.cleanupEveryType(stashInstanceId, results, run);
+        await this.cleanupEveryType(stashInstanceId, results, run, seenIds);
       }
 
       const duration = Date.now() - startTime;
@@ -2516,23 +2577,25 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * One type of one instance in `mode`. The full path fetches every entity
-   * and cleans the type up. The others fetch what changed since the type's
-   * last sync (everything when it never synced); the smart path first asks
-   * Stash how many changed and skips the type at none, clearing an earlier
-   * run's error.
+   * One type of one instance in `mode`. The full path fetches every entity,
+   * cleans the type up and fetches what no page returned. The others fetch
+   * what changed since the type's last sync (everything when it never
+   * synced, its page ids then kept in `seenIds` for the completeness check
+   * after the cleanups); the smart path first asks Stash how many changed
+   * and skips the type at none, clearing an earlier run's error.
    */
   private async syncEntityType(
     entityType: EntityType,
     stashInstanceId: string,
     mode: SyncMode,
-    run: SyncRunContext
+    run: SyncRunContext,
+    seenIds: Map<EntityType, Set<string>>
   ): Promise<SyncResult> {
     if (mode === "full") {
       return this.runEntityType(
         entityType,
         stashInstanceId,
-        { syncType: "full", withCleanup: true },
+        { syncType: "full", withCleanup: true, seen: new Set() },
         run
       );
     }
@@ -2546,10 +2609,12 @@ class StashSyncService extends EventEmitter {
     if (!lastSync) {
       // Never synced - do full sync for this entity type only
       logger.info(`${entityType}: No previous sync, syncing all`);
+      const seen = new Set<string>();
+      seenIds.set(entityType, seen);
       return this.runEntityType(
         entityType,
         stashInstanceId,
-        { syncType: "full", withCleanup: false },
+        { syncType: "full", withCleanup: false, seen },
         run
       );
     }
@@ -2898,14 +2963,17 @@ class StashSyncService extends EventEmitter {
    * updated after `since`, or only `ids` (a page of ids per request; none
    * for an empty list, which Stash would read as no list). Each page is
    * written by the type's spec before the next is asked for, and the loop
-   * ends at Stash's count or on an empty page. The run's abort is checked
-   * before every page and ends a request in flight. The result carries the
-   * newest updated_at seen, the type's next watermark.
+   * ends at Stash's count or on an empty page. Pages come in updated_at
+   * order, so an entity edited in Stash meanwhile moves to the end and is
+   * fetched again. The run's abort is checked before every page and ends a
+   * request in flight. The result carries the newest updated_at seen, the
+   * type's next watermark, leaving out (and logging) values more than
+   * WATERMARK_MAX_SKEW_MS in the future.
    */
   private async paginate(
     entityType: EntityType,
     stashInstanceId: string,
-    { since, ids }: PaginateOptions,
+    { since, ids, seen }: PaginateOptions,
     run: SyncRunContext
   ): Promise<SyncResult> {
     // Widened to every type's entity: the pages it fetches are the ones its
@@ -2919,6 +2987,7 @@ class StashSyncService extends EventEmitter {
     let synced = 0;
     let total = 0;
     let maxUpdatedAt: string | undefined;
+    const future: FutureDated = { count: 0, ids: [] };
 
     this.emitProgress({ entityType, phase: "fetching", current: 0, total: 0 });
 
@@ -2946,7 +3015,8 @@ class StashSyncService extends EventEmitter {
           if (items.length === 0) break;
 
           // Track max updated_at for sync state
-          maxUpdatedAt = newestUpdatedAt(maxUpdatedAt, items);
+          maxUpdatedAt = newestUpdatedAt(maxUpdatedAt, items, future);
+          if (seen) for (const item of items) seen.add(item.id);
 
           // What the page points at and Peek lacks goes first, while no
           // transaction is open; then the page, in one transaction
@@ -2983,6 +3053,14 @@ class StashSyncService extends EventEmitter {
         current: synced,
         total: synced,
       });
+
+      if (future.count > 0) {
+        logger.warn(
+          `${future.count} ${plural} carry an updated_at more than ${WATERMARK_MAX_SKEW_MS / 60_000} minutes ahead of this server's clock: ` +
+            `they are synced, but the next sync starts from the newest time that is not, so it fetches them again until then`,
+          { instanceId: stashInstanceId, ...future }
+        );
+      }
 
       const durationMs = Date.now() - startTime;
       logger.info(
@@ -3052,13 +3130,14 @@ class StashSyncService extends EventEmitter {
    * type's timestamps stay where they were (saveSyncState moves them only
    * with a `maxUpdatedAt`), so the next sync retries it from its old
    * "since". A cleanup that skips, refuses or fails adds its text after the
-   * type's own error. An abort throws Error("Sync aborted") and saves
-   * nothing.
+   * type's own error, and so does a failed fetch of what no page returned
+   * (`fetchMissedIds`, after the cleanup). An abort throws
+   * Error("Sync aborted") and saves nothing.
    */
   private async runEntityType(
     entityType: EntityType,
     stashInstanceId: string,
-    { syncType, since, withCleanup }: RunEntityTypeOptions,
+    { syncType, since, withCleanup, seen }: RunEntityTypeOptions,
     run: SyncRunContext
   ): Promise<SyncResult> {
     const startTime = Date.now();
@@ -3067,7 +3146,7 @@ class StashSyncService extends EventEmitter {
       result = await this.paginate(
         entityType,
         stashInstanceId,
-        { since: syncType === "full" ? undefined : since },
+        { since: syncType === "full" ? undefined : since, seen },
         run
       );
     } catch (error) {
@@ -3094,7 +3173,22 @@ class StashSyncService extends EventEmitter {
       );
       run.changes.addDeleted(entityType, stashInstanceId, outcome.deletedIds);
       result.deleted = outcome.deleted;
-      result.error = joinProblems(result.error, cleanupProblem(outcome));
+      const missed =
+        seen && result.error === undefined
+          ? await this.fetchMissedIds(
+              entityType,
+              stashInstanceId,
+              seen,
+              outcome.stashIds,
+              run
+            )
+          : undefined;
+      result.synced += missed?.fetched ?? 0;
+      result.error = joinProblems(
+        result.error,
+        cleanupProblem(outcome),
+        missed?.problem
+      );
     }
 
     await this.saveSyncState(stashInstanceId, syncType, result);
@@ -3102,15 +3196,69 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * The completeness check of a type fetched whole: the ids in Stash's list
+   * (`stashIds`, which its cleanup read) that no page returned (`seen`) are
+   * fetched by id and written, into the run's change set like any page.
+   * Paging by offset skips an entity whenever one on a page already fetched
+   * is edited in Stash (it moves to the end of the updated_at order, and
+   * the rest move up a place), and an entity created after the last page
+   * was asked for is on none. Nothing is compared when the cleanup did not
+   * read the whole list. The pages' watermark stays: what is fetched here is
+   * older than it, or newer and fetched again by the next sync. A failure
+   * becomes the returned `problem`, for the type's `lastError`; an abort
+   * throws.
+   */
+  private async fetchMissedIds(
+    entityType: EntityType,
+    stashInstanceId: string,
+    seen: ReadonlySet<string>,
+    stashIds: readonly string[] | undefined,
+    run: SyncRunContext
+  ): Promise<{ fetched: number; problem?: string }> {
+    const missed = (stashIds ?? []).filter((id) => !seen.has(id));
+    if (missed.length === 0) return { fetched: 0 };
+    const { plural } = ENTITY_TABLES[entityType];
+    logger.info(
+      `Fetching ${missed.length} ${plural} that Stash lists and no page returned`,
+      { instanceId: stashInstanceId, ids: missed.slice(0, LOGGED_IDS) }
+    );
+    try {
+      const { synced } = await this.paginate(
+        entityType,
+        stashInstanceId,
+        { ids: missed },
+        run
+      );
+      return { fetched: synced };
+    } catch (error) {
+      if (this.isAbort(error)) throw new Error("Sync aborted");
+      const message = describeStashError(error);
+      logger.error(`Failed to fetch the ${plural} no page returned`, {
+        stashInstanceId,
+        entityType,
+        error: message,
+      });
+      return {
+        fetched: 0,
+        problem: `Could not fetch ${missed.length.toLocaleString("en-US")} ${plural} the pages missed: ${message}`,
+      };
+    }
+  }
+
+  /**
    * The incremental paths' cleanup, every type after all of them synced.
    * Each type's soft-deleted count goes into its result and its rows into
    * the run's change set, and a cleanup that skips, refuses or fails is
-   * added to the type's `lastError`.
+   * added to the type's `lastError`. A type fetched whole this run (never
+   * synced before, its page ids in `seenIds`) that synced cleanly then gets
+   * what no page returned (`fetchMissedIds`), a failure of which is added
+   * too.
    */
   private async cleanupEveryType(
     stashInstanceId: string,
     results: SyncResult[],
-    run: SyncRunContext
+    run: SyncRunContext,
+    seenIds: ReadonlyMap<EntityType, ReadonlySet<string>>
   ): Promise<void> {
     logger.info("Checking for deleted entities...");
     let totalDeleted = 0;
@@ -3124,7 +3272,19 @@ class StashSyncService extends EventEmitter {
       totalDeleted += outcome.deleted;
       const result = results.find((r) => r.entityType === entityType);
       if (result) result.deleted = outcome.deleted;
-      const problem = cleanupProblem(outcome);
+      const seen = seenIds.get(entityType);
+      const missed =
+        seen && result?.error === undefined
+          ? await this.fetchMissedIds(
+              entityType,
+              stashInstanceId,
+              seen,
+              outcome.stashIds,
+              run
+            )
+          : undefined;
+      if (result) result.synced += missed?.fetched ?? 0;
+      const problem = joinProblems(cleanupProblem(outcome), missed?.problem);
       if (problem !== undefined) {
         const lastError = joinProblems(result?.error, problem) ?? problem;
         if (result) result.error = lastError;

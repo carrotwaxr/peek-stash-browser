@@ -1,9 +1,10 @@
 /**
  * Unit tests for StashSyncService's one page loop, `paginate`, and the
- * per-type specs it reads, `ENTITY_SYNC`: paging to Stash's count, the
- * updated_at filter of an incremental sync, narrowing by ids, the newest
- * updated_at as the next sync's watermark, the abort check between pages,
- * and the smart sync's change count (`getChangeCount`).
+ * per-type specs it reads, `ENTITY_SYNC`: paging to Stash's count in
+ * updated_at order, the updated_at filter of an incremental sync, narrowing
+ * by ids, the newest updated_at (not a future one) as the next sync's
+ * watermark, the abort check between pages, and the smart sync's change
+ * count (`getChangeCount`).
  *
  * The loop tests stub a spec's `fetchPage` and `processBatch`; the request
  * tests run the real specs against a stubbed Stash client and read the
@@ -11,7 +12,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StashClient } from "../../graphql/StashClient.js";
-import { CriterionModifier } from "../../graphql/generated/graphql.js";
+import {
+  CriterionModifier,
+  SortDirectionEnum,
+} from "../../graphql/generated/graphql.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   ENTITY_SYNC,
@@ -20,7 +24,8 @@ import {
   stashSyncService,
 } from "../../services/StashSyncService.js";
 import { SyncChangeSet, noChanges } from "../../services/SyncChangeSet.js";
-import { objectContaining } from "../helpers/matchers.js";
+import { logger } from "../../utils/logger.js";
+import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -335,6 +340,108 @@ describe("StashSyncService.paginate", () => {
     const result = await paginate("tag", {}, run);
 
     expect(result.maxUpdatedAt).toBe(newest);
+  });
+
+  it.each(TYPES)(
+    "every page asks for sort updated_at ascending: $type",
+    async ({ type, method }) => {
+      const { run } = newRun();
+
+      await paginate(type, {}, run);
+      await paginate(type, { since: SINCE }, run);
+      await paginate(type, { ids: ["1", "2"] }, run);
+
+      const filters = client[method].mock.calls.map(
+        (_, i) => request(client[method], i).vars.filter
+      );
+      const sorted = objectContaining({
+        sort: "updated_at",
+        direction: SortDirectionEnum.Asc,
+      });
+      expect(filters).toEqual([sorted, sorted, sorted]);
+    }
+  );
+
+  it("an entity edited in Stash after its page was fetched is fetched again on a later page", async () => {
+    // Stash holds tags 1-1000, each updated a second after the one before;
+    // the stub pages them as Stash does: by updated_at when asked, else by id
+    const library = tags(1, 1000, (id) =>
+      new Date(Date.UTC(2025, 10, 1, 0, 0, id)).toISOString()
+    );
+    const edited = "2025-12-28T09:00:00-08:00";
+    client.findTags.mockImplementation((vars) => {
+      const filter = vars?.filter;
+      const ordered = [...library].sort(
+        (a, b) =>
+          (filter?.sort === "updated_at"
+            ? Date.parse(a.updated_at) - Date.parse(b.updated_at)
+            : 0) || Number(a.id) - Number(b.id)
+      );
+      const perPage = filter?.per_page ?? 25;
+      const pageNo = filter?.page ?? 1;
+      return Promise.resolve({
+        findTags: {
+          tags: ordered.slice((pageNo - 1) * perPage, pageNo * perPage),
+          count: library.length,
+        },
+      });
+    });
+    const written: Array<Array<SyncEntityOf<"tag">>> = [];
+    vi.spyOn(ENTITY_SYNC.tag, "processBatch").mockImplementation((items) => {
+      written.push(items);
+      // Tag 10 is edited in Stash while its page is written
+      if (written.length === 1) {
+        library[9] = { ...must(library[9]), updated_at: edited };
+      }
+      return Promise.resolve(noChanges());
+    });
+    const { run } = newRun();
+
+    const result = await paginate("tag", {}, run);
+
+    // The edit moved tag 10 to the end of Stash's order: the last page
+    // brings it again, and its new updated_at is the watermark. (The shift
+    // it causes skips one tag at the page boundary; a full sync fetches that
+    // one by id afterwards, from Stash's id list.)
+    expect(written).toHaveLength(2);
+    expect(must(written[1]).find((tag) => tag.id === "10")?.updated_at).toBe(
+      edited
+    );
+    expect(result.maxUpdatedAt).toBe(edited);
+  });
+
+  it("a future-dated updated_at does not become the watermark and is logged", async () => {
+    const now = Date.now();
+    const at = (msFromNow: number) => new Date(now + msFromNow).toISOString();
+    // Stash's clock two minutes ahead of Peek's: still a watermark
+    const withinSkew = at(2 * 60_000);
+    // An import dated a day ahead
+    const future = at(24 * 60 * 60_000);
+    const { processBatch } = tagPages(
+      [
+        tags(1, 500, (id) =>
+          id === 7
+            ? future
+            : id === 8
+              ? withinSkew
+              : "2025-12-27T10:00:00-08:00"
+        ),
+        tags(501, 502, () => future),
+      ],
+      502
+    );
+    const { run } = newRun();
+
+    const result = await paginate("tag", {}, run);
+
+    // Written like any other, but the watermark is the newest value that is
+    // not in the future, so the next sync still asks from there
+    expect(processBatch).toHaveBeenCalledTimes(2);
+    expect(result.maxUpdatedAt).toBe(withinSkew);
+    expect(logger.warn).toHaveBeenCalledWith(
+      stringContaining("ahead of this server's clock"),
+      objectContaining({ count: 3, ids: ["7", "501", "502"], newest: future })
+    );
   });
 
   it("stops on an empty page", async () => {

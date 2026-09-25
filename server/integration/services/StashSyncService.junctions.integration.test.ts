@@ -16,6 +16,10 @@
  * first, before the batch's transaction opens: no Stash request runs while
  * the write lock is held.
  *
+ * Item 42 (SYNC-21): after a full sync of a type, the ids in Stash's id list
+ * (read by its cleanup) that no page returned are fetched by id: paging by
+ * offset skips an entity when another is edited mid-sync.
+ *
  * Rows are seeded under two made-up instances, jn-a and jn-b, with the same
  * ids, which real sync never touches; the batch writers are called directly
  * with Stash-shaped rows, and the page loop with a stub Stash.
@@ -292,6 +296,7 @@ async function clearSeed(): Promise<void> {
   await prisma.stashStudio.deleteMany({ where: { stashInstanceId: inSeed } });
   await prisma.stashGroup.deleteMany({ where: { stashInstanceId: inSeed } });
   await prisma.stashTag.deleteMany({ where: { stashInstanceId: inSeed } });
+  await prisma.syncState.deleteMany({ where: { stashInstanceId: inSeed } });
 }
 
 /** What the stub Stash was asked for, and whether a transaction was open */
@@ -326,6 +331,8 @@ function page<T extends { id: string }>(
 /**
  * Routes jn-a's Stash client to a stub holding `library`, recording each
  * request and whether an interactive transaction was open when it went out.
+ * Tag pages leave out `tagsMissingFromPages` unless asked for them by id;
+ * Stash's tag id list (the cleanup's) has every tag.
  */
 function stubStash(
   library: {
@@ -333,6 +340,7 @@ function stubStash(
     tags: SyncTag[];
     galleries: SyncGallery[];
     studios: SyncStudio[];
+    tagsMissingFromPages?: string[];
   },
   inTransaction: () => boolean
 ): StashRequest[] {
@@ -355,8 +363,20 @@ function stubStash(
     },
     findTags: (vars) => {
       record("findTags", vars?.ids);
-      const { count, items } = page(library.tags, vars?.filter, vars?.ids);
+      const missing = vars?.ids ? [] : (library.tagsMissingFromPages ?? []);
+      const { count, items } = page(
+        library.tags.filter((tag) => !missing.includes(tag.id)),
+        vars?.filter,
+        vars?.ids
+      );
       return Promise.resolve({ findTags: { count, tags: items } });
+    },
+    findTagIDs: (vars) => {
+      record("findTagIDs", undefined);
+      const { count, items } = page(library.tags, vars?.filter, undefined);
+      return Promise.resolve({
+        findTags: { count, tags: items.map(({ id }) => ({ id })) },
+      });
     },
     findGalleries: (vars) => {
       record("findGalleries", vars?.ids);
@@ -541,6 +561,55 @@ describeWithDb(
       expect(refs(run.changes.changed("gallery").refs)).toEqual([`7@${JN_A}`]);
       expect(refs(run.changes.changed("studio").refs)).toEqual([`4@${JN_A}`]);
       expect(refs(run.changes.changed("scene").refs)).toEqual([`1@${JN_A}`]);
+    });
+
+    it("after a full sync, ids in Stash's id list that no page returned are fetched by id", async () => {
+      // Stash holds tags 1-4, but its pages never return tag 4: an entity
+      // edited mid-sync moved to the end of Stash's order and shifted tag 4
+      // onto a page already fetched. Its id list, read by the cleanup, has it
+      const requests = stubStash(
+        {
+          scenes: [],
+          tags: ["1", "2", "3", "4"].map(tagRow),
+          galleries: [],
+          studios: [],
+          tagsMissingFromPages: ["4"],
+        },
+        () => false
+      );
+      const run = newRun();
+
+      const result = await stashSyncService["syncEntityType"](
+        "tag",
+        JN_A,
+        "full",
+        run,
+        new Map()
+      );
+
+      const stored = await prisma.stashTag.findMany({
+        where: { stashInstanceId: JN_A },
+        select: { id: true, name: true },
+        orderBy: { id: "asc" },
+      });
+      expect(stored).toEqual(
+        ["1", "2", "3", "4"].map((id) => ({
+          id,
+          name: `Junctions IT tag ${id}`,
+        }))
+      );
+      // The pages, the cleanup's id list, then the one tag no page returned
+      expect(requests.map(({ op, ids }) => ({ op, ids }))).toEqual([
+        { op: "findTags", ids: undefined },
+        { op: "findTagIDs", ids: undefined },
+        { op: "findTags", ids: ["4"] },
+      ]);
+      expect(result.error).toBeUndefined();
+      // Written like any page: it reaches the post-sync steps (tags 1-3 were
+      // seeded without Stash's updated_at, so they count as changed too)
+      expect(refs(run.changes.changed("tag").refs)).toEqual(
+        ["1", "2", "3", "4"].map((id) => `${id}@${JN_A}`)
+      );
     });
 
     it("a batch's junction inserts run one after another on one connection", async () => {
