@@ -3206,8 +3206,9 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Makes `instanceIds` visible (`firstSyncedAt` = now) once `recomputed`
-   * holds no failure of a user whose scope covers the instance (no
-   * selection, or one naming it): that user would otherwise see it without
+   * holds no failure of a user whose scope covers the instance
+   * (`getUsersSelecting`: a selection naming it, or one naming no other
+   * enabled instance): that user would otherwise see it without
    * their exclusions. Such an instance stays hidden, its users are logged,
    * and the next sync, which counts it as a change again, retries.
    */
@@ -4784,7 +4785,8 @@ class StashSyncService extends EventEmitter {
    *
    * It answers once that is done. Afterwards, still under the lock, in
    * `purged` (which never rejects): the users whose scope held the instance
-   * (no selection, or a selection naming it, read before the batch removes
+   * (`getUsersSelecting`: a selection naming it, or one naming no other
+   * enabled instance, read before the batch removes
    * the selections) are recomputed, since their library changed, and then
    * the cached library goes. Its rows carry an instance id that no longer
    * exists, so a failure or an abort midway leaves them to the startup

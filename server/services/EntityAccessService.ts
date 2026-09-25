@@ -14,10 +14,11 @@
  * 2. StashInstance.enabled = 1 for that instance, and its first sync has
  *    finished with its users' exclusions computed (firstSyncedAt IS NOT
  *    NULL): until then nobody, admins included, is served its content.
- * 3. The instance is allowed: a user with no UserStashInstance rows may use
- *    every enabled instance, otherwise only their selected ones. Rules 2
- *    and 3 mirror UserInstanceService.getUserAllowedInstanceIds and must
- *    change with it (item 12); the integration test "agrees with
+ * 3. The instance is allowed: a user whose UserStashInstance rows name no
+ *    enabled instance (none at all, or only disabled ones) may use every
+ *    enabled instance, otherwise only their selected ones. Rules 2 and 3
+ *    mirror UserInstanceService.getUserAllowedInstanceIds and must change
+ *    with it (item 12); the integration test "agrees with
  *    getUserAllowedInstanceIds" fails when one side changes alone.
  * 4. No UserExcludedEntity row for (userId, entityType, entityId) has an
  *    instanceId of '' or the entity's instance.
@@ -97,11 +98,12 @@ const ENTITY_SOURCES: Record<AccessEntityType, EntitySource> = {
 /**
  * Rules 1, 2 and 3 for the row aliased `x`. Binds userId, userId. The
  * queries' own JOIN on StashInstance checks rule 2's enabled part too; the
- * probe here keeps every query that uses the clause on both parts.
+ * probe here keeps every query that uses the clause on both parts. Rule 3's
+ * first probe does not depend on `x`, so SQLite runs it once per statement.
  */
 const LIVE_AND_ALLOWED_WHERE = `x.deletedAt IS NULL
   AND EXISTS (SELECT 1 FROM StashInstance ri WHERE ri.id = x.stashInstanceId AND ri.enabled = 1 AND ri.firstSyncedAt IS NOT NULL)
-  AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ?)
+  AND (NOT EXISTS (SELECT 1 FROM UserStashInstance usi JOIN StashInstance si ON si.id = usi.instanceId AND si.enabled = 1 WHERE usi.userId = ?)
        OR EXISTS (SELECT 1 FROM UserStashInstance usi WHERE usi.userId = ? AND usi.instanceId = x.stashInstanceId))`;
 
 /**

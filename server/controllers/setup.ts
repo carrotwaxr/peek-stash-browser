@@ -746,8 +746,9 @@ export const updateStashInstance = async (
     // Reload the StashInstanceManager to pick up changes
     await stashInstanceManager.reload();
 
-    // The users whose scope holds the instance (no selection, or one naming
-    // it) see a different library now: their exclusion rows must match
+    // The users whose scope holds the instance (getUsersSelecting: a selection
+    // naming it, or one naming no other enabled instance, none at all
+    // included) see a different library now: their exclusion rows must match
     // before anyone lists it, so the recompute runs in this request
     if (enabledChanged) {
       await exclusionComputationService.recomputeUsers(

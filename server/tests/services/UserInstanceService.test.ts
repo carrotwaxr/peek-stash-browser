@@ -85,9 +85,13 @@ describe("UserInstanceService", () => {
       expect(result).toEqual(["instance-a"]);
     });
 
-    it("returns empty array when user selects only disabled instances", async () => {
+    it("a selection whose instances are all disabled means every enabled instance", async () => {
+      // A selection only narrows (invariant 11): once the admin disables
+      // every instance the user picked, they see what a user with no
+      // selection sees, not nothing (which answers 503 forever)
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-a", firstSyncedAt: new Date() }),
+        partialRow({ id: "instance-c", firstSyncedAt: new Date() }),
       ]);
       // User only selected instance-b which is now disabled
       mockPrisma.userStashInstance.findMany.mockResolvedValue([
@@ -96,7 +100,7 @@ describe("UserInstanceService", () => {
 
       const result = await getUserAllowedInstanceIds(1);
 
-      expect(result).toEqual([]);
+      expect(result).toEqual(["instance-a", "instance-c"]);
     });
 
     it("returns empty array when no instances are enabled", async () => {
@@ -206,6 +210,34 @@ describe("UserInstanceService", () => {
       expect(await getUserInstanceScope(1)).toEqual(["instance-b"]);
     });
 
+    it("a selection whose instances are all disabled means every enabled instance, first-syncing ones included; the allowed list keeps the ready ones", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({
+          id: "instance-a",
+          firstSyncedAt: new Date("2026-09-25T10:00:00Z"),
+        }),
+        partialRow({ id: "instance-b", firstSyncedAt: null }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "disabled-c" }),
+      ]);
+
+      expect(await getUserInstanceScope(1)).toEqual([
+        "instance-a",
+        "instance-b",
+      ]);
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["instance-a"]);
+
+      // Every enabled instance still on its first sync: nothing to show yet,
+      // so the 503 "initializing" stays until that sync's recompute has run
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "instance-b", firstSyncedAt: null }),
+      ]);
+
+      expect(await getUserInstanceScope(1)).toEqual(["instance-b"]);
+      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
+    });
+
     it("throws on a database error, where getUserAllowedInstanceIds answers none", async () => {
       mockPrisma.stashInstance.findMany.mockRejectedValue(
         new Error("SQLITE_BUSY")
@@ -217,18 +249,26 @@ describe("UserInstanceService", () => {
   });
 
   describe("getUsersSelecting", () => {
-    it("lists the users with no selection or a selection naming the instance, whatever its enabled state", async () => {
+    it("lists the users whose scope holds the instance in either enabled state: a selection naming it, or one without another enabled instance (none at all included)", async () => {
       mockPrisma.user.findMany.mockResolvedValue([
         partialRow({ id: 1 }),
         partialRow({ id: 3 }),
       ]);
 
       expect(await getUsersSelecting("instance-a")).toEqual([1, 3]);
+      // A user who selected only disabled instances sees every enabled one,
+      // so enabling or disabling instance-a changes what they see too
       expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
-            { stashInstances: { none: {} } },
             { stashInstances: { some: { instanceId: "instance-a" } } },
+            {
+              stashInstances: {
+                none: {
+                  instance: { enabled: true, id: { not: "instance-a" } },
+                },
+              },
+            },
           ],
         },
         select: { id: true },

@@ -812,7 +812,8 @@ class ExclusionComputationService {
    * The users a sync batch on `instanceId` holds its changes from: the
    * non-admins with a restriction row (restrictions never apply to admins)
    * and everyone with a hidden item, admins included, among the users whose
-   * scope holds the instance (no selection, or one naming it). None while
+   * scope holds the instance (`getUsersSelecting`: a selection naming it,
+   * or one naming no other enabled instance, none at all included). None while
    * the instance is disabled or still on its first sync: nobody sees it yet
    * (C17), so there is nothing to hold. The sync reads it once per run and
    * instance, before any batch transaction opens.

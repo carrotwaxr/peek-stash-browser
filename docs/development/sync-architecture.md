@@ -144,7 +144,7 @@ The steps below run once per sync, after every instance has synced, not once per
 - **Apply deletions** (the sync status's action after a refused cleanup) runs the steps for what it soft-deleted.
 - A sync that is aborted or fails before its steps hands its change set to the next sync, so the steps still cover what it wrote.
 
-A change to a user's instance scope recomputes exclusions in the same request: a user changing their instance selection (their own recompute), and an admin enabling, disabling or deleting an instance (every user with no selection or a selection naming it).
+A change to a user's instance scope recomputes exclusions in the same request: a user changing their instance selection (their own recompute), and an admin enabling, disabling or deleting an instance (every user whose selection names it or names no other enabled instance: a selection whose instances are all disabled means every enabled instance, as no selection does).
 
 An instance on its first sync (just added, or its URL changed: `StashInstance.firstSyncedAt` is NULL) is hidden from every user, admins included, while its rows arrive: the allowed instances (`getUserAllowedInstanceIds`) and the by-id access checks (`EntityAccessService`) leave it out, and the exclusion compute already covers it. In a run that synced it, it counts as a change, so its users are recomputed even when nothing else changed (a URL changed to the same Stash, say); after that recompute Peek sets `firstSyncedAt` and the instance shows. When the recompute of a user who can see it fails, it stays hidden and the next sync retries. A user whose every instance is on its first sync gets `503 ready: false` from the library routes (the client shows its syncing notice).
 

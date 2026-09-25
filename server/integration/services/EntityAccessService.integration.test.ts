@@ -19,7 +19,10 @@ import {
   getVisibleEntityKeys,
   resolveAccessibleInstanceId,
 } from "../../services/EntityAccessService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import {
+  getUserAllowedInstanceIds,
+  getUsersSelecting,
+} from "../../services/UserInstanceService.js";
 import {
   FX,
   FX_ID,
@@ -182,7 +185,14 @@ describeWithDb("EntityAccessService (integration)", () => {
       [FX_ID.B_ONLY, FX.B],
       [FX_ID.ON_OFF, FX.OFF],
     ];
-    const selections: string[][] = [[], [FX.A], [FX.B], [FX.OFF]];
+    // [FX.OFF] names no enabled instance: every enabled one, as []
+    const selections: string[][] = [
+      [],
+      [FX.A],
+      [FX.B],
+      [FX.OFF],
+      [FX.OFF, FX.B],
+    ];
 
     try {
       // B synced, then B on its first sync
@@ -214,6 +224,36 @@ describeWithDb("EntityAccessService (integration)", () => {
         where: { id: FX.B },
         data: { firstSyncedAt: new Date() },
       });
+    }
+  });
+
+  it("getUsersSelecting names the users whose scope holds an instance in either enabled state", async () => {
+    // Selection -> whether a change to A (enabled, disabled, deleted)
+    // changes what w sees: a selection naming A, or naming no other
+    // enabled instance (none, or only disabled ones: every enabled one)
+    const cases: Array<[string[], boolean]> = [
+      [[], true],
+      [[FX.A], true],
+      [[FX.OFF], true],
+      [[FX.OFF, FX.A], true],
+      [[FX.B], false],
+      [[FX.OFF, FX.B], false],
+    ];
+    try {
+      for (const [selection, affected] of cases) {
+        await prisma.userStashInstance.deleteMany({ where: { userId: w } });
+        for (const instanceId of selection) {
+          await prisma.userStashInstance.create({
+            data: { userId: w, instanceId },
+          });
+        }
+        expect(
+          (await getUsersSelecting(FX.A)).includes(w),
+          `selection [${selection.join(",")}]`
+        ).toBe(affected);
+      }
+    } finally {
+      await prisma.userStashInstance.deleteMany({ where: { userId: w } });
     }
   });
 
