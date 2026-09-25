@@ -8,12 +8,12 @@
  * 91 s on a 260k-image library; a correlated `NOT EXISTS` looks up each
  * image's rows in the junction's (imageId, imageInstanceId) index instead.
  * A sync's scoped pass (C5) drives every statement from the images it binds
- * as one JSON list, so it reads only those images' rows.
+ * as one JSON list, so it reads only those images' rows. The plans are a
+ * large library's (`largeLibraryPlanner`).
  * What the statements write is pinned by the real-SQLite
  * `tests/services/ImageGalleryInheritanceService.test.ts`.
  */
-import { describe, expect, it } from "vitest";
-import prisma from "../../prisma/singleton.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   INHERIT_PERFORMERS_SCOPED_SQL,
   INHERIT_PERFORMERS_SQL,
@@ -22,6 +22,10 @@ import {
   inheritScalarSql,
 } from "../../services/ImageGalleryInheritanceService.js";
 import { must } from "../../tests/helpers/must.js";
+import {
+  type LargeLibraryPlanner,
+  largeLibraryPlanner,
+} from "../helpers/largeLibraryPlanner.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -30,13 +34,10 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const PROBE =
   /^SEARCH x USING COVERING INDEX \S+ \(imageId=\? AND imageInstanceId=\?\)$/;
 
-async function planOf(sql: string, ...params: string[]): Promise<string[]> {
-  const rows = await prisma.$queryRawUnsafe<{ detail: string }[]>(
-    `EXPLAIN QUERY PLAN ${sql}`,
-    ...params
-  );
-  return rows.map((row) => row.detail);
-}
+let planner: LargeLibraryPlanner;
+
+const planOf = (sql: string, ...params: string[]) =>
+  planner.planOf(sql, ...params);
 
 /** A table scanned whole: any SCAN but the bound list's and a subquery's. */
 const tableScans = (plan: string[]): string[] =>
@@ -50,6 +51,14 @@ const tableScans = (plan: string[]): string[] =>
 const ONE_IMAGE = JSON.stringify([["1", "plan-instance"]]);
 
 describeWithDb("ImageGalleryInheritanceService query plans", () => {
+  beforeAll(async () => {
+    planner = await largeLibraryPlanner();
+  });
+
+  afterAll(async () => {
+    await planner.close();
+  });
+
   it("each inherit insert probes the image's existing rows by index", async () => {
     const plans = {
       performers: await planOf(INHERIT_PERFORMERS_SQL),

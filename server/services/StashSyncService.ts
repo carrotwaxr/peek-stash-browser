@@ -44,6 +44,10 @@ import type {
   SyncJob,
   SyncStatusResponse,
 } from "../types/api/sync.js";
+import {
+  checkpointWal,
+  refreshPlannerStatistics,
+} from "../utils/databaseMaintenance.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
@@ -3031,6 +3035,11 @@ class StashSyncService extends EventEmitter {
    * (`markFirstSynced`), each once no recompute of a user who can see it
    * failed. One whose content matches what Peek holds (a URL changed to the
    * same Stash) still recomputes its users, so it does not stay hidden.
+   *
+   * Last, unless the steps were skipped: `PRAGMA optimize`
+   * (`refreshPlannerStatistics`) and a best-effort WAL checkpoint, each its
+   * own writer-queue unit. A skipped run changed no table's size, and the
+   * daily full pass runs them anyway.
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
@@ -3073,6 +3082,9 @@ class StashSyncService extends EventEmitter {
               ? "nothing changed; only gallery inheritance re-applied to the rewritten images"
               : "nothing changed, post-sync steps skipped"
           );
+          // Nothing grew or shrank, so no statistics are due, and the WAL
+          // holds little more than the sync states
+          if (!wroteImages) return;
         } else {
           logger.info(
             "nothing changed; recomputing the users with pending holds",
@@ -3105,7 +3117,11 @@ class StashSyncService extends EventEmitter {
     if (recomputed !== null) {
       await this.markFirstSynced(firstSyncs, recomputed);
     }
-    // D8: PRAGMA optimize goes here, at the end of every run's steps
+    // Last, after the recompute: statistics for the tables the run and its
+    // steps grew or shrank, then the WAL they filled emptied into the
+    // database file. Each is its own unit, and a failure is only logged
+    await refreshPlannerStatistics("sync.optimize");
+    await dbWrite("sync.checkpoint", checkpointWal);
   }
 
   /**
