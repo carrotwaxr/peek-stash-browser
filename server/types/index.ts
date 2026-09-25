@@ -27,6 +27,7 @@ export type {
   StudioRef,
   GroupRef,
   GalleryRef,
+  GroupRelationRef,
   SceneFile,
   ScenePaths,
   SceneStream,

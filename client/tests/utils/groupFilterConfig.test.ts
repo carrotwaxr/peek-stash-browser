@@ -5,9 +5,34 @@
  * into the GraphQL filter format expected by the backend
  */
 import { describe, expect, it } from "vitest";
-import { buildGroupFilter } from "../../src/utils/filterConfig";
+import {
+  GROUP_FILTER_OPTIONS,
+  buildGroupFilter,
+} from "../../src/utils/filterConfig";
+import { parseSearchParams } from "../../src/utils/urlParams";
 
 describe("buildGroupFilter", () => {
+  describe("Parent collection filter", () => {
+    it("maps groupIds to containing_groups, keeping each value's instance", () => {
+      const result = buildGroupFilter({ groupIds: ["7:inst-a", "9"] });
+      expect(result.containing_groups).toEqual({
+        value: ["7:inst-a", "9"],
+        modifier: "INCLUDES",
+      });
+    });
+
+    it("a card's /collections?groupId=7&instance=inst-a opens with that filter", () => {
+      const { filters } = parseSearchParams(
+        new URLSearchParams("groupId=7&instance=inst-a"),
+        [...GROUP_FILTER_OPTIONS]
+      );
+      expect(buildGroupFilter(filters).containing_groups).toEqual({
+        value: ["7:inst-a"],
+        modifier: "INCLUDES",
+      });
+    });
+  });
+
   describe("Boolean Filters", () => {
     it("should build favorite filter when true", () => {
       const uiFilters = { favorite: true };

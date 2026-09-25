@@ -150,6 +150,7 @@ export function createMockGroup(
     back_image_path: overrides.back_image_path || null,
     scene_count: overrides.scene_count ?? 0,
     performer_count: overrides.performer_count ?? 0,
+    sub_group_count: overrides.sub_group_count ?? 0,
     studio: overrides.studio ?? null,
     tags: overrides.tags ?? [],
     created_at: overrides.created_at || new Date().toISOString(),

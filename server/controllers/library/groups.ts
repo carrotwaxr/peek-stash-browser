@@ -225,15 +225,21 @@ export const findGroups = async (
     }
 
     // For single-entity requests (detail pages), get group with computed counts
+    // and its place in the collection hierarchy
     let paginatedGroups = groups;
     if (ids && ids.length === 1 && paginatedGroups.length === 1) {
       const firstGroup = paginatedGroups[0] as (typeof paginatedGroups)[number];
-      const groupWithCounts = await stashEntityService.getGroup(
-        ids[0] as string,
-        firstGroup.instanceId
-      );
+      const [groupWithCounts, hierarchy] = await Promise.all([
+        stashEntityService.getGroup(ids[0] as string, firstGroup.instanceId),
+        groupQueryBuilder.getHierarchy(
+          firstGroup.id,
+          firstGroup.instanceId,
+          userId
+        ),
+      ]);
+      const existingGroup = { ...firstGroup, ...hierarchy };
+      paginatedGroups = [existingGroup];
       if (groupWithCounts) {
-        const existingGroup = firstGroup;
         paginatedGroups = [
           {
             ...existingGroup,

@@ -1,6 +1,41 @@
 import { createElement } from "react";
-import { describe, expect, it } from "vitest";
+import type * as routerModule from "react-router-dom";
+import type { NormalizedGroup } from "@peek/shared-types";
+import { render } from "@testing-library/react";
+import { must } from "@tests/testUtils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import GroupCard from "../../../src/components/cards/GroupCard";
+import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
+
+const { navigate, baseCardProps, config } = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  baseCardProps: vi.fn<(props: BaseCardProps) => void>(),
+  config: { hasMultipleInstances: true },
+}));
+
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof routerModule>();
+  return { ...actual, useNavigate: () => navigate };
+});
+vi.mock("../../../src/contexts/ConfigContext", () => ({
+  useConfig: () => config,
+}));
+vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
+  useCardDisplaySettings: () => ({
+    getSettings: () => ({ showRelationshipIndicators: true }),
+  }),
+}));
+// Captures the indicators GroupCard hands to BaseCard
+vi.mock("../../../src/components/ui/BaseCard", () => ({
+  BaseCard: (props: BaseCardProps) => {
+    baseCardProps(props);
+    return null;
+  },
+}));
+
+/** GroupCard renders from these fields; the rest are left out */
+const partialGroup = (fields: Partial<NormalizedGroup>) =>
+  fields as NormalizedGroup;
 
 describe("GroupCard", () => {
   const mockGroup = {
@@ -86,5 +121,60 @@ describe("GroupCard", () => {
     } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
+  });
+});
+
+describe("GroupCard collections indicator", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const indicator = (type: string) => {
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    return must(
+      props.indicators?.find((each) => each.type === type),
+      `the ${type} indicator`
+    );
+  };
+
+  it("the collections indicator links to /collections?groupId=<id> with the instance", () => {
+    render(
+      <GroupCard
+        group={partialGroup({
+          id: "7",
+          instanceId: "inst-a",
+          name: "Box set",
+          scene_count: 0,
+          sub_group_count: 2,
+          tags: [],
+        })}
+      />
+    );
+
+    const groups = indicator("GROUPS");
+    expect(groups.count).toBe(2);
+    must(groups.onClick, "the indicator's click")();
+
+    // urlParamsToFilters turns groupId and instance into "7:inst-a"
+    expect(navigate).toHaveBeenCalledWith(
+      "/collections?groupId=7&instance=inst-a"
+    );
+  });
+
+  it("a collection with no sub-collections has no link", () => {
+    render(
+      <GroupCard
+        group={partialGroup({
+          id: "8",
+          instanceId: "inst-a",
+          name: "Part 2",
+          scene_count: 0,
+          sub_group_count: 0,
+          tags: [],
+        })}
+      />
+    );
+
+    expect(indicator("GROUPS").onClick).toBeUndefined();
   });
 });

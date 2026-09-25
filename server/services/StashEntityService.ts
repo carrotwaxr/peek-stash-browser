@@ -282,6 +282,9 @@ const DEFAULT_GALLERY_USER_FIELDS = {
 const DEFAULT_GROUP_USER_FIELDS = {
   rating: null,
   favorite: false,
+  // Per user (it leaves out the sub-groups they cannot see): GroupQueryBuilder
+  // sets it on the list and detail rows
+  sub_group_count: 0,
 };
 
 class StashEntityService {

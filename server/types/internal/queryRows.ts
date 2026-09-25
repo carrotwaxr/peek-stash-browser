@@ -262,7 +262,7 @@ export interface GalleryQueryRow {
  * Raw row returned by GroupQueryBuilder's SELECT.
  *
  * Base columns from StashGroup, plus user data from LEFT JOIN on
- * GroupRating (r).
+ * GroupRating (r) and the count of sub-groups the user can see.
  */
 export interface GroupQueryRow {
   // StashGroup base columns
@@ -286,4 +286,18 @@ export interface GroupQueryRow {
   // User data from LEFT JOIN GroupRating (r)
   userRating: number | null;
   userFavorite: number | null; // SQLite boolean: 0 | 1
+
+  // COUNT(*) over GroupRelation: live sub-groups the user can see
+  subGroupCount: bigint;
+}
+
+/**
+ * Raw row of GroupQueryBuilder.getHierarchy: the group at the other end of a
+ * GroupRelation link, and the link's description.
+ */
+export interface GroupRelationQueryRow {
+  id: string;
+  stashInstanceId: string;
+  name: string;
+  description: string | null;
 }
