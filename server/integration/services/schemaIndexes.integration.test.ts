@@ -28,6 +28,8 @@ const JUNCTIONS = [
   { table: "GroupTag", parent: "group", child: "tag" },
   { table: "StudioTag", parent: "studio", child: "tag" },
   { table: "ClipTag", parent: "clip", child: "tag" },
+  // The group hierarchy: a containing group's row per sub-group
+  { table: "GroupRelation", parent: "containing", child: "sub" },
 ] as const;
 
 interface IndexRow {

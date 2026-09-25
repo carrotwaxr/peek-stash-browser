@@ -89,8 +89,11 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 | Scene | Many-to-Many | `SceneGroup` | Includes `sceneIndex` for ordering |
 | Tag | Many-to-Many | `GroupTag` | |
 | Studio | Many-to-One | — | `StashGroup.studioId` |
-| Containing Groups | Many-to-Many | — | Via Stash `containing_groups` |
-| Sub Groups | Many-to-Many | — | Via Stash `sub_groups` |
+| Containing Groups | Many-to-Many | `GroupRelation` | Rows where the group is the sub-group (`subId`) |
+| Sub Groups | Many-to-Many | `GroupRelation` | Rows where the group contains (`containingId`); `orderIndex` keeps Stash's order |
+
+!!! note "Group Hierarchy"
+    Stash stores the group hierarchy as one table, and its `containing_groups` and `sub_groups` are the same links read from either end. Peek keeps it the same way: one `GroupRelation` row per link, from the containing group to the sub-group, with the sub-group's place in the list (`orderIndex`) and Stash's description of the link (`description`, e.g. "Part 2"). Both groups are keyed on their instance; a link never crosses Stash servers.
 
 ---
 
