@@ -18,10 +18,11 @@ import {
   StashClient,
   StashRequestTimeoutError,
 } from "../../graphql/StashClient.js";
+import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
-import { stringContaining } from "../helpers/matchers.js";
+import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -98,7 +99,7 @@ const mockStashClient = {
     .fn()
     .mockResolvedValue({ findScenes: { scenes: [], count: 0 } }),
   findSceneMarkers: vi
-    .fn()
+    .fn<StashClient["findSceneMarkers"]>()
     .mockResolvedValue({ findSceneMarkers: { scene_markers: [], count: 0 } }),
   findImages: vi
     .fn()
@@ -150,6 +151,9 @@ function stashAnswersNothing(): void {
   mockStashClient.findScenesCompact.mockResolvedValue({
     findScenes: { scenes: [], count: 0 },
   });
+  mockStashClient.findSceneMarkers.mockResolvedValue({
+    findSceneMarkers: { scene_markers: [], count: 0 },
+  });
   mockStashClient.findImages.mockResolvedValue({
     findImages: { images: [], count: 0 },
   });
@@ -177,6 +181,9 @@ function everyTypeChanged(): void {
   });
   mockStashClient.findScenesCompact.mockResolvedValue({
     findScenes: { scenes: [], count: 1 },
+  });
+  mockStashClient.findSceneMarkers.mockResolvedValue({
+    findSceneMarkers: { scene_markers: [], count: 1 },
   });
   mockStashClient.findImages.mockResolvedValue({
     findImages: { images: [], count: 1 },
@@ -844,6 +851,57 @@ describe("StashSyncService", () => {
         "Stash request FindStudios timed out after 120 s; " +
           "Cleanup failed: Stash request FindStudioIDs timed out after 120 s",
       ]);
+    });
+  });
+
+  describe("smart sync of clips", () => {
+    const INSTANCE = "test-instance-uuid";
+    const SINCE = "2025-12-27T16:00:00-08:00";
+    /** The updated_at filter for SINCE, as Stash reads it */
+    const CHANGED_SINCE = {
+      updated_at: {
+        modifier: CriterionModifier.GreaterThan,
+        value: "2025-12-27T16:00:00.999",
+      },
+    };
+
+    it("smart sync counts changed markers and fetches only those", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      // Every type synced before, at SINCE
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: SINCE,
+          lastError: null,
+        })
+      );
+      // Stash has 3 markers updated since SINCE (lists none, so none is
+      // written); cleanup's unfiltered id list is empty
+      mockStashClient.findSceneMarkers.mockImplementation((vars) =>
+        Promise.resolve({
+          findSceneMarkers: {
+            scene_markers: [],
+            count: vars?.scene_marker_filter?.updated_at ? 3 : 0,
+          },
+        })
+      );
+
+      await stashSyncService.smartIncrementalSync(INSTANCE);
+
+      const requests = mockStashClient.findSceneMarkers.mock.calls.map(
+        ([vars]) => vars
+      );
+      const countRequest = must(requests[0], "the clip change count");
+      expect(countRequest.filter).toEqual(
+        objectContaining({ page: 1, per_page: 0 })
+      );
+      expect(countRequest.scene_marker_filter).toEqual(CHANGED_SINCE);
+      const pageRequest = must(requests[1], "the changed clips' first page");
+      expect(pageRequest.filter).toEqual(
+        objectContaining({ page: 1, per_page: 500, sort: "updated_at" })
+      );
+      expect(pageRequest.scene_marker_filter).toEqual(CHANGED_SINCE);
     });
   });
 });

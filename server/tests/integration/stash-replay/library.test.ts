@@ -139,6 +139,25 @@ describe("queryList", () => {
     expect(sorted("DESC")).toEqual(["100002", "100004", "100001", "100003"]);
   });
 
+  it("FindSceneMarkers answers a per_page 0 count under an updated_at filter", () => {
+    const library = fixtureLibrary();
+    // The smart sync's clip change count, as ENTITY_SYNC.clip asks for it
+    const changedSince = (value: string) =>
+      queryList(library, "FindSceneMarkers", "findSceneMarkers", {
+        filter: { page: 1, per_page: 0, sort: "updated_at", direction: "ASC" },
+        scene_marker_filter: {
+          updated_at: { modifier: "GREATER_THAN", value },
+        },
+      });
+
+    // The fixture's one clip was updated at 2003-02-11T08:00:00+00:00
+    const changed = changedSince("2003-02-11T07:59:59.999");
+    expect(changed.count).toBe(1);
+    expect(changed.scene_markers).toEqual([]);
+    const unchanged = changedSince("2003-02-11T08:00:00.999");
+    expect(unchanged.count).toBe(0);
+  });
+
   it("findScenes duration and filesize sum the matched first files", () => {
     const library = fixtureLibrary();
 

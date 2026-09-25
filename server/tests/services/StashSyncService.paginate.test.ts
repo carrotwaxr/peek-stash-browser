@@ -393,7 +393,7 @@ describe("StashSyncService.getChangeCount", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(TYPES.filter(({ type }) => type !== "clip"))(
+  it.each(TYPES)(
     "getChangeCount asks each spec for per_page 0 and returns its count: $type",
     async ({ type, method, filterArg }) => {
       const fetchPage = vi.spyOn(ENTITY_SYNC[type], "fetchPage");
@@ -419,18 +419,4 @@ describe("StashSyncService.getChangeCount", () => {
       expect(signal).toBe(run.signal);
     }
   );
-
-  it("counts no clip changes and asks Stash nothing (clips have no change count yet)", async () => {
-    const { run } = newRun();
-
-    const count = await stashSyncService["getChangeCount"](
-      "clip",
-      SINCE,
-      INSTANCE,
-      run
-    );
-
-    expect(count).toBe(0);
-    expect(client.findSceneMarkers).not.toHaveBeenCalled();
-  });
 });
