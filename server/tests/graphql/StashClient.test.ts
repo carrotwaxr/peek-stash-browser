@@ -201,7 +201,7 @@ describe("describeStashError", () => {
     expect(String(error)).toContain("private-search-term");
     const described = describeStashError(error);
     expect(described).toBe(
-      "input: tag_filter: unknown field; second problem (HTTP 422)"
+      "FindTags: input: tag_filter: unknown field; second problem (HTTP 422)"
     );
     expect(described).not.toContain("private-search-term");
     expect(described).not.toContain("query");
@@ -218,7 +218,37 @@ describe("describeStashError", () => {
       new StashClient({ url, apiKey: "key" }).version()
     );
 
-    expect(describeStashError(error)).toBe("Stash answered HTTP 502");
+    expect(describeStashError(error)).toBe("Version: Stash answered HTTP 502");
+  });
+
+  it("names the operation and the path of each GraphQL error, so a stored error says which field broke", async () => {
+    // What Stash answers when a resolver fails on one row (SYNC-10)
+    const url = await startServer((res) =>
+      answerJson(res, 200, {
+        data: null,
+        errors: [
+          {
+            message:
+              "runtime error: invalid memory address or nil pointer dereference",
+            path: ["findStudios", "studios", 3, "parent_studio"],
+          },
+          { message: "a problem with no path" },
+        ],
+      })
+    );
+    const client = new StashClient({ url, apiKey: "secret-key" });
+
+    const error = await rejectionOf(
+      client.findStudios({ filter: { q: "private-search-term" } })
+    );
+
+    const described = describeStashError(error);
+    expect(described).toBe(
+      "FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.parent_studio); a problem with no path (HTTP 200)"
+    );
+    expect(described).not.toContain("private-search-term");
+    expect(described).not.toContain("query");
+    expect(described).not.toContain("secret-key");
   });
 
   it("keeps a timeout's message", () => {

@@ -359,7 +359,7 @@
       "count": 41
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 16
+      "count": 15
     }
   },
   "services/StashSyncService.ts": {
@@ -367,7 +367,7 @@
       "count": 66
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
+      "count": 6
     }
   },
   "services/StudioQueryBuilder.ts": {

@@ -50,10 +50,13 @@ export class StashRequestTimeoutError extends Error {
 
 /**
  * A Stash request's failure in words fit for a log line or an admin's status
- * page: GraphQL error messages and the HTTP status, a timeout's message, a
- * network error's code, or the error's message, cut to 500 characters. Never
- * the query, its variables or the headers: a graphql-request `ClientError`'s
- * own message embeds the query and variables.
+ * page, cut to 500 characters:
+ * - a GraphQL answer: the operation, each error's message with the field it
+ *   broke on, and the HTTP status, as in `FindStudios: runtime error: ...
+ *   (at findStudios.studios.3.parent_studio) (HTTP 200)`;
+ * - a timeout's message, a network error's code, or the error's message.
+ * Never the query, its variables or the headers: a graphql-request
+ * `ClientError`'s own message embeds the query and variables.
  */
 export function describeStashError(error: unknown): string {
   const text = describe(error);
@@ -66,16 +69,33 @@ function describe(error: unknown): string {
   if (error instanceof ClientError) {
     const { errors, status } = error.response;
     const messages = (errors ?? [])
-      .map((e) => e.message)
-      .filter((message) => message.length > 0);
+      .filter((e) => e.message.length > 0)
+      .map((e) =>
+        e.path && e.path.length > 0
+          ? `${e.message} (at ${e.path.join(".")})`
+          : e.message
+      );
+    const operation = operationName(error.request.query);
+    const prefix = operation ? `${operation}: ` : "";
     return messages.length > 0
-      ? `${messages.join("; ")} (HTTP ${status})`
-      : `Stash answered HTTP ${status}`;
+      ? `${prefix}${messages.join("; ")} (HTTP ${status})`
+      : `${prefix}Stash answered HTTP ${status}`;
   }
   if (error instanceof StashRequestTimeoutError) return error.message;
   const code = networkErrorCode(error);
   if (code) return `Could not reach Stash (${code})`;
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The name of the operation a request's document starts with (`FindStudios`
+ * in `query FindStudios(...) {...}`), and nothing else of the query.
+ */
+function operationName(query: string | string[]): string | undefined {
+  const document = Array.isArray(query) ? query[0] : query;
+  return document?.match(
+    /^\s*(?:query|mutation|subscription)\s+([_A-Za-z][_0-9A-Za-z]*)/
+  )?.[1];
 }
 
 /**

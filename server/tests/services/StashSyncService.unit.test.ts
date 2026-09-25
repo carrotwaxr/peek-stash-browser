@@ -855,6 +855,97 @@ function cacheHoldsScenes(live: number, missing: string[]): void {
   );
 }
 
+describe("StashSyncService getSyncStatus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("getSyncStatus groups SyncState rows by configured instance and leaves out unknown instances", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    mockPrisma.stashInstance.findMany.mockResolvedValue([
+      partialRow({ id: "inst-a", name: "Main", enabled: true }),
+      partialRow({ id: "inst-b", name: "Archive", enabled: false }),
+    ]);
+    const synced = new Date("2026-09-24T17:00:00Z");
+    const state = (
+      id: number,
+      stashInstanceId: string,
+      entityType: string,
+      lastError: string | null = null
+    ) =>
+      partialRow<
+        Awaited<ReturnType<typeof mockPrisma.syncState.findMany>>[number]
+      >({
+        id,
+        stashInstanceId,
+        entityType,
+        lastFullSyncTimestamp: "2026-09-24T10:00:00-07:00",
+        lastIncrementalSyncTimestamp: null,
+        lastFullSyncActual: synced,
+        lastIncrementalSyncActual: null,
+        lastSyncCount: 3,
+        lastSyncDurationMs: 40,
+        lastError,
+        totalEntities: 3,
+      });
+    // The database answers what the query asks for; an unknown instance's
+    // row is there to be left out
+    const rows = [
+      state(1, "inst-a", "scene"),
+      state(2, "inst-a", "tag"),
+      state(3, "inst-b", "studio", "FindStudios: broke (HTTP 200)"),
+      state(4, "gone", "scene"),
+    ];
+    mockPrisma.syncState.findMany.mockImplementation(
+      prismaImpl((args) => {
+        const filter = args?.where?.stashInstanceId;
+        const ids = typeof filter === "object" ? filter.in : undefined;
+        return ids
+          ? rows.filter((row) => ids.includes(row.stashInstanceId))
+          : rows;
+      })
+    );
+    mockPrisma.syncSettings.findFirst.mockResolvedValue(
+      partialRow({ syncIntervalMinutes: 120, enableScanSubscription: false })
+    );
+
+    const status = await stashSyncService.getSyncStatus();
+
+    const expected = (entityType: string, lastError: string | null = null) => ({
+      entityType,
+      lastFullSyncTimestamp: "2026-09-24T10:00:00-07:00",
+      lastIncrementalSyncTimestamp: null,
+      lastFullSyncActual: "2026-09-24T17:00:00.000Z",
+      lastIncrementalSyncActual: null,
+      lastSyncCount: 3,
+      lastSyncDurationMs: 40,
+      lastError,
+      totalEntities: 3,
+    });
+    expect(status).toEqual({
+      inProgress: false,
+      activeJob: null,
+      settings: { syncIntervalMinutes: 120, enableScanSubscription: false },
+      instances: [
+        {
+          instanceId: "inst-a",
+          name: "Main",
+          enabled: true,
+          // In sync order: tags first
+          states: [expected("tag"), expected("scene")],
+        },
+        {
+          instanceId: "inst-b",
+          name: "Archive",
+          enabled: false,
+          states: [expected("studio", "FindStudios: broke (HTTP 200)")],
+        },
+      ],
+    });
+  });
+});
+
 describe("StashSyncService abort", () => {
   let hanging: Server;
   let url: string;

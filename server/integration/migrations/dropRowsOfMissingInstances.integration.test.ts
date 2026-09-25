@@ -113,16 +113,16 @@ async function seedJunctions(
   }
 }
 
+// Raw SQL: the column is NOT NULL from 20260925000800 on, and the client
+// follows the current schema
 async function seedSyncState(
   client: Client,
   instance: string | null
 ): Promise<void> {
-  await client.syncState.create({
-    data: {
-      stashInstanceId: instance,
-      entityType: "scene",
-      lastFullSyncTimestamp: "2026-01-26T00:00:00Z",
-    },
+  await insert(client, "SyncState", {
+    stashInstanceId: instance,
+    entityType: "scene",
+    lastFullSyncTimestamp: "2026-01-26T00:00:00Z",
   });
 }
 
