@@ -25,34 +25,12 @@ vi.mock("../../utils/hierarchyUtils.js", () => ({
   expandTagIds: vi.fn().mockResolvedValue([]),
 }));
 
-// Mock titleUtils
-vi.mock("../../utils/titleUtils.js", () => ({
-  getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
-}));
-
-// Keep every tooltip relation, so the visibility query doesn't consume the
-// mocked $queryRawUnsafe sequences
-vi.mock("../../services/EntityAccessService.js", () => ({
-  keepVisibleConditions: vi.fn((_u: number, _t: string, c: unknown[]) =>
-    Promise.resolve(c)
-  ),
-}));
-
 const mockPrisma = vi.mocked(prisma, true);
 
 describe("TagQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.galleryTag.findMany.mockResolvedValue([]);
-    mockPrisma.stashTag.findMany.mockResolvedValue([]);
-    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
-    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
-    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

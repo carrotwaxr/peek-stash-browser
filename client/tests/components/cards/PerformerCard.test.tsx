@@ -1,6 +1,53 @@
 import { createElement } from "react";
-import { describe, expect, it } from "vitest";
+import type * as routerModule from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
+import type { NormalizedPerformer, StudioRef } from "@peek/shared-types";
+import { render, screen } from "@testing-library/react";
+import { must } from "@tests/testUtils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import PerformerCard from "../../../src/components/cards/PerformerCard";
+import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
+
+const { baseCardProps } = vi.hoisted(() => ({
+  baseCardProps: vi.fn<(props: BaseCardProps) => void>(),
+}));
+
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof routerModule>();
+  return { ...actual, useNavigate: () => vi.fn() };
+});
+vi.mock("../../../src/contexts/ConfigContext", () => ({
+  useConfig: () => ({ hasMultipleInstances: false }),
+}));
+vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
+  useCardDisplaySettings: () => ({
+    getSettings: () => ({ showRelationshipIndicators: true }),
+  }),
+}));
+// Captures the indicators the card hands to BaseCard
+vi.mock("../../../src/components/ui/BaseCard", () => ({
+  BaseCard: (props: BaseCardProps) => {
+    baseCardProps(props);
+    return null;
+  },
+}));
+
+/** The indicator of one type from the card's last render */
+const indicator = (type: string) => {
+  const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+  return must(
+    props.indicators?.find((each) => each.type === type),
+    `the ${type} indicator`
+  );
+};
+
+/** Shows an indicator's tooltip grid */
+const renderTooltip = (type: string) =>
+  render(<MemoryRouter>{indicator(type).tooltipContent}</MemoryRouter>);
+
+/** PerformerCard renders from these fields; the rest are left out */
+const partialPerformer = (fields: Partial<NormalizedPerformer>) =>
+  fields as NormalizedPerformer;
 
 describe("PerformerCard", () => {
   const mockPerformer = {
@@ -89,5 +136,41 @@ describe("PerformerCard", () => {
     } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
+  });
+});
+
+describe("PerformerCard indicators", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const studio = (i: number): StudioRef => ({
+    id: String(i),
+    instanceId: "inst-a",
+    name: `Studio ${i}`,
+    image_path: null,
+    favorite: null,
+    parent_studio: null,
+  });
+
+  it("the studios indicator shows relation_totals.studios and its grid says how many more", () => {
+    render(
+      <PerformerCard
+        performer={partialPerformer({
+          id: "7",
+          instanceId: "inst-a",
+          name: "Performer",
+          scene_count: 0,
+          image_count: 0,
+          tags: [],
+          studios: Array.from({ length: 12 }, (_, i) => studio(i + 1)),
+          relation_totals: { studios: 20 },
+        })}
+      />
+    );
+
+    expect(indicator("STUDIOS").count).toBe(20);
+    renderTooltip("STUDIOS");
+    expect(screen.getByText("and 8 more")).toBeInTheDocument();
   });
 });

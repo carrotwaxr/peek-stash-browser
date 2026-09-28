@@ -6,14 +6,7 @@
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
-import type {
-  GalleryRef,
-  GroupRef,
-  NormalizedTag,
-  PeekTagFilter,
-  PerformerRef,
-  StudioRef,
-} from "../types/index.js";
+import type { NormalizedTag, PeekTagFilter } from "../types/index.js";
 import type { TagQueryRow } from "../types/internal/queryRows.js";
 import { entityKey } from "../utils/entityRef.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
@@ -30,8 +23,7 @@ import {
   parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { keepVisibleConditions } from "./EntityAccessService.js";
+import { loadTooltipRelations } from "./TooltipRelations.js";
 
 /** Tags on one of the scenes (the Tags page's scene filter) */
 const TAGS_BY_SCENE: ViaSceneSpec = {
@@ -741,8 +733,9 @@ class TagQueryBuilder {
   }
 
   /**
-   * Populate tag relations (performers, studios, groups, galleries, parent names)
-   * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
+   * The card's relations for the whole page: at most TOOLTIP_LIMIT
+   * performers, studios, collections and galleries with how many there are
+   * (TooltipRelations), one statement per relation; and its parents' names
    */
   async populateRelations(
     tags: NormalizedTag[],
@@ -750,7 +743,17 @@ class TagQueryBuilder {
   ): Promise<void> {
     if (tags.length === 0) return;
 
-    const tagIds = tags.map((t) => t.id);
+    const [relations] = await Promise.all([
+      loadTooltipRelations("tag", tags, userId),
+      this.hydrateParentNames(tags),
+    ]);
+    for (const tag of tags) {
+      Object.assign(tag, relations.get(entityKey(tag.id, tag.instanceId)));
+    }
+  }
+
+  /** The names of the page's parent tags, on each tag's own instance */
+  private async hydrateParentNames(tags: NormalizedTag[]): Promise<void> {
     const tagInstanceIds = [...new Set(tags.map((t) => t.instanceId))];
 
     // Collect all parent IDs that need name hydration
@@ -764,75 +767,16 @@ class TagQueryBuilder {
         }
       }
     }
+    if (parentIds.size === 0) return;
 
-    // Load all junctions in parallel (include parent tags lookup)
-    // Filter by both tagId AND tagInstanceId for multi-instance correctness
-    const [
-      performerTags,
-      studioTags,
-      groupTags,
-      galleryTags,
-      parentTagRecords,
-    ] = await Promise.all([
-      prisma.performerTag.findMany({
-        where: {
-          tagId: { in: tagIds },
-          tagInstanceId: { in: tagInstanceIds },
-        },
-        select: {
-          tagId: true,
-          tagInstanceId: true,
-          performerId: true,
-          performerInstanceId: true,
-        },
-      }),
-      prisma.studioTag.findMany({
-        where: {
-          tagId: { in: tagIds },
-          tagInstanceId: { in: tagInstanceIds },
-        },
-        select: {
-          tagId: true,
-          tagInstanceId: true,
-          studioId: true,
-          studioInstanceId: true,
-        },
-      }),
-      prisma.groupTag.findMany({
-        where: {
-          tagId: { in: tagIds },
-          tagInstanceId: { in: tagInstanceIds },
-        },
-        select: {
-          tagId: true,
-          tagInstanceId: true,
-          groupId: true,
-          groupInstanceId: true,
-        },
-      }),
-      prisma.galleryTag.findMany({
-        where: {
-          tagId: { in: tagIds },
-          tagInstanceId: { in: tagInstanceIds },
-        },
-        select: {
-          tagId: true,
-          tagInstanceId: true,
-          galleryId: true,
-          galleryInstanceId: true,
-        },
-      }),
-      // Fetch parent tag names - filter by parent instanceIds matching tag instanceIds
-      parentIds.size > 0
-        ? prisma.stashTag.findMany({
-            where: {
-              id: { in: Array.from(parentIds) },
-              stashInstanceId: { in: tagInstanceIds },
-            },
-            select: { id: true, stashInstanceId: true, name: true },
-          })
-        : [],
-    ]);
+    // Fetch parent tag names - filter by parent instanceIds matching tag instanceIds
+    const parentTagRecords = await prisma.stashTag.findMany({
+      where: {
+        id: { in: Array.from(parentIds) },
+        stashInstanceId: { in: tagInstanceIds },
+      },
+      select: { id: true, stashInstanceId: true, name: true },
+    });
 
     // Build parent name lookup map (by composite key) and hydrate parent names
     const parentNameMap = new Map<string, string>();
@@ -848,207 +792,6 @@ class TagQueryBuilder {
           name: parentNameMap.get(entityKey(p.id, tagInstanceId)) || "Unknown",
         }));
       }
-    }
-
-    // Collect unique entity refs from junction tables, by entityKey
-    const performerKeys = [
-      ...new Map(
-        performerTags.map((j) => [
-          entityKey(j.performerId, j.performerInstanceId),
-          { id: j.performerId, instanceId: j.performerInstanceId },
-        ])
-      ).values(),
-    ];
-    const studioKeys = [
-      ...new Map(
-        studioTags.map((j) => [
-          entityKey(j.studioId, j.studioInstanceId),
-          { id: j.studioId, instanceId: j.studioInstanceId },
-        ])
-      ).values(),
-    ];
-    const groupKeys = [
-      ...new Map(
-        groupTags.map((j) => [
-          entityKey(j.groupId, j.groupInstanceId),
-          { id: j.groupId, instanceId: j.groupInstanceId },
-        ])
-      ).values(),
-    ];
-    const galleryKeys = [
-      ...new Map(
-        galleryTags.map((j) => [
-          entityKey(j.galleryId, j.galleryInstanceId),
-          { id: j.galleryId, instanceId: j.galleryInstanceId },
-        ])
-      ).values(),
-    ];
-
-    // Build OR conditions for entity queries (need to match on composite keys)
-    const performerOrConditions = performerKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-    const studioOrConditions = studioKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-    const groupOrConditions = groupKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-    const galleryOrConditions = galleryKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-
-    // Keep only entities this user may see (hidden, restricted, deleted or
-    // on an instance they don't use); the junction loops below skip the rest
-    const [
-      visiblePerformerConditions,
-      visibleStudioConditions,
-      visibleGroupConditions,
-      visibleGalleryConditions,
-    ] = await Promise.all([
-      keepVisibleConditions(userId, "performer", performerOrConditions),
-      keepVisibleConditions(userId, "studio", studioOrConditions),
-      keepVisibleConditions(userId, "group", groupOrConditions),
-      keepVisibleConditions(userId, "gallery", galleryOrConditions),
-    ]);
-
-    // Load all entities in parallel using composite key lookups
-    const [performers, studios, groups, galleries] = await Promise.all([
-      visiblePerformerConditions.length > 0
-        ? prisma.stashPerformer.findMany({
-            where: { OR: visiblePerformerConditions },
-          })
-        : [],
-      visibleStudioConditions.length > 0
-        ? prisma.stashStudio.findMany({
-            where: { OR: visibleStudioConditions },
-          })
-        : [],
-      visibleGroupConditions.length > 0
-        ? prisma.stashGroup.findMany({ where: { OR: visibleGroupConditions } })
-        : [],
-      visibleGalleryConditions.length > 0
-        ? prisma.stashGallery.findMany({
-            where: { OR: visibleGalleryConditions },
-          })
-        : [],
-    ]);
-
-    // Build lookup maps with minimal tooltip data by entityKey
-    const performersById = new Map<string, PerformerRef>(
-      performers.map((p) => [
-        entityKey(p.id, p.stashInstanceId),
-        {
-          id: p.id,
-          instanceId: p.stashInstanceId,
-          name: p.name,
-          disambiguation: p.disambiguation || null,
-          gender: p.gender || null,
-          image_path: toProxyUrl(p.imagePath, p.stashInstanceId),
-          favorite: p.favorite ?? null,
-          rating100: p.rating100 ?? null,
-        },
-      ])
-    );
-
-    const studiosById = new Map<string, StudioRef>(
-      studios.map((s) => [
-        entityKey(s.id, s.stashInstanceId),
-        {
-          id: s.id,
-          instanceId: s.stashInstanceId,
-          name: s.name,
-          image_path: toProxyUrl(s.imagePath, s.stashInstanceId),
-          favorite: s.favorite ?? null,
-          parent_studio: s.parentId ? { id: s.parentId } : null,
-        },
-      ])
-    );
-
-    const groupsById = new Map<string, GroupRef>(
-      groups.map((g) => [
-        entityKey(g.id, g.stashInstanceId),
-        {
-          id: g.id,
-          instanceId: g.stashInstanceId,
-          name: g.name,
-          front_image_path: toProxyUrl(g.frontImagePath, g.stashInstanceId),
-          back_image_path: toProxyUrl(g.backImagePath, g.stashInstanceId),
-        },
-      ])
-    );
-
-    const galleriesById = new Map<string, GalleryRef>(
-      galleries.map((g) => [
-        entityKey(g.id, g.stashInstanceId),
-        {
-          id: g.id,
-          instanceId: g.stashInstanceId,
-          title:
-            g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-          cover: toProxyUrl(g.coverPath, g.stashInstanceId),
-        },
-      ])
-    );
-
-    // Build tag -> entities maps using composite keys
-    // Keyed by the tag's entityKey -> entities[]
-    const performersByTag = new Map<string, PerformerRef[]>();
-    for (const pt of performerTags) {
-      const performerKey = entityKey(pt.performerId, pt.performerInstanceId);
-      const performer = performersById.get(performerKey);
-      if (!performer) continue; // Skip orphaned junction records
-      const tagKey = entityKey(pt.tagId, pt.tagInstanceId);
-      const list = performersByTag.get(tagKey) ?? [];
-      list.push(performer);
-      performersByTag.set(tagKey, list);
-    }
-
-    const studiosByTag = new Map<string, StudioRef[]>();
-    for (const st of studioTags) {
-      const studioKey = entityKey(st.studioId, st.studioInstanceId);
-      const studio = studiosById.get(studioKey);
-      if (!studio) continue; // Skip orphaned junction records
-      const tagKey = entityKey(st.tagId, st.tagInstanceId);
-      const list = studiosByTag.get(tagKey) ?? [];
-      list.push(studio);
-      studiosByTag.set(tagKey, list);
-    }
-
-    const groupsByTag = new Map<string, GroupRef[]>();
-    for (const gt of groupTags) {
-      const groupKey = entityKey(gt.groupId, gt.groupInstanceId);
-      const group = groupsById.get(groupKey);
-      if (!group) continue; // Skip orphaned junction records
-      const tagKey = entityKey(gt.tagId, gt.tagInstanceId);
-      const list = groupsByTag.get(tagKey) ?? [];
-      list.push(group);
-      groupsByTag.set(tagKey, list);
-    }
-
-    const galleriesByTag = new Map<string, GalleryRef[]>();
-    for (const gt of galleryTags) {
-      const galleryKey = entityKey(gt.galleryId, gt.galleryInstanceId);
-      const gallery = galleriesById.get(galleryKey);
-      if (!gallery) continue; // Skip orphaned junction records
-      const tagKey = entityKey(gt.tagId, gt.tagInstanceId);
-      const list = galleriesByTag.get(tagKey) ?? [];
-      list.push(gallery);
-      galleriesByTag.set(tagKey, list);
-    }
-
-    // Populate tags with all relations using composite keys
-    for (const tag of tags) {
-      const tagInstanceId = tag.instanceId;
-      const tagKey = entityKey(tag.id, tagInstanceId);
-      tag.performers = performersByTag.get(tagKey) ?? [];
-      tag.studios = studiosByTag.get(tagKey) ?? [];
-      tag.groups = groupsByTag.get(tagKey) ?? [];
-      tag.galleries = galleriesByTag.get(tagKey) ?? [];
     }
   }
 }

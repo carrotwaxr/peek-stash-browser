@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import type * as routerModule from "react-router-dom";
-import type { NormalizedGroup } from "@peek/shared-types";
+import { MemoryRouter } from "react-router-dom";
+import type { NormalizedGroup, PerformerRef } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -227,6 +228,29 @@ describe("GroupCard indicators", () => {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
   );
+
+  const performer = (i: number): PerformerRef => ({
+    id: String(i),
+    instanceId: "inst-a",
+    name: `Performer ${i}`,
+    disambiguation: null,
+    gender: null,
+    image_path: null,
+    favorite: null,
+    rating100: null,
+  });
+
+  it("the performers indicator shows relation_totals.performers and its grid says how many more", () => {
+    const performers = renderCard({
+      performer_count: 35,
+      performers: Array.from({ length: 12 }, (_, i) => performer(i + 1)),
+      relation_totals: { performers: 30 },
+    })("PERFORMERS");
+
+    expect(performers.count).toBe(30);
+    render(<MemoryRouter>{performers.tooltipContent}</MemoryRouter>);
+    expect(screen.getByText("and 18 more")).toBeInTheDocument();
+  });
 
   it("the scenes link carries the collection's instance into the Scenes filter", () => {
     const scenes = renderCard({ scene_count: 4 })("SCENES");

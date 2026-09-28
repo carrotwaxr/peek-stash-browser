@@ -40,7 +40,7 @@
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 1
     }
   },
   "src/components/cards/ImageCard.tsx": {
@@ -54,25 +54,16 @@
   "src/components/cards/PerformerCard.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
     }
   },
   "src/components/cards/StudioCard.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
     }
   },
   "src/components/cards/TagCard.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
     }
   },
   "src/components/carousel-builder/CarouselBuilder.tsx": {

@@ -25,6 +25,11 @@ interface FindStudiosResponse {
         front_image_path: string | null;
       }>;
       galleries?: Array<{ id: string; title: string; cover: string | null }>;
+      relation_totals?: {
+        performers?: number;
+        groups?: number;
+        galleries?: number;
+      };
     }>;
     count: number;
   };
@@ -103,16 +108,19 @@ describe("Studio API", () => {
         expect(firstTag).toHaveProperty("image_path");
       });
 
-      it("returns performers with tooltip data", ({ skip }) => {
-        expect(studio).toHaveProperty("performers");
-        skip(!studio.performers?.length, "studioWithScenes has no performers");
-        const firstPerformer = must(
-          studio.performers?.[0],
-          "studio.performers[0]"
+      // The studio card's performers indicator shows a number, no tooltip
+      it("counts performers in relation_totals without listing them", () => {
+        expect(studio.performers).toBeUndefined();
+        expect(studio.relation_totals?.performers).toBeGreaterThan(0);
+      });
+
+      it("counts at least the groups and galleries it lists", () => {
+        expect(studio.relation_totals?.groups).toBeGreaterThanOrEqual(
+          studio.groups?.length ?? 0
         );
-        expect(firstPerformer).toHaveProperty("id");
-        expect(firstPerformer).toHaveProperty("name");
-        expect(firstPerformer).toHaveProperty("image_path");
+        expect(studio.relation_totals?.galleries).toBeGreaterThanOrEqual(
+          studio.galleries?.length ?? 0
+        );
       });
 
       it("returns groups with tooltip data", ({ skip }) => {

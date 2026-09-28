@@ -47,6 +47,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
             entities={performer.groups}
             title="Collections"
             parentInstanceId={performer.instanceId}
+            total={performer.relation_totals?.groups}
           />
         );
 
@@ -64,6 +65,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
             }
             title="Galleries"
             parentInstanceId={performer.instanceId}
+            total={performer.relation_totals?.galleries}
           />
         );
 
@@ -75,6 +77,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
             entities={performer.studios}
             title="Studios"
             parentInstanceId={performer.instanceId}
+            total={performer.relation_totals?.studios}
           />
         );
 
@@ -97,7 +100,10 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         },
         {
           type: "GROUPS",
-          count: performer.groups?.length || performer.group_count || 0,
+          count:
+            performer.relation_totals?.groups ??
+            performer.groups?.length ??
+            performer.group_count,
           tooltipContent: groupsTooltip,
         },
         {
@@ -117,7 +123,10 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         },
         {
           type: "GALLERIES",
-          count: performer.galleries?.length || performer.gallery_count || 0,
+          count:
+            performer.relation_totals?.galleries ??
+            performer.galleries?.length ??
+            performer.gallery_count,
           tooltipContent: galleriesTooltip,
         },
         {
@@ -127,7 +136,10 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         },
         {
           type: "STUDIOS",
-          count: performer.studios?.length || 0,
+          count:
+            performer.relation_totals?.studios ??
+            performer.studios?.length ??
+            0,
           tooltipContent: studiosTooltip,
         },
       ];
