@@ -1,7 +1,7 @@
 {
   "controllers/carousel.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 20
+      "count": 9
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5
@@ -38,18 +38,18 @@
   },
   "controllers/library/galleries.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 8
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
+      "count": 10
     }
   },
   "controllers/library/groups.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 6
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
+      "count": 6
     }
   },
   "controllers/library/images.ts": {
@@ -62,34 +62,34 @@
   },
   "controllers/library/performers.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 42
+      "count": 3
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 23
+      "count": 11
     }
   },
   "controllers/library/scenes.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 51
+      "count": 6
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 40
+      "count": 6
     }
   },
   "controllers/library/studios.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 6
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 14
+      "count": 12
     }
   },
   "controllers/library/tags.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 22
+      "count": 7
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 14
+      "count": 12
     }
   },
   "controllers/playlist.ts": {
@@ -351,15 +351,15 @@
   },
   "services/SceneQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 19
+      "count": 17
     }
   },
   "services/StashEntityService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 41
+      "count": 30
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
+      "count": 8
     }
   },
   "services/StashSyncService.ts": {
@@ -401,56 +401,6 @@
   "tests/controllers/carousel.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
-    }
-  },
-  "tests/filters/galleryFilters.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
-  "tests/filters/groupFilters.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
-  "tests/filters/performerFilters.test.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
-    }
-  },
-  "tests/filters/sceneFilters.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 38
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
-    }
-  },
-  "tests/filters/sceneFiltersExpensive.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
-  "tests/filters/studioFilters.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
-    }
-  },
-  "tests/filters/tagFilters.test.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
     }
   },
   "tests/helpers/mockDataGenerators.ts": {

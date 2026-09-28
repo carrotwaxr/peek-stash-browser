@@ -1,17 +1,14 @@
 /**
  * Unit Tests for Tags Library Controller
  *
- * Tests applyTagFilters, findTags, findTagsMinimal and findTagsForScenes.
+ * Tests findTags, findTagsMinimal and findTagsForScenes.
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  applyTagFilters,
   findTags,
   findTagsForScenes,
   findTagsMinimal,
 } from "../../../controllers/library/tags.js";
-import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -20,7 +17,6 @@ import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
-import { partialRow } from "../../helpers/prismaMock.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -32,9 +28,6 @@ vi.mock(
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
     getAllTags: vi.fn(),
-    getAllPerformers: vi.fn(),
-    getAllStudios: vi.fn(),
-    getAllScenes: vi.fn(),
     getTag: vi.fn(),
   },
 }));
@@ -103,242 +96,6 @@ const adminUser = testUser({ role: "ADMIN" });
 describe("Tags Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // ─── applyTagFilters ────────────────────────────────────────
-
-  describe("applyTagFilters", () => {
-    it("returns all tags when filters is null", async () => {
-      const tags = [createMockTag(), createMockTag()];
-      const result = await applyTagFilters(tags, null);
-      expect(result).toHaveLength(2);
-    });
-
-    it("returns all tags when filters is undefined", async () => {
-      const tags = [createMockTag()];
-      const result = await applyTagFilters(tags, undefined);
-      expect(result).toHaveLength(1);
-    });
-
-    it("filters by ids", async () => {
-      const tags = [
-        createMockTag({ id: "t1" }),
-        createMockTag({ id: "t2" }),
-        createMockTag({ id: "t3" }),
-      ];
-      const result = await applyTagFilters(tags, {
-        ids: { value: coerceEntityRefs(["t1", "t3"]), modifier: "INCLUDES" },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((t) => t.id)).toEqual(["t1", "t3"]);
-    });
-
-    it("filters by favorite", async () => {
-      const tags = [
-        createMockTag({ id: "t1", favorite: true }),
-        createMockTag({ id: "t2", favorite: false }),
-      ];
-      const result = await applyTagFilters(tags, { favorite: true });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by rating100 GREATER_THAN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", rating100: 50 }),
-        createMockTag({ id: "t2", rating100: 80 }),
-        createMockTag({ id: "t3", rating100: 30 }),
-      ];
-      const result = await applyTagFilters(tags, {
-        rating100: { modifier: "GREATER_THAN", value: 40 },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((t) => t.id)).toEqual(["t1", "t2"]);
-    });
-
-    it("filters by rating100 BETWEEN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", rating100: 50 }),
-        createMockTag({ id: "t2", rating100: 80 }),
-        createMockTag({ id: "t3", rating100: 30 }),
-      ];
-      const result = await applyTagFilters(tags, {
-        rating100: { modifier: "BETWEEN", value: 40, value2: 60 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by o_counter EQUALS", async () => {
-      const tags = [
-        createMockTag({ id: "t1", o_counter: 5 }),
-        createMockTag({ id: "t2", o_counter: 10 }),
-      ];
-      const result = await applyTagFilters(tags, {
-        o_counter: { modifier: "EQUALS", value: 5 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by play_count LESS_THAN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", play_count: 3 }),
-        createMockTag({ id: "t2", play_count: 10 }),
-      ];
-      const result = await applyTagFilters(tags, {
-        play_count: { modifier: "LESS_THAN", value: 5 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by scene_count GREATER_THAN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", scene_count: 20 }),
-        createMockTag({ id: "t2", scene_count: 5 }),
-      ];
-      const result = await applyTagFilters(tags, {
-        scene_count: { modifier: CriterionModifier.GreaterThan, value: 10 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by name text search (case insensitive)", async () => {
-      const tags = [
-        createMockTag({ id: "t1", name: "Action" }),
-        createMockTag({ id: "t2", name: "Comedy" }),
-      ];
-      const result = await applyTagFilters(tags, {
-        name: { value: "act", modifier: CriterionModifier.Includes },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by description text search", async () => {
-      const tags = [
-        createMockTag({ id: "t1", description: "high energy scenes" }),
-        createMockTag({ id: "t2", description: "relaxing content" }),
-      ];
-      const result = await applyTagFilters(tags, {
-        description: { value: "energy", modifier: CriterionModifier.Includes },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by created_at GREATER_THAN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", created_at: "2024-06-01T00:00:00Z" }),
-        createMockTag({ id: "t2", created_at: "2024-01-01T00:00:00Z" }),
-      ];
-      const result = await applyTagFilters(tags, {
-        created_at: {
-          modifier: CriterionModifier.GreaterThan,
-          value: "2024-03-01T00:00:00Z",
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by updated_at LESS_THAN", async () => {
-      const tags = [
-        createMockTag({ id: "t1", updated_at: "2024-02-01T00:00:00Z" }),
-        createMockTag({ id: "t2", updated_at: "2024-06-01T00:00:00Z" }),
-      ];
-      const result = await applyTagFilters(tags, {
-        updated_at: {
-          modifier: CriterionModifier.LessThan,
-          value: "2024-03-01T00:00:00Z",
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by performers (tags used by matching performers)", async () => {
-      mockStashEntityService.getAllPerformers.mockResolvedValue([
-        partialRow({
-          id: "p1",
-          name: "Perf 1",
-          tags: [partialRow({ id: "t1", name: "Tag1" })],
-        }),
-      ]);
-
-      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
-      const result = await applyTagFilters(tags, {
-        performers: { value: coerceEntityRefs(["p1"]), modifier: "INCLUDES" },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by studios (tags directly on matching studios)", async () => {
-      mockStashEntityService.getAllStudios.mockResolvedValue([
-        partialRow({
-          id: "s1",
-          name: "Studio 1",
-          tags: [partialRow({ id: "t2", name: "Tag2" })],
-        }),
-      ]);
-
-      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
-      const result = await applyTagFilters(tags, {
-        studios: { value: coerceEntityRefs(["s1"]), modifier: "INCLUDES" },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t2");
-    });
-
-    it("filters by scenes_filter.id (tags on matching scenes)", async () => {
-      mockStashEntityService.getAllScenes.mockResolvedValue([
-        partialRow({
-          id: "sc1",
-          tags: [partialRow({ id: "t1", name: "Tag1" })],
-          performers: [],
-        }),
-      ]);
-      mockStashEntityService.getAllPerformers.mockResolvedValue([]);
-
-      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
-      const result = await applyTagFilters(tags, {
-        scenes_filter: {
-          id: {
-            value: coerceEntityRefs(["sc1"]),
-            modifier: CriterionModifier.Includes,
-          },
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
-
-    it("filters by scenes_filter.groups (tags on scenes in those groups)", async () => {
-      mockStashEntityService.getAllScenes.mockResolvedValue([
-        partialRow({
-          id: "sc1",
-          tags: [partialRow({ id: "t1", name: "Tag1" })],
-          performers: [],
-          groups: [partialRow({ id: "g1" })],
-        }),
-      ]);
-      mockStashEntityService.getAllPerformers.mockResolvedValue([]);
-
-      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
-      const result = await applyTagFilters(tags, {
-        scenes_filter: {
-          groups: {
-            value: coerceEntityRefs(["g1"]),
-            modifier: CriterionModifier.Includes,
-          },
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("t1");
-    });
   });
 
   // ─── findTags HTTP handler ──────────────────────────────────

@@ -115,11 +115,13 @@ Hiding an entity (`addHiddenEntity`) computes its rows the same way and merges t
 
 ---
 
-## Current Architecture Issues
+## Why Queries Moved to SQL
+
+The first implementation filtered in memory. Every list now filters, sorts and pages in SQL through the query builders (see [Query Builders](#query-builders)); the in-memory pipeline and its `USE_SQL_QUERY_BUILDER` switch were removed in 3.4. The problems it had are kept here for context.
 
 ### Problem: In-Memory Filtering Doesn't Scale
 
-The current implementation loads all entities into memory then filters:
+The in-memory pipeline loaded all entities into memory then filtered:
 
 ```
 1. Load ALL scenes from cache
@@ -128,29 +130,29 @@ The current implementation loads all entities into memory then filters:
 4. Paginate
 ```
 
-This works for small collections but becomes problematic with:
+This worked for small collections but became a problem with:
 - 10k+ scenes
 - Multiple concurrent users
 - Complex restriction rules
 
 ### Problem: Redundant Computation
 
-Every request recomputes:
+Every request recomputed:
 - Which entities are hidden for this user
 - Which scenes match restriction rules
 - Which organizational entities are now empty
 
-`FilteredEntityCacheService` helps but is invalidated frequently.
+`FilteredEntityCacheService` helped but was invalidated frequently.
 
 ### Problem: Pagination Breaks
 
-To paginate correctly, we need to know the total count of visible items. Currently:
+To paginate correctly, a list needs the total count of visible items. The in-memory pipeline:
 1. Load ALL items
 2. Filter ALL items
 3. Get count
 4. Return page slice
 
-This defeats the purpose of pagination for large collections.
+This defeated the purpose of pagination for large collections.
 
 ---
 
@@ -349,7 +351,7 @@ Pre-computed exclusions need updating when:
 4. Add trigger points for recomputation (sync complete, restriction change, hide/unhide)
 5. Migrate query patterns to use exclusion JOINs
 6. Add admin endpoints for manual recomputation
-7. Remove in-memory filtering code once stable
+7. Remove in-memory filtering code once stable (done in 3.4)
 
 ### API Changes
 

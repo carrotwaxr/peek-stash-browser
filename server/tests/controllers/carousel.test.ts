@@ -38,25 +38,6 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-// Mock StashEntityService
-vi.mock("../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getAllScenes: vi.fn(),
-    getScenesPaginated: vi.fn(),
-    getStats: vi.fn(),
-  },
-}));
-
-// Mock EntityExclusionHelper
-vi.mock("../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    getExcludedIds: vi.fn().mockResolvedValue(new Set()),
-    getExclusionData: vi.fn().mockResolvedValue({ excludedIds: new Set() }),
-    isExcluded: vi.fn().mockReturnValue(false),
-    filterExcluded: vi.fn((scenes: unknown[]) => scenes),
-  },
-}));
-
 // Mock SceneQueryBuilder
 vi.mock("../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: {
@@ -66,10 +47,6 @@ vi.mock("../../services/SceneQueryBuilder.js", () => ({
 
 // Mock library/scenes helpers
 vi.mock("../../controllers/library/scenes.js", () => ({
-  mergeScenesWithUserData: vi.fn((scenes: unknown[]) => scenes),
-  applyQuickSceneFilters: vi.fn((scenes: unknown[]) => scenes),
-  applyExpensiveSceneFilters: vi.fn((scenes: unknown[]) => scenes),
-  sortScenes: vi.fn((scenes: unknown[]) => scenes),
   addStreamabilityInfo: vi.fn((scenes: unknown[]) => scenes),
 }));
 
@@ -641,7 +618,7 @@ describe("Carousel Controller", () => {
   // ==========================================================================
 
   describe("executeCarouselQuery (via previewCarousel)", () => {
-    it("uses SceneQueryBuilder SQL path by default", async () => {
+    it("runs the carousel query through SceneQueryBuilder", async () => {
       const scenes = [SAMPLE_SCENE];
       mockQueryBuilder.execute.mockResolvedValue({
         scenes,

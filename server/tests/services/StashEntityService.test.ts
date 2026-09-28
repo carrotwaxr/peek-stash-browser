@@ -193,7 +193,7 @@ const mockCachedGroup = partialRow<StashGroup>({
 describe("StashEntityService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default mock for studio name lookup (used by getAllScenes* methods)
+    // Default mock for studio name lookup (used by getScene and getScenesByIdsWithRelations)
     mockPrisma.stashStudio.findMany.mockResolvedValue([]);
   });
 
@@ -202,26 +202,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Scene Queries", () => {
-    it("should get all scenes with default user fields", async () => {
-      const mockCachedScenes = [
-        { ...mockCachedScene },
-        { ...mockCachedScene, id: "scene-2", title: "Scene 2" },
-      ];
-
-      mockPrisma.stashScene.findMany.mockResolvedValue(mockCachedScenes);
-
-      const result = await stashEntityService.getAllScenes();
-
-      expect(result).toHaveLength(2);
-      expect(must(result[0]).id).toBe("scene-1");
-      expect(must(result[0]).title).toBe("Test Scene");
-      // Check default user fields are applied
-      expect(must(result[0]).favorite).toBe(false);
-      expect(must(result[0]).o_counter).toBe(0);
-      expect(must(result[0]).play_count).toBe(0);
-      expect(must(result[0]).rating100).toBeNull();
-    });
-
     it("should get a single scene by ID", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue({
         ...mockCachedScene,
@@ -246,24 +226,6 @@ describe("StashEntityService", () => {
       );
 
       expect(result).toBeNull();
-    });
-
-    it("should get scenes by multiple IDs", async () => {
-      const mockCachedScenes = [
-        { ...mockCachedScene },
-        { ...mockCachedScene, id: "scene-3", title: "Scene 3" },
-      ];
-
-      mockPrisma.stashScene.findMany.mockResolvedValue(mockCachedScenes);
-
-      const result = await stashEntityService.getScenesByIds(
-        ["scene-1", "scene-3"],
-        "test-instance"
-      );
-
-      expect(result).toHaveLength(2);
-      expect(result.map((s) => s.id)).toContain("scene-1");
-      expect(result.map((s) => s.id)).toContain("scene-3");
     });
 
     it("should get scene count", async () => {
@@ -323,24 +285,6 @@ describe("StashEntityService", () => {
       );
 
       expect(result).toBeNull();
-    });
-
-    it("should get performers by IDs", async () => {
-      const mockCachedPerformers = [
-        { ...mockCachedPerformer },
-        { ...mockCachedPerformer, id: "performer-2", name: "Performer 2" },
-      ];
-
-      mockPrisma.stashPerformer.findMany.mockResolvedValue(
-        mockCachedPerformers
-      );
-
-      const result = await stashEntityService.getPerformersByIds(
-        ["performer-1", "performer-2"],
-        "test-instance"
-      );
-
-      expect(result).toHaveLength(2);
     });
 
     it("should get performer count", async () => {
@@ -684,23 +628,6 @@ describe("StashEntityService", () => {
 
       expect(lastRefreshed).toBeNull();
     });
-
-    it("should get cache version as timestamp", async () => {
-      const syncDate = new Date("2024-01-15T12:00:00Z");
-      storeSyncStates([sceneState("inst-a", { lastFullSyncActual: syncDate })]);
-
-      const version = await stashEntityService.getCacheVersion();
-
-      expect(version).toBe(syncDate.getTime());
-    });
-
-    it("should return 0 for cache version when no sync", async () => {
-      storeSyncStates([]);
-
-      const version = await stashEntityService.getCacheVersion();
-
-      expect(version).toBe(0);
-    });
   });
 
   describe("Transform instanceId inclusion (#390)", () => {
@@ -826,63 +753,11 @@ describe("StashEntityService", () => {
     });
   });
 
-  describe("Cross-Entity Relationship Lookups", () => {
-    it("getPerformerIdsByStudios returns empty set for empty input", async () => {
-      const result = await stashEntityService.getPerformerIdsByStudios([]);
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(0);
-      expect(prisma.$queryRaw).not.toHaveBeenCalled();
-    });
-
-    it("getPerformerIdsByStudios returns performer IDs from studio scenes", async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([
-        { performerId: "perf-1" },
-        { performerId: "perf-2" },
-      ]);
-
-      const result = await stashEntityService.getPerformerIdsByStudios([
-        "studio-1",
-      ]);
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(2);
-      expect(result.has("perf-1")).toBe(true);
-      expect(result.has("perf-2")).toBe(true);
-    });
-
-    it("getPerformerIdsByGroups returns empty set for empty input", async () => {
-      const result = await stashEntityService.getPerformerIdsByGroups([]);
-
-      expect(result.size).toBe(0);
-    });
-
-    it("getGroupIdsByPerformers returns empty set for empty input", async () => {
-      const result = await stashEntityService.getGroupIdsByPerformers([]);
-
-      expect(result.size).toBe(0);
-    });
-
-    it("getGroupIdsByPerformers returns group IDs from performer scenes", async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([
-        { groupId: "group-1" },
-        { groupId: "group-2" },
-      ]);
-
-      const result = await stashEntityService.getGroupIdsByPerformers([
-        "perf-1",
-      ]);
-
-      expect(result.size).toBe(2);
-      expect(result.has("group-1")).toBe(true);
-      expect(result.has("group-2")).toBe(true);
-    });
-  });
-
   describe("Studio Name Cache", () => {
     beforeEach(() => {
-      // Clear the in-memory singleton cache before each test
-      stashEntityService.invalidateStudioNameCache();
+      // Clear the singleton's cache, which lives as long as the process
+      stashEntityService["studioNameCache"] = null;
+      stashEntityService["studioNameCachePromise"] = null;
       vi.clearAllMocks();
       // Re-set default mock after clearAllMocks
       mockPrisma.stashStudio.findMany.mockResolvedValue([]);
@@ -899,48 +774,6 @@ describe("StashEntityService", () => {
       // Should only query DB once (second call uses cache)
       expect(prisma.stashStudio.findMany).toHaveBeenCalledTimes(1);
       expect(map1).toBe(map2); // Same reference
-    });
-
-    it("invalidateStudioNameCache forces fresh query", async () => {
-      mockPrisma.stashStudio.findMany.mockResolvedValue([
-        partialRow({ id: "s1", stashInstanceId: "inst-a", name: "Studio A" }),
-      ]);
-
-      await stashEntityService.getStudioNameMap();
-      stashEntityService.invalidateStudioNameCache();
-      await stashEntityService.getStudioNameMap();
-
-      // Should query DB twice (once before invalidation, once after)
-      expect(prisma.stashStudio.findMany).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle empty result sets gracefully", async () => {
-      mockPrisma.stashScene.findMany.mockResolvedValue([]);
-
-      const result = await stashEntityService.getAllScenes();
-
-      expect(result).toHaveLength(0);
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it("should handle empty ID array in getByIds", async () => {
-      mockPrisma.stashScene.findMany.mockResolvedValue([]);
-
-      const result = await stashEntityService.getScenesByIds(
-        [],
-        "test-instance"
-      );
-
-      expect(result).toHaveLength(0);
-      expect(prisma.stashScene.findMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: [] },
-          deletedAt: null,
-          stashInstanceId: "test-instance",
-        },
-      });
     });
   });
 

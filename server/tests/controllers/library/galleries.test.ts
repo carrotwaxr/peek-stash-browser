@@ -1,18 +1,15 @@
 /**
  * Unit Tests for Galleries Library Controller
  *
- * Tests applyGalleryFilters, findGalleries and findGalleriesMinimal.
+ * Tests findGalleries and findGalleriesMinimal.
  * Note: mergeGalleriesWithUserData is private and tested indirectly through
  * the handlers.
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  applyGalleryFilters,
   findGalleries,
   findGalleriesMinimal,
 } from "../../../controllers/library/galleries.js";
-import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -33,9 +30,7 @@ vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
     getAllGalleries: vi.fn(),
     getGallery: vi.fn(),
-    getPerformersByIds: vi.fn().mockResolvedValue([]),
     getStudio: vi.fn(),
-    getTagsByIds: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -55,11 +50,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
 
 vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
   coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
-vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  expandStudioIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
-  expandTagIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
 }));
 
 vi.mock("../../../utils/logger.js", () => ({
@@ -99,178 +89,6 @@ describe("Galleries Controller", () => {
     // Default: no ratings
     mockPrisma.galleryRating.findMany.mockResolvedValue([]);
     mockPrisma.imageRating.findMany.mockResolvedValue([]);
-  });
-
-  // ─── applyGalleryFilters ────────────────────────────────────
-
-  describe("applyGalleryFilters", () => {
-    it("returns all galleries when filters is null", async () => {
-      const galleries = [createMockGallery(), createMockGallery()];
-      const result = await applyGalleryFilters(galleries, null);
-      expect(result).toHaveLength(2);
-    });
-
-    it("returns all galleries when filters is undefined", async () => {
-      const galleries = [createMockGallery()];
-      const result = await applyGalleryFilters(galleries, undefined);
-      expect(result).toHaveLength(1);
-    });
-
-    it("filters by ids", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1" }),
-        createMockGallery({ id: "g2" }),
-        createMockGallery({ id: "g3" }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        ids: { value: coerceEntityRefs(["g1", "g3"]), modifier: "INCLUDES" },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((g) => g.id)).toEqual(["g1", "g3"]);
-    });
-
-    it("filters by favorite", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", favorite: true }),
-        createMockGallery({ id: "g2", favorite: false }),
-      ];
-      const result = await applyGalleryFilters(galleries, { favorite: true });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by rating100 GREATER_THAN", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", rating100: 80 }),
-        createMockGallery({ id: "g2", rating100: 30 }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by rating100 BETWEEN", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", rating100: 50 }),
-        createMockGallery({ id: "g2", rating100: 80 }),
-        createMockGallery({ id: "g3", rating100: 20 }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        rating100: {
-          modifier: CriterionModifier.Between,
-          value: 40,
-          value2: 60,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by image_count GREATER_THAN", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", image_count: 100 }),
-        createMockGallery({ id: "g2", image_count: 5 }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        image_count: { modifier: CriterionModifier.GreaterThan, value: 50 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by image_count EQUALS", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", image_count: 10 }),
-        createMockGallery({ id: "g2", image_count: 20 }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        image_count: { modifier: CriterionModifier.Equals, value: 10 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by title text search", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", title: "Beach Photos" }),
-        createMockGallery({ id: "g2", title: "Urban Shots" }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        title: { value: "beach", modifier: CriterionModifier.Includes },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by studios (with hierarchy expansion)", async () => {
-      const galleries = [
-        createMockGallery({
-          id: "g1",
-          studio: { id: "s1", name: "Studio1" },
-        }),
-        createMockGallery({
-          id: "g2",
-          studio: { id: "s2", name: "Studio2" },
-        }),
-        createMockGallery({ id: "g3", studio: null }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        studios: {
-          value: coerceEntityRefs(["s1"]),
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by performers", async () => {
-      const galleries = [
-        createMockGallery({
-          id: "g1",
-          performers: [
-            { id: "p1", name: "Perf1", gender: null, image_path: null },
-          ],
-        }),
-        createMockGallery({
-          id: "g2",
-          performers: [
-            { id: "p2", name: "Perf2", gender: null, image_path: null },
-          ],
-        }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        performers: {
-          value: coerceEntityRefs(["p1"]),
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by tags (with hierarchy expansion)", async () => {
-      const galleries = [
-        createMockGallery({
-          id: "g1",
-          tags: [{ id: "t1", name: "Tag1", image_path: null }],
-        }),
-        createMockGallery({
-          id: "g2",
-          tags: [{ id: "t2", name: "Tag2", image_path: null }],
-        }),
-      ];
-      const result = await applyGalleryFilters(galleries, {
-        tags: {
-          value: coerceEntityRefs(["t1"]),
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
   });
 
   // ─── findGalleries HTTP handler ─────────────────────────────

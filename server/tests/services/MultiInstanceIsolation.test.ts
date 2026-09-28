@@ -111,7 +111,9 @@ const createEmptyPrefs = (): EntityPreferences => ({
 describe("Multi-Instance Isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    stashEntityService.invalidateStudioNameCache();
+    // Clear the singleton's studio name cache, which lives as long as the process
+    stashEntityService["studioNameCache"] = null;
+    stashEntityService["studioNameCachePromise"] = null;
   });
 
   describe("StashEntityService.getPerformer with instanceId", () => {
