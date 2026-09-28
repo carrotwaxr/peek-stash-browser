@@ -53,7 +53,7 @@ From the user table, you can also:
 
 | Action | Description |
 |--------|-------------|
-| **Sync from Stash** | Import ratings and favorites from Stash for this user |
+| **Sync from Stash** | Import ratings, favorites, O counts and plays from Stash for this user |
 | **Delete** | Remove the user account |
 
 !!! warning "Cannot Delete Self"
@@ -225,15 +225,30 @@ Each user can customize their own experience:
 
 ### Sync from Stash (Import)
 
-Imports a user's ratings and favorites from Stash into Peek. Useful when:
+Imports a user's ratings, favorites, O counts and plays from Stash into Peek. Useful when:
 - A new user already has data in Stash
 - Recovering from a Peek database reset
 
 **To sync:**
 1. Go to **User Management**
 2. Click **Sync from Stash** for the user
-3. Select what to import (ratings, favorites, O-counter)
+3. Select what to import, per type
 4. Click **Start Sync**
+
+What it imports, from every Stash server the user can see:
+
+| Data | Types | What happens in Peek |
+|------|-------|----------------------|
+| **Ratings** | Scenes, performers, studios, galleries, groups, images | Each rated item gets Stash's rating. An unrated item in Stash changes nothing. |
+| **Favorites** | Performers, studios, tags | Each Stash favorite becomes a Peek favorite. A Peek favorite is never removed. |
+| **O counter and dates** | Scenes | Stash's O dates are added to the scene's history; the count is at least Stash's counter and never lower than Peek's. |
+| **Play count and dates** | Scenes | Stash's play dates are added the same way, and "last played" moves forward to the latest of them if later. |
+
+The dates merge, so an import never doubles a Peek event: a date Peek already holds within 60 seconds of one from Stash counts once, since an O or play pushed to Stash by Sync to Stash reappears there at nearly the same time. The rule assumes Peek and Stash agree on the time (Sync to Stash pushes each event as it happens, in the same request); two dates further apart count as two events. Peek's own dates and counts are always kept.
+
+Stash keeps O and play dates from version 0.25 on; on an older Stash the O and play options fail for that server, and its ratings and favorites still import.
+
+Only items that have the field set in Stash are read, in pages, so the import stays quick on large libraries.
 
 ### Sync to Stash (Export)
 
@@ -243,7 +258,7 @@ When enabled, user activity syncs back to Stash:
 |------|---------------|
 | **O-Counter** | Aggregates across users (increments add up) |
 | **Ratings** | Overwrites (last user to rate wins) |
-| **Favorites** | Individual per user |
+| **Favorites** | Overwrites (last user to change it wins), for performers, studios and tags; Stash has no favorite on scenes, galleries, groups or images |
 
 !!! warning "Multi-User Considerations"
     If multiple users rate the same scene, the last rating wins in Stash. O-counters aggregate, so they'll be higher in Stash than for any individual user.

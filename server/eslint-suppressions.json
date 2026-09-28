@@ -69,7 +69,7 @@
   },
   "controllers/user.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 45
+      "count": 42
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 7

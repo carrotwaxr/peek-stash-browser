@@ -67,16 +67,6 @@ export interface DefaultFilterPresets {
 }
 
 /**
- * Sync updates for entity ratings/favorites
- */
-export interface SyncUpdates {
-  rating?: number | null;
-  rating100?: number | null;
-  favorite?: boolean;
-  [key: string]: unknown;
-}
-
-/**
  * User content restriction from database
  */
 export interface UserRestriction {
@@ -347,25 +337,40 @@ export interface SyncFromStashParams extends Record<string, string> {
   userId: string;
 }
 
+/**
+ * What to import, per type. An option Stash has no field for on the type
+ * (a scene favorite, a tag rating) is ignored. `oCounter` imports O counts
+ * with their dates, `playCount` play counts with their dates.
+ */
+export interface SyncFromStashOptions {
+  scenes: {
+    rating: boolean;
+    favorite?: boolean;
+    oCounter: boolean;
+    playCount: boolean;
+  };
+  performers: { rating: boolean; favorite: boolean };
+  studios: { rating: boolean; favorite: boolean };
+  tags: { rating?: boolean; favorite: boolean };
+  galleries: { rating: boolean };
+  groups: { rating: boolean };
+  images: { rating: boolean };
+}
+
 export interface SyncFromStashBody {
   options?: {
-    scenes?: { rating?: boolean; favorite?: boolean; oCounter?: boolean };
-    performers?: { rating?: boolean; favorite?: boolean };
-    studios?: { rating?: boolean; favorite?: boolean };
-    tags?: { rating?: boolean; favorite?: boolean };
-    galleries?: { rating?: boolean };
-    groups?: { rating?: boolean };
+    [K in keyof SyncFromStashOptions]?: Partial<SyncFromStashOptions[K]>;
   };
 }
 
-export interface SyncStats {
-  scenes: { checked: number; updated: number; created: number };
-  performers: { checked: number; updated: number; created: number };
-  studios: { checked: number; updated: number; created: number };
-  tags: { checked: number; updated: number; created: number };
-  galleries: { checked: number; updated: number; created: number };
-  groups: { checked: number; updated: number; created: number };
+/** Per type: entities read from Stash, rows created, rows changed. */
+export interface SyncTypeStats {
+  checked: number;
+  updated: number;
+  created: number;
 }
+
+export type SyncStats = Record<keyof SyncFromStashOptions, SyncTypeStats>;
 
 export interface SyncFromStashResponse {
   success: true;

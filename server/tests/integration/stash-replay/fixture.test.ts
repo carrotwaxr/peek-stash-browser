@@ -79,6 +79,8 @@ const DATE_WINDOWS: Record<string, [string, string]> = {
   created_at: ["2003-01-01", "2003-12-31"],
   // created_at plus up to 400 days
   updated_at: ["2003-01-01", "2005-02-04"],
+  o_history: ["2003-01-01", "2005-02-04"],
+  play_history: ["2003-01-01", "2005-02-04"],
   build_time: ["2000-01-01", "2000-01-01"],
 };
 

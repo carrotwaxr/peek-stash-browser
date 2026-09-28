@@ -21,9 +21,11 @@ query FindScenes(
       director
       id
       o_counter
+      o_history
       organized
       play_count
       play_duration
+      play_history
       rating100
       resume_time
       title
