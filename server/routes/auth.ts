@@ -91,14 +91,8 @@ router.post("/login", authRateLimiter, async (req, res) => {
     // Set HTTP-only cookie
     setTokenCookie(res, token);
 
-    // Recompute rankings asynchronously on login (fire-and-forget)
-    rankingComputeService
-      .recomputeAllRankings(user.id)
-      .catch((err: unknown) => {
-        logger.error("Failed to recompute rankings on login", {
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
-      });
+    // Rankings over an hour old are recomputed in the background
+    void rankingComputeService.ensureFresh(user.id);
 
     res.json({
       success: true,

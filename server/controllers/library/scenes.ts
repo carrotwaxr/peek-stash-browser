@@ -480,29 +480,9 @@ export const getRecommendedScenes = async (
       }),
     ]);
 
-    // Check if rankings are stale (>1 hour since last compute)
-    // Recompute in background without blocking current request
-    const lastRanking = await prisma.userEntityRanking.findFirst({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
-      select: { updatedAt: true },
-    });
-
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    const isStale =
-      !lastRanking ||
-      Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS;
-
-    if (isStale) {
-      rankingComputeService
-        .recomputeAllRankings(userId)
-        .catch((err: unknown) => {
-          logger.error("Background ranking recompute failed", {
-            userId,
-            error: (err as Error).message,
-          });
-        });
-    }
+    // Rankings over an hour old are recomputed in the background; this
+    // request scores with the ones stored
+    void rankingComputeService.ensureFresh(userId);
 
     // Build sets of favorite and highly-rated entities using composite keys (id + instanceId)
     // to prevent cross-instance favorites from influencing recommendations for the wrong instance

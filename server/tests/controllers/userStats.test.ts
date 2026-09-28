@@ -2,17 +2,16 @@
  * Unit Tests for UserStats Controller
  *
  * Tests the getUserStats endpoint including auth checks, sortBy validation
- * (with default fallback), ranking freshness logic (ensureFreshRankings),
- * and error handling.
+ * (with default fallback), waiting for fresh rankings (the freshness rule
+ * itself is RankingComputeService.ensureFresh's, tested there), and error
+ * handling.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserStats } from "../../controllers/userStats.js";
-import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
-import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/UserStatsAggregationService.js", () => ({
@@ -23,22 +22,16 @@ vi.mock("../../services/UserStatsAggregationService.js", () => ({
 
 vi.mock("../../services/RankingComputeService.js", () => ({
   default: {
-    recomputeAllRankings: vi.fn(),
+    ensureFresh: vi.fn(),
   },
 }));
-
-vi.mock(
-  "../../prisma/singleton.js",
-  () => import("../helpers/prismaSingletonMock.js")
-);
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockStatsService = vi.mocked(userStatsAggregationService);
-const mockRankingService = vi.mocked(rankingComputeService);
-const mockPrisma = vi.mocked(prisma, true);
+const mockRankingService = vi.mocked(rankingComputeService, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -73,14 +66,7 @@ describe("UserStats Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default: rankings are fresh (updated just now)
-    mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
-      partialRow({
-        updatedAt: new Date(),
-      })
-    );
-
-    mockRankingService.recomputeAllRankings.mockResolvedValue(undefined);
+    mockRankingService.ensureFresh.mockResolvedValue(undefined);
     mockStatsService.getUserStats.mockResolvedValue(SAMPLE_STATS);
   });
 
@@ -167,49 +153,42 @@ describe("UserStats Controller", () => {
     });
   });
 
-  // ─── Ranking freshness (ensureFreshRankings) ──────────────────────────────
+  // ─── Ranking freshness ────────────────────────────────────────────────────
 
   describe("ranking freshness", () => {
-    it("does not recompute when rankings are fresh (< 1 hour old)", async () => {
-      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
-        partialRow({
-          updatedAt: new Date(), // just now — fresh
-        })
-      );
-
+    it("waits for the user's rankings to be fresh before reading the stats", async () => {
+      const events: string[] = [];
+      mockRankingService.ensureFresh.mockImplementation(async () => {
+        await Promise.resolve();
+        events.push("rankings fresh");
+      });
+      mockStatsService.getUserStats.mockImplementation(() => {
+        events.push("stats read");
+        return Promise.resolve(SAMPLE_STATS);
+      });
       const req = reqFor(getUserStats, { user: USER });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
-      expect(mockRankingService.recomputeAllRankings).not.toHaveBeenCalled();
+      expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(
+        1,
+        { wait: true }
+      );
+      expect(events).toEqual(["rankings fresh", "stats read"]);
     });
 
-    it("recomputes when rankings are stale (> 1 hour old)", async () => {
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
-        partialRow({
-          updatedAt: twoHoursAgo,
-        })
+    it("returns 500 without reading stats when the recompute fails", async () => {
+      mockRankingService.ensureFresh.mockRejectedValue(
+        new Error("disk I/O error")
       );
-
       const req = reqFor(getUserStats, { user: USER });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
-      expect(mockRankingService.recomputeAllRankings).toHaveBeenCalledWith(1);
-    });
-
-    it("recomputes when no rankings exist at all", async () => {
-      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
-
-      const req = reqFor(getUserStats, { user: USER });
-      const res = resFor(getUserStats);
-
-      await getUserStats(req, res);
-
-      expect(mockRankingService.recomputeAllRankings).toHaveBeenCalledWith(1);
+      expect(res._getStatus()).toBe(500);
+      expect(mockStatsService.getUserStats).not.toHaveBeenCalled();
     });
   });
 

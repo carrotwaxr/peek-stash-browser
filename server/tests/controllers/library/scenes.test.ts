@@ -20,6 +20,7 @@ import {
 } from "../../../controllers/library/scenes.js";
 import prisma from "../../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../../services/EntityAccessService.js";
+import rankingComputeService from "../../../services/RankingComputeService.js";
 import type * as recommendationScoringModule from "../../../services/RecommendationScoringService.js";
 import {
   hasAnyCriteria,
@@ -87,9 +88,7 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
 
 vi.mock("../../../services/RankingComputeService.js", () => ({
   default: {
-    getRankings: vi.fn(),
-    getLatestComputation: vi.fn(),
-    recomputeAllRankings: vi.fn().mockResolvedValue(undefined),
+    ensureFresh: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -178,6 +177,7 @@ const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
 const mockScore = vi.mocked(scoreScoringDataByPreferences);
 const mockLogger = vi.mocked(logger, true);
+const mockRankingService = vi.mocked(rankingComputeService, true);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -833,6 +833,21 @@ describe("getRecommendedScenes", () => {
     await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(401);
+  });
+
+  it("starts a ranking refresh without waiting and reads no ranking time itself", async () => {
+    mockHasAnyCriteria.mockReturnValue(false);
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(getRecommendedScenes);
+
+    await getRecommendedScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(1);
+    expect(mockPrisma.userEntityRanking.findFirst).not.toHaveBeenCalled();
   });
 
   it("returns empty result with message when user has no criteria", async () => {

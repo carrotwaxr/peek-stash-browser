@@ -2,13 +2,18 @@
  * Unit Tests for RankingComputeService
  *
  * Tests the percentile ranking algorithm, engagement score calculation,
- * tie handling, edge cases, and BigInt/float rounding from SQLite.
+ * tie handling, edge cases, and BigInt/float rounding from SQLite, and
+ * `ensureFresh`: at most one recompute per user per hour, shared by
+ * concurrent callers.
  */
 import type { Prisma } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { logger } from "../../utils/logger.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -363,7 +368,7 @@ describe("RankingComputeService", () => {
   });
 
   describe("multi-entity-type orchestration", () => {
-    it("computes rankings for all four entity types in parallel", async () => {
+    it("computes rankings for all four entity types", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
           {
@@ -419,6 +424,31 @@ describe("RankingComputeService", () => {
       expect(studioRankings).toHaveLength(1);
       expect(tagRankings).toHaveLength(1);
       expect(sceneRankings).toHaveLength(1);
+    });
+  });
+
+  describe("query order", () => {
+    it("reads one entity type after another, never two at once", async () => {
+      // Run together, the reads contend for the pool and the disk: at 200k
+      // scenes each took 0.8 to 1.3 s that way, 0.15 to 0.2 s in turn
+      let inFlight = 0;
+      let most = 0;
+      mockPrisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof prisma.$queryRaw>(async () => {
+          inFlight++;
+          most = Math.max(most, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          inFlight--;
+          return [];
+        })
+      );
+      rankingTx();
+
+      await rankingComputeService.recomputeAllRankings(1);
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(5);
+      expect(most).toBe(1);
+      mockPrisma.$queryRaw.mockReset();
     });
   });
 
@@ -518,6 +548,158 @@ describe("RankingComputeService", () => {
 
       const rankings = getWrittenRankings(txMock, "performer");
       expect(must(rankings[0]).instanceId).toBe("");
+    });
+  });
+
+  // The service remembers each user's last recompute for the life of the
+  // process, so every test here uses a user id of its own
+  describe("ensureFresh", () => {
+    const MINUTE_MS = 60 * 1000;
+    let now = 0;
+
+    const later = (ms: number) => {
+      now += ms;
+      vi.setSystemTime(now);
+    };
+
+    // One recompute is five queries: the average duration and one per type
+    const QUERIES_PER_RECOMPUTE = 5;
+    const recomputes = () =>
+      mockPrisma.$queryRaw.mock.calls.length / QUERIES_PER_RECOMPUTE;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      now = Date.UTC(2026, 8, 28, 12);
+      vi.setSystemTime(now);
+      // A user with no engagement: every query answers no rows (the average
+      // duration falls back to its default)
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      // Nothing known from before: no ranking row
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
+      rankingTx();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      mockPrisma.$queryRaw.mockReset();
+    });
+
+    it("a user with no engagement is recomputed once an hour, not on every call", async () => {
+      await rankingComputeService.ensureFresh(101, { wait: true });
+      await rankingComputeService.ensureFresh(101, { wait: true });
+      later(59 * MINUTE_MS);
+      await rankingComputeService.ensureFresh(101, { wait: true });
+
+      expect(recomputes()).toBe(1);
+
+      later(2 * MINUTE_MS);
+      await rankingComputeService.ensureFresh(101, { wait: true });
+
+      expect(recomputes()).toBe(2);
+      // Only the first call, knowing nothing yet, read the ranking table
+      expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it("concurrent ensureFresh calls share one recompute", async () => {
+      await Promise.all([
+        rankingComputeService.ensureFresh(102, { wait: true }),
+        rankingComputeService.ensureFresh(102, { wait: true }),
+        rankingComputeService.ensureFresh(102),
+      ]);
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(QUERIES_PER_RECOMPUTE);
+      expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledTimes(1);
+      // Each of the four types written once
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(4);
+    });
+
+    it("a failed recompute is retried on the next call", async () => {
+      mockPrisma.$queryRaw.mockRejectedValueOnce(new Error("disk I/O error"));
+
+      await expect(
+        rankingComputeService.ensureFresh(103, { wait: true })
+      ).rejects.toThrow("disk I/O error");
+      await rankingComputeService.ensureFresh(103, { wait: true });
+      await rankingComputeService.ensureFresh(103, { wait: true });
+
+      // The failed attempt's first query, then one whole recompute
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(
+        1 + QUERIES_PER_RECOMPUTE
+      );
+      expect(logger.error).toHaveBeenCalledWith(
+        "Ranking recompute failed",
+        objectContaining({ userId: 103 })
+      );
+    });
+
+    it("after a restart, freshness comes from the newest ranking row", async () => {
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+        partialRow({ updatedAt: new Date(now - 10 * MINUTE_MS) })
+      );
+
+      await rankingComputeService.ensureFresh(104, { wait: true });
+
+      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+      expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledWith({
+        where: { userId: 104 },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      });
+
+      // The row's time starts its hour: 51 minutes on, the rankings are stale
+      later(51 * MINUTE_MS);
+      await rankingComputeService.ensureFresh(104, { wait: true });
+
+      expect(recomputes()).toBe(1);
+      expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it("after a restart, a ranking row older than an hour is recomputed at once", async () => {
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+        partialRow({ updatedAt: new Date(now - 61 * MINUTE_MS) })
+      );
+
+      await rankingComputeService.ensureFresh(105, { wait: true });
+
+      expect(recomputes()).toBe(1);
+    });
+
+    it("without wait, ensureFresh returns while the recompute runs", async () => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mockPrisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof prisma.$queryRaw>(async () => {
+          await gate;
+          return [];
+        })
+      );
+
+      await rankingComputeService.ensureFresh(106);
+
+      expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
+
+      release();
+      // A waiting call joins the recompute already running
+      await rankingComputeService.ensureFresh(106, { wait: true });
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(QUERIES_PER_RECOMPUTE);
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(4);
+    });
+
+    it("without wait, a failed recompute is logged and not thrown", async () => {
+      const failure = new Error("disk I/O error");
+      mockPrisma.$queryRaw.mockRejectedValueOnce(failure);
+
+      await rankingComputeService.ensureFresh(107);
+
+      await vi.waitFor(() => {
+        expect(logger.error).toHaveBeenCalledWith("Ranking recompute failed", {
+          userId: 107,
+          error: failure,
+        });
+      });
     });
   });
 });
