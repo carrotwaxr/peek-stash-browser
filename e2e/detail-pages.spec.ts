@@ -70,6 +70,10 @@ const cardTitled = (page: Page, title: string) =>
     .getByRole("heading", { level: 3, name: title, exact: true })
     .locator("..");
 
+interface FindPerformersBody {
+  findPerformers: { performers: Array<{ id: string; instanceId: string }> };
+}
+
 /** The list page of each entity with a detail page, and its cards' label */
 const ENTITIES = [
   { entity: "performer", list: "/performers", label: "Performer" },
@@ -248,6 +252,32 @@ test.describe("Detail Pages", () => {
     await expect(
       page.getByRole("checkbox", { name: /^Include sub-studios \(\s*\d+\)$/ })
     ).toBeVisible();
+  });
+
+  test("the timeline view on a performer page shows bars", async ({ page }) => {
+    // The performer with the most scenes, opened from an instance-qualified
+    // link, so the timeline asks for the performer as "id:instanceId"
+    const found = await page.request.post("/api/library/performers", {
+      data: { filter: { per_page: 1, sort: "scene_count", direction: "DESC" } },
+    });
+    expect(found.ok(), await found.text()).toBeTruthy();
+    const [performer] = ((await found.json()) as FindPerformersBody)
+      .findPerformers.performers;
+    const { id, instanceId } = requireData(performer, "a performer");
+    await page.goto(
+      `/performer/${id}?instance=${encodeURIComponent(instanceId)}`
+    );
+
+    const scenes = new ListPage(page);
+    const n = await scenes.waitForResults("Scene");
+    requireData(n > 0, "a performer with scenes");
+    await scenes.viewModeButton.click();
+    await page.getByRole("option", { name: "Timeline view" }).click();
+
+    const timeline = page.getByRole("listbox", { name: "Timeline" });
+    await expect(timeline.getByRole("option").first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("images page loads and shows content or empty state", async ({
