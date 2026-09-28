@@ -1,5 +1,6 @@
 import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
+import { safeFileName } from "../utils/contentDisposition.js";
 import { entityKey, pairsJson } from "../utils/entityRef.js";
 import { getVisibleEntityKeys } from "./EntityAccessService.js";
 
@@ -53,7 +54,7 @@ export class DownloadService {
       const fileWithExt = pathParts[pathParts.length - 1] ?? "";
       displayName = fileWithExt.replace(/\.[^/.]+$/, ""); // Remove extension
     }
-    const fileName = this.sanitizeFileName(displayName || sceneId) + ".mp4";
+    const fileName = safeFileName(displayName || sceneId) + ".mp4";
 
     const download = await prisma.download.create({
       data: {
@@ -92,7 +93,7 @@ export class DownloadService {
       throw new Error("Image not found");
     }
 
-    const fileName = this.sanitizeFileName(image.title || imageId) + ".jpg";
+    const fileName = safeFileName(image.title || imageId) + ".jpg";
 
     const download = await prisma.download.create({
       data: {
@@ -129,7 +130,7 @@ export class DownloadService {
       throw new Error("Playlist not found");
     }
 
-    const fileName = this.sanitizeFileName(playlist.name) + ".zip";
+    const fileName = safeFileName(playlist.name) + ".zip";
 
     const download = await prisma.download.create({
       data: {
@@ -292,18 +293,6 @@ WHERE s.deletedAt IS NULL`,
     await prisma.download.delete({
       where: { id: downloadId },
     });
-  }
-
-  /**
-   * Sanitize a filename by removing invalid characters.
-   */
-  private sanitizeFileName(name: string): string {
-    if (!name || name.trim() === "") {
-      return "download";
-    }
-
-    // Remove or replace invalid characters for filenames
-    return name.trim().replace(/[<>:"/\\|?*]/g, "_");
   }
 }
 

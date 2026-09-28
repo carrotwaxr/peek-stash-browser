@@ -1,3 +1,4 @@
+import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
 import { parseTrustedAddresses } from "../utils/proxyAuthTrust.js";
 
@@ -31,7 +32,7 @@ export const validateStartup = () => {
     STASH_API_KEY: stashApiKey
       ? `set (${stashApiKey.length} characters)`
       : "NOT SET",
-    CONFIG_DIR: process.env.CONFIG_DIR || "/app/data",
+    CONFIG_DIR: getConfigDir(),
     LOG_LEVEL: process.env.LOG_LEVEL || "INFO",
     PROXY_AUTH_HEADER: proxyAuthHeader || "NOT SET",
     PROXY_AUTH_TRUSTED_IPS: proxyAuthTrustedIps || "NOT SET",

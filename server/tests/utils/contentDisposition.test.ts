@@ -1,6 +1,24 @@
 import http from "http";
 import { describe, expect, it } from "vitest";
-import { attachmentContentDisposition } from "../../utils/contentDisposition.js";
+import {
+  attachmentContentDisposition,
+  safeFileName,
+} from "../../utils/contentDisposition.js";
+
+describe("safeFileName", () => {
+  it("names a blank file download", () => {
+    expect(safeFileName("")).toBe("download");
+    expect(safeFileName("  ")).toBe("download");
+  });
+
+  it("replaces each character reserved on some OS with _", () => {
+    expect(safeFileName('a<b>:c"/d\\e|f?g*')).toBe("a_b__c__d_e_f_g_");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(safeFileName("  Test File  ")).toBe("Test File");
+  });
+});
 
 describe("attachmentContentDisposition", () => {
   it("keeps a plain ASCII name in both parameters", () => {

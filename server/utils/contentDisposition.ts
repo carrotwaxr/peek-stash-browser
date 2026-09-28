@@ -1,3 +1,9 @@
+/** A file name safe on every OS: reserved characters become "_", blank becomes "download". */
+export function safeFileName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed === "" ? "download" : trimmed.replace(/[<>:"/\\|?*]/g, "_");
+}
+
 /**
  * RFC 6266 attachment header: an ASCII `filename` for old clients plus
  * `filename*` (RFC 8187) carrying the exact UTF-8 name. Node rejects header

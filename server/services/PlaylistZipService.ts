@@ -4,6 +4,8 @@ import * as path from "path";
 import { Readable } from "stream";
 import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
+import { getConfigDir } from "../utils/configDir.js";
+import { safeFileName } from "../utils/contentDisposition.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { downloadService } from "./DownloadService.js";
@@ -18,8 +20,7 @@ export class PlaylistZipService {
    * Get the downloads directory path
    */
   private getDownloadsDir(): string {
-    const configDir = process.env.CONFIG_DIR || "/app/data";
-    return path.join(configDir, "downloads");
+    return path.join(getConfigDir(), "downloads");
   }
 
   /**
@@ -27,16 +28,6 @@ export class PlaylistZipService {
    */
   private getUserDir(userId: number): string {
     return path.join(this.getDownloadsDir(), `user-${userId}`);
-  }
-
-  /**
-   * Sanitize a filename by replacing invalid characters
-   */
-  private sanitizeFileName(name: string): string {
-    if (!name || name.trim() === "") {
-      return "download";
-    }
-    return name.trim().replace(/[<>:"/\\|?*]/g, "_");
   }
 
   /**
@@ -109,7 +100,7 @@ export class PlaylistZipService {
 
     const zipFileName = `download-${downloadId}.zip`;
     const zipFilePath = path.join(userDir, zipFileName);
-    const playlistDirName = this.sanitizeFileName(playlist.name);
+    const playlistDirName = safeFileName(playlist.name);
 
     // Create write stream and archiver
     const output = fs.createWriteStream(zipFilePath);
@@ -181,7 +172,7 @@ export class PlaylistZipService {
         }
 
         const sceneTitle = scene.title || scene.id;
-        const sanitizedTitle = this.sanitizeFileName(sceneTitle);
+        const sanitizedTitle = safeFileName(sceneTitle);
         const videoFileName = `${sanitizedTitle}.mp4`;
         const nfoFileName = `${sanitizedTitle}.nfo`;
 

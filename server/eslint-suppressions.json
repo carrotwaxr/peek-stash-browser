@@ -154,7 +154,7 @@
   },
   "initializers/validate.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 4
     }
   },
   "integration/api/auth-sessions.integration.test.ts": {
@@ -338,7 +338,7 @@
   },
   "services/PlaylistZipService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     }
   },
   "services/RecommendationScoringService.ts": {
@@ -487,11 +487,6 @@
     }
   },
   "utils/instanceUtils.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "utils/jwtSecret.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }

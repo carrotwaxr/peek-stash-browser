@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { getConfigDir } from "./configDir.js";
 import { logger } from "./logger.js";
 
 /**
@@ -53,7 +54,7 @@ export function resolveJwtSecret(env: NodeJS.ProcessEnv = process.env): {
     );
   }
 
-  const dir = env.CONFIG_DIR || "/app/data";
+  const dir = getConfigDir(env);
   const file = path.join(dir, JWT_SECRET_FILE);
 
   try {
