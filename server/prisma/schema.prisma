@@ -782,6 +782,8 @@ model StashPerformer {
   weightKg     Int? // Weight in kg
   measurements String? // e.g., "34D-24-34"
   fakeTits     String? // Breast type: "Natural", "Augmented", etc.
+  penisLength  Float? // In cm
+  circumcised  String? // "CUT" or "UNCUT"
   tattoos      String?
   piercings    String?
   careerLength String?

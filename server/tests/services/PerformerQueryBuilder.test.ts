@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { must } from "../helpers/must.js";
@@ -129,6 +130,38 @@ describe("PerformerQueryBuilder", () => {
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("p.stashInstanceId = ?");
+    });
+  });
+
+  describe("penis length", () => {
+    it("penis_length compares p.penisLength, so a performer without one never matches", async () => {
+      await performerQueryBuilder.execute({
+        userId: 1,
+        filters: {
+          penis_length: { value: 14, modifier: CriterionModifier.GreaterThan },
+        },
+        sort: "name",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+      });
+
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+      expect(mainQuerySql).toContain("p.penisLength > ?");
+      expect(mainQuerySql).not.toContain("COALESCE(p.penisLength");
+    });
+
+    it("sorts by penis_length", async () => {
+      await performerQueryBuilder.execute({
+        userId: 1,
+        sort: "penis_length",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+      expect(mainQuerySql).toMatch(/ORDER BY\s+p\.penisLength DESC,/);
     });
   });
 
