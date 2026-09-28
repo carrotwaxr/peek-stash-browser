@@ -17,6 +17,7 @@ import type {
 import type { TagQueryRow } from "../types/internal/queryRows.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
+import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -29,6 +30,29 @@ import {
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { keepVisibleConditions } from "./EntityAccessService.js";
+
+/** Tags on one of the scenes (the Tags page's scene filter) */
+const TAGS_BY_SCENE: ViaSceneSpec = {
+  alias: "t",
+  junction: { table: "SceneTag", alias: "st" },
+  entityIdCol: "tagId",
+  entityInstanceCol: "tagInstanceId",
+  sceneIdCol: "sceneId",
+  sceneInstanceCol: "sceneInstanceId",
+};
+
+/** Tags on a scene of one of the groups (the Tags page's collection filter) */
+const TAGS_BY_GROUP: ViaSceneSpec = {
+  ...TAGS_BY_SCENE,
+  via: {
+    table: "SceneGroup",
+    alias: "sg",
+    sceneIdCol: "sceneId",
+    sceneInstanceCol: "sceneInstanceId",
+    refIdCol: "groupId",
+    refInstanceCol: "groupInstanceId",
+  },
+};
 
 // Query builder options
 export interface TagQueryOptions {
@@ -286,7 +310,8 @@ class TagQueryBuilder {
   }
 
   /**
-   * Build scenes_filter (for tags on scenes in specific groups)
+   * Build scenes_filter: tags on specific scenes (`id`) or on scenes in
+   * specific groups (`groups`)
    */
   private buildScenesFilter(
     filter:
@@ -297,63 +322,18 @@ class TagQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter) {
-      return { sql: "", params: [] };
-    }
-
-    const clauses: FilterClause[] = [];
-
-    // Filter by scene IDs
-    if (filter.id?.value && filter.id.value.length > 0) {
-      const ids = filter.id.value;
-      const modifier = filter.id.modifier || "INCLUDES";
-      const placeholders = ids.map(() => "?").join(", ");
-
-      if (modifier === "INCLUDES") {
-        clauses.push({
-          sql: `t.id IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        });
-      } else if (modifier === "EXCLUDES") {
-        clauses.push({
-          sql: `t.id NOT IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        });
-      }
-    }
-
-    // Filter by groups (tags on scenes in specific groups)
-    if (filter.groups?.value && filter.groups.value.length > 0) {
-      const ids = filter.groups.value;
-      const modifier = filter.groups.modifier || "INCLUDES";
-      const placeholders = ids.map(() => "?").join(", ");
-
-      if (modifier === "INCLUDES") {
-        clauses.push({
-          sql: `t.id IN (
-            SELECT DISTINCT st.tagId
-            FROM SceneTag st
-            JOIN SceneGroup sg ON st.sceneId = sg.sceneId AND st.sceneInstanceId = sg.sceneInstanceId
-            WHERE sg.groupId IN (${placeholders})
-          )`,
-          params: ids,
-        });
-      } else if (modifier === "EXCLUDES") {
-        clauses.push({
-          sql: `t.id NOT IN (
-            SELECT DISTINCT st.tagId
-            FROM SceneTag st
-            JOIN SceneGroup sg ON st.sceneId = sg.sceneId AND st.sceneInstanceId = sg.sceneInstanceId
-            WHERE sg.groupId IN (${placeholders})
-          )`,
-          params: ids,
-        });
-      }
-    }
-
-    if (clauses.length === 0) {
-      return { sql: "", params: [] };
-    }
+    const clauses = [
+      viaSceneClause(
+        TAGS_BY_SCENE,
+        parseCompositeFilterValues(filter?.id?.value ?? []).parsed,
+        filter?.id?.modifier ?? "INCLUDES"
+      ),
+      viaSceneClause(
+        TAGS_BY_GROUP,
+        parseCompositeFilterValues(filter?.groups?.value ?? []).parsed,
+        filter?.groups?.modifier ?? "INCLUDES"
+      ),
+    ].filter((clause) => clause.sql !== "");
 
     return {
       sql: clauses.map((c) => c.sql).join(" AND "),

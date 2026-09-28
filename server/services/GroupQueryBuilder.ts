@@ -21,6 +21,7 @@ import type {
 } from "../types/internal/queryRows.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
+import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -60,6 +61,29 @@ export interface GroupHierarchy {
   containing_groups: GroupRelationRef[];
   sub_groups: GroupRelationRef[];
 }
+
+/** Groups holding one of the scenes (a scene's Collections tab) */
+const GROUPS_BY_SCENE: ViaSceneSpec = {
+  alias: "g",
+  junction: { table: "SceneGroup", alias: "sg" },
+  entityIdCol: "groupId",
+  entityInstanceCol: "groupInstanceId",
+  sceneIdCol: "sceneId",
+  sceneInstanceCol: "sceneInstanceId",
+};
+
+/** Groups with a scene of one of the performers (a performer's Collections tab) */
+const GROUPS_BY_PERFORMER: ViaSceneSpec = {
+  ...GROUPS_BY_SCENE,
+  via: {
+    table: "ScenePerformer",
+    alias: "sp",
+    sceneIdCol: "sceneId",
+    sceneInstanceCol: "sceneInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  },
+};
 
 /**
  * Builds and executes SQL queries for group filtering
@@ -266,48 +290,11 @@ class GroupQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    // Groups contain scenes via SceneGroup junction table
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `g.id IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            WHERE sg.sceneId IN (${placeholders})
-          )`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `g.id IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            WHERE sg.sceneId IN (${placeholders})
-            GROUP BY sg.groupId
-            HAVING COUNT(DISTINCT sg.sceneId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `g.id NOT IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            WHERE sg.sceneId IN (${placeholders})
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      GROUPS_BY_SCENE,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**
@@ -320,52 +307,11 @@ class GroupQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    // Groups contain scenes, scenes have performers
-    // Join: StashGroup -> SceneGroup -> ScenePerformer
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `g.id IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
-            WHERE sp.performerId IN (${placeholders})
-          )`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `g.id IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
-            WHERE sp.performerId IN (${placeholders})
-            GROUP BY sg.groupId
-            HAVING COUNT(DISTINCT sp.performerId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `g.id NOT IN (
-            SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
-            WHERE sp.performerId IN (${placeholders})
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      GROUPS_BY_PERFORMER,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**

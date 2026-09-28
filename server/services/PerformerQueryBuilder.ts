@@ -17,6 +17,7 @@ import type {
 import type { PerformerQueryRow } from "../types/internal/queryRows.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
+import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -43,6 +44,46 @@ function dedupeKeys(
     return true;
   });
 }
+
+/** Performers in one of the scenes */
+const PERFORMERS_BY_SCENE: ViaSceneSpec = {
+  alias: "p",
+  junction: { table: "ScenePerformer", alias: "sp" },
+  entityIdCol: "performerId",
+  entityInstanceCol: "performerInstanceId",
+  sceneIdCol: "sceneId",
+  sceneInstanceCol: "sceneInstanceId",
+};
+
+/** Performers in a scene of one of the groups (a collection's Performers tab) */
+const PERFORMERS_BY_GROUP: ViaSceneSpec = {
+  ...PERFORMERS_BY_SCENE,
+  via: {
+    table: "SceneGroup",
+    alias: "sg",
+    sceneIdCol: "sceneId",
+    sceneInstanceCol: "sceneInstanceId",
+    refIdCol: "groupId",
+    refInstanceCol: "groupInstanceId",
+  },
+};
+
+/**
+ * Performers in a live scene of one of the studios; a scene's studio is on
+ * the scene's instance
+ */
+const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
+  ...PERFORMERS_BY_SCENE,
+  via: {
+    table: "StashScene",
+    alias: "sc",
+    sceneIdCol: "id",
+    sceneInstanceCol: "stashInstanceId",
+    refIdCol: "studioId",
+    refInstanceCol: "stashInstanceId",
+  },
+  where: "sc.deletedAt IS NULL",
+};
 
 // Query builder options
 export interface PerformerQueryOptions {
@@ -261,45 +302,11 @@ class PerformerQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { modifier = "INCLUDES" } = filter;
-    // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
-    const { parsed } = parseCompositeFilterValues(filter.value);
-    const ids = parsed.map((p) => p.id);
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `p.id IN (
-            SELECT DISTINCT sp.performerId
-            FROM ScenePerformer sp
-            JOIN StashScene sc ON sp.sceneId = sc.id AND sp.sceneInstanceId = sc.stashInstanceId
-            WHERE sc.studioId IN (${placeholders}) AND sc.deletedAt IS NULL
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `p.id NOT IN (
-            SELECT DISTINCT sp.performerId
-            FROM ScenePerformer sp
-            JOIN StashScene sc ON sp.sceneId = sc.id AND sp.sceneInstanceId = sc.stashInstanceId
-            WHERE sc.studioId IN (${placeholders}) AND sc.deletedAt IS NULL
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      PERFORMERS_BY_STUDIO,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**
@@ -312,51 +319,11 @@ class PerformerQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    // Performers appear in scenes via ScenePerformer junction table
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `p.id IN (
-            SELECT sp.performerId FROM ScenePerformer sp
-            WHERE sp.sceneId IN (${placeholders})
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `p.id IN (
-            SELECT sp.performerId FROM ScenePerformer sp
-            WHERE sp.sceneId IN (${placeholders})
-              AND sp.performerInstanceId = p.stashInstanceId
-            GROUP BY sp.performerId, sp.performerInstanceId
-            HAVING COUNT(DISTINCT sp.sceneId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `p.id NOT IN (
-            SELECT sp.performerId FROM ScenePerformer sp
-            WHERE sp.sceneId IN (${placeholders})
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      PERFORMERS_BY_SCENE,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**
@@ -369,42 +336,11 @@ class PerformerQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `p.id IN (
-            SELECT DISTINCT sp.performerId
-            FROM ScenePerformer sp
-            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
-            WHERE sg.groupId IN (${placeholders})
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `p.id NOT IN (
-            SELECT DISTINCT sp.performerId
-            FROM ScenePerformer sp
-            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
-            WHERE sg.groupId IN (${placeholders})
-              AND sp.performerInstanceId = p.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      PERFORMERS_BY_GROUP,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**

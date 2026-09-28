@@ -16,6 +16,7 @@ import type {
 import type { GalleryQueryRow } from "../types/internal/queryRows.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
+import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -49,6 +50,16 @@ export interface GalleryQueryResult {
   galleries: NormalizedGallery[];
   total: number;
 }
+
+/** Galleries holding one of the scenes (a scene's Galleries tab) */
+const GALLERIES_BY_SCENE: ViaSceneSpec = {
+  alias: "g",
+  junction: { table: "SceneGallery", alias: "sg" },
+  entityIdCol: "galleryId",
+  entityInstanceCol: "galleryInstanceId",
+  sceneIdCol: "sceneId",
+  sceneInstanceCol: "sceneInstanceId",
+};
 
 /**
  * Builds and executes SQL queries for gallery filtering
@@ -226,48 +237,11 @@ class GalleryQueryBuilder {
       | undefined
       | null
   ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    // Galleries contain scenes via SceneGallery junction table
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `g.id IN (
-            SELECT sg.galleryId FROM SceneGallery sg
-            WHERE sg.sceneId IN (${placeholders}) AND sg.galleryInstanceId = g.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `g.id IN (
-            SELECT sg.galleryId FROM SceneGallery sg
-            WHERE sg.sceneId IN (${placeholders}) AND sg.galleryInstanceId = g.stashInstanceId
-            GROUP BY sg.galleryId
-            HAVING COUNT(DISTINCT sg.sceneId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `g.id NOT IN (
-            SELECT sg.galleryId FROM SceneGallery sg
-            WHERE sg.sceneId IN (${placeholders}) AND sg.galleryInstanceId = g.stashInstanceId
-          )`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    return viaSceneClause(
+      GALLERIES_BY_SCENE,
+      parseCompositeFilterValues(filter?.value ?? []).parsed,
+      filter?.modifier ?? "INCLUDES"
+    );
   }
 
   /**
