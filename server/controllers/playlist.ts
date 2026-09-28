@@ -42,8 +42,9 @@ import {
   getEntityInstanceIds,
 } from "../utils/entityInstanceId.js";
 import { entityKey } from "../utils/entityRef.js";
-import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
+import { mergeScenesWithUserData } from "./library/scenes.js";
 
 /**
  * Default user fields for scenes (when no user data is merged yet).
@@ -62,6 +63,83 @@ const DEFAULT_SCENE_USER_FIELDS = {
   last_played_at: null,
   last_o_at: null,
 };
+
+/** What a playlist item stores about its scene. */
+interface PlaylistItemRef {
+  sceneId: string;
+  instanceId: string | null;
+}
+
+/**
+ * The instance of an item's scene. An item saved before multi-instance has
+ * none (the backfill left none on prod): it is the default instance's
+ * scene. The loader fetches by it and the handlers look up by it, so an
+ * item finds the scene fetched for it.
+ */
+function itemInstanceId(item: PlaylistItemRef): string {
+  return (
+    emptyToNull(item.instanceId) ?? stashInstanceManager.getDefaultConfig().id
+  );
+}
+
+/** The key of an item's scene in loadItemScenes' map. */
+function itemSceneKey(item: PlaylistItemRef): string {
+  return entityKey(item.sceneId, itemInstanceId(item));
+}
+
+/**
+ * The scenes a playlist's items point at, visible to userId, keyed by
+ * entityKey. The viewer's exclusions apply (restrictions and hidden items,
+ * never the playlist owner's). withUserData replaces the rating, favorite,
+ * O and play fields with the viewer's own.
+ */
+async function loadItemScenes(
+  items: ReadonlyArray<PlaylistItemRef>,
+  userId: number,
+  options: { withUserData: boolean }
+): Promise<Map<string, NormalizedScene>> {
+  if (items.length === 0) return new Map();
+
+  // Fetch from the cache with relations, one query per instance
+  const idsByInstance = new Map<string, string[]>();
+  for (const item of items) {
+    const instanceId = itemInstanceId(item);
+    const ids = idsByInstance.get(instanceId);
+    if (ids) {
+      ids.push(item.sceneId);
+    } else {
+      idsByInstance.set(instanceId, [item.sceneId]);
+    }
+  }
+  const scenes: NormalizedScene[] = [];
+  for (const [instanceId, ids] of idsByInstance) {
+    scenes.push(
+      ...(await stashEntityService.getScenesByIdsWithRelations(ids, instanceId))
+    );
+  }
+
+  let visibleScenes = await entityExclusionHelper.filterExcluded(
+    scenes,
+    userId,
+    "scene"
+  );
+
+  if (options.withUserData) {
+    // Reset user-specific fields to defaults, then merge the viewer's
+    // WatchHistory and SceneRating
+    const scenesWithDefaults = visibleScenes.map((s) => ({
+      ...s,
+      ...DEFAULT_SCENE_USER_FIELDS,
+    }));
+    // Type assertion: cached scenes have o_history as string[] (from DB) vs Date[] in NormalizedScene
+    visibleScenes = await mergeScenesWithUserData(
+      scenesWithDefaults as unknown as NormalizedScene[],
+      userId
+    );
+  }
+
+  return new Map(visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s]));
+}
 
 /**
  * Get all playlists for current user
@@ -107,41 +185,14 @@ export const getUserPlaylists = async (
         }
 
         try {
-          // 1. Fetch scenes from cache with relations, grouped by instance
-          const scenesByInstance = groupIdsByInstance(
-            playlist.items,
-            (item) => item.instanceId,
-            (item) => item.sceneId,
-            stashInstanceManager.getDefaultConfig().id
-          );
-          const scenes: NormalizedScene[] = [];
-          for (const [instId, ids] of scenesByInstance) {
-            scenes.push(
-              ...(await stashEntityService.getScenesByIdsWithRelations(
-                ids,
-                instId
-              ))
-            );
-          }
-
-          // 2. Apply user exclusions (filter out hidden/restricted scenes)
-          const visibleScenes = await entityExclusionHelper.filterExcluded(
-            scenes,
-            userId,
-            "scene"
-          );
-
-          // Create a map of composite key to scene data (avoids cross-instance ID collisions)
-          const sceneMap = new Map(
-            visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s])
-          );
+          const scenes = await loadItemScenes(playlist.items, userId, {
+            withUserData: false,
+          });
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
           const itemsWithScenes = playlist.items.map((item) => ({
             ...item,
-            scene:
-              sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
-              null,
+            scene: scenes.get(itemSceneKey(item)) ?? null,
           }));
 
           return {
@@ -242,42 +293,15 @@ export const getSharedPlaylists = async (
 
         if (p.items.length > 0) {
           try {
-            // Fetch scenes from cache with relations, grouped by instance
-            const scenesByInstance = groupIdsByInstance(
-              p.items,
-              (item) => item.instanceId,
-              (item) => item.sceneId,
-              stashInstanceManager.getDefaultConfig().id
-            );
-            const scenes: NormalizedScene[] = [];
-            for (const [instId, ids] of scenesByInstance) {
-              scenes.push(
-                ...(await stashEntityService.getScenesByIdsWithRelations(
-                  ids,
-                  instId
-                ))
-              );
-            }
-
-            // Apply user exclusions (filter out hidden/restricted scenes)
-            const visibleScenes = await entityExclusionHelper.filterExcluded(
-              scenes,
-              userId,
-              "scene"
-            );
-
-            // Create a map of composite key to scene data (avoids cross-instance ID collisions)
-            const sceneMap = new Map(
-              visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s])
-            );
+            const scenes = await loadItemScenes(p.items, userId, {
+              withUserData: false,
+            });
 
             // Attach scene data to each playlist item
             itemsWithScenes = p.items.map((item) => ({
               instanceId: item.instanceId,
               sceneId: item.sceneId,
-              scene:
-                sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
-                null,
+              scene: scenes.get(itemSceneKey(item)) ?? null,
             }));
           } catch (cacheError) {
             logger.error(`Error fetching scenes for shared playlist ${p.id}`, {
@@ -367,57 +391,15 @@ export const getPlaylist = async (
     // Fetch scene details from cache for all items
     if (playlist.items.length > 0) {
       try {
-        // 1. Fetch scenes from cache with relations, grouped by instance
-        const scenesByInstance = groupIdsByInstance(
-          playlist.items,
-          (item) => item.instanceId,
-          (item) => item.sceneId,
-          stashInstanceManager.getDefaultConfig().id
-        );
-        const scenes: NormalizedScene[] = [];
-        for (const [instId, ids] of scenesByInstance) {
-          scenes.push(
-            ...(await stashEntityService.getScenesByIdsWithRelations(
-              ids,
-              instId
-            ))
-          );
-        }
-
-        // 2. Apply user exclusions (filter out hidden/restricted scenes)
-        const visibleScenes = await entityExclusionHelper.filterExcluded(
-          scenes,
-          userId,
-          "scene"
-        );
-
-        // 3. Reset user-specific fields to defaults before merging Peek user data
-        const scenesWithDefaults = visibleScenes.map((s) => ({
-          ...s,
-          ...DEFAULT_SCENE_USER_FIELDS,
-        }));
-
-        // 4. Merge with user's personal data (WatchHistory + SceneRating)
-        const { mergeScenesWithUserData } = await import("./library/scenes.js");
-        // Type assertion safe: scenes from cache are compatible with Normalized type structure
-        // Type assertion: cached scenes have o_history as string[] (from DB) vs Date[] in NormalizedScene
-        const scenesWithUserHistory = await mergeScenesWithUserData(
-          scenesWithDefaults as unknown as NormalizedScene[],
-          userId
-        );
-
-        // Create a map of composite key to scene data (avoids cross-instance ID collisions)
-        const sceneMap = new Map(
-          scenesWithUserHistory.map((s) => [entityKey(s.id, s.instanceId), s])
-        );
+        const scenes = await loadItemScenes(playlist.items, userId, {
+          withUserData: true,
+        });
 
         // Attach scene data to each playlist item
         // Note: Items with restricted/hidden scenes will have scene: null
         const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
-          scene:
-            sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
-            null,
+          scene: scenes.get(itemSceneKey(item)) ?? null,
         }));
 
         res.json({
