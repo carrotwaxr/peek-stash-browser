@@ -1,18 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import { apiGet } from "../../api";
 import { ApiError } from "../../api/client";
+import {
+  isLibraryInitializing,
+  useLibraryReady,
+} from "../../api/hooks/useLibraryReady";
+import { queryKeys } from "../../api/queryKeys";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTVMode } from "../../hooks/useTVMode";
 import SceneGrid from "../scene-search/SceneGrid";
 import {
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   Pagination,
-  SyncProgressBanner,
   Tooltip,
 } from "../ui/index";
 
@@ -26,6 +32,14 @@ interface RecommendationCriteria {
   ratedTags: number;
   favoritedScenes: number;
   ratedScenes: number;
+}
+
+/** GET /library/scenes/recommended (`GetRecommendedScenesResponse`) */
+interface RecommendedScenesResponse {
+  scenes: Record<string, unknown>[];
+  count: number;
+  message?: string;
+  criteria?: RecommendationCriteria;
 }
 
 const RecommendationInfoContent = () => (
@@ -63,90 +77,52 @@ const Recommended = () => {
   const pageRef = useRef<HTMLDivElement>(null);
   const { isTVMode } = useTVMode();
 
-  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{
-    message: string;
-    errorType: string | null;
-  } | null>(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [message, setMessage] = useState<string | null>(null);
-  const [initMessage, setInitMessage] = useState<string | null>(null);
-  const [criteria, setCriteria] = useState<RecommendationCriteria | null>(null);
-
   // Get pagination params from URL
   const page = parseInt(searchParams.get("page") ?? "1") || 1;
   const perPage = parseInt(searchParams.get("per_page") ?? "24") || 24;
 
-  // Calculate total pages
-  const totalPages = Math.ceil(totalCount / perPage);
+  // One query per page: a slower answer for another page never replaces
+  // this one, and leaving the page cancels the request in flight
+  const { ready } = useLibraryReady();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.scenes.recommended(page, perPage);
+  const {
+    data,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey,
+    queryFn: ({ signal }) =>
+      apiGet<RecommendedScenesResponse>(
+        `/library/scenes/recommended?page=${page}&per_page=${perPage}`,
+        signal
+      ),
+    enabled: ready,
+  });
 
-  // Fetch recommended scenes
-  useEffect(() => {
-    let retryCount = 0;
-    const MAX_RETRIES = 60;
-
-    const fetchRecommended = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setMessage(null);
-        setInitMessage(null);
-
-        const data = await apiGet<{
-          scenes: Record<string, unknown>[];
-          count: number;
-          message?: string;
-          criteria?: RecommendationCriteria;
-        }>(`/library/scenes/recommended?page=${page}&per_page=${perPage}`);
-
-        const {
-          scenes: fetchedScenes,
-          count,
-          message: msg,
-          criteria: criteriaCounts,
-        } = data;
-
-        setScenes(fetchedScenes);
-        setTotalCount(count);
-        setCriteria(criteriaCounts ?? null);
-        if (msg) {
-          setMessage(msg);
-        }
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching recommended scenes:", err);
-
-        // Check if server is initializing cache
-        const isInitializing =
-          err instanceof ApiError &&
-          err.status === 503 &&
-          err.data?.ready === false;
-
-        if (isInitializing && retryCount < MAX_RETRIES) {
-          setInitMessage("Server is syncing library, please wait...");
-          retryCount++;
-          setTimeout(() => {
-            void fetchRecommended();
-          }, 5000);
-          return;
-        }
-
-        setError({
+  // The library is on its first sync: the notice, not an error
+  const initializing = !ready || isLibraryInitializing(queryError);
+  const loading = isLoading || initializing;
+  const error =
+    queryError && !initializing
+      ? {
           message:
-            (err instanceof ApiError ? err.message : null) ||
+            (queryError instanceof ApiError ? queryError.message : null) ||
             "Failed to load recommendations",
           errorType:
-            (err instanceof ApiError
-              ? (err.data?.errorType as string)
-              : null) || null,
-        });
-        setLoading(false);
-      }
-    };
+            queryError instanceof ApiError &&
+            typeof queryError.data.errorType === "string"
+              ? queryError.data.errorType
+              : null,
+        }
+      : null;
+  const scenes = data?.scenes ?? [];
+  const totalCount = data?.count ?? 0;
+  const message = data?.message ?? null;
+  const criteria = data?.criteria ?? null;
 
-    void fetchRecommended();
-  }, [page, perPage]);
+  // Calculate total pages
+  const totalPages = Math.ceil(totalCount / perPage);
 
   // Handle page change
   const handlePageChange = (newPage: number) => {
@@ -183,10 +159,17 @@ const Recommended = () => {
     }, 50);
   };
 
-  // Handle successful hide - remove scene from state
+  // Handle successful hide - remove scene from this page's results
   const handleHideSuccess = (sceneId: string) => {
-    setScenes((prev) => prev.filter((s) => s.id !== sceneId));
-    setTotalCount((prev) => Math.max(0, prev - 1));
+    queryClient.setQueryData<RecommendedScenesResponse>(queryKey, (old) =>
+      old
+        ? {
+            ...old,
+            scenes: old.scenes.filter((s) => s.id !== sceneId),
+            count: Math.max(0, old.count - 1),
+          }
+        : old
+    );
   };
 
   // Initial focus for TV mode
@@ -272,10 +255,10 @@ const Recommended = () => {
           </Tooltip>
         </div>
 
-        {initMessage && <SyncProgressBanner message={initMessage} />}
+        <LibraryInitializingBanner />
 
         {/* Top Pagination */}
-        {!loading && !error && !message && !initMessage && totalPages > 1 && (
+        {!loading && !error && !message && totalPages > 1 && (
           <div className="mb-6">
             <Pagination
               currentPage={page}
@@ -289,7 +272,7 @@ const Recommended = () => {
         )}
 
         {/* Error type display */}
-        {error && error.errorType && (
+        {error?.errorType && (
           <div className="mb-4 text-sm text-gray-500">
             (Error type: {error.errorType})
           </div>
@@ -299,7 +282,7 @@ const Recommended = () => {
         <SceneGrid
           scenes={scenes as unknown as NormalizedScene[]}
           loading={loading}
-          error={!initMessage && error ? error.message : undefined}
+          error={error ? error.message : undefined}
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}

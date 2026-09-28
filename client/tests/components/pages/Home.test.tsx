@@ -1,8 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as lucideModule from "lucide-react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/api/client";
+import { createQueryClient } from "@/api/queryClient";
 import Home from "@/components/pages/Home";
+import type * as bannerModule from "@/components/ui/LibraryInitializingBanner";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { jsonResponse, requestsTo, stubApi } from "../../helpers/stubApi";
 
 // Mock react-router-dom
 vi.mock("react-router-dom", async () => {
@@ -19,8 +26,10 @@ vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ user: { username: "testuser" } })),
 }));
+/** The fetch function of each hardcoded carousel, by fetchKey */
+let mockCarouselQueries: Record<string, () => Promise<unknown>> = {};
 vi.mock("@/hooks/useHomeCarouselQueries", () => ({
-  useHomeCarouselQueries: vi.fn(() => ({})),
+  useHomeCarouselQueries: vi.fn(() => mockCarouselQueries),
 }));
 vi.mock("@/hooks/useHideBulkAction", () => ({
   useHideBulkAction: vi.fn(() => ({
@@ -47,16 +56,6 @@ vi.mock("@/api", () => ({
     executeCarousel: vi.fn(),
   },
 }));
-vi.mock("@/api/client", () => ({
-  ApiError: class ApiError extends Error {
-    isInitializing = false;
-    status: number;
-    constructor(msg: string, status = 500) {
-      super(msg);
-      this.status = status;
-    }
-  },
-}));
 
 // Mock constants
 const mockMigrateCarouselPreferences = vi.fn((prefs: unknown) => prefs || []);
@@ -77,18 +76,9 @@ vi.mock("@/utils/urlParams", () => ({
   buildSearchParams: vi.fn(() => new URLSearchParams()),
 }));
 
-// Mock TanStack Query
-vi.mock("@tanstack/react-query", async () => {
-  const actual = await vi.importActual("@tanstack/react-query");
-  return {
-    ...actual,
-    useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
-    useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
-  };
-});
-
-// Mock lucide-react
-vi.mock("lucide-react", () => ({
+// Mock lucide-react: Home's own icons; the rest (the navigation's) are real
+vi.mock("lucide-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof lucideModule>()),
   LucideEyeOff: (props: Record<string, unknown>) => (
     <span data-testid="icon-eye-off" {...props} />
   ),
@@ -100,8 +90,13 @@ vi.mock("lucide-react", () => ({
   ),
 }));
 
-// Mock UI components
-vi.mock("@/components/ui/index", () => ({
+// Mock UI components; the initializing notice is the real one
+vi.mock("@/components/ui/index", async () => ({
+  LibraryInitializingBanner: (
+    await vi.importActual<typeof bannerModule>(
+      "@/components/ui/LibraryInitializingBanner"
+    )
+  ).default,
   AddToPlaylistButton: () => <div data-testid="add-to-playlist" />,
   BulkActionBar: ({ selectedScenes }: Record<string, unknown>) => (
     <div data-testid="bulk-action-bar">
@@ -125,17 +120,68 @@ vi.mock("@/components/ui/index", () => ({
   PageLayout: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="page-layout">{children}</div>
   ),
-  SceneCarousel: ({ title }: Record<string, unknown>) => (
-    <div data-testid="scene-carousel">{title as string}</div>
+  SceneCarousel: ({ title, scenes, loading }: Record<string, unknown>) => (
+    <div data-testid="scene-carousel" data-loading={String(loading)}>
+      {title as string} ({(scenes as unknown[]).length} scenes)
+    </div>
   ),
 }));
 
 // Mock shared-types
 vi.mock("@peek/shared-types", () => ({}));
 
+let client: QueryClient;
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={client}>{children}</QueryClientProvider>
+);
+
+const renderHome = () => actAsync(() => render(<Home />, { wrapper }));
+
+/** Moves the clock on, running the timers and promises due by then. */
+const advance = (ms: number) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+
+/**
+ * Lets what is due now finish: TanStack Query tells React about a change
+ * on a timer a millisecond later.
+ */
+const settle = () => advance(50);
+
+/** Enables one hardcoded carousel, with the definition Home looks up. */
+async function enableCarousel(
+  fetchKey: string,
+  title: string,
+  fetchScenes: () => Promise<unknown>
+) {
+  const { CAROUSEL_DEFINITIONS } = await import("@/constants/carousels");
+  (CAROUSEL_DEFINITIONS as unknown as Array<Record<string, unknown>>).push({
+    fetchKey,
+    title,
+    iconComponent: () => <span />,
+    iconProps: {},
+  });
+  mockMigrateCarouselPreferences.mockReturnValue([
+    { id: fetchKey, enabled: true, order: 0 },
+  ]);
+  mockCarouselQueries = { [fetchKey]: fetchScenes };
+}
+
 describe("Home", () => {
+  afterEach(async () => {
+    client.clear();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    const { CAROUSEL_DEFINITIONS } = await import("@/constants/carousels");
+    (CAROUSEL_DEFINITIONS as unknown[]).length = 0;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    client = createQueryClient();
+    mockCarouselQueries = {};
     mockApiGet.mockResolvedValue({
       settings: { carouselPreferences: [] },
     });
@@ -147,31 +193,23 @@ describe("Home", () => {
 
   describe("Rendering", () => {
     it("renders without crashing", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(screen.getByTestId("page-layout")).toBeInTheDocument();
     });
 
     it("sets page title to 'Home'", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(usePageTitle).toHaveBeenCalledWith("Home");
     });
 
     it("shows welcome message with username", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       const header = screen.getByTestId("page-header");
       expect(header).toHaveTextContent("Welcome, testuser");
     });
 
     it("shows PageHeader with subtitle", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       const header = screen.getByTestId("page-header");
       expect(header).toHaveTextContent(
         "Discover your favorite content and explore new scenes"
@@ -179,18 +217,14 @@ describe("Home", () => {
     });
 
     it("shows PageLayout wrapper", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(screen.getByTestId("page-layout")).toBeInTheDocument();
     });
   });
 
   describe("Empty State", () => {
     it("renders no carousels when preferences are empty", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(screen.queryByTestId("scene-carousel")).not.toBeInTheDocument();
       expect(screen.queryByTestId("continue-watching")).not.toBeInTheDocument();
     });
@@ -198,32 +232,17 @@ describe("Home", () => {
 
   describe("Carousel Rendering", () => {
     it("renders hardcoded carousels when preferences match definitions", async () => {
-      const { CAROUSEL_DEFINITIONS } = await import("@/constants/carousels");
-      // Temporarily push a definition into the mocked empty array
-      const defs = CAROUSEL_DEFINITIONS as unknown as Array<
-        Record<string, unknown>
-      >;
-      defs.push({
-        fetchKey: "recentlyAddedScenes",
-        title: "Recently Added",
-        iconComponent: () => <span />,
-        iconProps: {},
-      });
+      await enableCarousel(
+        "recentlyAddedScenes",
+        "Recently Added",
+        vi.fn().mockResolvedValue([])
+      );
 
-      mockMigrateCarouselPreferences.mockReturnValue([
-        { id: "recentlyAddedScenes", enabled: true, order: 0 },
-      ]);
-
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
 
       expect(screen.getByTestId("scene-carousel")).toHaveTextContent(
         "Recently Added"
       );
-
-      // Clean up
-      defs.length = 0;
     });
 
     it("renders ContinueWatchingCarousel for special carousel", async () => {
@@ -243,41 +262,104 @@ describe("Home", () => {
         { id: "continueWatching", enabled: true, order: 0 },
       ]);
 
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
 
       expect(screen.getByTestId("continue-watching")).toBeInTheDocument();
-
-      // Clean up
-      defs.length = 0;
     });
   });
 
   describe("API Loading", () => {
     it("calls apiGet for user settings on mount", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(mockApiGet).toHaveBeenCalledWith("/user/settings");
     });
 
     it("calls libraryApi.getCarousels on mount", async () => {
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
       expect(mockGetCarousels).toHaveBeenCalled();
     });
 
     it("falls back to migrated empty prefs on API error", async () => {
       mockApiGet.mockRejectedValue(new Error("Network error"));
 
-      await actAsync(() => {
-        render(<Home />);
-      });
+      await renderHome();
 
       // Should fall back to migrateCarouselPreferences([])
       expect(mockMigrateCarouselPreferences).toHaveBeenCalledWith([]);
+    });
+  });
+
+  describe("Library initializing", () => {
+    it("Home carousels load once ready with no retry loop", async () => {
+      vi.useFakeTimers();
+      const fetchMock = stubApi({
+        "/library/ready": () => jsonResponse(200, { ready: true }),
+      });
+      const recentlyAdded = vi
+        .fn()
+        .mockRejectedValueOnce(
+          new ApiError("Server is initializing", 503, { ready: false })
+        )
+        .mockResolvedValue([{ id: "1", title: "Scene One" }]);
+      await enableCarousel(
+        "recentlyAddedScenes",
+        "Recently Added",
+        recentlyAdded
+      );
+
+      await renderHome();
+      await settle();
+
+      // One request, answered "initializing": the notice, the carousel waiting
+      expect(recentlyAdded).toHaveBeenCalledOnce();
+      expect(
+        screen.getByText("Server is syncing library, please wait...")
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("scene-carousel")).toHaveAttribute(
+        "data-loading",
+        "true"
+      );
+
+      await advance(4_800);
+      expect(recentlyAdded).toHaveBeenCalledOnce();
+      expect(requestsTo(fetchMock, "/library/ready")).toHaveLength(0);
+
+      // The re-check says ready: the carousel loads, once
+      await advance(300);
+      expect(requestsTo(fetchMock, "/library/ready")).toHaveLength(1);
+      expect(recentlyAdded).toHaveBeenCalledTimes(2);
+      expect(
+        screen.queryByText("Server is syncing library, please wait...")
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("scene-carousel")).toHaveTextContent(
+        "Recently Added (1 scenes)"
+      );
+      expect(screen.getByTestId("scene-carousel")).toHaveAttribute(
+        "data-loading",
+        "false"
+      );
+
+      await advance(60_000);
+      expect(recentlyAdded).toHaveBeenCalledTimes(2);
+      expect(requestsTo(fetchMock, "/library/ready")).toHaveLength(1);
+    });
+
+    it("a carousel that fails for another reason is left out, without a notice", async () => {
+      const failing = vi.fn().mockRejectedValue(new ApiError("Boom", 500));
+      await enableCarousel("recentlyAddedScenes", "Recently Added", failing);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await renderHome();
+
+      await waitFor(() => {
+        expect(failing).toHaveBeenCalledOnce();
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId("scene-carousel")).not.toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText("Server is syncing library, please wait...")
+      ).not.toBeInTheDocument();
     });
   });
 });

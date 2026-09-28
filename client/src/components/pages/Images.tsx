@@ -9,8 +9,8 @@ import { useSearchParams } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { type LibrarySearchParams } from "../../api";
-import { ApiError } from "../../api/client";
 import { useImageList } from "../../api/hooks";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -28,10 +28,10 @@ import TimelineView from "../timeline/TimelineView";
 import Lightbox from "../ui/Lightbox";
 import {
   ErrorMessage,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SearchControls,
-  SyncProgressBanner,
 } from "../ui/index";
 import WallView from "../wall/WallView";
 
@@ -128,11 +128,9 @@ const Images = () => {
     error,
     isPlaceholderData,
   } = useImageList(queryParams);
-  const initMessage =
-    error instanceof ApiError && error.isInitializing
-      ? "Server is syncing library, please wait..."
-      : null;
-  const isLoading = queryParams === null || queryLoading;
+  // The library is on its first sync: the notice, not the error page
+  const initializing = isLibraryInitializing(error);
+  const isLoading = queryParams === null || queryLoading || initializing;
 
   // Consume pending lightbox index when new data arrives
   const prevDataRef = useRef<unknown>(undefined);
@@ -259,7 +257,7 @@ const Images = () => {
     !isLoading && currentImages.length > 0 && isTVMode
   );
 
-  if (error && !initMessage) {
+  if (error && !initializing) {
     return (
       <PageLayout>
         <PageHeader title="Images" />
@@ -276,7 +274,7 @@ const Images = () => {
           subtitle="Browse all images in your library"
         />
 
-        {initMessage && <SyncProgressBanner message={initMessage} />}
+        <LibraryInitializingBanner />
 
         <SearchControls
           artifactType="image"

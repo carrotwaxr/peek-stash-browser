@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { type LibrarySearchParams } from "../../api";
-import { ApiError } from "../../api/client";
 import { useSceneList } from "../../api/hooks";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
@@ -17,11 +17,11 @@ import { ColumnConfigPopover, TableView } from "../table/index";
 import TimelineView from "../timeline/TimelineView";
 import {
   ErrorMessage,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SceneCard,
   SearchControls,
-  SyncProgressBanner,
 } from "../ui/index";
 import WallView from "../wall/WallView";
 import SceneGrid from "./SceneGrid";
@@ -106,11 +106,9 @@ const SceneSearch = ({
     error,
     isPlaceholderData,
   } = useSceneList(queryParams);
-  const initMessage =
-    error instanceof ApiError && error.isInitializing
-      ? "Server is syncing library, please wait..."
-      : null;
-  const isLoading = queryParams === null || queryLoading;
+  // The library is on its first sync: the notice, not the error page
+  const initializing = isLibraryInitializing(error);
+  const isLoading = queryParams === null || queryLoading || initializing;
 
   // Track current view mode for context settings
   // Initialize from URL to stay in sync with useFilterState on back navigation
@@ -295,7 +293,7 @@ const SceneSearch = ({
     onItemSelect: handleSceneClick,
   });
 
-  if (error) {
+  if (error && !initializing) {
     return (
       <PageLayout>
         <PageHeader title={title ?? ""} subtitle={subtitle} />
@@ -308,7 +306,7 @@ const SceneSearch = ({
     <PageLayout>
       <PageHeader title={title ?? ""} subtitle={subtitle} />
 
-      {initMessage && <SyncProgressBanner message={initMessage} />}
+      <LibraryInitializingBanner />
 
       <SearchControls
         artifactType="scene"
@@ -473,7 +471,6 @@ const SceneSearch = ({
                 }
                 density={gridDensity}
                 loading={isLoading}
-                error={error}
                 onSceneClick={
                   handleSceneClick as unknown as React.ComponentProps<
                     typeof SceneGrid

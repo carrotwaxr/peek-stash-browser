@@ -1,6 +1,8 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/api/client";
 import SceneSearch from "@/components/scene-search/SceneSearch";
 
 // Mock react-router-dom
@@ -83,7 +85,17 @@ vi.mock("@/api/hooks", () => ({
 }));
 vi.mock("@/api/client", () => ({
   ApiError: class ApiError extends Error {
-    isInitializing = false;
+    isInitializing: boolean;
+    status: number;
+    constructor(
+      message: string,
+      status = 500,
+      data: Record<string, unknown> = {}
+    ) {
+      super(message);
+      this.status = status;
+      this.isInitializing = status === 503 && data.ready === false;
+    }
   },
 }));
 vi.mock("@/api", () => ({}));
@@ -145,13 +157,15 @@ vi.mock("@/components/ui/index", () => ({
       {(error as Error)?.message || "Error"}
     </div>
   ),
-  SyncProgressBanner: ({ message }: Record<string, unknown>) => (
-    <div data-testid="sync-banner">{message as string}</div>
-  ),
+  LibraryInitializingBanner: () => <div data-testid="sync-banner" />,
   SceneCard: () => <div data-testid="scene-card" />,
 }));
+const mockSceneGridProps = vi.fn<(props: Record<string, unknown>) => void>();
 vi.mock("@/components/scene-search/SceneGrid", () => ({
-  default: () => <div data-testid="scene-grid" />,
+  default: (props: Record<string, unknown>) => {
+    mockSceneGridProps(props);
+    return <div data-testid="scene-grid" />;
+  },
 }));
 vi.mock("@/components/wall/WallView", () => ({
   default: () => <div data-testid="wall-view" />,
@@ -199,6 +213,44 @@ describe("SceneSearch", () => {
 
       const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
       expect(props).toMatchObject({ isRefreshing: true });
+    });
+  });
+
+  describe("Library initializing", () => {
+    it("a 503 ready:false on Scenes shows the sync banner, not an error page", () => {
+      mockUseSceneList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: new ApiError("Server is initializing", 503, { ready: false }),
+      });
+
+      render(<SceneSearch title="Scenes" />);
+
+      expect(screen.getByTestId("sync-banner")).toBeInTheDocument();
+      expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
+      // The controls stay, and the grid waits for the library
+      expect(screen.getByTestId("search-controls")).toBeInTheDocument();
+      const [gridProps] = must(
+        mockSceneGridProps.mock.calls.at(-1),
+        "the grid's props"
+      );
+      expect(gridProps).toMatchObject({ loading: true });
+      expect(gridProps.error).toBeUndefined();
+    });
+
+    it("any other error shows the error page", () => {
+      mockUseSceneList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: new ApiError("Something went wrong", 500),
+      });
+
+      render(<SceneSearch title="Scenes" />);
+
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Something went wrong"
+      );
+      expect(screen.queryByTestId("search-controls")).not.toBeInTheDocument();
     });
   });
 });

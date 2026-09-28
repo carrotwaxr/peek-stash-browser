@@ -29,6 +29,7 @@ import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
 import libraryImagesRoutes from "../routes/library/images.js";
 import libraryPerformersRoutes from "../routes/library/performers.js";
+import libraryReadyRoutes from "../routes/library/ready.js";
 import libraryScenesRoutes from "../routes/library/scenes.js";
 import libraryStudiosRoutes from "../routes/library/studios.js";
 import libraryTagsRoutes from "../routes/library/tags.js";
@@ -167,6 +168,11 @@ export const setupAPI = () => {
     requireCacheReady,
     authenticated(getClipsForScene)
   );
+
+  // Whether the user's library can be shown yet (the client's re-check while
+  // the library routes answer 503 ready:false). Before the entity routers,
+  // each of which runs authenticate on every request that enters it
+  app.use("/api/library", libraryReadyRoutes);
 
   // Library routes (all entities)
   app.use("/api/library", libraryScenesRoutes);

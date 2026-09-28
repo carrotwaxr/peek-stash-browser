@@ -326,7 +326,8 @@ export const libraryApi = {
     apiFetch(`/carousels/${id}`, { method: "DELETE" }),
   previewCarousel: (data: Record<string, unknown>) =>
     apiPost("/carousels/preview", data),
-  executeCarousel: (id: string) => apiGet(`/carousels/${id}/execute`),
+  executeCarousel: (id: string, signal?: AbortSignal) =>
+    apiGet(`/carousels/${id}/execute`, signal),
 };
 
 // Internal ratings helper used by libraryApi.updateRating/updateFavorite

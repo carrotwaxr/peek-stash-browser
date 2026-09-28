@@ -74,10 +74,18 @@ export interface ApiSuccessResponse {
 }
 
 /**
- * Cache not ready response (503)
+ * Cache not ready response (503): the user's library is not ready yet
  */
 export interface CacheNotReadyResponse {
   error: string;
   message: string;
   ready: false;
+}
+
+/**
+ * GET /api/library/ready: whether the user's library can be shown yet. The
+ * client asks every 5 seconds after a request answered CacheNotReadyResponse.
+ */
+export interface LibraryReadyResponse {
+  ready: boolean;
 }

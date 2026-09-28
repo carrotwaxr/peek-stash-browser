@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
 import { apiGet, libraryApi } from "../../api";
-import { ApiError } from "../../api/client";
+import {
+  isLibraryInitializing,
+  useLibraryReady,
+} from "../../api/hooks/useLibraryReady";
+import { queryKeys } from "../../api/queryKeys";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
@@ -28,7 +32,7 @@ import {
   Button,
   ContinueWatchingCarousel,
   HideConfirmationDialog,
-  LoadingSpinner,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SceneCarousel,
@@ -115,8 +119,6 @@ const Home = () => {
   const [selectedScenes, setSelectedScenes] = useState<
     Record<string, unknown>[]
   >([]);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [initMessage, setInitMessage] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -205,16 +207,6 @@ const Home = () => {
     onComplete: handleClearSelection,
   });
 
-  const handleInitializing = useCallback((initializing: boolean) => {
-    if (initializing) {
-      setIsInitializing(true);
-      setInitMessage("Server is syncing library, please wait...");
-    } else {
-      setIsInitializing(false);
-      setInitMessage(null);
-    }
-  }, []);
-
   // Build the list of active carousels (hardcoded + custom)
   const activeCarousels: CarouselDef[] = carouselPreferences
     .filter((pref) => pref.enabled !== false)
@@ -264,36 +256,7 @@ const Home = () => {
         subtitle="Discover your favorite content and explore new scenes"
       />
 
-      {/* Show initialization message at top */}
-      {isInitializing && (
-        <div
-          className="mb-6 px-6 py-4 rounded-lg border-l-4"
-          style={{
-            backgroundColor: "var(--status-info-bg)",
-            borderLeftColor: "var(--status-info)",
-            border: "1px solid var(--status-info-border)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <LoadingSpinner size="md" />
-            <div>
-              <p
-                className="font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {initMessage || "Server is syncing library, please wait..."}
-              </p>
-              <p
-                className="text-sm mt-1"
-                style={{ color: "var(--text-muted)" }}
-              >
-                This may take a minute on first startup. Checking every 5
-                seconds...
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <LibraryInitializingBanner />
 
       {activeCarousels.map((carousel) => {
         // Render custom carousel
@@ -319,7 +282,6 @@ const Home = () => {
               createSceneClickHandler={createSceneClickHandler}
               selectedScenes={selectedScenes}
               onToggleSelect={handleToggleSelect}
-              onInitializing={handleInitializing}
             />
           );
         }
@@ -345,7 +307,6 @@ const Home = () => {
                   scene: NormalizedScene
                 ) => void
               }
-              onInitializing={handleInitializing}
             />
           );
         }
@@ -361,7 +322,6 @@ const Home = () => {
             carouselQueries={carouselQueries}
             selectedScenes={selectedScenes}
             onToggleSelect={handleToggleSelect}
-            onInitializing={handleInitializing}
           />
         );
       })}
@@ -419,7 +379,9 @@ const Home = () => {
 };
 
 /**
- * HomeCarousel - Renders a hardcoded carousel using useHomeCarouselQueries
+ * HomeCarousel - Renders a hardcoded carousel using useHomeCarouselQueries.
+ * While the library is initializing it shows its loading state and asks
+ * nothing; it loads once useLibraryReady finds the library ready.
  */
 interface HomeCarouselProps {
   title: string;
@@ -432,7 +394,6 @@ interface HomeCarouselProps {
   carouselQueries: Record<string, () => Promise<unknown>>;
   selectedScenes: Record<string, unknown>[];
   onToggleSelect: (scene: Record<string, unknown>) => void;
-  onInitializing: (value: boolean) => void;
 }
 
 const HomeCarousel = ({
@@ -443,73 +404,32 @@ const HomeCarousel = ({
   carouselQueries,
   selectedScenes,
   onToggleSelect,
-  onInitializing,
 }: HomeCarouselProps) => {
-  const [retryCount, setRetryCount] = useState(0);
-  const queryClient = useQueryClient();
+  const { ready } = useLibraryReady();
   const fetchFunction = carouselQueries[fetchKey];
-  const queryKey = useMemo(
-    () => ["homeCarousel", fetchKey] as const,
-    [fetchKey]
-  );
   const {
     data: scenes,
-    isLoading: loading,
+    isLoading,
     error,
   } = useQuery({
-    queryKey,
+    queryKey: queryKeys.homeCarousels.byKey(fetchKey),
     queryFn: () => {
       if (!fetchFunction) throw new Error(`Unknown carousel: ${fetchKey}`);
       return fetchFunction();
     },
+    enabled: ready,
   });
-  const errorAny = error as (Error & { isInitializing?: boolean }) | null;
-  // Handle server initialization state
-  useEffect(() => {
-    if (errorAny?.isInitializing) {
-      if (retryCount < 60) {
-        // Max 60 retries (5 minutes at 5s intervals)
-        onInitializing(true);
-        const timer = setTimeout(() => {
-          setRetryCount((prev) => prev + 1);
-          void queryClient.invalidateQueries({ queryKey: [...queryKey] });
-        }, 5000); // Retry every 5 seconds
-        return () => clearTimeout(timer);
-      } else {
-        onInitializing(false);
-        console.error(
-          `[${title}] Failed to load after ${retryCount} retries:`,
-          error
-        );
-      }
-    } else if (!errorAny) {
-      onInitializing(false);
-      setRetryCount(0); // Reset retry count on success
-    }
-    return undefined;
-  }, [
-    error,
-    errorAny,
-    queryClient,
-    queryKey,
-    retryCount,
-    onInitializing,
-    title,
-  ]);
+  const initializing = !ready || isLibraryInitializing(error);
 
   // Silently skip failed carousels (non-initialization errors only)
-  if (errorAny && !errorAny.isInitializing) {
+  if (error && !initializing) {
     console.error(`Failed to load carousel "${title}":`, error);
     return null;
   }
 
-  // During initialization, show loading skeletons
-  // Keep component mounted to allow retry useEffect to continue running
-  const isInitializing = errorAny?.isInitializing;
-
   return (
     <SceneCarousel
-      loading={loading || !!isInitializing}
+      loading={isLoading || initializing}
       title={title}
       titleIcon={icon}
       scenes={(scenes || []) as unknown as NormalizedScene[]}
@@ -530,7 +450,7 @@ const HomeCarousel = ({
 
 /**
  * CustomCarousel - Renders a user-defined custom carousel
- * Fetches scenes from /api/carousels/:id/execute
+ * Fetches scenes from /api/carousels/:id/execute once the library is ready
  */
 interface CustomCarouselProps {
   carouselId: string;
@@ -543,7 +463,6 @@ interface CustomCarouselProps {
   ) => (scene: Record<string, unknown>) => void;
   selectedScenes: Record<string, unknown>[];
   onToggleSelect: (scene: Record<string, unknown>) => void;
-  onInitializing: (value: boolean) => void;
 }
 
 const CustomCarousel = ({
@@ -554,78 +473,35 @@ const CustomCarousel = ({
   createSceneClickHandler,
   selectedScenes,
   onToggleSelect,
-  onInitializing,
 }: CustomCarouselProps) => {
-  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Record<string, unknown> | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-
-  const fetchCarousel = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { scenes: fetchedScenes } = (await libraryApi.executeCarousel(
-        carouselId
-      )) as Record<string, any>;
-      setScenes(fetchedScenes || []);
-      setError(null);
-      onInitializing(false);
-    } catch (err) {
-      // Check if server is initializing
-      if (err instanceof ApiError && err.status === 503) {
-        setError({ isInitializing: true, message: err.message });
-      } else {
-        setError(err as Record<string, unknown>);
-        console.error(`Failed to load custom carousel "${title}":`, err);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [carouselId, onInitializing, title]);
-
-  useEffect(() => {
-    void fetchCarousel();
-  }, [fetchCarousel]);
-
-  // Handle server initialization state with retry
-  useEffect(() => {
-    if (error?.isInitializing) {
-      if (retryCount < 60) {
-        onInitializing(true);
-        const timer = setTimeout(() => {
-          setRetryCount((prev) => prev + 1);
-          void fetchCarousel();
-        }, 5000);
-        return () => clearTimeout(timer);
-      } else {
-        onInitializing(false);
-        console.error(
-          `[${title}] Failed to load after ${retryCount} retries:`,
-          error
-        );
-      }
-    } else if (!error) {
-      setRetryCount(0);
-    }
-    return undefined;
-  }, [error, retryCount, onInitializing, title, fetchCarousel]);
+  const { ready } = useLibraryReady();
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.carousels.execute(carouselId),
+    queryFn: ({ signal }) =>
+      libraryApi.executeCarousel(carouselId, signal) as Promise<{
+        scenes?: Record<string, unknown>[];
+      }>,
+    enabled: ready,
+    // Its rules can change in Settings: ask again on every visit
+    staleTime: 0,
+  });
+  const scenes = data?.scenes ?? [];
+  const initializing = !ready || isLibraryInitializing(error);
 
   // Silently skip failed carousels (non-initialization errors only)
-  if (error && !error.isInitializing) {
+  if (error && !initializing) {
+    console.error(`Failed to load custom carousel "${title}":`, error);
     return null;
   }
 
-  // During initialization, show loading skeletons
-  const isInitializing = error?.isInitializing;
-
   // Don't render if no scenes and not loading/initializing
-  if (!loading && !isInitializing && scenes.length === 0) {
+  if (!isLoading && !initializing && scenes.length === 0) {
     return null;
   }
 
   return (
     <SceneCarousel
-      loading={loading || !!isInitializing}
+      loading={isLoading || initializing}
       title={title}
       titleIcon={icon}
       scenes={scenes as unknown as NormalizedScene[]}
