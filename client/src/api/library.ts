@@ -1,7 +1,11 @@
 /**
  * Library API — entity search and lookup endpoints.
  */
-import type { NormalizedImage } from "@peek/shared-types";
+import type {
+  FindTagTreeResponse,
+  NormalizedImage,
+  TagTreeScope,
+} from "@peek/shared-types";
 import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
 
@@ -50,6 +54,17 @@ export const libraryApi = {
       body: JSON.stringify(params),
       signal,
     }),
+
+  /**
+   * The compact tag tree for the hierarchy and folder views: every tag the
+   * user can see, or with a scope the tags on its scenes and their ancestors
+   */
+  findTagTree: (scope?: TagTreeScope, signal?: AbortSignal) =>
+    apiPost<FindTagTreeResponse>(
+      "/library/tags/tree",
+      scope ? { scope } : {},
+      signal
+    ),
 
   findGalleries: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
     apiFetch("/library/galleries", {

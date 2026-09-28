@@ -9,6 +9,8 @@ paths:
   - "server/services/UserStatsService.ts"
   - "server/services/EntityAccessService.ts"
   - "server/services/RankingComputeService.ts"
+  - "server/services/TagTreeService.ts"
+  - "server/services/TooltipRelations.ts"
   - "server/utils/entityInstanceId.ts"
   - "server/utils/instanceUtils.ts"
   - "server/utils/dbWrite.ts"

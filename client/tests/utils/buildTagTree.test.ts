@@ -1,6 +1,6 @@
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type TagTreeSource, buildTagTree } from "../../src/utils/buildTagTree";
 
 describe("buildTagTree", () => {
@@ -394,5 +394,79 @@ describe("buildTagTree edge cases", () => {
     const result = buildTagTree(tags);
     expect(result).toHaveLength(1);
     expect(must(result[0]).id).toBe("1");
+  });
+});
+
+describe("buildTagTree across instances", () => {
+  it("two instances' tag 5 are two nodes", () => {
+    const tags = [
+      { id: "5", instanceId: "a", name: "Five on A", parents: [] },
+      { id: "6", instanceId: "a", name: "Six on A", parents: [{ id: "5" }] },
+      { id: "5", instanceId: "b", name: "Five on B", parents: [] },
+      { id: "7", instanceId: "b", name: "Seven on B", parents: [{ id: "5" }] },
+    ];
+
+    const result = buildTagTree(tags);
+
+    expect(result.map((n) => n.name)).toEqual(["Five on A", "Five on B"]);
+    expect(must(result[0]).children.map((n) => n.name)).toEqual(["Six on A"]);
+    expect(must(result[1]).children.map((n) => n.name)).toEqual(["Seven on B"]);
+  });
+
+  it("a search match on one instance marks only its own ancestors", () => {
+    const tags = [
+      { id: "5", instanceId: "a", name: "Genre", parents: [] },
+      { id: "6", instanceId: "a", name: "Action", parents: [{ id: "5" }] },
+      { id: "5", instanceId: "b", name: "Genre", parents: [] },
+      { id: "6", instanceId: "b", name: "Drama", parents: [{ id: "5" }] },
+    ];
+
+    const result = buildTagTree(tags, { filterQuery: "action" });
+
+    expect(result).toHaveLength(1);
+    expect(must(result[0]).instanceId).toBe("a");
+    expect(must(result[0]).isAncestorOnly).toBe(true);
+    expect(must(result[0]).children.map((n) => n.name)).toEqual(["Action"]);
+  });
+
+  it("a tag whose parents are all missing is a root", () => {
+    const tags = [
+      { id: "1", instanceId: "a", name: "Visible", parents: [] },
+      {
+        id: "2",
+        instanceId: "a",
+        name: "Orphan",
+        parents: [{ id: "99" }],
+      },
+    ];
+
+    const result = buildTagTree(tags);
+
+    expect(result.map((n) => n.name)).toEqual(["Orphan", "Visible"]);
+  });
+});
+
+describe("buildTagTree at 10,000 tags", () => {
+  // 500 roots, each with about 19 descendants over three levels
+  const tags = Array.from({ length: 10_000 }, (_, i) => ({
+    id: String(i),
+    instanceId: "a",
+    name: `Tag ${i}`,
+    parents: i < 500 ? [] : [{ id: String(Math.floor((i - 500) / 19.5)) }],
+    scene_count: i % 50,
+  }));
+
+  it("10,000 tags build without a linear search per node", () => {
+    const find = vi.spyOn(Array.prototype, "find");
+    try {
+      const tree = buildTagTree(tags);
+      const searched = buildTagTree(tags, { filterQuery: "99" });
+
+      expect(find).not.toHaveBeenCalled();
+      expect(tree).toHaveLength(500);
+      expect(searched.length).toBeGreaterThan(0);
+    } finally {
+      find.mockRestore();
+    }
   });
 });

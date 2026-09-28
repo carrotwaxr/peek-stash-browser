@@ -219,6 +219,28 @@ export interface TagQueryRow {
   userPlayCount: number | null;
 }
 
+/** A row of the compact tag tree (services/TagTreeService.ts) */
+export interface TagTreeQueryRow {
+  id: string;
+  stashInstanceId: string;
+  name: string;
+  imagePath: string | null;
+  parentIds: string | null; // JSON-encoded string[]
+  sceneCount: number;
+  sceneCountViaPerformers: number;
+  imageCount: number;
+  galleryCount: number;
+  performerCount: number;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
+  // LEFT JOIN TagRating (r) and UserTagStats (us)
+  userRating: number | null;
+  userFavorite: boolean | null;
+  userOCounter: number | null;
+  /** Scoped only: the scope's visible scenes carrying the tag (COALESCE) */
+  scopeSceneCount: bigint | null;
+}
+
 // ---------------------------------------------------------------------------
 // GalleryQueryBuilder
 // ---------------------------------------------------------------------------

@@ -4,23 +4,32 @@ import {
   ChevronsDownUp as LucideChevronsDownUp,
   ChevronsUpDown as LucideChevronsUpDown,
 } from "lucide-react";
-import { buildTagTree } from "../../utils/buildTagTree";
+import {
+  type TagTreeNode as TagTreeNodeData,
+  type TagTreeSource,
+  buildTagTree,
+  tagTreeKey,
+} from "../../utils/buildTagTree";
 import Button from "../ui/Button";
 import TagTreeNode from "./TagTreeNode";
 
 /**
- * Hierarchy view for tags - displays tags as an expandable tree.
+ * Hierarchy view for tags - displays tags as an expandable tree. Expansion
+ * and focus go by each tag's `tagTreeKey` ("id:instanceId"), so two
+ * instances' same-numbered tags expand apart.
  */
-interface TagItem {
-  id: string;
-  name?: string;
-  parents?: Array<{ id: string }>;
-  children?: TagItem[];
-  [key: string]: unknown;
+type TreeNode = TagTreeNodeData<TagTreeSource>;
+
+/** A row of the expanded tree, for keyboard navigation */
+interface VisibleNode {
+  key: string;
+  /** The row it sits under, null at the root */
+  parentKey: string | null;
+  hasChildren: boolean;
 }
 
 interface TagHierarchyViewProps {
-  tags: TagItem[];
+  tags: readonly TagTreeSource[];
   isLoading: boolean;
   searchQuery: string;
   sortField?: string;
@@ -34,7 +43,7 @@ const TagHierarchyView = ({
   sortField = "name",
   sortDirection = "ASC",
 }: TagHierarchyViewProps) => {
-  // Track which nodes are expanded (by tag id)
+  // Track which nodes are expanded (by tag key)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // Track focused node for keyboard navigation
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -53,31 +62,30 @@ const TagHierarchyView = ({
     [tags, searchQuery, sortField, sortDirection]
   );
 
-  // Get all IDs of nodes that have children (expandable nodes)
+  // Get all keys of nodes that have children (expandable nodes)
   const allExpandableIds = useMemo(() => {
-    const ids = new Set<string>();
-    const traverse = (node: Record<string, unknown>) => {
-      if ((node.children as unknown[] | undefined)?.length) {
-        ids.add(node.id as string);
-        (node.children as Record<string, unknown>[]).forEach(traverse);
+    const keys = new Set<string>();
+    const traverse = (node: TreeNode) => {
+      if (node.children.length > 0) {
+        keys.add(tagTreeKey(node));
+        node.children.forEach(traverse);
       }
     };
     tree.forEach(traverse);
-    return ids;
+    return keys;
   }, [tree]);
 
   // Get all visible nodes (for keyboard nav)
   const visibleNodes = useMemo(() => {
-    const nodes: Array<Record<string, unknown> & { depth: number }> = [];
-    const traverse = (node: Record<string, unknown>, depth = 0) => {
-      nodes.push({ ...node, depth });
-      if (expandedIds.has(node.id as string) && node.children) {
-        (node.children as Record<string, unknown>[]).forEach(
-          (child: Record<string, unknown>) => traverse(child, depth + 1)
-        );
+    const nodes: VisibleNode[] = [];
+    const traverse = (node: TreeNode, parentKey: string | null) => {
+      const key = tagTreeKey(node);
+      nodes.push({ key, parentKey, hasChildren: node.children.length > 0 });
+      if (expandedIds.has(key)) {
+        node.children.forEach((child) => traverse(child, key));
       }
     };
-    tree.forEach((root) => traverse(root));
+    tree.forEach((root) => traverse(root, null));
     return nodes;
   }, [tree, expandedIds]);
 
@@ -89,34 +97,25 @@ const TagHierarchyView = ({
       !hasInitializedRef.current
     ) {
       hasInitializedRef.current = true;
-      const rootIds = new Set<string>(
-        tree.map((t: Record<string, unknown>) => t.id as string)
-      );
-      setExpandedIds(rootIds);
+      setExpandedIds(new Set(tree.map(tagTreeKey)));
     }
   }, [tree, expandedIds.size]);
 
   // Auto-expand to show search matches
   useEffect(() => {
     if (searchQuery && tree.length > 0) {
-      // Find all ancestor IDs that need to be expanded to show matches
+      // Find all ancestor keys that need to be expanded to show matches
       const idsToExpand = new Set<string>();
-      const findAncestors = (
-        node: Record<string, unknown>,
-        ancestors: string[] = []
-      ) => {
-        const matches = (node.name as string | undefined)
+      const findAncestors = (node: TreeNode, ancestors: string[] = []) => {
+        const matches = node.name
           ?.toLowerCase()
           .includes(searchQuery.toLowerCase());
         if (matches) {
-          ancestors.forEach((id: string) => idsToExpand.add(id));
+          ancestors.forEach((key) => idsToExpand.add(key));
         }
-        if (node.children) {
-          (node.children as Record<string, unknown>[]).forEach(
-            (child: Record<string, unknown>) =>
-              findAncestors(child, [...ancestors, node.id as string])
-          );
-        }
+        node.children.forEach((child) =>
+          findAncestors(child, [...ancestors, tagTreeKey(node)])
+        );
       };
       tree.forEach((root) => findAncestors(root));
       if (idsToExpand.size > 0) {
@@ -154,9 +153,7 @@ const TagHierarchyView = ({
     (e: React.KeyboardEvent) => {
       if (!focusedId || visibleNodes.length === 0) return;
 
-      const currentIndex = visibleNodes.findIndex(
-        (n) => (n.id as string) === focusedId
-      );
+      const currentIndex = visibleNodes.findIndex((n) => n.key === focusedId);
       if (currentIndex === -1) return;
 
       const currentNode = visibleNodes[currentIndex];
@@ -171,55 +168,50 @@ const TagHierarchyView = ({
         case "ArrowDown":
           e.preventDefault();
           if (nextNode) {
-            setFocusedId(nextNode.id as string);
+            setFocusedId(nextNode.key);
           }
           break;
 
         case "ArrowUp":
           e.preventDefault();
           if (previousNode) {
-            setFocusedId(previousNode.id as string);
+            setFocusedId(previousNode.key);
           }
           break;
 
         case "ArrowRight":
           e.preventDefault();
-          if ((currentNode.children as unknown[] | undefined)?.length) {
-            if (!expandedIds.has(currentNode.id as string)) {
-              handleToggle(currentNode.id as string);
+          if (currentNode.hasChildren) {
+            if (!expandedIds.has(currentNode.key)) {
+              handleToggle(currentNode.key);
             } else if (nextNode) {
               // Already expanded, move to first child
-              setFocusedId(nextNode.id as string);
+              setFocusedId(nextNode.key);
             }
           }
           break;
 
         case "ArrowLeft":
           e.preventDefault();
-          if (expandedIds.has(currentNode.id as string)) {
-            handleToggle(currentNode.id as string);
-          } else {
-            // Find parent and focus it
-            const parentId = tags.find(
-              (t: TagItem) => t.id === (currentNode.id as string)
-            )?.parents?.[0]?.id;
-            if (parentId) {
-              setFocusedId(parentId);
-            }
+          if (expandedIds.has(currentNode.key)) {
+            handleToggle(currentNode.key);
+          } else if (currentNode.parentKey) {
+            // Focus the row it sits under
+            setFocusedId(currentNode.parentKey);
           }
           break;
 
         case "Home":
           e.preventDefault();
           if (firstNode) {
-            setFocusedId(firstNode.id as string);
+            setFocusedId(firstNode.key);
           }
           break;
 
         case "End":
           e.preventDefault();
           if (lastNode) {
-            setFocusedId(lastNode.id as string);
+            setFocusedId(lastNode.key);
           }
           break;
 
@@ -227,14 +219,14 @@ const TagHierarchyView = ({
           break;
       }
     },
-    [focusedId, visibleNodes, expandedIds, handleToggle, tags]
+    [focusedId, visibleNodes, expandedIds, handleToggle]
   );
 
   // Set initial focus
   useEffect(() => {
     const firstNode = visibleNodes[0];
     if (firstNode && !focusedId) {
-      setFocusedId(firstNode.id as string);
+      setFocusedId(firstNode.key);
     }
   }, [visibleNodes, focusedId]);
 
@@ -295,16 +287,16 @@ const TagHierarchyView = ({
         onKeyDown={handleKeyDown}
         className="space-y-1"
       >
-        {tree.map((rootTag: Record<string, unknown>) => (
+        {tree.map((rootTag) => (
           <TagTreeNode
-            key={rootTag.id as string}
+            key={tagTreeKey(rootTag)}
             tag={
               rootTag as unknown as React.ComponentProps<
                 typeof TagTreeNode
               >["tag"]
             }
             depth={0}
-            isExpanded={expandedIds.has(rootTag.id as string)}
+            isExpanded={expandedIds.has(tagTreeKey(rootTag))}
             expandedIds={expandedIds}
             onToggle={handleToggle}
             focusedId={focusedId}

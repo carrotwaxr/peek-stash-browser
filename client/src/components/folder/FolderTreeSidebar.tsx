@@ -6,10 +6,11 @@ import {
   LucideFolder,
   LucideFolderOpen,
 } from "lucide-react";
-import { buildTagTree } from "../../utils/buildTagTree";
+import { buildTagTree, tagTreeKey } from "../../utils/buildTagTree";
 
 interface TagItem {
   id: string;
+  instanceId?: string | null;
   name: string;
   parents?: Array<{ id: string }>;
   image_path?: string | null;
@@ -17,6 +18,7 @@ interface TagItem {
 
 interface TreeNodeData {
   id: string;
+  instanceId?: string | null;
   name: string;
   children?: TreeNodeData[];
 }
@@ -32,6 +34,8 @@ interface Props {
  * Collapsible tree sidebar for folder view on desktop.
  * Shows tag hierarchy with expand/collapse controls.
  * Features sticky parent breadcrumb for scroll context.
+ * Paths and expansion go by each tag's `tagTreeKey` ("id:instanceId"), as
+ * the folder view's paths do.
  */
 const FolderTreeSidebar = ({
   tags,
@@ -49,28 +53,11 @@ const FolderTreeSidebar = ({
     [tags]
   );
 
-  // Create a map of tag IDs to names for breadcrumb display
-  const tagNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const addToMap = (
-      nodes: Array<{ id: string; name: string; children?: unknown[] }>
-    ) => {
-      for (const node of nodes) {
-        map.set(node.id, node.name);
-        if ((node.children?.length ?? 0) > 0) {
-          addToMap(
-            node.children as Array<{
-              id: string;
-              name: string;
-              children?: unknown[];
-            }>
-          );
-        }
-      }
-    };
-    addToMap(tree);
-    return map;
-  }, [tree]);
+  // Create a map of tag keys to names for breadcrumb display
+  const tagNameMap = useMemo(
+    () => new Map(tags.map((tag) => [tagTreeKey(tag), tag.name])),
+    [tags]
+  );
 
   // Ref for the sidebar container (for scrolling)
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -188,9 +175,9 @@ const FolderTreeSidebar = ({
         <div className="pb-2">
           {tree.map((node) => (
             <TreeNode
-              key={node.id}
+              key={tagTreeKey(node)}
               node={node}
-              nodePath={[node.id]}
+              nodePath={[tagTreeKey(node)]}
               depth={0}
               expanded={expanded}
               toggleExpanded={toggleExpanded}
@@ -225,8 +212,9 @@ const TreeNode = ({
 }: TreeNodeProps) => {
   const children = node.children ?? [];
   const hasChildren = children.length > 0;
-  const isExpanded = expanded.has(node.id);
-  const isInPath = currentPath.includes(node.id);
+  const key = tagTreeKey(node);
+  const isExpanded = expanded.has(key);
+  const isInPath = currentPath.includes(key);
   // Check if this exact path matches the current path (handles multi-parent tags)
   const pathKey = nodePath.join(",");
   const currentPathKey = currentPath.join(",");
@@ -246,7 +234,7 @@ const TreeNode = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            toggleExpanded(node.id);
+            toggleExpanded(key);
           }}
           className="p-1 hover:bg-[var(--bg-primary)] rounded"
           style={{ visibility: hasChildren ? "visible" : "hidden" }}
@@ -288,9 +276,9 @@ const TreeNode = ({
         <div>
           {children.map((child) => (
             <TreeNode
-              key={child.id}
+              key={tagTreeKey(child)}
               node={child}
-              nodePath={[...nodePath, child.id]}
+              nodePath={[...nodePath, tagTreeKey(child)]}
               depth={depth + 1}
               expanded={expanded}
               toggleExpanded={toggleExpanded}

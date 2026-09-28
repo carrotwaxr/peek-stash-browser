@@ -5,7 +5,7 @@ export {
 } from "./useScenes";
 export { usePerformerList, usePerformerDetail } from "./usePerformers";
 export { useStudioList, useStudioDetail } from "./useStudios";
-export { useTagList, useTagDetail } from "./useTags";
+export { useTagList, useTagDetail, useTagTree } from "./useTags";
 export { useGalleryList, useGalleryDetail } from "./useGalleries";
 export { useGroupList, useGroupDetail } from "./useGroups";
 export { useImageList } from "./useImages";

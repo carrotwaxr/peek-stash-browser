@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
 import { requireData } from "./support/data";
 import { runPrefix } from "./support/names";
@@ -14,6 +14,10 @@ import { runPrefix } from "./support/names";
  * Relationship indicators (item 41.2): the studios with the most scenes, the
  * heaviest page for tooltip relations, render their cards with counts from
  * relation_totals; each card lists at most 12 related entities per kind.
+ *
+ * Tag trees (item 41.8): the Tags page's hierarchy view and the scenes'
+ * folder view build their trees from the compact tag tree, and a folder's
+ * path names the tag's instance.
  */
 
 /** A studio as the list endpoint sends it, as far as this spec reads it */
@@ -28,6 +32,28 @@ interface StudioJson {
     groups?: number;
     galleries?: number;
   };
+}
+
+/** A tag as the tree endpoint sends it, as far as this spec reads it */
+interface TreeTagJson {
+  id: string;
+  instanceId: string;
+  name: string;
+  parents: { id: string }[];
+  performers?: unknown;
+}
+
+/** Waits for the page's tag tree request and reads its tags */
+async function treeTags(page: Page, open: () => Promise<unknown>) {
+  const response = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/library/tags/tree" &&
+      r.request().method() === "POST"
+  );
+  await open();
+  const tree = await response;
+  expect(tree.status()).toBe(200);
+  return ((await tree.json()) as { tags: TreeTagJson[] }).tags;
 }
 
 /** The lists covered here, and their cards' label */
@@ -113,6 +139,67 @@ test.describe("List navigation", () => {
     const shown = await counts.allTextContents();
     expect(shown).toContain(String(first.scene_count));
     expect(shown).toContain(String(performers));
+  });
+
+  test("the Tags hierarchy view renders the tree", async ({ page }) => {
+    const tags = await treeTags(page, () => page.goto("/tags?view=hierarchy"));
+    // Compact rows: no tooltip relations
+    expect(tags.every((t) => t.performers === undefined)).toBe(true);
+
+    // A root with a child: the first level opens expanded
+    const byKey = new Map(tags.map((t) => [`${t.id}:${t.instanceId}`, t]));
+    const child = requireData(
+      tags.find((t) =>
+        t.parents.some(
+          (p) => byKey.get(`${p.id}:${t.instanceId}`)?.parents.length === 0
+        )
+      ),
+      "a tag under a root tag"
+    );
+    const root = requireData(
+      child.parents
+        .map((p) => byKey.get(`${p.id}:${child.instanceId}`))
+        .find((p) => p?.parents.length === 0),
+      "the child's root"
+    );
+
+    const tree = page.getByRole("tree", { name: "Tag hierarchy" });
+    const rootItem = tree
+      .getByRole("treeitem")
+      .filter({ hasText: root.name })
+      .first();
+    await expect(rootItem).toBeVisible({ timeout: 15_000 });
+    await expect(rootItem).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      tree.getByRole("treeitem").filter({ hasText: child.name }).first()
+    ).toBeVisible();
+  });
+
+  test("the folder view shows tag folders", async ({ page }) => {
+    const tags = await treeTags(page, () => page.goto("/scenes?view=folder"));
+    const roots = tags.filter((t) => t.parents.length === 0);
+    requireData(roots.length > 0, "a root tag");
+
+    // Folder cards are the buttons with a heading
+    const folders = page.locator("button:has(h3)");
+    await expect(folders.first()).toBeVisible({ timeout: 15_000 });
+    const names = await folders.locator("h3").allTextContents();
+    const root = requireData(
+      roots.find((r) => names.includes(r.name)),
+      "a root tag folder"
+    );
+
+    // Opening it puts the tag and its instance in the path
+    await folders
+      .filter({
+        has: page.getByRole("heading", { name: root.name, exact: true }),
+      })
+      .first()
+      .click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.searchParams.get("folderPath") === `${root.id}:${root.instanceId}`
+    );
   });
 
   // The other list pages have no empty state yet (LG-13): their empty-results

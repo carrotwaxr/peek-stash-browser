@@ -31,6 +31,10 @@ export type {
   FindTagsResponse,
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
+  TagTreeScope,
+  FindTagTreeRequest,
+  TagTreeRow,
+  FindTagTreeResponse,
   // Galleries
   FindGalleriesRequest,
   FindGalleriesResponse,

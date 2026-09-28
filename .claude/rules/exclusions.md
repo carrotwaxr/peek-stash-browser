@@ -51,6 +51,6 @@ A new endpoint filters through one of three paths. An endpoint with none of them
 
 Two instance lists, never swapped: the compute (`doRecomputeForUser`, `addHiddenEntity`) runs over `getUserInstanceScope`, first-syncing instances included, so their rows exist before they show; everything that shows content reads `getUserAllowedInstanceIds`, the scope without the instances whose first sync has not finished. A selection only narrows: when none of its instances is enabled, the scope is every enabled instance, as with no selection. `requireCacheReady` answers 503 `ready: false` when the allowed list is empty, which then means every instance in scope is still on its first sync.
 
-- The `LEFT JOIN UserExcludedEntity` in the query builders, for lists.
+- The `LEFT JOIN UserExcludedEntity` in the query builders, `TagTreeService` and `TooltipRelations`, for lists.
 - `entityExclusionHelper.filterExcluded`, for endpoints that read cached entities in memory.
 - `services/EntityAccessService.ts`, for endpoints that act on ids from the request: ratings, history writes, downloads, media and hides. It also checks `deletedAt` and the user's allowed instances (enabled, first sync done, selected: `LIVE_AND_ALLOWED_WHERE`, which mirrors `getUserAllowedInstanceIds`). It needs no role logic, because the compute already settles admins: an admin's rows hold only their own hides and cascades. The Hidden Items list uses its `resolveVisibleApartFromOwnHides`, which ignores only `hidden` rows.

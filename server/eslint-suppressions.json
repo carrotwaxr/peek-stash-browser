@@ -86,7 +86,7 @@
   },
   "controllers/library/tags.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
+      "count": 3
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 12

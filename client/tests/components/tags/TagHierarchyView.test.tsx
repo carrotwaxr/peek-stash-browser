@@ -363,4 +363,45 @@ describe("TagHierarchyView", () => {
       expect(screen.getByText("Child 2")).toBeInTheDocument();
     });
   });
+
+  describe("across instances", () => {
+    // Tag 5 on A and tag 5 on B, each with a child of its own (the tree
+    // reads parents; children as the list endpoint sent them)
+    const twoInstanceTags = [
+      {
+        id: "5",
+        instanceId: "a",
+        name: "Five on A",
+        parents: [],
+        children: [{ id: "6" }],
+      },
+      { id: "6", instanceId: "a", name: "Six on A", parents: [{ id: "5" }] },
+      {
+        id: "5",
+        instanceId: "b",
+        name: "Five on B",
+        parents: [],
+        children: [{ id: "7" }],
+      },
+      { id: "7", instanceId: "b", name: "Seven on B", parents: [{ id: "5" }] },
+    ];
+
+    it("expanding tag 5 on A leaves B's tag 5 collapsed", () => {
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={twoInstanceTags}
+          isLoading={false}
+        />
+      );
+      fireEvent.click(screen.getByText("Collapse All"));
+      expect(screen.queryByText("Six on A")).not.toBeInTheDocument();
+      expect(screen.queryByText("Seven on B")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Five on A"));
+
+      expect(screen.getByText("Six on A")).toBeInTheDocument();
+      expect(screen.queryByText("Seven on B")).not.toBeInTheDocument();
+    });
+  });
 });

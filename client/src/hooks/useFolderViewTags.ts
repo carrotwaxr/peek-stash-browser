@@ -1,13 +1,8 @@
-// client/src/hooks/useFolderViewTags.js
-import { useEffect, useMemo, useRef, useState } from "react";
-import { libraryApi } from "../api";
-import { apiPost } from "../api";
-import type { FolderTreeTag } from "../utils/buildFolderTree";
+// client/src/hooks/useFolderViewTags.ts
+import type { TagTreeRow, TagTreeScope } from "@peek/shared-types";
+import { useTagTree } from "../api/hooks";
 
-/**
- * Hook to fetch all tags with hierarchy for folder view.
- * Only fetches when folder view is active.
- */
+/** The detail page a folder view sits on, each as "id:instanceId" (or a bare id) */
 interface FolderViewFilters {
   performerId?: string;
   tagId?: string;
@@ -15,85 +10,28 @@ interface FolderViewFilters {
   groupId?: string;
 }
 
+const NO_TAGS: TagTreeRow[] = [];
+
+/** The tree's scope for the page's filters; undefined for the whole library */
+function scopeOf(filters: FolderViewFilters | null): TagTreeScope | undefined {
+  if (!filters) return undefined;
+  const scope: TagTreeScope = {};
+  if (filters.performerId) scope.performer = filters.performerId;
+  if (filters.tagId) scope.tag = filters.tagId;
+  if (filters.studioId) scope.studio = filters.studioId;
+  if (filters.groupId) scope.group = filters.groupId;
+  return Object.keys(scope).length > 0 ? scope : undefined;
+}
+
+/**
+ * The tags for the folder view, fetched only while it is active: every tag
+ * the user can see, or on a detail page the tags on its scenes and their
+ * ancestors (the compact tag tree; each row names its instance).
+ */
 export function useFolderViewTags(
   isActive: boolean,
   filters: FolderViewFilters | null = null
 ) {
-  const [tags, setTags] = useState<FolderTreeTag[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const fetchedRef = useRef(false);
-
-  // Memoize filter key to prevent unnecessary refetches
-  const filterKey = useMemo(() => {
-    if (!filters) return null;
-    return JSON.stringify(filters);
-  }, [filters]);
-
-  // Track last filter key
-  const lastFilterKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    // Reset fetched flag if filters change
-    if (filterKey !== lastFilterKeyRef.current) {
-      fetchedRef.current = false;
-      lastFilterKeyRef.current = filterKey;
-    }
-
-    if (!isActive || fetchedRef.current) return;
-
-    const fetchTags = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        let fetchedTags: FolderTreeTag[];
-
-        // Use filtered endpoint if filters are provided
-        if (
-          filters &&
-          (filters.performerId ||
-            filters.tagId ||
-            filters.studioId ||
-            filters.groupId)
-        ) {
-          const result = await apiPost<{ tags: FolderTreeTag[] }>(
-            "/library/tags/for-scenes",
-            {
-              performerId: filters.performerId,
-              tagId: filters.tagId,
-              studioId: filters.studioId,
-              groupId: filters.groupId,
-            }
-          );
-          fetchedTags = result?.tags || [];
-        } else {
-          // Fetch all tags (existing behavior)
-          const result = await libraryApi.findTags({
-            filter: {
-              per_page: -1,
-              sort: "name",
-              direction: "ASC",
-            },
-          });
-          fetchedTags =
-            (result as { findTags?: { tags?: FolderTreeTag[] } })?.findTags
-              ?.tags ?? [];
-        }
-
-        setTags(fetchedTags);
-        fetchedRef.current = true;
-      } catch (err) {
-        console.error("Failed to fetch tags for folder view:", err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchTags();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) captures all filter changes
-  }, [isActive, filterKey]);
-
-  return { tags, isLoading, error };
+  const { data, isLoading, error } = useTagTree(scopeOf(filters), isActive);
+  return { tags: data?.tags ?? NO_TAGS, isLoading, error };
 }

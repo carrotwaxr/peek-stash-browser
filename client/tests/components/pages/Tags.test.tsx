@@ -61,9 +61,15 @@ interface MockListResult {
 const mockUseTagList = vi.fn(
   (): MockListResult => ({ data: null, isLoading: false, error: null })
 );
+const mockUseTagTree = vi.fn((_scope: unknown, _enabled: boolean) => ({
+  data: undefined,
+  isLoading: false,
+}));
 const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   useTagList: (..._args: unknown[]) => mockUseTagList(),
+  useTagTree: (scope: unknown, enabled: boolean) =>
+    mockUseTagTree(scope, enabled),
 }));
 vi.mock("@/api/client", () => ({
   ApiError: class ApiError extends Error {
@@ -82,19 +88,6 @@ vi.mock("@/api/client", () => ({
     }
   },
 }));
-vi.mock("@/api", () => ({
-  libraryApi: { findTags: vi.fn() },
-}));
-vi.mock("@/api/queryKeys", () => ({
-  queryKeys: { tags: { list: vi.fn(() => ["tags", "list"]) } },
-}));
-vi.mock("@tanstack/react-query", async () => {
-  const actual = await vi.importActual("@tanstack/react-query");
-  return {
-    ...actual,
-    useQuery: vi.fn(() => ({ data: null, isLoading: false })),
-  };
-});
 
 // Mock child components
 vi.mock("@/components/ui/index", () => ({
@@ -251,6 +244,15 @@ describe("Tags", () => {
       const cards = screen.getAllByTestId("tag-card");
       expect(cards).toHaveLength(2);
       expect(cards[0]).toHaveTextContent("Action");
+    });
+  });
+
+  describe("Hierarchy view", () => {
+    it("reads the compact tag tree only while the hierarchy view is open", () => {
+      render(<Tags />);
+
+      // The grid view is open: the tree is not fetched
+      expect(mockUseTagTree).toHaveBeenLastCalledWith(undefined, false);
     });
   });
 

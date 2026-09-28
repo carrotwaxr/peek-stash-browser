@@ -552,3 +552,159 @@ describe("buildFolderTree - multi-tag items at root", () => {
     expect(result.items).toHaveLength(0);
   });
 });
+
+describe("buildFolderTree across instances", () => {
+  // Tag 5 on A (with child 6) and tag 5 on B (with child 7)
+  const tags = [
+    { id: "5", instanceId: "a", name: "Five A", parents: [], scene_count: 1 },
+    {
+      id: "6",
+      instanceId: "a",
+      name: "Six A",
+      parents: [{ id: "5" }],
+      scene_count: 1,
+    },
+    { id: "5", instanceId: "b", name: "Five B", parents: [], scene_count: 1 },
+    {
+      id: "7",
+      instanceId: "b",
+      name: "Seven B",
+      parents: [{ id: "5" }],
+      scene_count: 1,
+    },
+  ];
+  const items = [
+    { id: "s1", instanceId: "a", tags: [{ id: "6" }] },
+    { id: "s2", instanceId: "b", tags: [{ id: "5" }] },
+    { id: "s3", instanceId: "b", tags: [{ id: "7" }] },
+  ];
+
+  it("two tags with the same id on two instances make two folders", () => {
+    const result = buildFolderTree(items, tags, []);
+
+    expect(
+      result.folders.map((f) => [f.id, f.name, f.totalCount] as const)
+    ).toEqual([
+      ["5:a", "Five A", 1],
+      ["5:b", "Five B", 2],
+    ]);
+  });
+
+  it("a path of composite keys opens the folder on its own instance", () => {
+    const onA = buildFolderTree(items, tags, ["5:a"]);
+    expect(onA.breadcrumbs).toEqual([{ id: "5:a", name: "Five A" }]);
+    expect(onA.folders.map((f) => f.id)).toEqual(["6:a"]);
+    expect(onA.items).toEqual([]);
+
+    const onB = buildFolderTree(items, tags, ["5:b"]);
+    expect(onB.folders.map((f) => [f.id, f.totalCount])).toEqual([["7:b", 1]]);
+    // s2 carries B's tag 5 itself and no child of it
+    expect(onB.items.map((i) => i.id)).toEqual(["s2"]);
+  });
+});
+
+describe("buildFolderTree - reference results", () => {
+  // genre and mood are roots; thriller sits under both, noir under thriller
+  // and dark; extra has content elsewhere, empty has none
+  const tag = (
+    id: string,
+    name: string,
+    parents: string[],
+    children: string[],
+    image_count = 0
+  ) => ({
+    id,
+    name,
+    parents: parents.map((p) => ({ id: p })),
+    children: children.map((c) => ({ id: c })),
+    image_count,
+  });
+  const tags = [
+    tag("genre", "Genre", [], ["action", "thriller"]),
+    tag("mood", "Mood", [], ["thriller", "dark"]),
+    tag("action", "Action", ["genre"], []),
+    tag("thriller", "Thriller", ["genre", "mood"], ["noir"]),
+    tag("dark", "Dark", ["mood"], ["noir"]),
+    tag("noir", "Noir", ["thriller", "dark"], []),
+    tag("extra", "Extra", [], [], 7),
+    tag("empty", "Empty", [], []),
+  ];
+  const items = [
+    createItem("i1", ["action"]),
+    createItem("i2", ["noir"]),
+    createItem("i3", ["thriller", "dark"]),
+    createItem("i4", ["genre"]),
+    createItem("i5", []),
+    createItem("i6", ["noir", "action"]),
+  ];
+  const summary = (path: string[]) => {
+    const result = buildFolderTree(items, tags, path);
+    return {
+      folders: result.folders.map((f) => [f.id, f.totalCount]),
+      items: result.items.map((i) => i.id),
+    };
+  };
+
+  it("root folders and counts match the reference results for a multi-parent hierarchy", () => {
+    expect(summary([])).toEqual({
+      folders: [
+        ["extra", 7],
+        ["genre", 5],
+        ["mood", 3],
+        [UNTAGGED_FOLDER_ID, 1],
+      ],
+      items: [],
+    });
+    expect(summary(["mood"])).toEqual({
+      folders: [
+        ["dark", 3],
+        ["thriller", 3],
+      ],
+      items: [],
+    });
+    expect(summary(["genre"])).toEqual({
+      folders: [
+        ["action", 2],
+        ["thriller", 3],
+      ],
+      items: ["i4"],
+    });
+    expect(summary(["mood", "thriller"])).toEqual({
+      folders: [["noir", 2]],
+      items: ["i3"],
+    });
+    expect(summary(["genre", "thriller"])).toEqual(
+      summary(["mood", "thriller"])
+    );
+  });
+
+  it("each tag's ancestors are walked once per build", () => {
+    // Every read of a tag's parents or children is counted
+    const reads = new Map<string, number>();
+    const counted = tags.map((t) => ({
+      id: t.id,
+      name: t.name,
+      image_count: t.image_count,
+      get parents() {
+        reads.set(t.id, (reads.get(t.id) ?? 0) + 1);
+        return t.parents;
+      },
+      get children() {
+        reads.set(t.id, (reads.get(t.id) ?? 0) + 1);
+        return t.children;
+      },
+    }));
+    const many = Array.from({ length: 100 }, (_, i) =>
+      createItem(`m${i}`, [must(tags[i % tags.length]).id])
+    );
+
+    for (const path of [[], ["mood"], ["mood", "thriller"]]) {
+      reads.clear();
+      buildFolderTree(many, counted, path);
+      expect(
+        Math.max(0, ...reads.values()),
+        path.join("/")
+      ).toBeLessThanOrEqual(1);
+    }
+  });
+});
