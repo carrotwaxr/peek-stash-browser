@@ -65,7 +65,7 @@
       "count": 42
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 24
+      "count": 23
     }
   },
   "controllers/library/scenes.ts": {
@@ -81,7 +81,7 @@
       "count": 6
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
+      "count": 14
     }
   },
   "controllers/library/tags.ts": {
@@ -89,7 +89,7 @@
       "count": 22
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
+      "count": 14
     }
   },
   "controllers/playlist.ts": {

@@ -1,10 +1,8 @@
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -21,47 +19,6 @@ import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Merge user-specific data into studios
- * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
- */
-export async function mergeStudiosWithUserData(
-  studios: NormalizedStudio[],
-  userId: number
-): Promise<NormalizedStudio[]> {
-  // Fetch user ratings and stats in parallel
-  const [ratings, studioStats] = await Promise.all([
-    prisma.studioRating.findMany({ where: { userId } }),
-    userStatsService.getStudioStats(userId),
-  ]);
-
-  const ratingMap = new Map(
-    ratings.map((r) => [
-      `${r.studioId}\0${r.instanceId || ""}`,
-      {
-        rating: r.rating,
-        rating100: r.rating,
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  // Merge data
-  return studios.map((studio) => {
-    const compositeKey = `${studio.id}\0${studio.instanceId || ""}`;
-    const stats = studioStats.get(compositeKey) ?? {
-      oCounter: 0,
-      playCount: 0,
-    };
-    return {
-      ...studio,
-      ...ratingMap.get(compositeKey),
-      o_counter: stats.oCounter,
-      play_count: stats.playCount,
-    };
-  });
-}
 
 /**
  * findStudios using SQL query builder

@@ -4,7 +4,6 @@ import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -21,47 +20,6 @@ import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Merge user-specific data into tags
- * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
- */
-export async function mergeTagsWithUserData(
-  tags: NormalizedTag[],
-  userId: number
-): Promise<NormalizedTag[]> {
-  // Fetch user ratings and stats in parallel
-  const [ratings, tagStats] = await Promise.all([
-    prisma.tagRating.findMany({ where: { userId } }),
-    userStatsService.getTagStats(userId),
-  ]);
-
-  const ratingMap = new Map(
-    ratings.map((r) => [
-      `${r.tagId}\0${r.instanceId || ""}`,
-      {
-        rating: r.rating,
-        rating100: r.rating,
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  // Merge data
-  return tags.map((tag) => {
-    const compositeKey = `${tag.id}\0${tag.instanceId || ""}`;
-    const stats = tagStats.get(compositeKey) ?? {
-      oCounter: 0,
-      playCount: 0,
-    };
-    return {
-      ...tag,
-      ...ratingMap.get(compositeKey),
-      o_counter: stats.oCounter,
-      play_count: stats.playCount,
-    };
-  });
-}
 
 /**
  * findTags using SQL query builder

@@ -1,10 +1,8 @@
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -96,51 +94,6 @@ export function parseCareerLength(
 
   // Unable to parse
   return null;
-}
-
-/**
- * Merge user-specific data into performers
- * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
- */
-export async function mergePerformersWithUserData(
-  performers: NormalizedPerformer[],
-  userId: number
-): Promise<NormalizedPerformer[]> {
-  // Fetch user ratings and stats in parallel
-  const [ratings, performerStats] = await Promise.all([
-    prisma.performerRating.findMany({ where: { userId } }),
-    userStatsService.getPerformerStats(userId),
-  ]);
-
-  const ratingMap = new Map(
-    ratings.map((r) => [
-      `${r.performerId}\0${r.instanceId || ""}`,
-      {
-        rating: r.rating,
-        rating100: r.rating,
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  // Merge data
-  return performers.map((performer) => {
-    const compositeKey = `${performer.id}\0${performer.instanceId || ""}`;
-    const stats = performerStats.get(compositeKey) ?? {
-      oCounter: 0,
-      playCount: 0,
-      lastPlayedAt: null,
-      lastOAt: null,
-    };
-    return {
-      ...performer,
-      ...ratingMap.get(compositeKey),
-      o_counter: stats.oCounter,
-      play_count: stats.playCount,
-      last_played_at: stats.lastPlayedAt,
-      last_o_at: stats.lastOAt,
-    };
-  });
 }
 
 /**
