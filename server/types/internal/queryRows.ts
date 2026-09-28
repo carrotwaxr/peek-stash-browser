@@ -5,11 +5,15 @@
  * for the corresponding QueryBuilder's SELECT clause. Column names correspond
  * to SQL aliases (e.g. `s.rating100 AS stashRating100`).
  *
- * Types as Prisma's raw queries return them from SQLite:
+ * Types as Prisma's raw queries return them from SQLite, by the column's
+ * declared type:
  *   - INTEGER -> number
  *   - BIGINT (fileSize) -> bigint
  *   - COUNT, SUM and COALESCE over integers -> bigint
- *   - BOOLEAN -> boolean (fields below that still say 0 | 1 are wrong)
+ *   - BOOLEAN -> boolean, never 0 or 1
+ *   - DATETIME -> Date, whether the column holds text or epoch milliseconds
+ *     (Prisma fails the query on text it cannot parse); a transform writes
+ *     it out with toISOString(), which is what the JSON carried
  *   - TEXT -> string
  *   - NULL -> null
  *   - JSON held in TEXT columns -> string (parsed in transformRow)
@@ -39,7 +43,7 @@ export interface SceneQueryRow {
   studioId: string | null;
   stashRating100: number | null;
   duration: number | null;
-  organized: number | null; // SQLite boolean: 0 | 1
+  organized: boolean;
   details: string | null;
   director: string | null;
   urls: string | null; // JSON-encoded string[]
@@ -63,17 +67,17 @@ export interface SceneQueryRow {
   stashOCounter: number | null;
   stashPlayCount: number | null;
   stashPlayDuration: number | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN SceneRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // User data from LEFT JOIN WatchHistory (w)
   userPlayCount: number | null;
   userPlayDuration: number | null;
-  userLastPlayedAt: string | null;
+  userLastPlayedAt: Date | null;
   userOCount: number | null;
   userResumeTime: number | null;
   // JSONB, decoded: the list, or the JSON-encoded string older updates stored
@@ -99,7 +103,7 @@ export interface PerformerQueryRow {
   disambiguation: string | null;
   gender: string | null;
   birthdate: string | null;
-  stashFavorite: number | null; // SQLite boolean: 0 | 1
+  stashFavorite: boolean;
   stashRating100: number | null;
   sceneCount: number | null;
   imageCount: number | null;
@@ -121,18 +125,18 @@ export interface PerformerQueryRow {
   deathDate: string | null;
   url: string | null;
   imagePath: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN PerformerRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // User data from LEFT JOIN UserPerformerStats (s)
   userOCounter: number | null;
   userPlayCount: number | null;
-  userLastPlayedAt: string | null;
-  userLastOAt: string | null;
+  userLastPlayedAt: Date | null;
+  userLastOAt: Date | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +155,7 @@ export interface StudioQueryRow {
   stashInstanceId: string;
   name: string;
   parentId: string | null;
-  stashFavorite: number | null; // SQLite boolean: 0 | 1
+  stashFavorite: boolean;
   stashRating100: number | null;
   sceneCount: number | null;
   imageCount: number | null;
@@ -161,12 +165,12 @@ export interface StudioQueryRow {
   details: string | null;
   url: string | null;
   imagePath: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN StudioRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // User data from LEFT JOIN UserStudioStats (us)
   userOCounter: number | null;
@@ -188,7 +192,7 @@ export interface TagQueryRow {
   id: string;
   stashInstanceId: string;
   name: string;
-  stashFavorite: number | null; // SQLite boolean: 0 | 1
+  stashFavorite: boolean;
   sceneCount: number | null;
   imageCount: number | null;
   galleryCount: number | null;
@@ -201,12 +205,12 @@ export interface TagQueryRow {
   aliases: string | null; // JSON-encoded string[]
   parentIds: string | null; // JSON-encoded string[]
   imagePath: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN TagRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // User data from LEFT JOIN UserTagStats (us)
   userOCounter: number | null;
@@ -242,12 +246,12 @@ export interface GalleryQueryRow {
   folderPath: string | null;
   fileBasename: string | null;
   coverPath: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN GalleryRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // Cover image dimensions from LEFT JOIN StashImage (ci)
   coverWidth: number | null;
@@ -280,12 +284,12 @@ export interface GroupQueryRow {
   urls: string | null; // JSON-encoded string[]
   frontImagePath: string | null;
   backImagePath: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
 
   // User data from LEFT JOIN GroupRating (r)
   userRating: number | null;
-  userFavorite: number | null; // SQLite boolean: 0 | 1
+  userFavorite: boolean | null;
 
   // COUNT(*) over GroupRelation: live sub-groups the user can see
   subGroupCount: bigint;
@@ -300,4 +304,116 @@ export interface GroupRelationQueryRow {
   stashInstanceId: string;
   name: string;
   description: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// ImageQueryBuilder
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw row returned by ImageQueryBuilder's SELECT.
+ *
+ * Base columns from StashImage, plus user data from LEFT JOINs on
+ * ImageRating (r) and ImageViewHistory (v).
+ */
+export interface ImageQueryRow {
+  // StashImage base columns
+  id: string;
+  stashInstanceId: string;
+  title: string | null;
+  code: string | null;
+  details: string | null;
+  photographer: string | null;
+  urls: string | null; // JSON-encoded string[]
+  date: string | null;
+  studioId: string | null;
+  stashRating100: number | null;
+  stashOCounter: number;
+  organized: boolean;
+  filePath: string | null;
+  width: number | null;
+  height: number | null;
+  fileSize: bigint | null; // BIGINT column: Prisma returns a bigint
+  pathThumbnail: string | null;
+  pathPreview: string | null;
+  pathImage: string | null;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
+
+  // User data from LEFT JOIN ImageRating (r)
+  userRating: number | null;
+  userFavorite: boolean | null;
+
+  // User data from LEFT JOIN ImageViewHistory (v)
+  userViewCount: number | null;
+  userOCount: number | null;
+  userLastViewedAt: Date | null;
+}
+
+/** Raw row of ImageQueryBuilder's performer lookup for a page of images. */
+export interface ImagePerformerQueryRow {
+  imageId: string;
+  id: string;
+  stashInstanceId: string;
+  name: string;
+  disambiguation: string | null;
+  gender: string | null;
+  favorite: boolean;
+  rating100: number | null;
+  imagePath: string | null;
+}
+
+/** Raw row of ImageQueryBuilder's tag lookup for a page of images. */
+export interface ImageTagQueryRow {
+  imageId: string;
+  id: string;
+  stashInstanceId: string;
+  name: string;
+  favorite: boolean;
+  imagePath: string | null;
+}
+
+/** Raw row of ImageQueryBuilder's gallery lookup for a page of images. */
+export interface ImageGalleryQueryRow {
+  imageId: string;
+  id: string;
+  stashInstanceId: string;
+  title: string | null;
+  coverPath: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// ClipQueryBuilder
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw row returned by ClipQueryBuilder's SELECT.
+ *
+ * Base columns from StashClip, the scene's columns from INNER JOIN
+ * StashScene (s), and the primary tag's from LEFT JOIN StashTag (pt).
+ */
+export interface ClipRow {
+  // StashClip base columns
+  id: string;
+  stashInstanceId: string;
+  sceneId: string;
+  sceneInstanceId: string;
+  title: string | null;
+  seconds: number;
+  endSeconds: number | null;
+  primaryTagId: string | null;
+  primaryTagInstanceId: string | null;
+  screenshotPath: string | null;
+  isGenerated: boolean;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
+
+  // Scene columns from INNER JOIN StashScene (s)
+  sceneTitle: string | null;
+  scenePathScreenshot: string | null;
+  sceneStudioId: string | null;
+
+  // Primary tag columns from LEFT JOIN StashTag (pt)
+  primaryTagName: string | null;
+  primaryTagColor: string | null;
 }

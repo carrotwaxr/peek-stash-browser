@@ -6,6 +6,7 @@
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
+import type { ClipRow } from "../types/internal/queryRows.js";
 import { entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import type { FilterClause } from "../utils/sqlFilterBuilders.js";
@@ -54,30 +55,6 @@ export interface ClipWithRelations {
     studioId: string | null;
     stashInstanceId: string;
   };
-}
-
-// Raw query result row
-interface ClipRow {
-  id: string;
-  stashInstanceId: string;
-  sceneId: string;
-  sceneInstanceId: string;
-  title: string | null;
-  seconds: number;
-  endSeconds: number | null;
-  primaryTagId: string | null;
-  primaryTagInstanceId: string | null;
-  screenshotPath: string | null;
-  isGenerated: boolean | number; // BOOLEAN column: Prisma returns a boolean
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
-  // Scene fields
-  sceneTitle: string | null;
-  scenePathScreenshot: string | null;
-  sceneStudioId: string | null;
-  // Primary tag fields
-  primaryTagName: string | null;
-  primaryTagColor: string | null;
 }
 
 /**
@@ -463,18 +440,13 @@ class ClipQueryBuilder {
         endSeconds: row.endSeconds,
         primaryTagId: row.primaryTagId,
         screenshotPath: row.screenshotPath,
-        // SQLite via Prisma raw queries may return number or string for boolean columns
-        isGenerated: Number(row.isGenerated) === 1,
-        stashCreatedAt: row.stashCreatedAt
-          ? new Date(row.stashCreatedAt)
-          : null,
-        stashUpdatedAt: row.stashUpdatedAt
-          ? new Date(row.stashUpdatedAt)
-          : null,
+        isGenerated: row.isGenerated,
+        stashCreatedAt: row.stashCreatedAt,
+        stashUpdatedAt: row.stashUpdatedAt,
         primaryTag: row.primaryTagId
           ? {
               id: row.primaryTagId,
-              name: row.primaryTagName || "",
+              name: row.primaryTagName ?? "",
               color: row.primaryTagColor,
             }
           : null,

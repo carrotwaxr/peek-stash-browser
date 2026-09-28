@@ -2,7 +2,9 @@
  * Shared SQL result parsing helpers for QueryBuilder transformRow methods.
  *
  * These utilities handle the impedance mismatch between SQLite's type system
- * and TypeScript's type system (e.g. JSON columns, boolean integers).
+ * and TypeScript's type system (e.g. JSON held in TEXT columns, "" for
+ * absent text). Prisma's raw queries already return BOOLEAN columns as
+ * booleans (see types/internal/queryRows.ts).
  */
 
 /**
@@ -19,13 +21,6 @@ export function parseJsonArray<T = string>(
   } catch {
     return [];
   }
-}
-
-/**
- * Convert SQLite integer boolean (0/1) to JavaScript boolean.
- */
-export function parseSqliteBoolean(value: number | null | undefined): boolean {
-  return value === 1;
 }
 
 /** Stash and user text where "" means absent: "" and null read as null. */

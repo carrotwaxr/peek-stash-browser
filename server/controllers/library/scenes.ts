@@ -99,7 +99,7 @@ export async function mergeScenesWithUserData(
           resume_time: wh.resumeTime || 0,
           play_history: playHistory,
           // The stored ISO strings, which the response has always carried
-          o_history: oHistory as unknown as NormalizedScene["o_history"],
+          o_history: oHistory,
           last_played_at:
             playHistory.length > 0
               ? (playHistory[playHistory.length - 1] ?? null)

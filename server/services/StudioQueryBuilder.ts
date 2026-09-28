@@ -541,8 +541,8 @@ class StudioQueryBuilder {
       group_count: row.groupCount || 0,
 
       // Timestamps
-      created_at: row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt?.toISOString() ?? null,
+      updated_at: row.stashUpdatedAt?.toISOString() ?? null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,

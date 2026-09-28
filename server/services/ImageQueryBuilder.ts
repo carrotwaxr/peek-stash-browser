@@ -5,13 +5,15 @@
  * Eliminates the need to load all images into memory.
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import type { StashStudio } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
+import type { GalleryRef, PerformerRef, TagRef } from "../types/index.js";
 import type {
-  GalleryRef,
-  NormalizedImage,
-  PerformerRef,
-  TagRef,
-} from "../types/index.js";
+  ImageGalleryQueryRow,
+  ImagePerformerQueryRow,
+  ImageQueryRow,
+  ImageTagQueryRow,
+} from "../types/internal/queryRows.js";
 import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -21,6 +23,7 @@ import {
   buildFavoriteFilter,
   buildJunctionFilter,
 } from "../utils/sqlFilterBuilders.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getImageFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
@@ -53,9 +56,32 @@ export interface ImageFilter {
   updated_at?: { value?: string; value2?: string; modifier?: string };
 }
 
+/**
+ * An image as execute returns it: the selected row (ImageQueryRow) with its
+ * title's fallback, its file size as a number, its dates as ISO strings, its
+ * media paths as proxy URLs, the API's instanceId beside stashInstanceId
+ * (callers spread the row), and its relations. The images controller maps
+ * the user and Stash columns to the API's names.
+ */
+export interface ImageListRow extends Omit<
+  ImageQueryRow,
+  "fileSize" | "stashCreatedAt" | "stashUpdatedAt" | "userLastViewedAt"
+> {
+  instanceId: string;
+  fileSize: number | null;
+  stashCreatedAt: string | null;
+  stashUpdatedAt: string | null;
+  userLastViewedAt: string | null;
+  performers: PerformerRef[];
+  tags: TagRef[];
+  galleries: GalleryRef[];
+  /** The whole cached studio row, with its image as a proxy URL */
+  studio: (StashStudio & { image_path: string | null }) | null;
+}
+
 // Query result
 export interface ImageQueryResult {
-  images: NormalizedImage[];
+  images: ImageListRow[];
   total: number;
 }
 
@@ -350,19 +376,21 @@ class ImageQueryBuilder {
    * Uses raw SQL to handle orphaned junction records gracefully
    */
   private async hydrateImages(
-    rows: Record<string, unknown>[]
-  ): Promise<NormalizedImage[]> {
+    rows: Omit<ImageListRow, "performers" | "tags" | "galleries" | "studio">[]
+  ): Promise<ImageListRow[]> {
     if (rows.length === 0) return [];
 
-    const imageIds = rows.map((r) => r.id as string);
+    const imageIds = rows.map((r) => r.id);
     const imageIdPlaceholders = imageIds.map(() => "?").join(",");
+    const studioIds = rows.flatMap((r) => (r.studioId ? [r.studioId] : []));
 
     // Fetch all related data in parallel using raw SQL to handle orphaned records
     const [performers, tags, galleries, studios] = await Promise.all([
       // Performers - join with existence check
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      prisma.$queryRawUnsafe<ImagePerformerQueryRow[]>(
         `
-        SELECT ip.imageId, p.*
+        SELECT ip.imageId, p.id, p.stashInstanceId, p.name, p.disambiguation,
+          p.gender, p.favorite, p.rating100, p.imagePath
         FROM ImagePerformer ip
         INNER JOIN StashPerformer p ON p.id = ip.performerId AND p.stashInstanceId = ip.performerInstanceId
         WHERE ip.imageId IN (${imageIdPlaceholders}) AND p.deletedAt IS NULL
@@ -370,9 +398,9 @@ class ImageQueryBuilder {
         ...imageIds
       ),
       // Tags - join with existence check (handles orphaned ImageTag records)
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      prisma.$queryRawUnsafe<ImageTagQueryRow[]>(
         `
-        SELECT it.imageId, t.*
+        SELECT it.imageId, t.id, t.stashInstanceId, t.name, t.favorite, t.imagePath
         FROM ImageTag it
         INNER JOIN StashTag t ON t.id = it.tagId AND t.stashInstanceId = it.tagInstanceId
         WHERE it.imageId IN (${imageIdPlaceholders}) AND t.deletedAt IS NULL
@@ -380,9 +408,9 @@ class ImageQueryBuilder {
         ...imageIds
       ),
       // Galleries - join with existence check
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      prisma.$queryRawUnsafe<ImageGalleryQueryRow[]>(
         `
-        SELECT ig.imageId, g.*
+        SELECT ig.imageId, g.id, g.stashInstanceId, g.title, g.coverPath
         FROM ImageGallery ig
         INNER JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
         WHERE ig.imageId IN (${imageIdPlaceholders}) AND g.deletedAt IS NULL
@@ -391,7 +419,7 @@ class ImageQueryBuilder {
       ),
       prisma.stashStudio.findMany({
         where: {
-          id: { in: rows.map((r) => r.studioId as string).filter(Boolean) },
+          id: { in: studioIds },
         },
       }),
     ]);
@@ -400,58 +428,43 @@ class ImageQueryBuilder {
     // Note: Frontend expects snake_case field names (image_path) and paths.cover for galleries
     const performersByImage = new Map<string, PerformerRef[]>();
     for (const row of performers) {
-      const imageId = row.imageId as string;
-      if (!performersByImage.has(imageId)) {
-        performersByImage.set(imageId, []);
-      }
-      performersByImage.get(imageId)?.push({
-        id: row.id as string,
-        instanceId: row.stashInstanceId as string,
-        name: row.name as string,
-        disambiguation: row.disambiguation as string | null,
-        gender: row.gender as string | null,
-        favorite: row.favorite as boolean | null,
-        rating100: row.rating100 as number | null,
-        image_path: toProxyUrl(
-          row.imagePath as string | null,
-          row.stashInstanceId as string
-        ),
+      const list = performersByImage.get(row.imageId) ?? [];
+      list.push({
+        id: row.id,
+        instanceId: row.stashInstanceId,
+        name: row.name,
+        disambiguation: row.disambiguation,
+        gender: row.gender,
+        favorite: row.favorite,
+        rating100: row.rating100,
+        image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
       });
+      performersByImage.set(row.imageId, list);
     }
 
     const tagsByImage = new Map<string, TagRef[]>();
     for (const row of tags) {
-      const imageId = row.imageId as string;
-      if (!tagsByImage.has(imageId)) {
-        tagsByImage.set(imageId, []);
-      }
-      tagsByImage.get(imageId)?.push({
-        id: row.id as string,
-        instanceId: row.stashInstanceId as string,
-        name: row.name as string,
-        favorite: row.favorite as boolean | null,
-        image_path: toProxyUrl(
-          row.imagePath as string | null,
-          row.stashInstanceId as string
-        ),
+      const list = tagsByImage.get(row.imageId) ?? [];
+      list.push({
+        id: row.id,
+        instanceId: row.stashInstanceId,
+        name: row.name,
+        favorite: row.favorite,
+        image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
       });
+      tagsByImage.set(row.imageId, list);
     }
 
     const galleriesByImage = new Map<string, GalleryRef[]>();
     for (const row of galleries) {
-      const imageId = row.imageId as string;
-      if (!galleriesByImage.has(imageId)) {
-        galleriesByImage.set(imageId, []);
-      }
-      galleriesByImage.get(imageId)?.push({
-        id: row.id as string,
-        instanceId: row.stashInstanceId as string,
-        title: row.title as string | null,
-        cover: toProxyUrl(
-          row.coverPath as string | null,
-          row.stashInstanceId as string
-        ),
+      const list = galleriesByImage.get(row.imageId) ?? [];
+      list.push({
+        id: row.id,
+        instanceId: row.stashInstanceId,
+        title: row.title,
+        cover: toProxyUrl(row.coverPath, row.stashInstanceId),
       });
+      galleriesByImage.set(row.imageId, list);
     }
 
     const studiosById = new Map(
@@ -464,11 +477,11 @@ class ImageQueryBuilder {
     // Hydrate each row
     return rows.map((row) => ({
       ...row,
-      performers: performersByImage.get(row.id as string) ?? [],
-      tags: tagsByImage.get(row.id as string) ?? [],
-      galleries: galleriesByImage.get(row.id as string) ?? [],
-      studio: row.studioId ? studiosById.get(row.studioId as string) : null,
-    })) as unknown as NormalizedImage[];
+      performers: performersByImage.get(row.id) ?? [],
+      tags: tagsByImage.get(row.id) ?? [],
+      galleries: galleriesByImage.get(row.id) ?? [],
+      studio: row.studioId ? (studiosById.get(row.studioId) ?? null) : null,
+    }));
   }
 
   async execute(options: ImageQueryOptions): Promise<ImageQueryResult> {
@@ -601,32 +614,22 @@ class ImageQueryBuilder {
     });
 
     // Execute query
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      sql,
-      ...params
-    );
+    const rows = await prisma.$queryRawUnsafe<ImageQueryRow[]>(sql, ...params);
 
-    // Convert BigInt fields to Number and transform URLs to proxy paths with instanceId.
-    // instanceId is the API name; stashInstanceId stays because callers spread the row.
+    // Convert BigInt fields to Number, Dates to ISO strings, and URLs to proxy
+    // paths with instanceId. instanceId is the API name; stashInstanceId stays
+    // because callers spread the row.
     const transformedRows = rows.map((row) => ({
       ...row,
-      instanceId: row.stashInstanceId as string,
-      title:
-        (row.title as string) ||
-        getImageFallbackTitle(row.filePath as string | null),
-      fileSize: row.fileSize != null ? Number(row.fileSize) : null,
-      pathThumbnail: toProxyUrl(
-        row.pathThumbnail as string | null,
-        row.stashInstanceId as string
-      ),
-      pathPreview: toProxyUrl(
-        row.pathPreview as string | null,
-        row.stashInstanceId as string
-      ),
-      pathImage: toProxyUrl(
-        row.pathImage as string | null,
-        row.stashInstanceId as string
-      ),
+      instanceId: row.stashInstanceId,
+      title: emptyToNull(row.title) ?? getImageFallbackTitle(row.filePath),
+      fileSize: row.fileSize !== null ? Number(row.fileSize) : null,
+      stashCreatedAt: row.stashCreatedAt?.toISOString() ?? null,
+      stashUpdatedAt: row.stashUpdatedAt?.toISOString() ?? null,
+      userLastViewedAt: row.userLastViewedAt?.toISOString() ?? null,
+      pathThumbnail: toProxyUrl(row.pathThumbnail, row.stashInstanceId),
+      pathPreview: toProxyUrl(row.pathPreview, row.stashInstanceId),
+      pathImage: toProxyUrl(row.pathImage, row.stashInstanceId),
     }));
 
     // Hydrate with related entities

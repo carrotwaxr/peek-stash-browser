@@ -1080,8 +1080,8 @@ class PerformerQueryBuilder {
       group_count: row.groupCount || 0,
 
       // Timestamps
-      created_at: row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt?.toISOString() ?? null,
+      updated_at: row.stashUpdatedAt?.toISOString() ?? null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,
@@ -1089,8 +1089,8 @@ class PerformerQueryBuilder {
       favorite: Boolean(row.userFavorite),
       o_counter: row.userOCounter ?? 0,
       play_count: row.userPlayCount ?? 0,
-      last_played_at: row.userLastPlayedAt || null,
-      last_o_at: row.userLastOAt || null,
+      last_played_at: row.userLastPlayedAt?.toISOString() ?? null,
+      last_o_at: row.userLastOAt?.toISOString() ?? null,
 
       // Relations - populated separately
       tags: [] as TagRef[],

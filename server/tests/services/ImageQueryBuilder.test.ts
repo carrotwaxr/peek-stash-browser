@@ -1,18 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+} from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
-import type { NormalizedImage } from "../../types/index.js";
 import { must } from "../helpers/must.js";
-
-/**
- * The rows the builder returns carry the user's rating columns its query
- * selects. hydrateImages casts the raw rows to NormalizedImage, which does not
- * declare them (item 74).
- */
-type ImageRowWithUserData = NormalizedImage & {
-  userRating: number | null;
-  userFavorite: boolean | number | null;
-};
 
 describe("ImageQueryBuilder", () => {
   const testUserId = 9999;
@@ -125,6 +121,61 @@ describe("ImageQueryBuilder", () => {
       for (const image of result.images) {
         expect(image.instanceId).toBe(testInstanceId);
       }
+    });
+
+    it("execute returns rows typed as ImageQueryRow and keeps organized as a boolean", async () => {
+      await prisma.stashImage.update({
+        where: {
+          id_stashInstanceId: {
+            id: testImageIds[0],
+            stashInstanceId: testInstanceId,
+          },
+        },
+        data: { organized: true },
+      });
+      await prisma.imageRating.create({
+        data: {
+          userId: testUserId,
+          instanceId: testInstanceId,
+          imageId: testImageIds[0],
+          rating: 80,
+          favorite: true,
+        },
+      });
+
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        allowedInstanceIds: [testInstanceId],
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+      const organized = must(
+        result.images.find((i) => i.id === testImageIds[0]),
+        "the organized image"
+      );
+      const plain = must(
+        result.images.find((i) => i.id === testImageIds[1]),
+        "the plain image"
+      );
+
+      // The selected columns, typed as SQLite returns them: a wrong column
+      // type or a column the query does not select fails typecheck:tests
+      expectTypeOf(organized.organized).toEqualTypeOf<boolean>();
+      expectTypeOf(organized.userFavorite).toEqualTypeOf<boolean | null>();
+      expectTypeOf(organized.userRating).toEqualTypeOf<number | null>();
+      expectTypeOf(organized.fileSize).toEqualTypeOf<number | null>();
+      expectTypeOf(organized.stashCreatedAt).toEqualTypeOf<string | null>();
+
+      expect(organized.organized).toBe(true);
+      expect(organized.userFavorite).toBe(true);
+      expect(organized.userRating).toBe(80);
+      expect(plain.organized).toBe(false);
+      expect(plain.userFavorite).toBeNull();
+      expect(plain.userRating).toBeNull();
+      // A DATETIME column arrives as a Date; the row carries its ISO string
+      expect(organized.stashCreatedAt).toBe("2024-01-01T00:00:00.000Z");
     });
   });
 
@@ -554,10 +605,9 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.images).toHaveLength(2);
 
-      const images = result.images as ImageRowWithUserData[];
-      const img1 = images.find((i) => i.id === "999001");
-      expect(img1?.userRating).toBe(90);
-      expect(img1?.userFavorite).toBeTruthy(); // SQLite may return 1 or true
+      const img1 = must(result.images.find((i) => i.id === "999001"));
+      expect(img1.userRating).toBe(90);
+      expect(img1.userFavorite).toBe(true);
     });
 
     afterEach(async () => {
