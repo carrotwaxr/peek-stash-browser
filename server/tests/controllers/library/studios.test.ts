@@ -8,11 +8,17 @@ import {
   findStudios,
   findStudiosMinimal,
 } from "../../../controllers/library/studios.js";
+import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 // --- Imports ---
 
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
@@ -29,20 +35,12 @@ vi.mock("../../../services/StudioQueryBuilder.js", () => ({
   studioQueryBuilder: { execute: vi.fn() },
 }));
 
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
-  },
+vi.mock("../../../services/MinimalEntityQuery.js", () => ({
+  findMinimalEntities: vi.fn(),
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
-vi.mock("../../../utils/entityInstanceId.js", () => ({
-  disambiguateEntityNames: vi
-    .fn()
-    .mockImplementation((entities: unknown[]) => entities),
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
@@ -70,6 +68,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockStudioQueryBuilder = vi.mocked(studioQueryBuilder);
+const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -218,94 +217,52 @@ describe("Studios Controller", () => {
   // ─── findStudiosMinimal ─────────────────────────────────────
 
   describe("findStudiosMinimal", () => {
-    it("returns minimal studios on happy path", async () => {
-      const studios = [
-        createMockStudio({ id: "s1", name: "Alpha Studio" }),
-        createMockStudio({ id: "s2", name: "Beta Studio" }),
-      ];
-      mockStashEntityService.getAllStudios.mockResolvedValue(studios);
-
+    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+      const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
+      mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findStudiosMinimal, {
-        body: { filter: {} },
+        body: {
+          ids: ["1:inst-a"],
+          filter: { q: " al ", per_page: 20 },
+          count_filter: { min_scene_count: 1 },
+        },
         user: defaultUser,
       });
       const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().studios).toHaveLength(2);
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+        entity: "studio",
+        q: "al",
+        perPage: 20,
+        ids: [{ id: "1", instanceId: "inst-a" }],
+        countFilter: { min_scene_count: 1 },
+        dropped: [],
+      });
+      expect(res._getOkBody()).toEqual({ studios: rows });
     });
 
-    it("applies search query filtering", async () => {
-      const studios = [
-        createMockStudio({ id: "s1", name: "Alpha" }),
-        createMockStudio({ id: "s2", name: "Beta" }),
-      ];
-      mockStashEntityService.getAllStudios.mockResolvedValue(studios);
-
+    it("a sort field answers 400 before any query: the pickers always list by name", async () => {
       const req = reqFor(findStudiosMinimal, {
-        body: { filter: { q: "alpha" } },
+        body: malformed({ filter: { sort: "name" } }),
         user: defaultUser,
       });
       const res = resFor(findStudiosMinimal);
 
-      await findStudiosMinimal(req, res);
-
-      expect(res._getOkBody().studios).toHaveLength(1);
+      await expect(findStudiosMinimal(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "filter.sort" }],
+      });
+      expect(mockFindMinimalEntities).not.toHaveBeenCalled();
     });
 
-    it("applies count_filter with min_scene_count", async () => {
-      const studios = [
-        createMockStudio({ id: "s1", scene_count: 50 }),
-        createMockStudio({ id: "s2", scene_count: 2 }),
-      ];
-      mockStashEntityService.getAllStudios.mockResolvedValue(studios);
-
-      const req = reqFor(findStudiosMinimal, {
-        body: { filter: {}, count_filter: { min_scene_count: 10 } },
-        user: defaultUser,
-      });
+    it("a query error reaches the central error handler", async () => {
+      mockFindMinimalEntities.mockRejectedValue(new Error("fail"));
+      const req = reqFor(findStudiosMinimal, { user: defaultUser });
       const res = resFor(findStudiosMinimal);
 
-      await findStudiosMinimal(req, res);
-
-      expect(res._getOkBody().studios).toHaveLength(1);
-    });
-
-    it("applies pagination via per_page", async () => {
-      const studios = [
-        createMockStudio({ id: "s1", name: "A" }),
-        createMockStudio({ id: "s2", name: "B" }),
-        createMockStudio({ id: "s3", name: "C" }),
-      ];
-      mockStashEntityService.getAllStudios.mockResolvedValue(studios);
-
-      const req = reqFor(findStudiosMinimal, {
-        body: { filter: { per_page: 2 } },
-        user: defaultUser,
-      });
-      const res = resFor(findStudiosMinimal);
-
-      await findStudiosMinimal(req, res);
-
-      expect(res._getOkBody().studios).toHaveLength(2);
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getAllStudios.mockRejectedValue(
-        new Error("cache failure")
-      );
-
-      const req = reqFor(findStudiosMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findStudiosMinimal);
-
-      await findStudiosMinimal(req, res);
-
-      expect(res._getStatus()).toBe(500);
+      await expect(findStudiosMinimal(req, res)).rejects.toThrow("fail");
     });
   });
 });

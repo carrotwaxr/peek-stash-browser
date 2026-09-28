@@ -27,3 +27,12 @@ export function parseJsonArray<T = string>(
 export function emptyToNull(value: string | null | undefined): string | null {
   return value === undefined || value === "" ? null : value;
 }
+
+/**
+ * A LIKE pattern matching `text` anywhere, for `LIKE ? ESCAPE '\'`: `%`, `_`
+ * and the backslash itself are escaped, so each matches only itself. SQLite's
+ * LIKE ignores case for ASCII letters only.
+ */
+export function likeContains(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}

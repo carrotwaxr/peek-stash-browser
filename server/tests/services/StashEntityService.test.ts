@@ -238,23 +238,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Performer Queries", () => {
-    it("should get all performers with default user fields", async () => {
-      const mockCachedPerformers = [{ ...mockCachedPerformer }];
-
-      mockPrisma.stashPerformer.findMany.mockResolvedValue(
-        mockCachedPerformers
-      );
-
-      const result = await stashEntityService.getAllPerformers();
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("performer-1");
-      expect(must(result[0]).name).toBe("Test Performer");
-      // Check default user fields
-      expect(must(result[0]).favorite).toBe(false);
-      expect(must(result[0]).o_counter).toBe(0);
-    });
-
     it("should get performer by ID", async () => {
       mockPrisma.stashPerformer.findFirst.mockResolvedValue({
         ...mockCachedPerformer,
@@ -274,6 +257,9 @@ describe("StashEntityService", () => {
       expect(result).not.toBeNull();
       expect(must(result).id).toBe("performer-1");
       expect(must(result).scene_count).toBe(10);
+      // The default user fields
+      expect(must(result).favorite).toBe(false);
+      expect(must(result).o_counter).toBe(0);
     });
 
     it("should return null for non-existent performer", async () => {
@@ -409,20 +395,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Gallery Queries", () => {
-    it("should get all galleries with default user fields", async () => {
-      const mockCachedGalleries = [{ ...mockCachedGallery }];
-
-      mockPrisma.stashGallery.findMany.mockResolvedValue(mockCachedGalleries);
-
-      const result = await stashEntityService.getAllGalleries();
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("gallery-1");
-      expect(must(result[0]).title).toBe("Test Gallery");
-      // Check default user fields
-      expect(must(result[0]).favorite).toBe(false);
-    });
-
     it("should get gallery by ID", async () => {
       mockPrisma.stashGallery.findFirst.mockResolvedValue({
         ...mockCachedGallery,
@@ -437,7 +409,10 @@ describe("StashEntityService", () => {
 
       expect(result).not.toBeNull();
       expect(must(result).id).toBe("gallery-1");
+      expect(must(result).title).toBe("Test Gallery");
       expect(must(result).image_count).toBe(50);
+      // The default user fields
+      expect(must(result).favorite).toBe(false);
     });
 
     it("should return null for non-existent gallery", async () => {
@@ -461,20 +436,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Group Queries", () => {
-    it("should get all groups with default user fields", async () => {
-      const mockCachedGroups = [{ ...mockCachedGroup }];
-
-      mockPrisma.stashGroup.findMany.mockResolvedValue(mockCachedGroups);
-
-      const result = await stashEntityService.getAllGroups();
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("group-1");
-      expect(must(result[0]).name).toBe("Test Group");
-      // Check default user fields
-      expect(must(result[0]).favorite).toBe(false);
-    });
-
     it("should get group by ID", async () => {
       mockPrisma.stashGroup.findFirst.mockResolvedValue({
         ...mockCachedGroup,
@@ -491,7 +452,10 @@ describe("StashEntityService", () => {
 
       expect(result).not.toBeNull();
       expect(must(result).id).toBe("group-1");
+      expect(must(result).name).toBe("Test Group");
       expect(must(result).scene_count).toBe(15);
+      // The default user fields
+      expect(must(result).favorite).toBe(false);
     });
 
     it("should return null for non-existent group", async () => {

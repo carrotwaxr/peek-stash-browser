@@ -1,6 +1,5 @@
-import prisma from "../../prisma/singleton.js";
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
@@ -13,8 +12,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedGallery } from "../../types/index.js";
-import { entityKey } from "../../utils/entityRef.js";
 import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
@@ -24,35 +21,6 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Merge galleries with user rating/favorite data
- */
-async function mergeGalleriesWithUserData(
-  galleries: NormalizedGallery[],
-  userId: number
-): Promise<NormalizedGallery[]> {
-  const ratings = await prisma.galleryRating.findMany({ where: { userId } });
-
-  const ratingMap = new Map(
-    ratings.map((r) => [
-      entityKey(r.galleryId, r.instanceId ?? ""),
-      {
-        rating: r.rating,
-        rating100: r.rating,
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  return galleries.map((gallery) => ({
-    ...gallery,
-    rating: null,
-    rating100: null,
-    favorite: false,
-    ...ratingMap.get(entityKey(gallery.id, gallery.instanceId)),
-  }));
-}
 
 /**
  * Find galleries endpoint
@@ -178,90 +146,19 @@ export const findGalleries = async (
 };
 
 /**
- * Minimal galleries - just id and title for dropdowns
+ * One page of galleries for an entity picker, in name order: the shown name
+ * (the title, else the file, else the folder) matched in SQL, or the ids a
+ * picker has selected. A ValidationError (400) reaches the central error
+ * handler.
  */
 export const findGalleriesMinimal = async (
   req: TypedAuthRequest<FindGalleriesMinimalRequest>,
   res: TypedResponse<FindGalleriesMinimalResponse | ApiErrorResponse>
 ) => {
-  // q, title order, a page of 50 unless the request names 1..250, and the
-  // count minimums; a ValidationError (400) reaches the central error handler
-  const request = parseMinimalRequest("gallery", req.body, {
-    userId: req.user.id,
-  });
+  const userId = req.user.id;
+  const request = parseMinimalRequest("gallery", req.body, { userId });
   logDropped("POST /library/galleries/minimal", request.dropped);
 
-  try {
-    const userId = req.user.id;
-    const { q: searchQuery, direction, perPage } = request;
-    const count_filter = request.countFilter;
-
-    // Step 1: Get all galleries from cache
-    let galleries = await stashEntityService.getAllGalleries();
-
-    if (galleries.length === 0) {
-      logger.warn("Gallery cache not initialized, returning empty result");
-      res.json({
-        galleries: [],
-      });
-      return;
-    }
-
-    // Step 2: Merge with user data (for favorites)
-    galleries = await mergeGalleriesWithUserData(galleries, userId);
-
-    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    galleries = await entityExclusionHelper.filterExcluded(
-      galleries,
-      userId,
-      "gallery"
-    );
-
-    // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
-    if (count_filter) {
-      const { min_image_count } = count_filter;
-      galleries = galleries.filter((g) => {
-        const conditions: boolean[] = [];
-        if (min_image_count !== undefined)
-          conditions.push(g.image_count >= min_image_count);
-        return conditions.length === 0 || conditions.some((c) => c);
-      });
-    }
-
-    // Step 3: Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      galleries = galleries.filter((g) => {
-        const title = g.title || "";
-        return title.toLowerCase().includes(lowerQuery);
-      });
-    }
-
-    // Step 4: Sort by title
-    galleries = galleries.sort((a, b) => {
-      const aTitle = (a.title || "").toLowerCase();
-      const bTitle = (b.title || "").toLowerCase();
-      const comparison = aTitle.localeCompare(bTitle);
-      return direction === "DESC" ? -comparison : comparison;
-    });
-
-    // Step 5: The first page, in the minimal shape (the pickers never page)
-    const minimalGalleries = galleries.slice(0, perPage).map((g) => ({
-      id: g.id,
-      title: g.title || "", // Galleries use 'title' not 'name'
-      instanceId: g.instanceId || "",
-    }));
-
-    res.json({
-      galleries: minimalGalleries,
-    });
-  } catch (error) {
-    logger.error("Error in findGalleriesMinimal", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find galleries",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
+  const galleries = await findMinimalEntities(userId, request);
+  res.json({ galleries });
 };

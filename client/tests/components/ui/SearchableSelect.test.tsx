@@ -1,44 +1,33 @@
 /**
- * SearchableSelect - fetchItemsByIds instance-scoped API calls
+ * SearchableSelect: the entity picker behind filter dropdowns, carousel rules
+ * and content restrictions.
  *
- * Tests that when SearchableSelect resolves selected entity names from
- * composite "id:instanceId" keys, it groups values by instanceId and
- * passes instance_id in the entity-specific filter to avoid ambiguous
- * lookups on multi-instance setups.
+ * Its options come from the `/minimal` endpoints: nothing loads until the
+ * dropdown opens, each search aborts the one before, and a response for a
+ * search that is no longer current is dropped, and no list is kept in the
+ * browser. The names of the selected values ("id:instanceId", or a bare id)
+ * are resolved with one minimal request carrying their ids, at most 100 per
+ * request.
  */
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
-import { must } from "@tests/testUtils";
+import { actAsync, flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
 // --- Hoisted mocks (available before vi.mock factory runs) ---
 
-/** The instance filter SearchableSelect adds to a lookup by id */
-interface InstanceFilter {
-  instance_id: string;
-}
-
-/** What SearchableSelect sends to look entities up by id */
-interface IdLookupParams {
-  ids?: string[];
-  tag_filter?: InstanceFilter;
-  performer_filter?: InstanceFilter;
-  studio_filter?: InstanceFilter;
-  group_filter?: InstanceFilter;
-  gallery_filter?: InstanceFilter;
-}
-
-type FindMock = (params: IdLookupParams) => Promise<unknown>;
-type FindMinimalMock = (params: unknown) => Promise<unknown[]>;
+type FindMinimalMock = (
+  params: MinimalRequest,
+  signal?: AbortSignal
+) => Promise<MinimalEntity[]>;
+type FindMock = (params: unknown) => Promise<unknown>;
 
 const {
   mockFindTags,
   mockFindPerformers,
-  mockFindStudios,
-  mockFindGroups,
-  mockFindGalleries,
   mockFindTagsMinimal,
   mockFindPerformersMinimal,
   mockFindStudiosMinimal,
@@ -47,21 +36,20 @@ const {
 } = vi.hoisted(() => ({
   mockFindTags: vi.fn<FindMock>(),
   mockFindPerformers: vi.fn<FindMock>(),
-  mockFindStudios: vi.fn<FindMock>(),
-  mockFindGroups: vi.fn<FindMock>(),
-  mockFindGalleries: vi.fn<FindMock>(),
-  mockFindTagsMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
-  mockFindPerformersMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
-  mockFindStudiosMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
-  mockFindGroupsMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
-  mockFindGalleriesMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
+  mockFindTagsMinimal: vi.fn<FindMinimalMock>(),
+  mockFindPerformersMinimal: vi.fn<FindMinimalMock>(),
+  mockFindStudiosMinimal: vi.fn<FindMinimalMock>(),
+  mockFindGroupsMinimal: vi.fn<FindMinimalMock>(),
+  mockFindGalleriesMinimal: vi.fn<FindMinimalMock>(),
 }));
 
-// Mock filterCache so localStorage is never hit
-vi.mock("../../../src/utils/filterCache", () => ({
-  getCache: vi.fn().mockReturnValue(null),
-  setCache: vi.fn(),
-}));
+const MINIMAL_MOCKS = [
+  mockFindTagsMinimal,
+  mockFindPerformersMinimal,
+  mockFindStudiosMinimal,
+  mockFindGroupsMinimal,
+  mockFindGalleriesMinimal,
+];
 
 // Mock useDebounce to return value immediately (no delay)
 vi.mock("../../../src/hooks/useDebounce", () => ({
@@ -74,324 +62,84 @@ vi.mock("../../../src/api", () => ({
     findTagsMinimal: mockFindTagsMinimal,
     findPerformers: mockFindPerformers,
     findPerformersMinimal: mockFindPerformersMinimal,
-    findStudios: mockFindStudios,
     findStudiosMinimal: mockFindStudiosMinimal,
-    findGroups: mockFindGroups,
     findGroupsMinimal: mockFindGroupsMinimal,
-    findGalleries: mockFindGalleries,
     findGalleriesMinimal: mockFindGalleriesMinimal,
   },
 }));
 
 // --- Helpers ---
 
-/** Default empty response for find* API methods */
-const emptyTagsResponse = { findTags: { tags: [] } };
-const emptyPerformersResponse = { findPerformers: { performers: [] } };
+/** A minimal request the component made, answered when the test says so */
+interface PendingCall {
+  params: MinimalRequest;
+  signal: AbortSignal | undefined;
+  resolve: (rows: MinimalEntity[]) => void;
+}
 
-/** Creates a findTags response with given tags */
-const makeTagsResponse = (tags: unknown[]) => ({
-  findTags: { tags },
+/** Makes `mock` hold every request until the test resolves it */
+function holdCalls(mock: typeof mockFindPerformersMinimal): PendingCall[] {
+  const calls: PendingCall[] = [];
+  mock.mockImplementation(
+    (params, signal) =>
+      new Promise<MinimalEntity[]>((resolve) => {
+        calls.push({ params, signal, resolve });
+      })
+  );
+  return calls;
+}
+
+const row = (id: string, instanceId: string, name: string): MinimalEntity => ({
+  id,
+  instanceId,
+  name,
 });
 
-const makePerformersResponse = (performers: unknown[]) => ({
-  findPerformers: { performers },
-});
+/** The trigger that opens the dropdown */
+const trigger = (container: HTMLElement) =>
+  must(
+    container.querySelector<HTMLElement>("[class*='cursor-pointer']"),
+    "the trigger"
+  );
 
-const makeStudiosResponse = (studios: unknown[]) => ({
-  findStudios: { studios },
-});
-
-const makeGroupsResponse = (groups: unknown[]) => ({
-  findGroups: { groups },
-});
-
-const makeGalleriesResponse = (galleries: unknown[]) => ({
-  findGalleries: { galleries },
+beforeEach(() => {
+  vi.clearAllMocks();
+  for (const mock of MINIMAL_MOCKS) mock.mockResolvedValue([]);
 });
 
 // --- Tests ---
 
-describe("SearchableSelect fetchItemsByIds", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default: all find* return empty
-    mockFindTags.mockResolvedValue(emptyTagsResponse);
-    mockFindPerformers.mockResolvedValue(emptyPerformersResponse);
-    mockFindStudios.mockResolvedValue({ findStudios: { studios: [] } });
-    mockFindGroups.mockResolvedValue({ findGroups: { groups: [] } });
-    mockFindGalleries.mockResolvedValue({ findGalleries: { galleries: [] } });
-  });
-
-  it("passes instance filter when resolving composite key values", async () => {
-    mockFindTags.mockResolvedValue(
-      makeTagsResponse([
-        { id: "82", instanceId: "instance-abc", name: "Outdoor" },
-      ])
-    );
+describe("SearchableSelect selected names", () => {
+  it("resolves selected names with one minimal request carrying ids", async () => {
+    mockFindTagsMinimal.mockResolvedValue([
+      row("82", "inst-1", "Tag A"),
+      row("15", "inst-2", "Tag B"),
+    ]);
 
     render(
       <SearchableSelect
         entityType="tags"
-        value={["82:instance-abc"]}
+        value={["82:inst-1", "15:inst-2", "99"]}
         onChange={vi.fn()}
         multi
       />
     );
 
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ids: ["82"],
-          tag_filter: { instance_id: "instance-abc" },
-        })
-      );
+    expect(await screen.findByText("Tag A")).toBeTruthy();
+    expect(screen.getByText("Tag B")).toBeTruthy();
+    expect(mockFindTagsMinimal).toHaveBeenCalledTimes(1);
+    const [params, signal] = must(mockFindTagsMinimal.mock.calls[0]);
+    expect(params).toEqual({
+      ids: ["82:inst-1", "15:inst-2", "99"],
+      filter: { per_page: 100 },
     });
+    expect(signal).toBeInstanceOf(AbortSignal);
+    // Never the full list endpoints
+    expect(mockFindTags).not.toHaveBeenCalled();
   });
 
-  it("groups multiple values by instanceId and makes separate calls", async () => {
-    mockFindTags
-      .mockResolvedValueOnce(
-        makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
-      )
-      .mockResolvedValueOnce(
-        makeTagsResponse([{ id: "15", instanceId: "inst-2", name: "Tag B" }])
-      );
-
-    render(
-      <SearchableSelect
-        entityType="tags"
-        value={["82:inst-1", "15:inst-2"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledTimes(2);
-    });
-
-    // Verify each call was scoped to its instance
-    const calls = mockFindTags.mock.calls;
-    const callArgs = calls.map((c) => c[0]);
-
-    expect(callArgs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          ids: ["82"],
-          tag_filter: { instance_id: "inst-1" },
-        }),
-        expect.objectContaining({
-          ids: ["15"],
-          tag_filter: { instance_id: "inst-2" },
-        }),
-      ])
-    );
-  });
-
-  it("works with bare IDs (no instance) for backward compatibility", async () => {
-    mockFindTags.mockResolvedValue(
-      makeTagsResponse([{ id: "82", name: "Classic" }])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="tags"
-        value={["82"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledWith(
-        expect.objectContaining({ ids: ["82"] })
-      );
-    });
-
-    // Should NOT have a tag_filter with instance_id
-    const callArg = mockFindTags.mock.calls.find(
-      (c) => c[0].ids && c[0].ids.includes("82")
-    )?.[0];
-    expect(callArg).toBeDefined();
-    expect(must(callArg).tag_filter).toBeUndefined();
-  });
-
-  it("handles multiple IDs from same instance in one call", async () => {
-    mockFindTags.mockResolvedValue(
-      makeTagsResponse([
-        { id: "82", instanceId: "inst-1", name: "Tag A" },
-        { id: "15", instanceId: "inst-1", name: "Tag B" },
-      ])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="tags"
-        value={["82:inst-1", "15:inst-1"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // vitest types asymmetric matchers as any
-          ids: expect.arrayContaining(["82", "15"]) as unknown,
-          tag_filter: { instance_id: "inst-1" },
-        })
-      );
-    });
-
-    // Should only make ONE call for this instance group
-    const instanceCalls = mockFindTags.mock.calls.filter(
-      (c) => c[0].tag_filter?.instance_id === "inst-1"
-    );
-    expect(instanceCalls).toHaveLength(1);
-  });
-
-  it("works with performers entity type and instance filter", async () => {
-    mockFindPerformers.mockResolvedValue(
-      makePerformersResponse([{ id: "5", instanceId: "inst-x", name: "Jane" }])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="performers"
-        value={["5:inst-x"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindPerformers).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ids: ["5"],
-          performer_filter: { instance_id: "inst-x" },
-        })
-      );
-    });
-  });
-
-  it("works with studios entity type and instance filter", async () => {
-    mockFindStudios.mockResolvedValue(
-      makeStudiosResponse([{ id: "3", instanceId: "inst-y", name: "Studio Z" }])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="studios"
-        value={["3:inst-y"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindStudios).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ids: ["3"],
-          studio_filter: { instance_id: "inst-y" },
-        })
-      );
-    });
-  });
-
-  it("works with groups entity type and instance filter", async () => {
-    mockFindGroups.mockResolvedValue(
-      makeGroupsResponse([{ id: "7", instanceId: "inst-z", name: "Group G" }])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="groups"
-        value={["7:inst-z"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindGroups).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ids: ["7"],
-          group_filter: { instance_id: "inst-z" },
-        })
-      );
-    });
-  });
-
-  it("works with galleries entity type and instance filter", async () => {
-    mockFindGalleries.mockResolvedValue(
-      makeGalleriesResponse([
-        { id: "10", instanceId: "inst-g", name: "Gallery X" },
-      ])
-    );
-
-    render(
-      <SearchableSelect
-        entityType="galleries"
-        value={["10:inst-g"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindGalleries).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ids: ["10"],
-          gallery_filter: { instance_id: "inst-g" },
-        })
-      );
-    });
-  });
-
-  it("handles mixed bare and composite keys", async () => {
-    // Two calls expected: one for inst-1 group, one for bare group
-    mockFindTags
-      .mockResolvedValueOnce(
-        makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
-      )
-      .mockResolvedValueOnce(makeTagsResponse([{ id: "99", name: "Tag C" }]));
-
-    render(
-      <SearchableSelect
-        entityType="tags"
-        value={["82:inst-1", "99"]}
-        onChange={vi.fn()}
-        multi
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledTimes(2);
-    });
-
-    const calls = mockFindTags.mock.calls.map((c) => c[0]);
-
-    // One call with instance filter
-    expect(calls).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          ids: ["82"],
-          tag_filter: { instance_id: "inst-1" },
-        }),
-      ])
-    );
-
-    // One call without instance filter (bare IDs)
-    const bareCall = calls.find((c) => !c.tag_filter);
-    expect(bareCall).toBeDefined();
-    expect(must(bareCall).ids).toEqual(["99"]);
-  });
-
-  it("deduplicates IDs within the same instance group", async () => {
-    mockFindTags.mockResolvedValue(
-      makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
-    );
+  it("sends each selected id once", async () => {
+    mockFindTagsMinimal.mockResolvedValue([row("82", "inst-1", "Tag A")]);
 
     render(
       <SearchableSelect
@@ -402,57 +150,60 @@ describe("SearchableSelect fetchItemsByIds", () => {
       />
     );
 
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalled();
-    });
-
-    // Should deduplicate: only one "82" in the ids array
-    const callArg = must(mockFindTags.mock.calls[0])[0];
-    expect(callArg.ids).toEqual(["82"]);
+    expect(await screen.findByText("Tag A")).toBeTruthy();
+    expect(must(mockFindTagsMinimal.mock.calls[0])[0].ids).toEqual([
+      "82:inst-1",
+    ]);
   });
 
-  it("returns partial results when one instance group fails", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    // inst-1 succeeds, inst-2 fails
-    mockFindTags
-      .mockResolvedValueOnce(
-        makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
+  it("looks more than 100 selected values up 100 at a time", async () => {
+    const value = Array.from({ length: 150 }, (_, i) => `${i + 1}:inst-1`);
+    mockFindPerformersMinimal.mockImplementation(({ ids = [] }) =>
+      Promise.resolve(
+        ids.map((ref) => {
+          const id = ref.split(":")[0] ?? ref;
+          return row(id, "inst-1", `Performer ${id}`);
+        })
       )
-      .mockRejectedValueOnce(new Error("Instance unreachable"));
+    );
 
-    const { container } = render(
+    render(
       <SearchableSelect
-        entityType="tags"
-        value={["82:inst-1", "15:inst-2"]}
+        entityType="performers"
+        value={value}
         onChange={vi.fn()}
         multi
       />
     );
 
-    // Wait for the successful result to render as a chip
-    await waitFor(() => {
-      expect(mockFindTags).toHaveBeenCalledTimes(2);
-    });
+    expect(await screen.findByText("Performer 150")).toBeTruthy();
+    const sent = mockFindPerformersMinimal.mock.calls.map(
+      ([params]) => params.ids
+    );
+    expect(sent).toEqual([value.slice(0, 100), value.slice(100)]);
+  });
 
-    // Should log the error for the failed group
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Error fetching tags by IDs"),
-        expect.any(Error)
-      );
-    });
+  it("a failed lookup is logged and leaves the placeholder", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFindStudiosMinimal.mockRejectedValue(new Error("Server unreachable"));
 
-    // The successful instance's tag should still render
-    await waitFor(() => {
-      const text = container.textContent;
-      expect(text).toContain("Tag A");
-    });
+    render(
+      <SearchableSelect
+        entityType="studios"
+        value="3:inst-y"
+        onChange={vi.fn()}
+        placeholder="Pick a studio"
+      />
+    );
 
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("Pick a studio")).toBeTruthy();
     consoleSpy.mockRestore();
   });
 
-  it("returns empty array for unsupported entity type in fetchItemsByIds", async () => {
+  it("requests nothing for an unsupported entity type", async () => {
     render(
       <SearchableSelect
         entityType={untrusted("unsupported")}
@@ -462,34 +213,145 @@ describe("SearchableSelect fetchItemsByIds", () => {
       />
     );
 
-    // None of the API methods should be called
-    await waitFor(() => {
-      expect(mockFindTags).not.toHaveBeenCalled();
-      expect(mockFindPerformers).not.toHaveBeenCalled();
-      expect(mockFindStudios).not.toHaveBeenCalled();
-    });
+    await actAsync(() => {});
+    for (const mock of MINIMAL_MOCKS) expect(mock).not.toHaveBeenCalled();
+    expect(mockFindTags).not.toHaveBeenCalled();
+    expect(mockFindPerformers).not.toHaveBeenCalled();
   });
 });
 
-describe("SearchableSelect loadOptions guard", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset minimal mocks to resolve empty
-    mockFindTagsMinimal.mockResolvedValue([]);
-    mockFindPerformersMinimal.mockResolvedValue([]);
-    mockFindStudiosMinimal.mockResolvedValue([]);
-    mockFindGroupsMinimal.mockResolvedValue([]);
-    mockFindGalleriesMinimal.mockResolvedValue([]);
-    // Reset find mocks for fetchItemsByIds
-    mockFindTags.mockResolvedValue({ findTags: { tags: [] } });
-    mockFindPerformers.mockResolvedValue({
-      findPerformers: { performers: [] },
+describe("SearchableSelect options", () => {
+  it("requests nothing until opened", async () => {
+    const { container } = render(
+      <SearchableSelect
+        entityType="performers"
+        value={[]}
+        onChange={vi.fn()}
+        multi
+        countFilterContext="scenes"
+      />
+    );
+
+    await actAsync(() => {});
+    await flushPromises();
+    expect(mockFindPerformersMinimal).not.toHaveBeenCalled();
+
+    fireEvent.click(trigger(container));
+
+    await waitFor(() => {
+      expect(mockFindPerformersMinimal).toHaveBeenCalledTimes(1);
     });
-    mockFindStudios.mockResolvedValue({ findStudios: { studios: [] } });
-    mockFindGroups.mockResolvedValue({ findGroups: { groups: [] } });
-    mockFindGalleries.mockResolvedValue({
-      findGalleries: { galleries: [] },
+    const [params, signal] = must(mockFindPerformersMinimal.mock.calls[0]);
+    expect(params).toEqual({
+      filter: { per_page: 50 },
+      count_filter: { min_scene_count: 1 },
     });
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("lists what the server answers on each opening, never a list kept in the browser", async () => {
+    // A list an earlier version kept in localStorage, maybe for another user
+    localStorage.setItem(
+      "peek-performers-cache",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: [{ id: "9:inst-1", name: "Kept Name" }],
+      })
+    );
+    mockFindPerformersMinimal.mockResolvedValue([
+      row("1", "inst-1", "Fresh Name"),
+    ]);
+    try {
+      const { container } = render(
+        <SearchableSelect
+          entityType="performers"
+          value={[]}
+          onChange={vi.fn()}
+          multi
+        />
+      );
+
+      fireEvent.click(trigger(container));
+      expect(await screen.findByText("Fresh Name")).toBeTruthy();
+      expect(screen.queryByText("Kept Name")).toBeNull();
+
+      // Closed and opened again: asked again
+      fireEvent.click(trigger(container));
+      fireEvent.click(trigger(container));
+      await waitFor(() => {
+        expect(mockFindPerformersMinimal).toHaveBeenCalledTimes(2);
+      });
+    } finally {
+      localStorage.removeItem("peek-performers-cache");
+    }
+  });
+
+  it("a slower earlier response never replaces a later one", async () => {
+    const calls = holdCalls(mockFindPerformersMinimal);
+    const { container } = render(
+      <SearchableSelect
+        entityType="performers"
+        value={[]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    fireEvent.click(trigger(container));
+    const input = await screen.findByPlaceholderText("Type to search...");
+    fireEvent.change(input, { target: { value: "ann" } });
+    await waitFor(() => {
+      expect(calls.some((c) => c.params.filter?.q === "ann")).toBe(true);
+    });
+
+    // The search for "ann" answers first
+    const later = must(
+      calls.find((c) => c.params.filter?.q === "ann"),
+      "the request for ann"
+    );
+    await actAsync(() => later.resolve([row("2", "inst-1", "Anna")]));
+    expect(await screen.findByText("Anna")).toBeTruthy();
+
+    // The request made on opening answers last
+    const earlier = calls.filter((c) => c.params.filter?.q === undefined);
+    expect(earlier.length).toBeGreaterThan(0);
+    for (const call of earlier) {
+      await actAsync(() => call.resolve([row("1", "inst-1", "Zed")]));
+    }
+    await flushPromises();
+
+    expect(screen.queryByText("Zed")).toBeNull();
+    expect(screen.getByText("Anna")).toBeTruthy();
+  });
+
+  it("aborts the previous request when the search changes", async () => {
+    const calls = holdCalls(mockFindPerformersMinimal);
+    const { container } = render(
+      <SearchableSelect
+        entityType="performers"
+        value={[]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    fireEvent.click(trigger(container));
+    const input = await screen.findByPlaceholderText("Type to search...");
+    await waitFor(() => {
+      expect(calls.length).toBeGreaterThan(0);
+    });
+    const first = must(calls[0], "the request made on opening");
+    const firstSignal = must(first.signal, "the first request's signal");
+    expect(firstSignal.aborted).toBe(false);
+
+    fireEvent.change(input, { target: { value: "ann" } });
+    await waitFor(() => {
+      expect(calls.some((c) => c.params.filter?.q === "ann")).toBe(true);
+    });
+
+    expect(firstSignal.aborted).toBe(true);
+    const latest = must(calls.at(-1), "the latest request");
+    expect(must(latest.signal, "the latest signal").aborted).toBe(false);
   });
 
   it("does not throw and returns empty results for unsupported entity type", async () => {
@@ -505,8 +367,7 @@ describe("SearchableSelect loadOptions guard", () => {
     );
 
     // Open the dropdown to trigger loadOptions
-    const trigger = must(container.querySelector("[class*='cursor-pointer']"));
-    fireEvent.click(trigger);
+    fireEvent.click(trigger(container));
 
     // Wait for component to settle - loadOptions should bail out gracefully
     await waitFor(() => {
@@ -515,11 +376,7 @@ describe("SearchableSelect loadOptions guard", () => {
     });
 
     // None of the minimal API methods should have been called
-    expect(mockFindTagsMinimal).not.toHaveBeenCalled();
-    expect(mockFindPerformersMinimal).not.toHaveBeenCalled();
-    expect(mockFindStudiosMinimal).not.toHaveBeenCalled();
-    expect(mockFindGroupsMinimal).not.toHaveBeenCalled();
-    expect(mockFindGalleriesMinimal).not.toHaveBeenCalled();
+    for (const mock of MINIMAL_MOCKS) expect(mock).not.toHaveBeenCalled();
 
     // Should not have logged any errors (guard returns early, not throws)
     expect(consoleSpy).not.toHaveBeenCalled();

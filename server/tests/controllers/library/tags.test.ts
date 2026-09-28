@@ -11,10 +11,16 @@ import {
   findTagsMinimal,
 } from "../../../controllers/library/tags.js";
 import { ValidationError } from "../../../middleware/errorHandler.js";
+import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { loadTagTree } from "../../../services/TagTreeService.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 import { untrusted } from "../../helpers/untrusted.js";
@@ -36,20 +42,12 @@ vi.mock("../../../services/TagTreeService.js", () => ({
   loadTagTree: vi.fn(),
 }));
 
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
-  },
+vi.mock("../../../services/MinimalEntityQuery.js", () => ({
+  findMinimalEntities: vi.fn(),
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
-vi.mock("../../../utils/entityInstanceId.js", () => ({
-  disambiguateEntityNames: vi
-    .fn()
-    .mockImplementation((entities: unknown[]) => entities),
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
@@ -78,6 +76,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 const mockLoadTagTree = vi.mocked(loadTagTree);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
+const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -234,114 +233,52 @@ describe("Tags Controller", () => {
   // ─── findTagsMinimal ────────────────────────────────────────
 
   describe("findTagsMinimal", () => {
-    it("returns minimal tags on happy path", async () => {
-      const tags = [
-        createMockTag({ id: "t1", name: "Alpha" }),
-        createMockTag({ id: "t2", name: "Beta" }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(tags);
-
+    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+      const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
+      mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findTagsMinimal, {
-        body: { filter: {} },
+        body: {
+          ids: ["1:inst-a"],
+          filter: { q: " al ", per_page: 20 },
+          count_filter: { min_scene_count: 1 },
+        },
         user: defaultUser,
       });
       const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().tags).toHaveLength(2);
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+        entity: "tag",
+        q: "al",
+        perPage: 20,
+        ids: [{ id: "1", instanceId: "inst-a" }],
+        countFilter: { min_scene_count: 1 },
+        dropped: [],
+      });
+      expect(res._getOkBody()).toEqual({ tags: rows });
     });
 
-    it("applies search query filtering", async () => {
-      const tags = [
-        createMockTag({ id: "t1", name: "Action" }),
-        createMockTag({ id: "t2", name: "Comedy" }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(tags);
-
+    it("a sort field answers 400 before any query: the pickers always list by name", async () => {
       const req = reqFor(findTagsMinimal, {
-        body: { filter: { q: "act" } },
+        body: malformed({ filter: { sort: "name" } }),
         user: defaultUser,
       });
       const res = resFor(findTagsMinimal);
 
-      await findTagsMinimal(req, res);
-
-      expect(res._getOkBody().tags).toHaveLength(1);
+      await expect(findTagsMinimal(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "filter.sort" }],
+      });
+      expect(mockFindMinimalEntities).not.toHaveBeenCalled();
     });
 
-    it("applies sorting by specified field", async () => {
-      const tags = [
-        createMockTag({ id: "t1", name: "Zebra" }),
-        createMockTag({ id: "t2", name: "Alpha" }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(tags);
-
-      const req = reqFor(findTagsMinimal, {
-        body: { filter: { sort: "name", direction: "ASC" } },
-        user: defaultUser,
-      });
+    it("a query error reaches the central error handler", async () => {
+      mockFindMinimalEntities.mockRejectedValue(new Error("fail"));
+      const req = reqFor(findTagsMinimal, { user: defaultUser });
       const res = resFor(findTagsMinimal);
 
-      await findTagsMinimal(req, res);
-
-      const result = res._getOkBody().tags;
-      expect(must(result[0]).name).toBe("Alpha");
-      expect(must(result[1]).name).toBe("Zebra");
-    });
-
-    it("respects per_page pagination", async () => {
-      const tags = [
-        createMockTag({ id: "t1", name: "A" }),
-        createMockTag({ id: "t2", name: "B" }),
-        createMockTag({ id: "t3", name: "C" }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(tags);
-
-      const req = reqFor(findTagsMinimal, {
-        body: { filter: { per_page: 2 } },
-        user: defaultUser,
-      });
-      const res = resFor(findTagsMinimal);
-
-      await findTagsMinimal(req, res);
-
-      expect(res._getOkBody().tags).toHaveLength(2);
-    });
-
-    it("applies count_filter with min_scene_count", async () => {
-      const tags = [
-        createMockTag({ id: "t1", scene_count: 10 }),
-        createMockTag({ id: "t2", scene_count: 0 }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(tags);
-
-      const req = reqFor(findTagsMinimal, {
-        body: { filter: {}, count_filter: { min_scene_count: 5 } },
-        user: defaultUser,
-      });
-      const res = resFor(findTagsMinimal);
-
-      await findTagsMinimal(req, res);
-
-      expect(res._getOkBody().tags).toHaveLength(1);
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getAllTags.mockRejectedValue(
-        new Error("cache failure")
-      );
-
-      const req = reqFor(findTagsMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findTagsMinimal);
-
-      await findTagsMinimal(req, res);
-
-      expect(res._getStatus()).toBe(500);
+      await expect(findTagsMinimal(req, res)).rejects.toThrow("fail");
     });
   });
 

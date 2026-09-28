@@ -16,13 +16,50 @@ import type {
   NormalizedTag,
 } from "../entities.js";
 import type { ListRequestInput } from "../filters/index.js";
-import type { MinimalCountFilter, PaginationFilter } from "./common.js";
+import type { MinimalCountFilter } from "./common.js";
 
 /**
  * A list row with its View in Stash link: the entity's page in its own Stash,
  * or null when the viewer is not an admin (Stash's address reaches only admins)
  */
 export type WithStashUrl<T> = T & { stashUrl: string | null };
+
+// =============================================================================
+// ENTITY PICKERS
+// =============================================================================
+
+/**
+ * POST /api/library/<entities>/minimal: the entity pickers (filter
+ * dropdowns, carousel rules, content restrictions). One page in name order,
+ * of what the user can see on the instances they use.
+ */
+export interface MinimalRequest {
+  /**
+   * Only these entities, as `"id:instanceId"` (a bare id is that id on every
+   * instance the user sees): how a picker names its selected values. At most
+   * MINIMAL_IDS_MAX (100).
+   */
+  ids?: string[];
+  filter?: {
+    /** Matched anywhere in the name or an alias, ignoring case */
+    q?: string;
+    /** 1 to MINIMAL_PER_PAGE_MAX (100); 50 when absent */
+    per_page?: number;
+  };
+  /** The counts an entity must reach, any one of them */
+  count_filter?: MinimalCountFilter;
+}
+
+/**
+ * An entity as a picker lists it. A gallery without a title is named by its
+ * file, else its folder. When listed entities of two instances share a name,
+ * each one not on the default instance carries its instance's name.
+ */
+export interface MinimalEntity {
+  id: string;
+  instanceId: string;
+  name: string;
+}
 
 // =============================================================================
 // SCENES
@@ -111,13 +148,10 @@ export interface FindPerformersResponse {
 /**
  * POST /api/library/performers/minimal - Get minimal performer data
  */
-export interface FindPerformersMinimalRequest {
-  filter?: PaginationFilter;
-  count_filter?: MinimalCountFilter;
-}
+export type FindPerformersMinimalRequest = MinimalRequest;
 
 export interface FindPerformersMinimalResponse {
-  performers: Array<{ id: string; name: string; instanceId: string }>;
+  performers: MinimalEntity[];
 }
 
 // =============================================================================
@@ -139,13 +173,10 @@ export interface FindStudiosResponse {
 /**
  * POST /api/library/studios/minimal - Get minimal studio data
  */
-export interface FindStudiosMinimalRequest {
-  filter?: PaginationFilter;
-  count_filter?: MinimalCountFilter;
-}
+export type FindStudiosMinimalRequest = MinimalRequest;
 
 export interface FindStudiosMinimalResponse {
-  studios: Array<{ id: string; name: string; instanceId: string }>;
+  studios: MinimalEntity[];
 }
 
 // =============================================================================
@@ -167,13 +198,10 @@ export interface FindTagsResponse {
 /**
  * POST /api/library/tags/minimal - Get minimal tag data
  */
-export interface FindTagsMinimalRequest {
-  filter?: PaginationFilter;
-  count_filter?: MinimalCountFilter;
-}
+export type FindTagsMinimalRequest = MinimalRequest;
 
 export interface FindTagsMinimalResponse {
-  tags: Array<{ id: string; name: string; instanceId: string }>;
+  tags: MinimalEntity[];
 }
 
 /**
@@ -251,13 +279,10 @@ export interface FindGalleriesResponse {
 /**
  * POST /api/library/galleries/minimal - Get minimal gallery data
  */
-export interface FindGalleriesMinimalRequest {
-  filter?: PaginationFilter;
-  count_filter?: MinimalCountFilter;
-}
+export type FindGalleriesMinimalRequest = MinimalRequest;
 
 export interface FindGalleriesMinimalResponse {
-  galleries: Array<{ id: string; title: string; instanceId: string }>;
+  galleries: MinimalEntity[];
 }
 
 // =============================================================================
@@ -279,13 +304,10 @@ export interface FindGroupsResponse {
 /**
  * POST /api/library/groups/minimal - Get minimal group data
  */
-export interface FindGroupsMinimalRequest {
-  filter?: PaginationFilter;
-  count_filter?: MinimalCountFilter;
-}
+export type FindGroupsMinimalRequest = MinimalRequest;
 
 export interface FindGroupsMinimalResponse {
-  groups: Array<{ id: string; name: string; instanceId: string }>;
+  groups: MinimalEntity[];
 }
 
 // =============================================================================

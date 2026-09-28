@@ -2,7 +2,17 @@
  * Library API — entity search and lookup endpoints.
  */
 import type {
+  FindGalleriesMinimalRequest,
+  FindGalleriesMinimalResponse,
+  FindGroupsMinimalRequest,
+  FindGroupsMinimalResponse,
+  FindPerformersMinimalRequest,
+  FindPerformersMinimalResponse,
+  FindStudiosMinimalRequest,
+  FindStudiosMinimalResponse,
   FindTagTreeResponse,
+  FindTagsMinimalRequest,
+  FindTagsMinimalResponse,
   NormalizedImage,
   TagTreeScope,
 } from "@peek/shared-types";
@@ -173,46 +183,66 @@ export const libraryApi = {
       : null;
   },
 
-  // Minimal endpoints
-  findPerformersMinimal: async (params: LibrarySearchParams = {}) => {
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/performers/minimal",
-      params
-    );
-    return (result?.performers as unknown[]) || [];
-  },
+  // Entity pickers: one page in name order, or the ids a picker selected
+  findPerformersMinimal: async (
+    params: FindPerformersMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindPerformersMinimalResponse>(
+        "/library/performers/minimal",
+        params,
+        signal
+      )
+    ).performers,
 
-  findStudiosMinimal: async (params: LibrarySearchParams = {}) => {
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/studios/minimal",
-      params
-    );
-    return (result?.studios as unknown[]) || [];
-  },
+  findStudiosMinimal: async (
+    params: FindStudiosMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindStudiosMinimalResponse>(
+        "/library/studios/minimal",
+        params,
+        signal
+      )
+    ).studios,
 
-  findTagsMinimal: async (params: LibrarySearchParams = {}) => {
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/tags/minimal",
-      params
-    );
-    return (result?.tags as unknown[]) || [];
-  },
+  findTagsMinimal: async (
+    params: FindTagsMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindTagsMinimalResponse>(
+        "/library/tags/minimal",
+        params,
+        signal
+      )
+    ).tags,
 
-  findGroupsMinimal: async (params: LibrarySearchParams = {}) => {
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/groups/minimal",
-      params
-    );
-    return (result?.groups as unknown[]) || [];
-  },
+  findGroupsMinimal: async (
+    params: FindGroupsMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindGroupsMinimalResponse>(
+        "/library/groups/minimal",
+        params,
+        signal
+      )
+    ).groups,
 
-  findGalleriesMinimal: async (params: LibrarySearchParams = {}) => {
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/galleries/minimal",
-      params
-    );
-    return (result?.galleries as unknown[]) || [];
-  },
+  findGalleriesMinimal: async (
+    params: FindGalleriesMinimalRequest = {},
+    signal?: AbortSignal
+  ) =>
+    (
+      await apiPost<FindGalleriesMinimalResponse>(
+        "/library/galleries/minimal",
+        params,
+        signal
+      )
+    ).galleries,
 
   // Gallery images: the images search with an instance-aware galleries
   // filter, so exclusions apply and each image carries the user's own data

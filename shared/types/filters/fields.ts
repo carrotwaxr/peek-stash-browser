@@ -35,6 +35,12 @@ export const PER_PAGE_MAX = 250;
 /** Most ids one ref criterion may name */
 export const MAX_REF_VALUES = 1000;
 
+/** Most rows an entity picker's `/minimal` request returns; a larger per_page is held to it */
+export const MINIMAL_PER_PAGE_MAX = 100;
+
+/** Most ids one `/minimal` request may look up */
+export const MINIMAL_IDS_MAX = 100;
+
 /** Count and age clauses that compare and take BETWEEN, but not NOT_BETWEEN */
 const COUNT_MODIFIERS = [...COMPARISON_MODIFIERS, "BETWEEN"] as const;
 

@@ -1071,11 +1071,12 @@ describe("parseClipQuery", () => {
 });
 
 describe("parseMinimalRequest", () => {
-  it("reads q, sort name, direction, per_page and count_filter", () => {
+  it("reads q, per_page held to 1..100, ids and count_filter; always name order", () => {
     const parsed = parseMinimalRequest(
       "gallery",
       {
-        filter: { q: " a ", sort: "name", direction: "desc", per_page: 1000 },
+        ids: ["12:inst-a", "13"],
+        filter: { q: " a ", per_page: 1000 },
         count_filter: { min_scene_count: 1, min_image_count: 0 },
       },
       opts("reject")
@@ -1083,53 +1084,117 @@ describe("parseMinimalRequest", () => {
     expect(parsed).toEqual({
       entity: "gallery",
       q: "a",
-      sort: "name",
-      direction: "DESC",
-      perPage: PER_PAGE_MAX,
+      perPage: 100,
+      ids: [
+        { id: "12", instanceId: "inst-a" },
+        { id: "13", instanceId: undefined },
+      ],
       countFilter: { min_scene_count: 1, min_image_count: 0 },
       dropped: [],
     });
     expect(parseMinimalRequest("tag", {}, opts("reject"))).toEqual({
       entity: "tag",
       q: undefined,
-      sort: "name",
-      direction: "ASC",
       perPage: 50,
+      ids: undefined,
       countFilter: undefined,
       dropped: [],
     });
+    expect(
+      parseMinimalRequest("tag", { filter: { per_page: 0 } }, opts("reject"))
+        .perPage
+    ).toBe(1);
+    // An empty list names nothing to look up: no ids filter
+    expect(
+      parseMinimalRequest("studio", { ids: [] }, opts("reject")).ids
+    ).toBeUndefined();
   });
 
-  it("another sort, a negative count, an unknown count key and an unknown body key are invalid", () => {
+  it("sort, direction and page are unknown fields: the pickers list one page in name order", () => {
     const issues = issuesOf(() =>
       parseMinimalRequest(
         "performer",
-        {
-          filter: { sort: "rating" },
-          count_filter: { min_scene_count: -1, min_tag_count: 1 },
-          ids: ["1"],
-        },
+        { filter: { sort: "name", direction: "ASC", page: 1 } },
         opts("reject")
       )
     );
     expect(paths(issues)).toEqual([
       "filter.sort",
-      "count_filter.min_scene_count",
-      "count_filter.min_tag_count",
-      "ids",
+      "filter.direction",
+      "filter.page",
     ]);
     const dropped = parseMinimalRequest(
       "performer",
-      { filter: { sort: "rating" }, count_filter: { min_tag_count: 1 } },
+      { filter: { sort: "rating", direction: "DESC", q: "x" } },
       opts("drop")
     );
-    expect(dropped.sort).toBe("name");
-    expect(dropped.countFilter).toBeUndefined();
-    expect(paths(dropped.dropped)).toEqual([
-      "filter.sort",
-      "count_filter.min_tag_count",
-    ]);
+    expect(dropped.q).toBe("x");
+    expect(paths(dropped.dropped)).toEqual(["filter.sort", "filter.direction"]);
   });
+
+  it("a negative count, an unknown count key and an unknown body key are invalid", () => {
+    const issues = issuesOf(() =>
+      parseMinimalRequest(
+        "performer",
+        {
+          count_filter: { min_scene_count: -1, min_tag_count: 1 },
+          performer_filter: {},
+        },
+        opts("reject")
+      )
+    );
+    expect(paths(issues)).toEqual([
+      "count_filter.min_scene_count",
+      "count_filter.min_tag_count",
+      "performer_filter",
+    ]);
+    const dropped = parseMinimalRequest(
+      "performer",
+      { count_filter: { min_tag_count: 1 } },
+      opts("drop")
+    );
+    expect(dropped.countFilter).toBeUndefined();
+    expect(paths(dropped.dropped)).toEqual(["count_filter.min_tag_count"]);
+  });
+
+  it.each(POLICIES)(
+    "ids that are not ids, or more than 100 of them, fail in both policies (%s)",
+    (policy) => {
+      expect(
+        paths(
+          issuesOf(() =>
+            parseMinimalRequest(
+              "tag",
+              { ids: ["12:inst-a", "abc", "7:bad instance"] },
+              opts(policy)
+            )
+          )
+        )
+      ).toEqual(["ids.1", "ids.2"]);
+      const tooMany = Array.from({ length: 101 }, (_, i) => String(i + 1));
+      expect(
+        paths(
+          issuesOf(() =>
+            parseMinimalRequest("tag", { ids: tooMany }, opts(policy))
+          )
+        )
+      ).toEqual(["ids"]);
+      expect(
+        paths(
+          issuesOf(() =>
+            parseMinimalRequest("tag", { ids: "12" }, opts(policy))
+          )
+        )
+      ).toEqual(["ids"]);
+      expect(
+        parseMinimalRequest(
+          "tag",
+          { ids: Array.from({ length: 100 }, (_, i) => String(i + 1)) },
+          opts(policy)
+        ).ids
+      ).toHaveLength(100);
+    }
+  );
 
   it.each(POLICIES)("a body that is not an object fails (%s)", (policy) => {
     expect(

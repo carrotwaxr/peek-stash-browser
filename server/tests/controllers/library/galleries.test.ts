@@ -2,8 +2,6 @@
  * Unit Tests for Galleries Library Controller
  *
  * Tests findGalleries and findGalleriesMinimal.
- * Note: mergeGalleriesWithUserData is private and tested indirectly through
- * the handlers.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -12,23 +10,22 @@ import {
 } from "../../../controllers/library/galleries.js";
 // --- Imports ---
 
-import prisma from "../../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
+import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { createMockGallery } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
-vi.mock(
-  "../../../prisma/singleton.js",
-  () => import("../../helpers/prismaSingletonMock.js")
-);
-
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getAllGalleries: vi.fn(),
     getGallery: vi.fn(),
     getStudio: vi.fn(),
   },
@@ -38,10 +35,8 @@ vi.mock("../../../services/GalleryQueryBuilder.js", () => ({
   galleryQueryBuilder: { execute: vi.fn() },
 }));
 
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
-  },
+vi.mock("../../../services/MinimalEntityQuery.js", () => ({
+  findMinimalEntities: vi.fn(),
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
@@ -65,9 +60,9 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGalleryQueryBuilder = vi.mocked(galleryQueryBuilder);
+const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -75,9 +70,6 @@ const adminUser = testUser({ role: "ADMIN" });
 describe("Galleries Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: no ratings
-    mockPrisma.galleryRating.findMany.mockResolvedValue([]);
-    mockPrisma.imageRating.findMany.mockResolvedValue([]);
   });
 
   // ─── findGalleries HTTP handler ─────────────────────────────
@@ -217,142 +209,52 @@ describe("Galleries Controller", () => {
   // ─── findGalleriesMinimal ───────────────────────────────────
 
   describe("findGalleriesMinimal", () => {
-    it("returns minimal galleries on happy path", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", title: "Alpha" }),
-        createMockGallery({ id: "g2", title: "Beta" }),
-      ];
-      mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
-
+    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+      const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
+      mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findGalleriesMinimal, {
-        body: { filter: {} },
+        body: {
+          ids: ["1:inst-a"],
+          filter: { q: " al ", per_page: 20 },
+          count_filter: { min_scene_count: 1 },
+        },
         user: defaultUser,
       });
       const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().galleries).toHaveLength(2);
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+        entity: "gallery",
+        q: "al",
+        perPage: 20,
+        ids: [{ id: "1", instanceId: "inst-a" }],
+        countFilter: { min_scene_count: 1 },
+        dropped: [],
+      });
+      expect(res._getOkBody()).toEqual({ galleries: rows });
     });
 
-    it("returns the first per_page in title order, 50 by default, DESC reversed", async () => {
-      mockStashEntityService.getAllGalleries.mockResolvedValue(
-        Array.from({ length: 60 }, (_, i) =>
-          createMockGallery({
-            id: String(i + 1),
-            title: `Item ${String(i + 1).padStart(2, "0")}`,
-          })
-        )
-      );
-      const run = async (filter: {
-        per_page?: number;
-        direction?: "ASC" | "DESC";
-      }) => {
-        const req = reqFor(findGalleriesMinimal, {
-          body: { filter },
-          user: defaultUser,
-        });
-        const res = resFor(findGalleriesMinimal);
-        await findGalleriesMinimal(req, res);
-        return res._getOkBody().galleries.map((x) => x.id);
-      };
-
-      const byDefault = await run({});
-      expect(byDefault).toHaveLength(50);
-      expect(byDefault.slice(0, 2)).toEqual(["1", "2"]);
-      expect(await run({ per_page: 3, direction: "DESC" })).toEqual([
-        "60",
-        "59",
-        "58",
-      ]);
-    });
-
-    it("returns empty when cache is not initialized", async () => {
-      mockStashEntityService.getAllGalleries.mockResolvedValue([]);
-
+    it("a sort field answers 400 before any query: the pickers always list by name", async () => {
       const req = reqFor(findGalleriesMinimal, {
-        body: { filter: {} },
+        body: malformed({ filter: { sort: "name" } }),
         user: defaultUser,
       });
       const res = resFor(findGalleriesMinimal);
 
-      await findGalleriesMinimal(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().galleries).toEqual([]);
+      await expect(findGalleriesMinimal(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "filter.sort" }],
+      });
+      expect(mockFindMinimalEntities).not.toHaveBeenCalled();
     });
 
-    it("applies search query filtering", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", title: "Beach Photos" }),
-        createMockGallery({ id: "g2", title: "Urban Shots" }),
-      ];
-      mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
-
-      const req = reqFor(findGalleriesMinimal, {
-        body: { filter: { q: "beach" } },
-        user: defaultUser,
-      });
+    it("a query error reaches the central error handler", async () => {
+      mockFindMinimalEntities.mockRejectedValue(new Error("fail"));
+      const req = reqFor(findGalleriesMinimal, { user: defaultUser });
       const res = resFor(findGalleriesMinimal);
 
-      await findGalleriesMinimal(req, res);
-
-      expect(res._getOkBody().galleries).toHaveLength(1);
-    });
-
-    it("applies count_filter with min_image_count", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", image_count: 100 }),
-        createMockGallery({ id: "g2", image_count: 2 }),
-      ];
-      mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
-
-      const req = reqFor(findGalleriesMinimal, {
-        body: { filter: {}, count_filter: { min_image_count: 10 } },
-        user: defaultUser,
-      });
-      const res = resFor(findGalleriesMinimal);
-
-      await findGalleriesMinimal(req, res);
-
-      expect(res._getOkBody().galleries).toHaveLength(1);
-    });
-
-    it("sorts by title", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", title: "Zebra" }),
-        createMockGallery({ id: "g2", title: "Alpha" }),
-      ];
-      mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
-
-      const req = reqFor(findGalleriesMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findGalleriesMinimal);
-
-      await findGalleriesMinimal(req, res);
-
-      const result = res._getOkBody().galleries;
-      expect(must(result[0]).title).toBe("Alpha");
-      expect(must(result[1]).title).toBe("Zebra");
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getAllGalleries.mockRejectedValue(
-        new Error("fail")
-      );
-
-      const req = reqFor(findGalleriesMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findGalleriesMinimal);
-
-      await findGalleriesMinimal(req, res);
-
-      expect(res._getStatus()).toBe(500);
+      await expect(findGalleriesMinimal(req, res)).rejects.toThrow("fail");
     });
   });
 });

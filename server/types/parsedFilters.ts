@@ -202,14 +202,17 @@ export interface ParsedRecommendedQuery {
 /** The lists with a `/minimal` endpoint (the entity pickers) */
 export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
 
-/** `POST /api/library/<entities>/minimal`: name order only */
+/** `POST /api/library/<entities>/minimal`: one page, always in name order */
 export interface ParsedMinimalRequest<E extends MinimalKind> {
   readonly entity: E;
   readonly q: string | undefined;
-  readonly sort: "name";
-  readonly direction: "ASC" | "DESC";
-  /** 1..PER_PAGE_MAX */
+  /** 1..MINIMAL_PER_PAGE_MAX; 50 when absent */
   readonly perPage: number;
+  /**
+   * Only these entities (at most MINIMAL_IDS_MAX); a bare ref matches its id
+   * on every instance. Undefined when absent or empty.
+   */
+  readonly ids: readonly FilterRef[] | undefined;
   /** Only the keys sent, each a non-negative integer; OR semantics */
   readonly countFilter: MinimalCountFilter | undefined;
   readonly dropped: readonly DroppedInput[];

@@ -1,3 +1,4 @@
+import { MINIMAL_PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
@@ -18,7 +19,7 @@ import {
  *
  * The requests go through the one parser (item 38) with the server in
  * reject mode: an unknown count_filter key answers 400, and the page size is
- * 50 unless the request names one, held to 1..250. The page-size cases seed
+ * 50 unless the request names one, held to 1..100. The page-size cases seed
  * 260 rows of each type on a made-up instance (the replay's library is
  * smaller than a page) for a user who sees every instance, and delete them
  * before the file ends.
@@ -37,7 +38,7 @@ interface MinimalTagResponse {
 }
 
 interface MinimalGalleryResponse {
-  galleries: Array<{ id: string; title: string }>;
+  galleries: Array<{ id: string; name: string }>;
 }
 
 interface MinimalGroupResponse {
@@ -397,7 +398,7 @@ describe("Minimal Endpoint Count Filters", () => {
     ];
 
     it.each(ENDPOINTS)(
-      "minimal: per_page 1000 returns at most 250 ($type)",
+      "minimal: per_page 1000 returns at most 100 ($type)",
       async ({ type, rows }) => {
         const { client } = must(viewer, "the viewer");
 
@@ -406,7 +407,7 @@ describe("Minimal Endpoint Count Filters", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(rows(response.data)).toHaveLength(250);
+        expect(rows(response.data)).toHaveLength(MINIMAL_PER_PAGE_MAX);
       }
     );
 

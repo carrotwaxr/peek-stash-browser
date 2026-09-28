@@ -270,6 +270,9 @@ export type {
 // Library endpoint types
 export type {
   WithStashUrl,
+  // Entity pickers
+  MinimalRequest,
+  MinimalEntity,
   // Scenes
   FindScenesRequest,
   FindScenesResponse,

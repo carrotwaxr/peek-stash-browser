@@ -193,7 +193,7 @@ describe("Entity List Benchmarks", () => {
   it("minimal performer list", async () => {
     const result = await measureEndpoint("performer-list-minimal", async () => {
       const res = await adminClient.post("/api/library/performers/minimal", {
-        filter: { page: 1, per_page: 100 },
+        filter: { per_page: 100 },
       });
       expect(res.ok).toBe(true);
     });
@@ -203,7 +203,7 @@ describe("Entity List Benchmarks", () => {
   it("minimal tag list", async () => {
     const result = await measureEndpoint("tag-list-minimal", async () => {
       const res = await adminClient.post("/api/library/tags/minimal", {
-        filter: { page: 1, per_page: 100 },
+        filter: { per_page: 100 },
       });
       expect(res.ok).toBe(true);
     });
