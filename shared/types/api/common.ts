@@ -30,13 +30,24 @@ export interface MinimalCountFilter {
 }
 
 /**
- * Standard error response
+ * One problem with a request's input: where it is (a dotted path such as
+ * `scene_filter.performers.modifier`) and what is wrong with it.
+ */
+export interface ApiErrorIssue {
+  path: string;
+  message: string;
+}
+
+/**
+ * Standard error response. `issues` lists what was invalid in a request
+ * refused with errorType VALIDATION_ERROR.
  */
 export interface ApiErrorResponse {
   error: string;
   message?: string;
   details?: string;
   errorType?: string;
+  issues?: ApiErrorIssue[];
 }
 
 /**

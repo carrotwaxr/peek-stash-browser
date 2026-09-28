@@ -2,6 +2,7 @@
 export type {
   PaginationFilter,
   MinimalCountFilter,
+  ApiErrorIssue,
   ApiErrorResponse,
   AmbiguousLookupResponse,
   ApiSuccessResponse,

@@ -18,11 +18,12 @@
 export type LogContext = { [key: string]: unknown };
 
 const UNSERIALISABLE_CONTEXT = "[unserialisable context]";
+const CIRCULAR = "[Circular]";
 
 /**
  * An Error as the fields a log reader needs: name, message and stack, plus a
  * database error's `code` and `meta` (Prisma, SQLite, Node system errors)
- * and its `cause`, which the replacer walks in turn.
+ * and its `cause`, which the walk visits in turn.
  */
 function serializeError(error: Error): Record<string, unknown> {
   const fields: Record<string, unknown> = {
@@ -38,27 +39,70 @@ function serializeError(error: Error): Record<string, unknown> {
   return fields;
 }
 
+function hasToJSON(
+  value: object
+): value is { toJSON: (key: string) => unknown } {
+  return "toJSON" in value && typeof value.toJSON === "function";
+}
+
+/**
+ * `value` rebuilt as `JSON.stringify` can write it: an Error as its fields, a
+ * BigInt as a number (a string past 2^53), and an object that is one of its
+ * own ancestors as "[Circular]". `ancestors` is the path from the root to
+ * `value` (pushed on entering an object, popped on leaving it), so the same
+ * object reached twice without a cycle is written twice. `toJSON` is called
+ * once, as `JSON.stringify` does; functions, symbols and undefined pass
+ * through for it to drop.
+ */
+function toLoggable(value: unknown, key: string, ancestors: object[]): unknown {
+  const current =
+    typeof value === "object" && value !== null && hasToJSON(value)
+      ? value.toJSON(key)
+      : value;
+  if (typeof current === "bigint") {
+    const asNumber = Number(current);
+    return Number.isSafeInteger(asNumber) ? asNumber : current.toString();
+  }
+  if (typeof current !== "object" || current === null) return current;
+  // A boxed string, number or boolean: JSON.stringify writes its value
+  if (
+    current instanceof String ||
+    current instanceof Number ||
+    current instanceof Boolean
+  ) {
+    return current;
+  }
+  if (ancestors.includes(current)) return CIRCULAR;
+
+  ancestors.push(current);
+  try {
+    if (Array.isArray(current)) {
+      return current.map((item: unknown, index) =>
+        toLoggable(item, String(index), ancestors)
+      );
+    }
+    const source = current instanceof Error ? serializeError(current) : current;
+    const fields: Record<string, unknown> = {};
+    for (const [name, field] of Object.entries(source)) {
+      fields[name] = toLoggable(field, name, ancestors);
+    }
+    return fields;
+  } finally {
+    ancestors.pop();
+  }
+}
+
 /**
  * The context as one line of JSON. `JSON.stringify` writes an Error as `{}`
- * and throws on a BigInt (raw SQL rows carry them) and on a cycle, so the
- * replacer turns an Error into its fields, a BigInt into a number (a string
- * past 2^53), and an object met a second time into "[Circular]". Anything
- * else that throws (a getter, a `toJSON`) gives "[unserialisable context]":
- * a log call never becomes the caller's exception.
+ * and throws on a BigInt (raw SQL rows carry them) and on a cycle, so
+ * `toLoggable` first turns an Error into its fields, a BigInt into a number
+ * (a string past 2^53), and a true cycle into "[Circular]". Anything else
+ * that throws (a getter, a `toJSON`) gives "[unserialisable context]": a log
+ * call never becomes the caller's exception.
  */
 export function serializeContext(context: LogContext): string {
-  const seen = new WeakSet();
   try {
-    return JSON.stringify(context, (_key, value: unknown): unknown => {
-      if (typeof value === "bigint") {
-        const asNumber = Number(value);
-        return Number.isSafeInteger(asNumber) ? asNumber : value.toString();
-      }
-      if (typeof value !== "object" || value === null) return value;
-      if (seen.has(value)) return "[Circular]";
-      seen.add(value);
-      return value instanceof Error ? serializeError(value) : value;
-    });
+    return JSON.stringify(toLoggable(context, "", []));
   } catch {
     return UNSERIALISABLE_CONTEXT;
   }
