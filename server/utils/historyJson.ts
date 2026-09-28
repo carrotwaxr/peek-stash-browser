@@ -46,3 +46,40 @@ function readEntry(entry: unknown): string | null {
   }
   return null;
 }
+
+/** A Peek timestamp this close to a Stash one is the same event. */
+export const HISTORY_MERGE_WINDOW_MS = 60_000;
+
+/**
+ * Merges Stash's history of a scene into Peek's, for the admin's Sync from
+ * Stash: Stash's timestamps, plus every Peek timestamp with no Stash
+ * timestamp within HISTORY_MERGE_WINDOW_MS of it (an O pushed by Sync to
+ * Stash reappears in Stash at nearly the same time, so both clocks are
+ * assumed the same). Stash's timestamps are stored in toISOString() form,
+ * as Peek writes its own; the result is ordered by time. A Stash entry that
+ * is not a time is dropped; a Peek entry that is not is kept, at the end,
+ * since the merge never loses a Peek event.
+ */
+export function mergeHistory(peek: string[], stash: string[]): string[] {
+  const stashTimes = stash
+    .map((entry) => Date.parse(entry))
+    .filter((ms) => Number.isFinite(ms));
+  const merged: Array<{ ms: number; entry: string }> = stashTimes.map((ms) => ({
+    ms,
+    entry: new Date(ms).toISOString(),
+  }));
+  const unparseable: string[] = [];
+  for (const entry of peek) {
+    const ms = Date.parse(entry);
+    if (!Number.isFinite(ms)) {
+      unparseable.push(entry);
+      continue;
+    }
+    const sameEvent = stashTimes.some(
+      (stashMs) => Math.abs(stashMs - ms) <= HISTORY_MERGE_WINDOW_MS
+    );
+    if (!sameEvent) merged.push({ ms, entry });
+  }
+  merged.sort((a, b) => a.ms - b.ms);
+  return [...merged.map((item) => item.entry), ...unparseable];
+}

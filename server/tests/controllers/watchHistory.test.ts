@@ -966,6 +966,10 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith({
         where: { userId: 1 },
       });
+      // The five deletes are one writer-queue unit
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      const ops = must(mockPrisma.$transaction.mock.calls[0])[0];
+      expect(Array.isArray(ops) && ops.length).toBe(5);
 
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({

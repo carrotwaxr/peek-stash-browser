@@ -391,6 +391,23 @@ const dayBetween = (fromYear: number, toYear: number): Rule =>
   when((c) => c.day(fromYear, toYear));
 const rating = when((c) => c.rng().pick(RATINGS));
 const counter = when((c) => c.rng().int(1, 9));
+/**
+ * A scene's O or play dates: as many as its counter (Stash keeps one date
+ * per count), each within 400 days of created_at, in time order.
+ */
+const historyOf =
+  (counterField: string): Rule =>
+  (c) => {
+    const count =
+      c.entity.lengths[c.field] ??
+      (c.present(counterField) ? c.rng(counterField).int(1, 9) : 0);
+    return numbers(count)
+      .map(
+        (n) => c.createdSeconds() + c.rng(`${c.field}.${n}`).int(0, 400 * DAY)
+      )
+      .sort((a, b) => a - b)
+      .map(timestamp);
+  };
 const flag = when((c) => c.rng().int(0, 1) === 1);
 const between = (min: number, max: number): Rule =>
   when((c) => c.rng().int(min, max));
@@ -566,6 +583,8 @@ const RULES: Record<EntityType, Record<string, Rule>> = {
   scene: {
     files: sceneFiles,
     paths: scenePaths,
+    o_history: historyOf("o_counter"),
+    play_history: historyOf("play_count"),
     sceneStreams: (c) =>
       c.length() > 0
         ? streamLabels(c.dimensions()[1]).map((name) => ({ label: name }))

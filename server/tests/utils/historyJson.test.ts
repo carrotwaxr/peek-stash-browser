@@ -4,7 +4,7 @@
  * JSON-encoded string instead of an array, so both shapes must read back.
  */
 import { describe, expect, it } from "vitest";
-import { readHistory } from "../../utils/historyJson.js";
+import { mergeHistory, readHistory } from "../../utils/historyJson.js";
 
 describe("readHistory", () => {
   const A = "2026-01-01T00:00:00.000Z";
@@ -70,5 +70,51 @@ describe("readHistory", () => {
     it("falls back to an entry's time when it has no startTime", () => {
       expect(readHistory([{ time: A }, B])).toEqual([A, B]);
     });
+  });
+});
+
+describe("mergeHistory", () => {
+  // Stash's offset form and its stored (toISOString) form
+  const STASH_T = "2021-10-12T18:02:42-05:00";
+  const T = "2021-10-12T23:02:42.000Z";
+  const T_PLUS_60S = "2021-10-12T23:03:42.000Z";
+  const T_PLUS_61S = "2021-10-12T23:03:43.000Z";
+  const T_MINUS_2S = "2021-10-12T23:02:40.000Z";
+  const U = "2021-11-01T10:00:00.000Z";
+
+  it("stores Stash's timestamps in toISOString form", () => {
+    expect(mergeHistory([], [STASH_T])).toEqual([T]);
+  });
+
+  it("drops a Peek timestamp within 60 seconds of a Stash one, either side", () => {
+    expect(mergeHistory([T_MINUS_2S], [STASH_T])).toEqual([T]);
+    expect(mergeHistory([T_PLUS_60S], [STASH_T])).toEqual([T]);
+  });
+
+  it("keeps a Peek timestamp more than 60 seconds from every Stash one", () => {
+    expect(mergeHistory([T_PLUS_61S], [STASH_T])).toEqual([T, T_PLUS_61S]);
+    expect(mergeHistory([U], [STASH_T])).toEqual([T, U]);
+  });
+
+  it("keeps every Stash timestamp, and Peek's with nothing from Stash", () => {
+    expect(mergeHistory([U], [])).toEqual([U]);
+    expect(mergeHistory([], [U, STASH_T])).toEqual([T, U]);
+  });
+
+  it("orders the merged list by time", () => {
+    expect(mergeHistory([U, T_MINUS_2S], [])).toEqual([T_MINUS_2S, U]);
+    expect(mergeHistory([U], [STASH_T])).toEqual([T, U]);
+  });
+
+  it("is idempotent: merging the merge with the same Stash list changes nothing", () => {
+    const once = mergeHistory([T_MINUS_2S, U], [STASH_T]);
+    expect(mergeHistory(once, [STASH_T])).toEqual(once);
+  });
+
+  it("drops a Stash entry that is not a time and keeps a Peek entry that is not", () => {
+    expect(mergeHistory(["not a time"], ["also not", STASH_T])).toEqual([
+      T,
+      "not a time",
+    ]);
   });
 });

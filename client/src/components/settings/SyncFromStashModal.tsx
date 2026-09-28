@@ -20,15 +20,22 @@ interface SyncStats {
   tags: SyncEntityStats | null;
   galleries: SyncEntityStats | null;
   groups: SyncEntityStats | null;
+  images: SyncEntityStats | null;
 }
 
 interface SyncOptions {
-  scenes: { rating: boolean; favorite?: boolean; oCounter: boolean };
+  scenes: {
+    rating: boolean;
+    favorite?: boolean;
+    oCounter: boolean;
+    playCount: boolean;
+  };
   performers: { rating: boolean; favorite: boolean };
   studios: { rating: boolean; favorite: boolean };
   tags: { rating: boolean; favorite: boolean };
   galleries: { rating: boolean };
   groups: { rating: boolean };
+  images: { rating: boolean };
 }
 
 interface Props {
@@ -42,12 +49,18 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
   const [syncResult, setSyncResult] = useState<SyncStats | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncOptions, setSyncOptions] = useState<SyncOptions>({
-    scenes: { rating: true, favorite: false, oCounter: false },
+    scenes: {
+      rating: true,
+      favorite: false,
+      oCounter: false,
+      playCount: false,
+    },
     performers: { rating: true, favorite: true },
     studios: { rating: true, favorite: true },
     tags: { rating: false, favorite: true },
     galleries: { rating: true },
     groups: { rating: true },
+    images: { rating: true },
   });
 
   const toggleSyncOption = (entityType: keyof SyncOptions, field: string) => {
@@ -99,7 +112,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
         <Paper.Header>
           <Paper.Title>Sync from Stash</Paper.Title>
           <Paper.Subtitle className="mt-1">
-            Import ratings and favorites for {user.username}
+            Import ratings, favorites, O counts and plays for {user.username}
           </Paper.Subtitle>
         </Paper.Header>
         <Paper.Body>
@@ -124,10 +137,14 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                 <li>
                   Only imports items that have the selected fields set in Stash
                 </li>
-                <li>Updates existing Peek data if values differ from Stash</li>
                 <li>
-                  O Counter import syncs total count only (not individual
-                  timestamps)
+                  A rating in Stash replaces the rating in Peek; a favorite in
+                  Stash is added, and never removes one from Peek
+                </li>
+                <li>
+                  O counts and play counts come with their dates. Dates Peek
+                  already holds are kept, and a date Stash got from Peek is not
+                  counted twice
                 </li>
                 <li>May take several minutes for large libraries</li>
               </ul>
@@ -144,24 +161,15 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                     onChange={() => toggleSyncOption("scenes", "rating")}
                   />
                   <SyncCheckbox
-                    label="O Counter"
+                    label="O counter and dates"
                     checked={syncOptions.scenes.oCounter}
                     onChange={() => toggleSyncOption("scenes", "oCounter")}
                   />
-                  {syncOptions.scenes.oCounter && (
-                    <p
-                      className="text-xs ml-6 p-2 rounded"
-                      style={{
-                        color: "rgb(245, 158, 11)",
-                        backgroundColor: "rgba(245, 158, 11, 0.1)",
-                        border: "1px solid rgba(245, 158, 11, 0.3)",
-                      }}
-                    >
-                      Warning: Only the total O Counter value will be synced.
-                      Individual timestamps from Stash history will not be
-                      imported.
-                    </p>
-                  )}
+                  <SyncCheckbox
+                    label="Play count and dates"
+                    checked={syncOptions.scenes.playCount}
+                    onChange={() => toggleSyncOption("scenes", "playCount")}
+                  />
                   <p
                     className="text-xs ml-6"
                     style={{ color: "var(--text-muted)" }}
@@ -242,6 +250,21 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                     Groups do not have favorites in Stash
                   </p>
                 </SyncOptionGroup>
+
+                {/* Images */}
+                <SyncOptionGroup title="Images">
+                  <SyncCheckbox
+                    label="Rating"
+                    checked={syncOptions.images.rating}
+                    onChange={() => toggleSyncOption("images", "rating")}
+                  />
+                  <p
+                    className="text-xs ml-6"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Images do not have favorites in Stash
+                  </p>
+                </SyncOptionGroup>
               </div>
             )}
 
@@ -308,6 +331,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                     stats={syncResult.galleries}
                   />
                   <SyncResultItem label="Groups" stats={syncResult.groups} />
+                  <SyncResultItem label="Images" stats={syncResult.images} />
                 </div>
               </div>
             )}

@@ -21,7 +21,7 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../types/api/index.js";
-import { dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
@@ -614,14 +614,14 @@ export async function clearAllWatchHistory(
 
     logger.info("Clearing all watch history and stats", { userId });
 
-    // Delete watch history, all related stats, and rankings in parallel
+    // Delete watch history, all related stats, and rankings as one unit
     const [
       watchHistoryResult,
       performerStatsResult,
       studioStatsResult,
       tagStatsResult,
       rankingsResult,
-    ] = await Promise.all([
+    ] = await dbWriteBatch("history.clear", [
       prisma.watchHistory.deleteMany({ where: { userId } }),
       prisma.userPerformerStats.deleteMany({ where: { userId } }),
       prisma.userStudioStats.deleteMany({ where: { userId } }),
