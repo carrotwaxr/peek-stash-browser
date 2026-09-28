@@ -10,6 +10,7 @@ import {
   buildDerivedWeightsFromScoringData,
   buildImplicitWeightsFromRankings,
   countUserCriteria,
+  diversifyByScoreTier,
   hasAnyCriteria,
   scoreScoringDataByPreferences,
 } from "../../services/RecommendationScoringService.js";
@@ -1725,46 +1726,13 @@ export const getRecommendedScenes = async (
     // Sort by score descending
     scoredScenes.sort((a, b) => b.score - a.score);
 
-    // Add diversity through score tier randomization
-    // Group scenes into score tiers (10% bands) and randomize within each tier
-    // This creates variety while maintaining general quality order
-    const diversifiedScenes: ScoredSceneId[] = [];
-    if (scoredScenes.length > 0) {
-      const firstScene = scoredScenes[0] as ScoredSceneId;
-      const lastScene = scoredScenes[scoredScenes.length - 1] as ScoredSceneId;
-      const maxScore = firstScene.score;
-      const minScore = lastScene.score;
-      const scoreRange = maxScore - minScore;
-      const tierSize = scoreRange / 10; // 10 tiers
-
-      // Group scenes by tier
-      const tiers: ScoredSceneId[][] = Array.from({ length: 10 }, () => []);
-      for (const scoredScene of scoredScenes) {
-        const tierIndex = Math.min(
-          9,
-          Math.floor((maxScore - scoredScene.score) / tierSize)
-        );
-        (tiers[tierIndex] as ScoredSceneId[]).push(scoredScene);
-      }
-
-      // Use seeded random for consistent shuffle order per user
-      // This prevents duplicates across pages while maintaining diversity
-      // Seed changes daily for fresh shuffle order
-      const rng = new SeededRandom(generateDailySeed(userId));
-
-      // Randomize within each tier and combine
-      for (const tier of tiers) {
-        // Fisher-Yates shuffle with seeded random
-        for (let i = tier.length - 1; i > 0; i--) {
-          const j = rng.nextInt(i + 1);
-          [tier[i], tier[j]] = [
-            tier[j] as ScoredSceneId,
-            tier[i] as ScoredSceneId,
-          ];
-        }
-        diversifiedScenes.push(...tier);
-      }
-    }
+    // Add diversity through score tier randomization: 10% bands, shuffled
+    // within each. The seed is per user and changes daily, so the order holds
+    // across pages (no duplicates) and refreshes each day.
+    const diversifiedScenes = diversifyByScoreTier(
+      scoredScenes,
+      new SeededRandom(generateDailySeed(userId))
+    );
 
     // Cap at top 500 recommendations
     const cappedScenes = diversifiedScenes.slice(0, 500);

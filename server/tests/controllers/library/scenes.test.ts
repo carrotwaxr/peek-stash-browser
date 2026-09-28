@@ -29,6 +29,7 @@ import {
 } from "../../../graphql/generated/graphql.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
+import type * as recommendationScoringModule from "../../../services/RecommendationScoringService.js";
 import {
   hasAnyCriteria,
   scoreScoringDataByPreferences,
@@ -99,30 +100,37 @@ vi.mock("../../../services/RankingComputeService.js", () => ({
   },
 }));
 
-vi.mock("../../../services/RecommendationScoringService.js", () => ({
-  buildDerivedWeightsFromScoringData: vi.fn().mockReturnValue({
-    derivedPerformerWeights: new Map(),
-    derivedStudioWeights: new Map(),
-    derivedTagWeights: new Map(),
-  }),
-  buildImplicitWeightsFromRankings: vi.fn().mockReturnValue({
-    implicitPerformerWeights: new Map(),
-    implicitStudioWeights: new Map(),
-    implicitTagWeights: new Map(),
-  }),
-  scoreScoringDataByPreferences: vi.fn().mockReturnValue(0),
-  countUserCriteria: vi.fn().mockReturnValue({
-    favoritePerformers: 0,
-    ratedPerformers: 0,
-    favoriteStudios: 0,
-    ratedStudios: 0,
-    favoriteTags: 0,
-    ratedTags: 0,
-    ratedScenes: 0,
-    favoriteScenes: 0,
-  }),
-  hasAnyCriteria: vi.fn().mockReturnValue(false),
-}));
+vi.mock(
+  "../../../services/RecommendationScoringService.js",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof recommendationScoringModule>();
+    return {
+      diversifyByScoreTier: actual.diversifyByScoreTier,
+      buildDerivedWeightsFromScoringData: vi.fn().mockReturnValue({
+        derivedPerformerWeights: new Map(),
+        derivedStudioWeights: new Map(),
+        derivedTagWeights: new Map(),
+      }),
+      buildImplicitWeightsFromRankings: vi.fn().mockReturnValue({
+        implicitPerformerWeights: new Map(),
+        implicitStudioWeights: new Map(),
+        implicitTagWeights: new Map(),
+      }),
+      scoreScoringDataByPreferences: vi.fn().mockReturnValue(0),
+      countUserCriteria: vi.fn().mockReturnValue({
+        favoritePerformers: 0,
+        ratedPerformers: 0,
+        favoriteStudios: 0,
+        ratedStudios: 0,
+        favoriteTags: 0,
+        ratedTags: 0,
+        ratedScenes: 0,
+        favoriteScenes: 0,
+      }),
+      hasAnyCriteria: vi.fn().mockReturnValue(false),
+    };
+  }
+);
 
 vi.mock("../../../utils/codecDetection.js", () => ({
   isSceneStreamable: vi
@@ -153,7 +161,7 @@ vi.mock("../../../utils/seededRandom.js", () => ({
       randomSeed: undefined,
     })),
   SeededRandom: vi.fn().mockImplementation(() => ({
-    nextInt: vi.fn().mockReturnValue(0),
+    shuffle: vi.fn(<T>(items: T[]) => items),
   })),
   generateDailySeed: vi.fn().mockReturnValue(42),
 }));
@@ -2039,6 +2047,66 @@ describe("getRecommendedScenes", () => {
       expect(res._getStatus()).toBe(200);
       expect(res._getOkBody().count).toBe(2);
       expect([...requestedIds()].sort()).toEqual(["malformed", "unwatched"]);
+    });
+  });
+
+  describe("score tiers", () => {
+    afterEach(() => {
+      mockHasAnyCriteria.mockReturnValue(false);
+      mockScore.mockReturnValue(0);
+    });
+
+    it("answers 200 when one scene is the only match", async () => {
+      const actual = await vi.importActual<typeof recommendationScoringModule>(
+        "../../../services/RecommendationScoringService.js"
+      );
+      mockScore.mockImplementation(actual.scoreScoringDataByPreferences);
+      mockHasAnyCriteria.mockReturnValue(true);
+      mockPrisma.performerRating.findMany.mockResolvedValue([
+        partialRow({
+          performerId: "p1",
+          instanceId: "default",
+          favorite: true,
+          rating: null,
+        }),
+      ]);
+      // p1 is in one scene only, so one scene scores: the score range is 0
+      mockStashEntityService.getScenesForScoring.mockResolvedValueOnce([
+        {
+          id: "s1",
+          instanceId: "default",
+          studioId: null,
+          performerIds: ["p1"],
+          tagIds: [],
+          oCounter: 0,
+          date: null,
+        },
+        {
+          id: "s2",
+          instanceId: "default",
+          studioId: null,
+          performerIds: ["p2"],
+          tagIds: [],
+          oCounter: 0,
+          date: null,
+        },
+      ]);
+      mockSceneQueryBuilder.getByIds.mockResolvedValueOnce({
+        scenes: [createMockScene({ id: "s1" })],
+        total: 1,
+      });
+
+      const req = reqFor(getRecommendedScenes, {
+        user: testUser(),
+        query: { page: "1" },
+      });
+      const res = resFor(getRecommendedScenes);
+      await getRecommendedScenes(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      const body = res._getOkBody();
+      expect(body.count).toBe(1);
+      expect(body.scenes.map((s) => s.id)).toEqual(["s1"]);
     });
   });
 

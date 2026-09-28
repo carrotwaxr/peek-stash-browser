@@ -1,5 +1,6 @@
 // server/services/RecommendationScoringService.ts
 import type { NormalizedScene, SceneScoringData } from "../types/index.js";
+import type { SeededRandom } from "../utils/seededRandom.js";
 
 // Configuration constants
 export const SCENE_WEIGHT_BASE = 0.4;
@@ -598,4 +599,31 @@ export function scoreScoringDataByPreferences(
   }
 
   return baseScore;
+}
+
+/**
+ * Add variety to a ranked list while keeping its rough order: the scores fall
+ * into 10 bands (10% of the range each), highest first, and each band is
+ * shuffled with `rng`. When every score is equal (range 0, one scored scene
+ * included) all scenes share the first band.
+ */
+export function diversifyByScoreTier<T extends { score: number }>(
+  scored: readonly T[], // sorted by score, highest first
+  rng: SeededRandom
+): T[] {
+  const first = scored[0];
+  const last = scored[scored.length - 1];
+  if (!first || !last) return [];
+  const range = first.score - last.score;
+  const tierSize = range / 10;
+  const tiers: T[][] = Array.from({ length: 10 }, () => []);
+  for (const s of scored) {
+    // One tier when every score is equal: no division by zero
+    const index =
+      range > 0
+        ? Math.min(9, Math.floor((first.score - s.score) / tierSize))
+        : 0;
+    tiers[index]?.push(s);
+  }
+  return tiers.flatMap((tier) => rng.shuffle(tier));
 }
