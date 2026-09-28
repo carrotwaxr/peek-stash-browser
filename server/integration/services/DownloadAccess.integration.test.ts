@@ -7,10 +7,14 @@
  * to download; the owner hides nothing and gets every live scene on an
  * enabled instance.
  *
- * The zip runs in this worker: CONFIG_DIR points at a temp directory, fetch
- * is stubbed, and the instance manager answers only for A and B.
+ * The zip and the file route run in this worker: CONFIG_DIR points at a temp
+ * directory, fetch is stubbed, and the instance manager answers only for A
+ * and B.
  */
+import express from "express";
 import fs from "fs";
+import type http from "http";
+import type { AddressInfo } from "net";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -23,11 +27,17 @@ import {
   it,
   vi,
 } from "vitest";
+import { getDownloadFile } from "../../controllers/download.js";
+import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import {
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../../services/StashInstanceManager.js";
 import { must } from "../../tests/helpers/must.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import {
   FX,
   FX_ID,
@@ -46,6 +56,9 @@ const BASE_URLS: Record<string, string> = {
   [FX.A]: "http://stash-a.test",
   [FX.B]: "http://stash-b.test",
 };
+
+// The file route is requested over real HTTP; Stash is the stubbed fetch
+const realFetch = globalThis.fetch;
 
 describe("Download access (integration)", () => {
   let owner: number;
@@ -106,15 +119,12 @@ describe("Download access (integration)", () => {
     configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-dl-access-"));
     process.env.CONFIG_DIR = configDir;
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(stashInstanceManager, "getBaseUrl").mockImplementation(
+    vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation(
       (id?: string) => {
-        const url = id ? BASE_URLS[id] : undefined;
-        if (!url) throw new Error(`unexpected instance ${String(id)}`);
-        return url;
+        const baseUrl = id ? BASE_URLS[id] : undefined;
+        if (!baseUrl) throw new UnknownInstanceError(String(id));
+        return { baseUrl, apiKey: `key-${id}` };
       }
-    );
-    vi.spyOn(stashInstanceManager, "getApiKey").mockImplementation(
-      (id?: string) => `key-${id}`
     );
   }, 60000);
 
@@ -235,5 +245,60 @@ describe("Download access (integration)", () => {
     expect(await status(legacyImage.id)).toBe("EXPIRED");
     expect(await status(sceneOnA.id)).toBe("COMPLETED");
     expect(await status(zip.id)).toBe("COMPLETED");
+  });
+
+  it("a file download fetches from the download's own instance", async () => {
+    await prisma.user.update({
+      where: { id: owner },
+      data: { canDownloadFilesOverride: true },
+    });
+    // SAME exists on A and B; the download is B's
+    const download = await prisma.download.create({
+      data: {
+        userId: owner,
+        type: "SCENE",
+        status: "COMPLETED",
+        entityType: "scene",
+        entityId: FX_ID.SAME,
+        instanceId: FX.B,
+        fileName: "same-on-b.mp4",
+        progress: 100,
+      },
+    });
+
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as AuthenticatedRequest).user = {
+        id: owner,
+        username: "access-it-owner",
+        role: "USER",
+      };
+      next();
+    });
+    app.get("/api/downloads/:id/file", authenticated(getDownloadFile));
+    const server = await new Promise<http.Server>((resolve) => {
+      const listening = app.listen(0, () => resolve(listening));
+    });
+    try {
+      const { port } = server.address() as AddressInfo;
+      const res = await realFetch(
+        `http://127.0.0.1:${port}/api/downloads/${download.id}/file`
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(
+        `bytes:http://stash-b.test/scene/${FX_ID.SAME}/stream`
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://stash-b.test/scene/${FX_ID.SAME}/stream`,
+        expect.objectContaining({ headers: { ApiKey: `key-${FX.B}` } })
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
+    }
   });
 });

@@ -195,7 +195,7 @@ export const findPerformers = async (
       stashUrl: buildStashEntityUrl(
         "performer",
         performer.id,
-        performer.instanceId || undefined,
+        performer.instanceId,
         req.user
       ),
     }));

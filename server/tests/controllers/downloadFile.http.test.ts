@@ -16,12 +16,18 @@ import {
 import { getDownloadFile } from "../../controllers/download.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import { downloadService } from "../../services/DownloadService.js";
+import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 // Real Express and real HTTP: Node validates header bytes only when a header
 // is actually written, and sendFile writes its headers asynchronously.
 
-const state = vi.hoisted(() => ({ stashUrl: "" }));
+const state = vi.hoisted(() => ({ stashUrl: "", stashRequests: 0 }));
+
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../services/DownloadService.js", () => ({
   downloadService: {
@@ -29,12 +35,22 @@ vi.mock("../../services/DownloadService.js", () => ({
   },
 }));
 
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    getBaseUrl: vi.fn(() => state.stashUrl),
-    getApiKey: vi.fn(() => "test-key"),
-  },
-}));
+// Only inst-a is loaded; any other id is an instance that is not (disabled,
+// deleted, or "" on a row stored before instances were carried)
+vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof stashInstanceManagerModule>();
+  return {
+    UnknownInstanceError: actual.UnknownInstanceError,
+    stashInstanceManager: {
+      getCredentials: vi.fn((id?: string) => {
+        if (id !== "inst-a") {
+          throw new actual.UnknownInstanceError(String(id));
+        }
+        return { baseUrl: state.stashUrl, apiKey: "test-key" };
+      }),
+    },
+  };
+});
 
 vi.mock("../../services/PermissionService.js", () => ({
   resolveUserPermissions: vi.fn(() =>
@@ -96,6 +112,7 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
     fs.writeFileSync(zipPath, "zip-bytes");
 
     stashServer = http.createServer((_req, res) => {
+      state.stashRequests++;
       res.writeHead(200, { "content-type": "video/mp4" });
       res.end("video-bytes");
     });
@@ -126,6 +143,7 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
 
   beforeEach(() => {
     mockGetDownload.mockReset();
+    state.stashRequests = 0;
   });
 
   it("serves a playlist zip whose name has a curly apostrophe and an emoji", async () => {
@@ -184,5 +202,34 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
       "attachment; filename=\"Part 1 _ Intro.mp4\"; filename*=UTF-8''Part%201%20%E2%80%93%20Intro.mp4"
     );
     expect(await res.text()).toBe("video-bytes");
+  });
+
+  it("a download whose instance is not loaded answers 404 and never fetches", async () => {
+    // Disabled or deleted since the download was made: the file is not
+    // fetched from any other Stash
+    mockGetDownload.mockResolvedValue({
+      id: 9,
+      userId: 1,
+      type: "SCENE",
+      status: "COMPLETED",
+      entityType: "scene",
+      entityId: "12",
+      instanceId: "inst-gone",
+      fileName: "Scene 12.mp4",
+      fileSize: BigInt(11),
+      filePath: null,
+      progress: 100,
+      error: null,
+      playlistId: null,
+      createdAt: new Date(),
+      completedAt: new Date(),
+      expiresAt: null,
+    });
+
+    const res = await fetch(`${peekUrl}/api/downloads/9/file`);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Download not found" });
+    expect(state.stashRequests).toBe(0);
   });
 });

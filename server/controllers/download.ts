@@ -4,7 +4,11 @@ import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { getPlaylistAccess } from "../services/PlaylistAccessService.js";
 import { playlistZipService } from "../services/PlaylistZipService.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  type StashCredentials,
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type {
   DeleteDownloadParams,
@@ -433,13 +437,22 @@ export async function getDownloadFile(
       return res.status(404).json({ error: "Download not found" });
     }
 
-    // Each file comes from the instance it lives on
-    const stashBaseUrl = stashInstanceManager.getBaseUrl(download.instanceId);
-    const apiKey = stashInstanceManager.getApiKey(download.instanceId);
+    // Each file comes from the instance it lives on, and from no other: an
+    // instance disabled or deleted since then is not found
+    let credentials: StashCredentials;
+    try {
+      credentials = stashInstanceManager.getCredentials(download.instanceId);
+    } catch (error) {
+      if (error instanceof UnknownInstanceError) {
+        return res.status(404).json({ error: "Download not found" });
+      }
+      throw error;
+    }
+    const { baseUrl, apiKey } = credentials;
     const fileUrl =
       entityType === "scene"
-        ? `${stashBaseUrl}/scene/${download.entityId}/stream`
-        : `${stashBaseUrl}/image/${download.entityId}/image`;
+        ? `${baseUrl}/scene/${download.entityId}/stream`
+        : `${baseUrl}/image/${download.entityId}/image`;
 
     // Abort the upstream fetch if the client disconnects
     const abort = new AbortController();

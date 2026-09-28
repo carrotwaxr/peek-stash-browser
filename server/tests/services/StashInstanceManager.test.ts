@@ -297,31 +297,6 @@ describe("StashInstanceManager", () => {
     });
   });
 
-  describe("getBaseUrl", () => {
-    it("strips /graphql suffix from instance URL", async () => {
-      const { manager } = await importFresh([INSTANCE_A]);
-      await manager.initialize();
-
-      expect(manager.getBaseUrl(INSTANCE_A.id)).toBe("http://stash-a:9999");
-    });
-
-    it("returns default instance URL when no instanceId provided", async () => {
-      const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
-      await manager.initialize();
-
-      expect(manager.getBaseUrl()).toBe("http://stash-a:9999");
-    });
-
-    it("throws when no instances configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.getBaseUrl()).toThrow(
-        "No Stash instance configured"
-      );
-    });
-  });
-
   describe("getUiUrl", () => {
     it("returns uiUrl when configured", async () => {
       const { manager } = await importFresh([INSTANCE_A]);
@@ -353,41 +328,23 @@ describe("StashInstanceManager", () => {
       expect(manager.getUiUrl(INSTANCE_B.id)).toBe("http://stash-b:9999");
     });
 
-    it("returns default instance uiUrl when no instanceId provided", async () => {
+    it("falls back to url when uiUrl is empty", async () => {
+      const { manager } = await importFresh([{ ...INSTANCE_A, uiUrl: "" }]);
+      await manager.initialize();
+
+      expect(manager.getUiUrl(INSTANCE_A.id)).toBe("http://stash-a:9999");
+    });
+
+    it("an instance that is not loaded, or an empty id, throws UnknownInstanceError", async () => {
       const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
       await manager.initialize();
+      const { UnknownInstanceError } =
+        await import("../../services/StashInstanceManager.js");
 
-      expect(manager.getUiUrl()).toBe("https://stash-a.example.com");
-    });
-
-    it("throws when no instances configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.getUiUrl()).toThrow("No Stash instance configured");
-    });
-  });
-
-  describe("getApiKey", () => {
-    it("returns API key for a specific instance", async () => {
-      const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
-      await manager.initialize();
-
-      expect(manager.getApiKey(INSTANCE_B.id)).toBe("key-b");
-    });
-
-    it("returns default instance API key when no instanceId provided", async () => {
-      const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
-      await manager.initialize();
-
-      expect(manager.getApiKey()).toBe("key-a");
-    });
-
-    it("throws when no instances configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.getApiKey()).toThrow("No Stash instance configured");
+      expect(() => manager.getUiUrl("nonexistent-id")).toThrow(
+        UnknownInstanceError
+      );
+      expect(() => manager.getUiUrl("")).toThrow(UnknownInstanceError);
     });
   });
 
@@ -436,28 +393,6 @@ describe("StashInstanceManager", () => {
       expect(logger.error).toHaveBeenCalledWith(
         `Failed to initialize Stash instance: ${INSTANCE_A.name}`,
         expect.objectContaining({ error: "Connection refused" })
-      );
-    });
-  });
-
-  describe("getBaseUrl with unknown instanceId", () => {
-    it("throws when specific instanceId is not found", async () => {
-      const { manager } = await importFresh([INSTANCE_A]);
-      await manager.initialize();
-
-      expect(() => manager.getBaseUrl("nonexistent-id")).toThrow(
-        "No Stash instance configured"
-      );
-    });
-  });
-
-  describe("getApiKey with unknown instanceId", () => {
-    it("throws when specific instanceId is not found", async () => {
-      const { manager } = await importFresh([INSTANCE_A]);
-      await manager.initialize();
-
-      expect(() => manager.getApiKey("nonexistent-id")).toThrow(
-        "No Stash instance configured"
       );
     });
   });
@@ -544,6 +479,17 @@ describe("StashInstanceManager", () => {
       );
     });
 
+    it("getCredentials('') throws UnknownInstanceError: an empty id is not 'no instance'", async () => {
+      // A row stored before instances were carried has instanceId "";
+      // it must not be served from whichever instance comes first
+      const { manager } = await importFresh([B_AT_0, DEFAULT_AT_5]);
+      await manager.initialize();
+      const { UnknownInstanceError } =
+        await import("../../services/StashInstanceManager.js");
+
+      expect(() => manager.getCredentials("")).toThrow(UnknownInstanceError);
+    });
+
     it("no id and no instance configured is a configuration error, not an unknown instance", async () => {
       const { manager } = await importFresh([]);
       await manager.initialize();
@@ -590,9 +536,6 @@ describe("StashInstanceManager", () => {
       expect(manager.getCredentials()).toEqual(served);
       expect(manager.resolveInstanceId("default")).toBe("default");
       expect(manager.resolveInstanceId()).toBe("default");
-      // The older per-field helpers agree
-      expect(manager.getBaseUrl()).toBe(served.baseUrl);
-      expect(manager.getApiKey()).toBe(served.apiKey);
       expect(manager.getDefaultConfig().id).toBe("default");
     });
   });

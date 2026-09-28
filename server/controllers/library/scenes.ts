@@ -201,7 +201,7 @@ export function addStreamabilityInfo(
     const stashUrl = buildStashEntityUrl(
       "scene",
       scene.id,
-      scene.instanceId || undefined,
+      scene.instanceId,
       viewer
     );
 

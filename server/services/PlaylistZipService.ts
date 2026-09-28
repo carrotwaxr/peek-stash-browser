@@ -199,12 +199,13 @@ export class PlaylistZipService {
           name: `${playlistDirName}/${nfoFileName}`,
         });
 
-        // Stream video file from the Stash instance the scene lives on
-        const stashBaseUrl = stashInstanceManager.getBaseUrl(
+        // Stream video file from the Stash instance the scene lives on. An
+        // instance disabled or deleted since the list was read throws
+        // UnknownInstanceError, and the download fails below.
+        const { baseUrl, apiKey } = stashInstanceManager.getCredentials(
           scene.stashInstanceId
         );
-        const apiKey = stashInstanceManager.getApiKey(scene.stashInstanceId);
-        const streamUrl = `${stashBaseUrl}/scene/${scene.id}/stream`;
+        const streamUrl = `${baseUrl}/scene/${scene.id}/stream`;
 
         logger.debug(`Fetching video from Stash`, {
           sceneId: scene.id,

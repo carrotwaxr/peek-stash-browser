@@ -71,7 +71,10 @@ import {
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
+import {
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "./StashInstanceManager.js";
 import {
   type BatchChanges,
   type IncomingEntity,
@@ -4669,6 +4672,19 @@ class StashSyncService extends EventEmitter {
     logger.info("Re-probing ungenerated clips...", { stashInstanceId });
     const startTime = Date.now();
 
+    // Previews are probed with this instance's own key; an instance that is
+    // not loaded (disabled or deleted) is skipped
+    let apiKey: string;
+    try {
+      ({ apiKey } = stashInstanceManager.getCredentials(stashInstanceId));
+    } catch (error) {
+      if (!(error instanceof UnknownInstanceError)) throw error;
+      logger.warn("Re-probe skipped: the Stash instance is not loaded", {
+        stashInstanceId,
+      });
+      return { checked: 0, updated: 0 };
+    }
+
     // Find all clips with isGenerated=false for this instance
     const clips = await prisma.stashClip.findMany({
       where: {
@@ -4687,7 +4703,6 @@ class StashSyncService extends EventEmitter {
     logger.info(`Found ${clips.length} ungenerated clips to re-probe`);
 
     // Build preview URLs with API key
-    const apiKey = stashInstanceManager.getApiKey(stashInstanceId);
     const urlMap = new Map<string, string>();
     for (const clip of clips) {
       if (clip.previewPath) {
