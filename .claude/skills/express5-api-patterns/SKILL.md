@@ -50,12 +50,26 @@ router.get("/thing/:id", async (req, res) => {
 
 ```typescript
 throw new NotFoundError("Scene not found"); // 404, errorType NOT_FOUND
-throw new ValidationError("rating must be 0-100"); // 400, VALIDATION_ERROR
+throw new ValidationError("Invalid request", { issues }); // 400, VALIDATION_ERROR; also { details }
 throw new ForbiddenError(); // 403, FORBIDDEN
+throw new ConflictError("A playlist has that name"); // 409, CONFLICT
+throw new ServiceUnavailableError("Sync is running", { retryAfterSeconds: 30 }); // 503, Retry-After
 throw new AppError("Stash unreachable", 502); // any status
 ```
 
-An `AppError` becomes `{ error, errorType? }` with its status. Anything else becomes a sanitized 500. Use an explicit try/catch only for cleanup or a custom response shape, and check `res.headersSent` before responding from a catch block or a stream event handler.
+The handler maps what reaches it:
+
+| Error | Status | Body |
+|---|---|---|
+| `AppError` and subclasses | its own | `{ error: message, errorType?, issues?, details? }` |
+| `isDatabaseBusy` (Prisma P1008, P2010 with SQLite code 5) | 503, `Retry-After: 1` | "The database is busy, try again", `SERVICE_UNAVAILABLE` |
+| Prisma P2002 (unique) and P2003 (foreign key) | 409 | fixed text, `CONFLICT` |
+| Prisma P2025 (row not found) | 404 | "Not found", `NOT_FOUND` |
+| express.json's refusal (`type` `entity.parse.failed`, ...) | its 4xx | "Invalid request body" (413: "Request body too large") |
+| another middleware 4xx (`status` 4xx, `expose` not false) | its 4xx | the status's reason phrase |
+| anything else | 500 | "Internal server error" |
+
+Only an `AppError`'s message reaches the client, so write it for them and never pass a caught error's message into one. The handler logs 5xx at ERROR ("Request failed") and the rest at WARN ("Request refused"), with the method, the path (no query string), the user id and the whole error (`{ error }`, which the logger expands to name, message, stack, code and cause); a refused request body is logged by its `type` only, since its message quotes the body. After headers are sent it destroys the response and writes nothing. Use an explicit try/catch only for cleanup or a custom response shape, and check `res.headersSent` before responding from a catch block or a stream event handler.
 
 ## 3. Typed handlers
 
@@ -82,7 +96,7 @@ router.put("/scene/:sceneId", authenticated(updateSceneRating));
 
 ## 4. Responses
 
-- Errors are `{ error: string }`, optionally with `message` and `details` (`ApiErrorResponse`). `sendError`, `sendSuccess`, `sendCreated` and `sendNoContent` in `server/utils/responses.ts` produce these shapes; controllers adopt them as they're touched.
+- Errors are `{ error: string }`, optionally with `errorType`, `message`, `details` and `issues` (`ApiErrorResponse`). Produce them by throwing an `AppError` subclass (section 2), not by hand; controllers that still write `res.status(4xx).json({ error })` move to throwing as they're touched. Success bodies are plain `res.json(...)` (`res.status(201).json(...)`, `res.sendStatus(204)`).
 - A 503 with `ready: false` means the cache is still warming (`requireCacheReady`). The client shows its initializing state for it.
 - Handlers and middleware never return the response: send it, then `return;` on its own line (`res.status(404).json({ error: "Not found" }); return;`). `noImplicitReturns` rejects a handler that returns `res` on some paths and falls off the end on others; older handlers that `return res` on every path move to this form when touched.
 

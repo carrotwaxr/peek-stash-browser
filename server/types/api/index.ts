@@ -18,6 +18,7 @@
 export type {
   PaginationFilter,
   MinimalCountFilter,
+  ApiErrorIssue,
   ApiErrorResponse,
   ApiSuccessResponse,
   CacheNotReadyResponse,

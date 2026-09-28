@@ -1,9 +1,9 @@
 /**
  * The logger writes one line per call and never throws: an Error in the
  * context keeps its name, message, stack, cause and database code, a BigInt
- * from a raw SQL row logs as a number (or a string past 2^53), a circular
- * context logs [Circular], and a context that cannot be serialised at all
- * still logs the message.
+ * from a raw SQL row logs as a number (or a string past 2^53), a cycle logs
+ * [Circular] while an object met twice without one logs twice, and a context
+ * that cannot be serialised at all still logs the message.
  */
 import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,6 +86,20 @@ describe("logger", () => {
     expect(line).toContain('"self":"[Circular]"');
     expect(line).toContain('"message":"loop"');
     expect(line).toContain('"cause":"[Circular]"');
+  });
+
+  it("the same object under two keys logs twice", () => {
+    const shared = { id: 7, error: new Error("shared") };
+
+    logger.info("x", { a: shared, b: shared, list: [shared, shared] });
+
+    const line = onlyLine();
+    expect(line).not.toContain("[Circular]");
+    const once = `{"id":7,"error":{"name":"Error","message":"shared"`;
+    expect(line.split(once)).toHaveLength(5);
+    expect(line).toContain(`"a":${once}`);
+    expect(line).toContain(`"b":${once}`);
+    expect(line).toContain(`"list":[${once}`);
   });
 
   it("a context that cannot be serialised still logs the message", () => {
