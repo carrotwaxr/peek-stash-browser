@@ -27,3 +27,8 @@ export function parseJsonArray<T = string>(
 export function parseSqliteBoolean(value: number | null | undefined): boolean {
   return value === 1;
 }
+
+/** Stash and user text where "" means absent: "" and null read as null. */
+export function emptyToNull(value: string | null | undefined): string | null {
+  return value === undefined || value === "" ? null : value;
+}
