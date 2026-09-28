@@ -18,6 +18,7 @@ import type {
   NormalizedGallery,
   PeekGalleryFilter,
 } from "../../types/index.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -32,10 +33,9 @@ async function mergeGalleriesWithUserData(
 ): Promise<NormalizedGallery[]> {
   const ratings = await prisma.galleryRating.findMany({ where: { userId } });
 
-  const KEY_SEP = "\0";
   const ratingMap = new Map(
     ratings.map((r) => [
-      `${r.galleryId}${KEY_SEP}${r.instanceId || ""}`,
+      entityKey(r.galleryId, r.instanceId ?? ""),
       {
         rating: r.rating,
         rating100: r.rating,
@@ -49,7 +49,7 @@ async function mergeGalleriesWithUserData(
     rating: null,
     rating100: null,
     favorite: false,
-    ...ratingMap.get(`${gallery.id}${KEY_SEP}${gallery.instanceId || ""}`),
+    ...ratingMap.get(entityKey(gallery.id, gallery.instanceId)),
   }));
 }
 

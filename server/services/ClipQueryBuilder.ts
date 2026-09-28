@@ -6,6 +6,7 @@
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
+import { entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import type { FilterClause } from "../utils/sqlFilterBuilders.js";
 import {
@@ -428,7 +429,7 @@ class ClipQueryBuilder {
       Array<{ id: string; name: string; color: string | null }>
     >();
     for (const tag of tags) {
-      const key = `${tag.clipId}:${tag.clipInstanceId}`;
+      const key = entityKey(tag.clipId, tag.clipInstanceId);
       if (!tagMap.has(key)) {
         tagMap.set(key, []);
       }
@@ -453,7 +454,7 @@ class ClipQueryBuilder {
     >
   ): ClipWithRelations[] {
     return rows.map((row) => {
-      const key = `${row.id}:${row.stashInstanceId}`;
+      const key = entityKey(row.id, row.stashInstanceId);
       return {
         id: row.id,
         sceneId: row.sceneId,

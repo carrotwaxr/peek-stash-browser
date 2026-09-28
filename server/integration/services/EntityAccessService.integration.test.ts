@@ -14,7 +14,6 @@ import prisma from "../../prisma/singleton.js";
 import {
   type AccessEntityType,
   canUserAccessEntity,
-  entityRefKey,
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
   resolveAccessibleInstanceId,
@@ -23,6 +22,7 @@ import {
   getUserAllowedInstanceIds,
   getUsersSelecting,
 } from "../../services/UserInstanceService.js";
+import { entityKey } from "../../utils/entityRef.js";
 import {
   FX,
   FX_ID,
@@ -165,7 +165,7 @@ describeWithDb("EntityAccessService (integration)", () => {
             { id: FX_ID.SAME, instanceId: FX.A },
             { id: FX_ID.SAME, instanceId: FX.B },
           ])
-        ).toEqual(new Set([entityRefKey(FX_ID.SAME, FX.A)]));
+        ).toEqual(new Set([entityKey(FX_ID.SAME, FX.A)]));
       }
       // The legacy guess skips it too
       expect(
@@ -310,7 +310,7 @@ describeWithDb("EntityAccessService (integration)", () => {
       { id: "9999999", instanceId: FX.A },
     ]);
 
-    expect(keys).toEqual(new Set([entityRefKey(FX_ID.SAME, FX.A)]));
+    expect(keys).toEqual(new Set([entityKey(FX_ID.SAME, FX.A)]));
   });
 
   it("getVisibleEntityKeys handles 5,000 refs in one call", async () => {
@@ -323,6 +323,6 @@ describeWithDb("EntityAccessService (integration)", () => {
     const keys = await getVisibleEntityKeys(u, "scene", refs);
 
     expect(keys.size).toBe(1);
-    expect(keys.has(entityRefKey(FX_ID.SAME, FX.A))).toBe(true);
+    expect(keys.has(entityKey(FX_ID.SAME, FX.A))).toBe(true);
   });
 });

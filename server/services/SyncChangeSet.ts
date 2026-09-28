@@ -26,12 +26,7 @@
  * instances with a change are still known.
  */
 import type { SyncEntityType } from "../types/api/sync.js";
-
-/** One entity on one instance. */
-export interface EntityRef {
-  id: string;
-  instanceId: string;
-}
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 
 /** The 13 junction tables sync writes. */
 export type JunctionName =
@@ -127,17 +122,12 @@ export interface DetectChangesOptions {
   markChanged?: boolean;
 }
 
-/** In-memory key of a ref (`${id}\0${instanceId}`, as the other maps use). */
-const KEY_SEP = "\0";
-const refKey = (ref: EntityRef): string =>
-  `${ref.id}${KEY_SEP}${ref.instanceId}`;
-
 /** Refs without duplicates, in first-seen order. */
 class RefList {
   private readonly byKey = new Map<string, EntityRef>();
 
   add(ref: EntityRef): void {
-    const key = refKey(ref);
+    const key = entityKey(ref.id, ref.instanceId);
     if (!this.byKey.has(key)) this.byKey.set(key, ref);
   }
 
@@ -152,21 +142,6 @@ class RefList {
   refs(): EntityRef[] {
     return Array.from(this.byKey.values());
   }
-}
-
-/** Refs without duplicates, in first-seen order. */
-export function distinctRefs(refs: Iterable<EntityRef>): EntityRef[] {
-  const list = new RefList();
-  list.addAll(refs);
-  return list.refs();
-}
-
-/**
- * Refs as one JSON parameter of [id, instanceId] pairs, which a statement
- * reads with `json_each(?)` and `json_extract(j.value, '$[0]')`/`'$[1]'`.
- */
-export function pairsJson(refs: readonly EntityRef[]): string {
-  return JSON.stringify(refs.map((ref) => [ref.id, ref.instanceId]));
 }
 
 /** The junction rows a batch deleted, grouped by their near id. */
@@ -250,8 +225,8 @@ export function detectChanges({
       const old = oldLinks[junction]?.get(entity.id) ?? [];
       const next = farIds.map((id): EntityRef => ({ id, instanceId }));
       const differs = !sameKeys(
-        new Set(old.map(refKey)),
-        new Set(next.map(refKey))
+        new Set(old.map((r) => entityKey(r.id, r.instanceId))),
+        new Set(next.map((r) => entityKey(r.id, r.instanceId)))
       );
       linkDiffs.push({ junction, old, next, differs });
       if (!differs) continue;

@@ -40,7 +40,6 @@ import {
   updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
-import type * as entityAccessModule from "../../services/EntityAccessService.js";
 import {
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
@@ -49,6 +48,7 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
+import { entityKey } from "../../utils/entityRef.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
@@ -104,17 +104,11 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
-// Mock EntityAccessService (hiding requires visibility); entityRefKey stays real
-vi.mock("../../services/EntityAccessService.js", async () => {
-  const actual = await vi.importActual<typeof entityAccessModule>(
-    "../../services/EntityAccessService.js"
-  );
-  return {
-    entityRefKey: actual.entityRefKey,
-    getVisibleEntityKeys: vi.fn(),
-    getIdsVisibleOnAnyInstance: vi.fn(),
-  };
-});
+// Mock EntityAccessService (hiding requires visibility)
+vi.mock("../../services/EntityAccessService.js", () => ({
+  getVisibleEntityKeys: vi.fn(),
+  getIdsVisibleOnAnyInstance: vi.fn(),
+}));
 
 // Mock UserHiddenEntityService (dynamically imported)
 vi.mock("../../services/UserHiddenEntityService.js", () => ({
@@ -159,7 +153,7 @@ function visibleIds(...ids: string[]) {
       new Set(
         refs
           .filter((r) => ids.includes(r.id))
-          .map((r) => `${r.id}\0${r.instanceId}`)
+          .map((r) => entityKey(r.id, r.instanceId))
       )
     )
   );
@@ -181,7 +175,7 @@ describe("User Controller — Features", () => {
       Promise.resolve(new Set(ids))
     );
     mockVisibleKeys.mockImplementation((_userId, _type, refs) =>
-      Promise.resolve(new Set(refs.map((r) => `${r.id}\0${r.instanceId}`)))
+      Promise.resolve(new Set(refs.map((r) => entityKey(r.id, r.instanceId))))
     );
   });
 

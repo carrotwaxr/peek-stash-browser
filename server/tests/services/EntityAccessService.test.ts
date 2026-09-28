@@ -11,13 +11,13 @@ import prisma from "../../prisma/singleton.js";
 import {
   type AccessEntityType,
   canUserAccessEntity,
-  entityRefKey,
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
   keepVisibleConditions,
   resolveAccessibleInstanceId,
   resolveVisibleApartFromOwnHides,
 } from "../../services/EntityAccessService.js";
+import { entityKey } from "../../utils/entityRef.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
@@ -177,8 +177,7 @@ describe("EntityAccessService", () => {
         { id: "3", instanceId: "A" },
       ]);
 
-      expect(keys).toEqual(new Set(["1\0A", "2\0B"]));
-      expect(entityRefKey("1", "A")).toBe("1\0A");
+      expect(keys).toEqual(new Set([entityKey("1", "A"), entityKey("2", "B")]));
     });
   });
 
@@ -307,8 +306,8 @@ describe("EntityAccessService", () => {
 
       expect(resolved).toEqual(
         new Map([
-          [entityRefKey("1", "A"), "A"],
-          [entityRefKey("2", ""), "B"],
+          [entityKey("1", "A"), "A"],
+          [entityKey("2", ""), "B"],
         ])
       );
     });

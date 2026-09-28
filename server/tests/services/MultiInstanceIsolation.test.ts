@@ -336,11 +336,11 @@ describe("Multi-Instance Isolation", () => {
       );
       expect(resolve).toBeDefined();
       expect(must(resolve).slice(1)).toContain(
-        JSON.stringify([{ id: "perf1", iid: INST_A }])
+        JSON.stringify([["perf1", INST_A]])
       );
       expect(must(resolve).slice(1)).toContain(JSON.stringify([]));
       // The cascade source is the A-scoped ref only
-      expect(refsFill()).toBe(JSON.stringify([{ id: "perf1", iid: INST_A }]));
+      expect(refsFill()).toBe(JSON.stringify([["perf1", INST_A]]));
 
       // Direct hidden row and the two cascades carry instance A; 3 rows
       expect(new Set(mergedKeys())).toEqual(
@@ -426,7 +426,7 @@ describe("Multi-Instance Isolation", () => {
       expect(must(edge)[0]).toContain("x.deletedAt IS NULL");
       expect(must(edge)[0]).toContain("r.inst = x.stashInstanceId");
       expect(must(edge).slice(1)).toEqual([INST_A, INST_B]);
-      expect(refsFill()).toBe(JSON.stringify([{ id: "studio1", iid: INST_A }]));
+      expect(refsFill()).toBe(JSON.stringify([["studio1", INST_A]]));
 
       expect(mergedKeys()).toContain(`scene:scene1@${INST_A}:cascade`);
       expect(mergedKeys().some((k) => k.includes(`@${INST_B}:`))).toBe(false);
@@ -452,7 +452,7 @@ describe("Multi-Instance Isolation", () => {
 
       // Every edge joins the A-scoped closure; the inherited-tag query binds
       // the allowed instances and the tag id never reaches SQL text
-      expect(refsFill()).toBe(JSON.stringify([{ id: "tag1", iid: INST_A }]));
+      expect(refsFill()).toBe(JSON.stringify([["tag1", INST_A]]));
       const inherited = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
         /AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/.test(
           c[0]

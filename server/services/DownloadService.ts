@@ -1,6 +1,7 @@
 import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import { entityRefKey, getVisibleEntityKeys } from "./EntityAccessService.js";
+import { entityKey, pairsJson } from "../utils/entityRef.js";
+import { getVisibleEntityKeys } from "./EntityAccessService.js";
 
 /** 24 hours in milliseconds for download expiry */
 const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -170,7 +171,7 @@ export class DownloadService {
       items.map((item) => ({ id: item.sceneId, instanceId: item.instanceId }))
     );
     return items.filter((item) =>
-      visible.has(entityRefKey(item.sceneId, item.instanceId))
+      visible.has(entityKey(item.sceneId, item.instanceId))
     );
   }
 
@@ -194,7 +195,7 @@ export class DownloadService {
 FROM json_each(?) j
 CROSS JOIN StashScene s ON s.id = json_extract(j.value, '$[0]') AND s.stashInstanceId = json_extract(j.value, '$[1]')
 WHERE s.deletedAt IS NULL`,
-      JSON.stringify(items.map((i) => [i.sceneId, i.instanceId]))
+      pairsJson(items.map((i) => ({ id: i.sceneId, instanceId: i.instanceId })))
     );
 
     const total = rows[0]?.total;

@@ -3,8 +3,6 @@ import { randomUUID } from "crypto";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import {
-  type EntityRef,
-  entityRefKey,
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
 } from "../services/EntityAccessService.js";
@@ -89,6 +87,7 @@ import type {
   UpdateUserStashInstancesBody,
 } from "../types/api/user.js";
 import { dbWriteBatch } from "../utils/dbWrite.js";
+import { type EntityRef, compositeKey, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 import {
@@ -2328,7 +2327,7 @@ export const updateUserRestrictions = async (
         return;
       }
       const mode = r.mode as RestrictionMode;
-      const pair = `${r.entityType}:${mode}`;
+      const pair = compositeKey(r.entityType, mode);
       if (seenPairs.has(pair)) {
         res.status(400).json({
           error: `Only one ${mode} list is allowed for ${r.entityType}`,
@@ -2577,7 +2576,7 @@ async function checkHideTargets(
     const visible = target.instanceId
       ? visibleKeys
           .get(target.entityType)
-          ?.has(entityRefKey(target.entityId, target.instanceId))
+          ?.has(entityKey(target.entityId, target.instanceId))
       : visibleIds.get(target.entityType)?.has(target.entityId);
     return visible ? "hide" : "not-found";
   });

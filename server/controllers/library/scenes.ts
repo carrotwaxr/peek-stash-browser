@@ -33,6 +33,7 @@ import type {
 } from "../../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { readHistory } from "../../utils/historyJson.js";
 import { logger } from "../../utils/logger.js";
@@ -88,9 +89,7 @@ export async function mergeScenesWithUserData(
     prisma.tagRating.findMany({ where: { userId } }),
   ]);
 
-  // Use composite keys (entityId + instanceId) for multi-instance correctness
-  const KEY_SEP = "\0";
-
+  // Keys carry the instance (entityKey) for multi-instance correctness
   // Create lookup maps for O(1) access
   const watchMap = new Map(
     watchHistory.map((wh) => {
@@ -98,7 +97,7 @@ export async function mergeScenesWithUserData(
       const playHistory = readHistory(wh.playHistory);
 
       return [
-        `${wh.sceneId}${KEY_SEP}${wh.instanceId || ""}`,
+        entityKey(wh.sceneId, wh.instanceId ?? ""),
         {
           o_counter: wh.oCount || 0,
           play_count: wh.playCount || 0,
@@ -122,7 +121,7 @@ export async function mergeScenesWithUserData(
 
   const ratingMap = new Map(
     sceneRatings.map((r) => [
-      `${r.sceneId}${KEY_SEP}${r.instanceId || ""}`,
+      entityKey(r.sceneId, r.instanceId ?? ""),
       {
         rating: r.rating,
         rating100: r.rating, // Alias for consistency with Stash API
@@ -135,22 +134,22 @@ export async function mergeScenesWithUserData(
   const performerFavorites = new Set(
     performerRatings
       .filter((r) => r.favorite)
-      .map((r) => `${r.performerId}${KEY_SEP}${r.instanceId || ""}`)
+      .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
   );
   const studioFavorites = new Set(
     studioRatings
       .filter((r) => r.favorite)
-      .map((r) => `${r.studioId}${KEY_SEP}${r.instanceId || ""}`)
+      .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
   );
   const tagFavorites = new Set(
     tagRatings
       .filter((r) => r.favorite)
-      .map((r) => `${r.tagId}${KEY_SEP}${r.instanceId || ""}`)
+      .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
   );
 
   // Merge data and update nested entity favorites
   return scenes.map((scene) => {
-    const sceneKey = `${scene.id}${KEY_SEP}${scene.instanceId || ""}`;
+    const sceneKey = entityKey(scene.id, scene.instanceId);
     const mergedScene = {
       ...scene,
       ...watchMap.get(sceneKey),
@@ -161,9 +160,7 @@ export async function mergeScenesWithUserData(
     if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
       mergedScene.performers = mergedScene.performers.map((p) => ({
         ...p,
-        favorite: performerFavorites.has(
-          `${p.id}${KEY_SEP}${p.instanceId || ""}`
-        ),
+        favorite: performerFavorites.has(entityKey(p.id, p.instanceId)),
       }));
     }
 
@@ -172,7 +169,7 @@ export async function mergeScenesWithUserData(
       mergedScene.studio = {
         ...mergedScene.studio,
         favorite: studioFavorites.has(
-          `${mergedScene.studio.id}${KEY_SEP}${mergedScene.studio.instanceId || ""}`
+          entityKey(mergedScene.studio.id, mergedScene.studio.instanceId ?? "")
         ),
       };
     }
@@ -181,7 +178,7 @@ export async function mergeScenesWithUserData(
     if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
       mergedScene.tags = mergedScene.tags.map((t) => ({
         ...t,
-        favorite: tagFavorites.has(`${t.id}${KEY_SEP}${t.instanceId || ""}`),
+        favorite: tagFavorites.has(entityKey(t.id, t.instanceId)),
       }));
     }
 
@@ -1556,32 +1553,32 @@ export const getRecommendedScenes = async (
     const favoritePerformers = new Set(
       performerRatings
         .filter((r) => r.favorite)
-        .map((r) => `${r.performerId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
     );
     const highlyRatedPerformers = new Set(
       performerRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => `${r.performerId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
     );
     const favoriteStudios = new Set(
       studioRatings
         .filter((r) => r.favorite)
-        .map((r) => `${r.studioId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
     );
     const highlyRatedStudios = new Set(
       studioRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => `${r.studioId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
     );
     const favoriteTags = new Set(
       tagRatings
         .filter((r) => r.favorite)
-        .map((r) => `${r.tagId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
     );
     const highlyRatedTags = new Set(
       tagRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => `${r.tagId}\0${r.instanceId || ""}`)
+        .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
     );
 
     // Count user criteria for feedback

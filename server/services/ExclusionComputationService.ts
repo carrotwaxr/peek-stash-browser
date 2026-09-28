@@ -61,6 +61,7 @@ import {
 import prisma from "../prisma/singleton.js";
 import type { SyncEntityType } from "../types/api/sync.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { compositeKey, entityKey, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import type { BatchChanges } from "./SyncChangeSet.js";
 import {
@@ -433,15 +434,6 @@ function parseStoredIds(entityIds: string): Ref[] {
   }
 }
 
-/** The JSON shape every temp-table fill binds: [{ id, iid }]. */
-function refsJson(refs: ResolvedRef[]): string {
-  return JSON.stringify(refs.map((r) => ({ id: r.id, iid: r.instanceId })));
-}
-
-function refKey(ref: Ref): string {
-  return `${ref.id}\0${ref.instanceId}`;
-}
-
 /**
  * Result of recomputing exclusions for a set of users.
  */
@@ -674,7 +666,11 @@ class ExclusionComputationService {
       const seen = new Set<string>();
       const allExclusions: ExclusionRecord[] = [];
       for (const excl of allExclusionsRaw) {
-        const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ""}`;
+        const key = compositeKey(
+          excl.entityType,
+          excl.entityId,
+          excl.instanceId || ""
+        );
         if (!seen.has(key)) {
           seen.add(key);
           allExclusions.push(excl);
@@ -1151,8 +1147,8 @@ class ExclusionComputationService {
   ): Promise<void> {
     if (refs.length === 0) return;
     await tx.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO ${table} (id, inst) SELECT json_extract(value, '$.id'), json_extract(value, '$.iid') FROM json_each(?)`,
-      refsJson(refs)
+      `INSERT OR IGNORE INTO ${table} (id, inst) SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)`,
+      pairsJson(refs)
     );
   }
 
@@ -1195,9 +1191,7 @@ class ExclusionComputationService {
 
     const table = RESOLVE_TABLE[entityType];
     const bare = refs.filter((r) => !r.instanceId).map((r) => r.id);
-    const scoped = refs
-      .filter((r) => r.instanceId)
-      .map((r) => ({ id: r.id, iid: r.instanceId }));
+    const scoped = refs.filter((r) => r.instanceId);
     const inst = buildInstanceFilterClause(
       allowedInstanceIds,
       "t.stashInstanceId"
@@ -1209,12 +1203,12 @@ class ExclusionComputationService {
       WHERE t.deletedAt IS NULL AND ${inst.sql}
       UNION
       SELECT t.id, t.stashInstanceId FROM json_each(?) sc
-      CROSS JOIN ${table} t ON t.id = json_extract(sc.value, '$.id') AND t.stashInstanceId = json_extract(sc.value, '$.iid')
+      CROSS JOIN ${table} t ON t.id = json_extract(sc.value, '$[0]') AND t.stashInstanceId = json_extract(sc.value, '$[1]')
       WHERE t.deletedAt IS NULL AND ${inst.sql}`;
     const params = [
       JSON.stringify(bare),
       ...inst.params,
-      JSON.stringify(scoped),
+      pairsJson(scoped),
       ...inst.params,
     ];
 
@@ -1378,9 +1372,9 @@ class ExclusionComputationService {
       allowedInstanceIds,
       { descendants: true }
     );
-    const stored = new Set(hides.map(refKey));
+    const stored = new Set(hides.map((h) => entityKey(h.id, h.instanceId)));
     for (const ref of refs) {
-      if (stored.has(refKey(ref))) continue;
+      if (stored.has(entityKey(ref.id, ref.instanceId))) continue;
       records.push({
         userId,
         entityType,
@@ -1555,7 +1549,7 @@ class ExclusionComputationService {
       entityId: string,
       instanceId: string
     ) => {
-      const key = `${entityType}:${entityId}:${instanceId || ""}`;
+      const key = compositeKey(entityType, entityId, instanceId || "");
       if (!seen.has(key)) {
         seen.add(key);
         cascadeExclusions.push({
@@ -1573,7 +1567,8 @@ class ExclusionComputationService {
     for (const source of sources) {
       const merged =
         refsByType.get(source.entityType) ?? new Map<string, ResolvedRef>();
-      for (const ref of source.refs) merged.set(refKey(ref), ref);
+      for (const ref of source.refs)
+        merged.set(entityKey(ref.id, ref.instanceId), ref);
       refsByType.set(source.entityType, merged);
     }
 
@@ -1768,7 +1763,7 @@ class ExclusionComputationService {
         : allowedInstanceIds;
       for (const instanceId of instances) {
         const ref = { id: excl.entityId, instanceId };
-        set.set(refKey(ref), ref);
+        set.set(entityKey(ref.id, ref.instanceId), ref);
       }
     }
     for (const type of Object.keys(sets) as ExclusionSetType[]) {
@@ -1814,7 +1809,8 @@ class ExclusionComputationService {
     for (const source of only ?? []) {
       const merged =
         onlyByType.get(source.entityType) ?? new Map<string, ResolvedRef>();
-      for (const ref of source.refs) merged.set(refKey(ref), ref);
+      for (const ref of source.refs)
+        merged.set(entityKey(ref.id, ref.instanceId), ref);
       onlyByType.set(source.entityType, merged);
     }
     /** The FROM for one query, or null to skip it. Fills _peek_refs. */

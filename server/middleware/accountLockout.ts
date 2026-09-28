@@ -1,4 +1,5 @@
 import { ipKeyGenerator } from "express-rate-limit";
+import { compositeKey } from "../utils/entityRef.js";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -30,7 +31,7 @@ const clientKey = (ip: string): string =>
   ipKeyGenerator(ip.replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, "$1"));
 
 const lockoutKey = (username: string, ip: string): string =>
-  `${username.toLowerCase()}\0${clientKey(ip)}`;
+  compositeKey(username.toLowerCase(), clientKey(ip));
 
 const isStale = (record: FailedAttemptRecord, now: number): boolean =>
   (record.lockedUntil === null || record.lockedUntil <= now) &&

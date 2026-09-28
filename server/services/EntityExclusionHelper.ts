@@ -8,12 +8,13 @@
  * and instance-scoped exclusions (specific instanceId → applies only to that instance).
  */
 import prisma from "../prisma/singleton.js";
+import { entityKey } from "../utils/entityRef.js";
 
 /** Structured exclusion data for instance-aware in-memory filtering */
 export interface ExclusionData {
   /** Entity IDs excluded from ALL instances (global exclusions with empty instanceId) */
   globalIds: Set<string>;
-  /** Composite "entityId:instanceId" keys for instance-scoped exclusions */
+  /** entityKey(entityId, instanceId) of the instance-scoped exclusions */
   scopedKeys: Set<string>;
 }
 
@@ -63,7 +64,7 @@ class EntityExclusionHelper {
         globalExcludedIds.add(r.entityId);
       } else {
         // Scoped exclusion: applies only to specific instance
-        scopedExclusions.add(`${r.entityId}:${r.instanceId}`);
+        scopedExclusions.add(entityKey(r.entityId, r.instanceId));
       }
     }
 
@@ -76,7 +77,7 @@ class EntityExclusionHelper {
       // Check instance-scoped exclusion (if entity has instanceId)
       if (
         entity.instanceId &&
-        scopedExclusions.has(`${entity.id}:${entity.instanceId}`)
+        scopedExclusions.has(entityKey(entity.id, entity.instanceId))
       ) {
         return false;
       }
@@ -144,7 +145,7 @@ class EntityExclusionHelper {
    * @param userId User ID to check exclusions for (if undefined, returns empty sets)
    * @param entityType Type of entity
    * @returns Object with globalIds (Set of entity IDs excluded from all instances)
-   *          and scopedKeys (Set of "entityId:instanceId" keys for instance-scoped exclusions)
+   *          and scopedKeys (Set of entityKey(entityId, instanceId) for instance-scoped exclusions)
    */
   async getExclusionData(
     userId: number | undefined,
@@ -171,7 +172,7 @@ class EntityExclusionHelper {
       if (!r.instanceId) {
         globalIds.add(r.entityId);
       } else {
-        scopedKeys.add(`${r.entityId}:${r.instanceId}`);
+        scopedKeys.add(entityKey(r.entityId, r.instanceId));
       }
     }
 
@@ -197,7 +198,7 @@ class EntityExclusionHelper {
     }
     if (
       entityInstanceId &&
-      exclusionData.scopedKeys.has(`${entityId}:${entityInstanceId}`)
+      exclusionData.scopedKeys.has(entityKey(entityId, entityInstanceId))
     ) {
       return true;
     }

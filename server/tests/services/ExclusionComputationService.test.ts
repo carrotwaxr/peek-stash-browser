@@ -797,7 +797,7 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
     // Bare ids, allowed instances and scoped refs are bound, never spliced
     expect(params[0]).toBe(JSON.stringify([]));
     expect(params).toContain("A");
-    expect(params).toContain(JSON.stringify([{ id: "471", iid: "A" }]));
+    expect(params).toContain(JSON.stringify([["471", "A"]]));
 
     expect(createdRows()).toEqual(
       expect.arrayContaining([
@@ -957,8 +957,8 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
     expect(fill).toBeDefined();
     expect(must(fill)[1]).toBe(
       JSON.stringify([
-        { id: "1", iid: "A" },
-        { id: "9", iid: "A" },
+        ["1", "A"],
+        ["9", "A"],
       ])
     );
     expect(createdRows().some((r) => r.entityId === "9")).toBe(false);
@@ -1343,8 +1343,8 @@ describe("cascades (Rule 3)", () => {
     );
     expect(must(fill)[1]).toBe(
       JSON.stringify([
-        { id: "p1", iid: "A" },
-        { id: "p1", iid: "B" },
+        ["p1", "A"],
+        ["p1", "B"],
       ])
     );
   });
@@ -1430,16 +1430,16 @@ describe("computeEmptyExclusions", () => {
       /INSERT OR IGNORE INTO _peek_ex_gallery/.test(sql)
     );
     expect(galleryFill).toBeDefined();
-    expect(must(galleryFill)[1]).toBe(JSON.stringify([{ id: "g9", iid: "A" }]));
+    expect(must(galleryFill)[1]).toBe(JSON.stringify([["g9", "A"]]));
     const imageFill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_ex_image/.test(sql)
     );
-    expect(must(imageFill)[1]).toBe(JSON.stringify([{ id: "i9", iid: "A" }]));
+    expect(must(imageFill)[1]).toBe(JSON.stringify([["i9", "A"]]));
     // The "" scene hide reaches every allowed instance through its per-instance copy
     const sceneFill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_ex_scene/.test(sql)
     );
-    expect(must(sceneFill)[1]).toBe(JSON.stringify([{ id: "s9", iid: "A" }]));
+    expect(must(sceneFill)[1]).toBe(JSON.stringify([["s9", "A"]]));
     // The empty queries probe the temp sets, not a bound JSON array
     for (const [sql] of queriesMatching(
       /FROM Stash(Gallery g|Performer p|Studio st|Group g|Tag t)/
@@ -1625,7 +1625,7 @@ describe("reason precedence (restrictions before hides)", () => {
         sql.includes("INSERT OR IGNORE INTO _peek_refs") &&
         String(json).includes("p2")
     );
-    expect(refsFill?.[1]).toBe(JSON.stringify([{ id: "p2", iid: "A" }]));
+    expect(refsFill?.[1]).toBe(JSON.stringify([["p2", "A"]]));
   });
 
   it("the empty check under the restrictions alone runs before the hides join the sets", async () => {
@@ -1669,7 +1669,7 @@ describe("reason precedence (restrictions before hides)", () => {
     // The hidden image joins the sets only after the check
     expect(events).toEqual([
       "empty check for the hidden gallery",
-      `image set += ${JSON.stringify([{ id: "i1", iid: "A" }])}`,
+      `image set += ${JSON.stringify([["i1", "A"]])}`,
     ]);
   });
 
@@ -1812,8 +1812,8 @@ describe("addHiddenEntity", () => {
     );
     expect(must(fill)[1]).toBe(
       JSON.stringify([
-        { id: "2", iid: "A" },
-        { id: "7", iid: "A" },
+        ["2", "A"],
+        ["7", "A"],
       ])
     );
     expect([...mergedKeys()].some((k) => k.includes("@B:"))).toBe(false);
@@ -1853,7 +1853,7 @@ describe("addHiddenEntity", () => {
     const fill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-    expect(must(fill)[1]).toBe(JSON.stringify([{ id: "perf1", iid: "A" }]));
+    expect(must(fill)[1]).toBe(JSON.stringify([["perf1", "A"]]));
   });
 
   it("a full recompute and addHiddenEntity write the same rows for the same hide", async () => {
@@ -2198,9 +2198,7 @@ describe("hidden and restricted ids never reach SQL text", () => {
     expect(resolves.length).toBeGreaterThanOrEqual(2);
     const allParams = resolves.flatMap(([, ...params]) => params.map(String));
     expect(allParams).toContain(JSON.stringify([HOSTILE]));
-    expect(allParams).toContain(
-      JSON.stringify([{ id: HOSTILE_LISTED, iid: "A" }])
-    );
+    expect(allParams).toContain(JSON.stringify([[HOSTILE_LISTED, "A"]]));
   });
 
   it("a hostile id that matches nothing hides nothing beyond the stored row", async () => {

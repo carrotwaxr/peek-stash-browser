@@ -49,6 +49,12 @@ import {
   refreshPlannerStatistics,
 } from "../utils/databaseMaintenance.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import {
+  type EntityRef,
+  compositeKey,
+  distinctRefs,
+  entityKey,
+} from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { logSyncFailure } from "../utils/syncLog.js";
@@ -68,7 +74,6 @@ import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import {
   type BatchChanges,
-  type EntityRef,
   type IncomingEntity,
   type JunctionName,
   type RefScope,
@@ -76,7 +81,6 @@ import {
   type StoredEntity,
   SyncChangeSet,
   detectChanges,
-  distinctRefs,
   linksByNearId,
   noChanges,
 } from "./SyncChangeSet.js";
@@ -910,7 +914,7 @@ interface GroupLink {
 
 /** A link's key within its instance. */
 function groupLinkKey(link: { containingId: string; subId: string }): string {
-  return `${link.containingId}\0${link.subId}`;
+  return compositeKey(link.containingId, link.subId);
 }
 
 /**
@@ -3307,7 +3311,7 @@ class StashSyncService extends EventEmitter {
     // Each scene once, however many of its sources changed
     const byKey = new Map<string, EntityRef>();
     const add = (refs: readonly EntityRef[]) => {
-      for (const ref of refs) byKey.set(`${ref.id}\0${ref.instanceId}`, ref);
+      for (const ref of refs) byKey.set(entityKey(ref.id, ref.instanceId), ref);
     };
     add(scenes.refs);
     for (const { type, scopes } of sources) {

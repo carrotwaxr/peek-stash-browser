@@ -1,7 +1,13 @@
 import prisma from "../prisma/singleton.js";
 import { dbWrite } from "../utils/dbWrite.js";
+import {
+  type EntityRef,
+  compositeKey,
+  distinctRefs,
+  entityKey,
+  pairsJson,
+} from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
-import { type EntityRef, distinctRefs, pairsJson } from "./SyncChangeSet.js";
 
 /** Scenes per batch: one read of their sources and one UPDATE (a dbWrite unit). */
 const BATCH_SIZE = 500;
@@ -55,7 +61,7 @@ const SOURCE_TYPES: readonly SourceType[] = [
 
 /** In-memory key of one source of a type. */
 const sourceKey = (type: SourceType, id: string, instanceId: string) =>
-  `${type}\0${id}\0${instanceId}`;
+  compositeKey(type, id, instanceId);
 
 /**
  * SceneTagInheritanceService
@@ -184,11 +190,6 @@ WHERE s.deletedAt IS NULL`,
     const sceneIds = scenes.map((s) => s.id);
     const sceneInstanceIds = [...new Set(scenes.map((s) => s.stashInstanceId))];
 
-    // Composite key helper
-    const KEY_SEP = "\0";
-    const compositeKey = (id: string, instanceId: string) =>
-      `${id}${KEY_SEP}${instanceId}`;
-
     // Get direct tags for all scenes in batch (scoped by instance)
     const directTags = await prisma.sceneTag.findMany({
       where: {
@@ -199,7 +200,7 @@ WHERE s.deletedAt IS NULL`,
     });
     const directTagsByScene = new Map<string, Set<string>>();
     for (const dt of directTags) {
-      const key = compositeKey(dt.sceneId, dt.sceneInstanceId);
+      const key = entityKey(dt.sceneId, dt.sceneInstanceId);
       if (!directTagsByScene.has(key)) {
         directTagsByScene.set(key, new Set());
       }
@@ -313,7 +314,7 @@ WHERE s.deletedAt IS NULL`,
     const tagsByPerformer = new Map<string, string[]>();
     for (const pt of performerTags) {
       if (!isLive("tag", pt.tagId, pt.tagInstanceId)) continue;
-      const key = compositeKey(pt.performerId, pt.performerInstanceId);
+      const key = entityKey(pt.performerId, pt.performerInstanceId);
       if (!tagsByPerformer.has(key)) {
         tagsByPerformer.set(key, []);
       }
@@ -323,7 +324,7 @@ WHERE s.deletedAt IS NULL`,
     const tagsByStudio = new Map<string, string[]>();
     for (const st of studioTags) {
       if (!isLive("tag", st.tagId, st.tagInstanceId)) continue;
-      const key = compositeKey(st.studioId, st.studioInstanceId);
+      const key = entityKey(st.studioId, st.studioInstanceId);
       if (!tagsByStudio.has(key)) {
         tagsByStudio.set(key, []);
       }
@@ -333,7 +334,7 @@ WHERE s.deletedAt IS NULL`,
     const tagsByGroup = new Map<string, string[]>();
     for (const gt of groupTags) {
       if (!isLive("tag", gt.tagId, gt.tagInstanceId)) continue;
-      const key = compositeKey(gt.groupId, gt.groupInstanceId);
+      const key = entityKey(gt.groupId, gt.groupInstanceId);
       if (!tagsByGroup.has(key)) {
         tagsByGroup.set(key, []);
       }
@@ -346,8 +347,8 @@ WHERE s.deletedAt IS NULL`,
       if (!isLive("performer", sp.performerId, sp.performerInstanceId)) {
         continue;
       }
-      const sceneKey = compositeKey(sp.sceneId, sp.sceneInstanceId);
-      const perfKey = compositeKey(sp.performerId, sp.performerInstanceId);
+      const sceneKey = entityKey(sp.sceneId, sp.sceneInstanceId);
+      const perfKey = entityKey(sp.performerId, sp.performerInstanceId);
       if (!performersByScene.has(sceneKey)) {
         performersByScene.set(sceneKey, []);
       }
@@ -358,8 +359,8 @@ WHERE s.deletedAt IS NULL`,
     const groupsByScene = new Map<string, string[]>();
     for (const sg of sceneGroups) {
       if (!isLive("group", sg.groupId, sg.groupInstanceId)) continue;
-      const sceneKey = compositeKey(sg.sceneId, sg.sceneInstanceId);
-      const grpKey = compositeKey(sg.groupId, sg.groupInstanceId);
+      const sceneKey = entityKey(sg.sceneId, sg.sceneInstanceId);
+      const grpKey = entityKey(sg.groupId, sg.groupInstanceId);
       if (!groupsByScene.has(sceneKey)) {
         groupsByScene.set(sceneKey, []);
       }
@@ -374,7 +375,7 @@ WHERE s.deletedAt IS NULL`,
     }[] = [];
 
     for (const scene of scenes) {
-      const sceneKey = compositeKey(scene.id, scene.stashInstanceId);
+      const sceneKey = entityKey(scene.id, scene.stashInstanceId);
       const inheritedTags = new Set<string>();
       const directTagsForScene = directTagsByScene.get(sceneKey) ?? new Set();
 
@@ -394,7 +395,7 @@ WHERE s.deletedAt IS NULL`,
         scene.studioId &&
         isLive("studio", scene.studioId, scene.stashInstanceId)
       ) {
-        const studioKey = compositeKey(scene.studioId, scene.stashInstanceId);
+        const studioKey = entityKey(scene.studioId, scene.stashInstanceId);
         const tags = tagsByStudio.get(studioKey) ?? [];
         for (const tagId of tags) {
           if (!directTagsForScene.has(tagId)) {

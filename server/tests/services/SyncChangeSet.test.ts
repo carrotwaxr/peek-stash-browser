@@ -6,17 +6,15 @@
 import { describe, expect, it } from "vitest";
 import {
   type BatchChanges,
-  type EntityRef,
   type IncomingEntity,
   SCOPE_LIMIT,
   type StoredEntity,
   SyncChangeSet,
   detectChanges,
-  distinctRefs,
   linksByNearId,
   noChanges,
-  pairsJson,
 } from "../../services/SyncChangeSet.js";
+import type { EntityRef } from "../../utils/entityRef.js";
 
 const INSTANCE = "cs-a";
 const UPDATED = "2026-01-02T03:04:05-08:00";
@@ -373,19 +371,5 @@ describe("SyncChangeSet", () => {
     expect(changes.instances()).toEqual([INSTANCE]);
     // Other types are unaffected
     expect(changes.changed("scene").whole).toBe(false);
-  });
-});
-
-describe("ref helpers", () => {
-  it("distinctRefs keeps each id once per instance, in first-seen order", () => {
-    expect(
-      distinctRefs([ref("2"), ref("1"), ref("2"), ref("2", "cs-b")])
-    ).toEqual([ref("2"), ref("1"), ref("2", "cs-b")]);
-  });
-
-  it("pairsJson binds refs as [id, instanceId] pairs", () => {
-    expect(pairsJson([ref("1"), ref("1", "cs-b")])).toBe(
-      '[["1","cs-a"],["1","cs-b"]]'
-    );
   });
 });

@@ -23,15 +23,16 @@ import type {
 } from "../types/api/index.js";
 import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
-// Key format: "userId:sceneId"
+// Keyed by user and scene id
 const sessionPlayCountIncrements = new Map<string, boolean>();
 
 function getSessionKey(userId: number, sceneId: string): string {
-  return `${userId}:${sceneId}`;
+  return compositeKey(String(userId), sceneId);
 }
 
 /**

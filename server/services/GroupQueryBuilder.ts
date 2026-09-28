@@ -19,6 +19,7 @@ import type {
   GroupQueryRow,
   GroupRelationQueryRow,
 } from "../types/internal/queryRows.js";
+import { entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
 import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
@@ -857,7 +858,7 @@ class GroupQueryBuilder {
     const sceneKeys = [
       ...new Map(
         sceneGroups.map((sg) => [
-          `${sg.sceneId}:${sg.sceneInstanceId}`,
+          entityKey(sg.sceneId, sg.sceneInstanceId),
           { id: sg.sceneId, instanceId: sg.sceneInstanceId },
         ])
       ).values(),
@@ -897,11 +898,11 @@ class GroupQueryBuilder {
         : [],
     ]);
 
-    // Collect unique entity keys (id:instanceId) from junction tables
+    // Collect unique entity refs from junction tables, by entityKey
     const tagKeys = [
       ...new Map(
         tagJunctions.map((j) => [
-          `${j.tagId}:${j.tagInstanceId}`,
+          entityKey(j.tagId, j.tagInstanceId),
           { id: j.tagId, instanceId: j.tagInstanceId },
         ])
       ).values(),
@@ -912,7 +913,7 @@ class GroupQueryBuilder {
           g.studioId
             ? [
                 [
-                  `${g.studioId}:${g.instanceId}`,
+                  entityKey(g.studioId, g.instanceId),
                   { id: g.studioId, instanceId: g.instanceId },
                 ] as const,
               ]
@@ -923,7 +924,7 @@ class GroupQueryBuilder {
     const performerKeys = [
       ...new Map(
         scenePerformers.map((sp) => [
-          `${sp.performerId}:${sp.performerInstanceId}`,
+          entityKey(sp.performerId, sp.performerInstanceId),
           { id: sp.performerId, instanceId: sp.performerInstanceId },
         ])
       ).values(),
@@ -931,7 +932,7 @@ class GroupQueryBuilder {
     const galleryKeys = [
       ...new Map(
         sceneGalleries.map((sg) => [
-          `${sg.galleryId}:${sg.galleryInstanceId}`,
+          entityKey(sg.galleryId, sg.galleryInstanceId),
           { id: sg.galleryId, instanceId: sg.galleryInstanceId },
         ])
       ).values(),
@@ -991,10 +992,10 @@ class GroupQueryBuilder {
         : [],
     ]);
 
-    // Build lookup maps with composite keys (id:instanceId)
+    // Build lookup maps by entityKey
     const tagsByKey = new Map<string, TagRef>();
     for (const t of tags) {
-      const key = `${t.id}:${t.stashInstanceId}`;
+      const key = entityKey(t.id, t.stashInstanceId);
       tagsByKey.set(key, {
         id: t.id,
         instanceId: t.stashInstanceId,
@@ -1006,7 +1007,7 @@ class GroupQueryBuilder {
 
     const studiosByKey = new Map<string, StudioRef>();
     for (const s of studios) {
-      const key = `${s.id}:${s.stashInstanceId}`;
+      const key = entityKey(s.id, s.stashInstanceId);
       studiosByKey.set(key, {
         id: s.id,
         instanceId: s.stashInstanceId,
@@ -1019,7 +1020,7 @@ class GroupQueryBuilder {
 
     const performersByKey = new Map<string, PerformerRef>();
     for (const p of performers) {
-      const key = `${p.id}:${p.stashInstanceId}`;
+      const key = entityKey(p.id, p.stashInstanceId);
       performersByKey.set(key, {
         id: p.id,
         instanceId: p.stashInstanceId,
@@ -1034,7 +1035,7 @@ class GroupQueryBuilder {
 
     const galleriesByKey = new Map<string, GalleryRef>();
     for (const g of galleries) {
-      const key = `${g.id}:${g.stashInstanceId}`;
+      const key = entityKey(g.id, g.stashInstanceId);
       galleriesByKey.set(key, {
         id: g.id,
         instanceId: g.stashInstanceId,
@@ -1044,35 +1045,35 @@ class GroupQueryBuilder {
     }
 
     // Build group -> tags map using composite keys
-    // Key format: groupId:groupInstanceId -> tags[]
+    // Keyed by the group's entityKey -> tags[]
     const tagsByGroup = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
-      const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
+      const tagKey = entityKey(junction.tagId, junction.tagInstanceId);
       const tag = tagsByKey.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
-      const groupKey = `${junction.groupId}:${junction.groupInstanceId}`;
+      const groupKey = entityKey(junction.groupId, junction.groupInstanceId);
       const list = tagsByGroup.get(groupKey) ?? [];
       list.push(tag);
       tagsByGroup.set(groupKey, list);
     }
 
     // Build group -> scene mapping using composite keys
-    // Key format: groupId:groupInstanceId -> Set<sceneId:sceneInstanceId>
+    // Keyed by the group's entityKey -> Set of scene entityKeys
     const scenesByGroup = new Map<string, Set<string>>();
     for (const sg of sceneGroups) {
-      const groupKey = `${sg.groupId}:${sg.groupInstanceId}`;
-      const sceneKey = `${sg.sceneId}:${sg.sceneInstanceId}`;
+      const groupKey = entityKey(sg.groupId, sg.groupInstanceId);
+      const sceneKey = entityKey(sg.sceneId, sg.sceneInstanceId);
       const set = scenesByGroup.get(groupKey) ?? new Set();
       set.add(sceneKey);
       scenesByGroup.set(groupKey, set);
     }
 
     // Build scene -> entities mappings using composite keys
-    // Key format: sceneId:sceneInstanceId -> Set<entityId:entityInstanceId>
+    // Keyed by the scene's entityKey -> Set of entity entityKeys
     const performersByScene = new Map<string, Set<string>>();
     for (const sp of scenePerformers) {
-      const sceneKey = `${sp.sceneId}:${sp.sceneInstanceId}`;
-      const performerKey = `${sp.performerId}:${sp.performerInstanceId}`;
+      const sceneKey = entityKey(sp.sceneId, sp.sceneInstanceId);
+      const performerKey = entityKey(sp.performerId, sp.performerInstanceId);
       const set = performersByScene.get(sceneKey) ?? new Set();
       set.add(performerKey);
       performersByScene.set(sceneKey, set);
@@ -1080,8 +1081,8 @@ class GroupQueryBuilder {
 
     const galleriesByScene = new Map<string, Set<string>>();
     for (const sg of sceneGalleries) {
-      const sceneKey = `${sg.sceneId}:${sg.sceneInstanceId}`;
-      const galleryKey = `${sg.galleryId}:${sg.galleryInstanceId}`;
+      const sceneKey = entityKey(sg.sceneId, sg.sceneInstanceId);
+      const galleryKey = entityKey(sg.galleryId, sg.galleryInstanceId);
       const set = galleriesByScene.get(sceneKey) ?? new Set();
       set.add(galleryKey);
       galleriesByScene.set(sceneKey, set);
@@ -1089,12 +1090,12 @@ class GroupQueryBuilder {
 
     // Populate groups using composite keys
     for (const group of groups) {
-      const groupKey = `${group.id}:${group.instanceId}`;
+      const groupKey = entityKey(group.id, group.instanceId);
       group.tags = tagsByGroup.get(groupKey) ?? [];
 
       // Hydrate studio with tooltip data (id, name, image_path) using composite key
       if (group.studio?.id) {
-        const studioKey = `${group.studio.id}:${group.instanceId}`;
+        const studioKey = entityKey(group.studio.id, group.instanceId);
         const studioData = studiosByKey.get(studioKey);
         if (studioData) {
           group.studio = studioData;

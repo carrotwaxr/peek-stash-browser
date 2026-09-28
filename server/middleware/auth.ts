@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
 import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
+import { compositeKey } from "../utils/entityRef.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
 import { shouldLogOnce } from "../utils/logThrottle.js";
 import { logger } from "../utils/logger.js";
@@ -120,7 +121,12 @@ export const authenticate = async (
       if (trusted) {
         return await authenticateUser(username, peer, req, res, next);
       }
-      if (shouldLogOnce(`proxy-auth-untrusted\0${peer}`, TEN_MINUTES_MS)) {
+      if (
+        shouldLogOnce(
+          compositeKey("proxy-auth-untrusted", peer),
+          TEN_MINUTES_MS
+        )
+      ) {
         logger.warn(
           trust.mode === "none"
             ? `Proxy auth: ignored the ${proxyAuthHeader} header from ${peer}, because PROXY_AUTH_TRUSTED_IPS has an invalid entry`
@@ -175,7 +181,10 @@ const authenticateUser = async (
   if (!user) {
     const shortName = username.slice(0, 64);
     if (
-      shouldLogOnce(`proxy-auth-unknown\0${shortName}\0${peer}`, TEN_MINUTES_MS)
+      shouldLogOnce(
+        compositeKey("proxy-auth-unknown", shortName, peer),
+        TEN_MINUTES_MS
+      )
     ) {
       logger.warn("Proxy auth: the header names no Peek user", {
         username: shortName,
@@ -185,7 +194,9 @@ const authenticateUser = async (
     return await authenticateToken(req, res, next);
   }
 
-  if (shouldLogOnce(`proxy-auth-signin\0${user.username}`, ONE_HOUR_MS)) {
+  if (
+    shouldLogOnce(compositeKey("proxy-auth-signin", user.username), ONE_HOUR_MS)
+  ) {
     logger.info("Proxy auth: signed in from header", {
       username: user.username,
       peer,
