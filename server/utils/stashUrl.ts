@@ -4,29 +4,16 @@
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 
 /**
- * Gets the base Stash URL from the current instance configuration
- * @returns Base Stash URL (e.g., http://localhost:9999)
- */
-export function getStashBaseUrl(): string | null {
-  try {
-    return stashInstanceManager.getBaseUrl();
-  } catch {
-    // No instance configured
-    return null;
-  }
-}
-
-/**
- * Gets the UI Stash URL from the current instance configuration
- * This is used for "View in Stash" links - uses uiUrl if set
- * @param instanceId - Optional instance ID for multi-instance routing
+ * The Stash UI address of an instance, for "View in Stash" links: its uiUrl
+ * when set, else its url. Null when the instance is not loaded (disabled,
+ * deleted, or "" from a row stored before instances were carried).
+ * @param instanceId - The entity's instance
  * @returns UI Stash URL (e.g., http://localhost:9999 or https://stash.example.com)
  */
-export function getStashUiUrl(instanceId?: string): string | null {
+export function getStashUiUrl(instanceId: string): string | null {
   try {
     return stashInstanceManager.getUiUrl(instanceId);
   } catch {
-    // No instance configured
     return null;
   }
 }
@@ -36,7 +23,7 @@ export function getStashUiUrl(instanceId?: string): string | null {
  * Uses the uiUrl if configured, otherwise falls back to the base url
  * @param entityType - Type of entity (scene, performer, studio, tag, group, gallery, image)
  * @param entityId - ID of the entity
- * @param instanceId - Instance ID for multi-instance routing (undefined: the default instance)
+ * @param instanceId - The entity's instance; no link when it is not loaded
  * @param viewer - The requesting user. Stash's address is internal, so only
  *   admins get a link; everyone else, and a missing viewer, gets null.
  * @returns Full URL to the entity in Stash, or null
@@ -51,7 +38,7 @@ export function buildStashEntityUrl(
     | "gallery"
     | "image",
   entityId: string | number,
-  instanceId: string | undefined,
+  instanceId: string,
   viewer: { role: string } | undefined
 ): string | null {
   if (viewer?.role !== "ADMIN") {

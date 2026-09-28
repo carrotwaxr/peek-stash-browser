@@ -2,27 +2,21 @@
  * Unit Tests for stashUrl utility
  *
  * Tests the Stash URL builder functions used to generate links to
- * Stash entities. Covers base URL retrieval, entity URL construction
+ * Stash entities. Covers the instance's UI address, entity URL construction
  * for all entity types, and error/edge-case handling.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildStashEntityUrl,
-  getStashBaseUrl,
-  getStashUiUrl,
-} from "../../utils/stashUrl.js";
+import { buildStashEntityUrl, getStashUiUrl } from "../../utils/stashUrl.js";
 import { untrusted } from "../helpers/untrusted.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
-const { mockGetBaseUrl, mockGetUiUrl } = vi.hoisted(() => ({
-  mockGetBaseUrl: vi.fn(),
+const { mockGetUiUrl } = vi.hoisted(() => ({
   mockGetUiUrl: vi.fn(),
 }));
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getBaseUrl: mockGetBaseUrl,
     getUiUrl: mockGetUiUrl,
   },
 }));
@@ -32,38 +26,8 @@ describe("stashUrl", () => {
     vi.clearAllMocks();
   });
 
-  describe("getStashBaseUrl", () => {
-    it("returns URL from stashInstanceManager", () => {
-      mockGetBaseUrl.mockReturnValue("http://localhost:9999");
-
-      const result = getStashBaseUrl();
-
-      expect(result).toBe("http://localhost:9999");
-      expect(mockGetBaseUrl).toHaveBeenCalledOnce();
-    });
-
-    it("returns null when stashInstanceManager throws", () => {
-      mockGetBaseUrl.mockImplementation(() => {
-        throw new Error("No instance configured");
-      });
-
-      const result = getStashBaseUrl();
-
-      expect(result).toBeNull();
-    });
-  });
-
   describe("getStashUiUrl", () => {
-    it("returns URL from stashInstanceManager for the default instance", () => {
-      mockGetUiUrl.mockReturnValue("https://stash.example.com");
-
-      const result = getStashUiUrl();
-
-      expect(result).toBe("https://stash.example.com");
-      expect(mockGetUiUrl).toHaveBeenCalledWith(undefined);
-    });
-
-    it("passes through a specific instanceId", () => {
+    it("passes through the instanceId", () => {
       mockGetUiUrl.mockReturnValue("https://stash-b.example.com");
 
       const result = getStashUiUrl("instance-b");
@@ -72,14 +36,13 @@ describe("stashUrl", () => {
       expect(mockGetUiUrl).toHaveBeenCalledWith("instance-b");
     });
 
-    it("returns null when stashInstanceManager throws", () => {
-      mockGetUiUrl.mockImplementation(() => {
-        throw new Error("No instance configured");
+    it("returns null when the instance is not loaded", () => {
+      mockGetUiUrl.mockImplementation((id: string) => {
+        throw new Error(`Stash instance not found: ${id}`);
       });
 
-      const result = getStashUiUrl("instance-b");
-
-      expect(result).toBeNull();
+      expect(getStashUiUrl("instance-b")).toBeNull();
+      expect(getStashUiUrl("")).toBeNull();
     });
   });
 
@@ -125,7 +88,7 @@ describe("stashUrl", () => {
       (entityType, expectedPath) => {
         mockGetUiUrl.mockReturnValue(BASE_URL);
 
-        const result = buildStashEntityUrl(entityType, "42", undefined, ADMIN);
+        const result = buildStashEntityUrl(entityType, "42", "inst", ADMIN);
 
         expect(result).toBe(`${BASE_URL}/${expectedPath}/42`);
       }
@@ -140,12 +103,12 @@ describe("stashUrl", () => {
       expect(mockGetUiUrl).toHaveBeenCalledWith("instance-b");
     });
 
-    it("returns null when getStashUiUrl returns null", () => {
-      mockGetUiUrl.mockImplementation(() => {
-        throw new Error("No instance configured");
+    it("returns null when the entity's instance is not loaded", () => {
+      mockGetUiUrl.mockImplementation((id: string) => {
+        throw new Error(`Stash instance not found: ${id}`);
       });
 
-      const result = buildStashEntityUrl("scene", "42", undefined, ADMIN);
+      const result = buildStashEntityUrl("scene", "42", "inst", ADMIN);
 
       expect(result).toBeNull();
     });
@@ -156,7 +119,7 @@ describe("stashUrl", () => {
       const result = buildStashEntityUrl(
         untrusted("unknown"),
         "42",
-        undefined,
+        "inst",
         ADMIN
       );
 
@@ -166,7 +129,7 @@ describe("stashUrl", () => {
     it("works with string entityId", () => {
       mockGetUiUrl.mockReturnValue(BASE_URL);
 
-      const result = buildStashEntityUrl("scene", "123", undefined, ADMIN);
+      const result = buildStashEntityUrl("scene", "123", "inst", ADMIN);
 
       expect(result).toBe(`${BASE_URL}/scenes/123`);
     });
@@ -174,7 +137,7 @@ describe("stashUrl", () => {
     it("works with number entityId", () => {
       mockGetUiUrl.mockReturnValue(BASE_URL);
 
-      const result = buildStashEntityUrl("performer", 456, undefined, ADMIN);
+      const result = buildStashEntityUrl("performer", 456, "inst", ADMIN);
 
       expect(result).toBe(`${BASE_URL}/performers/456`);
     });

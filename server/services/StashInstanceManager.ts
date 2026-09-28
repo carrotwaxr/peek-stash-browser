@@ -2,6 +2,7 @@ import type { StashInstance } from "@prisma/client";
 import { StashClient } from "../graphql/StashClient.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
  * A request named a Stash instance that is not loaded: disabled, deleted or
@@ -216,70 +217,36 @@ class StashInstanceManager {
 
   /**
    * The base URL and API key of the instance a request is served from (see
-   * resolveInstanceId). A named instance that is not loaded (disabled or
-   * deleted) throws UnknownInstanceError; no instance named and none
-   * configured throws "No Stash instance configured".
+   * resolveInstanceId). A named instance that is not loaded (disabled,
+   * deleted, or "" from a row stored before instances were carried) throws
+   * UnknownInstanceError; no instance named and none configured throws
+   * "No Stash instance configured". Anything stored about an entity names
+   * its instance: pass it, never nothing.
    */
   getCredentials(instanceId?: string): StashCredentials {
     if (instanceId === undefined) {
       return credentialsOf(this.getDefaultConfig());
     }
+    return credentialsOf(this.loadedConfig(instanceId));
+  }
+
+  /**
+   * The address a "View in Stash" link opens for an entity on this instance:
+   * its uiUrl when set, else its url, without /graphql or a trailing slash.
+   * Throws UnknownInstanceError when the instance is not loaded.
+   */
+  getUiUrl(instanceId: string): string {
+    const config = this.loadedConfig(instanceId);
+    return (emptyToNull(config.uiUrl) ?? config.url)
+      .replace("/graphql", "")
+      .replace(/\/$/, "");
+  }
+
+  /** The config of a loaded (enabled) instance, or UnknownInstanceError. */
+  private loadedConfig(instanceId: string): StashInstance {
     const config = this.configs.get(instanceId);
     if (!config) throw new UnknownInstanceError(instanceId);
-    return credentialsOf(config);
-  }
-
-  /**
-   * Get the URL for a Stash instance (without /graphql suffix)
-   * Used by proxy controllers to construct full URLs
-   */
-  getBaseUrl(instanceId?: string): string {
-    const config = instanceId
-      ? this.configs.get(instanceId)
-      : this.configs.values().next().value;
-
-    if (!config) {
-      throw new Error("No Stash instance configured");
-    }
-
-    return config.url.replace("/graphql", "");
-  }
-
-  /**
-   * Get the UI URL for a Stash instance for "View in Stash" links
-   * Uses uiUrl if configured, otherwise falls back to the base url (without /graphql)
-   * @param instanceId - Optional instance ID. If not provided, uses the default instance
-   */
-  getUiUrl(instanceId?: string): string {
-    const config = instanceId
-      ? this.configs.get(instanceId)
-      : this.configs.values().next().value;
-
-    if (!config) {
-      throw new Error("No Stash instance configured");
-    }
-
-    // Use uiUrl if set, otherwise use url stripped of /graphql
-    if (config.uiUrl) {
-      return config.uiUrl.replace("/graphql", "").replace(/\/$/, "");
-    }
-    return config.url.replace("/graphql", "").replace(/\/$/, "");
-  }
-
-  /**
-   * Get the API key for a Stash instance
-   * Used by proxy controllers to authenticate requests
-   */
-  getApiKey(instanceId?: string): string {
-    const config = instanceId
-      ? this.configs.get(instanceId)
-      : this.configs.values().next().value;
-
-    if (!config) {
-      throw new Error("No Stash instance configured");
-    }
-
-    return config.apiKey;
+    return config;
   }
 
   /**

@@ -187,7 +187,7 @@ export const findImages = async (
       stashUrl: buildStashEntityUrl(
         "image",
         image.id,
-        image.instanceId || undefined,
+        image.instanceId,
         req.user
       ),
     }));

@@ -72,8 +72,10 @@ vi.mock("../../utils/streamProxy.js", () => ({
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getBaseUrl: vi.fn((id?: string) => `http://stash-${id}:9999`),
-    getApiKey: vi.fn((id?: string) => `key-${id}`),
+    getCredentials: vi.fn((id?: string) => ({
+      baseUrl: `http://stash-${id}:9999`,
+      apiKey: `key-${id}`,
+    })),
   },
 }));
 

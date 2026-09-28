@@ -284,7 +284,7 @@ export const findGalleries = async (
       stashUrl: buildStashEntityUrl(
         "gallery",
         gallery.id,
-        gallery.instanceId || undefined,
+        gallery.instanceId,
         req.user
       ),
     }));

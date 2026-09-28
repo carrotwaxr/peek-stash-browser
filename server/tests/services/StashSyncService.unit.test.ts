@@ -20,7 +20,12 @@ import {
 } from "../../graphql/StashClient.js";
 import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
+import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
+import {
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
 import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -194,7 +199,10 @@ function everyTypeChanged(): void {
   });
 }
 
-vi.mock("../../services/StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => ({
+  UnknownInstanceError: (
+    await importOriginal<typeof stashInstanceManagerModule>()
+  ).UnknownInstanceError,
   stashInstanceManager: {
     getDefault: vi.fn(() => mockStashClient),
     get: vi.fn(() => mockStashClient),
@@ -202,8 +210,10 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       { id: "test-instance-uuid", name: "Test Instance" },
     ]),
     hasInstances: vi.fn(() => true),
-    getBaseUrl: vi.fn(() => "http://localhost:9999"),
-    getApiKey: vi.fn(() => "test-api-key"),
+    getCredentials: vi.fn(() => ({
+      baseUrl: "http://localhost:9999",
+      apiKey: "test-api-key",
+    })),
     reload: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -1539,5 +1549,62 @@ describe("StashSyncService queued full syncs", () => {
     expect(fullSync).toHaveBeenCalledExactlyOnceWith("instance-b");
     await must(fullSync.mock.results[0], "the queued sync").value;
     expect(stashSyncService.isSyncing()).toBe(false);
+  });
+});
+
+describe("StashSyncService reProbeUngeneratedClips", () => {
+  const PREVIEW = "http://stash-b:9999/scene/1/scene_marker/7/stream";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("probes each preview with its own instance's key", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockReturnValueOnce({
+      baseUrl: "http://stash-b:9999",
+      apiKey: "key-b",
+    });
+    mockPrisma.stashClip.findMany.mockResolvedValue([
+      partialRow({ id: "7", previewPath: PREVIEW }),
+    ]);
+    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(
+      new Map([[`${PREVIEW}?apikey=key-b`, true]])
+    );
+
+    expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
+      checked: 1,
+      updated: 1,
+    });
+    expect(stashInstanceManager.getCredentials).toHaveBeenCalledWith("inst-b");
+    expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
+      `${PREVIEW}?apikey=key-b`,
+    ]);
+  });
+
+  it("skips an instance that is not loaded, and logs it", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockImplementationOnce(
+      (id) => {
+        throw new UnknownInstanceError(String(id));
+      }
+    );
+    const warn = vi.spyOn(logger, "warn");
+
+    try {
+      expect(
+        await stashSyncService.reProbeUngeneratedClips("inst-gone")
+      ).toEqual({ checked: 0, updated: 0 });
+      expect(mockPrisma.stashClip.findMany).not.toHaveBeenCalled();
+      expect(clipPreviewProber.probeBatch).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        "Re-probe skipped: the Stash instance is not loaded",
+        { stashInstanceId: "inst-gone" }
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
