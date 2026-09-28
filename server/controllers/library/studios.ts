@@ -49,14 +49,16 @@ export const findStudios = async (
       requestingUser.id
     );
 
-    // Merge root-level ids with studio_filter
+    // Merge root-level ids with studio_filter. The builder reads the
+    // filter as sent, as before: PeekStudioFilter types its criteria as
+    // Stash's, which always name a modifier, where a request may omit it
     const normalizedIds = ids
       ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : studio_filter?.ids;
-    const mergedFilter: PeekStudioFilter = {
+    const mergedFilter = {
       ...studio_filter,
       ids: normalizedIds,
-    };
+    } as PeekStudioFilter;
 
     // Extract specific instance ID for disambiguation (from studio_filter.instance_id)
     const specificInstanceId = studio_filter?.instance_id;

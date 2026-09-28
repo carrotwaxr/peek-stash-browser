@@ -6,6 +6,7 @@
  */
 import type { JsonValue } from "@prisma/client/runtime/library";
 import type { NormalizedScene, PeekSceneFilter } from "../index.js";
+import type { WithStashUrl } from "./library.js";
 
 // =============================================================================
 // COMMON TYPES
@@ -131,7 +132,7 @@ export interface PreviewCarouselRequest {
 }
 
 export interface PreviewCarouselResponse {
-  scenes: NormalizedScene[];
+  scenes: WithStashUrl<NormalizedScene>[];
 }
 
 // =============================================================================
@@ -152,5 +153,5 @@ export interface ExecuteCarouselByIdResponse {
     title: string;
     icon: string;
   };
-  scenes: NormalizedScene[];
+  scenes: WithStashUrl<NormalizedScene>[];
 }

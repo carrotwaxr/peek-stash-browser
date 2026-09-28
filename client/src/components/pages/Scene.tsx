@@ -180,10 +180,7 @@ const SceneContent = () => {
               instanceId={scene?.instanceId as string}
               title={displayTitle}
             />
-            <ViewInStashButton
-              stashUrl={(scene?.stashUrl as string) || ""}
-              size={20}
-            />
+            <ViewInStashButton stashUrl={scene?.stashUrl ?? ""} size={20} />
           </div>
           <h1
             className="text-2xl font-bold line-clamp-2"

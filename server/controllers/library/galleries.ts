@@ -83,14 +83,16 @@ export const findGalleries = async (
       requestingUser.id
     );
 
-    // Merge root-level ids with gallery_filter
+    // Merge root-level ids with gallery_filter. The builder reads the
+    // filter as sent, as before: PeekGalleryFilter types its criteria as
+    // Stash's, which always name a modifier, where a request may omit it
     const normalizedIds = ids
       ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : gallery_filter?.ids;
-    const mergedFilter: PeekGalleryFilter & Record<string, unknown> = {
+    const mergedFilter = {
       ...gallery_filter,
       ids: normalizedIds,
-    };
+    } as PeekGalleryFilter & Record<string, unknown>;
 
     // Extract specific instance ID for disambiguation (from gallery_filter.instance_id)
     const specificInstanceId = gallery_filter?.instance_id;

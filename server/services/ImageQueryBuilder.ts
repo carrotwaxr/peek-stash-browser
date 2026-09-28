@@ -51,9 +51,16 @@ export interface ImageFilter {
   galleries?: { value: string[]; modifier?: string };
   q?: string; // Search query
   // Date filters
-  date?: { value?: string; value2?: string; modifier?: string };
-  created_at?: { value?: string; value2?: string; modifier?: string };
-  updated_at?: { value?: string; value2?: string; modifier?: string };
+  date?: DateFilter;
+  created_at?: DateFilter;
+  updated_at?: DateFilter;
+}
+
+/** A date criterion as `buildDateFilter` reads it */
+interface DateFilter {
+  value?: string | null;
+  value2?: string | null;
+  modifier?: string;
 }
 
 /**

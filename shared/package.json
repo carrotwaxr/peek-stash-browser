@@ -38,6 +38,10 @@
       "types": "./dist/api/imageViewHistory.d.ts",
       "default": "./dist/api/imageViewHistory.js"
     },
+    "./api/library.js": {
+      "types": "./dist/api/library.d.ts",
+      "default": "./dist/api/library.js"
+    },
     "./api/ratings.js": {
       "types": "./dist/api/ratings.d.ts",
       "default": "./dist/api/ratings.js"

@@ -30,6 +30,7 @@ import type {
   ScoredSceneId,
   TypedAuthRequest,
   TypedResponse,
+  WithStashUrl,
 } from "../../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
@@ -191,7 +192,7 @@ export async function mergeScenesWithUserData(
 export function addStreamabilityInfo(
   scenes: NormalizedScene[],
   viewer: { role: string } | undefined
-): NormalizedScene[] {
+): WithStashUrl<NormalizedScene>[] {
   return scenes.map((scene) => {
     const streamabilityInfo = isSceneStreamable(scene);
     const stashUrl = buildStashEntityUrl(
@@ -241,8 +242,10 @@ export const findScenes = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Build filters object
-    const filters: PeekSceneFilter = { ...scene_filter };
+    // Build filters object. The builder reads the filter as sent, as before:
+    // PeekSceneFilter types its criteria as Stash's, which always name a
+    // modifier, where a request may omit it
+    const filters = { ...scene_filter } as PeekSceneFilter;
     if (ids && ids.length > 0) {
       filters.ids = { value: coerceEntityRefs(ids), modifier: "INCLUDES" };
     }

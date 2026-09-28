@@ -5,6 +5,7 @@
  * Admin-only for management operations, with a user-facing endpoint
  * to get their own group memberships.
  */
+import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
@@ -26,6 +27,19 @@ import type {
   UpdateUserGroupParams,
   UpdateUserGroupResponse,
 } from "../types/api/groups.js";
+
+/**
+ * The group fields a member list shows (`UserGroupSummary`): the current
+ * user's groups and, for an admin, any user's
+ */
+export const USER_GROUP_SUMMARY_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  canShare: true,
+  canDownloadFiles: true,
+  canDownloadPlaylists: true,
+} as const satisfies Prisma.UserGroupSelect;
 
 /**
  * Get all groups with member counts (admin only)
@@ -388,21 +402,8 @@ export const getUserGroups = async (
 
   const memberships = await prisma.userGroupMembership.findMany({
     where: { userId: req.user.id },
-    include: {
-      group: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          canShare: true,
-          canDownloadFiles: true,
-          canDownloadPlaylists: true,
-        },
-      },
-    },
+    include: { group: { select: USER_GROUP_SUMMARY_SELECT } },
   });
 
-  return res.json({
-    groups: memberships.map((m) => m.group),
-  });
+  return res.json({ groups: memberships.map((m) => m.group) });
 };

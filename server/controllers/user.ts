@@ -24,6 +24,7 @@ import {
 } from "../services/exclusionPolicy.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { GetUserGroupMembershipsResponse } from "../types/api/groups.js";
 import type {
   AdminRegenerateRecoveryKeyParams,
   AdminRegenerateRecoveryKeyResponse,
@@ -100,6 +101,7 @@ import {
   generateRecoveryKey,
   hashRecoveryKey,
 } from "../utils/recoveryKey.js";
+import { USER_GROUP_SUMMARY_SELECT } from "./groups.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [
@@ -3047,7 +3049,7 @@ export const updateUserPermissionOverrides = async (
  */
 export const getUserGroupMemberships = async (
   req: TypedAuthRequest<never, GetUserGroupMembershipsParams>,
-  res: TypedResponse<{ groups: unknown[] } | ApiErrorResponse>
+  res: TypedResponse<GetUserGroupMembershipsResponse | ApiErrorResponse>
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
@@ -3063,23 +3065,10 @@ export const getUserGroupMemberships = async (
 
     const memberships = await prisma.userGroupMembership.findMany({
       where: { userId },
-      include: {
-        group: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            canShare: true,
-            canDownloadFiles: true,
-            canDownloadPlaylists: true,
-          },
-        },
-      },
+      include: { group: { select: USER_GROUP_SUMMARY_SELECT } },
     });
 
-    res.json({
-      groups: memberships.map((m) => m.group),
-    });
+    res.json({ groups: memberships.map((m) => m.group) });
   } catch (error) {
     logger.error("Error getting user group memberships", {
       error: error instanceof Error ? error.message : "Unknown error",

@@ -2,14 +2,17 @@
  * Admin API — groups, permissions, recovery keys, password reset.
  */
 import type {
+  GetAllUserGroupsResponse,
+  GetCurrentUserGroupsResponse,
   GetRecoveryKeyResponse,
+  GetUserGroupMembershipsResponse,
   RegenerateRecoveryKeyResponse,
 } from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 // ── User Groups (admin management) ────────────────────────────────────
 
-export const getGroups = () => apiGet<{ groups: unknown[] }>("/groups");
+export const getGroups = () => apiGet<GetAllUserGroupsResponse>("/groups");
 
 export const getGroup = (groupId: string) =>
   apiGet<{ group: unknown }>(`/groups/${groupId}`);
@@ -30,10 +33,10 @@ export const removeGroupMember = (groupId: string, userId: string) =>
   apiDelete(`/groups/${groupId}/members/${userId}`);
 
 export const getUserGroupMemberships = (userId: number) =>
-  apiGet<{ groups: unknown[] }>(`/user/${userId}/groups`);
+  apiGet<GetUserGroupMembershipsResponse>(`/user/${userId}/groups`);
 
 export const getMyGroups = () =>
-  apiGet<{ groups: unknown[] }>("/groups/user/mine");
+  apiGet<GetCurrentUserGroupsResponse>("/groups/user/mine");
 
 // ── Permissions ────────────────────────────────────────────────────────
 

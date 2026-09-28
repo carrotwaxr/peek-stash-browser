@@ -9,6 +9,7 @@ import type {
   FindImagesResponse,
   TypedAuthRequest,
   TypedResponse,
+  WithStashUrl,
 } from "../../types/api/index.js";
 import type { NormalizedImage } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
@@ -100,12 +101,14 @@ export const findImages = async (
       filters.favorite = image_filter.favorite;
     }
 
+    // The builder reads these as sent, as before: ImageFilter types their
+    // modifier as always present, where a request may omit it
     if (image_filter?.rating100) {
-      filters.rating100 = image_filter.rating100;
+      filters.rating100 = image_filter.rating100 as ImageFilter["rating100"];
     }
 
     if (image_filter?.o_counter) {
-      filters.o_counter = image_filter.o_counter;
+      filters.o_counter = image_filter.o_counter as ImageFilter["o_counter"];
     }
 
     if (image_filter?.performers?.value) {
@@ -204,7 +207,7 @@ export const findImages = async (
     res.json({
       findImages: {
         count: result.total,
-        images: imagesWithStashUrl as NormalizedImage[],
+        images: imagesWithStashUrl as WithStashUrl<NormalizedImage>[],
       },
     });
   } catch (error) {
