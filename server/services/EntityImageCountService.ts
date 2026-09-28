@@ -1,7 +1,7 @@
 import prisma from "../prisma/singleton.js";
 import { dbWrite } from "../utils/dbWrite.js";
+import { type EntityRef, distinctRefs, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
-import { type EntityRef, distinctRefs, pairsJson } from "./SyncChangeSet.js";
 
 /** The entities whose imageCount includes gallery inheritance. */
 type CountedType = "performer" | "studio" | "tag";

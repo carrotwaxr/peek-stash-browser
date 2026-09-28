@@ -41,7 +41,7 @@
       "count": 8
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 13
+      "count": 12
     }
   },
   "controllers/library/groups.ts": {
@@ -49,7 +49,7 @@
       "count": 6
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
+      "count": 7
     }
   },
   "controllers/library/images.ts": {
@@ -73,7 +73,7 @@
       "count": 51
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 52
+      "count": 40
     }
   },
   "controllers/library/studios.ts": {
@@ -97,7 +97,7 @@
       "count": 13
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
+      "count": 1
     }
   },
   "controllers/proxy.ts": {
@@ -359,7 +359,7 @@
       "count": 41
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
+      "count": 12
     }
   },
   "services/StashSyncService.ts": {
@@ -395,7 +395,7 @@
       "count": 4
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 10
+      "count": 9
     }
   },
   "tests/controllers/carousel.test.ts": {

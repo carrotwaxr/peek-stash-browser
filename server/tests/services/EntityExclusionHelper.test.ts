@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing
@@ -195,8 +196,8 @@ describe("EntityExclusionHelper", () => {
       expect(result.globalIds.has("1")).toBe(true);
 
       expect(result.scopedKeys.size).toBe(2);
-      expect(result.scopedKeys.has("2:instA")).toBe(true);
-      expect(result.scopedKeys.has("3:instB")).toBe(true);
+      expect(result.scopedKeys.has(entityKey("2", "instA"))).toBe(true);
+      expect(result.scopedKeys.has(entityKey("3", "instB"))).toBe(true);
     });
 
     it("returns empty sets when userId is undefined", async () => {
@@ -252,7 +253,7 @@ describe("EntityExclusionHelper", () => {
     it("returns true for instance-scoped excluded entities matching instance", () => {
       const exclusionData = {
         globalIds: new Set<string>(),
-        scopedKeys: new Set(["2:instA"]),
+        scopedKeys: new Set([entityKey("2", "instA")]),
       };
 
       expect(
@@ -263,7 +264,7 @@ describe("EntityExclusionHelper", () => {
     it("returns false for instance-scoped excluded entities with different instance", () => {
       const exclusionData = {
         globalIds: new Set<string>(),
-        scopedKeys: new Set(["2:instA"]),
+        scopedKeys: new Set([entityKey("2", "instA")]),
       };
 
       expect(
@@ -274,7 +275,7 @@ describe("EntityExclusionHelper", () => {
     it("returns false for instance-scoped exclusions when entity has no instanceId", () => {
       const exclusionData = {
         globalIds: new Set<string>(),
-        scopedKeys: new Set(["2:instA"]),
+        scopedKeys: new Set([entityKey("2", "instA")]),
       };
 
       expect(
@@ -285,7 +286,7 @@ describe("EntityExclusionHelper", () => {
     it("returns false for non-excluded entities", () => {
       const exclusionData = {
         globalIds: new Set(["1"]),
-        scopedKeys: new Set(["2:instA"]),
+        scopedKeys: new Set([entityKey("2", "instA")]),
       };
 
       expect(
@@ -299,7 +300,7 @@ describe("EntityExclusionHelper", () => {
     it("checks global exclusions before scoped exclusions", () => {
       const exclusionData = {
         globalIds: new Set(["1"]),
-        scopedKeys: new Set(["1:instA"]),
+        scopedKeys: new Set([entityKey("1", "instA")]),
       };
 
       // Entity "1" is both globally and scoped-excluded; should be excluded regardless of instance

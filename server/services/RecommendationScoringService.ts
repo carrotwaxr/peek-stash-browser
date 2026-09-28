@@ -1,5 +1,6 @@
 // server/services/RecommendationScoringService.ts
 import type { NormalizedScene, SceneScoringData } from "../types/index.js";
+import { entityKey } from "../utils/entityRef.js";
 import type { SeededRandom } from "../utils/seededRandom.js";
 
 // Configuration constants
@@ -227,7 +228,7 @@ export function scoreSceneByPreferences(
 
     for (const performer of scene.performers) {
       const performerId = performer.id;
-      const perfKey = `${performerId}\0${instId}`;
+      const perfKey = entityKey(performerId, instId);
 
       if (prefs.favoritePerformers.has(perfKey)) {
         favoritePerformerCount++;
@@ -271,7 +272,7 @@ export function scoreSceneByPreferences(
   // Score studio (using composite key for multi-instance)
   if (scene.studio) {
     const studioId = scene.studio.id;
-    const studioKey = `${studioId}\0${instId}`;
+    const studioKey = entityKey(studioId, instId);
 
     if (prefs.favoriteStudios.has(studioKey)) {
       baseScore += STUDIO_FAVORITE_WEIGHT;
@@ -315,7 +316,7 @@ export function scoreSceneByPreferences(
   let implicitTagWeight = 0;
 
   for (const tagId of sceneTags) {
-    const tagKey = `${tagId}\0${instId}`;
+    const tagKey = entityKey(tagId, instId);
     if (prefs.favoriteTags.has(tagKey)) favoriteSceneTagCount++;
     else if (prefs.highlyRatedTags.has(tagKey)) ratedSceneTagCount++;
 
@@ -328,7 +329,7 @@ export function scoreSceneByPreferences(
 
   for (const tagId of performerTags) {
     if (!sceneTags.has(tagId)) {
-      const tagKey = `${tagId}\0${instId}`;
+      const tagKey = entityKey(tagId, instId);
       if (prefs.favoriteTags.has(tagKey)) favoritePerformerTagCount++;
       else if (prefs.highlyRatedTags.has(tagKey)) ratedPerformerTagCount++;
     }
@@ -336,7 +337,7 @@ export function scoreSceneByPreferences(
 
   for (const tagId of studioTags) {
     if (!sceneTags.has(tagId) && !performerTags.has(tagId)) {
-      const tagKey = `${tagId}\0${instId}`;
+      const tagKey = entityKey(tagId, instId);
       if (prefs.favoriteTags.has(tagKey)) favoriteStudioTagCount++;
       else if (prefs.highlyRatedTags.has(tagKey)) ratedStudioTagCount++;
     }
@@ -507,10 +508,10 @@ export function scoreScoringDataByPreferences(
 
   const sceneInstId = scoringData.instanceId || "";
   for (const performerId of scoringData.performerIds) {
-    const compositeKey = `${performerId}\0${sceneInstId}`;
-    if (prefs.favoritePerformers.has(compositeKey)) {
+    const performerKey = entityKey(performerId, sceneInstId);
+    if (prefs.favoritePerformers.has(performerKey)) {
       favoritePerformerCount++;
-    } else if (prefs.highlyRatedPerformers.has(compositeKey)) {
+    } else if (prefs.highlyRatedPerformers.has(performerKey)) {
       highlyRatedPerformerCount++;
     }
 
@@ -540,7 +541,7 @@ export function scoreScoringDataByPreferences(
 
   // Score studio (using composite key for multi-instance)
   if (scoringData.studioId) {
-    const studioKey = `${scoringData.studioId}\0${sceneInstId}`;
+    const studioKey = entityKey(scoringData.studioId, sceneInstId);
     if (prefs.favoriteStudios.has(studioKey)) {
       baseScore += STUDIO_FAVORITE_WEIGHT;
     } else if (prefs.highlyRatedStudios.has(studioKey)) {
@@ -567,7 +568,7 @@ export function scoreScoringDataByPreferences(
   let implicitTagWeight = 0;
 
   for (const tagId of scoringData.tagIds) {
-    const tagKey = `${tagId}\0${sceneInstId}`;
+    const tagKey = entityKey(tagId, sceneInstId);
     if (prefs.favoriteTags.has(tagKey)) {
       favoriteTagCount++;
     } else if (prefs.highlyRatedTags.has(tagKey)) {

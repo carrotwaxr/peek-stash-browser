@@ -41,11 +41,10 @@ import {
   getEntityInstanceId,
   getEntityInstanceIds,
 } from "../utils/entityInstanceId.js";
+import { entityKey } from "../utils/entityRef.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
-
-const KEY_SEP = "\0";
 
 /**
  * Default user fields for scenes (when no user data is merged yet).
@@ -138,19 +137,15 @@ export const getUserPlaylists = async (
 
           // Create a map of composite key to scene data (avoids cross-instance ID collisions)
           const sceneMap = new Map(
-            transformedScenes.map((s) => [
-              `${s.id}${KEY_SEP}${s.instanceId}`,
-              s,
-            ])
+            transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
           );
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
           const itemsWithScenes = playlist.items.map((item) => ({
             ...item,
             scene:
-              sceneMap.get(
-                `${item.sceneId}${KEY_SEP}${item.instanceId || ""}`
-              ) ?? null,
+              sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
+              null,
           }));
 
           return {
@@ -282,10 +277,7 @@ export const getSharedPlaylists = async (
 
             // Create a map of composite key to scene data (avoids cross-instance ID collisions)
             const sceneMap = new Map(
-              transformedScenes.map((s) => [
-                `${s.id}${KEY_SEP}${s.instanceId}`,
-                s,
-              ])
+              transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
             );
 
             // Attach scene data to each playlist item
@@ -293,9 +285,8 @@ export const getSharedPlaylists = async (
               instanceId: item.instanceId,
               sceneId: item.sceneId,
               scene:
-                sceneMap.get(
-                  `${item.sceneId}${KEY_SEP}${item.instanceId || ""}`
-                ) ?? null,
+                sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
+                null,
             }));
           } catch (cacheError) {
             logger.error(`Error fetching scenes for shared playlist ${p.id}`, {
@@ -431,7 +422,7 @@ export const getPlaylist = async (
 
         // Create a map of composite key to scene data (avoids cross-instance ID collisions)
         const sceneMap = new Map(
-          transformedScenes.map((s) => [`${s.id}${KEY_SEP}${s.instanceId}`, s])
+          transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
         );
 
         // Attach scene data to each playlist item
@@ -439,7 +430,7 @@ export const getPlaylist = async (
         const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
           scene:
-            sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) ??
+            sceneMap.get(entityKey(item.sceneId, item.instanceId ?? "")) ??
             null,
         }));
 

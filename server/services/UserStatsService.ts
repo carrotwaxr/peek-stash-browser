@@ -2,15 +2,12 @@ import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { KEY_SEP, entityKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-
-// Separator for composite map keys (entityId + instanceId).
-// Using a character that won't appear in UUIDs or Stash numeric IDs.
-export const KEY_SEP = "\0";
 
 /**
  * UserStatsService
@@ -83,7 +80,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        `${s.performerId}${KEY_SEP}${s.instanceId}`,
+        entityKey(s.performerId, s.instanceId),
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
@@ -113,7 +110,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        `${s.studioId}${KEY_SEP}${s.instanceId}`,
+        entityKey(s.studioId, s.instanceId),
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
@@ -141,7 +138,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        `${s.tagId}${KEY_SEP}${s.instanceId}`,
+        entityKey(s.tagId, s.instanceId),
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
@@ -472,11 +469,11 @@ class UserStatsService {
       }
       // Use composite key (id + instanceId) to avoid cross-instance collisions
       const sceneMap = new Map(
-        scenes.map((s) => [`${s.id}\0${s.instanceId || ""}`, s])
+        scenes.map((s) => [entityKey(s.id, s.instanceId), s])
       );
 
       for (const wh of watchHistory) {
-        const scene = sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ""}`);
+        const scene = sceneMap.get(entityKey(wh.sceneId, wh.instanceId ?? ""));
         if (!scene) continue;
 
         // Get instanceId from the watch history record
@@ -497,7 +494,7 @@ class UserStatsService {
 
         // Aggregate performers (using composite key: performerId + instanceId)
         for (const performer of scene.performers || []) {
-          const statsKey = `${performer.id}${KEY_SEP}${whInstanceId}`;
+          const statsKey = entityKey(performer.id, whInstanceId);
           const existing = performerStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,
@@ -522,7 +519,7 @@ class UserStatsService {
 
         // Aggregate studio (using composite key: studioId + instanceId)
         if (scene.studio) {
-          const statsKey = `${scene.studio.id}${KEY_SEP}${whInstanceId}`;
+          const statsKey = entityKey(scene.studio.id, whInstanceId);
           const existing = studioStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,
@@ -536,7 +533,7 @@ class UserStatsService {
 
         // Aggregate tags (using composite key: tagId + instanceId)
         for (const tag of scene.tags || []) {
-          const statsKey = `${tag.id}${KEY_SEP}${whInstanceId}`;
+          const statsKey = entityKey(tag.id, whInstanceId);
           const existing = tagStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,

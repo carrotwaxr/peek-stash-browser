@@ -9,10 +9,8 @@ import type {
   NormalizedTag,
 } from "../types/index.js";
 import { dbWrite } from "../utils/dbWrite.js";
-import {
-  entityRefKey,
-  resolveVisibleApartFromOwnHides,
-} from "./EntityAccessService.js";
+import { compositeKey, entityKey } from "../utils/entityRef.js";
+import { resolveVisibleApartFromOwnHides } from "./EntityAccessService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { stashEntityService } from "./StashEntityService.js";
 
@@ -199,17 +197,18 @@ class UserHiddenEntityService {
       },
       select: { entityType: true, entityId: true, instanceId: true },
     });
-    const key = (...parts: string[]) => parts.join("\0");
     const stored = new Set(
-      rows.map((r) => key(r.entityType, r.entityId, r.instanceId))
+      rows.map((r) => compositeKey(r.entityType, r.entityId, r.instanceId))
     );
-    const anyInstance = new Set(rows.map((r) => key(r.entityType, r.entityId)));
+    const anyInstance = new Set(
+      rows.map((r) => compositeKey(r.entityType, r.entityId))
+    );
 
     return targets.map((t) =>
       t.instanceId
-        ? stored.has(key(t.entityType, t.entityId, t.instanceId)) ||
-          stored.has(key(t.entityType, t.entityId, ""))
-        : anyInstance.has(key(t.entityType, t.entityId))
+        ? stored.has(compositeKey(t.entityType, t.entityId, t.instanceId)) ||
+          stored.has(compositeKey(t.entityType, t.entityId, ""))
+        : anyInstance.has(compositeKey(t.entityType, t.entityId))
     );
   }
 
@@ -255,7 +254,7 @@ class UserHiddenEntityService {
       );
       for (const row of rows) {
         const instanceId = resolved.get(
-          entityRefKey(row.entityId, row.instanceId)
+          entityKey(row.entityId, row.instanceId)
         );
         if (instanceId) shownOn.set(row.id, instanceId);
       }

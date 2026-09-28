@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
 import type * as entityAccessModule from "../../services/EntityAccessService.js";
-import {
-  entityRefKey,
-  getVisibleEntityKeys,
-} from "../../services/EntityAccessService.js";
+import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -266,9 +264,9 @@ describe("DownloadService", () => {
       ]);
       vi.mocked(getVisibleEntityKeys).mockResolvedValue(
         new Set([
-          entityRefKey("s3", "inst-a"),
-          entityRefKey("s1", "inst-b"),
-          entityRefKey("s1", "inst-a"),
+          entityKey("s3", "inst-a"),
+          entityKey("s1", "inst-b"),
+          entityKey("s1", "inst-a"),
         ])
       );
 

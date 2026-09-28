@@ -38,6 +38,7 @@
  * is never allowed because a query failed.
  */
 import prisma from "../prisma/singleton.js";
+import { type EntityRef, entityKey, pairsJson } from "../utils/entityRef.js";
 
 export type AccessEntityType =
   | "scene"
@@ -48,20 +49,6 @@ export type AccessEntityType =
   | "gallery"
   | "image"
   | "clip";
-
-export interface EntityRef {
-  id: string;
-  instanceId: string;
-}
-
-// Matches UserStatsService.KEY_SEP. Not imported: UserStatsService pulls in
-// StashEntityService and the instance manager.
-const KEY_SEP = "\0";
-
-/** Map key for in-memory sets: `${id}\0${instanceId}`. */
-export function entityRefKey(id: string, instanceId: string): string {
-  return `${id}${KEY_SEP}${instanceId}`;
-}
 
 interface EntitySource {
   table: string;
@@ -194,7 +181,7 @@ LIMIT 1`;
 }
 
 /**
- * Batch form: the entityRefKey()s of the refs the user may see. One SQL round
+ * Batch form: the entityKey()s of the refs the user may see. One SQL round
  * trip, one bound JSON parameter for all refs, so a large batch never hits
  * SQLite's bound-parameter limit.
  */
@@ -205,12 +192,12 @@ export async function getVisibleEntityKeys(
 ): Promise<Set<string>> {
   const source = sourceFor(entityType);
 
-  const unique = new Map<string, [string, string]>();
+  const unique = new Map<string, EntityRef>();
   for (const ref of refs) {
     const id = ref.id ?? "";
     const instanceId = ref.instanceId ?? "";
     if (!id || !instanceId) continue;
-    unique.set(entityRefKey(id, instanceId), [id, instanceId]);
+    unique.set(entityKey(id, instanceId), { id, instanceId });
   }
   if (unique.size === 0) return new Set();
 
@@ -228,10 +215,10 @@ WHERE ${ACCESS_WHERE}
 
   const rows = await prisma.$queryRawUnsafe<EntityRef[]>(
     sql,
-    JSON.stringify([...unique.values()]),
+    pairsJson([...unique.values()]),
     ...accessParams(source, userId, entityType)
   );
-  return new Set(rows.map((r) => entityRefKey(r.id, r.instanceId)));
+  return new Set(rows.map((r) => entityKey(r.id, r.instanceId)));
 }
 
 /**
@@ -280,7 +267,7 @@ export async function keepVisibleConditions<
     conditions.map((c) => ({ id: c.id, instanceId: c.stashInstanceId }))
   );
   return conditions.filter((c) =>
-    visible.has(entityRefKey(c.id, c.stashInstanceId))
+    visible.has(entityKey(c.id, c.stashInstanceId))
   );
 }
 
@@ -338,7 +325,7 @@ export type HideableEntityType = Exclude<AccessEntityType, "clip">;
 
 /**
  * For hidden rows: where could this user see each entity if they had hidden
- * nothing? Returns, keyed by entityRefKey(ref.id, ref.instanceId) as passed
+ * nothing? Returns, keyed by entityKey(ref.id, ref.instanceId) as passed
  * in, the instance to show the entity from; a ref with no entry has no such
  * instance (restricted for the user, empty for them, deleted, or on an
  * instance they do not use). A ref with instanceId '' (a hide stored for
@@ -353,12 +340,12 @@ export async function resolveVisibleApartFromOwnHides(
 ): Promise<Map<string, string>> {
   const source = sourceFor(entityType);
 
-  const unique = new Map<string, [string, string]>();
+  const unique = new Map<string, EntityRef>();
   for (const ref of refs) {
     const id = ref.id ?? "";
     const instanceId = ref.instanceId ?? "";
     if (!id) continue;
-    unique.set(entityRefKey(id, instanceId), [id, instanceId]);
+    unique.set(entityKey(id, instanceId), { id, instanceId });
   }
   if (unique.size === 0) return new Map();
 
@@ -383,13 +370,13 @@ FROM r`;
     Array<{ id: string; requested: string; instanceId: string | null }>
   >(
     sql,
-    JSON.stringify([...unique.values()]),
+    pairsJson([...unique.values()]),
     ...accessParams(source, userId, entityType)
   );
   const resolved = new Map<string, string>();
   for (const row of rows) {
     if (row.instanceId) {
-      resolved.set(entityRefKey(row.id, row.requested), row.instanceId);
+      resolved.set(entityKey(row.id, row.requested), row.instanceId);
     }
   }
   return resolved;

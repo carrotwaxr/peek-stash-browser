@@ -29,6 +29,7 @@ import type {
   SceneScoringData,
   SceneStream,
 } from "../types/index.js";
+import { entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import {
   STREAM_RESOLUTIONS,
@@ -1082,7 +1083,7 @@ class StashEntityService {
       const map = new Map<string, string>();
       for (const s of studios) {
         if (s.name) {
-          map.set(`${s.id}\0${s.stashInstanceId}`, s.name);
+          map.set(entityKey(s.id, s.stashInstanceId), s.name);
           // Also set by ID only (for backwards compat when instanceId unavailable)
           if (!map.has(s.id)) map.set(s.id, s.name);
         }
@@ -1127,7 +1128,7 @@ class StashEntityService {
       const map = new Map<string, string>();
       for (const t of tags || []) {
         if (t.name) {
-          map.set(`${t.id}\0${t.stashInstanceId}`, t.name);
+          map.set(entityKey(t.id, t.stashInstanceId), t.name);
           // Also set by ID only (for backwards compat when instanceId unavailable)
           if (!map.has(t.id)) map.set(t.id, t.name);
         }
@@ -2193,7 +2194,7 @@ class StashEntityService {
         const sceneInstanceId = scene.instanceId || "";
         // Try composite key first, fall back to ID-only
         const name =
-          studioNames.get(`${scene.studio.id}\0${sceneInstanceId}`) ||
+          studioNames.get(entityKey(scene.studio.id, sceneInstanceId)) ??
           studioNames.get(scene.studio.id);
         if (name) {
           (scene.studio as { id: string; name?: string }).name = name;
@@ -2222,8 +2223,8 @@ class StashEntityService {
           id: tagId,
           // Try composite key first, fall back to ID-only
           name:
-            tagNames.get(`${tagId}\0${sceneInstanceId}`) ||
-            tagNames.get(tagId) ||
+            tagNames.get(entityKey(tagId, sceneInstanceId)) ??
+            tagNames.get(tagId) ??
             "Unknown",
         }));
       }

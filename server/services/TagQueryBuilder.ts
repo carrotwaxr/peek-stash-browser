@@ -15,6 +15,7 @@ import type {
   StudioRef,
 } from "../types/index.js";
 import type { TagQueryRow } from "../types/internal/queryRows.js";
+import { entityKey } from "../utils/entityRef.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
 import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
@@ -835,7 +836,7 @@ class TagQueryBuilder {
     // Build parent name lookup map (by composite key) and hydrate parent names
     const parentNameMap = new Map<string, string>();
     for (const pt of parentTagRecords) {
-      const key = `${pt.id}:${pt.stashInstanceId}`;
+      const key = entityKey(pt.id, pt.stashInstanceId);
       parentNameMap.set(key, pt.name || "Unknown");
     }
     for (const tag of tags) {
@@ -843,16 +844,16 @@ class TagQueryBuilder {
         const tagInstanceId = tag.instanceId;
         tag.parents = tag.parents.map((p) => ({
           id: p.id,
-          name: parentNameMap.get(`${p.id}:${tagInstanceId}`) || "Unknown",
+          name: parentNameMap.get(entityKey(p.id, tagInstanceId)) || "Unknown",
         }));
       }
     }
 
-    // Collect unique entity keys (id:instanceId) from junction tables
+    // Collect unique entity refs from junction tables, by entityKey
     const performerKeys = [
       ...new Map(
         performerTags.map((j) => [
-          `${j.performerId}:${j.performerInstanceId}`,
+          entityKey(j.performerId, j.performerInstanceId),
           { id: j.performerId, instanceId: j.performerInstanceId },
         ])
       ).values(),
@@ -860,7 +861,7 @@ class TagQueryBuilder {
     const studioKeys = [
       ...new Map(
         studioTags.map((j) => [
-          `${j.studioId}:${j.studioInstanceId}`,
+          entityKey(j.studioId, j.studioInstanceId),
           { id: j.studioId, instanceId: j.studioInstanceId },
         ])
       ).values(),
@@ -868,7 +869,7 @@ class TagQueryBuilder {
     const groupKeys = [
       ...new Map(
         groupTags.map((j) => [
-          `${j.groupId}:${j.groupInstanceId}`,
+          entityKey(j.groupId, j.groupInstanceId),
           { id: j.groupId, instanceId: j.groupInstanceId },
         ])
       ).values(),
@@ -876,7 +877,7 @@ class TagQueryBuilder {
     const galleryKeys = [
       ...new Map(
         galleryTags.map((j) => [
-          `${j.galleryId}:${j.galleryInstanceId}`,
+          entityKey(j.galleryId, j.galleryInstanceId),
           { id: j.galleryId, instanceId: j.galleryInstanceId },
         ])
       ).values(),
@@ -936,10 +937,10 @@ class TagQueryBuilder {
         : [],
     ]);
 
-    // Build lookup maps with minimal tooltip data by composite key (id:instanceId)
+    // Build lookup maps with minimal tooltip data by entityKey
     const performersById = new Map<string, PerformerRef>(
       performers.map((p) => [
-        `${p.id}:${p.stashInstanceId}`,
+        entityKey(p.id, p.stashInstanceId),
         {
           id: p.id,
           instanceId: p.stashInstanceId,
@@ -955,7 +956,7 @@ class TagQueryBuilder {
 
     const studiosById = new Map<string, StudioRef>(
       studios.map((s) => [
-        `${s.id}:${s.stashInstanceId}`,
+        entityKey(s.id, s.stashInstanceId),
         {
           id: s.id,
           instanceId: s.stashInstanceId,
@@ -969,7 +970,7 @@ class TagQueryBuilder {
 
     const groupsById = new Map<string, GroupRef>(
       groups.map((g) => [
-        `${g.id}:${g.stashInstanceId}`,
+        entityKey(g.id, g.stashInstanceId),
         {
           id: g.id,
           instanceId: g.stashInstanceId,
@@ -988,7 +989,7 @@ class TagQueryBuilder {
 
     const galleriesById = new Map<string, GalleryRef>(
       galleries.map((g) => [
-        `${g.id}:${g.stashInstanceId}`,
+        entityKey(g.id, g.stashInstanceId),
         {
           id: g.id,
           instanceId: g.stashInstanceId,
@@ -1000,13 +1001,13 @@ class TagQueryBuilder {
     );
 
     // Build tag -> entities maps using composite keys
-    // Key format: tagId:tagInstanceId -> entities[]
+    // Keyed by the tag's entityKey -> entities[]
     const performersByTag = new Map<string, PerformerRef[]>();
     for (const pt of performerTags) {
-      const performerKey = `${pt.performerId}:${pt.performerInstanceId}`;
+      const performerKey = entityKey(pt.performerId, pt.performerInstanceId);
       const performer = performersById.get(performerKey);
       if (!performer) continue; // Skip orphaned junction records
-      const tagKey = `${pt.tagId}:${pt.tagInstanceId}`;
+      const tagKey = entityKey(pt.tagId, pt.tagInstanceId);
       const list = performersByTag.get(tagKey) ?? [];
       list.push(performer);
       performersByTag.set(tagKey, list);
@@ -1014,10 +1015,10 @@ class TagQueryBuilder {
 
     const studiosByTag = new Map<string, StudioRef[]>();
     for (const st of studioTags) {
-      const studioKey = `${st.studioId}:${st.studioInstanceId}`;
+      const studioKey = entityKey(st.studioId, st.studioInstanceId);
       const studio = studiosById.get(studioKey);
       if (!studio) continue; // Skip orphaned junction records
-      const tagKey = `${st.tagId}:${st.tagInstanceId}`;
+      const tagKey = entityKey(st.tagId, st.tagInstanceId);
       const list = studiosByTag.get(tagKey) ?? [];
       list.push(studio);
       studiosByTag.set(tagKey, list);
@@ -1025,10 +1026,10 @@ class TagQueryBuilder {
 
     const groupsByTag = new Map<string, GroupRef[]>();
     for (const gt of groupTags) {
-      const groupKey = `${gt.groupId}:${gt.groupInstanceId}`;
+      const groupKey = entityKey(gt.groupId, gt.groupInstanceId);
       const group = groupsById.get(groupKey);
       if (!group) continue; // Skip orphaned junction records
-      const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
+      const tagKey = entityKey(gt.tagId, gt.tagInstanceId);
       const list = groupsByTag.get(tagKey) ?? [];
       list.push(group);
       groupsByTag.set(tagKey, list);
@@ -1036,10 +1037,10 @@ class TagQueryBuilder {
 
     const galleriesByTag = new Map<string, GalleryRef[]>();
     for (const gt of galleryTags) {
-      const galleryKey = `${gt.galleryId}:${gt.galleryInstanceId}`;
+      const galleryKey = entityKey(gt.galleryId, gt.galleryInstanceId);
       const gallery = galleriesById.get(galleryKey);
       if (!gallery) continue; // Skip orphaned junction records
-      const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
+      const tagKey = entityKey(gt.tagId, gt.tagInstanceId);
       const list = galleriesByTag.get(tagKey) ?? [];
       list.push(gallery);
       galleriesByTag.set(tagKey, list);
@@ -1048,7 +1049,7 @@ class TagQueryBuilder {
     // Populate tags with all relations using composite keys
     for (const tag of tags) {
       const tagInstanceId = tag.instanceId;
-      const tagKey = `${tag.id}:${tagInstanceId}`;
+      const tagKey = entityKey(tag.id, tagInstanceId);
       tag.performers = performersByTag.get(tagKey) ?? [];
       tag.studios = studiosByTag.get(tagKey) ?? [];
       tag.groups = groupsByTag.get(tagKey) ?? [];

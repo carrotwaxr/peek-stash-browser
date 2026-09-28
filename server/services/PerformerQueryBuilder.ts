@@ -15,6 +15,7 @@ import type {
   TagRef,
 } from "../types/index.js";
 import type { PerformerQueryRow } from "../types/internal/queryRows.js";
+import { entityKey } from "../utils/entityRef.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
 import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
@@ -30,7 +31,6 @@ import {
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { keepVisibleConditions } from "./EntityAccessService.js";
-import { KEY_SEP } from "./UserStatsService.js";
 
 /** Deduplicate composite key objects by id+stashInstanceId */
 function dedupeKeys(
@@ -38,7 +38,7 @@ function dedupeKeys(
 ): { id: string; stashInstanceId: string }[] {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = `${item.id}:${item.stashInstanceId}`;
+    const key = entityKey(item.id, item.stashInstanceId);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1246,10 +1246,10 @@ class PerformerQueryBuilder {
         : [],
     ]);
 
-    // Build lookup maps keyed by composite id:instanceId (prevents cross-instance collisions)
+    // Build lookup maps by entityKey (prevents cross-instance collisions)
     const tagsByKey = new Map<string, TagRef>(
       tags.map((t) => [
-        `${t.id}:${t.stashInstanceId}`,
+        entityKey(t.id, t.stashInstanceId),
         {
           id: t.id,
           instanceId: t.stashInstanceId,
@@ -1262,7 +1262,7 @@ class PerformerQueryBuilder {
 
     const groupsByKey = new Map<string, GroupRef>(
       groups.map((g) => [
-        `${g.id}:${g.stashInstanceId}`,
+        entityKey(g.id, g.stashInstanceId),
         {
           id: g.id,
           instanceId: g.stashInstanceId,
@@ -1281,7 +1281,7 @@ class PerformerQueryBuilder {
 
     const galleriesByKey = new Map<string, GalleryRef>(
       galleries.map((g) => [
-        `${g.id}:${g.stashInstanceId}`,
+        entityKey(g.id, g.stashInstanceId),
         {
           id: g.id,
           instanceId: g.stashInstanceId,
@@ -1294,7 +1294,7 @@ class PerformerQueryBuilder {
 
     const studiosByKey = new Map<string, StudioRef>(
       studios.map((s) => [
-        `${s.id}:${s.stashInstanceId}`,
+        entityKey(s.id, s.stashInstanceId),
         {
           id: s.id,
           instanceId: s.stashInstanceId,
@@ -1306,59 +1306,61 @@ class PerformerQueryBuilder {
       ])
     );
 
-    // Build performer -> scene mapping (keyed by composite performerId\0instanceId)
+    // Build performer -> scene mapping (keyed by entityKey)
     const scenesByPerformer = new Map<string, Set<string>>();
     for (const sp of scenePerformers) {
-      const key = `${sp.performerId}${KEY_SEP}${sp.performerInstanceId}`;
+      const key = entityKey(sp.performerId, sp.performerInstanceId);
       const set = scenesByPerformer.get(key) ?? new Set();
       set.add(sp.sceneId);
       scenesByPerformer.set(key, set);
     }
 
-    // Build scene -> entities mappings (using composite keys id:instanceId)
+    // Build scene -> entities mappings (entity sets by entityKey)
     const groupsByScene = new Map<string, Set<string>>();
     for (const sg of sceneGroups) {
       const set = groupsByScene.get(sg.sceneId) ?? new Set();
-      set.add(`${sg.groupId}:${sg.groupInstanceId}`);
+      set.add(entityKey(sg.groupId, sg.groupInstanceId));
       groupsByScene.set(sg.sceneId, set);
     }
 
     const galleriesByScene = new Map<string, Set<string>>();
     for (const sg of sceneGalleries) {
       const set = galleriesByScene.get(sg.sceneId) ?? new Set();
-      set.add(`${sg.galleryId}:${sg.galleryInstanceId}`);
+      set.add(entityKey(sg.galleryId, sg.galleryInstanceId));
       galleriesByScene.set(sg.sceneId, set);
     }
 
     const studioByScene = new Map<string, string>();
     for (const s of scenes) {
       if (s.studioId)
-        studioByScene.set(s.id, `${s.studioId}:${s.stashInstanceId}`);
+        studioByScene.set(s.id, entityKey(s.studioId, s.stashInstanceId));
     }
 
-    // Build performer -> tags map (keyed by composite performerId\0instanceId)
+    // Build performer -> tags map (keyed by entityKey)
     const tagsByPerformer = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
-      const tag = tagsByKey.get(`${junction.tagId}:${junction.tagInstanceId}`);
+      const tag = tagsByKey.get(
+        entityKey(junction.tagId, junction.tagInstanceId)
+      );
       if (!tag) continue;
-      const key = `${junction.performerId}${KEY_SEP}${junction.performerInstanceId}`;
+      const key = entityKey(junction.performerId, junction.performerInstanceId);
       const list = tagsByPerformer.get(key) ?? [];
       list.push(tag);
       tagsByPerformer.set(key, list);
     }
 
-    // Build performer -> galleries map from direct GalleryPerformer junction (keyed by composite performerId\0instanceId)
+    // Build performer -> galleries map from direct GalleryPerformer junction (keyed by entityKey)
     const galleriesByPerformer = new Map<string, Set<string>>();
     for (const gp of galleryPerformers) {
-      const key = `${gp.performerId}${KEY_SEP}${gp.performerInstanceId}`;
+      const key = entityKey(gp.performerId, gp.performerInstanceId);
       const set = galleriesByPerformer.get(key) ?? new Set();
-      set.add(`${gp.galleryId}:${gp.galleryInstanceId}`);
+      set.add(entityKey(gp.galleryId, gp.galleryInstanceId));
       galleriesByPerformer.set(key, set);
     }
 
     // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
-      const performerKey = `${performer.id}${KEY_SEP}${performer.instanceId || ""}`;
+      const performerKey = entityKey(performer.id, performer.instanceId);
       performer.tags = tagsByPerformer.get(performerKey) ?? [];
 
       // Derive groups and studios from performer's scenes

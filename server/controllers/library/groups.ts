@@ -15,6 +15,7 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -36,14 +37,13 @@ async function mergeGroupsWithUserData(
 
     const ratingsMap = new Map(
       groupRatings.map((r) => [
-        `${r.groupId}\0${r.instanceId || ""}`,
+        entityKey(r.groupId, r.instanceId ?? ""),
         { rating: r.rating, rating100: r.rating, favorite: r.favorite },
       ])
     );
 
     return groups.map((group) => {
-      const compositeKey = `${group.id}\0${group.instanceId || ""}`;
-      const userRating = ratingsMap.get(compositeKey);
+      const userRating = ratingsMap.get(entityKey(group.id, group.instanceId));
       return {
         ...group,
         rating: userRating?.rating ?? null,

@@ -14,6 +14,7 @@ import type {
   TagRef,
 } from "../types/index.js";
 import type { GalleryQueryRow } from "../types/internal/queryRows.js";
+import { entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
 import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
@@ -729,15 +730,20 @@ class GalleryQueryBuilder {
     const galleryIds = galleries.map((g) => g.id);
     const galleryInstanceIds = [...new Set(galleries.map((g) => g.instanceId))];
 
-    // Collect unique (studioId, instanceId) pairs - each gallery's studio comes from its own instance
+    // Collect unique (studioId, instanceId) pairs - each gallery's studio comes
+    // from its own instance; a gallery without a studio has none to load
     const studioKeys = [
       ...new Map(
-        galleries
-          .filter((g) => g.studio?.id)
-          .map((g) => [
-            `${g.studio?.id}:${g.instanceId}`,
-            { id: g.studio?.id ?? "", instanceId: g.instanceId },
-          ])
+        galleries.flatMap((g) =>
+          g.studio?.id
+            ? [
+                [
+                  entityKey(g.studio.id, g.instanceId),
+                  { id: g.studio.id, instanceId: g.instanceId },
+                ] as const,
+              ]
+            : []
+        )
       ).values(),
     ];
 
@@ -758,11 +764,11 @@ class GalleryQueryBuilder {
       }),
     ]);
 
-    // Collect unique entity keys (id:instanceId) from junction tables
+    // Collect unique entity refs from junction tables, by entityKey
     const performerKeys = [
       ...new Map(
         performerJunctions.map((j) => [
-          `${j.performerId}:${j.performerInstanceId}`,
+          entityKey(j.performerId, j.performerInstanceId),
           { id: j.performerId, instanceId: j.performerInstanceId },
         ])
       ).values(),
@@ -770,7 +776,7 @@ class GalleryQueryBuilder {
     const tagKeys = [
       ...new Map(
         tagJunctions.map((j) => [
-          `${j.tagId}:${j.tagInstanceId}`,
+          entityKey(j.tagId, j.tagInstanceId),
           { id: j.tagId, instanceId: j.tagInstanceId },
         ])
       ).values(),
@@ -809,10 +815,10 @@ class GalleryQueryBuilder {
         : Promise.resolve([]),
     ]);
 
-    // Build entity lookup maps by composite key (id:instanceId)
+    // Build entity lookup maps by entityKey
     const performersByKey = new Map<string, PerformerRef>();
     for (const performer of performers) {
-      const key = `${performer.id}:${performer.stashInstanceId}`;
+      const key = entityKey(performer.id, performer.stashInstanceId);
       performersByKey.set(key, {
         id: performer.id,
         instanceId: performer.stashInstanceId,
@@ -830,7 +836,7 @@ class GalleryQueryBuilder {
 
     const tagsByKey = new Map<string, TagRef>();
     for (const tag of tags) {
-      const key = `${tag.id}:${tag.stashInstanceId}`;
+      const key = entityKey(tag.id, tag.stashInstanceId);
       tagsByKey.set(key, {
         id: tag.id,
         instanceId: tag.stashInstanceId,
@@ -842,7 +848,7 @@ class GalleryQueryBuilder {
 
     const studiosByKey = new Map<string, StudioRef>();
     for (const studio of studios) {
-      const key = `${studio.id}:${studio.stashInstanceId}`;
+      const key = entityKey(studio.id, studio.stashInstanceId);
       studiosByKey.set(key, {
         id: studio.id,
         instanceId: studio.stashInstanceId,
@@ -854,13 +860,19 @@ class GalleryQueryBuilder {
     }
 
     // Build gallery-to-entities maps using junction tables with composite keys
-    // Key format: galleryId:galleryInstanceId -> entities[]
+    // Keyed by the gallery's entityKey -> entities[]
     const performersByGallery = new Map<string, PerformerRef[]>();
     for (const junction of performerJunctions) {
-      const performerKey = `${junction.performerId}:${junction.performerInstanceId}`;
+      const performerKey = entityKey(
+        junction.performerId,
+        junction.performerInstanceId
+      );
       const performer = performersByKey.get(performerKey);
       if (!performer) continue; // Skip orphaned junction records
-      const galleryKey = `${junction.galleryId}:${junction.galleryInstanceId}`;
+      const galleryKey = entityKey(
+        junction.galleryId,
+        junction.galleryInstanceId
+      );
       const list = performersByGallery.get(galleryKey) ?? [];
       list.push(performer);
       performersByGallery.set(galleryKey, list);
@@ -868,10 +880,13 @@ class GalleryQueryBuilder {
 
     const tagsByGallery = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
-      const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
+      const tagKey = entityKey(junction.tagId, junction.tagInstanceId);
       const tag = tagsByKey.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
-      const galleryKey = `${junction.galleryId}:${junction.galleryInstanceId}`;
+      const galleryKey = entityKey(
+        junction.galleryId,
+        junction.galleryInstanceId
+      );
       const list = tagsByGallery.get(galleryKey) ?? [];
       list.push(tag);
       tagsByGallery.set(galleryKey, list);
@@ -879,13 +894,13 @@ class GalleryQueryBuilder {
 
     // Populate galleries using composite keys
     for (const gallery of galleries) {
-      const galleryKey = `${gallery.id}:${gallery.instanceId}`;
+      const galleryKey = entityKey(gallery.id, gallery.instanceId);
       gallery.performers = performersByGallery.get(galleryKey) ?? [];
       gallery.tags = tagsByGallery.get(galleryKey) ?? [];
 
       // Hydrate studio with full data using composite key
       if (gallery.studio?.id) {
-        const studioKey = `${gallery.studio.id}:${gallery.instanceId}`;
+        const studioKey = entityKey(gallery.studio.id, gallery.instanceId);
         const fullStudio = studiosByKey.get(studioKey);
         if (fullStudio) {
           gallery.studio = fullStudio;

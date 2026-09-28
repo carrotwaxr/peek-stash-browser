@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import type * as entityAccessModule from "../../services/EntityAccessService.js";
-import {
-  entityRefKey,
-  resolveVisibleApartFromOwnHides,
-} from "../../services/EntityAccessService.js";
+import { resolveVisibleApartFromOwnHides } from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { anyOf } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -18,16 +15,10 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-// The access check is mocked; entityRefKey stays real
-vi.mock("../../services/EntityAccessService.js", async () => {
-  const actual = await vi.importActual<typeof entityAccessModule>(
-    "../../services/EntityAccessService.js"
-  );
-  return {
-    entityRefKey: actual.entityRefKey,
-    resolveVisibleApartFromOwnHides: vi.fn(),
-  };
-});
+// The access check is mocked
+vi.mock("../../services/EntityAccessService.js", () => ({
+  resolveVisibleApartFromOwnHides: vi.fn(),
+}));
 
 // Mock ExclusionComputationService
 vi.mock("../../services/ExclusionComputationService.js", () => ({
@@ -62,7 +53,7 @@ function everyRefVisible() {
     Promise.resolve(
       new Map(
         refs.map((r) => [
-          entityRefKey(r.id, r.instanceId),
+          entityKey(r.id, r.instanceId),
           r.instanceId || "shown-instance",
         ])
       )
@@ -438,7 +429,7 @@ describe("UserHiddenEntityService", () => {
 
     it("returns a row the user may not see as restricted, without its entity", async () => {
       mockResolveVisible.mockResolvedValue(
-        new Map([[entityRefKey("10", "i"), "i"]])
+        new Map([[entityKey("10", "i"), "i"]])
       );
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
         partialRow({

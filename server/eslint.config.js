@@ -5,6 +5,35 @@ import tseslint from "typescript-eslint";
 
 const testFiles = ["tests/**/*.ts", "integration/**/*.ts"];
 
+// no-restricted-syntax takes one option list per config block, and a later
+// block that sets the rule for some files replaces the whole list there. So
+// every selector lives in RESTRICTED: the source block uses all of it, and a
+// block for some files passes restrictedExcept(...) or [...RESTRICTED, X],
+// so no selector drops out by accident.
+
+// The writer rule: every transaction is a dbWrite unit, so writers queue in
+// Node instead of starving each other inside the engine
+const WRITER_RULE = {
+  selector: 'MemberExpression[property.name="$transaction"]',
+  message: "use dbWriteTransaction / dbWriteBatch (server-sql.md, Writes)",
+};
+
+// In-memory keys carry the instance, spelled one way: a template or string
+// holding the key separator (\0) is a key built by hand
+const ENTITY_KEY_RULE = {
+  selector: "TemplateElement[value.cooked=/\\u0000/], Literal[value=/\\u0000/]",
+  message:
+    "build in-memory keys with entityKey/compositeKey (utils/entityRef.ts)",
+};
+
+const RESTRICTED = [WRITER_RULE, ENTITY_KEY_RULE];
+
+/** The rule's options with every selector but the ones named. */
+const restrictedExcept = (...dropped) => [
+  "error",
+  ...RESTRICTED.filter((selector) => !dropped.includes(selector)),
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -82,21 +111,27 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
 
-      // The writer rule: every transaction is a dbWrite unit, so writers
-      // queue in Node instead of starving each other inside the engine
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: 'MemberExpression[property.name="$transaction"]',
-          message:
-            "use dbWriteTransaction / dbWriteBatch (server-sql.md, Writes)",
-        },
-      ],
+      // The writer rule and the entity key rule (RESTRICTED, above)
+      "no-restricted-syntax": ["error", ...RESTRICTED],
     },
   },
-  // The one place that calls $transaction, and the tests that mock it
+  // The one place that calls $transaction
   {
-    files: ["utils/dbWrite.ts", ...testFiles],
+    files: ["utils/dbWrite.ts"],
+    rules: {
+      "no-restricted-syntax": restrictedExcept(WRITER_RULE),
+    },
+  },
+  // The one place that builds keys with the separator
+  {
+    files: ["utils/entityRef.ts"],
+    rules: {
+      "no-restricted-syntax": restrictedExcept(ENTITY_KEY_RULE),
+    },
+  },
+  // Tests mock $transaction and spell keys out in their expectations
+  {
+    files: testFiles,
     rules: {
       "no-restricted-syntax": "off",
     },
