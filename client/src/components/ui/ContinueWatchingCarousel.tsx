@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
+import { useQuery } from "@tanstack/react-query";
 import { PlayCircle } from "lucide-react";
 import { libraryApi } from "../../api";
-import { ApiError } from "../../api/client";
+import {
+  isLibraryInitializing,
+  useLibraryReady,
+} from "../../api/hooks/useLibraryReady";
+import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -18,150 +23,95 @@ interface WatchHistoryEntry {
   [key: string]: unknown;
 }
 
+interface SceneWithProgress extends NormalizedScene {
+  watchHistory: WatchHistoryEntry | null;
+  resumeTime: number;
+  playCount: number;
+  lastPlayedAt: string | null;
+}
+
+/** Scenes watched less than this share of their length are left out. */
+const MIN_WATCH_PERCENT = 2;
+
 /**
  * Continue Watching carousel component
- * Shows scenes that have been partially watched with resume times
+ * Shows scenes that have been partially watched with resume times. While the
+ * library is initializing it shows its loading state and asks nothing.
  */
 interface Props {
   selectedScenes?: NormalizedScene[];
   onToggleSelect?: (scene: NormalizedScene) => void;
-  onInitializing?: (isInitializing: boolean) => void;
 }
 
 const ContinueWatchingCarousel = ({
   selectedScenes = [],
   onToggleSelect,
-  onInitializing,
 }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
+  const { ready } = useLibraryReady();
   const {
     data: watchHistoryList,
     loading: loadingHistory,
     error,
-    refresh,
   } = useAllWatchHistory({
     inProgress: true,
     limit: 12,
   });
 
-  interface SceneWithProgress extends NormalizedScene {
-    watchHistory: WatchHistoryEntry | null;
-    resumeTime: number;
-    playCount: number;
-    lastPlayedAt: string | null;
-  }
+  const whList = watchHistoryList as WatchHistoryEntry[];
+  const sceneIds = useMemo(() => whList.map((wh) => wh.sceneId), [whList]);
 
-  const [scenes, setScenes] = useState<SceneWithProgress[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
-  const [retryTrigger, setRetryTrigger] = useState(0);
-  const [scenesFetchError, setScenesFetchError] = useState<ApiError | null>(
-    null
-  );
+  // The full scene of each watch history entry
+  const {
+    data: fetchedScenes,
+    isLoading: loadingScenes,
+    error: scenesFetchError,
+  } = useQuery({
+    queryKey: queryKeys.homeCarousels.continueWatching(sceneIds),
+    queryFn: async ({ signal }) => {
+      const response = (await libraryApi.findScenes(
+        { ids: sceneIds },
+        signal
+      )) as { findScenes?: { scenes?: NormalizedScene[] } };
+      return response.findScenes?.scenes ?? [];
+    },
+    enabled: ready && !loadingHistory && sceneIds.length > 0,
+  });
 
-  // Fetch full scene data for each watch history entry
-  useEffect(() => {
-    const fetchScenes = async () => {
-      if (loadingHistory) {
-        return;
-      }
+  const scenes = useMemo((): SceneWithProgress[] => {
+    const withProgress = (fetchedScenes ?? []).map((scene) => {
+      const watchHistory = whList.find((wh) => wh.sceneId === scene.id);
+      return {
+        ...scene,
+        watchHistory: watchHistory ?? null,
+        resumeTime: watchHistory?.resumeTime || 0,
+        playCount: watchHistory?.playCount || 0,
+        lastPlayedAt: watchHistory?.lastPlayedAt || null,
+      };
+    });
 
-      if (!watchHistoryList || watchHistoryList.length === 0) {
-        setScenes([]);
-        setLoading(false);
-        return;
-      }
+    // Only scenes watched for at least 2% of their length: an accidental
+    // click does not clutter Continue Watching
+    const watched = withProgress.filter((scene) => {
+      const duration = scene.files?.[0]?.duration;
+      const playDuration = scene.watchHistory?.playDuration;
+      if (!duration || !playDuration) return false;
+      return (playDuration / duration) * 100 >= MIN_WATCH_PERCENT;
+    });
 
-      try {
-        setLoading(true);
+    // Most recently played first
+    return watched.sort((a, b) => {
+      const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
+      const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [fetchedScenes, whList]);
 
-        // Extract scene IDs from watch history
-        const whList = watchHistoryList as WatchHistoryEntry[];
-        const sceneIds = whList.map((wh) => wh.sceneId);
-
-        // Fetch scenes in bulk
-        const response = await libraryApi.findScenes({ ids: sceneIds });
-        const fetchedScenes =
-          (response as { findScenes?: { scenes?: NormalizedScene[] } })
-            ?.findScenes?.scenes ?? [];
-
-        // Match scenes with watch history data and add progress info
-        const scenesWithProgress = fetchedScenes.map(
-          (scene: NormalizedScene) => {
-            const watchHistory = whList.find((wh) => wh.sceneId === scene.id);
-            return {
-              ...scene,
-              watchHistory: watchHistory ?? null,
-              resumeTime: watchHistory?.resumeTime || 0,
-              playCount: watchHistory?.playCount || 0,
-              lastPlayedAt:
-                (watchHistory?.lastPlayedAt as string | null) || null,
-            };
-          }
-        );
-
-        // Filter: Only show scenes where user has watched at least 2% of the video
-        // This prevents accidental clicks from cluttering Continue Watching
-        const MIN_WATCH_PERCENT = 2;
-        const filteredScenes = scenesWithProgress.filter((scene) => {
-          const duration = scene.files?.[0]?.duration;
-          const playDuration = scene.watchHistory?.playDuration;
-
-          if (!duration || !playDuration) {
-            return false; // No duration data, exclude
-          }
-
-          const percentWatched = (playDuration / duration) * 100;
-          return percentWatched >= MIN_WATCH_PERCENT;
-        });
-
-        // Sort by lastPlayedAt (most recent first)
-        filteredScenes.sort((a, b) => {
-          const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
-          const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
-          return dateB.getTime() - dateA.getTime();
-        });
-
-        setScenes(filteredScenes);
-        setScenesFetchError(null);
-      } catch (err) {
-        console.error("Error fetching continue watching scenes:", err);
-        setScenesFetchError(err instanceof ApiError ? err : null);
-        setScenes([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchScenes();
-  }, [watchHistoryList, loadingHistory, retryTrigger]);
-
-  // Handle server initialization state
-  useEffect(() => {
-    const isWatchHistoryInitializing = false; // error from useAllWatchHistory is string | null, never has isInitializing
-    const isScenesInitializing = scenesFetchError?.isInitializing;
-    const isInitializing = isWatchHistoryInitializing || isScenesInitializing;
-
-    if (isInitializing && retryCount < 60 && onInitializing) {
-      onInitializing(true);
-      const timer = setTimeout(() => {
-        setRetryCount((prev) => prev + 1);
-        void refresh(); // Retry watch history fetch
-        setRetryTrigger((prev) => prev + 1); // Trigger scenes refetch
-      }, 5000);
-      return () => clearTimeout(timer);
-    } else if (isInitializing && retryCount >= 60 && onInitializing) {
-      onInitializing(false);
-      console.error(
-        `[Continue Watching] Failed to load after ${retryCount} retries`
-      );
-    } else if (!isInitializing && onInitializing) {
-      onInitializing(false);
-      setRetryCount(0);
-    }
-    return undefined;
-  }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
+  // Waiting for the library only matters when there are scenes to show
+  const initializing =
+    sceneIds.length > 0 && (!ready || isLibraryInitializing(scenesFetchError));
+  const loading = loadingHistory || loadingScenes;
 
   const handleSceneClick = (scene: NormalizedScene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
@@ -197,21 +147,20 @@ const ContinueWatchingCarousel = ({
   };
 
   // Don't show carousel if error (non-initialization) or no scenes
-  const isInitializing = scenesFetchError?.isInitializing;
-  if (error || (scenesFetchError && !scenesFetchError.isInitializing)) {
+  if (error || (scenesFetchError && !initializing)) {
     console.error(
       "Continue Watching error (non-initialization):",
       error || scenesFetchError
     );
     return null;
   }
-  if (!loading && !isInitializing && scenes.length === 0) {
+  if (!loading && !initializing && scenes.length === 0) {
     return null;
   }
 
   return (
     <SceneCarousel
-      loading={loading || isInitializing}
+      loading={loading || initializing}
       title="Continue Watching"
       titleIcon={<PlayCircle className="w-6 h-6" color="#10b981" />}
       scenes={scenes}

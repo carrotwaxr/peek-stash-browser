@@ -51,6 +51,8 @@ interface Observation {
   adminScenes: string[];
   /** POST /api/library/scenes for the user whose only instance is NEW */
   onlyNew: { status: number; ready: unknown };
+  /** GET /api/library/ready for the same user: the client's re-check */
+  onlyNewReadyCheck: { status: number; ready: unknown };
   /** The admin's GET of a NEW scene's screenshot */
   screenshot: number;
   /** firstSyncedAt of NEW and of the primary instance in the sync status */
@@ -170,6 +172,9 @@ describeReplay("an instance on its first sync", () => {
       "/api/library/scenes",
       { filter: { per_page: 1 } }
     );
+    const readyCheck = await onlyNew.client.get<{ ready?: unknown }>(
+      "/api/library/ready"
+    );
     const screenshot = await fetch(
       `${TEST_CONFIG.baseUrl}/api/proxy/stash?path=${encodeURIComponent(`/scene/${sceneId}/screenshot`)}&instanceId=${NEW}`,
       { headers: { Cookie: adminCookie } }
@@ -187,6 +192,10 @@ describeReplay("an instance on its first sync", () => {
       restrictedScenes: await newScenesListedTo(restricted.client),
       adminScenes: await newScenesListedTo(adminClient),
       onlyNew: { status: scenes.status, ready: scenes.data.ready },
+      onlyNewReadyCheck: {
+        status: readyCheck.status,
+        ready: readyCheck.data.ready,
+      },
       screenshot: screenshot.status,
       firstSyncedAt: {
         new: instance(NEW).firstSyncedAt,
@@ -348,6 +357,12 @@ describeReplay("an instance on its first sync", () => {
     expect(before.onlyNew).toEqual({ status: 503, ready: false });
     expect(during.onlyNew).toEqual({ status: 503, ready: false });
     expect(after.onlyNew.status).toBe(200);
+  });
+
+  it("GET /library/ready answers ready false while the user's only instance is on its first sync, then true", () => {
+    expect(before.onlyNewReadyCheck).toEqual({ status: 200, ready: false });
+    expect(during.onlyNewReadyCheck).toEqual({ status: 200, ready: false });
+    expect(after.onlyNewReadyCheck).toEqual({ status: 200, ready: true });
   });
 
   it("GET /api/sync/status reports firstSyncedAt per instance", () => {

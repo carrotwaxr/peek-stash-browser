@@ -1,8 +1,8 @@
 /**
  * Unit Tests for Auth Middleware Functions
  *
- * Tests authenticate, authenticateToken, requireAdmin, and requireCacheReady
- * middleware functions with mocked Prisma and UserInstanceService.
+ * Tests authenticate, authenticateToken, requireAdmin, requireCacheReady and
+ * isLibraryReady with mocked Prisma and UserInstanceService.
  * Covers proxy auth flow, JWT token validation, token refresh, role checks,
  * and cache readiness.
  */
@@ -24,6 +24,7 @@ import {
   authenticate,
   authenticateToken,
   generateToken,
+  isLibraryReady,
   requireAdmin,
   requireCacheReady,
   setTokenCookie,
@@ -760,6 +761,19 @@ describe("Auth Middleware", () => {
       expect(statusFn).toHaveBeenCalledWith(403);
       expect(jsonFn).toHaveBeenCalledWith({ error: "Admin access required." });
       expect(nextFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("isLibraryReady", () => {
+    it("is false while the user has no instance past its first sync, and true once one is", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      await expect(isLibraryReady(MOCK_USER.id)).resolves.toBe(false);
+
+      mockAllowedInstances.mockResolvedValue(["inst-a"]);
+      await expect(isLibraryReady(MOCK_USER.id)).resolves.toBe(true);
+
+      expect(mockAllowedInstances).toHaveBeenCalledTimes(2);
+      expect(mockAllowedInstances).toHaveBeenLastCalledWith(MOCK_USER.id);
     });
   });
 

@@ -287,13 +287,20 @@ export const requireAdmin = (
 };
 
 /**
- * Library routes answer 503 `ready: false` while the user has no instance to
- * show: a fresh install before its first sync, or a user whose every
- * instance is still on its first sync (an instance shows once that sync's
- * exclusions are computed). The client retries and shows the sync banner.
- * It also keeps the routes behind it from reading an empty instance list,
- * which the query builders take as no instance filter. Runs after
- * authenticate.
+ * Whether the user has an instance to show: false on a fresh install before
+ * its first sync, or while every instance the user sees is still on its
+ * first sync (an instance shows once that sync's exclusions are computed).
+ * `requireCacheReady` and `GET /api/library/ready` both answer from it.
+ */
+export const isLibraryReady = async (userId: number): Promise<boolean> =>
+  (await getUserAllowedInstanceIds(userId)).length > 0;
+
+/**
+ * Library routes answer 503 `ready: false` while the user's library is not
+ * ready (`isLibraryReady`). The client shows its sync notice and re-checks
+ * `GET /api/library/ready` every 5 seconds instead of retrying. It also
+ * keeps the routes behind it from reading an empty instance list, which the
+ * query builders take as no instance filter. Runs after authenticate.
  */
 export const requireCacheReady = async (
   req: Request,
@@ -305,8 +312,7 @@ export const requireCacheReady = async (
     res.status(401).json({ error: "Access denied. No token provided." });
     return;
   }
-  const allowed = await getUserAllowedInstanceIds(user.id);
-  if (allowed.length === 0) {
+  if (!(await isLibraryReady(user.id))) {
     res.status(503).json({
       error: "Server is initializing",
       message: "Cache is still loading. Please wait a moment and try again.",

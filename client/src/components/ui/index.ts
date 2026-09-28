@@ -7,7 +7,6 @@ export { BaseCard } from "./BaseCard";
 export { BaseGrid } from "./BaseGrid";
 export { default as BulkActionBar } from "./BulkActionBar";
 export { default as Button } from "./Button";
-export { default as SyncProgressBanner } from "./SyncProgressBanner";
 export {
   CardContainer,
   CardDefaultImage,
@@ -39,6 +38,7 @@ export { default as GlobalLayout } from "./GlobalLayout";
 export { default as HelpModal } from "./HelpModal";
 export { default as InfoMessage } from "./InfoMessage";
 export { default as LazyThumbnail } from "./LazyThumbnail";
+export { default as LibraryInitializingBanner } from "./LibraryInitializingBanner";
 export { default as Lightbox } from "./Lightbox";
 export { default as LoadingSpinner } from "./LoadingSpinner";
 export { default as MediaImage } from "./MediaImage";

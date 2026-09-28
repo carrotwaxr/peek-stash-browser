@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { type GetClipsOptions, getClips } from "../../api";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useTableColumns } from "../../hooks/useTableColumns";
@@ -10,6 +11,7 @@ import { getScenePathWithTime } from "../../utils/entityLinks";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import {
   ErrorMessage,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SearchControls,
@@ -67,7 +69,9 @@ const ClipSearch = ({
     queryFn:
       clipQueryParams === null ? skipToken : () => getClips(clipQueryParams),
   });
-  const isLoading = clipQueryParams === null || queryLoading;
+  // The library is on its first sync: the notice, not the error page
+  const initializing = isLibraryInitializing(error);
+  const isLoading = clipQueryParams === null || queryLoading || initializing;
 
   // Wall playback preference
   const { wallPlayback, updateWallPlayback } = useWallPlayback();
@@ -144,7 +148,7 @@ const ClipSearch = ({
     );
   };
 
-  if (error) {
+  if (error && !initializing) {
     return (
       <PageLayout>
         <PageHeader title={title ?? ""} subtitle={subtitle} />
@@ -156,6 +160,8 @@ const ClipSearch = ({
   return (
     <PageLayout>
       <PageHeader title={title ?? ""} subtitle={subtitle} />
+
+      <LibraryInitializingBanner />
 
       <SearchControls
         artifactType="clip"

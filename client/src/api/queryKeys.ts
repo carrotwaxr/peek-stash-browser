@@ -19,6 +19,8 @@ export const queryKeys = {
       ["scenes", instanceId, "externalPlayerLink", id] as const,
     similar: (instanceId: string, id: string, page: number) =>
       ["scenes", instanceId, "similar", id, page] as const,
+    recommended: (page: number, perPage: number) =>
+      ["scenes", undefined, "recommended", { page, perPage }] as const,
   },
   performers: {
     all: (instanceId?: string) => ["performers", instanceId] as const,
@@ -83,7 +85,20 @@ export const queryKeys = {
       ["images", instanceId, "list", params] as const,
   },
 
+  // Whether the user's library can be shown yet (useLibraryReady)
+  library: {
+    ready: () => ["library", "ready"] as const,
+  },
+
   // ── Carousels ────────────────────────────────────────────────────────
+  // The Home page's built-in carousels, and Continue Watching's scenes
+  homeCarousels: {
+    all: () => ["homeCarousel"] as const,
+    byKey: (fetchKey: string) => ["homeCarousel", fetchKey] as const,
+    continueWatching: (sceneIds: readonly string[]) =>
+      ["homeCarousel", "continueWatching", sceneIds] as const,
+  },
+  // The user's custom carousels
   carousels: {
     all: () => ["carousels"] as const,
     list: () => ["carousels", "list"] as const,

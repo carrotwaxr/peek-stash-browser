@@ -177,9 +177,8 @@ vi.mock("@/components/ui/index", () => ({
       {(error as Error)?.message || "Error"}
     </div>
   ),
-  SyncProgressBanner: ({ message }: Record<string, unknown>) => (
-    <div data-testid="sync-banner">{message as string}</div>
-  ),
+  // Shows itself while the library is initializing (its own test covers when)
+  LibraryInitializingBanner: () => <div data-testid="sync-banner" />,
 }));
 vi.mock("@/components/wall/WallView", () => ({
   default: () => <div data-testid="wall-view" />,
@@ -250,7 +249,7 @@ describe("Images", () => {
       );
     });
 
-    it("shows SyncProgressBanner when error is initializing", () => {
+    it("an initializing 503 shows the sync banner, not the error page", () => {
       const error = new ApiError("init", 503, { ready: false });
       mockUseImageList.mockReturnValue({
         data: null,
@@ -259,9 +258,9 @@ describe("Images", () => {
       });
 
       render(<Images />);
-      expect(screen.getByTestId("sync-banner")).toHaveTextContent(
-        "Server is syncing library, please wait..."
-      );
+      expect(screen.getByTestId("sync-banner")).toBeInTheDocument();
+      expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
+      expect(screen.getByTestId("search-controls")).toBeInTheDocument();
     });
   });
 

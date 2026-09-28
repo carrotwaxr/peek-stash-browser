@@ -22,6 +22,7 @@ export type {
   ApiErrorResponse,
   ApiSuccessResponse,
   CacheNotReadyResponse,
+  LibraryReadyResponse,
   AmbiguousLookupResponse,
 } from "@peek/shared-types/api/common.js";
 

@@ -2,8 +2,8 @@ import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { NormalizedGroup } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
-import { ApiError } from "../../api/client";
 import { useGroupList } from "../../api/hooks";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -16,10 +16,10 @@ import { GroupCard } from "../cards/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import {
   ErrorMessage,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SearchControls,
-  SyncProgressBanner,
 } from "../ui/index";
 
 // View modes available for groups page
@@ -57,11 +57,9 @@ const Groups = () => {
     error,
     isPlaceholderData,
   } = useGroupList(queryParams);
-  const initMessage =
-    error instanceof ApiError && error.isInitializing
-      ? "Server is syncing library, please wait..."
-      : null;
-  const isLoading = queryParams === null || queryLoading;
+  // The library is on its first sync: the notice, not the error page
+  const initializing = isLibraryInitializing(error);
+  const isLoading = queryParams === null || queryLoading || initializing;
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams<"group">) => {
@@ -101,8 +99,7 @@ const Groups = () => {
     !isLoading && currentGroups.length > 0 && isTVMode
   );
 
-  // Only show error page for non-initializing errors
-  if (error && !initMessage) {
+  if (error && !initializing) {
     return (
       <PageLayout>
         <PageHeader title="Collections" />
@@ -119,7 +116,7 @@ const Groups = () => {
           subtitle="Browse collections and movies in your library"
         />
 
-        {initMessage && <SyncProgressBanner message={initMessage} />}
+        <LibraryInitializingBanner />
 
         {/* Controls Section. SearchControls reads the URL once, on mount: a
             collection card's sub-collection count links here with another

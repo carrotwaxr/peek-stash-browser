@@ -2,8 +2,8 @@ import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { NormalizedTag } from "@peek/shared-types";
 import type { LibrarySearchParams } from "../../api";
-import { ApiError } from "../../api/client";
 import { useTagList, useTagTree } from "../../api/hooks";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -17,10 +17,10 @@ import { ColumnConfigPopover, TableView } from "../table/index";
 import { TagHierarchyView } from "../tags/index";
 import {
   ErrorMessage,
+  LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SearchControls,
-  SyncProgressBanner,
 } from "../ui/index";
 
 // View modes for Tags page
@@ -64,11 +64,9 @@ const Tags = () => {
     error,
     isPlaceholderData,
   } = useTagList(queryParams);
-  const initMessage =
-    error instanceof ApiError && error.isInitializing
-      ? "Server is syncing library, please wait..."
-      : null;
-  const isLoading = queryParams === null || queryLoading;
+  // The library is on its first sync: the notice, not the error page
+  const initializing = isLibraryInitializing(error);
+  const isLoading = queryParams === null || queryLoading || initializing;
 
   // The compact tag tree for the hierarchy view, fetched only there
   const { data: hierarchyData, isLoading: hierarchyLoading } = useTagTree(
@@ -115,8 +113,7 @@ const Tags = () => {
     !isLoading && currentTags.length > 0 && isTVMode
   );
 
-  // Only show error page for non-initializing errors
-  if (error && !initMessage) {
+  if (error && !initializing) {
     return (
       <PageLayout>
         <PageHeader title="Tags" />
@@ -130,7 +127,7 @@ const Tags = () => {
       <div ref={pageRef}>
         <PageHeader title="Tags" subtitle="Browse tags in your library" />
 
-        {initMessage && <SyncProgressBanner message={initMessage} />}
+        <LibraryInitializingBanner />
 
         {/* Controls Section */}
         <SearchControls
