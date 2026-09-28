@@ -404,7 +404,7 @@ The list shows every backup of the database in the data directory, labeled with 
 | Before upgrading to 3.5.0 | Peek itself, before it applied that version's database migrations | `peek-stash-browser.db.backup-20260924-101112-pre-3.5.0` |
 | Before an upgrade (older Peek) | Versions before 3.4.0, when they upgraded a database from before 2.0.1 | `peek-stash-browser.db.backup.20260924_101112` |
 
-Times in the names are UTC. Peek keeps the 3 newest "Before upgrading" backups and deletes older ones when it takes a new one; it never deletes the other kinds. See [Upgrading](../getting-started/upgrading.md#automatic-backup-before-migrations) for when the automatic backup is taken and how to restore one.
+Times in the names are UTC. Peek keeps the 3 newest "Before upgrading" backups and deletes older ones when it takes a new one; it never deletes the other kinds. A backup cut off because Peek stopped while writing it is never listed, and is deleted the next time Peek takes a backup. See [Upgrading](../getting-started/upgrading.md#automatic-backup-before-migrations) for when the automatic backup is taken and how to restore one.
 
 ### Managing Backups
 

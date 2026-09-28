@@ -16,7 +16,7 @@ When an upgrade has database migrations to apply, Peek copies the database befor
 peek-stash-browser.db.backup-20260924-101112-pre-3.4.0
 ```
 
-Peek keeps the 3 newest of these and deletes older ones. It never deletes a backup you made yourself. A new install, and an upgrade with no migrations, take no backup. This backup is the way back to the version you ran before: see [Downgrading](#downgrading).
+Peek keeps the 3 newest of these and deletes older ones. It never deletes a backup you made yourself. If Peek stops while it copies (the container restarts or crashes during the upgrade), the unfinished copy is never listed or counted among the 3: the next start deletes it and copies again. A new install, and an upgrade with no migrations, take no backup. This backup is the way back to the version you ran before: see [Downgrading](#downgrading).
 
 Settings → Server Settings → Backup lists these backups as "Before upgrading to 3.4.0", beside the ones made there, with each file's path (see [Database Backup](../user-guide/user-management.md#database-backup)).
 

@@ -56,11 +56,28 @@ function databaseOf(file: string, used: number): void {
   );
 }
 
-/** A file handle whose `sync` and `close` succeed. */
-function fileHandle(): FileHandle {
+/** The first 16 bytes of every SQLite database file. */
+const SQLITE_MAGIC = Buffer.from("SQLite format 3\u0000", "latin1");
+
+/**
+ * A file handle whose `sync` and `close` succeed, on a SQLite file of
+ * `size()` bytes: `read` gives its first bytes, SQLite's magic then zeros.
+ */
+function fileHandle(size: () => number = () => 4096): FileHandle {
   return partialRow<FileHandle>({
     sync: vi.fn(() => Promise.resolve()),
     close: vi.fn(() => Promise.resolve()),
+    read: vi.fn(<T extends NodeJS.ArrayBufferView>(buffer: T) => {
+      const target = Buffer.from(
+        buffer.buffer,
+        buffer.byteOffset,
+        buffer.byteLength
+      );
+      const bytesRead = Math.min(size(), target.length);
+      target.fill(0);
+      target.set(SQLITE_MAGIC.subarray(0, bytesRead));
+      return Promise.resolve({ bytesRead, buffer });
+    }),
   });
 }
 
@@ -68,7 +85,8 @@ function fileHandle(): FileHandle {
  * The backup directory `/app/data` on a fake disk, holding `existing` (names
  * to mtimes), 4096 bytes each. `open(name, "wx")` claims a name, failing
  * with EEXIST when it exists; `VACUUM INTO` fails as SQLite does when its
- * target exists and is not empty, and otherwise writes 4096 bytes.
+ * target exists and is not empty, and otherwise writes 4096 bytes; `rename`
+ * moves a file.
  */
 function fakeBackupDir(existing: Record<string, Date> = {}): void {
   const files = new Map(
@@ -89,8 +107,19 @@ function fakeBackupDir(existing: Record<string, Date> = {}): void {
         )
       );
     }
-    if (!files.has(name)) files.set(name, { size: 0, mtime: new Date() });
-    return Promise.resolve(fileHandle());
+    if (flags === "wx") files.set(name, { size: 0, mtime: new Date() });
+    return Promise.resolve(fileHandle(() => files.get(name)?.size ?? 0));
+  });
+  vi.mocked(fs.rename).mockImplementation((from, to) => {
+    const entry = files.get(String(from));
+    if (!entry) {
+      return Promise.reject(
+        new Error(`ENOENT: no such file, rename '${String(from)}'`)
+      );
+    }
+    files.delete(String(from));
+    files.set(String(to), entry);
+    return Promise.resolve();
   });
   mockPrisma.$executeRaw.mockImplementation(
     prismaImpl<typeof prisma.$executeRaw>((_query, ...values: unknown[]) => {
@@ -129,6 +158,8 @@ describe("DatabaseBackupService", () => {
     vi.clearAllMocks();
     process.env = { ...originalEnv, CONFIG_DIR: "/app/data" };
     databaseOf("/app/data/peek-stash-browser.db", MIB);
+    // Every file opened is a whole SQLite file unless a test says otherwise
+    vi.mocked(fs.open).mockImplementation(() => Promise.resolve(fileHandle()));
   });
 
   afterEach(() => {
@@ -334,12 +365,17 @@ describe("DatabaseBackupService", () => {
         "peek-stash-browser.db.backup-20260118-104532"
       );
       expect(backup.size).toBe(4096);
-      // The path is a bound parameter, not spliced into the SQL
+      // The path is a bound parameter, not spliced into the SQL; the copy is
+      // written under a temporary name, then renamed
       const [sql, ...values] = must(mockPrisma.$executeRaw.mock.calls[0]);
       expect([...(sql as TemplateStringsArray)]).toEqual(["VACUUM INTO ", ""]);
       expect(values).toEqual([
-        "/app/data/peek-stash-browser.db.backup-20260118-104532",
+        "/app/data/peek-stash-browser.db.backup-20260118-104532.partial",
       ]);
+      expect(fs.rename).toHaveBeenCalledExactlyOnceWith(
+        "/app/data/peek-stash-browser.db.backup-20260118-104532.partial",
+        "/app/data/peek-stash-browser.db.backup-20260118-104532"
+      );
       expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -427,6 +463,7 @@ describe("DatabaseBackupService", () => {
       mockStatfs.mockResolvedValue(
         partialRow({ bavail: needed - 1, bsize: 1 })
       );
+      mockReaddir.mockResolvedValue(["peek-stash-browser.db"]);
 
       const { databaseBackupService, InsufficientSpaceError } =
         await import("../../services/DatabaseBackupService.js");
@@ -445,19 +482,18 @@ describe("DatabaseBackupService", () => {
       expect(fs.unlink).not.toHaveBeenCalled();
     });
 
-    it("deletes a partial file when VACUUM INTO fails with SQLITE_FULL", async () => {
+    it("deletes its temporary when VACUUM INTO fails with SQLITE_FULL", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-09-24T10:11:12.000Z"));
       databaseOf("/app/data/peek-stash-browser.db", 100 * MIB);
       mockStatfs.mockResolvedValue(
         partialRow({ bavail: 1024 * MIB, bsize: 1 })
       );
-      vi.mocked(fs.open).mockResolvedValue(fileHandle());
+      fakeBackupDir();
       const full = new Error(
         "Raw query failed. Code: `13`. Message: `database or disk is full`"
       );
       mockPrisma.$executeRaw.mockRejectedValue(full);
-      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       const { databaseBackupService } =
         await import("../../services/DatabaseBackupService.js");
@@ -468,9 +504,12 @@ describe("DatabaseBackupService", () => {
       const target =
         "/app/data/peek-stash-browser.db.backup-20260924-101112-pre-3.5.0";
       expect(must(mockPrisma.$executeRaw.mock.calls[0]).slice(1)).toEqual([
-        target,
+        `${target}.partial`,
       ]);
-      expect(fs.unlink).toHaveBeenCalledExactlyOnceWith(target);
+      expect(fs.unlink).toHaveBeenCalledWith(`${target}.partial`);
+      expect(fs.unlink).not.toHaveBeenCalledWith(target);
+      expect(fs.rename).not.toHaveBeenCalled();
+      expect(await mockReaddir("/app/data")).toEqual([]);
 
       vi.useRealTimers();
     });
