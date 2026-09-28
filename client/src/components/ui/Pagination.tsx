@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 import { useTVMode } from "../../hooks/useTVMode";
+import { PER_PAGE_MAX } from "../../utils/urlParams";
 import Button from "./Button";
 
 interface Props {
@@ -84,17 +85,19 @@ const Pagination = ({
     }
   };
 
+  const isValidPerPage = (num: number) =>
+    !isNaN(num) && num >= 1 && num <= PER_PAGE_MAX;
+
   const handleCustomInputChange = (value: string) => {
     setCustomInput(value);
-    const num = parseInt(value, 10);
-    setCustomError(isNaN(num) || num < 1 || num > 500);
+    setCustomError(!isValidPerPage(parseInt(value, 10)));
   };
 
   const handleCustomSubmit = () => {
     const num = parseInt(customInput, 10);
-    if (!isNaN(num) && num >= 1 && num <= 500 && num !== perPage) {
+    if (isValidPerPage(num) && num !== perPage) {
       onPerPageChange?.(num);
-    } else if (isNaN(num) || num < 1 || num > 500) {
+    } else if (!isValidPerPage(num)) {
       // Reset to current value if invalid
       setCustomInput(String(perPage));
       setCustomError(false);
@@ -315,7 +318,7 @@ const Pagination = ({
                   onChange={(e) => handleCustomInputChange(e.target.value)}
                   onBlur={handleCustomSubmit}
                   onKeyDown={handleCustomKeyDown}
-                  placeholder="1-500"
+                  placeholder={`1-${PER_PAGE_MAX}`}
                   className="w-14 px-2 py-1 rounded text-sm font-medium transition-colors text-center"
                   style={{
                     backgroundColor: "var(--bg-card)",

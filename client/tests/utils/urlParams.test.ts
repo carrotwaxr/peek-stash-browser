@@ -113,6 +113,19 @@ describe("parseSearchParams", () => {
       expect(result.perPage).toBe(48);
     });
 
+    it("per_page=500 in the URL parses to 250, per_page=0 to 24", () => {
+      const parse = (query: string) =>
+        parseSearchParams(new URLSearchParams(query), mockFilterOptions)
+          .perPage;
+
+      expect(parse("per_page=500")).toBe(250);
+      expect(parse("per_page=250")).toBe(250);
+      expect(parse("per_page=1")).toBe(1);
+      expect(parse("per_page=0")).toBe(24);
+      expect(parse("per_page=-5")).toBe(24);
+      expect(parse("per_page=abc")).toBe(24);
+    });
+
     it("parses view mode", () => {
       const params = new URLSearchParams("view=wall");
       const result = parseSearchParams(params, mockFilterOptions);
