@@ -201,7 +201,12 @@ export interface TextSpec<M extends TextModifier = TextModifier> {
   readonly kind: "text";
   readonly modifiers: readonly M[];
   readonly defaultModifier: M;
+  /** Most characters a trimmed value may have */
+  readonly maxLength: number;
 }
+
+/** What a text value may have unless the field says otherwise */
+export const TEXT_MAX_LENGTH = 500;
 
 export interface EnumSpec<
   V extends string = string,
@@ -350,14 +355,22 @@ export function date<const O extends ScalarOptions<DateModifier> = NoOptions>(
   return spec as DateSpec<Extract<ModifiersOf<O, DateModifier>, DateModifier>>;
 }
 
-/** A text field: every text modifier, INCLUDES when the modifier is missing */
-export function text<const O extends ScalarOptions<TextModifier> = NoOptions>(
+interface TextOptions extends ScalarOptions<TextModifier> {
+  readonly maxLength?: number;
+}
+
+/**
+ * A text field: every text modifier, INCLUDES when the modifier is missing,
+ * up to TEXT_MAX_LENGTH characters
+ */
+export function text<const O extends TextOptions = NoOptions>(
   options?: O
 ): TextSpec<Extract<ModifiersOf<O, TextModifier>, TextModifier>> {
   const spec: TextSpec = {
     kind: "text",
     modifiers: options?.modifiers ?? TEXT_MODIFIERS,
     defaultModifier: options?.defaultModifier ?? "INCLUDES",
+    maxLength: options?.maxLength ?? TEXT_MAX_LENGTH,
   };
   return spec as TextSpec<Extract<ModifiersOf<O, TextModifier>, TextModifier>>;
 }
