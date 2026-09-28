@@ -22,6 +22,7 @@ export {
   REF_MODIFIERS,
   RESOLUTIONS,
   SINGLE_REF_MODIFIERS,
+  TEXT_MAX_LENGTH,
   TEXT_MODIFIERS,
 } from "./criteria.js";
 export type {

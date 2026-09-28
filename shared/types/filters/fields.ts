@@ -14,14 +14,10 @@
  * starts here.
  */
 import {
-  BREAST_TYPES,
   COMPARISON_MODIFIERS,
-  ETHNICITIES,
-  EYE_COLORS,
   type EntityKind,
   type FieldSpec,
   GENDERS,
-  HAIR_COLORS,
   ORIENTATIONS,
   RESOLUTIONS,
   bool,
@@ -45,6 +41,18 @@ const COUNT_MODIFIERS = [...COMPARISON_MODIFIERS, "BETWEEN"] as const;
 /** A count or age: EQUALS when the modifier is missing */
 const count = () =>
   num({ modifiers: COUNT_MODIFIERS, defaultModifier: "EQUALS" });
+
+/**
+ * A performer attribute Stash stores as free text (ethnicity, hair colour,
+ * eye colour, breast type): compared whole, ignoring case, so a value the
+ * option lists (ETHNICITIES and the rest) lack still filters
+ */
+const freeText = () =>
+  text({
+    modifiers: ["EQUALS", "NOT_EQUALS"],
+    defaultModifier: "EQUALS",
+    maxLength: 100,
+  });
 
 // =============================================================================
 // FILTER FIELDS
@@ -96,10 +104,10 @@ export const PERFORMER_FIELDS = {
   piercings: text(),
   measurements: text(),
   gender: enumOf(GENDERS),
-  ethnicity: enumOf(ETHNICITIES),
-  hair_color: enumOf(HAIR_COLORS),
-  eye_color: enumOf(EYE_COLORS),
-  fake_tits: enumOf(BREAST_TYPES),
+  ethnicity: freeText(),
+  hair_color: freeText(),
+  eye_color: freeText(),
+  fake_tits: freeText(),
   tags: ref("tag", { hierarchical: true }),
   /** Performers in scenes of these studios */
   studios: ref("studio"),
