@@ -52,7 +52,7 @@ export interface ClipWithRelations {
     title: string | null;
     pathScreenshot: string | null;
     studioId: string | null;
-    stashInstanceId: string | null;
+    stashInstanceId: string;
   };
 }
 

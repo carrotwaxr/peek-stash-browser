@@ -266,8 +266,8 @@ describeWithDb("Tooltip relations (integration)", () => {
     for (const clip of clips) {
       const inst = clip.scene.stashInstanceId;
       const name = sameName(inst);
-      expect(names(clip.tags), inst ?? "").toEqual([name]);
-      expect(clip.primaryTag?.name, inst ?? "").toBe(name);
+      expect(names(clip.tags), inst).toEqual([name]);
+      expect(clip.primaryTag?.name, inst).toBe(name);
     }
   });
 });

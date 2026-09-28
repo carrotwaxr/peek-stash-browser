@@ -20,6 +20,7 @@ import { entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -1504,23 +1505,20 @@ class SceneQueryBuilder {
 
       // Paths - transform to proxy URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(row.pathScreenshot, row.stashInstanceId),
-        preview: this.transformUrl(row.pathPreview, row.stashInstanceId),
+        screenshot: toProxyUrl(row.pathScreenshot, row.stashInstanceId),
+        preview: toProxyUrl(row.pathPreview, row.stashInstanceId),
         // Always null: Peek serves streams and captions through its own
         // routes, and the media proxy refuses both Stash routes
         stream: null,
-        sprite: this.transformUrl(
+        sprite: toProxyUrl(
           row.pathSprite ? `/scene/${row.id}/vtt/sprite` : null,
           row.stashInstanceId
         ),
-        vtt: this.transformUrl(
+        vtt: toProxyUrl(
           row.pathVtt ? `/scene/${row.id}/vtt/thumbs` : null,
           row.stashInstanceId
         ),
-        chapters_vtt: this.transformUrl(
-          row.pathChaptersVtt,
-          row.stashInstanceId
-        ),
+        chapters_vtt: toProxyUrl(row.pathChaptersVtt, row.stashInstanceId),
         caption: null,
       },
 
@@ -1855,7 +1853,7 @@ class SceneQueryBuilder {
       name: p.name,
       disambiguation: p.disambiguation,
       gender: p.gender,
-      image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
+      image_path: toProxyUrl(p.imagePath, p.stashInstanceId),
       favorite: p.favorite,
       rating100: p.rating100,
     };
@@ -1872,7 +1870,7 @@ class SceneQueryBuilder {
       id: t.id,
       instanceId: t.stashInstanceId,
       name: t.name,
-      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+      image_path: toProxyUrl(t.imagePath, t.stashInstanceId),
       favorite: t.favorite,
     };
   }
@@ -1889,7 +1887,7 @@ class SceneQueryBuilder {
       id: s.id,
       instanceId: s.stashInstanceId,
       name: s.name,
-      image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
+      image_path: toProxyUrl(s.imagePath, s.stashInstanceId),
       favorite: s.favorite,
       parent_studio: s.parentId ? { id: s.parentId } : null,
     };
@@ -1906,8 +1904,8 @@ class SceneQueryBuilder {
       id: g.id,
       instanceId: g.stashInstanceId,
       name: g.name,
-      front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
-      back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
+      front_image_path: toProxyUrl(g.frontImagePath, g.stashInstanceId),
+      back_image_path: toProxyUrl(g.backImagePath, g.stashInstanceId),
     };
   }
 
@@ -1918,7 +1916,7 @@ class SceneQueryBuilder {
     stashInstanceId: string;
   }): GalleryRef {
     const coverUrl = g.coverPath
-      ? this.transformUrl(g.coverPath, g.stashInstanceId)
+      ? toProxyUrl(g.coverPath, g.stashInstanceId)
       : null;
     return {
       id: g.id,
@@ -1927,48 +1925,6 @@ class SceneQueryBuilder {
       // Cover as simple string URL for consistency
       cover: coverUrl,
     };
-  }
-
-  /**
-   * Transform a Stash URL/path to a proxy URL
-   * @param urlOrPath - The URL or path to transform
-   * @param instanceId - Optional Stash instance ID for multi-instance routing
-   */
-  private transformUrl(
-    urlOrPath: string | null,
-    instanceId?: string | null
-  ): string | null {
-    if (!urlOrPath) return null;
-
-    // If it's already a proxy URL, return as-is
-    if (urlOrPath.startsWith("/api/proxy/stash")) {
-      return urlOrPath;
-    }
-
-    // Build base proxy URL
-    let proxyPath: string;
-
-    // If it's a full URL (http://...), extract path + query
-    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-      try {
-        const url = new URL(urlOrPath);
-        const pathWithQuery = url.pathname + url.search;
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-      } catch {
-        // If URL parsing fails, treat as path
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-      }
-    } else {
-      // Otherwise treat as path and encode it
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-
-    // Add instanceId for multi-instance routing
-    if (instanceId) {
-      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-    }
-
-    return proxyPath;
   }
 
   /**

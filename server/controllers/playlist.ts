@@ -44,7 +44,6 @@ import {
 import { entityKey } from "../utils/entityRef.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
-import { transformScene } from "../utils/stashUrlProxy.js";
 
 /**
  * Default user fields for scenes (when no user data is merged yet).
@@ -132,12 +131,9 @@ export const getUserPlaylists = async (
             "scene"
           );
 
-          // 3. Transform scenes to add proxy URLs
-          const transformedScenes = visibleScenes.map((s) => transformScene(s));
-
           // Create a map of composite key to scene data (avoids cross-instance ID collisions)
           const sceneMap = new Map(
-            transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
+            visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s])
           );
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
@@ -270,14 +266,9 @@ export const getSharedPlaylists = async (
               "scene"
             );
 
-            // Transform scenes to add proxy URLs
-            const transformedScenes = visibleScenes.map((s) =>
-              transformScene(s)
-            );
-
             // Create a map of composite key to scene data (avoids cross-instance ID collisions)
             const sceneMap = new Map(
-              transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
+              visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s])
             );
 
             // Attach scene data to each playlist item
@@ -415,14 +406,9 @@ export const getPlaylist = async (
           userId
         );
 
-        // 5. Transform paths for proxy URLs
-        const transformedScenes = scenesWithUserHistory.map((s) =>
-          transformScene(s)
-        );
-
         // Create a map of composite key to scene data (avoids cross-instance ID collisions)
         const sceneMap = new Map(
-          transformedScenes.map((s) => [entityKey(s.id, s.instanceId), s])
+          scenesWithUserHistory.map((s) => [entityKey(s.id, s.instanceId), s])
         );
 
         // Attach scene data to each playlist item

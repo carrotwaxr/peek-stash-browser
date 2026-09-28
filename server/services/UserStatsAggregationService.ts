@@ -23,6 +23,7 @@ import type {
   TopTag,
   UserStatsResponse,
 } from "../types/api/index.js";
+import { toProxyUrl } from "../utils/proxyUrl.js";
 
 /**
  * Valid sort options for top lists
@@ -34,48 +35,6 @@ export type TopListSortBy = "engagement" | "oCount" | "playCount";
  */
 export interface UserStatsOptions {
   sortBy?: TopListSortBy;
-}
-
-/**
- * Transform a Stash URL/path to a proxy URL
- * All Stash URLs must be proxied to avoid leaking the API key to clients
- * @param urlOrPath - The URL or path to transform
- * @param instanceId - Optional Stash instance ID for multi-instance routing
- */
-export function transformUrl(
-  urlOrPath: string | null,
-  instanceId?: string | null
-): string | null {
-  if (!urlOrPath) return null;
-
-  // If it's already a proxy URL, return as-is
-  if (urlOrPath.startsWith("/api/proxy/stash")) {
-    return urlOrPath;
-  }
-
-  let proxyPath: string;
-
-  // If it's a full URL (http://...), extract path + query
-  if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-    try {
-      const url = new URL(urlOrPath);
-      const pathWithQuery = url.pathname + url.search;
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-    } catch {
-      // If URL parsing fails, treat as path
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-  } else {
-    // Otherwise treat as path and encode it
-    proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-  }
-
-  // Add instanceId for multi-instance routing
-  if (instanceId) {
-    proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-  }
-
-  return proxyPath;
 }
 
 class UserStatsAggregationService {
@@ -264,10 +223,9 @@ class UserStatsAggregationService {
         id: r.entityId,
         title: scene?.title ?? null,
         filePath: scene?.filePath ?? null,
-        imageUrl: transformUrl(
-          scene?.pathScreenshot ?? null,
-          scene?.stashInstanceId
-        ),
+        imageUrl: scene
+          ? toProxyUrl(scene.pathScreenshot, scene.stashInstanceId)
+          : null,
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -306,10 +264,9 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: performer?.name ?? "Unknown",
-        imageUrl: transformUrl(
-          performer?.imagePath ?? null,
-          performer?.stashInstanceId
-        ),
+        imageUrl: performer
+          ? toProxyUrl(performer.imagePath, performer.stashInstanceId)
+          : null,
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -348,10 +305,9 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: studio?.name ?? "Unknown",
-        imageUrl: transformUrl(
-          studio?.imagePath ?? null,
-          studio?.stashInstanceId
-        ),
+        imageUrl: studio
+          ? toProxyUrl(studio.imagePath, studio.stashInstanceId)
+          : null,
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -390,7 +346,7 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: tag?.name ?? "Unknown",
-        imageUrl: transformUrl(tag?.imagePath ?? null, tag?.stashInstanceId),
+        imageUrl: tag ? toProxyUrl(tag.imagePath, tag.stashInstanceId) : null,
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -447,7 +403,7 @@ class UserStatsAggregationService {
       id: scene.id,
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
-      imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+      imageUrl: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
       playCount: topResult.playCount,
     };
   }
@@ -500,7 +456,7 @@ class UserStatsAggregationService {
       id: image.id,
       title: image.title ?? null,
       filePath: image.filePath ?? null,
-      imageUrl: transformUrl(image.pathThumbnail, image.stashInstanceId),
+      imageUrl: toProxyUrl(image.pathThumbnail, image.stashInstanceId),
       viewCount: topResult.viewCount,
     };
   }
@@ -551,7 +507,7 @@ class UserStatsAggregationService {
       id: scene.id,
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
-      imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+      imageUrl: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
       oCount: topResult.oCount,
     };
   }
@@ -597,7 +553,7 @@ class UserStatsAggregationService {
     return {
       id: performer.id,
       name: performer.name ?? "Unknown",
-      imageUrl: transformUrl(performer.imagePath, performer.stashInstanceId),
+      imageUrl: toProxyUrl(performer.imagePath, performer.stashInstanceId),
       oCount: topResult.oCounter,
     };
   }
