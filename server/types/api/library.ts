@@ -53,6 +53,8 @@ export interface FindSimilarScenesQuery extends Record<
   string | undefined
 > {
   page?: string;
+  /** The seed's instance; without it, the first instance the user can see it on */
+  instanceId?: string;
 }
 
 export interface FindSimilarScenesResponse {

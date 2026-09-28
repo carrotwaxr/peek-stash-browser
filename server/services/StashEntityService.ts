@@ -28,7 +28,7 @@ import type {
   SceneScoringData,
   SceneStream,
 } from "../types/index.js";
-import { entityKey } from "../utils/entityRef.js";
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -43,6 +43,14 @@ import {
   getSceneFallbackTitle,
 } from "../utils/titleUtils.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
+
+/** One "Scenes like this" candidate: a scene on the seed's instance. */
+export interface SimilarSceneCandidate {
+  sceneId: string;
+  instanceId: string;
+  weight: number;
+  date: string | null;
+}
 
 /** Junction table entry for scene-performer with included performer */
 interface ScenePerformerWithPerformer {
@@ -315,100 +323,79 @@ class StashEntityService {
   }
 
   /**
-   * Get candidate scene IDs for similarity matching using SQL
-   * Returns up to maxCandidates scenes that share performers, tags, or studio
-   * with the given scene, weighted by relationship type.
+   * The candidates for "Scenes like this": up to maxCandidates scenes on
+   * the seed's instance that share a performer (3 points each), its studio
+   * (2) or a tag (1 each) with the seed, live, and not excluded for the
+   * user, sorted by total weight, then date, then id.
    *
-   * Weights:
-   * - Shared performer: 3 points
-   * - Same studio: 2 points
-   * - Shared tag: 1 point
-   *
-   * @param sceneId - The scene to find similar scenes for
-   * @param excludedIds - Set of scene IDs to exclude (e.g., user exclusions)
-   * @param maxCandidates - Maximum number of candidates to return (default 500)
-   * @returns Array of candidate scene IDs with weights and dates, sorted by weight desc then date desc
+   * Every branch joins within the seed's instance, so the candidates are
+   * all on it and the seed's own access check covers the allowed
+   * instances. The exclusions are an anti-join on UserExcludedEntity, never
+   * a bound list: a user with 100k excluded scenes costs nothing extra.
    */
   async getSimilarSceneCandidates(
-    sceneId: string,
-    excludedIds: Set<string>,
+    seed: EntityRef,
+    userId: number,
     maxCandidates: number = 500
-  ): Promise<Array<{ sceneId: string; weight: number; date: string | null }>> {
+  ): Promise<SimilarSceneCandidate[]> {
     const startTime = Date.now();
 
-    // Convert excludedIds to array for SQL IN clause
-    // If empty, use a dummy value that won't match any ID
-    const excludedArray =
-      excludedIds.size > 0 ? Array.from(excludedIds) : ["__NONE__"];
-
-    // SQL query to find candidate scenes sharing performers, tags, or studio
-    // Uses UNION ALL to combine weighted matches, then groups and sums weights
-    // Includes date for secondary sorting
-    // Note: Performer and tag matching is instance-aware (same ID + same instance)
     const sql = `
       WITH candidates AS (
-        -- Scenes sharing performers (weight: 3 per match)
-        SELECT sp2.sceneId, 3 as weight
+        SELECT sp2.sceneId, sp2.sceneInstanceId AS inst, 3 AS weight
         FROM ScenePerformer sp1
         JOIN ScenePerformer sp2 ON sp2.performerId = sp1.performerId AND sp2.performerInstanceId = sp1.performerInstanceId
-        JOIN StashScene s ON s.id = sp2.sceneId AND s.stashInstanceId = sp2.sceneInstanceId AND s.deletedAt IS NULL
-        WHERE sp1.sceneId = ?
-          AND sp2.sceneId != ?
-
+        WHERE sp1.sceneId = ? AND sp1.sceneInstanceId = ?
         UNION ALL
-
-        -- Scenes from same studio (weight: 2) - scoped to same instance
-        SELECT s2.id as sceneId, 2 as weight
+        SELECT s2.id, s2.stashInstanceId, 2
         FROM StashScene s1
-        JOIN StashScene s2 ON s2.studioId = s1.studioId
-          AND s2.stashInstanceId = s1.stashInstanceId
-          AND s2.deletedAt IS NULL
-        WHERE s1.id = ?
-          AND s2.id != ?
-          AND s1.studioId IS NOT NULL
-
+        JOIN StashScene s2 ON s2.studioId = s1.studioId AND s2.stashInstanceId = s1.stashInstanceId
+        WHERE s1.id = ? AND s1.stashInstanceId = ? AND s1.studioId IS NOT NULL
         UNION ALL
-
-        -- Scenes sharing tags (weight: 1 per match)
-        SELECT st2.sceneId, 1 as weight
+        SELECT st2.sceneId, st2.sceneInstanceId, 1
         FROM SceneTag st1
         JOIN SceneTag st2 ON st2.tagId = st1.tagId AND st2.tagInstanceId = st1.tagInstanceId
-        JOIN StashScene s ON s.id = st2.sceneId AND s.stashInstanceId = st2.sceneInstanceId AND s.deletedAt IS NULL
-        WHERE st1.sceneId = ?
-          AND st2.sceneId != ?
+        WHERE st1.sceneId = ? AND st1.sceneInstanceId = ?
+      ), scored AS (
+        SELECT sceneId, inst, SUM(weight) AS totalWeight FROM candidates
+        WHERE NOT (sceneId = ? AND inst = ?)
+        GROUP BY sceneId, inst
       )
-      SELECT c.sceneId, SUM(c.weight) as totalWeight, s.date
-      FROM candidates c
-      JOIN StashScene s ON s.id = c.sceneId
-      WHERE c.sceneId NOT IN (${excludedArray.map(() => "?").join(",")})
-      GROUP BY c.sceneId
-      ORDER BY totalWeight DESC, s.date DESC
+      SELECT c.sceneId, c.inst AS instanceId, c.totalWeight, s.date
+      FROM scored c
+      JOIN StashScene s ON s.id = c.sceneId AND s.stashInstanceId = c.inst AND s.deletedAt IS NULL
+      LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = c.sceneId
+        AND (e.instanceId = '' OR e.instanceId = c.inst)
+      WHERE e.id IS NULL
+      ORDER BY c.totalWeight DESC, s.date DESC, s.id
       LIMIT ?
     `;
 
-    // Build params array: sceneId appears 6 times (for each WHERE clause),
-    // then excludedIds, then maxCandidates
-    const params = [
-      sceneId,
-      sceneId, // performers
-      sceneId,
-      sceneId, // studio
-      sceneId,
-      sceneId, // tags
-      ...excludedArray,
-      maxCandidates,
-    ];
-
+    const { id, instanceId } = seed;
     const rows = await prisma.$queryRawUnsafe<
       Array<{
         sceneId: string;
+        instanceId: string;
         totalWeight: bigint; // SUM of integers
         date: string | null;
       }>
-    >(sql, ...params);
+    >(
+      sql,
+      id,
+      instanceId, // performers
+      id,
+      instanceId, // studio
+      id,
+      instanceId, // tags
+      id,
+      instanceId, // never the seed itself
+      userId,
+      maxCandidates
+    );
 
     const result = rows.map((row) => ({
       sceneId: row.sceneId,
+      instanceId: row.instanceId,
       weight: Number(row.totalWeight),
       date: row.date,
     }));

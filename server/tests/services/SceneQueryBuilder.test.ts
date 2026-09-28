@@ -8,7 +8,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
-import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import {
+  buildRefsClause,
+  sceneQueryBuilder,
+} from "../../services/SceneQueryBuilder.js";
 import type { SceneQueryRow } from "../../types/internal/queryRows.js";
 import { must } from "../helpers/must.js";
 
@@ -633,5 +636,72 @@ describe("SceneQueryBuilder", () => {
       expect(scene.updated_at).toBeNull();
       expect(scene.last_played_at).toBeNull();
     });
+  });
+});
+
+describe("buildRefsClause", () => {
+  it("binds one (id, instance) pair per ref", () => {
+    expect(
+      buildRefsClause([
+        { id: "1", instanceId: "inst-a" },
+        { id: "1", instanceId: "inst-b" },
+      ])
+    ).toEqual({
+      sql: "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))",
+      params: ["1", "inst-a", "1", "inst-b"],
+    });
+  });
+
+  it("matches nothing for no refs", () => {
+    expect(buildRefsClause([])).toEqual({ sql: "0", params: [] });
+  });
+});
+
+describe("getByRefs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([]) // main query
+      .mockResolvedValueOnce([{ total: 0 }]); // count query
+  });
+
+  it("binds one (id, instance) pair per ref, so B's same id stays out", async () => {
+    await sceneQueryBuilder.getByRefs({
+      userId: 1,
+      refs: [
+        { id: "7", instanceId: "inst-a" },
+        { id: "8", instanceId: "inst-a" },
+      ],
+      allowedInstanceIds: ["inst-a", "inst-b"],
+    });
+
+    const call = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+    const sql = call[0];
+    const params = call.slice(1);
+    expect(sql).toContain(
+      "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))"
+    );
+    expect(sql).not.toContain("s.id IN (");
+    // The pairs appear in order, each id beside its instance
+    const at = params.indexOf("7");
+    expect(params.slice(at, at + 4)).toEqual(["7", "inst-a", "8", "inst-a"]);
+  });
+
+  it("applies the user's exclusions by default", async () => {
+    await sceneQueryBuilder.getByRefs({
+      userId: 1,
+      refs: [{ id: "7", instanceId: "inst-a" }],
+    });
+
+    const sql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+    expect(sql).toContain("LEFT JOIN UserExcludedEntity e");
+    expect(sql).toContain("e.id IS NULL");
+  });
+
+  it("runs no query for no refs", async () => {
+    const result = await sceneQueryBuilder.getByRefs({ userId: 1, refs: [] });
+
+    expect(result).toEqual({ scenes: [], total: 0 });
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,9 @@
-import type { ExternalPlayerLinkResponse } from "@peek/shared-types";
+import type {
+  ExternalPlayerLinkResponse,
+  NormalizedScene,
+} from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { apiPost } from "..";
+import { apiGet, apiPost } from "..";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
@@ -49,5 +52,39 @@ export function useExternalPlayerLink(sceneId: string, instanceId: string) {
     staleTime: 60 * 60 * 1000,
     refetchInterval: 60 * 60 * 1000,
     retry: false,
+  });
+}
+
+export interface SimilarScenesResponse {
+  scenes: NormalizedScene[];
+  count: number;
+  page: number;
+  perPage: number;
+}
+
+/**
+ * One page of "Scenes like this" for a scene, keyed by the scene's instance,
+ * id and page, so the Similar Scenes tab and the Recommended sidebar share
+ * one request for page 1.
+ *
+ * The query does not take TanStack's abort signal: with the signal consumed,
+ * the fetch is cancelled the moment its last observer unmounts, and a
+ * remount (StrictMode's double mount, a layout change) sends it again. A
+ * page of ids is cheap to let finish and cache.
+ */
+export function useSimilarScenes(
+  sceneId: string,
+  instanceId: string,
+  page: number
+) {
+  return useQuery({
+    queryKey: queryKeys.scenes.similar(instanceId, sceneId, page),
+    queryFn: () =>
+      apiGet<SimilarScenesResponse>(
+        `/library/scenes/${sceneId}/similar?instanceId=${encodeURIComponent(instanceId)}&page=${page}`
+      ),
+    enabled: !!sceneId && !!instanceId,
+    // Keep the current page on screen while the next one loads
+    placeholderData: keepPreviousData,
   });
 }

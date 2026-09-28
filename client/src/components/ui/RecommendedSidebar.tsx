@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { apiGet } from "../../api";
+import { useSimilarScenes } from "../../api/hooks/useScenes";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneTitle } from "../../utils/format";
@@ -9,46 +8,25 @@ import { useLazyLoad } from "./CardComponents";
 
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar
- * Shows 12 scenes in a scrollable vertical layout
+ * Shows the first 12 of the scene's similar scenes (page 1, the same query
+ * the Similar Scenes tab reads) in a scrollable vertical layout.
  * @param {string} sceneId - Current scene ID for fetching similar scenes
+ * @param {string} instanceId - The scene's instance
  * @param {number} maxHeight - Maximum height in pixels to match left column
  */
 interface Props {
   sceneId: string;
+  instanceId: string;
   maxHeight?: number;
 }
 
-const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
+const RecommendedSidebar = ({ sceneId, instanceId, maxHeight }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
-  const [scenes, setScenes] = useState<NormalizedScene[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchRecommendedScenes = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const data = await apiGet<{ scenes: NormalizedScene[] }>(
-          `/library/scenes/${sceneId}/similar?page=1`
-        );
-
-        // Only take first 12 scenes for sidebar
-        setScenes(data.scenes.slice(0, 12));
-      } catch (err) {
-        console.error("Error fetching recommended scenes:", err);
-        setError((err as Error).message || "Failed to load recommendations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (sceneId) {
-      void fetchRecommendedScenes();
-    }
-  }, [sceneId]);
+  const { data, isPending, isError } = useSimilarScenes(sceneId, instanceId, 1);
+  // Only take first 12 scenes for sidebar
+  const scenes = data?.scenes.slice(0, 12) ?? [];
+  const loading = isPending;
 
   const handleSceneClick = (scene: NormalizedScene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
@@ -96,7 +74,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
   }
 
   // Error or no results - don't show anything
-  if (error || scenes.length === 0) {
+  if (isError || scenes.length === 0) {
     return null;
   }
 

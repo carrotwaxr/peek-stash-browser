@@ -16,7 +16,7 @@ import type {
   TagRef,
 } from "../types/index.js";
 import type { SceneQueryRow } from "../types/internal/queryRows.js";
-import { entityKey } from "../utils/entityRef.js";
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
@@ -45,6 +45,7 @@ export interface SceneQueryOptions {
   perPage: number;
   randomSeed?: number;
   searchQuery?: string; // Text search query - searches title, details, path, performer names, studio name, tag names
+  refs?: readonly EntityRef[]; // Only these (id, instance) scenes, on top of the other clauses
 }
 
 // Query result
@@ -58,6 +59,32 @@ export interface SceneByIdsOptions {
   userId: number;
   ids: string[];
   allowedInstanceIds?: string[]; // Multi-instance filtering
+}
+
+// Query by (id, instance) refs
+export interface SceneByRefsOptions {
+  userId: number;
+  refs: readonly EntityRef[];
+  allowedInstanceIds?: string[]; // Multi-instance filtering
+}
+
+/**
+ * The clause matching exactly these (id, instance) scenes, one bound pair
+ * per ref: `(s.id = ? AND s.stashInstanceId = ?) OR ...`, which SQLite runs
+ * as a MULTI-INDEX OR over the primary key. No refs matches nothing. C4
+ * folds this into the base builder's idClause.
+ */
+export function buildRefsClause(
+  refs: readonly EntityRef[],
+  alias: string = "s"
+): FilterClause {
+  if (refs.length === 0) {
+    return { sql: "0", params: [] };
+  }
+  return {
+    sql: `(${refs.map(() => `(${alias}.id = ? AND ${alias}.stashInstanceId = ?)`).join(" OR ")})`,
+    params: refs.flatMap((ref) => [ref.id, ref.instanceId]),
+  };
 }
 
 /**
@@ -990,6 +1017,7 @@ class SceneQueryBuilder {
       allowedInstanceIds,
       specificInstanceId,
       filters,
+      refs,
     } = options;
 
     // Build FROM clause with optional exclusion JOIN
@@ -1011,6 +1039,11 @@ class SceneQueryBuilder {
       if (specificFilter.sql) {
         whereClauses.push(specificFilter);
       }
+    }
+
+    // Exactly these (id, instance) scenes
+    if (refs) {
+      whereClauses.push(buildRefsClause(refs));
     }
 
     // ID filter
@@ -1900,6 +1933,30 @@ class SceneQueryBuilder {
       sortDirection: "DESC",
       page: 1,
       perPage: ids.length, // Get all requested IDs
+    });
+  }
+
+  /**
+   * The scenes named by (id, instance) refs, with the user's exclusions
+   * and allowed instances applied as on every list (invariant 3), in no
+   * particular order: the caller reorders by entityKey. At most one page of
+   * refs at a time, since each binds two parameters.
+   */
+  async getByRefs(options: SceneByRefsOptions): Promise<SceneQueryResult> {
+    const { userId, refs, allowedInstanceIds } = options;
+
+    if (refs.length === 0) {
+      return { scenes: [], total: 0 };
+    }
+
+    return this.execute({
+      userId,
+      refs,
+      allowedInstanceIds,
+      sort: "created_at",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: refs.length,
     });
   }
 }
