@@ -1490,7 +1490,7 @@
   },
   "src/utils/entityLinks.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
+      "count": 4
     }
   },
   "src/utils/filterConfig.ts": {
@@ -1536,9 +1536,6 @@
     }
   },
   "src/utils/urlParams.ts": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 3
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 15
     }

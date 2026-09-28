@@ -215,4 +215,93 @@ test.describe("List navigation", () => {
     });
     await expect(list.cards("Scene")).toHaveCount(0);
   });
+
+  // FILTERS-11: a card's count opens its list through a filter that page
+  // declares. The Images page's studio filter is studioIds, which the link's
+  // studioId sets; before, the link opened every image.
+  test("a studio card's image count opens the images of that studio", async ({
+    page,
+  }) => {
+    interface StudioRow {
+      id: string;
+      instanceId: string;
+      name: string;
+      image_count: number;
+    }
+    const imageCount = async (studio?: StudioRow) => {
+      const response = await page.request.post("/api/library/images", {
+        data: {
+          filter: { per_page: 1 },
+          ...(studio && {
+            image_filter: {
+              studios: {
+                value: [`${studio.id}:${studio.instanceId}`],
+                modifier: "INCLUDES",
+              },
+            },
+          }),
+        },
+      });
+      expect(response.ok(), await response.text()).toBeTruthy();
+      return ((await response.json()) as { findImages: { count: number } })
+        .findImages.count;
+    };
+
+    const listed = await page.request.post("/api/library/studios", {
+      data: { filter: { per_page: 250, sort: "name", direction: "ASC" } },
+    });
+    expect(listed.ok(), await listed.text()).toBeTruthy();
+    const { studios } = (
+      (await listed.json()) as { findStudios: { studios: StudioRow[] } }
+    ).findStudios;
+
+    // A studio with some of the library's images, not all of them, so an
+    // unfiltered list cannot pass for its images
+    const all = await imageCount();
+    let subject: { studio: StudioRow; count: number } | undefined;
+    for (const studio of studios.filter((each) => each.image_count > 0)) {
+      const count = await imageCount(studio);
+      if (count > 0 && count < all) {
+        subject = { studio, count };
+        break;
+      }
+    }
+    const { studio, count } = requireData(
+      subject,
+      "a studio with some of the library's images"
+    );
+
+    const list = new ListPage(page);
+    await list.goto(`/studios?q=${encodeURIComponent(studio.name)}`);
+    await list.waitForResults("Studio");
+    const card = list.cards("Studio").filter({
+      has: page.locator(".card-title").getByText(studio.name, { exact: true }),
+    });
+    await expect(card).toHaveCount(1);
+
+    const images = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/library/images" &&
+        r.request().method() === "POST"
+    );
+    await card
+      .locator(
+        ".card-indicator-icon:has(svg.lucide-images) + .card-indicator-text"
+      )
+      .click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/images\\?studioId=${studio.id}(&|$)`)
+    );
+    const response = await images;
+    const sent = response.request().postDataJSON() as {
+      image_filter?: { studios?: { value?: string[] } };
+    };
+    expect(sent.image_filter?.studios?.value).toHaveLength(1);
+    expect(sent.image_filter?.studios?.value?.[0]).toMatch(
+      new RegExp(`^${studio.id}(:|$)`)
+    );
+    const body = (await response.json()) as { findImages: { count: number } };
+    expect(body.findImages.count).toBe(count);
+  });
 });

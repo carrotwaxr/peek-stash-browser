@@ -4,7 +4,7 @@ import type { NormalizedGallery } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import { galleryTitle } from "../../utils/gallery";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -76,6 +76,33 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         />
       );
 
+    // Each count opens its list through that page's gallery filter; Scenes,
+    // Performers and Tags have none, so those counts open nothing
+    const imagesLink = getFilteredListPath(
+      "/images",
+      "galleries",
+      gallery,
+      hasMultipleInstances
+    );
+    const scenesLink = getFilteredListPath(
+      "/scenes",
+      "galleries",
+      gallery,
+      hasMultipleInstances
+    );
+    const performersLink = getFilteredListPath(
+      "/performers",
+      "galleries",
+      gallery,
+      hasMultipleInstances
+    );
+    const tagsLink = getFilteredListPath(
+      "/tags",
+      "galleries",
+      gallery,
+      hasMultipleInstances
+    );
+
     const indicators = [
       {
         type: "IMAGES",
@@ -83,15 +110,9 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         // Config says 'nav' for gallery->images
         onClick:
           getIndicatorBehavior("gallery", "images") === "nav" &&
-          gallery.image_count > 0
-            ? () =>
-                navigate(
-                  appendInstanceParam(
-                    `/images?galleryId=${gallery.id}`,
-                    gallery,
-                    hasMultipleInstances
-                  )
-                )
+          gallery.image_count > 0 &&
+          imagesLink
+            ? () => navigate(imagesLink)
             : undefined,
       },
       {
@@ -101,15 +122,9 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         // Config says 'nav' for gallery->scenes
         onClick:
           getIndicatorBehavior("gallery", "scenes") === "nav" &&
-          gallery.scenes?.length > 0
-            ? () =>
-                navigate(
-                  appendInstanceParam(
-                    `/scenes?galleryId=${gallery.id}`,
-                    gallery,
-                    hasMultipleInstances
-                  )
-                )
+          gallery.scenes?.length > 0 &&
+          scenesLink
+            ? () => navigate(scenesLink)
             : undefined,
       },
       {
@@ -118,15 +133,9 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         tooltipContent: performersTooltip,
         onClick:
           getIndicatorBehavior("gallery", "performers") === "nav" &&
-          gallery.performers?.length > 0
-            ? () =>
-                navigate(
-                  appendInstanceParam(
-                    `/performers?galleryId=${gallery.id}`,
-                    gallery,
-                    hasMultipleInstances
-                  )
-                )
+          gallery.performers?.length > 0 &&
+          performersLink
+            ? () => navigate(performersLink)
             : undefined,
       },
       {
@@ -135,15 +144,9 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         tooltipContent: tagsTooltip,
         onClick:
           getIndicatorBehavior("gallery", "tags") === "nav" &&
-          gallery.tags?.length > 0
-            ? () =>
-                navigate(
-                  appendInstanceParam(
-                    `/tags?galleryId=${gallery.id}`,
-                    gallery,
-                    hasMultipleInstances
-                  )
-                )
+          gallery.tags?.length > 0 &&
+          tagsLink
+            ? () => navigate(tagsLink)
             : undefined,
       },
     ];

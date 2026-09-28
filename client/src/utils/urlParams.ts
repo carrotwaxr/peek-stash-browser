@@ -1,7 +1,7 @@
 /**
  * Utility functions for persisting filter/sort state to URL query parameters
  */
-import { makeCompositeKey } from "./compositeKey";
+import { makeCompositeKey, parseCompositeKey } from "./compositeKey";
 import type { FilterOption } from "./filterConfig";
 
 /** The most rows a list page asks for; the server holds `per_page` to it. */
@@ -116,7 +116,28 @@ const filtersToUrlParams = (
 };
 
 /**
- * Deserialize URL query parameters to filter state
+ * The URL param that sets an entity filter to one entity: the option's key in
+ * the singular (`tagIds` reads `tagId`; `studioId` and `sceneId` read
+ * themselves). With the page's `instance` param it becomes "id:instance".
+ * Card counts link to a list with it (`getFilteredListPath`).
+ */
+export const entityParamFor = (key: string) =>
+  key.endsWith("Ids") ? key.slice(0, -1) : key;
+
+/**
+ * One entity from a singular param: joined with the page's `instance` param
+ * into "id:instance", unless the value names its instance already (a
+ * single-select filter's own value on a detail page, whose `instance` is the
+ * page's entity).
+ */
+const entityRefFromParam = (value: string, instance: string | null) =>
+  parseCompositeKey(value).instanceId === undefined
+    ? makeCompositeKey(value, instance)
+    : value;
+
+/**
+ * Deserialize URL query parameters to filter state. Only the page's own
+ * options are read: a param for a filter the page does not have is ignored.
  *
  * @param {URLSearchParams} searchParams - URL search params
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
@@ -127,41 +148,9 @@ const urlParamsToFilters = (
   filterOptions: FilterOption[]
 ) => {
   const filters: Record<string, unknown> = {};
-
-  // Handle singular entity ID params from card indicator clicks
-  // (e.g., /scenes?performerId=82&instance=abc-123 → performerIds: ["82:abc-123"])
   const instanceParam = searchParams.get("instance");
-  const singularToPlural: Record<string, string> = {
-    performerId: "performerIds",
-    studioId: "studioId", // studioId is already the correct key (single-select)
-    tagId: "tagIds",
-    groupId: "groupIds",
-    galleryId: "galleryIds",
-  };
-
-  const singularProcessedKeys = new Set<string>();
-  for (const [singular, pluralKey] of Object.entries(singularToPlural)) {
-    if (searchParams.has(singular)) {
-      const rawId = searchParams.get(singular)!;
-      const compositeId = makeCompositeKey(rawId, instanceParam);
-
-      // Check if the plural key is multi-select or single-select
-      const filterOption = filterOptions.find(
-        (opt: FilterOption) => opt.key === pluralKey
-      );
-      if (filterOption?.multi) {
-        filters[pluralKey] = [compositeId];
-      } else {
-        filters[pluralKey] = compositeId;
-      }
-      singularProcessedKeys.add(pluralKey);
-    }
-  }
 
   filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
-    // Skip keys already handled by singular-to-plural mapping above
-    if (singularProcessedKeys.has(key)) return;
-
     switch (type) {
       case "checkbox":
         if (searchParams.has(key)) {
@@ -176,27 +165,30 @@ const urlParamsToFilters = (
         }
         break;
 
-      case "searchable-select":
-        if (searchParams.has(key)) {
-          const value = searchParams.get(key);
-          if (multi) {
-            // Multi-select: deserialize comma-separated string to array
-            // Keep as strings (Stash uses string IDs)
-            filters[key] = value!.split(",").filter(Boolean);
-          } else {
-            // Single select: just set the value
-            filters[key] = value;
-          }
+      case "searchable-select": {
+        // A card's count links with one entity and its instance
+        // (/scenes?performerId=82&instance=abc-123 → performerIds:
+        // ["82:abc-123"]); it wins over the option's own list
+        const one = searchParams.get(entityParamFor(key));
+        const value = searchParams.get(key);
+        if (one) {
+          const ref = entityRefFromParam(one, instanceParam);
+          filters[key] = multi ? [ref] : ref;
+        } else if (value !== null) {
+          // A multi-select's value is a comma-separated list of refs, each
+          // naming its own instance; a single-select's is one value
+          filters[key] = multi ? value.split(",").filter(Boolean) : value;
         }
-        // Deserialize modifier if present
-        if (modifierKey && searchParams.has(modifierKey)) {
-          filters[modifierKey] = searchParams.get(modifierKey);
+        const modifier = modifierKey ? searchParams.get(modifierKey) : null;
+        if (modifierKey && modifier !== null) {
+          filters[modifierKey] = modifier;
         }
-        // Deserialize hierarchy depth if present
-        if (hierarchyKey && searchParams.has(hierarchyKey)) {
-          filters[hierarchyKey] = parseInt(searchParams.get(hierarchyKey)!, 10);
+        const depth = hierarchyKey ? searchParams.get(hierarchyKey) : null;
+        if (hierarchyKey && depth !== null) {
+          filters[hierarchyKey] = parseInt(depth, 10);
         }
         break;
+      }
 
       case "range": {
         const min = searchParams.get(`${key}_min`);

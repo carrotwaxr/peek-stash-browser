@@ -6,7 +6,7 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { useTVMode } from "../../hooks/useTVMode";
 import { formatRelativeTime } from "../../utils/date";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import {
   formatDurationCompact,
   formatResolution,
@@ -189,6 +189,33 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
+      // Each count opens its list through that page's scene filter, where
+      // the page has one
+      const performersLink = getFilteredListPath(
+        "/performers",
+        "scenes",
+        scene,
+        hasMultipleInstances
+      );
+      const groupsLink = getFilteredListPath(
+        "/collections",
+        "scenes",
+        scene,
+        hasMultipleInstances
+      );
+      const galleriesLink = getFilteredListPath(
+        "/galleries",
+        "scenes",
+        scene,
+        hasMultipleInstances
+      );
+      const tagsLink = getFilteredListPath(
+        "/tags",
+        "scenes",
+        scene,
+        hasMultipleInstances
+      );
+
       return [
         {
           type: "PLAY_COUNT",
@@ -202,15 +229,9 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
           onClick:
             getIndicatorBehavior("scene", "performers") === "nav" &&
-            scene.performers?.length > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/performers?sceneId=${scene.id}`,
-                      scene,
-                      hasMultipleInstances
-                    )
-                  )
+            scene.performers?.length > 0 &&
+            performersLink
+              ? () => navigate(performersLink)
               : undefined,
         },
         {
@@ -219,15 +240,9 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           tooltipContent: groupsTooltip,
           onClick:
             getIndicatorBehavior("scene", "groups") === "nav" &&
-            scene.groups?.length > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/collections?sceneId=${scene.id}`,
-                      scene,
-                      hasMultipleInstances
-                    )
-                  )
+            scene.groups?.length > 0 &&
+            groupsLink
+              ? () => navigate(groupsLink)
               : undefined,
         },
         {
@@ -236,15 +251,9 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           tooltipContent: galleriesTooltip,
           onClick:
             getIndicatorBehavior("scene", "galleries") === "nav" &&
-            scene.galleries?.length > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/galleries?sceneId=${scene.id}`,
-                      scene,
-                      hasMultipleInstances
-                    )
-                  )
+            scene.galleries?.length > 0 &&
+            galleriesLink
+              ? () => navigate(galleriesLink)
               : undefined,
         },
         {
@@ -253,15 +262,9 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           tooltipContent: tagsTooltip,
           onClick:
             getIndicatorBehavior("scene", "tags") === "nav" &&
-            allTags?.length > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/tags?sceneId=${scene.id}`,
-                      scene,
-                      hasMultipleInstances
-                    )
-                  )
+            allTags?.length > 0 &&
+            tagsLink
+              ? () => navigate(tagsLink)
               : undefined,
         },
       ];

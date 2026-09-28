@@ -4,7 +4,7 @@ import type { NormalizedTag } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
@@ -80,36 +80,36 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
+      // Each count opens its list through that page's tag filter
+      const scenesLink = getFilteredListPath(
+        "/scenes",
+        "tags",
+        tag,
+        hasMultipleInstances
+      );
+      const imagesLink = getFilteredListPath(
+        "/images",
+        "tags",
+        tag,
+        hasMultipleInstances
+      );
+
       return [
         { type: "PLAY_COUNT", count: tag.play_count },
         {
           type: "SCENES",
           count: tag.scene_count,
           onClick:
-            tag.scene_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/scenes?tagIds=${tag.id}`,
-                      tag,
-                      hasMultipleInstances
-                    )
-                  )
+            tag.scene_count > 0 && scenesLink
+              ? () => navigate(scenesLink)
               : undefined,
         },
         {
           type: "IMAGES",
           count: tag.image_count,
           onClick:
-            tag.image_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/images?tagIds=${tag.id}`,
-                      tag,
-                      hasMultipleInstances
-                    )
-                  )
+            tag.image_count > 0 && imagesLink
+              ? () => navigate(imagesLink)
               : undefined,
         },
         {
