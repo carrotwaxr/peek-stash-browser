@@ -34,14 +34,19 @@ function okResponse(body: unknown) {
 }
 
 /**
- * Creates a non-ok Response-like object for mocking fetch.
+ * A non-ok Response for mocking fetch.
  */
-function errorResponse(status = 401, body = {}) {
-  return Promise.resolve({
-    ok: false,
-    status,
-    json: () => Promise.resolve(body),
-  });
+function errorResponse(
+  status = 401,
+  body = {},
+  headers: Record<string, string> = {}
+) {
+  return Promise.resolve(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json", ...headers },
+    })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +249,69 @@ describe("login()", () => {
     });
 
     expect(loginResult).toEqual({ success: false, error: "Login failed" });
+  });
+});
+
+describe("login() refused for a while", () => {
+  async function loginAnswered(response: () => Promise<Response>) {
+    globalThis.fetch = vi.fn().mockImplementation((url) => {
+      if (url === "/api/auth/check") {
+        return errorResponse(401);
+      }
+      if (url === "/api/auth/login") {
+        return response();
+      }
+      return errorResponse(404);
+    });
+
+    const { result } = renderWithAuth();
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let loginResult;
+    await act(async () => {
+      loginResult = await result.current.login({
+        username: "x",
+        password: "y",
+      });
+    });
+    return loginResult;
+  }
+
+  it("a locked account's message names the retry time", async () => {
+    const loginResult = await loginAnswered(() =>
+      errorResponse(
+        423,
+        {
+          error: "Account temporarily locked due to too many failed attempts",
+          retryAfterSeconds: 900,
+        },
+        { "Retry-After": "900" }
+      )
+    );
+
+    expect(loginResult).toEqual({
+      success: false,
+      error:
+        "Account temporarily locked due to too many failed attempts. Try again in 15 minutes.",
+    });
+  });
+
+  it("a rate-limited login names the retry time from Retry-After", async () => {
+    const loginResult = await loginAnswered(() =>
+      errorResponse(
+        429,
+        { error: "Too many authentication attempts, please try again later" },
+        { "Retry-After": "840" }
+      )
+    );
+
+    expect(loginResult).toEqual({
+      success: false,
+      error:
+        "Too many authentication attempts, please try again later. Try again in 14 minutes.",
+    });
   });
 });
 

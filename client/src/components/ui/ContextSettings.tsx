@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideSettings } from "lucide-react";
-import { apiPut } from "../../api";
+import { apiPut, getErrorMessage } from "../../api";
 import {
   SETTING_LABELS,
   getAvailableSettings,
@@ -110,11 +110,8 @@ const ContextSettings = ({
           onSettingChange(key, value);
         }
         showSuccess("Setting saved");
-      } catch (err: unknown) {
-        showError(
-          (err as { response?: { data?: { error?: string } } })?.response?.data
-            ?.error || "Failed to save setting"
-        );
+      } catch (err) {
+        showError(getErrorMessage(err, "Failed to save setting"));
       } finally {
         setSaving(false);
       }

@@ -191,14 +191,55 @@ describe("Auth Middleware", () => {
       expect(nextFn).not.toHaveBeenCalled();
     });
 
-    it("returns 403 for invalid/tampered token", async () => {
+    // 401 is the one status the client reads as "the session is gone" and
+    // answers with the login page; 403 means a signed-in user was refused
+    it("returns 401 for an invalid or tampered token", async () => {
       const req = createMockReq({ cookies: { token: "invalid.jwt.token" } });
       const { res, statusFn, jsonFn } = createMockRes();
 
       await authenticateToken(req, res, nextFn);
 
-      expect(statusFn).toHaveBeenCalledWith(403);
+      expect(statusFn).toHaveBeenCalledWith(401);
       expect(jsonFn).toHaveBeenCalledWith({ error: "Invalid token." });
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("returns 401 for an expired token", async () => {
+      const token = jwt.sign(
+        {
+          id: MOCK_USER.id,
+          username: MOCK_USER.username,
+          role: MOCK_USER.role,
+          iat: Math.floor(Date.now() / 1000) - 3 * 3600,
+          exp: Math.floor(Date.now() / 1000) - 3600,
+        },
+        getJwtSecret()
+      );
+      const req = createMockReq({ cookies: { token } });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      await authenticateToken(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(jsonFn).toHaveBeenCalledWith({ error: "Invalid token." });
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("a failed user lookup reaches the error handler instead of ending the session", async () => {
+      const token = generateToken({
+        id: MOCK_USER.id,
+        username: MOCK_USER.username,
+        role: MOCK_USER.role,
+      });
+      const req = createMockReq({ cookies: { token } });
+      const { res, statusFn } = createMockRes();
+      const busy = new Error("SQLITE_BUSY: database is locked");
+      mockPrisma.user.findUnique.mockRejectedValue(busy);
+
+      await expect(authenticateToken(req, res, nextFn)).rejects.toBe(busy);
+
+      expect(statusFn).not.toHaveBeenCalled();
       expect(nextFn).not.toHaveBeenCalled();
     });
 
@@ -378,7 +419,7 @@ describe("Auth Middleware", () => {
 
         await authenticateToken(req, res, nextFn);
 
-        expect(statusFn).toHaveBeenCalledWith(403);
+        expect(statusFn).toHaveBeenCalledWith(401);
         expect(nextFn).not.toHaveBeenCalled();
       } finally {
         fs.rmSync(configDir, { recursive: true, force: true });

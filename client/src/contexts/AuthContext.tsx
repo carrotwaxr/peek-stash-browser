@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from "react";
+import {
+  ApiError,
+  getErrorMessage,
+  readRetryAfterSeconds,
+} from "../api/client";
 import { AuthContext } from "./AuthContextProvider";
 import type { AuthUser } from "./AuthContextProvider";
 
@@ -60,8 +65,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(user);
       return { success: true, user };
     } else {
-      const { error } = data as LoginErrorResponse;
-      return { success: false, error: error || "Login failed" };
+      const body = data as LoginErrorResponse & Record<string, unknown>;
+      // A lockout (423) or rate limit (429) says how long to wait
+      const refusal = new ApiError(
+        body.error || "Login failed",
+        response.status,
+        body,
+        readRetryAfterSeconds(response, body)
+      );
+      return { success: false, error: getErrorMessage(refusal) };
     }
   };
 

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
-import { apiPost } from "../../../api";
-import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
+import {
+  apiPost,
+  getErrorMessage,
+  getRecoveryKey,
+  regenerateRecoveryKey,
+} from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
@@ -48,7 +52,7 @@ const AccountTab = () => {
       setHasRecoveryKey(true);
       setKeyPassword("");
     } catch (err) {
-      showError((err as Error).message || "Failed to create recovery key");
+      showError(getErrorMessage(err, "Failed to create recovery key"));
     } finally {
       setCreatingKey(false);
     }
@@ -116,7 +120,7 @@ const AccountTab = () => {
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
-      showError((err as Error).message || "Failed to change password");
+      showError(getErrorMessage(err, "Failed to change password"));
     } finally {
       setPasswordChanging(false);
     }

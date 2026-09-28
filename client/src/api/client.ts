@@ -3,6 +3,7 @@
  *
  * Replaces the base fetch helpers from services/api.js with typed wrappers.
  */
+import { PUBLIC_ROUTES, isPublicRoute } from "../constants/navigation";
 
 const API_BASE_URL = "/api";
 const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
@@ -25,10 +26,10 @@ export function redirectToLogin(message?: string): void {
     window.location.pathname + window.location.search
   );
   if (message) sessionStorage.setItem(LOGIN_MESSAGE_STORAGE_KEY, message);
-  window.location.href = "/login";
+  window.location.href = PUBLIC_ROUTES.login;
 }
 
-// Background/fire-and-forget endpoints where 401/403 should NOT trigger redirect.
+// Background/fire-and-forget endpoints where a 401 should NOT trigger redirect.
 const AUTH_SILENT_ENDPOINTS = new Set([
   "/watch-history/save-activity",
   "/watch-history/increment-play-count",
@@ -44,96 +45,152 @@ export class ApiError extends Error {
   data: Record<string, unknown>;
   /** True when server returns 503 with ready: false (cache still warming). */
   isInitializing: boolean;
+  /** When the server says to try again: its Retry-After, in seconds. */
+  retryAfterSeconds: number | undefined;
 
   constructor(
     message: string,
     status: number,
-    data: Record<string, unknown> = {}
+    data: Record<string, unknown> = {},
+    retryAfterSeconds?: number
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.data = data;
     this.isInitializing = status === 503 && data.ready === false;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
 /**
+ * Seconds to wait before trying again: the Retry-After header (seconds or an
+ * HTTP date), else a body's `retryAfterSeconds` (the login lockout sends both).
+ */
+export function readRetryAfterSeconds(
+  response: Response,
+  data: Record<string, unknown>
+): number | undefined {
+  const header = response.headers.get("Retry-After")?.trim();
+  if (header) {
+    if (/^\d+$/.test(header)) return Number(header);
+    const date = Date.parse(header);
+    if (!Number.isNaN(date)) {
+      return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+    }
+  }
+  const fromBody = data.retryAfterSeconds;
+  return typeof fromBody === "number" && Number.isFinite(fromBody)
+    ? fromBody
+    : undefined;
+}
+
+const plural = (count: number, unit: string) =>
+  `${count} ${unit}${count === 1 ? "" : "s"}`;
+
+/** "30 seconds", "14 minutes" */
+function formatWait(seconds: number): string {
+  return seconds < 60
+    ? plural(Math.max(1, Math.ceil(seconds)), "second")
+    : plural(Math.ceil(seconds / 60), "minute");
+}
+
+/**
+ * What to tell the user about a failed request: the server's message, with
+ * the wait for a lockout (423) or a rate limit (429) when the server gave
+ * one. Anything that is not an Error gets the fallback.
+ */
+export function getErrorMessage(
+  err: unknown,
+  fallback = "Something went wrong. Please try again."
+): string {
+  if (err instanceof ApiError) {
+    const waits = err.status === 423 || err.status === 429;
+    if (!waits || err.retryAfterSeconds === undefined) return err.message;
+    const sentence = /[.!?]$/.test(err.message)
+      ? err.message
+      : `${err.message}.`;
+    return `${sentence} Try again in ${formatWait(err.retryAfterSeconds)}.`;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
+/** The request's headers: JSON by default, and the caller's on top. */
+function requestHeaders(callerHeaders: HeadersInit | undefined): Headers {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  new Headers(callerHeaders).forEach((value, name) => {
+    headers.set(name, value);
+  });
+  return headers;
+}
+
+/** An error response's JSON body, or a line naming the status. */
+async function readErrorBody(
+  response: Response
+): Promise<Record<string, unknown>> {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      return body as Record<string, unknown>;
+    }
+  } catch {
+    // Not JSON (a proxy's HTML error page, say)
+  }
+  return { error: `HTTP error! status: ${response.status}` };
+}
+
+function errorMessage(data: Record<string, unknown>, status: number): string {
+  if (typeof data.error === "string" && data.error) return data.error;
+  if (typeof data.message === "string" && data.message) return data.message;
+  return `HTTP error! status: ${status}`;
+}
+
+/**
  * Base fetch wrapper with auth redirect and error handling.
+ *
+ * Only a 401 means the session is gone: it sends the browser to the login
+ * page, except from a background endpoint, an /auth/ endpoint or a public
+ * page. Every other failure, 403 included, throws an ApiError for the caller
+ * to show where the user is.
  */
 export async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  const config: RequestInit = {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
-    },
     ...options,
-  };
+    headers: requestHeaders(options.headers),
+  });
 
-  const response = await fetch(url, config);
-
-  if (!response.ok) {
-    let errorData: Record<string, unknown>;
-    try {
-      errorData = (await response.json()) as Record<string, unknown>;
-    } catch {
-      errorData = { error: `HTTP error! status: ${response.status}` };
-    }
-
-    const isAuthEndpoint = endpoint.startsWith("/auth/");
-    const isSilentEndpoint = AUTH_SILENT_ENDPOINTS.has(endpoint);
-
-    if (
-      (response.status === 401 || response.status === 403) &&
-      !isAuthEndpoint
-    ) {
-      console.warn(
-        `[API] Auth failure: ${response.status} on ${endpoint}`,
-        `| error: ${(errorData?.error as string) || "unknown"}`,
-        `| cookie present: ${document.cookie.length > 0}`,
-        `| page: ${window.location.pathname}`
-      );
-
-      if (isSilentEndpoint) {
-        throw new ApiError(
-          (errorData?.error as string) || `Auth failure on ${endpoint}`,
-          response.status,
-          errorData
-        );
-      }
-
-      // Don't redirect if already on /login or /setup — would cause infinite reload
-      const currentUrl = window.location.pathname;
-      if (currentUrl === "/login" || currentUrl === "/setup") {
-        throw new ApiError(
-          (errorData?.error as string) || `Auth failure on ${endpoint}`,
-          response.status,
-          errorData
-        );
-      }
-
-      if (!isRedirectingToLogin) {
-        redirectToLogin();
-        return new Promise<T>(() => {});
-      }
-    }
-
-    throw new ApiError(
-      (errorData.error as string) ||
-        (errorData.message as string) ||
-        `HTTP error! status: ${response.status}`,
-      response.status,
-      errorData
-    );
+  if (response.ok) {
+    // No Content has no body to parse
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
   }
 
-  return (await response.json()) as T;
+  const errorData = await readErrorBody(response);
+  const error = new ApiError(
+    errorMessage(errorData, response.status),
+    response.status,
+    errorData,
+    readRetryAfterSeconds(response, errorData)
+  );
+
+  const sessionLost =
+    response.status === 401 &&
+    !endpoint.startsWith("/auth/") &&
+    !AUTH_SILENT_ENDPOINTS.has(endpoint) &&
+    !isPublicRoute(window.location.pathname);
+
+  if (sessionLost && !isRedirectingToLogin) {
+    redirectToLogin();
+    // The page is leaving; the caller never needs to handle this request
+    return new Promise<T>(() => {});
+  }
+
+  throw error;
 }
 
 export function apiGet<T = unknown>(

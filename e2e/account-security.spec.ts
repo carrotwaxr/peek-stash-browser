@@ -73,6 +73,60 @@ test.describe("Account security", () => {
     }
   });
 
+  // A throwaway user: a wrong current password on this form is not a failed
+  // login, so it counts toward no lockout, but the run admin stays untouched
+  test("a wrong current password shows the server's message and stays in Settings", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    const user = await createUser(page.request, "sec");
+    createdUserIds.push(user.id);
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const userPage = await context.newPage();
+      await userPage.goto(ACCOUNT_TAB);
+      await expect(
+        userPage.getByRole("heading", { name: "Change Password" })
+      ).toBeVisible({ timeout: 15_000 });
+
+      await userPage
+        .getByLabel("Current Password", { exact: true })
+        .fill(`${user.password}-wrong`);
+      await userPage
+        .getByLabel("New Password", { exact: true })
+        .fill("E2eSecurity3");
+      await userPage
+        .getByLabel("Confirm New Password", { exact: true })
+        .fill("E2eSecurity3");
+      const answer = userPage.waitForResponse((response) =>
+        response.url().endsWith("/api/user/change-password")
+      );
+      await userPage
+        .getByRole("button", { name: "Change Password", exact: true })
+        .click();
+      expect((await answer).status()).toBe(400);
+
+      await expect(
+        userPage.getByText("Current password is incorrect")
+      ).toBeVisible();
+      expect(new URL(userPage.url()).pathname).toBe("/settings");
+      await expect(
+        userPage.getByLabel("Current Password", { exact: true })
+      ).toHaveValue(`${user.password}-wrong`);
+
+      // Still signed in, with the old password
+      await userPage.reload();
+      await expect(
+        userPage.getByRole("heading", { name: "Change Password" })
+      ).toBeVisible({ timeout: 15_000 });
+      expect(new URL(userPage.url()).pathname).toBe("/settings");
+    } finally {
+      await context.close();
+    }
+  });
+
   test("changing the password signs out the user's other session", async ({
     page,
     browser,

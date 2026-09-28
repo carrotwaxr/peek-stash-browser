@@ -19,6 +19,7 @@ import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
 import Login from "./components/pages/Login";
 import SetupWizard from "./components/pages/SetupWizard";
 import { GlobalLayout } from "./components/ui/index";
+import { PUBLIC_ROUTES } from "./constants/navigation";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
 import { ConfigProvider } from "./contexts/ConfigContext";
@@ -118,7 +119,7 @@ const AppContent = () => {
         <Routes>
           {/* Setup wizard route */}
           <Route
-            path="/setup"
+            path={PUBLIC_ROUTES.setup}
             element={
               <SetupGuard
                 setupStatus={safeSetupStatus}
@@ -134,7 +135,7 @@ const AppContent = () => {
 
           {/* Login route */}
           <Route
-            path="/login"
+            path={PUBLIC_ROUTES.login}
             element={
               <LoginGuard
                 setupStatus={safeSetupStatus}
@@ -146,7 +147,10 @@ const AppContent = () => {
           />
 
           {/* Forgot password route */}
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path={PUBLIC_ROUTES.forgotPassword}
+            element={<ForgotPasswordPage />}
+          />
 
           {/* Protected app routes */}
           <Route

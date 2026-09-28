@@ -1,9 +1,4 @@
 {
-  "src/api/client.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
   "src/api/library.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 14
@@ -209,11 +204,6 @@
   "src/components/pages/Downloads.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
-    }
-  },
-  "src/components/pages/ForgotPasswordPage.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
     }
   },
   "src/components/pages/Galleries.tsx": {
@@ -728,10 +718,10 @@
   },
   "src/components/ui/ContextSettings.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 6
+      "count": 5
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/ui/ContinueWatchingCarousel.tsx": {
@@ -1689,11 +1679,6 @@
   "tests/components/pages/Downloads.test.tsx": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
-    }
-  },
-  "tests/components/pages/ForgotPasswordPage.test.tsx": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
     }
   },
   "tests/components/pages/Galleries.test.tsx": {

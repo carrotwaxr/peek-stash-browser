@@ -1,22 +1,76 @@
 /**
- * redirectToLogin and the 401 branch of apiFetch (sweep item 2).
+ * apiFetch's login redirect and error plumbing (sweep items 2 and 39).
  *
  * isRedirectingToLogin is module state that never resets (the page does a
  * full navigation), so every test resets the module registry and imports
  * the client afresh.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { must } from "../testUtils";
 
-type FakeLocation = { pathname: string; search: string; href: string };
+type FakeLocation = {
+  pathname: string;
+  search: string;
+  href: string;
+  /** How many times the page navigated (href assigned) */
+  navigations: number;
+};
 
 function stubLocation(pathname: string, search = ""): FakeLocation {
-  const fake: FakeLocation = { pathname, search, href: "" };
+  let href = "";
+  const fake = {
+    pathname,
+    search,
+    navigations: 0,
+    get href() {
+      return href;
+    },
+    set href(value: string) {
+      href = value;
+      fake.navigations += 1;
+    },
+  };
   Object.defineProperty(window, "location", {
     value: fake,
     writable: true,
     configurable: true,
   });
   return fake;
+}
+
+/** A real Response, as the browser's fetch resolves; one per call. */
+function respond(
+  status: number,
+  body?: unknown,
+  headers: Record<string, string> = {}
+): Response {
+  return new Response(body === undefined ? null : JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers },
+  });
+}
+
+function stubFetch(
+  status: number,
+  body?: unknown,
+  headers?: Record<string, string>
+) {
+  const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+    Promise.resolve(respond(status, body, headers))
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+/** A redirect leaves the promise pending forever; race it with a tick. */
+function settleOrPending(promise: Promise<unknown>): Promise<string> {
+  return Promise.race([
+    promise.then(
+      () => "resolved",
+      () => "rejected"
+    ),
+    new Promise<string>((resolve) => setTimeout(() => resolve("pending"), 20)),
+  ]);
 }
 
 describe("api client login redirect", () => {
@@ -26,7 +80,6 @@ describe("api client login redirect", () => {
     vi.resetModules();
     sessionStorage.clear();
     location = stubLocation("/scene/5", "?instance=inst-a");
-    vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -51,30 +104,11 @@ describe("api client login redirect", () => {
   });
 
   it("apiFetch 401 still redirects without a message", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () =>
-          Promise.resolve({ error: "Access denied. No token provided." }),
-      })
-    );
+    stubFetch(401, { error: "Access denied. No token provided." });
     const { apiFetch, LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } =
       await import("@/api/client");
 
-    // The promise never settles after a redirect; race it with a tick
-    const outcome = await Promise.race([
-      apiFetch("/library/scenes").then(
-        () => "resolved",
-        () => "rejected"
-      ),
-      new Promise<string>((resolve) =>
-        setTimeout(() => resolve("pending"), 20)
-      ),
-    ]);
-
-    expect(outcome).toBe("pending");
+    expect(await settleOrPending(apiFetch("/library/scenes"))).toBe("pending");
     expect(location.href).toBe("/login");
     expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe(
       "/scene/5?instance=inst-a"
@@ -82,20 +116,28 @@ describe("api client login redirect", () => {
     expect(sessionStorage.getItem(LOGIN_MESSAGE_STORAGE_KEY)).toBeNull();
   });
 
-  it("apiFetch 401 on an /auth/ endpoint throws instead of redirecting", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () =>
-          Promise.resolve({ error: "Access denied. No token provided." }),
-      })
+  it("a 401 redirects once and remembers the page", async () => {
+    stubFetch(401, { error: "Session expired. Please log in again." });
+    const { apiFetch, REDIRECT_STORAGE_KEY } = await import("@/api/client");
+
+    const first = settleOrPending(apiFetch("/library/scenes"));
+    const second = apiFetch("/library/performers").catch((e: unknown) => e);
+
+    expect(await first).toBe("pending");
+    await second;
+    expect(location.navigations).toBe(1);
+    expect(location.href).toBe("/login");
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe(
+      "/scene/5?instance=inst-a"
     );
+  });
+
+  it("apiFetch 401 on an /auth/ endpoint throws instead of redirecting", async () => {
+    stubFetch(401, { error: "Access denied. No token provided." });
     const { apiFetch, ApiError } = await import("@/api/client");
 
     await expect(apiFetch("/auth/check")).rejects.toBeInstanceOf(ApiError);
-    expect(location.href).toBe("");
+    expect(location.navigations).toBe(0);
   });
 
   it("redirectToLogin without a message stores no login notice", async () => {
@@ -114,10 +156,9 @@ describe("api client login redirect", () => {
 
     redirectToLogin("first");
     location.pathname = "/other";
-    location.href = "";
     redirectToLogin("second");
 
-    expect(location.href).toBe("");
+    expect(location.navigations).toBe(1);
     expect(sessionStorage.getItem(LOGIN_MESSAGE_STORAGE_KEY)).toBe("first");
     expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe(
       "/scene/5?instance=inst-a"
@@ -125,44 +166,54 @@ describe("api client login redirect", () => {
   });
 
   it("a 401 after a redirect has started throws instead of redirecting again", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () => Promise.resolve({ error: "Session expired" }),
-      })
-    );
+    stubFetch(401, { error: "Session expired" });
     const { apiFetch, redirectToLogin, ApiError } =
       await import("@/api/client");
     redirectToLogin();
-    location.href = "";
 
     const err = await apiFetch("/library/scenes").catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as InstanceType<typeof ApiError>).status).toBe(401);
     expect((err as Error).message).toBe("Session expired");
-    expect(location.href).toBe("");
+    expect(location.navigations).toBe(1);
   });
 
-  it("a 403 redirects to login like a 401", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: () => Promise.resolve({ error: "Forbidden" }),
-      })
-    );
-    const { apiFetch, REDIRECT_STORAGE_KEY } = await import("@/api/client");
+  it("a 403 throws ApiError and does not redirect", async () => {
+    stubFetch(403, {
+      error: "You don't have permission to download files",
+      errorType: "FORBIDDEN",
+    });
+    const { apiFetch, ApiError } = await import("@/api/client");
 
-    void apiFetch("/library/scenes");
-    await vi.waitFor(() => expect(location.href).toBe("/login"));
-    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBe(
-      "/scene/5?instance=inst-a"
+    const request = apiFetch("/downloads/scene/5");
+    expect(await settleOrPending(request)).toBe("rejected");
+    const err = await request.catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as InstanceType<typeof ApiError>).status).toBe(403);
+    expect((err as Error).message).toBe(
+      "You don't have permission to download files"
     );
+    expect(location.navigations).toBe(0);
+    expect(sessionStorage.length).toBe(0);
   });
+
+  it.each([400, 404, 409, 423, 429])(
+    "a %i throws ApiError and does not redirect",
+    async (status) => {
+      stubFetch(status, { error: "Refused" });
+      const { apiFetch, ApiError } = await import("@/api/client");
+
+      const err = await apiFetch("/playlists/7/shares").catch(
+        (e: unknown) => e
+      );
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as InstanceType<typeof ApiError>).status).toBe(status);
+      expect(location.navigations).toBe(0);
+    }
+  );
 
   it.each([
     "/watch-history/save-activity",
@@ -172,63 +223,34 @@ describe("api client login redirect", () => {
   ])(
     "a 401 on the background endpoint %s throws and leaves the page alone",
     async (endpoint) => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 401,
-          json: () => Promise.resolve({ error: "Session expired" }),
-        })
-      );
+      stubFetch(401, { error: "Session expired" });
       const { apiFetch, ApiError } = await import("@/api/client");
 
       const err = await apiFetch(endpoint).catch((e: unknown) => e);
 
       expect(err).toBeInstanceOf(ApiError);
       expect((err as Error).message).toBe("Session expired");
-      expect(location.href).toBe("");
+      expect(location.navigations).toBe(0);
       expect(sessionStorage.length).toBe(0);
     }
   );
 
-  it("a 403 on a background endpoint with no error body names the endpoint", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: () => Promise.resolve({}),
-      })
-    );
-    const { apiFetch } = await import("@/api/client");
-
-    await expect(apiFetch("/image-view-history/view")).rejects.toThrow(
-      "Auth failure on /image-view-history/view"
-    );
-    expect(location.href).toBe("");
-  });
-
-  it.each(["/login", "/setup"])(
-    "a 401 while on %s throws instead of reloading the page",
+  it.each(["/login", "/setup", "/forgot-password"])(
+    "a 401 on %s does not redirect",
     async (pathname) => {
       location.pathname = pathname;
       location.search = "";
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 401,
-          json: () => Promise.resolve({}),
-        })
-      );
+      stubFetch(401, {});
       const { apiFetch, ApiError, REDIRECT_STORAGE_KEY } =
         await import("@/api/client");
 
-      const err = await apiFetch("/setup/status").catch((e: unknown) => e);
+      const request = apiFetch("/setup/status");
+      expect(await settleOrPending(request)).toBe("rejected");
+      const err = await request.catch((e: unknown) => e);
 
       expect(err).toBeInstanceOf(ApiError);
-      expect((err as Error).message).toBe("Auth failure on /setup/status");
-      expect(location.href).toBe("");
+      expect((err as InstanceType<typeof ApiError>).status).toBe(401);
+      expect(location.navigations).toBe(0);
       expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBeNull();
     }
   );
@@ -246,37 +268,66 @@ describe("apiFetch errors and results", () => {
   });
 
   it("returns the parsed body and sends cookies and JSON headers", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ scenes: [1, 2] }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = stubFetch(200, { scenes: [1, 2] });
     const { apiPost } = await import("@/api/client");
 
     await expect(apiPost("/library/scenes", { page: 2 })).resolves.toEqual({
       scenes: [1, 2],
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/library/scenes",
-      expect.objectContaining({
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({ page: 2 }),
-        headers: { "Content-Type": "application/json" },
-      })
+    const [url, init] = must(fetchMock.mock.calls[0], "the fetch call");
+    expect(url).toBe("/api/library/scenes");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("include");
+    expect(init?.body).toBe(JSON.stringify({ page: 2 }));
+    expect(new Headers(init?.headers).get("Content-Type")).toBe(
+      "application/json"
     );
   });
 
-  it("uses the server's error message", async () => {
+  it("a caller's headers keep Content-Type", async () => {
+    const fetchMock = stubFetch(200, {});
+    const { apiFetch } = await import("@/api/client");
+
+    await apiFetch("/playlists", {
+      method: "POST",
+      body: "{}",
+      headers: { "X-Peek-Test": "1" },
+    });
+
+    const [, init] = must(fetchMock.mock.calls[0], "the fetch call");
+    const headers = new Headers(init?.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("X-Peek-Test")).toBe("1");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("include");
+  });
+
+  it("a caller's Content-Type replaces the default", async () => {
+    const fetchMock = stubFetch(200, {});
+    const { apiFetch } = await import("@/api/client");
+
+    await apiFetch("/import", {
+      method: "POST",
+      body: "x",
+      headers: new Headers({ "content-type": "text/plain" }),
+    });
+
+    const [, init] = must(fetchMock.mock.calls[0], "the fetch call");
+    expect(new Headers(init?.headers).get("Content-Type")).toBe("text/plain");
+  });
+
+  it("a 204 resolves undefined", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ error: "Bad filter" }),
-      })
+      vi.fn(() => Promise.resolve(new Response(null, { status: 204 })))
     );
+    const { apiDelete } = await import("@/api/client");
+
+    await expect(apiDelete("/playlists/7")).resolves.toBeUndefined();
+  });
+
+  it("uses the server's error message", async () => {
+    stubFetch(400, { error: "Bad filter" });
     const { apiFetch, ApiError } = await import("@/api/client");
 
     const err = await apiFetch("/library/scenes").catch((e: unknown) => e);
@@ -290,14 +341,7 @@ describe("apiFetch errors and results", () => {
   });
 
   it("falls back to the body's message field", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 409,
-        json: () => Promise.resolve({ message: "Already exists" }),
-      })
-    );
+    stubFetch(409, { message: "Already exists" });
     const { apiFetch } = await import("@/api/client");
 
     await expect(apiFetch("/playlists")).rejects.toThrow("Already exists");
@@ -306,11 +350,11 @@ describe("apiFetch errors and results", () => {
   it("names the status when the body is not JSON", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: () => Promise.reject(new SyntaxError("Unexpected token <")),
-      })
+      vi.fn(() =>
+        Promise.resolve(
+          new Response("<html>Bad Gateway</html>", { status: 502 })
+        )
+      )
     );
     const { apiFetch, ApiError } = await import("@/api/client");
 
@@ -322,14 +366,7 @@ describe("apiFetch errors and results", () => {
   });
 
   it("marks a 503 with ready false as still initializing", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-        json: () => Promise.resolve({ ready: false, message: "Cache warming" }),
-      })
-    );
+    stubFetch(503, { ready: false, message: "Cache warming" });
     const { apiFetch, ApiError } = await import("@/api/client");
 
     const err = await apiFetch("/library/scenes").catch((e: unknown) => e);
@@ -337,5 +374,124 @@ describe("apiFetch errors and results", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect((err as InstanceType<typeof ApiError>).isInitializing).toBe(true);
     expect((err as Error).message).toBe("Cache warming");
+  });
+
+  it("reads Retry-After into retryAfterSeconds", async () => {
+    stubFetch(
+      429,
+      { error: "Too many authentication attempts, please try again later" },
+      { "Retry-After": "840" }
+    );
+    const { apiFetch, ApiError } = await import("@/api/client");
+
+    const err = await apiFetch("/auth/forgot-password/init").catch(
+      (e: unknown) => e
+    );
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as InstanceType<typeof ApiError>).retryAfterSeconds).toBe(840);
+  });
+
+  it("takes the body's retryAfterSeconds when there is no header", async () => {
+    stubFetch(423, {
+      error: "Account temporarily locked due to too many failed attempts",
+      retryAfterSeconds: 30,
+    });
+    const { apiFetch, ApiError } = await import("@/api/client");
+
+    const err = await apiFetch("/auth/login").catch((e: unknown) => e);
+
+    expect((err as InstanceType<typeof ApiError>).retryAfterSeconds).toBe(30);
+  });
+
+  it("has no retryAfterSeconds without a header or body field", async () => {
+    stubFetch(400, { error: "Bad filter" });
+    const { apiFetch, ApiError } = await import("@/api/client");
+
+    const err = await apiFetch("/library/scenes").catch((e: unknown) => e);
+
+    expect(
+      (err as InstanceType<typeof ApiError>).retryAfterSeconds
+    ).toBeUndefined();
+  });
+});
+
+describe("getErrorMessage", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("is the server's message for an ApiError", async () => {
+    const { ApiError, getErrorMessage } = await import("@/api/client");
+
+    expect(
+      getErrorMessage(
+        new ApiError("Current password is incorrect", 400),
+        "Failed to change password"
+      )
+    ).toBe("Current password is incorrect");
+  });
+
+  it("adds the retry time to a 429", async () => {
+    const { ApiError, getErrorMessage } = await import("@/api/client");
+
+    expect(
+      getErrorMessage(
+        new ApiError(
+          "Too many authentication attempts, please try again later",
+          429,
+          {},
+          840
+        )
+      )
+    ).toBe(
+      "Too many authentication attempts, please try again later. Try again in 14 minutes."
+    );
+  });
+
+  it("adds the retry time to a 423, in seconds under a minute", async () => {
+    const { ApiError, getErrorMessage } = await import("@/api/client");
+
+    expect(
+      getErrorMessage(
+        new ApiError(
+          "Account temporarily locked due to too many failed attempts",
+          423,
+          {},
+          30
+        )
+      )
+    ).toBe(
+      "Account temporarily locked due to too many failed attempts. Try again in 30 seconds."
+    );
+    expect(getErrorMessage(new ApiError("Locked.", 423, {}, 61))).toBe(
+      "Locked. Try again in 2 minutes."
+    );
+    expect(getErrorMessage(new ApiError("Locked", 423, {}, 1))).toBe(
+      "Locked. Try again in 1 second."
+    );
+  });
+
+  it("adds no retry time to other statuses", async () => {
+    const { ApiError, getErrorMessage } = await import("@/api/client");
+
+    expect(
+      getErrorMessage(
+        new ApiError("The database is busy, try again", 503, {}, 1)
+      )
+    ).toBe("The database is busy, try again");
+  });
+
+  it("is an Error's message, else the fallback", async () => {
+    const { getErrorMessage } = await import("@/api/client");
+
+    expect(getErrorMessage(new Error("Failed to fetch"), "Fallback")).toBe(
+      "Failed to fetch"
+    );
+    expect(getErrorMessage(new Error(""), "Fallback")).toBe("Fallback");
+    expect(getErrorMessage("nope", "Fallback")).toBe("Fallback");
+    expect(getErrorMessage(undefined)).toBe(
+      "Something went wrong. Please try again."
+    );
   });
 });

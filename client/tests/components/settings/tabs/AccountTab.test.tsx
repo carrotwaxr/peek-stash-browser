@@ -1,23 +1,30 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getRecoveryKey, regenerateRecoveryKey } from "../../../../src/api";
+import * as api from "../../../../src/api";
 import AccountTab from "../../../../src/components/settings/tabs/AccountTab";
 import { showError, showSuccess } from "../../../../src/utils/toast";
 import { flushPromises } from "../../../testUtils";
 
-vi.mock("../../../../src/api", () => ({
-  getRecoveryKey: vi.fn(),
-  regenerateRecoveryKey: vi.fn(),
-  apiPost: vi.fn(),
-}));
+// The tab's API calls are stubbed per test; the rest of the module
+// (getErrorMessage, ApiError) is the real one
+vi.mock("../../../../src/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof api>();
+  return {
+    ...actual,
+    getRecoveryKey: vi.fn(),
+    regenerateRecoveryKey: vi.fn(),
+    apiPost: vi.fn(),
+  };
+});
 
 vi.mock("../../../../src/utils/toast", () => ({
   showError: vi.fn(),
   showSuccess: vi.fn(),
 }));
 
-const mockGetRecoveryKey = vi.mocked(getRecoveryKey);
-const mockRegenerateRecoveryKey = vi.mocked(regenerateRecoveryKey);
+const mockGetRecoveryKey = vi.mocked(api.getRecoveryKey);
+const mockRegenerateRecoveryKey = vi.mocked(api.regenerateRecoveryKey);
+const mockApiPost = vi.mocked(api.apiPost);
 
 const NEW_KEY = "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-3456";
 const KEY_PATTERN = /^([A-Z2-9]{4}-){6}[A-Z2-9]{4}$/;
@@ -86,6 +93,74 @@ describe("AccountTab recovery key", () => {
       expect(showError).toHaveBeenCalledWith("Current password is incorrect");
     });
     expect(screen.queryByText(KEY_PATTERN)).not.toBeInTheDocument();
+  });
+});
+
+describe("AccountTab change password", () => {
+  let navigations: number;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    sessionStorage.clear();
+    navigations = 0;
+    const location = { pathname: "/settings", search: "?tab=account" };
+    Object.defineProperty(location, "href", {
+      get: () => "/settings?tab=account",
+      set: () => {
+        navigations += 1;
+      },
+    });
+    Object.defineProperty(window, "location", {
+      value: location,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("a wrong current password shows the server's message and stays in Settings", async () => {
+    const actual = await vi.importActual<typeof api>("../../../../src/api");
+    mockApiPost.mockImplementation(actual.apiPost);
+    mockGetRecoveryKey.mockResolvedValue({ hasRecoveryKey: true });
+    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ error: "Current password is incorrect" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AccountTab />);
+
+    fireEvent.change(screen.getByLabelText("Current Password"), {
+      target: { value: "Wrong1pass" },
+    });
+    fireEvent.change(screen.getByLabelText("New Password"), {
+      target: { value: "NewPass123" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm New Password"), {
+      target: { value: "NewPass123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change Password" }));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith("Current password is incorrect");
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/user/change-password",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(navigations).toBe(0);
+    expect(showSuccess).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Current Password")).toHaveValue("Wrong1pass");
   });
 });
 
