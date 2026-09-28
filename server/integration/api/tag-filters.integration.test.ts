@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -302,44 +303,20 @@ describe("Tag Filters", () => {
     });
   });
 
-  describe("parent/child relationships", () => {
-    it("filters tags with child_count > 0", async () => {
-      const response = await adminClient.post<FindTagsResponse>(
-        "/api/library/tags",
-        {
+  describe("Stash tag filters Peek does not apply", () => {
+    // The request parser refuses them rather than ignore them: no builder
+    // counts a tag's parents or children
+    it.each(["child_count", "parent_count"])(
+      "%s answers 400 naming it",
+      async (field) => {
+        const response = await adminClient.post("/api/library/tags", {
           filter: { per_page: 100 },
-          tag_filter: {
-            child_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
+          tag_filter: { [field]: { value: 0, modifier: "GREATER_THAN" } },
+        });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findTags).toBeDefined();
-      // Filter should work - may return 0 results if no parent tags exist in test data
-    });
-
-    it("filters tags with parent_count > 0", async () => {
-      const response = await adminClient.post<FindTagsResponse>(
-        "/api/library/tags",
-        {
-          filter: { per_page: 100 },
-          tag_filter: {
-            parent_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findTags).toBeDefined();
-      // Filter should work - may return 0 results if no child tags exist in test data
-    });
+        expectRefused(response, [`tag_filter.${field}`]);
+      }
+    );
   });
 
   describe("sorting", () => {

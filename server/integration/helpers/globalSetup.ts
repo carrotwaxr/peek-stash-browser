@@ -109,6 +109,11 @@ export async function setup() {
   // Set test database URL
   process.env.DATABASE_URL = TEST_CONFIG.databaseUrl;
 
+  // Unknown list filter input answers 400 (the image ships drop), so client
+  // drift and a stale test fail the run. The server runs in this process and
+  // the test workers inherit it.
+  process.env.PEEK_FILTER_POLICY = "reject";
+
   // The server runs in this process. Files it writes under CONFIG_DIR, such
   // as the playlist zips the download tests start, go to a temp directory
   // that teardown removes, never to a real config directory.

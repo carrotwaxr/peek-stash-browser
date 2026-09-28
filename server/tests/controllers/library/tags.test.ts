@@ -4,7 +4,6 @@
  * Tests findTags, findTagsMinimal and findTagTree.
  */
 // --- Imports ---
-import type * as instanceAwareIdModule from "@peek/shared-types/instanceAwareId.js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findTagTree,
@@ -53,11 +52,6 @@ vi.mock("../../../utils/entityInstanceId.js", () => ({
     .mockImplementation((entities: unknown[]) => entities),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof instanceAwareIdModule>()),
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
   hydrateTagRelationships: vi
     .fn()
@@ -66,13 +60,6 @@ vi.mock("../../../utils/hierarchyUtils.js", () => ({
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
-    sortField: field,
-    randomSeed: undefined,
-  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -162,13 +149,13 @@ describe("Tags Controller", () => {
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
       const tags = [
-        createMockTag({ id: "t1", instanceId: "inst-a" }),
-        createMockTag({ id: "t1", instanceId: "inst-b" }),
+        createMockTag({ id: "101", instanceId: "inst-a" }),
+        createMockTag({ id: "101", instanceId: "inst-b" }),
       ];
       mockTagQueryBuilder.execute.mockResolvedValue({ tags, total: 2 });
 
       const req = reqFor(findTags, {
-        body: { ids: ["t1"], filter: {}, tag_filter: {} },
+        body: { ids: ["101"], filter: {}, tag_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findTags);
@@ -195,7 +182,7 @@ describe("Tags Controller", () => {
     });
 
     it("fetches detail counts for single-ID lookup", async () => {
-      const tag = createMockTag({ id: "t1", instanceId: "default" });
+      const tag = createMockTag({ id: "101", instanceId: "default" });
       mockTagQueryBuilder.execute.mockResolvedValue({
         tags: [tag],
         total: 1,
@@ -213,7 +200,7 @@ describe("Tags Controller", () => {
       mockStashEntityService.getAllTags.mockResolvedValue([tag]);
 
       const req = reqFor(findTags, {
-        body: { ids: ["t1"], filter: {}, tag_filter: {} },
+        body: { ids: ["101"], filter: {}, tag_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findTags);
@@ -222,7 +209,7 @@ describe("Tags Controller", () => {
 
       expect(res._getStatus()).toBe(200);
       expect(mockStashEntityService.getTag).toHaveBeenCalledWith(
-        "t1",
+        "101",
         "default"
       );
     });
@@ -231,7 +218,7 @@ describe("Tags Controller", () => {
       mockTagQueryBuilder.execute.mockResolvedValue({ tags: [], total: 0 });
 
       const req = reqFor(findTags, {
-        body: { ids: ["t1"], tag_filter: {} },
+        body: { ids: ["101"], tag_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findTags);

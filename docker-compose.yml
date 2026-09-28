@@ -11,6 +11,9 @@ services:
     environment:
       # Config directory location inside container
       - CONFIG_DIR=/app/data
+      # Unknown list filter input answers 400 (the image ships drop), so client
+      # drift shows on the dev stack
+      - PEEK_FILTER_POLICY=reject
     volumes:
       # Hot reloading - mount source code
       - ./server:/app/server

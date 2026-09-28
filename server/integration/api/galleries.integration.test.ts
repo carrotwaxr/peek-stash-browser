@@ -32,8 +32,7 @@ describe("Gallery API", () => {
       const response = await adminClient.post<FindGalleriesResponse>(
         "/api/library/galleries",
         {
-          page: 1,
-          per_page: 10,
+          filter: { page: 1, per_page: 10 },
         }
       );
 

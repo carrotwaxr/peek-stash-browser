@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -10,10 +11,10 @@ import { adminClient } from "../helpers/testClient.js";
  * - title filter (scenes, galleries, groups)
  * - name filter (performers, studios, tags)
  * - details filter (description/notes)
- * - url filter
- * - stash_id filter
  * - Query parameter (global search)
- * - String modifiers: EQUALS, NOT_EQUALS, INCLUDES, EXCLUDES, MATCHES_REGEX
+ * - String modifiers: EQUALS, NOT_EQUALS, INCLUDES, EXCLUDES, IS_NULL, NOT_NULL
+ * - Stash's url, aliases and stash_id filters and MATCHES_REGEX, which Peek
+ *   refuses (400)
  */
 
 interface FindScenesResponse {
@@ -142,24 +143,6 @@ describe("Text Search Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
-
-    it("filters by title MATCHES_REGEX", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            title: {
-              value: "^[A-Z].*",
-              modifier: "MATCHES_REGEX",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
   });
 
   describe("scene details filter", () => {
@@ -200,44 +183,6 @@ describe("Text Search Filters", () => {
     });
   });
 
-  describe("scene url filter", () => {
-    it("filters by url INCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            url: {
-              value: "http",
-              modifier: "INCLUDES",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters by url IS_NULL (no url)", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            url: {
-              value: "",
-              modifier: "IS_NULL",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-  });
-
   describe("performer name filter", () => {
     it("filters by name INCLUDES", async () => {
       const response = await adminClient.post<FindPerformersResponse>(
@@ -256,62 +201,6 @@ describe("Text Search Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
       expect(response.data.findPerformers.count).toBeGreaterThan(0);
-    });
-
-    it("filters by name MATCHES_REGEX", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
-          filter: { per_page: 50 },
-          performer_filter: {
-            name: {
-              value: "^[A-Z].*",
-              modifier: "MATCHES_REGEX",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
-    });
-  });
-
-  describe("performer aliases filter", () => {
-    it("filters by aliases INCLUDES", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
-          filter: { per_page: 50 },
-          performer_filter: {
-            aliases: {
-              value: "a",
-              modifier: "INCLUDES",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
-    });
-
-    it("filters by aliases NOT_NULL (has aliases)", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
-          filter: { per_page: 50 },
-          performer_filter: {
-            aliases: {
-              value: "",
-              modifier: "NOT_NULL",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
     });
   });
 
@@ -386,39 +275,54 @@ describe("Text Search Filters", () => {
     });
   });
 
-  describe("stash_id filter", () => {
-    it("filters scenes by stash_id NOT_NULL", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
+  describe("Stash text filters Peek does not apply", () => {
+    // The request parser refuses them rather than ignore them: no builder
+    // has a clause for these fields or for MATCHES_REGEX
+    it.each([
+      {
+        path: "scene_filter.title.modifier",
+        list: "scenes",
+        body: {
           scene_filter: {
-            stash_id_endpoint: {
-              modifier: "NOT_NULL",
-            },
+            title: { value: "^[A-Z].*", modifier: "MATCHES_REGEX" },
           },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters performers by stash_id NOT_NULL", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
-          filter: { per_page: 50 },
+        },
+      },
+      {
+        path: "scene_filter.url",
+        list: "scenes",
+        body: {
+          scene_filter: { url: { value: "http", modifier: "INCLUDES" } },
+        },
+      },
+      {
+        path: "scene_filter.stash_id_endpoint",
+        list: "scenes",
+        body: { scene_filter: { stash_id_endpoint: { modifier: "NOT_NULL" } } },
+      },
+      {
+        path: "performer_filter.name.modifier",
+        list: "performers",
+        body: {
           performer_filter: {
-            stash_id_endpoint: {
-              modifier: "NOT_NULL",
-            },
+            name: { value: "^[A-Z]", modifier: "MATCHES_REGEX" },
           },
-        }
-      );
+        },
+      },
+      {
+        path: "performer_filter.aliases",
+        list: "performers",
+        body: {
+          performer_filter: { aliases: { value: "a", modifier: "INCLUDES" } },
+        },
+      },
+    ])("$path answers 400 naming it", async ({ path, list, body }) => {
+      const response = await adminClient.post(`/api/library/${list}`, {
+        filter: { per_page: 50 },
+        ...body,
+      });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
+      expectRefused(response, [path]);
     });
   });
 

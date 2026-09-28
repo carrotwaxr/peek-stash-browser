@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -104,41 +105,18 @@ describe("Performer Age Filters", () => {
       expect(response.data.findPerformers).toBeDefined();
     });
 
-    it("filters performers with unknown age (IS_NULL)", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
+    it.each(["IS_NULL", "NOT_NULL"])(
+      "age %s is not a Peek filter: 400 naming the modifier",
+      async (modifier) => {
+        // Age is computed from the birthdate: filter on birthdate instead
+        const response = await adminClient.post("/api/library/performers", {
           filter: { per_page: 50 },
-          performer_filter: {
-            age: {
-              value: 0,
-              modifier: "IS_NULL",
-            },
-          },
-        }
-      );
+          performer_filter: { age: { value: 0, modifier } },
+        });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
-    });
-
-    it("filters performers with known age (NOT_NULL)", async () => {
-      const response = await adminClient.post<FindPerformersResponse>(
-        "/api/library/performers",
-        {
-          filter: { per_page: 50 },
-          performer_filter: {
-            age: {
-              value: 0,
-              modifier: "NOT_NULL",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findPerformers).toBeDefined();
-    });
+        expectRefused(response, ["performer_filter.age.modifier"]);
+      }
+    );
   });
 
   describe("birthdate filter", () => {

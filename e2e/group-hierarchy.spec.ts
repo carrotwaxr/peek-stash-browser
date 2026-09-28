@@ -36,7 +36,7 @@ test("G's page shows Part Of with P and Sub-Collections with C; G's card shows 1
   page,
 }) => {
   const listed = await page.request.post("/api/library/groups", {
-    data: { filter: { per_page: 500, sort: "name", direction: "ASC" } },
+    data: { filter: { per_page: 250, sort: "name", direction: "ASC" } },
   });
   expect(listed.ok(), await listed.text()).toBeTruthy();
   const rows = ((await listed.json()) as FindGroupsBody).findGroups.groups;

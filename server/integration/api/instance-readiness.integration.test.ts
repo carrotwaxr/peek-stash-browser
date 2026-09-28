@@ -95,14 +95,39 @@ async function loginCookie(
   return `token=${token}`;
 }
 
+/** A page holds at most this many rows */
+const PAGE = 250;
+
+/**
+ * Every scene in `client`'s scene list, page by page; the status and
+ * `ready` of the first answer that was not a page.
+ */
+async function scenesListedTo(
+  client: TestClient
+): Promise<{ status: number; ready: unknown; scenes: ListedScene[] }> {
+  const scenes: ListedScene[] = [];
+  for (let page = 1; page <= 100; page++) {
+    const res = await client.post<{
+      findScenes?: { count: number; scenes: ListedScene[] };
+      ready?: unknown;
+    }>("/api/library/scenes", { filter: { page, per_page: PAGE } });
+    const found = res.data.findScenes;
+    if (res.status !== 200 || found === undefined) {
+      return { status: res.status, ready: res.data.ready, scenes };
+    }
+    scenes.push(...found.scenes);
+    if (found.scenes.length < PAGE || scenes.length >= found.count) {
+      return { status: res.status, ready: res.data.ready, scenes };
+    }
+  }
+  throw new Error("More than 100 pages of scenes");
+}
+
 /** NEW's scene ids in `client`'s scene list. */
 async function newScenesListedTo(client: TestClient): Promise<string[]> {
-  const res = await client.post<{
-    findScenes: { count: number; scenes: ListedScene[] };
-  }>("/api/library/scenes", { filter: { per_page: 1000 } });
-  expect(res.status).toBe(200);
-  expect(res.data.findScenes.count).toBeLessThanOrEqual(1000);
-  return res.data.findScenes.scenes
+  const { status, scenes } = await scenesListedTo(client);
+  expect(status).toBe(200);
+  return scenes
     .filter((scene) => scene.instanceId === NEW)
     .map((scene) => scene.id)
     .sort();
@@ -425,11 +450,8 @@ describeReplay("an instance on its first sync", () => {
     });
     try {
       expect(disabled.status).toBe(200);
-      const res = await user.client.post<{
-        findScenes: { count: number; scenes: ListedScene[] };
-        ready?: unknown;
-      }>("/api/library/scenes", { filter: { per_page: 1000 } });
-      expect({ status: res.status, ready: res.data.ready }).toEqual({
+      const res = await scenesListedTo(user.client);
+      expect({ status: res.status, ready: res.ready }).toEqual({
         status: 200,
         ready: undefined,
       });
@@ -453,11 +475,8 @@ describeReplay("an instance on its first sync", () => {
 
       // Everything the admin sees (every enabled instance) but the user's
       // excluded scenes
-      const admin = await adminClient.post<{
-        findScenes: { count: number; scenes: ListedScene[] };
-      }>("/api/library/scenes", { filter: { per_page: 1000 } });
+      const admin = await scenesListedTo(adminClient);
       expect(admin.status).toBe(200);
-      expect(admin.data.findScenes.count).toBeLessThanOrEqual(1000);
       const rows = await prisma.userExcludedEntity.findMany({
         where: { userId: user.id, entityType: "scene" },
         select: { entityId: true, instanceId: true },
@@ -469,11 +488,11 @@ describeReplay("an instance on its first sync", () => {
             (row.instanceId === "" || row.instanceId === scene.instanceId)
         );
       const key = (scene: ListedScene) => `${scene.id}:${scene.instanceId}`;
-      const listed = res.data.findScenes.scenes.map(key).sort();
+      const listed = res.scenes.map(key).sort();
       expect(listed.some((k) => k.endsWith(`:${primaryId}`))).toBe(true);
       expect(listed.some((k) => k.endsWith(`:${NEW}`))).toBe(false);
       expect(listed).toEqual(
-        admin.data.findScenes.scenes
+        admin.scenes
           .filter((scene) => !isExcluded(scene))
           .map(key)
           .sort()

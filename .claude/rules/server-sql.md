@@ -24,7 +24,7 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 
 ## Filter values
 
-- Filter values arrive as `"id:instanceId"` strings, and `coerceEntityRefs` marks them as `InstanceAwareId`.
+- Filter values reach the builders through the request parser (`utils/listRequest.ts`) as `FilterRef` pairs; until each builder takes `ParsedListRequest` (C4 to C8), `utils/legacyFilter.ts` spells them back as `"id"`/`"id:instanceId"` strings, which `coerceEntityRefs` marks as `InstanceAwareId`.
 - `buildJunctionFilter` and `buildDirectFilter` match (id, instance) pairs only for values that carry an instance. A bare id matches that id on every instance, and two Stash servers reuse small ids all the time.
 - `parseCompositeFilterValues` returns the instance with each id. Several builders keep only `.id`, and the depth expansion in `hierarchyUtils.ts` works on bare ids, so those filters cross instances. New code keeps the instance through expansion.
 - A scene tag filter checks both the `SceneTag` junction and the `inheritedTagIds` JSON column through `json_each`.

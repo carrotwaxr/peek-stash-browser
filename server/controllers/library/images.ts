@@ -1,9 +1,7 @@
-import {
-  type ImageFilter,
-  imageQueryBuilder,
-} from "../../services/ImageQueryBuilder.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
+  AmbiguousLookupResponse,
   ApiErrorResponse,
   FindImagesRequest,
   FindImagesResponse,
@@ -12,6 +10,12 @@ import type {
   WithStashUrl,
 } from "../../types/api/index.js";
 import type { NormalizedImage } from "../../types/index.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -52,117 +56,20 @@ function transformImageResult(image: Record<string, any>): any {
  */
 export const findImages = async (
   req: TypedAuthRequest<FindImagesRequest>,
-  res: TypedResponse<FindImagesResponse | ApiErrorResponse>
+  res: TypedResponse<
+    FindImagesResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   const startTime = Date.now();
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("image", req.body, { userId: req.user.id });
+  logDropped("POST /library/images", request.dropped);
+
   try {
-    const userId = req.user?.id;
-    const { filter, image_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "title";
-    const sortDirection = filter?.direction || "ASC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
-
-    // Parse random_<seed> format
-    let randomSeed: number | undefined;
-    let sortField = sortFieldRaw;
-
-    if (sortFieldRaw.startsWith("random_")) {
-      const seedStr = sortFieldRaw.slice(7);
-      const parsedSeed = parseInt(seedStr, 10);
-      if (!isNaN(parsedSeed)) {
-        randomSeed = parsedSeed % 1e8;
-        sortField = "random";
-      }
-    } else if (sortFieldRaw === "random") {
-      randomSeed = (userId + Date.now()) % 1e8;
-    }
-
-    // Build filter object from request
-    const filters: ImageFilter = {};
-
-    if (searchQuery) {
-      filters.q = searchQuery;
-    }
-
-    // Support both top-level ids and image_filter.ids (like scenes controller)
-    if (ids && Array.isArray(ids) && ids.length > 0) {
-      filters.ids = { value: ids, modifier: "INCLUDES" };
-    } else if (image_filter?.ids?.value) {
-      filters.ids = {
-        value: image_filter.ids.value.map(String),
-        modifier: image_filter.ids.modifier || "INCLUDES",
-      };
-    }
-
-    if (image_filter?.favorite !== undefined) {
-      filters.favorite = image_filter.favorite;
-    }
-
-    // The builder reads these as sent, as before: ImageFilter types their
-    // modifier as always present, where a request may omit it
-    if (image_filter?.rating100) {
-      filters.rating100 = image_filter.rating100 as ImageFilter["rating100"];
-    }
-
-    if (image_filter?.o_counter) {
-      filters.o_counter = image_filter.o_counter as ImageFilter["o_counter"];
-    }
-
-    if (image_filter?.performers?.value) {
-      filters.performers = {
-        value: image_filter.performers.value.map(String),
-        modifier: image_filter.performers.modifier || "INCLUDES",
-      };
-    }
-
-    if (image_filter?.tags?.value) {
-      filters.tags = {
-        value: image_filter.tags.value.map(String),
-        modifier: image_filter.tags.modifier || "INCLUDES",
-      };
-    }
-
-    if (image_filter?.studios?.value) {
-      filters.studios = {
-        value: image_filter.studios.value.map(String),
-        modifier: image_filter.studios.modifier || "INCLUDES",
-      };
-    }
-
-    if (image_filter?.galleries?.value) {
-      filters.galleries = {
-        value: image_filter.galleries.value.map(String),
-        modifier: image_filter.galleries.modifier || "INCLUDES",
-      };
-    }
-
-    // Date filters
-    if (image_filter?.date) {
-      filters.date = {
-        value: image_filter.date.value,
-        value2: image_filter.date.value2,
-        modifier: image_filter.date.modifier || "GREATER_THAN",
-      };
-    }
-
-    if (image_filter?.created_at) {
-      filters.created_at = {
-        value: image_filter.created_at.value,
-        value2: image_filter.created_at.value2,
-        modifier: image_filter.created_at.modifier || "GREATER_THAN",
-      };
-    }
-
-    if (image_filter?.updated_at) {
-      filters.updated_at = {
-        value: image_filter.updated_at.value,
-        value2: image_filter.updated_at.value2,
-        modifier: image_filter.updated_at.modifier || "GREATER_THAN",
-      };
-    }
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A gallery or detail view asks for one image by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
     const applyExclusions = true;
@@ -170,18 +77,39 @@ export const findImages = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Execute query
+    // Execute query. The image builder reads the search text from its filter
     const result = await imageQueryBuilder.execute({
       userId,
-      filters,
+      filters: { ...toLegacyFilter("image", request.filter), q: request.q },
       applyExclusions,
       allowedInstanceIds,
-      sort: sortField,
-      sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
+      specificInstanceId,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      randomSeed,
+      randomSeed: request.sort.seed,
     });
+
+    // Check for ambiguous results on single-ID lookups
+    // This happens when the same ID exists in multiple Stash instances
+    if (lookup && !specificInstanceId && result.images.length > 1) {
+      logger.warn("Ambiguous image lookup", {
+        id: lookup.id,
+        matchCount: result.images.length,
+        instances: result.images.map((i) => i.instanceId),
+      });
+      res.status(400).json({
+        error: "Ambiguous lookup",
+        message: `Multiple images found with ID ${lookup.id}. Specify instance_id parameter.`,
+        matches: result.images.map((i) => ({
+          id: i.id,
+          title: i.title,
+          instanceId: i.instanceId,
+        })),
+      });
+      return;
+    }
 
     // Transform and add stashUrl to each image
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- transformImageResult intentionally returns any (dynamic DB row transformer)

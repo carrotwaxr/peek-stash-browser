@@ -8,8 +8,11 @@
  * Unknown or invalid input follows `PEEK_FILTER_POLICY`: `reject` answers
  * 400 with one issue per problem; `drop` (the default for this release)
  * ignores it and returns a record for `logDropped`. A body that is not an
- * object is a 400 in both. Stored carousel rules always parse leniently: the
- * user cannot fix them by resending.
+ * object, and a bad id or instance naming what a request looks up (`ids`,
+ * `instance_id`, a clip's `sceneId` and `instanceId`), are a 400 in both:
+ * ignoring those would answer a detail page with the whole list. Stored
+ * carousel rules always parse leniently: the user cannot fix them by
+ * resending.
  */
 import {
   CLIP_PARAMS,
@@ -53,6 +56,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
   ParsedMinimalRequest,
+  ParsedSceneClipsQuery,
   ParsedSort,
   RefCriterion,
   TextCriterion,
@@ -66,7 +70,7 @@ const PER_PAGE_DEFAULT = 40;
 const CLIP_PER_PAGE_DEFAULT = 24;
 const MINIMAL_PER_PAGE_DEFAULT = 50;
 const Q_MAX_LENGTH = 200;
-/** A random seed is reduced to this, as `parseRandomSort` did */
+/** A random seed is reduced to this, as the list controllers always did */
 const SEED_MODULUS = 1e8;
 /** Stash ids are integers */
 const ID_PATTERN = /^\d{1,20}$/;
@@ -131,9 +135,20 @@ class Problems {
     }
   }
 
-  finish(policy: FilterPolicy): DroppedInput[] {
+  /**
+   * Throws in reject mode, and in drop mode too when a problem is at one of
+   * the `lookupKeys` (or under it): the ids or instance naming what the
+   * request looks up. Dropping one would widen a detail page's lookup to the
+   * whole list, where the builders matched nothing before the parser.
+   */
+  finish(
+    policy: FilterPolicy,
+    lookupKeys: readonly string[] = []
+  ): DroppedInput[] {
     if (this.issues.length === 0) return [];
-    if (policy === "reject") {
+    const atLookupKey = ({ path }: ApiErrorIssue) =>
+      lookupKeys.some((key) => path === key || path.startsWith(`${key}.`));
+    if (policy === "reject" || this.issues.some(atLookupKey)) {
       throw new ValidationError("Invalid request", { issues: this.issues });
     }
     return this.issues.map(({ path, message }) => ({ path, reason: message }));
@@ -370,6 +385,11 @@ type RangeCriterion<V> =
   | { readonly modifier: RangeModifier; readonly value: V; readonly value2: V }
   | { readonly modifier: PresenceModifier };
 
+/** Stash's criterion inputs require a value, so its callers send "" for none */
+function blankAsNull(value: unknown): unknown {
+  return value === "" ? null : value;
+}
+
 /** A number or date criterion: BETWEEN and NOT_BETWEEN need value2, IS_NULL and NOT_NULL no value */
 function rangeSchema<V extends number | string>(
   spec: NumberSpec | DateSpec,
@@ -378,8 +398,8 @@ function rangeSchema<V extends number | string>(
   return z
     .strictObject({
       modifier: z.enum(spec.modifiers).nullish(),
-      value: valueSchema.nullish(),
-      value2: valueSchema.nullish(),
+      value: z.preprocess(blankAsNull, valueSchema.nullish()),
+      value2: z.preprocess(blankAsNull, valueSchema.nullish()),
     })
     .transform((c, ctx): RangeCriterion<V> => {
       const modifier = c.modifier ?? spec.defaultModifier;
@@ -749,8 +769,25 @@ export function parseListRequest<E extends EntityKind>(
     // The one boundary cast: each criterion was validated by its field's schema
     filter: fields.criteria as ParsedFilter<E>,
     specificInstanceId: fields.specificInstanceId,
-    dropped: problems.finish(policy),
+    dropped: problems.finish(policy, [
+      "ids",
+      `${filterKey}.ids`,
+      `${filterKey}.instance_id`,
+    ]),
   };
+}
+
+/**
+ * The one entity a by-id lookup names (a detail page's request): the ref of
+ * an INCLUDES `ids` criterion with exactly one value. A bare ref can match
+ * that id on several instances, which the list controllers answer with the
+ * ambiguous-lookup 400 unless `instance_id` names one.
+ */
+export function singleIdRef(
+  ids: RefCriterion | undefined
+): FilterRef | undefined {
+  if (ids?.modifier !== "INCLUDES" || ids.refs.length !== 1) return undefined;
+  return ids.refs[0];
 }
 
 /**
@@ -815,6 +852,19 @@ function queryString(
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw === "string") return raw;
   problems.add(path, "Expected one value");
+  return undefined;
+}
+
+/** "true" or "false" as a query value; absent when missing or invalid */
+function parseBooleanText(
+  raw: unknown,
+  path: string,
+  problems: Problems
+): boolean | undefined {
+  const text = queryString(raw, path, problems);
+  if (text === undefined) return undefined;
+  if (text === "true" || text === "false") return text === "true";
+  problems.add(path, "Expected true or false");
   return undefined;
 }
 
@@ -902,11 +952,7 @@ export function parseClipQuery(
         break;
       case "boolean":
         handlers.set(key, (raw, path) => {
-          const text = queryString(raw, path, problems);
-          if (text === undefined) return;
-          if (text === "true" || text === "false")
-            isGenerated = text === "true";
-          else problems.add(path, "Expected true or false");
+          isGenerated = parseBooleanText(raw, path, problems) ?? isGenerated;
         });
         break;
       case "ref":
@@ -936,7 +982,52 @@ export function parseClipQuery(
     sort: resolveSort("clip", sortField, state.direction, options.userId),
     filter,
     specificInstanceId,
-    dropped: problems.finish(policy),
+    dropped: problems.finish(policy, ["sceneId", "instanceId"]),
+  };
+}
+
+/** A path parameter holding a Stash id: a 400 in both policies otherwise */
+export function parseStashId(raw: unknown, path: string): string {
+  if (typeof raw === "string" && ID_PATTERN.test(raw)) return raw;
+  throw new ValidationError("Invalid request", {
+    issues: [{ path, message: "Expected an id" }],
+  });
+}
+
+/** `GET /api/scenes/:id/clips`: the scene, its instance, and whether clips without a preview come too */
+export function parseSceneClipsRequest(
+  sceneId: unknown,
+  query: unknown,
+  options: ParseOptions
+): ParsedSceneClipsQuery {
+  const policy = options.policy ?? filterPolicy();
+  const id = parseStashId(sceneId, "id");
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let includeUngenerated: boolean | undefined;
+  let specificInstanceId: string | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    [
+      "includeUngenerated",
+      (raw, path) => {
+        includeUngenerated = parseBooleanText(raw, path, problems);
+      },
+    ],
+    [
+      "instanceId",
+      (raw, path) => {
+        specificInstanceId = parseInstanceId(raw, path, problems);
+      },
+    ],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+
+  return {
+    sceneId: id,
+    includeUngenerated: includeUngenerated ?? false,
+    specificInstanceId,
+    dropped: problems.finish(policy, ["instanceId"]),
   };
 }
 

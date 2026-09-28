@@ -29,18 +29,10 @@ describe("Tag Parent Name Hydration", () => {
   });
 
   it("hydrates parent tag names (not empty strings) in list view", async () => {
-    // Find tags that have parents
+    // Every tag; some have parents
     const response = await adminClient.post<FindTagsResponse>(
       "/api/library/tags",
-      {
-        filter: { per_page: 100 },
-        tag_filter: {
-          parent_count: {
-            value: 0,
-            modifier: "GREATER_THAN",
-          },
-        },
-      }
+      { filter: { per_page: 250 } }
     );
 
     expect(response.ok).toBe(true);
@@ -70,15 +62,7 @@ describe("Tag Parent Name Hydration", () => {
     // First find a tag that has parents
     const listResponse = await adminClient.post<FindTagsResponse>(
       "/api/library/tags",
-      {
-        filter: { per_page: 100 },
-        tag_filter: {
-          parent_count: {
-            value: 0,
-            modifier: "GREATER_THAN",
-          },
-        },
-      }
+      { filter: { per_page: 250 } }
     );
 
     expect(listResponse.ok).toBe(true);

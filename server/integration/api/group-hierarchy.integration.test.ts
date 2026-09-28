@@ -85,7 +85,7 @@ async function list(
   groupFilter: Record<string, unknown> = {}
 ): Promise<GroupRow[]> {
   const res = await client.post<FindGroupsResponse>("/api/library/groups", {
-    filter: { page: 1, per_page: 500, sort: "name", direction: "ASC" },
+    filter: { page: 1, per_page: 250, sort: "name", direction: "ASC" },
     group_filter: groupFilter,
   });
   expect(res.status).toBe(200);

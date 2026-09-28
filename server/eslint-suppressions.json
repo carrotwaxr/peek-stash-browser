@@ -38,34 +38,26 @@
   },
   "controllers/library/galleries.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 10
+      "count": 5
     }
   },
   "controllers/library/groups.ts": {
+    "@typescript-eslint/no-unnecessary-condition": {
+      "count": 1
+    },
+    "@typescript-eslint/prefer-nullish-coalescing": {
+      "count": 1
+    }
+  },
+  "controllers/library/performers.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 6
-    }
-  },
-  "controllers/library/images.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 13
-    }
-  },
-  "controllers/library/performers.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 11
     }
   },
   "controllers/library/scenes.ts": {
@@ -73,23 +65,23 @@
       "count": 6
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
+      "count": 1
     }
   },
   "controllers/library/studios.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
+      "count": 7
     }
   },
   "controllers/library/tags.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
+      "count": 7
     }
   },
   "controllers/playlist.ts": {

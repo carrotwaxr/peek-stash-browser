@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
@@ -14,13 +13,15 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type {
-  NormalizedGallery,
-  PeekGalleryFilter,
-} from "../../types/index.js";
+import type { NormalizedGallery } from "../../types/index.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -62,40 +63,21 @@ export const findGalleries = async (
     FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("gallery", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/galleries", request.dropped);
+
   try {
     const startTime = Date.now();
-    const userId = req.user?.id;
-    const { filter, gallery_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "title";
-    const sortDirection = filter?.direction || "ASC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its gallery by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
-    const requestingUser = req.user;
     const applyExclusions = true;
-
-    // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(
-      sortFieldRaw,
-      requestingUser.id
-    );
-
-    // Merge root-level ids with gallery_filter. The builder reads the
-    // filter as sent, as before: PeekGalleryFilter types its criteria as
-    // Stash's, which always name a modifier, where a request may omit it
-    const normalizedIds = ids
-      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
-      : gallery_filter?.ids;
-    const mergedFilter = {
-      ...gallery_filter,
-      ids: normalizedIds,
-    } as PeekGalleryFilter & Record<string, unknown>;
-
-    // Extract specific instance ID for disambiguation (from gallery_filter.instance_id)
-    const specificInstanceId = gallery_filter?.instance_id;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -103,33 +85,28 @@ export const findGalleries = async (
     // Use SQL-native query builder
     const { galleries, total } = await galleryQueryBuilder.execute({
       userId,
-      filters: mergedFilter,
+      filters: toLegacyFilter("gallery", request.filter),
       applyExclusions,
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      searchQuery,
-      randomSeed,
+      searchQuery: request.q,
+      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups
-    if (
-      ids &&
-      ids.length === 1 &&
-      !specificInstanceId &&
-      galleries.length > 1
-    ) {
+    if (lookup && !specificInstanceId && galleries.length > 1) {
       logger.warn("Ambiguous gallery lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: galleries.length,
         instances: galleries.map((g) => g.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple galleries found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple galleries found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: galleries.map((g) => ({
           id: g.id,
           title: g.title,
@@ -141,11 +118,11 @@ export const findGalleries = async (
 
     // For single-entity requests (detail pages), get gallery with computed counts
     let paginatedGalleries = galleries;
-    if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
+    if (lookup && paginatedGalleries.length === 1) {
       const existingGallery =
         paginatedGalleries[0] as (typeof paginatedGalleries)[number];
       const galleryWithCounts = await stashEntityService.getGallery(
-        ids[0] as string,
+        existingGallery.id,
         existingGallery.instanceId
       );
       if (galleryWithCounts) {

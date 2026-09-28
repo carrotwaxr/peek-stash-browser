@@ -31,7 +31,9 @@ test("a scene below 720p gets proxied stream paths without HD tiers and its firs
   const found = await page.request.post("/api/library/scenes", {
     data: {
       filter: { per_page: 1 },
-      scene_filter: { resolution: { value: "720p", modifier: "LESS_THAN" } },
+      scene_filter: {
+        resolution: { value: "STANDARD_HD", modifier: "LESS_THAN" },
+      },
     },
   });
   expect(found.ok(), await found.text()).toBeTruthy();

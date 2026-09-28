@@ -48,8 +48,7 @@ describe("Tag API", () => {
       const response = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
         {
-          page: 1,
-          per_page: 10,
+          filter: { page: 1, per_page: 10 },
         }
       );
 
@@ -198,28 +197,16 @@ describe("Tag API", () => {
       // Get admin tag count
       const adminResponse = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
-        {
-          filter: {
-            per_page: -1,
-            sort: "name",
-            direction: "ASC",
-          },
-        }
+        { filter: { sort: "name", direction: "ASC" } }
       );
 
       expect(adminResponse.ok).toBe(true);
       const adminTagCount = adminResponse.data.findTags.count;
 
-      // Get non-admin tag count (same query as folder view uses)
+      // Get non-admin tag count
       const userResponse = await testUserClient.post<FindTagsResponse>(
         "/api/library/tags",
-        {
-          filter: {
-            per_page: -1,
-            sort: "name",
-            direction: "ASC",
-          },
-        }
+        { filter: { sort: "name", direction: "ASC" } }
       );
 
       expect(userResponse.ok).toBe(true);

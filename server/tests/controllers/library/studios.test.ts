@@ -45,10 +45,6 @@ vi.mock("../../../utils/entityInstanceId.js", () => ({
     .mockImplementation((entities: unknown[]) => entities),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
   hydrateStudioRelationships: vi
     .fn()
@@ -57,13 +53,6 @@ vi.mock("../../../utils/hierarchyUtils.js", () => ({
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
-    sortField: field,
-    randomSeed: undefined,
-  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -159,8 +148,8 @@ describe("Studios Controller", () => {
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
       const studios = [
-        createMockStudio({ id: "s1", instanceId: "inst-a" }),
-        createMockStudio({ id: "s1", instanceId: "inst-b" }),
+        createMockStudio({ id: "101", instanceId: "inst-a" }),
+        createMockStudio({ id: "101", instanceId: "inst-b" }),
       ];
       mockStudioQueryBuilder.execute.mockResolvedValue({
         studios,
@@ -168,7 +157,7 @@ describe("Studios Controller", () => {
       });
 
       const req = reqFor(findStudios, {
-        body: { ids: ["s1"], filter: {}, studio_filter: {} },
+        body: { ids: ["101"], filter: {}, studio_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findStudios);
@@ -195,7 +184,7 @@ describe("Studios Controller", () => {
     });
 
     it("fetches detail counts for single-ID lookup", async () => {
-      const studio = createMockStudio({ id: "s1", instanceId: "default" });
+      const studio = createMockStudio({ id: "101", instanceId: "default" });
       mockStudioQueryBuilder.execute.mockResolvedValue({
         studios: [studio],
         total: 1,
@@ -211,7 +200,7 @@ describe("Studios Controller", () => {
       mockStashEntityService.getAllStudios.mockResolvedValue([studio]);
 
       const req = reqFor(findStudios, {
-        body: { ids: ["s1"], filter: {}, studio_filter: {} },
+        body: { ids: ["101"], filter: {}, studio_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findStudios);
@@ -220,7 +209,7 @@ describe("Studios Controller", () => {
 
       expect(res._getStatus()).toBe(200);
       expect(mockStashEntityService.getStudio).toHaveBeenCalledWith(
-        "s1",
+        "101",
         "default"
       );
     });

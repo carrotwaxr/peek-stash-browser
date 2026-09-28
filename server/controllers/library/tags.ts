@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { z } from "zod";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -18,13 +17,18 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import type { NormalizedTag } from "../../types/index.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
-import { parseFilterRef } from "../../utils/listRequest.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseFilterRef,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -36,70 +40,47 @@ export const findTags = async (
     FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("tag", req.body, { userId: req.user.id });
+  logDropped("POST /library/tags", request.dropped);
+
   try {
     const startTime = Date.now();
-    const userId = req.user?.id;
-    const requestingUser = req.user;
-    const { filter, tag_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
-      | "ASC"
-      | "DESC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
-
-    // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(
-      sortFieldRaw,
-      requestingUser.id
-    );
-
-    // Merge root-level ids with tag_filter. The builder reads the
-    // filter as sent, as before: PeekTagFilter types its criteria as
-    // Stash's, which always name a modifier, where a request may omit it
-    const normalizedIds = ids
-      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
-      : tag_filter?.ids;
-    const mergedFilter = {
-      ...tag_filter,
-      ids: normalizedIds,
-    } as PeekTagFilter;
-
-    // Extract specific instance ID for disambiguation (from tag_filter.instance_id)
-    const specificInstanceId = tag_filter?.instance_id;
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its tag by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
     const { tags, total } = await tagQueryBuilder.execute({
       userId,
-      filters: mergedFilter,
+      filters: toLegacyFilter("tag", request.filter),
       // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
       // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.
       applyExclusions: true,
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      searchQuery,
-      randomSeed,
+      searchQuery: request.q,
+      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (ids && ids.length === 1 && !specificInstanceId && tags.length > 1) {
+    if (lookup && !specificInstanceId && tags.length > 1) {
       logger.warn("Ambiguous tag lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: tags.length,
         instances: tags.map((t) => t.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple tags found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple tags found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: tags.map((t) => ({
           id: t.id,
           name: t.name,
@@ -111,10 +92,10 @@ export const findTags = async (
 
     // For single-entity requests (detail pages), get tag with computed counts
     let resultTags = tags;
-    if (ids && ids.length === 1 && resultTags.length === 1) {
+    if (lookup && resultTags.length === 1) {
       const firstTag = resultTags[0] as (typeof resultTags)[number];
       const tagWithCounts = await stashEntityService.getTag(
-        ids[0] as string,
+        firstTag.id,
         firstTag.instanceId
       );
       if (tagWithCounts) {
@@ -147,7 +128,7 @@ export const findTags = async (
     // Hydrate parent/child relationships with names
     // For single-tag requests (detail pages), we need all tags for accurate parent/child lookup
     let hydratedTags: NormalizedTag[];
-    if (ids && ids.length === 1) {
+    if (lookup) {
       // Get all tags for hierarchy lookup, then hydrate
       const allTags = await stashEntityService.getAllTags();
       const allHydrated = await hydrateTagRelationships(allTags);

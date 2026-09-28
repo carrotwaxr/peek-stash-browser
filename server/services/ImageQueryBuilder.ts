@@ -32,6 +32,7 @@ export interface ImageQueryOptions {
   filters?: ImageFilter;
   applyExclusions?: boolean; // Default true - use pre-computed exclusions
   allowedInstanceIds?: string[]; // Multi-instance support
+  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
@@ -499,6 +500,7 @@ class ImageQueryBuilder {
       perPage,
       applyExclusions = true,
       allowedInstanceIds,
+      specificInstanceId,
       filters,
     } = options;
 
@@ -512,6 +514,14 @@ class ImageQueryBuilder {
     const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
     if (instanceFilter.sql) {
       whereClauses.push(instanceFilter);
+    }
+
+    // Specific instance filter (for disambiguation on detail pages)
+    if (specificInstanceId) {
+      whereClauses.push({
+        sql: "i.stashInstanceId = ?",
+        params: [specificInstanceId],
+      });
     }
 
     // Add user data filters

@@ -30,7 +30,12 @@ import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
 import { logger } from "../../../utils/logger.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { objectContaining } from "../../helpers/matchers.js";
 import {
   createMockPerformer,
@@ -163,10 +168,6 @@ vi.mock("../../../utils/logger.js", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
-}));
-
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
@@ -632,6 +633,41 @@ describe("findScenes", () => {
 
     expect(res._getStatus()).toBe(500);
     expect(res._getBody()).toMatchObject({ error: "Failed to find scenes" });
+  });
+
+  describe("with PEEK_FILTER_POLICY=drop", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("an unknown key is logged once and the request succeeds", async () => {
+      vi.stubEnv("PEEK_FILTER_POLICY", "drop");
+      mockSceneQueryBuilder.execute.mockResolvedValue({
+        scenes: [createMockScene({ id: "s1" })],
+        total: 1,
+      });
+      const body = malformed({
+        filter: { page: 1 },
+        scene_filter: { b7_not_a_field: { value: 1 } },
+      });
+
+      for (const attempt of [1, 2]) {
+        const req = reqFor(findScenes, { body, user: testUser() });
+        const res = resFor(findScenes);
+        await findScenes(req, res);
+        expect(res._getStatus(), `request ${attempt}`).toBe(200);
+        expect(res._getOkBody().findScenes.count).toBe(1);
+      }
+
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "Unknown filter input ignored",
+        objectContaining({
+          route: "POST /library/scenes",
+          path: "scene_filter.b7_not_a_field",
+        })
+      );
+    });
   });
 
   describe("with USE_SQL_QUERY_BUILDER=false", () => {

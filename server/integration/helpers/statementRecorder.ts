@@ -1,7 +1,7 @@
 /**
- * Records the statements code sends while it runs, on the main Prisma client
- * and on the clients of the interactive transactions it opens, with how many
- * were in flight at once.
+ * Records the statements code sends while it runs, with their parameters, on
+ * the main Prisma client and on the clients of the interactive transactions it
+ * opens, with how many were in flight at once.
  *
  * `vi.spyOn` cannot wrap Prisma's client proxy (it finds no property
  * descriptor and installs a stub that swallows the call), so the wrappers go
@@ -22,6 +22,8 @@ import prisma from "../../prisma/singleton.js";
 /** One statement: its SQL, or `<model>.<method>` for a model call. */
 export interface RecordedStatement {
   sql: string;
+  /** A raw statement's bound parameters; a model call's arguments */
+  params: readonly unknown[];
   /** Sent on an interactive transaction's client */
   inTransaction: boolean;
 }
@@ -77,10 +79,11 @@ export function recordStatements(
 
   const track = async (
     sql: string,
+    params: readonly unknown[],
     inTransaction: boolean,
     run: () => unknown
   ): Promise<unknown> => {
-    statements.push({ sql, inTransaction });
+    statements.push({ sql, params, inTransaction });
     inFlight++;
     maxInFlight = Math.max(maxInFlight, inFlight);
     try {
@@ -90,18 +93,25 @@ export function recordStatements(
     }
   };
 
-  /** A wrapper recording each call of `method`, run with the caller's `this`. */
+  /**
+   * A wrapper recording each call of `method`, run with the caller's `this`.
+   * `raw`: the first argument is the SQL and the rest its parameters.
+   */
   const recording = (
     name: (sql: unknown) => string,
     method: unknown,
-    inTransaction: (self: unknown) => boolean
+    inTransaction: (self: unknown) => boolean,
+    raw: boolean
   ) =>
     function (this: unknown, ...args: unknown[]): Promise<unknown> {
       if (typeof method !== "function") {
         return Promise.reject(new Error("not a method"));
       }
-      return track(name(args[0]), inTransaction(this), () =>
-        Reflect.apply(method, this, args)
+      return track(
+        name(args[0]),
+        raw ? args.slice(1) : args,
+        inTransaction(this),
+        () => Reflect.apply(method, this, args)
       );
     };
 
@@ -116,7 +126,8 @@ export function recordStatements(
       recording(
         (sql) => String(sql),
         original,
-        (self) => self !== prisma
+        (self) => self !== prisma,
+        true
       )
     );
     restores.push(() => Reflect.set(prisma, name, original));
@@ -133,7 +144,8 @@ export function recordStatements(
         recording(
           () => `${model}.${method}`,
           original,
-          () => false
+          () => false,
+          false
         )
       );
       restores.push(() => Reflect.set(delegate, method, original));
@@ -162,7 +174,8 @@ export function recordStatements(
               ? recording(
                   () => `${String(prop)}.${method}`,
                   original,
-                  () => true
+                  () => true,
+                  false
                 ).bind(delegate)
               : original;
           },
