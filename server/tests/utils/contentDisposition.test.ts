@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attachmentContentDisposition,
   safeFileName,
+  uniqueFileName,
 } from "../../utils/contentDisposition.js";
 
 describe("safeFileName", () => {
@@ -17,6 +18,66 @@ describe("safeFileName", () => {
 
   it("trims surrounding whitespace", () => {
     expect(safeFileName("  Test File  ")).toBe("Test File");
+  });
+
+  it("strips control characters, CR and LF included", () => {
+    expect(safeFileName("a\r\nb\tc\u0000d\u001f\u007fe\u0085f")).toBe("abcdef");
+  });
+
+  it("trims dots and spaces at both ends", () => {
+    expect(safeFileName(" .hidden ")).toBe("hidden");
+    expect(safeFileName("Wait for it...")).toBe("Wait for it");
+    expect(safeFileName("Title. ")).toBe("Title");
+    expect(safeFileName("v1.2 final")).toBe("v1.2 final");
+  });
+
+  it("names '.', '..' and a name of only dots and spaces download", () => {
+    for (const name of [".", "..", "...", " . . ", "\r\n"]) {
+      expect(safeFileName(name)).toBe("download");
+    }
+  });
+
+  it("never leaves a path that climbs out of its folder", () => {
+    expect(safeFileName("../../etc/passwd")).toBe("_.._etc_passwd");
+    expect(safeFileName("..\\..\\x")).toBe("_.._x");
+  });
+
+  it("prefixes Windows device names with _, with or without an extension", () => {
+    expect(safeFileName("CON")).toBe("_CON");
+    expect(safeFileName("nul")).toBe("_nul");
+    expect(safeFileName("Aux ")).toBe("_Aux");
+    expect(safeFileName("com1")).toBe("_com1");
+    expect(safeFileName("LPT9.part")).toBe("_LPT9.part");
+    expect(safeFileName("PRN .x")).toBe("_PRN .x");
+    expect(safeFileName("CONSOLE")).toBe("CONSOLE");
+    expect(safeFileName("Con Air")).toBe("Con Air");
+    expect(safeFileName("COM10")).toBe("COM10");
+  });
+
+  it("caps a name at 200 UTF-8 bytes without splitting a character", () => {
+    expect(safeFileName("a".repeat(300))).toBe("a".repeat(200));
+    // é is 2 bytes, 🎬 is 4 (a surrogate pair in JS)
+    expect(safeFileName("é".repeat(150))).toBe("é".repeat(100));
+    expect(safeFileName("a" + "🎬".repeat(60))).toBe("a" + "🎬".repeat(49));
+    // A cut that ends on a space or dot is trimmed again
+    expect(safeFileName("a".repeat(199) + " b")).toBe("a".repeat(199));
+  });
+});
+
+describe("uniqueFileName", () => {
+  it("keeps the first name and numbers later ones that match it, ignoring case", () => {
+    const taken = new Set<string>();
+    expect(uniqueFileName("Scene", taken)).toBe("Scene");
+    expect(uniqueFileName("scene", taken)).toBe("scene (2)");
+    expect(uniqueFileName("Scene", taken)).toBe("Scene (3)");
+    expect(uniqueFileName("Other", taken)).toBe("Other");
+  });
+
+  it("skips a numbered name another entry already has", () => {
+    const taken = new Set<string>();
+    expect(uniqueFileName("Scene (2)", taken)).toBe("Scene (2)");
+    expect(uniqueFileName("Scene", taken)).toBe("Scene");
+    expect(uniqueFileName("Scene", taken)).toBe("Scene (3)");
   });
 });
 

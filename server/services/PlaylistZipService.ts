@@ -5,7 +5,7 @@ import { Readable } from "stream";
 import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
 import { getConfigDir } from "../utils/configDir.js";
-import { safeFileName } from "../utils/contentDisposition.js";
+import { safeFileName, uniqueFileName } from "../utils/contentDisposition.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { downloadService } from "./DownloadService.js";
@@ -31,7 +31,9 @@ export class PlaylistZipService {
   }
 
   /**
-   * Generate M3U playlist content
+   * M3U playlist content: one #EXTINF line and one file line per item. A
+   * line break in a title becomes a space, and a file line that would start
+   * with "#" (a comment to players) is written as "./#...".
    */
   private generateM3U(
     items: Array<{ title: string; duration: number | null; fileName: string }>
@@ -40,8 +42,12 @@ export class PlaylistZipService {
 
     for (const item of items) {
       const duration = item.duration ?? -1;
-      content += `#EXTINF:${duration},${item.title}\n`;
-      content += `${item.fileName}\n`;
+      const title = item.title.replace(/[\r\n]+/g, " ");
+      const file = item.fileName.startsWith("#")
+        ? `./${item.fileName}`
+        : item.fileName;
+      content += `#EXTINF:${duration},${title}\n`;
+      content += `${file}\n`;
     }
 
     return content;
@@ -114,6 +120,8 @@ export class PlaylistZipService {
       duration: number | null;
       fileName: string;
     }> = [];
+    // Each scene's file names, so two same-title scenes get two entries
+    const takenNames = new Set<string>();
 
     try {
       // Pipe archive to file
@@ -172,7 +180,10 @@ export class PlaylistZipService {
         }
 
         const sceneTitle = scene.title || scene.id;
-        const sanitizedTitle = safeFileName(sceneTitle);
+        const sanitizedTitle = uniqueFileName(
+          safeFileName(sceneTitle),
+          takenNames
+        );
         const videoFileName = `${sanitizedTitle}.mp4`;
         const nfoFileName = `${sanitizedTitle}.nfo`;
 

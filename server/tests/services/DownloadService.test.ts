@@ -199,6 +199,66 @@ describe("DownloadService", () => {
     });
   });
 
+  describe("the file name a download is created with", () => {
+    function createdFileName(): string {
+      return must(vi.mocked(prisma, true).download.create.mock.calls[0])[0].data
+        .fileName;
+    }
+
+    beforeEach(() => {
+      vi.mocked(prisma.download.create).mockResolvedValue(downloadRow());
+    });
+
+    it("a scene is named by its title made safe", async () => {
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
+        partialRow({ id: "s1", title: 'Who? What: "This"/That.\n' })
+      );
+
+      await service.createSceneDownload(1, "s1", "inst-a");
+
+      expect(createdFileName()).toBe("Who_ What_ _This__That.mp4");
+    });
+
+    it("a scene without a title is named by its file, then by its id", async () => {
+      vi.mocked(prisma.stashScene.findFirst)
+        .mockResolvedValueOnce(
+          partialRow({ id: "s1", title: "", filePath: "/media/My Clip.v2.mkv" })
+        )
+        .mockResolvedValueOnce(
+          partialRow({ id: "s2", title: null, filePath: null })
+        );
+
+      await service.createSceneDownload(1, "s1", "inst-a");
+      await service.createSceneDownload(1, "s2", "inst-a");
+
+      expect(
+        vi
+          .mocked(prisma.download.create)
+          .mock.calls.map(([args]) => args.data.fileName)
+      ).toEqual(["My Clip.v2.mp4", "s2.mp4"]);
+    });
+
+    it("an image titled with a Windows device name is not that device", async () => {
+      vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(
+        partialRow({ id: "i1", title: "NUL" })
+      );
+
+      await service.createImageDownload(1, "i1", "inst-a");
+
+      expect(createdFileName()).toBe("_NUL.jpg");
+    });
+
+    it("a playlist named '..' downloads as download.zip", async () => {
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
+        partialRow<PlaylistWithItems>({ id: 1, name: "..", items: [] })
+      );
+
+      await service.createPlaylistDownload(1, 1);
+
+      expect(createdFileName()).toBe("download.zip");
+    });
+  });
+
   describe("calculatePlaylistSize", () => {
     const items = [
       { sceneId: "s1", instanceId: "inst-a" },

@@ -10,9 +10,18 @@ export interface SceneNfoInput {
   fileName?: string;
 }
 
+/**
+ * Characters XML 1.0 cannot hold, escaped or not: C0 controls other than
+ * tab, LF and CR, and U+FFFE and U+FFFF. A parser rejects the whole file on
+ * one of them, so they are dropped.
+ */
+// eslint-disable-next-line no-control-regex
+const NOT_XML_CHAR = /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/g;
+
 function escapeXml(text: string | null | undefined): string {
   if (text == null) return "";
   return text
+    .replace(NOT_XML_CHAR, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -20,18 +29,27 @@ function escapeXml(text: string | null | undefined): string {
     .replace(/'/g, "&apos;");
 }
 
+/** A CDATA section holding `text` exactly: each "]]>" is split across two sections. */
+function cdata(text: string): string {
+  const safe = text
+    .replace(NOT_XML_CHAR, "")
+    .replace(/]]>/g, "]]]]><![CDATA[>");
+  return `<![CDATA[${safe}]]>`;
+}
+
 export function generateSceneNfo(scene: SceneNfoInput): string {
-  const title = scene.title || scene.fileName || "Unknown";
+  const title = escapeXml(scene.title || scene.fileName || "Unknown");
   const details = scene.details || "";
   const date = scene.date || "";
-  const year = date ? date.split("-")[0] : "";
-  const studio = scene.studioName || "";
+  const year = escapeXml(date ? date.split("-")[0] : "");
+  const studio = escapeXml(scene.studioName || "");
+  const escapedDate = escapeXml(date);
 
   let rating = "";
   let criticRating = "";
   if (scene.rating100 != null) {
-    rating = String(Math.floor(scene.rating100 / 10));
-    criticRating = String(scene.rating100);
+    rating = escapeXml(String(Math.floor(scene.rating100 / 10)));
+    criticRating = escapeXml(String(scene.rating100));
   }
 
   // Build performers XML
@@ -56,19 +74,19 @@ export function generateSceneNfo(scene: SceneNfoInput): string {
 
   return `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <movie>
-    <name>${escapeXml(title)}</name>
-    <title>${escapeXml(title)}</title>
-    <originaltitle>${escapeXml(title)}</originaltitle>
-    <sorttitle>${escapeXml(title)}</sorttitle>
+    <name>${title}</name>
+    <title>${title}</title>
+    <originaltitle>${title}</originaltitle>
+    <sorttitle>${title}</sorttitle>
     <criticrating>${criticRating}</criticrating>
     <rating>${rating}</rating>
     <userrating>${rating}</userrating>
-    <plot><![CDATA[${details}]]></plot>
-    <premiered>${date}</premiered>
-    <releasedate>${date}</releasedate>
+    <plot>${cdata(details)}</plot>
+    <premiered>${escapedDate}</premiered>
+    <releasedate>${escapedDate}</releasedate>
     <year>${year}</year>
-    <studio>${escapeXml(studio)}</studio>${performersXml}
+    <studio>${studio}</studio>${performersXml}
     <genre>Adult</genre>${tagsXml}
-    <uniqueid type="stash">${scene.id}</uniqueid>
+    <uniqueid type="stash">${escapeXml(scene.id)}</uniqueid>
 </movie>`;
 }
