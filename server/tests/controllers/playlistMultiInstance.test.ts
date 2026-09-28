@@ -79,7 +79,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-// Dynamic import mock for mergeScenesWithUserData (used in getPlaylist)
+// mergeScenesWithUserData (getPlaylist's user data) passes scenes through
 vi.mock("../../controllers/library/scenes.js", () => ({
   mergeScenesWithUserData: vi.fn((scenes: unknown[]) =>
     Promise.resolve(scenes)
@@ -320,5 +320,101 @@ describe("Playlist multi-instance scene map (#393)", () => {
     expect(items).toHaveLength(2);
     expect(must(items[0]).scene?.title).toBe("Scene from A");
     expect(must(items[1]).scene?.title).toBe("Scene from B");
+  });
+});
+
+/**
+ * An item saved before multi-instance has no instance: its scene is fetched
+ * from the default instance (inst-A here), and must be found under that
+ * instance too, not under "".
+ */
+describe("Playlist item with no instance", () => {
+  const LEGACY_ITEM = {
+    playlistId: 4,
+    sceneId: "42",
+    instanceId: null,
+    position: 0,
+    addedAt: new Date(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetScenes.mockResolvedValueOnce([
+      stubScene("42", "inst-A", "Scene from A"),
+    ]);
+  });
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("getUserPlaylists attaches the default instance's scene", async () => {
+    mockPrisma.playlist.findMany.mockResolvedValueOnce([
+      partialRow<PlaylistWithCountAndItems>({
+        id: 4,
+        userId: USER.id,
+        name: "Legacy",
+        _count: { items: 1 },
+        items: [{ id: 30, ...LEGACY_ITEM }],
+      }),
+    ]);
+
+    const req = reqFor(getUserPlaylists, { user: USER });
+    const res = resFor(getUserPlaylists);
+    await getUserPlaylists(req, res);
+
+    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
+    const items = must(must(res._getOkBody().playlists[0]).items);
+    expect(must(items[0]).instanceId).toBeNull();
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
+  });
+
+  it("getSharedPlaylists attaches the default instance's scene", async () => {
+    mockPrisma.playlist.findMany.mockResolvedValueOnce([
+      partialRow<SharedPlaylistWithItems>({
+        id: 4,
+        userId: 99,
+        name: "Shared Legacy",
+        description: null,
+        user: partialRow({ id: 99, username: "other" }),
+        shares: [
+          partialRow({
+            sharedAt: new Date(),
+            group: partialRow({ name: "Group1" }),
+          }),
+        ],
+        _count: { items: 1 },
+        items: [{ id: 31, ...LEGACY_ITEM }],
+      }),
+    ]);
+
+    const req = reqFor(getSharedPlaylists, { user: USER });
+    const res = resFor(getSharedPlaylists);
+    await getSharedPlaylists(req, res);
+
+    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
+    const items = must(must(res._getOkBody().playlists[0]).items);
+    expect(must(items[0]).instanceId).toBeNull();
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
+  });
+
+  it("getPlaylist attaches the default instance's scene", async () => {
+    mockGetAccess.mockResolvedValueOnce({ level: "owner" });
+    mockPrisma.playlist.findUnique.mockResolvedValueOnce(
+      partialRow<PlaylistWithItems>({
+        id: 4,
+        userId: USER.id,
+        name: "Legacy",
+        items: [{ id: 32, ...LEGACY_ITEM }],
+      })
+    );
+
+    const req = reqFor(getPlaylist, { params: { id: "4" }, user: USER });
+    const res = resFor(getPlaylist);
+    await getPlaylist(req, res);
+
+    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
+    const items = must(res._getOkBody().playlist.items);
+    expect(must(items[0]).instanceId).toBeNull();
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
   });
 });
