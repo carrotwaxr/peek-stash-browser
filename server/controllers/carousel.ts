@@ -1,8 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
-import { stashEntityService } from "../services/StashEntityService.js";
 import type {
   ApiErrorResponse,
   CarouselPreference,
@@ -25,22 +23,13 @@ import type {
 } from "../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import { logger } from "../utils/logger.js";
-import {
-  addStreamabilityInfo,
-  applyExpensiveSceneFilters,
-  applyQuickSceneFilters,
-  mergeScenesWithUserData,
-  sortScenes,
-} from "./library/scenes.js";
+import { addStreamabilityInfo } from "./library/scenes.js";
 
 // Maximum number of custom carousels per user
 const MAX_CAROUSELS_PER_USER = 15;
 
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
-
-// Feature flag for SQL query builder
-const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
 
 /**
  * Get all custom carousels for the current user
@@ -343,9 +332,6 @@ export const previewCarousel = async (
  * Execute a carousel's scene query
  * This is also exported for use by the homepage to render carousel scenes
  *
- * OPTIMIZED: For carousels without filters, uses DB pagination with pre-computed exclusions
- * For carousels with filters, still needs to load scenes but uses optimized exclusion checking
- *
  * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
  */
 export async function executeCarouselQuery(
@@ -357,167 +343,26 @@ export async function executeCarouselQuery(
 ): Promise<NormalizedScene[]> {
   const startTime = Date.now();
 
-  // NEW: Use SQL query builder if enabled
-  if (USE_SQL_QUERY_BUILDER) {
-    logger.debug("executeCarouselQuery: using SQL query builder path");
-
-    // Execute query (applyExclusions defaults to true)
-    const result = await sceneQueryBuilder.execute({
-      userId,
-      filters: rules,
-      sort,
-      sortDirection: direction.toUpperCase() as "ASC" | "DESC",
-      page: 1,
-      perPage: CAROUSEL_SCENE_LIMIT,
-      // Use different seed per carousel load for variety
-      randomSeed: sort === "random" ? userId + Date.now() : userId,
-    });
-
-    const scenes = addStreamabilityInfo(result.scenes, viewer);
-
-    logger.debug("executeCarouselQuery complete (SQL path)", {
-      totalTimeMs: Date.now() - startTime,
-      resultCount: scenes.length,
-    });
-
-    return scenes;
-  }
-
-  // Check if carousel has any actual filters
-  const hasFilters = rules && Object.keys(rules).length > 0;
-
-  // Check for expensive filters that need user data
-  const hasExpensiveFilters =
-    rules?.favorite !== undefined ||
-    rules?.rating100 !== undefined ||
-    rules?.o_counter !== undefined ||
-    rules?.play_count !== undefined ||
-    rules?.play_duration !== undefined ||
-    rules?.last_played_at !== undefined ||
-    rules?.last_o_at !== undefined ||
-    rules?.performer_favorite !== undefined ||
-    rules?.studio_favorite !== undefined ||
-    rules?.tag_favorite !== undefined;
-
-  // Check if sort field is supported by DB
-  const dbSortFields = new Set([
-    "created_at",
-    "updated_at",
-    "date",
-    "title",
-    "duration",
-    "random",
-  ]);
-  const canUseDbSort = dbSortFields.has(sort);
-
-  // FAST PATH: No filters, DB-supported sort
-  if (!hasFilters && canUseDbSort) {
-    logger.debug("executeCarouselQuery: using FAST PATH (no filters)");
-
-    // Get pre-computed scene exclusions
-    const exclusionStart = Date.now();
-    const excludeIds = await entityExclusionHelper.getExcludedIds(
-      userId,
-      "scene"
-    );
-    logger.debug(
-      `executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`
-    );
-
-    // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
-    const dbStart = Date.now();
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
-    const { scenes } = await stashEntityService.getScenesPaginated({
-      page: 1,
-      perPage: CAROUSEL_SCENE_LIMIT,
-      sortField: sort,
-      sortDirection: direction.toUpperCase() as "ASC" | "DESC",
-      excludeIds,
-    });
-    logger.debug(
-      `executeCarouselQuery: DB pagination took ${Date.now() - dbStart}ms`
-    );
-
-    // Merge with user data
-    const mergeStart = Date.now();
-    const scenesWithUserData = await mergeScenesWithUserData(scenes, userId);
-    logger.debug(
-      `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
-    );
-
-    // Add streamability info
-    const finalScenes = addStreamabilityInfo(scenesWithUserData, viewer);
-
-    logger.debug(
-      `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`
-    );
-    return finalScenes;
-  }
-
-  // STANDARD PATH: Has filters, need to load more scenes
-  logger.debug(
-    `executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`
-  );
-
-  // Get pre-computed scene exclusions (instance-aware)
-  const exclusionStart = Date.now();
-  const exclusionData = await entityExclusionHelper.getExclusionData(
+  // Execute query (applyExclusions defaults to true)
+  const result = await sceneQueryBuilder.execute({
     userId,
-    "scene"
-  );
-  logger.debug(
-    `executeCarouselQuery: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`
-  );
+    filters: rules,
+    sort,
+    sortDirection: direction.toUpperCase() as "ASC" | "DESC",
+    page: 1,
+    perPage: CAROUSEL_SCENE_LIMIT,
+    // Use different seed per carousel load for variety
+    randomSeed: sort === "random" ? userId + Date.now() : userId,
+  });
 
-  // Get scenes from cache (lightweight browse query)
-  const cacheStart = Date.now();
-  // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
-  let scenes = await stashEntityService.getAllScenes();
-  logger.debug(
-    `executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`
-  );
+  const scenes = addStreamabilityInfo(result.scenes, viewer);
 
-  // Apply pre-computed exclusions (instance-aware filtering)
-  const filterStart = Date.now();
-  scenes = scenes.filter(
-    (s) => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData)
-  );
-  logger.debug(
-    `executeCarouselQuery: applied exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`
-  );
+  logger.debug("executeCarouselQuery complete (SQL path)", {
+    totalTimeMs: Date.now() - startTime,
+    resultCount: scenes.length,
+  });
 
-  // Apply the carousel's filter rules (quick filters that don't need user data)
-  const quickFilterStart = Date.now();
-  scenes = await applyQuickSceneFilters(scenes, rules);
-  logger.debug(
-    `executeCarouselQuery: applyQuickSceneFilters took ${Date.now() - quickFilterStart}ms`
-  );
-
-  // Merge with user-specific data (ratings, watch history, favorites)
-  const mergeStart = Date.now();
-  scenes = await mergeScenesWithUserData(scenes, userId);
-  logger.debug(
-    `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
-  );
-
-  // Apply filters that require user data (favorite, rating, play_count, etc.)
-  const expensiveFilterStart = Date.now();
-  scenes = applyExpensiveSceneFilters(scenes, rules);
-  logger.debug(
-    `executeCarouselQuery: applyExpensiveSceneFilters took ${Date.now() - expensiveFilterStart}ms`
-  );
-
-  // Add streamability info
-  scenes = addStreamabilityInfo(scenes, viewer);
-
-  // Sort the results
-  scenes = sortScenes(scenes, sort, direction);
-
-  // Limit to carousel size
-  logger.debug(
-    `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (STANDARD PATH)`
-  );
-  return scenes.slice(0, CAROUSEL_SCENE_LIMIT);
+  return scenes;
 }
 
 /**

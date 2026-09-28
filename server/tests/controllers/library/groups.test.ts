@@ -1,18 +1,15 @@
 /**
  * Unit Tests for Groups Library Controller
  *
- * Tests applyGroupFilters, findGroups, and findGroupsMinimal.
+ * Tests findGroups and findGroupsMinimal.
  * Note: mergeGroupsWithUserData is private and tested indirectly
  * through findGroupsMinimal.
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  applyGroupFilters,
   findGroups,
   findGroupsMinimal,
 } from "../../../controllers/library/groups.js";
-import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -33,7 +30,6 @@ vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
     getAllGroups: vi.fn(),
     getGroup: vi.fn(),
-    getGroupIdsByPerformers: vi.fn().mockResolvedValue(new Set()),
   },
 }));
 
@@ -108,196 +104,6 @@ describe("Groups Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.groupRating.findMany.mockResolvedValue([]);
-  });
-
-  // ─── applyGroupFilters ──────────────────────────────────────
-
-  describe("applyGroupFilters", () => {
-    it("returns all groups when filters is null", async () => {
-      const groups = [createMockGroup(), createMockGroup()];
-      const result = await applyGroupFilters(groups, null);
-      expect(result).toHaveLength(2);
-    });
-
-    it("returns all groups when filters is undefined", async () => {
-      const groups = [createMockGroup()];
-      const result = await applyGroupFilters(groups, undefined);
-      expect(result).toHaveLength(1);
-    });
-
-    it("filters by ids", async () => {
-      const groups = [
-        createMockGroup({ id: "g1" }),
-        createMockGroup({ id: "g2" }),
-        createMockGroup({ id: "g3" }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        ids: { value: coerceEntityRefs(["g1", "g3"]), modifier: "INCLUDES" },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((g) => g.id)).toEqual(["g1", "g3"]);
-    });
-
-    it("filters by favorite", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", favorite: true }),
-        createMockGroup({ id: "g2", favorite: false }),
-      ];
-      const result = await applyGroupFilters(groups, { favorite: true });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by tags INCLUDES", async () => {
-      const groups = [
-        createMockGroup({
-          id: "g1",
-          tags: [{ id: "t1", name: "A", image_path: null }],
-        }),
-        createMockGroup({
-          id: "g2",
-          tags: [{ id: "t2", name: "B", image_path: null }],
-        }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        tags: {
-          value: coerceEntityRefs(["t1"]),
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by tags INCLUDES_ALL", async () => {
-      const groups = [
-        createMockGroup({
-          id: "g1",
-          tags: [
-            { id: "t1", name: "A", image_path: null },
-            { id: "t2", name: "B", image_path: null },
-          ],
-        }),
-        createMockGroup({
-          id: "g2",
-          tags: [{ id: "t1", name: "A", image_path: null }],
-        }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        tags: {
-          value: coerceEntityRefs(["t1", "t2"]),
-          modifier: CriterionModifier.IncludesAll,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by tags EXCLUDES", async () => {
-      const groups = [
-        createMockGroup({
-          id: "g1",
-          tags: [{ id: "t1", name: "A", image_path: null }],
-        }),
-        createMockGroup({
-          id: "g2",
-          tags: [{ id: "t2", name: "B", image_path: null }],
-        }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        tags: {
-          value: coerceEntityRefs(["t1"]),
-          modifier: CriterionModifier.Excludes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g2");
-    });
-
-    it("filters by performers via getGroupIdsByPerformers", async () => {
-      mockStashEntityService.getGroupIdsByPerformers.mockResolvedValue(
-        new Set(["g1"])
-      );
-
-      const groups = [
-        createMockGroup({ id: "g1" }),
-        createMockGroup({ id: "g2" }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        performers: {
-          value: ["p1", "p2"],
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-      expect(
-        mockStashEntityService.getGroupIdsByPerformers
-      ).toHaveBeenCalledWith(["p1", "p2"]);
-    });
-
-    it("filters by studios", async () => {
-      const groups = [
-        createMockGroup({
-          id: "g1",
-          studio: { id: "s1", name: "Studio1" },
-        }),
-        createMockGroup({
-          id: "g2",
-          studio: { id: "s2", name: "Studio2" },
-        }),
-        createMockGroup({ id: "g3", studio: null }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        studios: {
-          value: coerceEntityRefs(["s1"]),
-          modifier: CriterionModifier.Includes,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by rating100 GREATER_THAN", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", rating100: 80 }),
-        createMockGroup({ id: "g2", rating100: 30 }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by rating100 BETWEEN", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", rating100: 50 }),
-        createMockGroup({ id: "g2", rating100: 80 }),
-        createMockGroup({ id: "g3", rating100: 20 }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        rating100: {
-          modifier: CriterionModifier.Between,
-          value: 40,
-          value2: 60,
-        },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g1");
-    });
-
-    it("filters by rating100 EQUALS", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", rating100: 50 }),
-        createMockGroup({ id: "g2", rating100: 80 }),
-      ];
-      const result = await applyGroupFilters(groups, {
-        rating100: { modifier: CriterionModifier.Equals, value: 80 },
-      });
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("g2");
-    });
   });
 
   // ─── findGroups HTTP handler ────────────────────────────────

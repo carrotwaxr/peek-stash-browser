@@ -24,7 +24,6 @@ import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   buildDateFilter,
-  buildDirectFilter,
   buildFavoriteFilter,
   buildJunctionFilter,
   buildNumericFilter,
@@ -184,56 +183,6 @@ class SceneQueryBuilder {
       "s",
       modifier
     );
-  }
-
-  /**
-   * Build tag filter clause
-   * Handles composite "id:instanceId" values for multi-instance filtering
-   */
-  private buildTagFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = coerceEntityRefs(filter.value);
-    const modifier = filter.modifier || "INCLUDES";
-
-    return buildJunctionFilter(
-      ids,
-      "SceneTag",
-      "sceneId",
-      "sceneInstanceId",
-      "tagId",
-      "tagInstanceId",
-      "s",
-      modifier
-    );
-  }
-
-  /**
-   * Build studio filter clause
-   * Studios use a direct FK (studioId) on the scene — no junction table.
-   * Instance is implied by scene's stashInstanceId.
-   */
-  private buildStudioFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = coerceEntityRefs(filter.value);
-    const modifier = filter.modifier || "INCLUDES";
-
-    return buildDirectFilter(ids, "s.studioId", "s.stashInstanceId", modifier);
   }
 
   /**

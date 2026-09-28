@@ -174,20 +174,6 @@ export default tseslint.config(
         "error",
         { assertFunctionNames: ["expect", "expect*"] },
       ],
-      // Tests of the legacy scene path (USE_SQL_QUERY_BUILDER=false) call
-      // it on purpose, until item 73 removes the path
-      "@typescript-eslint/no-deprecated": [
-        "error",
-        {
-          allow: [
-            {
-              from: "file",
-              name: "getAllScenes",
-              path: "services/StashEntityService.ts",
-            },
-          ],
-        },
-      ],
       "vitest/no-standalone-expect": [
         "error",
         {

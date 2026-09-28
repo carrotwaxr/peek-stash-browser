@@ -19,7 +19,6 @@ import type {
   PeekGalleryFilter,
 } from "../../types/index.js";
 import { entityKey } from "../../utils/entityRef.js";
-import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -51,122 +50,6 @@ async function mergeGalleriesWithUserData(
     favorite: false,
     ...ratingMap.get(entityKey(gallery.id, gallery.instanceId)),
   }));
-}
-
-/**
- * Apply gallery filters. Filter values are not validated, so an id can
- * arrive as a number: String() normalizes it.
- */
-export async function applyGalleryFilters(
-  galleries: NormalizedGallery[],
-  filters: PeekGalleryFilter | null | undefined
-): Promise<NormalizedGallery[]> {
-  if (!filters) return galleries;
-
-  let filtered = galleries;
-
-  // Filter by IDs
-  if (filters.ids?.value && filters.ids.value.length > 0) {
-    const idSet = new Set(filters.ids.value as string[]);
-    filtered = filtered.filter((g) => idSet.has(g.id));
-  }
-
-  // Filter by favorite
-  if (filters.favorite !== undefined) {
-    filtered = filtered.filter((g) => g.favorite === filters.favorite);
-  }
-
-  // Filter by rating100
-  if (filters.rating100) {
-    const { modifier, value, value2 } = filters.rating100;
-    filtered = filtered.filter((g) => {
-      const rating = g.rating100 || 0;
-      if (modifier === "GREATER_THAN") return rating > value;
-      if (modifier === "LESS_THAN") return rating < value;
-      if (modifier === "EQUALS") return rating === value;
-      if (modifier === "NOT_EQUALS") return rating !== value;
-      if (modifier === "BETWEEN")
-        return (
-          value !== undefined &&
-          value2 !== null &&
-          value2 !== undefined &&
-          rating >= value &&
-          rating <= value2
-        );
-      return true;
-    });
-  }
-
-  // Filter by image_count
-  if (filters.image_count) {
-    const { modifier, value, value2 } = filters.image_count;
-    filtered = filtered.filter((g) => {
-      const count = g.image_count || 0;
-      if (modifier === "GREATER_THAN") return count > value;
-      if (modifier === "LESS_THAN") return count < value;
-      if (modifier === "EQUALS") return count === value;
-      if (modifier === "NOT_EQUALS") return count !== value;
-      if (modifier === "BETWEEN")
-        return (
-          value2 !== null &&
-          value2 !== undefined &&
-          count >= value &&
-          count <= value2
-        );
-      return true;
-    });
-  }
-
-  // Filter by title (text search)
-  if (filters.title) {
-    const searchValue = filters.title.value.toLowerCase();
-    filtered = filtered.filter((g) => {
-      const title = g.title || "";
-      return title.toLowerCase().includes(searchValue);
-    });
-  }
-
-  // Filter by studio
-  // Supports hierarchical filtering via depth parameter
-  if (filters.studios && filters.studios.value) {
-    const { value: studioIds, depth } = filters.studios;
-    // Expand studio IDs to include descendants if depth is specified
-    const expandedStudioIds = new Set(
-      await expandStudioIds(
-        studioIds.map((id: unknown) => String(id)),
-        depth ?? 0
-      )
-    );
-    filtered = filtered.filter(
-      (g) => g.studio && expandedStudioIds.has(g.studio.id)
-    );
-  }
-
-  // Filter by performers
-  if (filters.performers && filters.performers.value) {
-    const performerIds = new Set(filters.performers.value.map(String));
-    filtered = filtered.filter((g) =>
-      g.performers?.some((p) => performerIds.has(p.id))
-    );
-  }
-
-  // Filter by tags
-  // Supports hierarchical filtering via depth parameter
-  if (filters.tags && filters.tags.value) {
-    const { value: tagIds, depth } = filters.tags;
-    // Expand tag IDs to include descendants if depth is specified
-    const expandedTagIds = new Set(
-      await expandTagIds(
-        tagIds.map((id: unknown) => String(id)),
-        depth ?? 0
-      )
-    );
-    filtered = filtered.filter((g) =>
-      g.tags?.some((t) => expandedTagIds.has(t.id))
-    );
-  }
-
-  return filtered;
 }
 
 /**

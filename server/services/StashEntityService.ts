@@ -7,7 +7,6 @@
  * This service maintains compatibility with existing controller patterns
  * while using the new SQLite-backed architecture.
  */
-import { Prisma } from "@prisma/client";
 import type {
   StashGallery,
   StashGroup,
@@ -174,47 +173,6 @@ type SceneStreamSource = Pick<
   | "fileHeight"
 >;
 
-/** Scene fields returned by BROWSE_SELECT queries (a subset of StashScene; no stream choices) */
-type BrowseSceneRow = Pick<
-  StashScene,
-  | "id"
-  | "stashInstanceId"
-  | "title"
-  | "code"
-  | "date"
-  | "studioId"
-  | "rating100"
-  | "duration"
-  | "organized"
-  | "details"
-  | "director"
-  | "urls"
-  | "filePath"
-  | "fileBitRate"
-  | "fileFrameRate"
-  | "fileWidth"
-  | "fileHeight"
-  | "fileVideoCodec"
-  | "fileAudioCodec"
-  | "fileSize"
-  | "pathScreenshot"
-  | "pathPreview"
-  | "pathSprite"
-  | "pathVtt"
-  | "pathChaptersVtt"
-  | "pathStream"
-  | "pathCaption"
-  | "captions"
-  | "oCounter"
-  | "playCount"
-  | "playDuration"
-  | "stashCreatedAt"
-  | "stashUpdatedAt"
-  | "syncedAt"
-  | "deletedAt"
-  | "inheritedTagIds"
->;
-
 /** Transformed image output shape (returned by transformImage) */
 // TransformedImage is a subset of NormalizedImage (without user activity fields).
 // Using NormalizedImage directly as return type since user fields are optional.
@@ -298,87 +256,7 @@ class StashEntityService {
   private tagNameCache: Map<string, string> | null = null;
   private tagNameCachePromise: Promise<Map<string, string>> | null = null;
 
-  // Columns to select for browse queries (browse rows carry no stream list)
-  private readonly BROWSE_SELECT = {
-    id: true,
-    stashInstanceId: true,
-    title: true,
-    code: true,
-    date: true,
-    studioId: true,
-    rating100: true,
-    duration: true,
-    organized: true,
-    details: true,
-    director: true,
-    urls: true,
-    filePath: true,
-    fileBitRate: true,
-    fileFrameRate: true,
-    fileWidth: true,
-    fileHeight: true,
-    fileVideoCodec: true,
-    fileAudioCodec: true,
-    fileSize: true,
-    pathScreenshot: true,
-    pathPreview: true,
-    pathSprite: true,
-    pathVtt: true,
-    pathChaptersVtt: true,
-    pathStream: true,
-    pathCaption: true,
-    captions: true,
-    // Not selected: the stream choices (read by getPlaybackStreams)
-    oCounter: true,
-    playCount: true,
-    playDuration: true,
-    stashCreatedAt: true,
-    stashUpdatedAt: true,
-    syncedAt: true,
-    deletedAt: true,
-    inheritedTagIds: true,
-  } as const;
-
   // ==================== Scene Queries ====================
-
-  /**
-   * Get all scenes from cache
-   * Returns scenes with default user fields (not merged with user-specific data)
-   *
-   * @deprecated Use SceneQueryBuilder.execute() instead for consistent scene data with relations.
-   * This method returns scenes with empty relation arrays (performers, tags, etc.).
-   * Only kept for legacy fallback paths when USE_SQL_QUERY_BUILDER=false.
-   */
-  async getAllScenes(): Promise<NormalizedScene[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where: { deletedAt: null },
-      select: this.BROWSE_SELECT,
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => this.transformSceneForBrowse(c));
-    const transformTime = Date.now() - transformStart;
-
-    // Hydrate studio names and inherited tags
-    const hydrateStart = Date.now();
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(result, studioNames);
-    this.hydrateInheritedTags(result, tagNames);
-    const hydrateTime = Date.now() - hydrateStart;
-
-    logger.info(
-      `getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
 
   /**
    * Get lightweight scene data for scoring operations
@@ -543,191 +421,6 @@ class StashEntityService {
   }
 
   /**
-   * Get lightweight scene data for entity visibility filtering
-   * Returns only IDs needed to determine which entities appear in scenes
-   * Much more efficient than loading full scene objects
-   *
-   * Returns scenes with:
-   * - id: Scene ID
-   * - performers: Array<{ id: string }> - performer IDs
-   * - tags: Array<{ id: string }> - tag IDs
-   * - studio: { id: string } | null - studio ID
-   */
-  async getScenesForVisibility(): Promise<
-    Array<{
-      id: string;
-      performers: Array<{ id: string }>;
-      tags: Array<{ id: string }>;
-      studio: { id: string } | null;
-    }>
-  > {
-    const scoringData = await this.getScenesForScoring();
-
-    // Transform to the shape expected by empty entity filters
-    return scoringData.map((s) => ({
-      id: s.id,
-      // Transform to array of objects with id property (matches existing interface)
-      performers: s.performerIds.map((id) => ({ id })),
-      tags: s.tagIds.map((id) => ({ id })),
-      // studio property needs to match { id: string } | null shape
-      studio: s.studioId ? { id: s.studioId } : null,
-    }));
-  }
-
-  /**
-   * Get all scenes with tags relation included
-   * Used for empty entity filtering which needs to know which tags appear on visible scenes
-   *
-   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
-   * This method loads full scene objects when only IDs are needed.
-   */
-  async getAllScenesWithTags(): Promise<NormalizedScene[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where: { deletedAt: null },
-      select: {
-        ...this.BROWSE_SELECT,
-        // Include tags relation for filtering
-        tags: {
-          select: { tagId: true },
-        },
-      },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => {
-      const scene = this.transformSceneForBrowse(c);
-      // Override tags with the junction table data (cast to satisfy type checker - only id is needed for filtering)
-      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) ||
-        []) as typeof scene.tags;
-      return scene;
-    });
-    const transformTime = Date.now() - transformStart;
-
-    // Hydrate studio names and inherited tags
-    const hydrateStart = Date.now();
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(result, studioNames);
-    this.hydrateInheritedTags(result, tagNames);
-    const hydrateTime = Date.now() - hydrateStart;
-
-    logger.info(
-      `getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
-
-  /**
-   * Get all scenes with performers relation included
-   * Used for empty entity filtering which needs to know which performers appear in visible scenes
-   *
-   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
-   * This method loads full scene objects when only IDs are needed.
-   */
-  async getAllScenesWithPerformers(): Promise<NormalizedScene[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where: { deletedAt: null },
-      select: {
-        ...this.BROWSE_SELECT,
-        performers: {
-          select: { performerId: true },
-        },
-      },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => {
-      const scene = this.transformSceneForBrowse(c);
-      scene.performers = (c.performers?.map((p: { performerId: string }) => ({
-        id: p.performerId,
-      })) || []) as typeof scene.performers;
-      return scene;
-    });
-    const transformTime = Date.now() - transformStart;
-
-    // Hydrate studio names and inherited tags
-    const hydrateStart = Date.now();
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(result, studioNames);
-    this.hydrateInheritedTags(result, tagNames);
-    const hydrateTime = Date.now() - hydrateStart;
-
-    logger.info(
-      `getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
-
-  /**
-   * Get all scenes with both performers and tags relations included
-   * Used for tags filtering which needs both performer IDs and tag IDs
-   *
-   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
-   * This method loads full scene objects when only IDs are needed.
-   */
-  async getAllScenesWithPerformersAndTags(): Promise<NormalizedScene[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where: { deletedAt: null },
-      select: {
-        ...this.BROWSE_SELECT,
-        performers: {
-          select: { performerId: true },
-        },
-        tags: {
-          select: { tagId: true },
-        },
-      },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => {
-      const scene = this.transformSceneForBrowse(c);
-      scene.performers = (c.performers?.map((p: { performerId: string }) => ({
-        id: p.performerId,
-      })) || []) as typeof scene.performers;
-      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) ||
-        []) as typeof scene.tags;
-      return scene;
-    });
-    const transformTime = Date.now() - transformStart;
-
-    // Hydrate studio names and inherited tags
-    const hydrateStart = Date.now();
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(result, studioNames);
-    this.hydrateInheritedTags(result, tagNames);
-    const hydrateTime = Date.now() - hydrateStart;
-
-    logger.info(
-      `getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
-
-  /**
    * Get scene by ID (includes related entities)
    * @param id - Scene ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
@@ -765,29 +458,7 @@ class StashEntityService {
   }
 
   /**
-   * Get scenes by IDs
-   * @param ids - Array of scene IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getScenesByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedScene[]> {
-    const cached = await prisma.stashScene.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    return cached.map((c) => this.transformScene(c));
-  }
-
-  /**
    * Get scenes by IDs with full relations (performers, tags, studio, groups, galleries)
-   * Use this when you need the related entities, not just scene data.
-   * This is more expensive than getScenesByIds due to the joins.
    * @param ids - Array of scene IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
@@ -831,114 +502,6 @@ class StashEntityService {
     return prisma.stashScene.count({
       where: { deletedAt: null },
     });
-  }
-
-  /**
-   * Get scenes with database-level pagination and sorting
-   * This is the optimized path for browse queries
-   * Supports efficient exclusion filtering using NOT IN at the database level
-   *
-   * @deprecated Use SceneQueryBuilder.execute() instead for consistent scene data with relations.
-   * This method returns scenes with empty relation arrays (performers, tags, etc.).
-   * Only kept for legacy fallback paths when USE_SQL_QUERY_BUILDER=false.
-   */
-  async getScenesPaginated(options: {
-    page: number;
-    perPage: number;
-    sortField: string;
-    sortDirection: "ASC" | "DESC";
-    excludeIds?: Set<string>;
-  }): Promise<{ scenes: NormalizedScene[]; total: number }> {
-    const startTotal = Date.now();
-    const { page, perPage, sortField, sortDirection, excludeIds } = options;
-
-    // Map API sort fields to database columns
-    const sortColumnMap: Record<string, string> = {
-      created_at: "stashCreatedAt",
-      updated_at: "stashUpdatedAt",
-      date: "date",
-      title: "title",
-      duration: "duration",
-      filesize: "fileSize",
-      bitrate: "fileBitRate",
-      framerate: "fileFrameRate",
-      random: "id", // Will use special handling
-    };
-
-    const sortColumn = sortColumnMap[sortField] || "stashCreatedAt";
-    const isRandom = sortField === "random";
-
-    // Build where clause with exclusions at DB level
-    const where: Prisma.StashSceneWhereInput = { deletedAt: null };
-    if (excludeIds && excludeIds.size > 0) {
-      where.id = { notIn: Array.from(excludeIds) };
-    }
-
-    // Get total count first (for pagination info) - respecting exclusions
-    const countStart = Date.now();
-    const total = await prisma.stashScene.count({ where });
-    logger.debug(
-      `getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`
-    );
-
-    // Build orderBy
-    const direction = sortDirection.toLowerCase() as Prisma.SortOrder;
-    let orderBy: Prisma.StashSceneOrderByWithRelationInput;
-    if (isRandom) {
-      // For random, we'll use a seeded approach based on page
-      // This gives consistent results per page but variety across pages
-      orderBy = { id: direction };
-    } else {
-      orderBy = { [sortColumn]: direction };
-    }
-
-    // Query with pagination - exclusions already applied in where clause
-    const queryStart = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where,
-      select: this.BROWSE_SELECT,
-      orderBy,
-      skip: (page - 1) * perPage,
-      take: perPage,
-    });
-    const queryTime = Date.now() - queryStart;
-
-    // Transform results
-    const transformStart = Date.now();
-    const scenes = cached.map((c) => this.transformSceneForBrowse(c));
-    const transformTime = Date.now() - transformStart;
-
-    // Hydrate studio names and inherited tags
-    const hydrateStart = Date.now();
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(scenes, studioNames);
-    this.hydrateInheritedTags(scenes, tagNames);
-    const hydrateTime = Date.now() - hydrateStart;
-
-    logger.info(
-      `getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`
-    );
-
-    return { scenes, total };
-  }
-
-  /**
-   * Get scene IDs only (for restriction filtering)
-   * Much faster than loading full scene objects
-   */
-  async getSceneIds(): Promise<string[]> {
-    const startTime = Date.now();
-    const cached = await prisma.stashScene.findMany({
-      where: { deletedAt: null },
-      select: { id: true },
-    });
-    logger.info(
-      `getSceneIds: took ${Date.now() - startTime}ms, count=${cached.length}`
-    );
-    return cached.map((c) => c.id);
   }
 
   // ==================== Performer Queries ====================
@@ -1029,26 +592,6 @@ class StashEntityService {
   }
 
   /**
-   * Get performers by IDs
-   * @param ids - Array of performer IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getPerformersByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedPerformer[]> {
-    const cached = await prisma.stashPerformer.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    return cached.map((c) => this.transformPerformer(c));
-  }
-
-  /**
    * Get total performer count
    */
   async getPerformerCount(): Promise<number> {
@@ -1098,14 +641,6 @@ class StashEntityService {
   }
 
   /**
-   * Invalidate the studio name cache (call after sync or studio updates)
-   */
-  invalidateStudioNameCache(): void {
-    this.studioNameCache = null;
-    this.studioNameCachePromise = null;
-  }
-
-  /**
    * Get a lightweight Map of tag ID -> name for hydrating inherited tags.
    * Uses in-memory caching to avoid repeated DB queries.
    */
@@ -1140,14 +675,6 @@ class StashEntityService {
     })();
 
     return this.tagNameCachePromise;
-  }
-
-  /**
-   * Invalidate the tag name cache (call after sync or tag updates)
-   */
-  invalidateTagNameCache(): void {
-    this.tagNameCache = null;
-    this.tagNameCachePromise = null;
   }
 
   /**
@@ -1244,26 +771,6 @@ class StashEntityService {
       performerCount,
       groupCount,
     });
-  }
-
-  /**
-   * Get studios by IDs
-   * @param ids - Array of studio IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getStudiosByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedStudio[]> {
-    const cached = await prisma.stashStudio.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    return cached.map((c) => this.transformStudio(c));
   }
 
   /**
@@ -1370,26 +877,6 @@ class StashEntityService {
   }
 
   /**
-   * Get tags by IDs
-   * @param ids - Array of tag IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getTagsByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedTag[]> {
-    const cached = await prisma.stashTag.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    return cached.map((c) => this.transformTag(c));
-  }
-
-  /**
    * Get total tag count
    */
   async getTagCount(): Promise<number> {
@@ -1453,25 +940,6 @@ class StashEntityService {
       ...cached,
       imageCount,
     });
-  }
-
-  /**
-   * Get galleries by IDs
-   */
-  async getGalleriesByIds(ids: string[]): Promise<NormalizedGallery[]> {
-    const cached = await prisma.stashGallery.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-      },
-      include: {
-        performers: { include: { performer: true } },
-        tags: { include: { tag: true } },
-        scenes: { include: { scene: true } },
-      },
-    });
-
-    return cached.map((c) => this.transformGallery(c));
   }
 
   /**
@@ -1548,26 +1016,6 @@ class StashEntityService {
   }
 
   /**
-   * Get groups by IDs
-   * @param ids - Array of group IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getGroupsByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedGroup[]> {
-    const cached = await prisma.stashGroup.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    return cached.map((c) => this.transformGroup(c));
-  }
-
-  /**
    * Get total group count
    */
   async getGroupCount(): Promise<number> {
@@ -1599,68 +1047,6 @@ class StashEntityService {
   };
 
   /**
-   * Get all images from cache with relations
-   * Uses chunked queries to avoid Prisma's string conversion limit with large datasets.
-   * The "Failed to convert rust String into napi string" error occurs when Prisma
-   * tries to serialize very large result sets (500k+ rows with relations).
-   */
-  async getAllImages(): Promise<TransformedImage[]> {
-    const startTime = Date.now();
-
-    // Get total count first
-    const totalCount = await prisma.stashImage.count({
-      where: { deletedAt: null },
-    });
-
-    // For smaller datasets, use single query (faster)
-    if (totalCount < 10000) {
-      const cached = await prisma.stashImage.findMany({
-        where: { deletedAt: null },
-        include: this.imageIncludes,
-      });
-      const result = cached.map((c) =>
-        this.transformImage(c as unknown as ImageInput)
-      );
-      logger.info(
-        `getAllImages: single query for ${totalCount} images in ${Date.now() - startTime}ms`
-      );
-      return result;
-    }
-
-    // For large datasets, fetch in chunks to avoid Prisma string limit
-    // Chunk size of 5000 keeps each query well under the limit
-    const CHUNK_SIZE = 5000;
-    const allImages: TransformedImage[] = [];
-    let offset = 0;
-
-    while (offset < totalCount) {
-      const chunkStart = Date.now();
-      const chunk = await prisma.stashImage.findMany({
-        where: { deletedAt: null },
-        include: this.imageIncludes,
-        skip: offset,
-        take: CHUNK_SIZE,
-        orderBy: { id: "asc" }, // Consistent ordering for pagination
-      });
-
-      const transformed = chunk.map((c) =>
-        this.transformImage(c as unknown as ImageInput)
-      );
-      allImages.push(...transformed);
-
-      logger.debug(
-        `getAllImages chunk: offset=${offset}, fetched=${chunk.length} in ${Date.now() - chunkStart}ms`
-      );
-      offset += CHUNK_SIZE;
-    }
-
-    logger.info(
-      `getAllImages: chunked query for ${totalCount} images in ${Date.now() - startTime}ms`
-    );
-    return allImages;
-  }
-
-  /**
    * Get image by ID with relations
    * @param id - Image ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
@@ -1680,53 +1066,6 @@ class StashEntityService {
 
     if (!cached) return null;
     return this.transformImage(cached as unknown as ImageInput);
-  }
-
-  /**
-   * Get images by IDs with relations
-   * Uses chunked queries for large ID sets to avoid Prisma's string conversion limit.
-   * @param ids - Array of image IDs
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getImagesByIds(
-    ids: string[],
-    instanceId: string
-  ): Promise<NormalizedImage[]> {
-    if (ids.length === 0) return [];
-
-    // For smaller sets, use single query
-    if (ids.length < 5000) {
-      const cached = await prisma.stashImage.findMany({
-        where: {
-          id: { in: ids },
-          deletedAt: null,
-          stashInstanceId: instanceId,
-        },
-        include: this.imageIncludes,
-      });
-      return cached.map((c) => this.transformImage(c as unknown as ImageInput));
-    }
-
-    // For large sets, fetch in chunks
-    const CHUNK_SIZE = 5000;
-    const allImages: NormalizedImage[] = [];
-
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-      const chunkIds = ids.slice(i, i + CHUNK_SIZE);
-      const chunk = await prisma.stashImage.findMany({
-        where: {
-          id: { in: chunkIds },
-          deletedAt: null,
-          stashInstanceId: instanceId,
-        },
-        include: this.imageIncludes,
-      });
-      allImages.push(
-        ...chunk.map((c) => this.transformImage(c as unknown as ImageInput))
-      );
-    }
-
-    return allImages;
   }
 
   /**
@@ -1852,15 +1191,6 @@ class StashEntityService {
     return latest;
   }
 
-  /**
-   * Get cache version for FilteredEntityCacheService compatibility
-   * Uses the last sync timestamp as a version number
-   */
-  async getCacheVersion(): Promise<number> {
-    const lastSync = await this.getLastRefreshed();
-    return lastSync ? lastSync.getTime() : 0;
-  }
-
   // ==================== Data Transform Helpers ====================
 
   /**
@@ -1917,75 +1247,6 @@ class StashEntityService {
     });
     if (!source) return [];
     return this.generateSceneStreams(sceneId, instanceId, source);
-  }
-
-  // ==================== Relationship Queries (for filtering) ====================
-
-  /**
-   * Get performer IDs that appear in scenes from specific studios.
-   * Used for filtering performers by studio on detail pages.
-   * Schema dependencies: ScenePerformer.performerId, StashScene.studioId
-   */
-  async getPerformerIdsByStudios(studioIds: string[]): Promise<Set<string>> {
-    if (studioIds.length === 0) return new Set();
-
-    const startTime = Date.now();
-    const results = await prisma.$queryRaw<{ performerId: string }[]>`
-      SELECT DISTINCT sp.performerId
-      FROM ScenePerformer sp
-      INNER JOIN StashScene cs ON sp.sceneId = cs.id AND sp.sceneInstanceId = cs.stashInstanceId
-      WHERE cs.studioId IN (${Prisma.join(studioIds)})
-        AND cs.deletedAt IS NULL
-    `;
-    logger.debug(
-      `getPerformerIdsByStudios: ${Date.now() - startTime}ms, studios=${studioIds.length}, performers=${results.length}`
-    );
-
-    return new Set(results.map((r) => r.performerId));
-  }
-
-  /**
-   * Get performer IDs that appear in scenes from specific groups.
-   * Used for filtering performers by group on detail pages.
-   * Schema dependencies: ScenePerformer.performerId, SceneGroup.groupId
-   */
-  async getPerformerIdsByGroups(groupIds: string[]): Promise<Set<string>> {
-    if (groupIds.length === 0) return new Set();
-
-    const startTime = Date.now();
-    const results = await prisma.$queryRaw<{ performerId: string }[]>`
-      SELECT DISTINCT sp.performerId
-      FROM ScenePerformer sp
-      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
-      WHERE sg.groupId IN (${Prisma.join(groupIds)})
-    `;
-    logger.debug(
-      `getPerformerIdsByGroups: ${Date.now() - startTime}ms, groups=${groupIds.length}, performers=${results.length}`
-    );
-
-    return new Set(results.map((r) => r.performerId));
-  }
-
-  /**
-   * Get group IDs that contain scenes with specific performers.
-   * Used for filtering groups by performer on detail pages.
-   * Schema dependencies: SceneGroup.groupId, ScenePerformer.performerId
-   */
-  async getGroupIdsByPerformers(performerIds: string[]): Promise<Set<string>> {
-    if (performerIds.length === 0) return new Set();
-
-    const startTime = Date.now();
-    const results = await prisma.$queryRaw<{ groupId: string }[]>`
-      SELECT DISTINCT sg.groupId
-      FROM SceneGroup sg
-      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
-      WHERE sp.performerId IN (${Prisma.join(performerIds)})
-    `;
-    logger.debug(
-      `getGroupIdsByPerformers: ${Date.now() - startTime}ms, performers=${performerIds.length}, groups=${results.length}`
-    );
-
-    return new Set(results.map((r) => r.groupId));
   }
 
   private transformScene(scene: StashScene): NormalizedScene {
@@ -2066,96 +1327,6 @@ class StashEntityService {
       updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
 
       // Nested entities - studio from studioId, others empty (loaded separately or via include)
-      studio: scene.studioId ? { id: scene.studioId } : null,
-      performers: [],
-      tags: [],
-      groups: [],
-      galleries: [],
-
-      // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds
-        ? (JSON.parse(scene.inheritedTagIds) as string[])
-        : [],
-    };
-  }
-
-  /**
-   * Transform scene for browse queries (no streams - generated on demand)
-   */
-  private transformSceneForBrowse(scene: BrowseSceneRow): NormalizedScene {
-    return {
-      // User fields (defaults first, then override with actual values)
-      ...DEFAULT_SCENE_USER_FIELDS,
-
-      id: scene.id,
-      instanceId: scene.stashInstanceId,
-      title: scene.title || getSceneFallbackTitle(scene.filePath),
-      code: scene.code,
-      date: scene.date,
-      details: scene.details,
-      rating100: scene.rating100,
-      organized: scene.organized,
-
-      // URLs
-      urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
-
-      // File metadata
-      files: scene.filePath
-        ? [
-            {
-              path: scene.filePath,
-              duration: scene.duration,
-              bit_rate: scene.fileBitRate,
-              frame_rate: scene.fileFrameRate,
-              width: scene.fileWidth,
-              height: scene.fileHeight,
-              video_codec: scene.fileVideoCodec,
-              audio_codec: scene.fileAudioCodec,
-              size: scene.fileSize ? Number(scene.fileSize) : null,
-            },
-          ]
-        : [],
-
-      // Transformed URLs with instanceId for multi-instance routing
-      paths: {
-        screenshot: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
-        preview: toProxyUrl(scene.pathPreview, scene.stashInstanceId),
-        sprite: toProxyUrl(
-          scene.pathSprite ? `/scene/${scene.id}/vtt/sprite` : null,
-          scene.stashInstanceId
-        ),
-        vtt: toProxyUrl(
-          scene.pathVtt ? `/scene/${scene.id}/vtt/thumbs` : null,
-          scene.stashInstanceId
-        ),
-        chapters_vtt: toProxyUrl(scene.pathChaptersVtt, scene.stashInstanceId),
-        // Always null: Peek serves streams and captions through its own
-        // routes, and the media proxy refuses both Stash routes
-        stream: null,
-        caption: null,
-      },
-
-      // Empty sceneStreams for browse - generated on demand for playback
-      sceneStreams: [],
-
-      // Caption metadata for multi-language subtitle support
-      captions: scene.captions
-        ? (JSON.parse(scene.captions) as {
-            language_code: string;
-            caption_type: string;
-          }[])
-        : [],
-
-      // Stash counters (override defaults)
-      o_counter: scene.oCounter ?? 0,
-      play_count: scene.playCount ?? 0,
-      play_duration: scene.playDuration ?? 0,
-
-      // Timestamps
-      created_at: scene.stashCreatedAt?.toISOString() ?? null,
-      updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
-
-      // Nested entities - studioId only (name added by caller if needed), others empty (loaded separately or via include)
       studio: scene.studioId ? { id: scene.studioId } : null,
       performers: [],
       tags: [],
