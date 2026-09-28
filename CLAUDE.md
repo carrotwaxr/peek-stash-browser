@@ -48,6 +48,7 @@ Invariants:
 
 - Every cached Stash entity belongs to an instance. The 8 entity tables key on `@@id([id, stashInstanceId])` and junctions on 4-part keys. Every query, lookup and cache key carries the instance; one without it mixes data across servers silently.
 - One entity ID has three spellings. DB: bare `id` plus `stashInstanceId` (Peek's own per-user tables call it `instanceId`). API, URLs and filter values: `"id:instanceId"` (`InstanceAwareId` and `parseEntityRef` in `shared/types/instanceAwareId.ts`; `compositeKey.ts` in the client). In-memory Maps: `entityKey(id, instanceId)` from `server/utils/entityRef.ts` (`` `${id}\0${instanceId}` ``), with `compositeKey()` for a key of other parts; lint rejects a key built by hand. Convert at the API boundary, and keep the instance after parsing.
+- Filters and sorts are declared once in `shared/types/filters`: the client's options and the server's parser read them, and a new filter starts there.
 - Libraries reach 100k+ scenes. Filter and paginate in SQL; never load or loop over the whole library per request.
 - Database writes queue through `dbWrite` in `server/utils/dbWrite.ts`: every transaction, multi-row statement and user-path write is one unit, and no unit holds the write lock longer than 1 s (lint rejects `prisma.$transaction` elsewhere). See `.claude/rules/server-sql.md`, "Writes".
 - Migrations are written by hand (see `.claude/rules/prisma.md`). Never run `prisma migrate dev` or `prisma db push`.
