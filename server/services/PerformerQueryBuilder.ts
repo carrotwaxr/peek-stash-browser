@@ -956,7 +956,7 @@ class PerformerQueryBuilder {
 
     const params = [...fromClause.params, ...whereParams, perPage, offset];
 
-    logger.info("PerformerQueryBuilder.execute", {
+    logger.debug("PerformerQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -1032,7 +1032,7 @@ class PerformerQueryBuilder {
     await this.populateRelations(performers, userId);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("PerformerQueryBuilder.execute complete", {
+    logger.debug("PerformerQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: performers.length,

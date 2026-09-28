@@ -73,7 +73,7 @@ export async function pingWatchHistory(
       return;
     }
 
-    logger.info("Watch history ping", {
+    logger.debug("Watch history ping", {
       userId,
       sceneId,
       currentTime: currentTime.toFixed(2),
@@ -168,7 +168,7 @@ export async function pingWatchHistory(
               lastPingTime = watchHistory.lastPlayedAt;
             } else {
               // New session after significant gap, use sessionStart
-              logger.info("New viewing session detected", {
+              logger.debug("New viewing session detected", {
                 userId,
                 sceneId,
                 timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
@@ -198,7 +198,7 @@ export async function pingWatchHistory(
             // Don't let seek distance exceed the time delta (prevent negative values)
             playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
 
-            logger.info("Adjusted playback delta for seeks", {
+            logger.debug("Adjusted playback delta for seeks", {
               userId,
               sceneId,
               timeSinceLastPing: timeSinceLastPing.toFixed(2),
@@ -250,7 +250,7 @@ export async function pingWatchHistory(
           // Append timestamp to play history (Stash's pattern)
           playHistory.push(now.toISOString());
 
-          logger.info("Play count incremented (percentage threshold met)", {
+          logger.debug("Play count incremented (percentage threshold met)", {
             userId,
             sceneId,
             newPlayCount: watchHistory.playCount + 1,
@@ -325,7 +325,7 @@ export async function pingWatchHistory(
             });
           }
 
-          logger.info("Synced activity to Stash", {
+          logger.debug("Synced activity to Stash", {
             userId,
             sceneId,
             resumeTime,
@@ -689,7 +689,7 @@ export async function saveActivity(
       return;
     }
 
-    logger.info("Save activity", {
+    logger.debug("Save activity", {
       userId,
       sceneId,
       resumeTime: resumeTime?.toFixed(2),
@@ -752,7 +752,7 @@ export async function saveActivity(
             playDuration: playDuration,
           });
 
-          logger.info("Synced activity to Stash", {
+          logger.debug("Synced activity to Stash", {
             userId,
             sceneId,
             resumeTime,
@@ -812,7 +812,7 @@ export async function incrementPlayCount(
       return;
     }
 
-    logger.info("Increment play count", { userId, sceneId });
+    logger.debug("Increment play count", { userId, sceneId });
 
     // Get user settings for syncToStash, and the scene's instance if this
     // user can see it

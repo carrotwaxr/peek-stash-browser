@@ -961,7 +961,7 @@ export const findScenes = async (
 
     // NEW: Use SQL query builder if enabled (now supports text search too)
     if (USE_SQL_QUERY_BUILDER) {
-      logger.info("findScenes: using SQL query builder path", {
+      logger.debug("findScenes: using SQL query builder path", {
         hasSearchQuery: !!searchQuery,
       });
 
@@ -1033,7 +1033,7 @@ export const findScenes = async (
         );
       }
 
-      logger.info("findScenes complete (SQL path)", {
+      logger.debug("findScenes complete (SQL path)", {
         totalTimeMs: Date.now() - requestStart,
         resultCount: scenes.length,
         total: result.total,
@@ -1450,7 +1450,7 @@ export const findSimilarScenes = async (
       .map((id) => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
 
-    logger.info("findSimilarScenes completed", {
+    logger.debug("findSimilarScenes completed", {
       totalTime: `${Date.now() - startTime}ms`,
       sceneId: id,
       candidateCount: candidates.length,
@@ -1773,7 +1773,7 @@ export const getRecommendedScenes = async (
       .map((id) => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
 
-    logger.info("getRecommendedScenes completed", {
+    logger.debug("getRecommendedScenes completed", {
       totalTime: `${Date.now() - startTime}ms`,
       userId,
       candidateCount: cappedScenes.length,

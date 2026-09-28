@@ -123,7 +123,7 @@ export async function updateSceneRating(
       })
     );
 
-    logger.info("Scene rating updated", { userId, sceneId, rating, favorite });
+    logger.debug("Scene rating updated", { userId, sceneId, rating, favorite });
 
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
@@ -246,7 +246,7 @@ export async function updatePerformerRating(
       })
     );
 
-    logger.info("Performer rating updated", {
+    logger.debug("Performer rating updated", {
       userId,
       performerId,
       rating,
@@ -375,7 +375,7 @@ export async function updateStudioRating(
       })
     );
 
-    logger.info("Studio rating updated", {
+    logger.debug("Studio rating updated", {
       userId,
       studioId,
       rating,
@@ -499,7 +499,7 @@ export async function updateTagRating(
       })
     );
 
-    logger.info("Tag rating updated", { userId, tagId, rating, favorite });
+    logger.debug("Tag rating updated", { userId, tagId, rating, favorite });
 
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
@@ -621,7 +621,7 @@ export async function updateGalleryRating(
       })
     );
 
-    logger.info("Gallery rating updated", {
+    logger.debug("Gallery rating updated", {
       userId,
       galleryId,
       rating,
@@ -743,7 +743,7 @@ export async function updateGroupRating(
       })
     );
 
-    logger.info("Group rating updated", { userId, groupId, rating, favorite });
+    logger.debug("Group rating updated", { userId, groupId, rating, favorite });
 
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
@@ -860,7 +860,7 @@ export async function updateImageRating(
       })
     );
 
-    logger.info("Image rating updated", { userId, imageId, rating, favorite });
+    logger.debug("Image rating updated", { userId, imageId, rating, favorite });
 
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {

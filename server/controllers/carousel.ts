@@ -359,7 +359,7 @@ export async function executeCarouselQuery(
 
   // NEW: Use SQL query builder if enabled
   if (USE_SQL_QUERY_BUILDER) {
-    logger.info("executeCarouselQuery: using SQL query builder path");
+    logger.debug("executeCarouselQuery: using SQL query builder path");
 
     // Execute query (applyExclusions defaults to true)
     const result = await sceneQueryBuilder.execute({
@@ -375,7 +375,7 @@ export async function executeCarouselQuery(
 
     const scenes = addStreamabilityInfo(result.scenes, viewer);
 
-    logger.info("executeCarouselQuery complete (SQL path)", {
+    logger.debug("executeCarouselQuery complete (SQL path)", {
       totalTimeMs: Date.now() - startTime,
       resultCount: scenes.length,
     });
@@ -412,7 +412,7 @@ export async function executeCarouselQuery(
 
   // FAST PATH: No filters, DB-supported sort
   if (!hasFilters && canUseDbSort) {
-    logger.info("executeCarouselQuery: using FAST PATH (no filters)");
+    logger.debug("executeCarouselQuery: using FAST PATH (no filters)");
 
     // Get pre-computed scene exclusions
     const exclusionStart = Date.now();
@@ -420,7 +420,7 @@ export async function executeCarouselQuery(
       userId,
       "scene"
     );
-    logger.info(
+    logger.debug(
       `executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`
     );
 
@@ -434,28 +434,28 @@ export async function executeCarouselQuery(
       sortDirection: direction.toUpperCase() as "ASC" | "DESC",
       excludeIds,
     });
-    logger.info(
+    logger.debug(
       `executeCarouselQuery: DB pagination took ${Date.now() - dbStart}ms`
     );
 
     // Merge with user data
     const mergeStart = Date.now();
     const scenesWithUserData = await mergeScenesWithUserData(scenes, userId);
-    logger.info(
+    logger.debug(
       `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
     );
 
     // Add streamability info
     const finalScenes = addStreamabilityInfo(scenesWithUserData, viewer);
 
-    logger.info(
+    logger.debug(
       `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`
     );
     return finalScenes;
   }
 
   // STANDARD PATH: Has filters, need to load more scenes
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`
   );
 
@@ -465,7 +465,7 @@ export async function executeCarouselQuery(
     userId,
     "scene"
   );
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`
   );
 
@@ -473,7 +473,7 @@ export async function executeCarouselQuery(
   const cacheStart = Date.now();
   // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
   let scenes = await stashEntityService.getAllScenes();
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`
   );
 
@@ -482,28 +482,28 @@ export async function executeCarouselQuery(
   scenes = scenes.filter(
     (s) => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData)
   );
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: applied exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`
   );
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
   const quickFilterStart = Date.now();
   scenes = await applyQuickSceneFilters(scenes, rules);
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: applyQuickSceneFilters took ${Date.now() - quickFilterStart}ms`
   );
 
   // Merge with user-specific data (ratings, watch history, favorites)
   const mergeStart = Date.now();
   scenes = await mergeScenesWithUserData(scenes, userId);
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
   );
 
   // Apply filters that require user data (favorite, rating, play_count, etc.)
   const expensiveFilterStart = Date.now();
   scenes = applyExpensiveSceneFilters(scenes, rules);
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: applyExpensiveSceneFilters took ${Date.now() - expensiveFilterStart}ms`
   );
 
@@ -514,7 +514,7 @@ export async function executeCarouselQuery(
   scenes = sortScenes(scenes, sort, direction);
 
   // Limit to carousel size
-  logger.info(
+  logger.debug(
     `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (STANDARD PATH)`
   );
   return scenes.slice(0, CAROUSEL_SCENE_LIMIT);

@@ -1345,7 +1345,7 @@ class SceneQueryBuilder {
 
     const params = [...fromClause.params, ...whereParams, perPage, offset];
 
-    logger.info("SceneQueryBuilder.execute", {
+    logger.debug("SceneQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -1426,7 +1426,7 @@ class SceneQueryBuilder {
     await this.populateRelations(scenes);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("SceneQueryBuilder.execute complete", {
+    logger.debug("SceneQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: scenes.length,

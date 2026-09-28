@@ -87,7 +87,7 @@ These settings have sensible defaults but can be customized:
 | `CONFIG_DIR`         | Where backups and download zips go | `/app/data`                    | The database stays in `/app/data`. A directory outside `/app/data` is given to `PUID:PGID` on start |
 | `PUID`               | User that owns `/app/data` and runs the server | `99` (unRAID's `nobody`) | See [File ownership](installation.md#file-ownership-puidpgid). `0` runs as root, with a warning |
 | `PGID`               | Group that owns `/app/data` | `100` (unRAID's `users`)              | See [File ownership](installation.md#file-ownership-puidpgid) |
-| `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE`. No level logs Stash API keys or signed stream links, so a `DEBUG` log is safe to share |
+| `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE`. `INFO` logs server events (library syncs, users, settings, restrictions, writes to Stash) and errors with their cause; `DEBUG` adds per-request timings (lists, playback progress, ratings). No level logs Stash API keys or signed stream links, so a `DEBUG` log is safe to share |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 | `PROXY_AUTH_TRUSTED_IPS` | Addresses allowed to send `PROXY_AUTH_HEADER` | Unset (any address, with a startup warning) | Comma-separated IPs and CIDR ranges of your auth proxy. See [Trusted proxy addresses](#trusted-proxy-addresses) |

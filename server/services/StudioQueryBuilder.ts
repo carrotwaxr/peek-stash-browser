@@ -433,7 +433,7 @@ class StudioQueryBuilder {
 
     const params = [...fromClause.params, ...whereParams, perPage, offset];
 
-    logger.info("StudioQueryBuilder.execute", {
+    logger.debug("StudioQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -506,7 +506,7 @@ class StudioQueryBuilder {
     await this.populateRelations(studios, userId);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("StudioQueryBuilder.execute complete", {
+    logger.debug("StudioQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: studios.length,

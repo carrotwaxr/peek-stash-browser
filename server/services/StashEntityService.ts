@@ -427,7 +427,7 @@ class StashEntityService {
       date: row.date,
     }));
 
-    logger.info(
+    logger.debug(
       `getScenesForScoring: ${Date.now() - startTime}ms, count=${result.length}`
     );
 
@@ -533,7 +533,7 @@ class StashEntityService {
       date: row.date,
     }));
 
-    logger.info(
+    logger.debug(
       `getSimilarSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`
     );
 

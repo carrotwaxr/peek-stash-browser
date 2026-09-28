@@ -634,7 +634,7 @@ class GroupQueryBuilder {
       offset,
     ];
 
-    logger.info("GroupQueryBuilder.execute", {
+    logger.debug("GroupQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -704,7 +704,7 @@ class GroupQueryBuilder {
     await this.populateRelations(groups, userId);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("GroupQueryBuilder.execute complete", {
+    logger.debug("GroupQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: groups.length,

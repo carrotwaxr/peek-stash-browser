@@ -200,7 +200,7 @@ export const findPerformers = async (
       ),
     }));
 
-    logger.info("findPerformers completed", {
+    logger.debug("findPerformers completed", {
       totalTime: `${Date.now() - startTime}ms`,
       totalCount: total,
       returnedCount: performersWithStashUrl.length,

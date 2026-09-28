@@ -251,7 +251,7 @@ export const findGroups = async (
         // Hydrate tags with names
         paginatedGroups = await hydrateEntityTags(paginatedGroups);
 
-        logger.info("Computed counts for group detail", {
+        logger.debug("Computed counts for group detail", {
           groupId: existingGroup.id,
           groupName: existingGroup.name,
           sceneCount: groupWithCounts.scene_count,
@@ -271,7 +271,7 @@ export const findGroups = async (
       ),
     }));
 
-    logger.info("findGroups completed", {
+    logger.debug("findGroups completed", {
       totalTime: `${Date.now() - startTime}ms`,
       totalCount: total,
       returnedCount: groupsWithStashUrl.length,
