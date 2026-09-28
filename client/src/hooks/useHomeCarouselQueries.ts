@@ -1,4 +1,4 @@
-import { commonFilters, libraryApi } from "../api";
+import { commonFilters, filterHelpers, libraryApi } from "../api";
 
 interface StashScene {
   id: string;
@@ -7,14 +7,6 @@ interface StashScene {
 
 interface FindScenesResponse {
   findScenes?: { scenes?: StashScene[] };
-}
-
-interface FindStudiosResponse {
-  findStudios?: { studios?: Array<{ id: string; [key: string]: unknown }> };
-}
-
-interface FindTagsResponse {
-  findTags?: { tags?: Array<{ id: string; [key: string]: unknown }> };
 }
 
 export const useHomeCarouselQueries = (perCarousel: number = 12) => {
@@ -26,65 +18,23 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       // Extract scenes from server response structure
       return response?.findScenes?.scenes ?? [];
     },
+    // The server's favorite filters match every studio or tag the user has
+    // favorited, each on its own instance, in one request.
     favoriteStudioScenes: async () => {
-      const response = (await libraryApi.findStudios(
-        commonFilters.favoriteStudios(1, perCarousel)
-      )) as FindStudiosResponse;
-
-      // Extract scenes from server response structure
-      const favoriteStudios = response?.findStudios?.studios ?? [];
-      const favoriteStudioIds = favoriteStudios.map((studio) => studio.id);
-
-      if (favoriteStudioIds.length === 0) {
-        return [];
-      }
-      const scenesResponse = (await libraryApi.findScenes({
-        filter: {
-          page: 1,
-          per_page: perCarousel,
-          sort: "random",
-          direction: "ASC",
-        },
-        scene_filter: {
-          studios: {
-            value: favoriteStudioIds,
-            modifier: "INCLUDES",
-            depth: 0,
-          },
-        },
+      const response = (await libraryApi.findScenes({
+        filter: filterHelpers.pagination(1, perCarousel, "random", "ASC"),
+        scene_filter: { studio_favorite: true },
       })) as FindScenesResponse;
 
-      return scenesResponse?.findScenes?.scenes ?? [];
+      return response.findScenes?.scenes ?? [];
     },
     favoriteTagScenes: async () => {
-      const response = (await libraryApi.findTags(
-        commonFilters.favoriteTags(1, perCarousel)
-      )) as FindTagsResponse;
-
-      // Extract scenes from server response structure
-      const favoriteTags = response?.findTags?.tags ?? [];
-      const favoriteTagIds = favoriteTags.map((tag) => tag.id);
-
-      if (favoriteTagIds.length === 0) {
-        return [];
-      }
-      const scenesResponse = (await libraryApi.findScenes({
-        filter: {
-          page: 1,
-          per_page: perCarousel,
-          sort: "random",
-          direction: "ASC",
-        },
-        scene_filter: {
-          tags: {
-            value: favoriteTagIds,
-            modifier: "INCLUDES",
-            depth: 0,
-          },
-        },
+      const response = (await libraryApi.findScenes({
+        filter: filterHelpers.pagination(1, perCarousel, "random", "ASC"),
+        scene_filter: { tag_favorite: true },
       })) as FindScenesResponse;
 
-      return scenesResponse?.findScenes?.scenes ?? [];
+      return response.findScenes?.scenes ?? [];
     },
     highRatedScenes: async () => {
       const response = (await libraryApi.findScenes(

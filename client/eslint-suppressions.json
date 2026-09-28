@@ -1419,7 +1419,7 @@
   },
   "src/hooks/useHomeCarouselQueries.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
+      "count": 3
     }
   },
   "src/hooks/useHorizontalNavigation.ts": {
