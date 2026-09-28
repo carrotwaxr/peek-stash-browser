@@ -4,6 +4,20 @@
 import { makeCompositeKey } from "./compositeKey";
 import type { FilterOption } from "./filterConfig";
 
+/** The most rows a list page asks for; the server holds `per_page` to it. */
+export const PER_PAGE_MAX = 250;
+const DEFAULT_PER_PAGE = 24;
+
+/**
+ * Reads `per_page` from the URL: above the maximum it becomes the maximum;
+ * missing, zero, negative or not a number it becomes the default.
+ */
+const parsePerPage = (value: string | null): number => {
+  const num = parseInt(value ?? "", 10);
+  if (isNaN(num) || num < 1) return DEFAULT_PER_PAGE;
+  return Math.min(num, PER_PAGE_MAX);
+};
+
 interface SearchState {
   searchText: string;
   sortField: string;
@@ -247,7 +261,7 @@ export const buildSearchParams = ({
   if (sortField) params.set("sort", sortField);
   if (sortDirection) params.set("dir", sortDirection);
   if (currentPage > 1) params.set("page", currentPage.toString());
-  if (perPage !== 24) params.set("per_page", perPage.toString());
+  if (perPage !== DEFAULT_PER_PAGE) params.set("per_page", perPage.toString());
   if (viewMode && viewMode !== "grid") params.set("view", viewMode);
   if (zoomLevel && zoomLevel !== "medium") params.set("zoom", zoomLevel);
   if (gridDensity && gridDensity !== "medium")
@@ -275,7 +289,7 @@ export const parseSearchParams = (
     sortField: searchParams.get("sort") || defaults.sortField || "o_counter",
     sortDirection: searchParams.get("dir") || defaults.sortDirection || "DESC",
     currentPage: parseInt(searchParams.get("page") || "1", 10),
-    perPage: parseInt(searchParams.get("per_page") || "24", 10),
+    perPage: parsePerPage(searchParams.get("per_page")),
     viewMode: searchParams.get("view") || defaults.viewMode || "grid",
     zoomLevel: searchParams.get("zoom") || defaults.zoomLevel || "medium",
     gridDensity:
