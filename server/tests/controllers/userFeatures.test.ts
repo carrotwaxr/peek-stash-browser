@@ -48,6 +48,7 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
+import type * as userHiddenEntityModule from "../../services/UserHiddenEntityService.js";
 import { entityKey } from "../../utils/entityRef.js";
 import {
   formatRecoveryKey,
@@ -110,27 +111,31 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   getIdsVisibleOnAnyInstance: vi.fn(),
 }));
 
-// Mock UserHiddenEntityService (dynamically imported)
-vi.mock("../../services/UserHiddenEntityService.js", () => ({
-  userHiddenEntityService: {
-    findAlreadyHidden: vi.fn(),
-    hideEntity: vi.fn().mockResolvedValue(undefined),
-    unhideEntity: vi.fn().mockResolvedValue(undefined),
-    unhideAll: vi.fn().mockResolvedValue(5),
-    getHiddenEntities: vi.fn().mockResolvedValue([]),
-    getHiddenEntityIds: vi.fn().mockResolvedValue({
-      scenes: new Set(),
-      performers: new Set(),
-      studios: new Set(),
-      tags: new Set(),
-      groups: new Set(),
-      galleries: new Set(),
-      images: new Set(),
-    }),
-  },
-}));
+// Mock UserHiddenEntityService; its list of hideable types stays real
+vi.mock(
+  "../../services/UserHiddenEntityService.js",
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof userHiddenEntityModule>()),
+    userHiddenEntityService: {
+      findAlreadyHidden: vi.fn(),
+      hideEntity: vi.fn().mockResolvedValue(undefined),
+      unhideEntity: vi.fn().mockResolvedValue(undefined),
+      unhideAll: vi.fn().mockResolvedValue(5),
+      getHiddenEntities: vi.fn().mockResolvedValue([]),
+      getHiddenEntityIds: vi.fn().mockResolvedValue({
+        scenes: new Set(),
+        performers: new Set(),
+        studios: new Set(),
+        tags: new Set(),
+        groups: new Set(),
+        galleries: new Set(),
+        images: new Set(),
+      }),
+    },
+  })
+);
 
-// Mock StashInstanceManager (dynamically imported by hideEntity/unhideEntity)
+// Mock StashInstanceManager (hide targets and unhide check the instance)
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getConfig: vi.fn().mockReturnValue({ id: "inst-1" }),
@@ -852,6 +857,102 @@ describe("User Controller — Features", () => {
       const res = resFor(getHiddenEntities);
       await getHiddenEntities(req, res);
       expect(res._getOkBody().hiddenEntities).toEqual([]);
+    });
+  });
+
+  describe("the hide handlers' entity types", () => {
+    const SEVEN_TYPES = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+      "image",
+    ];
+    const HANDLERS = [
+      "hideEntity",
+      "unhideEntity",
+      "unhideAllEntities",
+      "getHiddenEntities",
+    ] as const;
+    const hidden = vi.mocked(userHiddenEntityService, true);
+
+    /**
+     * Each handler called with one entity type (answering its status), and
+     * the types it passed on to the service so far.
+     */
+    const handlers: Record<
+      (typeof HANDLERS)[number],
+      { call: (entityType: string) => Promise<number>; passed: () => unknown[] }
+    > = {
+      hideEntity: {
+        call: async (entityType) => {
+          const req = reqFor(hideEntity, {
+            body: { entityType, entityId: "42" },
+            user: USER,
+          });
+          const res = resFor(hideEntity);
+          await hideEntity(req, res);
+          return res._getStatus();
+        },
+        passed: () => hidden.hideEntity.mock.calls.map((call) => call[1]),
+      },
+      unhideEntity: {
+        call: async (entityType) => {
+          const req = reqFor(unhideEntity, {
+            params: { entityType, entityId: "42" },
+            user: USER,
+          });
+          const res = resFor(unhideEntity);
+          await unhideEntity(req, res);
+          return res._getStatus();
+        },
+        passed: () => hidden.unhideEntity.mock.calls.map((call) => call[1]),
+      },
+      unhideAllEntities: {
+        call: async (entityType) => {
+          const req = reqFor(unhideAllEntities, {
+            query: { entityType },
+            user: USER,
+          });
+          const res = resFor(unhideAllEntities);
+          await unhideAllEntities(req, res);
+          return res._getStatus();
+        },
+        passed: () => hidden.unhideAll.mock.calls.map((call) => call[1]),
+      },
+      getHiddenEntities: {
+        call: async (entityType) => {
+          const req = reqFor(getHiddenEntities, {
+            query: { entityType },
+            user: USER,
+          });
+          const res = resFor(getHiddenEntities);
+          await getHiddenEntities(req, res);
+          return res._getStatus();
+        },
+        passed: () =>
+          hidden.getHiddenEntities.mock.calls.map((call) => call[1]),
+      },
+    };
+
+    it.each(HANDLERS)(
+      "%s answers 400 for a type outside HIDEABLE_ENTITY_TYPES",
+      async (name) => {
+        const handler = handlers[name];
+        expect(await handler.call("clip")).toBe(400);
+        expect(await handler.call("Scene")).toBe(400);
+        expect(handler.passed()).toEqual([]);
+      }
+    );
+
+    it.each(HANDLERS)("%s accepts each of the seven types", async (name) => {
+      const handler = handlers[name];
+      for (const entityType of SEVEN_TYPES) {
+        expect(await handler.call(entityType), entityType).toBe(200);
+      }
+      expect(handler.passed()).toEqual(SEVEN_TYPES);
     });
   });
 

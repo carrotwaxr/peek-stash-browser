@@ -234,8 +234,6 @@ router.post(
       const { instanceId } = (req.body ?? {}) as { instanceId?: string };
 
       // If no instance specified, get the first enabled instance
-      const { stashInstanceManager } =
-        await import("../services/StashInstanceManager.js");
       let targetInstanceId: string | undefined = instanceId;
       if (!targetInstanceId) {
         const enabledInstances = stashInstanceManager.getAllEnabled();
