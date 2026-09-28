@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
@@ -21,6 +22,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   FavoriteButton,
   LazyImage,
   LoadingSpinner,
@@ -42,8 +44,6 @@ interface EntityRef {
 const TagDetail = () => {
   const { tagId } = useParams<{ tagId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [tag, setTag] = useState<Record<string, unknown> | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -59,6 +59,10 @@ const TagDetail = () => {
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
+
+  const lookup = useEntityLookup(libraryApi.findTagById, tagId, instanceId);
+  const tag = lookup.entity ?? null;
+  const isLoading = lookup.status === "loading";
 
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get("includeSubTags") === "true";
@@ -113,26 +117,14 @@ const TagDetail = () => {
   // Set page title to tag name
   usePageTitle((tag?.name as string) || "Tag");
 
-  useEffect(() => {
-    const fetchTag = async () => {
-      try {
-        setIsLoading(true);
-        const tagData = (await libraryApi.findTagById(
-          tagId!,
-          instanceId
-        )) as Record<string, unknown> | null;
-        setTag(tagData);
-        setRating((tagData?.rating as number | null) ?? null);
-        setIsFavorite((tagData?.favorite as boolean) || false);
-      } catch {
-        // Error loading tag - will show loading spinner
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchTag();
-  }, [tagId, instanceId]);
+  // The rating and favorite controls start from each loaded tag's,
+  // set while rendering so they never show the previous one's
+  const [controlsFor, setControlsFor] = useState(tag);
+  if (controlsFor !== tag) {
+    setControlsFor(tag);
+    setRating((tag?.rating as number | null | undefined) ?? null);
+    setIsFavorite(tag?.favorite === true);
+  }
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
@@ -165,7 +157,7 @@ const TagDetail = () => {
     toggleFavorite,
   });
 
-  if (isLoading) {
+  if (lookup.status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -173,38 +165,16 @@ const TagDetail = () => {
     );
   }
 
-  // If tag not found after loading, show error and back button
-  if (!tag) {
+  // Found always carries the tag; the second check narrows it for below
+  if (lookup.status !== "found" || !tag) {
     return (
-      <div className="min-h-screen px-4 lg:px-6 xl:px-8">
-        <div className="max-w-none">
-          <div className="mt-6 mb-6">
-            <Button
-              onClick={goBack}
-              variant="secondary"
-              icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-              title={backButtonText}
-            >
-              <span className="hidden sm:inline">{backButtonText}</span>
-            </Button>
-          </div>
-          <div className="flex flex-col items-center justify-center py-16">
-            <h2
-              className="text-2xl font-bold mb-4"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Tag Not Found
-            </h2>
-            <p
-              className="text-center mb-6"
-              style={{ color: "var(--text-muted)" }}
-            >
-              The tag you're looking for could not be found or you don't have
-              permission to view it.
-            </p>
-          </div>
-        </div>
-      </div>
+      <EntityNotFound
+        entityType="tag"
+        status={lookup.status === "found" ? "notFound" : lookup.status}
+        matches={lookup.matches}
+        error={lookup.error}
+        onRetry={lookup.retry}
+      />
     );
   }
 

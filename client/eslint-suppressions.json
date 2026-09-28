@@ -1,7 +1,7 @@
 {
   "src/api/library.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 14
+      "count": 2
     }
   },
   "src/api/setup.ts": {
@@ -219,7 +219,7 @@
   },
   "src/components/pages/GalleryDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 7
+      "count": 6
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
@@ -230,7 +230,7 @@
   },
   "src/components/pages/GroupDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 7
+      "count": 6
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
@@ -299,7 +299,7 @@
   },
   "src/components/pages/PerformerDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 9
+      "count": 8
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 8
@@ -348,7 +348,7 @@
   },
   "src/components/pages/Scene.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
@@ -360,7 +360,7 @@
       "count": 8
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/pages/SceneDetails.tsx": {
@@ -386,7 +386,7 @@
   },
   "src/components/pages/StudioDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 14
+      "count": 13
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
@@ -405,7 +405,7 @@
   },
   "src/components/pages/TagDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 10
+      "count": 9
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 10

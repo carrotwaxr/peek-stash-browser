@@ -39,6 +39,71 @@ import { apiFetch, apiGet, apiPost } from "./client";
 export type LibrarySearchParams<E extends EntityKind = EntityKind> =
   ListRequestInput<E>;
 
+// ── Single-entity lookup ───────────────────────────────────────────────
+
+/** The list endpoint each detail page looks its entity up through */
+const BY_ID = {
+  scene: {
+    path: "/library/scenes",
+    filter: "scene_filter",
+    result: "findScenes",
+    list: "scenes",
+  },
+  performer: {
+    path: "/library/performers",
+    filter: "performer_filter",
+    result: "findPerformers",
+    list: "performers",
+  },
+  studio: {
+    path: "/library/studios",
+    filter: "studio_filter",
+    result: "findStudios",
+    list: "studios",
+  },
+  tag: {
+    path: "/library/tags",
+    filter: "tag_filter",
+    result: "findTags",
+    list: "tags",
+  },
+  gallery: {
+    path: "/library/galleries",
+    filter: "gallery_filter",
+    result: "findGalleries",
+    list: "galleries",
+  },
+  group: {
+    path: "/library/groups",
+    filter: "group_filter",
+    result: "findGroups",
+    list: "groups",
+  },
+} as const;
+
+type ListResponse = Partial<
+  Record<string, Partial<Record<string, Record<string, unknown>[]>>>
+>;
+
+/**
+ * One entity by id through its list endpoint, so the user's exclusions
+ * apply: null when nothing matches (a missing, hidden or restricted entity
+ * looks the same). Without an instance, an id found on several servers
+ * rejects with the server's 400 (an ApiError whose data lists the matches).
+ */
+async function findOneById(
+  type: keyof typeof BY_ID,
+  id: string,
+  instanceId: string | null,
+  signal?: AbortSignal
+): Promise<Record<string, unknown> | null> {
+  const { path, filter, result, list } = BY_ID[type];
+  const params: LibrarySearchParams = { ids: [id] };
+  if (instanceId) params[filter] = { instance_id: instanceId };
+  const data = await apiPost<ListResponse>(path, params, signal);
+  return data[result]?.[list]?.[0] ?? null;
+}
+
 // ── Library API ────────────────────────────────────────────────────────
 
 export const libraryApi = {
@@ -103,91 +168,44 @@ export const libraryApi = {
       signal,
     }),
 
-  // Single-entity lookups
-  findSceneById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.scene_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/scenes",
-      params
-    );
-    return (result?.findScenes as Record<string, unknown>)?.scenes
-      ? ((
-          (result.findScenes as Record<string, unknown>).scenes as unknown[]
-        )[0] ?? null)
-      : null;
-  },
+  // Single-entity lookups: each resolves to null when there is no entity
+  // the user can see, and rejects with a 400 ApiError listing the matches
+  // when an id without an instance is on several servers
+  findSceneById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("scene", id, instanceId, signal),
 
-  findPerformerById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.performer_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/performers",
-      params
-    );
-    return (result?.findPerformers as Record<string, unknown>)?.performers
-      ? ((
-          (result.findPerformers as Record<string, unknown>)
-            .performers as unknown[]
-        )[0] ?? null)
-      : null;
-  },
+  findPerformerById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("performer", id, instanceId, signal),
 
-  findStudioById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.studio_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/studios",
-      params
-    );
-    return (result?.findStudios as Record<string, unknown>)?.studios
-      ? ((
-          (result.findStudios as Record<string, unknown>).studios as unknown[]
-        )[0] ?? null)
-      : null;
-  },
+  findStudioById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("studio", id, instanceId, signal),
 
-  findTagById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.tag_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/tags",
-      params
-    );
-    return (result?.findTags as Record<string, unknown>)?.tags
-      ? (((result.findTags as Record<string, unknown>).tags as unknown[])[0] ??
-          null)
-      : null;
-  },
+  findTagById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("tag", id, instanceId, signal),
 
-  findGalleryById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.gallery_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/galleries",
-      params
-    );
-    return (result?.findGalleries as Record<string, unknown>)?.galleries
-      ? ((
-          (result.findGalleries as Record<string, unknown>)
-            .galleries as unknown[]
-        )[0] ?? null)
-      : null;
-  },
+  findGalleryById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("gallery", id, instanceId, signal),
 
-  findGroupById: async (id: string, instanceId: string | null = null) => {
-    const params: LibrarySearchParams = { ids: [id] };
-    if (instanceId) params.group_filter = { instance_id: instanceId };
-    const result = await apiPost<Record<string, unknown>>(
-      "/library/groups",
-      params
-    );
-    return (result?.findGroups as Record<string, unknown>)?.groups
-      ? ((
-          (result.findGroups as Record<string, unknown>).groups as unknown[]
-        )[0] ?? null)
-      : null;
-  },
+  findGroupById: (
+    id: string,
+    instanceId: string | null = null,
+    signal?: AbortSignal
+  ) => findOneById("group", id, instanceId, signal),
 
   // Entity pickers: one page in name order, or the ids a picker selected
   findPerformersMinimal: async (

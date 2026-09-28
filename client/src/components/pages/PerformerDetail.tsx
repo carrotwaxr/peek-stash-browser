@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import type { TagRef } from "@peek/shared-types";
@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
@@ -21,6 +22,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   FavoriteButton,
   GenderIcon,
   LazyImage,
@@ -36,10 +38,6 @@ import {
 const PerformerDetail = () => {
   const { performerId } = useParams<{ performerId: string }>();
   const [searchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [performer, setPerformer] = useState<Record<string, unknown> | null>(
-    null
-  );
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -52,6 +50,14 @@ const PerformerDetail = () => {
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
+
+  const lookup = useEntityLookup(
+    libraryApi.findPerformerById,
+    performerId,
+    instanceId
+  );
+  const performer = lookup.entity ?? null;
+  const isLoading = lookup.status === "loading";
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
@@ -85,26 +91,14 @@ const PerformerDetail = () => {
   // Set page title to performer name
   usePageTitle((performer?.name as string) || "Performer");
 
-  useEffect(() => {
-    const fetchPerformer = async () => {
-      try {
-        setIsLoading(true);
-        const performerData = (await libraryApi.findPerformerById(
-          performerId!,
-          instanceId
-        )) as Record<string, unknown> | null;
-        setPerformer(performerData);
-        setRating(performerData?.rating as number | null);
-        setIsFavorite((performerData?.favorite as boolean) || false);
-      } catch {
-        // Error loading performer - will show loading spinner
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchPerformer();
-  }, [performerId, instanceId]);
+  // The rating and favorite controls start from each loaded performer's,
+  // set while rendering so they never show the previous one's
+  const [controlsFor, setControlsFor] = useState(performer);
+  if (controlsFor !== performer) {
+    setControlsFor(performer);
+    setRating((performer?.rating as number | null | undefined) ?? null);
+    setIsFavorite(performer?.favorite === true);
+  }
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
@@ -150,11 +144,23 @@ const PerformerDetail = () => {
     toggleFavorite,
   });
 
-  if (isLoading) {
+  if (lookup.status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
       </div>
+    );
+  }
+
+  if (lookup.status !== "found") {
+    return (
+      <EntityNotFound
+        entityType="performer"
+        status={lookup.status}
+        matches={lookup.matches}
+        error={lookup.error}
+        onRetry={lookup.retry}
+      />
     );
   }
 

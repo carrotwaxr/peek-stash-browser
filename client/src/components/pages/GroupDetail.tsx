@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { GroupRelationRef, TagRef } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -16,6 +17,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   FavoriteButton,
   LoadingSpinner,
   PageHeader,
@@ -35,8 +37,6 @@ interface EntityRef {
 const GroupDetail = () => {
   const { groupId } = useParams<{ groupId: string }>();
   const [searchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [group, setGroup] = useState<Record<string, unknown> | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -52,6 +52,10 @@ const GroupDetail = () => {
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
+
+  const lookup = useEntityLookup(libraryApi.findGroupById, groupId, instanceId);
+  const group = lookup.entity ?? null;
+  const isLoading = lookup.status === "loading";
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
@@ -75,26 +79,14 @@ const GroupDetail = () => {
   // Set page title to group name
   usePageTitle((group?.name as string) || "Collection");
 
-  useEffect(() => {
-    const fetchGroup = async () => {
-      try {
-        setIsLoading(true);
-        const groupData = (await libraryApi.findGroupById(
-          groupId!,
-          instanceId
-        )) as Record<string, unknown> | null;
-        setGroup(groupData);
-        setRating(groupData?.rating as number | null);
-        setIsFavorite((groupData?.favorite as boolean) || false);
-      } catch {
-        // Error loading group - will show loading spinner
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchGroup();
-  }, [groupId, instanceId]);
+  // The rating and favorite controls start from each loaded collection's,
+  // set while rendering so they never show the previous one's
+  const [controlsFor, setControlsFor] = useState(group);
+  if (controlsFor !== group) {
+    setControlsFor(group);
+    setRating((group?.rating as number | null | undefined) ?? null);
+    setIsFavorite(group?.favorite === true);
+  }
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
@@ -127,11 +119,23 @@ const GroupDetail = () => {
     toggleFavorite,
   });
 
-  if (isLoading) {
+  if (lookup.status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
       </div>
+    );
+  }
+
+  if (lookup.status !== "found") {
+    return (
+      <EntityNotFound
+        entityType="group"
+        status={lookup.status}
+        matches={lookup.matches}
+        error={lookup.error}
+        onRetry={lookup.retry}
+      />
     );
   }
 

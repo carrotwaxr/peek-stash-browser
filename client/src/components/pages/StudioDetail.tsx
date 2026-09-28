@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { NormalizedImage, TagRef } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
@@ -16,6 +17,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   FavoriteButton,
   LazyImage,
   LoadingSpinner,
@@ -42,8 +44,6 @@ interface StashId {
 const StudioDetail = () => {
   const { studioId } = useParams<{ studioId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [studio, setStudio] = useState<Record<string, unknown> | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -59,6 +59,14 @@ const StudioDetail = () => {
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
+
+  const lookup = useEntityLookup(
+    libraryApi.findStudioById,
+    studioId,
+    instanceId
+  );
+  const studio = lookup.entity ?? null;
+  const isLoading = lookup.status === "loading";
 
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
@@ -117,26 +125,14 @@ const StudioDetail = () => {
   // Set page title to studio name
   usePageTitle((studio?.name as string) || "Studio");
 
-  useEffect(() => {
-    const fetchStudio = async () => {
-      try {
-        setIsLoading(true);
-        const studioData = (await libraryApi.findStudioById(
-          studioId!,
-          instanceId
-        )) as Record<string, unknown> | null;
-        setStudio(studioData);
-        setRating(studioData?.rating as number | null);
-        setIsFavorite((studioData?.favorite as boolean) || false);
-      } catch {
-        // Error loading studio - will show loading spinner
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchStudio();
-  }, [studioId, instanceId]);
+  // The rating and favorite controls start from each loaded studio's,
+  // set while rendering so they never show the previous one's
+  const [controlsFor, setControlsFor] = useState(studio);
+  if (controlsFor !== studio) {
+    setControlsFor(studio);
+    setRating((studio?.rating as number | null | undefined) ?? null);
+    setIsFavorite(studio?.favorite === true);
+  }
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
@@ -175,11 +171,23 @@ const StudioDetail = () => {
     toggleFavorite,
   });
 
-  if (isLoading) {
+  if (lookup.status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
       </div>
+    );
+  }
+
+  if (lookup.status !== "found") {
+    return (
+      <EntityNotFound
+        entityType="studio"
+        status={lookup.status}
+        matches={lookup.matches}
+        error={lookup.error}
+        onRetry={lookup.retry}
+      />
     );
   }
 
