@@ -1,0 +1,108 @@
+// shared/types/filters/index.ts
+/**
+ * The list filter and sort contract (item 38): every list's filter fields,
+ * sorts and filter-panel keys, declared once. The client's filter options and
+ * the server's request parser both read it; a new filter starts here.
+ */
+export {
+  BREAST_TYPES,
+  COMPARISON_MODIFIERS,
+  DATE_MODIFIERS,
+  ENTITY_KINDS,
+  ENUM_MODIFIERS,
+  ETHNICITIES,
+  EYE_COLORS,
+  FIELD_KINDS,
+  GENDERS,
+  HAIR_COLORS,
+  NUMBER_MODIFIERS,
+  ORIENTATIONS,
+  PRESENCE_MODIFIERS,
+  RANGE_MODIFIERS,
+  REF_MODIFIERS,
+  RESOLUTIONS,
+  SINGLE_REF_MODIFIERS,
+  TEXT_MODIFIERS,
+} from "./criteria.js";
+export type {
+  BooleanSpec,
+  DateModifier,
+  DateSpec,
+  EntityKind,
+  EnumModifier,
+  EnumSpec,
+  FieldKind,
+  FieldSpec,
+  InstanceSpec,
+  NumberModifier,
+  NumberSpec,
+  PresenceModifier,
+  RangeModifier,
+  RefModifier,
+  RefSpec,
+  Resolution,
+  TextModifier,
+  TextSpec,
+} from "./criteria.js";
+
+export {
+  CLIP_PARAMS,
+  DEFAULT_SORT,
+  FIELDS,
+  FILTER_BODY_KEYS,
+  GALLERY_FIELDS,
+  GROUP_FIELDS,
+  IMAGE_FIELDS,
+  LIST_KINDS,
+  MAX_REF_VALUES,
+  PERFORMER_FIELDS,
+  PER_PAGE_MAX,
+  SCENE_FIELDS,
+  SORTS,
+  SORT_DIRECTIONS,
+  STUDIO_FIELDS,
+  TAG_FIELDS,
+} from "./fields.js";
+export type {
+  FieldSpecOf,
+  FilterBodyKey,
+  ListKind,
+  RandomSortKey,
+  SortDirection,
+  SortOf,
+} from "./fields.js";
+
+export {
+  CLIP_UI_KEYS,
+  GALLERY_UI_KEYS,
+  GROUP_UI_KEYS,
+  IMAGE_UI_KEYS,
+  PERFORMER_UI_KEYS,
+  SCENE_UI_KEYS,
+  STUDIO_UI_KEYS,
+  TAG_UI_KEYS,
+  UI_KEYS,
+} from "./uiKeys.js";
+export type { UiKey } from "./uiKeys.js";
+
+export type {
+  ClipQueryInput,
+  CriterionInput,
+  DateInput,
+  EnumInput,
+  FilterInput,
+  GalleryFilterInput,
+  GroupFilterInput,
+  HierarchicalRefInput,
+  ImageFilterInput,
+  ListPageInput,
+  ListRequestInput,
+  MultiEnumInput,
+  NumberInput,
+  PerformerFilterInput,
+  RefInput,
+  SceneFilterInput,
+  StudioFilterInput,
+  TagFilterInput,
+  TextInput,
+} from "./wire.js";
