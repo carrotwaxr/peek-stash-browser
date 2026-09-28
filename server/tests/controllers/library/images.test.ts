@@ -14,7 +14,12 @@ import {
   type ImageListRow,
   imageQueryBuilder,
 } from "../../../services/ImageQueryBuilder.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
@@ -243,10 +248,10 @@ describe("Images Controller", () => {
         body: {
           filter: {},
           image_filter: {
-            performers: { value: ["p1"], modifier: "INCLUDES" },
-            tags: { value: ["t1"], modifier: "INCLUDES" },
-            studios: { value: ["s1"] },
-            galleries: { value: ["g1"] },
+            performers: { value: ["11"], modifier: "INCLUDES" },
+            tags: { value: ["12:inst-a"], modifier: "INCLUDES", depth: -1 },
+            studios: { value: ["13"] },
+            galleries: { value: ["14"] },
           },
         },
         user: defaultUser,
@@ -257,21 +262,86 @@ describe("Images Controller", () => {
 
       const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.filters?.performers).toEqual({
-        value: ["p1"],
+        value: ["11"],
         modifier: "INCLUDES",
       });
       expect(callArgs.filters?.tags).toEqual({
-        value: ["t1"],
+        value: ["12:inst-a"],
         modifier: "INCLUDES",
+        depth: -1,
       });
       expect(callArgs.filters?.studios).toEqual({
-        value: ["s1"],
+        value: ["13"],
         modifier: "INCLUDES",
+        depth: 0,
       });
       expect(callArgs.filters?.galleries).toEqual({
-        value: ["g1"],
+        value: ["14"],
         modifier: "INCLUDES",
       });
+    });
+
+    it("passes image_filter.instance_id as the specific instance", async () => {
+      mockImageQueryBuilder.execute.mockResolvedValue({
+        images: [],
+        total: 0,
+      });
+
+      const req = reqFor(findImages, {
+        body: { ids: ["201"], image_filter: { instance_id: "inst-b" } },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
+
+      await findImages(req, res);
+
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(callArgs.specificInstanceId).toBe("inst-b");
+      expect(callArgs.filters?.ids).toEqual({
+        value: ["201"],
+        modifier: "INCLUDES",
+      });
+    });
+
+    it("answers the ambiguous lookup for one bare id found on two instances", async () => {
+      mockImageQueryBuilder.execute.mockResolvedValue({
+        images: [
+          createQueryBuilderImage({ id: "201", instanceId: "inst-a" }),
+          createQueryBuilderImage({ id: "201", instanceId: "inst-b" }),
+        ],
+        total: 2,
+      });
+
+      const req = reqFor(findImages, {
+        body: { ids: ["201"] },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
+
+      await findImages(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toMatchObject({
+        error: "Ambiguous lookup",
+        matches: [
+          { id: "201", instanceId: "inst-a" },
+          { id: "201", instanceId: "inst-b" },
+        ],
+      });
+    });
+
+    it("an unknown image_filter key answers 400 before any query", async () => {
+      const req = reqFor(findImages, {
+        body: malformed({ image_filter: { not_a_field: true } }),
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
+
+      await expect(findImages(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "image_filter.not_a_field" }],
+      });
+      expect(mockImageQueryBuilder.execute).not.toHaveBeenCalled();
     });
 
     it("supports top-level ids parameter", async () => {
@@ -281,7 +351,7 @@ describe("Images Controller", () => {
       });
 
       const req = reqFor(findImages, {
-        body: { filter: {}, ids: ["img1", "img2"] },
+        body: { filter: {}, ids: ["201", "202:inst-b"] },
         user: defaultUser,
       });
       const res = resFor(findImages);
@@ -290,7 +360,7 @@ describe("Images Controller", () => {
 
       const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.filters?.ids).toEqual({
-        value: ["img1", "img2"],
+        value: ["201", "202:inst-b"],
         modifier: "INCLUDES",
       });
     });

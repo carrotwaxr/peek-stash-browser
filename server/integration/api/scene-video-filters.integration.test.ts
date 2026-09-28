@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -11,9 +12,8 @@ import { adminClient } from "../helpers/testClient.js";
  * - video_codec
  * - audio_codec
  * - bitrate
- * - interactive (haptic/funscript support)
- * - path filters
- * - captions
+ * - organized
+ * - Stash's interactive, path and captions filters, which Peek refuses (400)
  */
 
 interface FindScenesResponse {
@@ -287,111 +287,32 @@ describe("Scene Video Filters", () => {
     });
   });
 
-  describe("interactive filter", () => {
-    it("filters interactive scenes (with funscript)", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            interactive: true,
-          },
-        }
-      );
+  describe("Stash scene filters Peek does not apply", () => {
+    // The request parser refuses them rather than ignore them: no builder
+    // has a clause for interactive, interactive_speed, path or captions
+    it.each([
+      { path: "scene_filter.interactive", criterion: { interactive: true } },
+      {
+        path: "scene_filter.interactive_speed",
+        criterion: {
+          interactive_speed: { value: 50, modifier: "GREATER_THAN" },
+        },
+      },
+      {
+        path: "scene_filter.path",
+        criterion: { path: { value: "/", modifier: "INCLUDES" } },
+      },
+      {
+        path: "scene_filter.captions",
+        criterion: { captions: { value: "", modifier: "NOT_NULL" } },
+      },
+    ])("$path answers 400 naming it", async ({ path, criterion }) => {
+      const response = await adminClient.post("/api/library/scenes", {
+        filter: { per_page: 50 },
+        scene_filter: criterion,
+      });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters non-interactive scenes", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            interactive: false,
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters by interactive_speed range", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            interactive_speed: {
-              value: 50,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-  });
-
-  describe("path filter", () => {
-    it("filters by path INCLUDES pattern", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            path: {
-              value: "/",
-              modifier: "INCLUDES",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters by path MATCHES_REGEX", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            path: {
-              value: ".*\\.mp4$",
-              modifier: "MATCHES_REGEX",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-  });
-
-  describe("captions filter", () => {
-    it("filters scenes with captions", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            captions: {
-              value: "",
-              modifier: "NOT_NULL",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
+      expectRefused(response, [path]);
     });
   });
 

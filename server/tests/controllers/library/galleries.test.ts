@@ -48,19 +48,8 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
-    sortField: field,
-    randomSeed: undefined,
-  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -160,8 +149,8 @@ describe("Galleries Controller", () => {
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
       const galleries = [
-        createMockGallery({ id: "g1", instanceId: "inst-a" }),
-        createMockGallery({ id: "g1", instanceId: "inst-b" }),
+        createMockGallery({ id: "101", instanceId: "inst-a" }),
+        createMockGallery({ id: "101", instanceId: "inst-b" }),
       ];
       mockGalleryQueryBuilder.execute.mockResolvedValue({
         galleries,
@@ -169,7 +158,7 @@ describe("Galleries Controller", () => {
       });
 
       const req = reqFor(findGalleries, {
-        body: { ids: ["g1"], filter: {}, gallery_filter: {} },
+        body: { ids: ["101"], filter: {}, gallery_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findGalleries);
@@ -197,7 +186,7 @@ describe("Galleries Controller", () => {
 
     it("fetches detail counts for single-ID lookup", async () => {
       const gallery = createMockGallery({
-        id: "g1",
+        id: "101",
         instanceId: "default",
       });
       mockGalleryQueryBuilder.execute.mockResolvedValue({
@@ -210,7 +199,7 @@ describe("Galleries Controller", () => {
       });
 
       const req = reqFor(findGalleries, {
-        body: { ids: ["g1"], filter: {}, gallery_filter: {} },
+        body: { ids: ["101"], filter: {}, gallery_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findGalleries);
@@ -219,7 +208,7 @@ describe("Galleries Controller", () => {
 
       expect(res._getStatus()).toBe(200);
       expect(mockStashEntityService.getGallery).toHaveBeenCalledWith(
-        "g1",
+        "101",
         "default"
       );
     });

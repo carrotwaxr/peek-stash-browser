@@ -192,7 +192,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
         const userTagsResponse = await testUserClient.post<FindTagsResponse>(
           "/api/library/tags",
           {
-            filter: { per_page: 1000 },
+            filter: { per_page: 250 },
           }
         );
 

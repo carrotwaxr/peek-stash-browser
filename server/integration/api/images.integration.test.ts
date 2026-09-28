@@ -25,8 +25,7 @@ describe("Image API", () => {
       const response = await adminClient.post<FindImagesResponse>(
         "/api/library/images",
         {
-          page: 1,
-          per_page: 10,
+          filter: { page: 1, per_page: 10 },
         }
       );
 

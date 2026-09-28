@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -278,80 +279,20 @@ describe("Group Filters", () => {
     });
   });
 
-  describe("o_counter filter", () => {
-    it("filters by o_counter GREATER_THAN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>(
-        "/api/library/groups",
-        {
+  describe("Stash group filters Peek does not apply", () => {
+    // Groups carry no O count or play count of their own; the request
+    // parser refuses the criteria rather than ignore them
+    it.each(["o_counter", "play_count"])(
+      "%s answers 400 naming it",
+      async (field) => {
+        const response = await adminClient.post("/api/library/groups", {
           filter: { per_page: 50 },
-          group_filter: {
-            o_counter: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
+          group_filter: { [field]: { value: 0, modifier: "GREATER_THAN" } },
+        });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findGroups).toBeDefined();
-    });
-
-    it("filters by o_counter EQUALS zero", async () => {
-      const response = await adminClient.post<FindGroupsResponse>(
-        "/api/library/groups",
-        {
-          filter: { per_page: 50 },
-          group_filter: {
-            o_counter: {
-              value: 0,
-              modifier: "EQUALS",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findGroups).toBeDefined();
-    });
-  });
-
-  describe("play_count filter", () => {
-    it("filters by play_count GREATER_THAN (watched groups)", async () => {
-      const response = await adminClient.post<FindGroupsResponse>(
-        "/api/library/groups",
-        {
-          filter: { per_page: 50 },
-          group_filter: {
-            play_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findGroups).toBeDefined();
-    });
-
-    it("filters by play_count EQUALS zero (unwatched groups)", async () => {
-      const response = await adminClient.post<FindGroupsResponse>(
-        "/api/library/groups",
-        {
-          filter: { per_page: 50 },
-          group_filter: {
-            play_count: {
-              value: 0,
-              modifier: "EQUALS",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findGroups).toBeDefined();
-    });
+        expectRefused(response, [`group_filter.${field}`]);
+      }
+    );
   });
 
   describe("scene_count filter", () => {

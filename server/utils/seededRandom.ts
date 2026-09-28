@@ -44,32 +44,3 @@ export function generateDailySeed(userId: number): number {
   const dayNumber = Math.floor(Date.now() / 86400000);
   return (userId + dayNumber) % 1e8;
 }
-
-/**
- * Parse sort field for random seed.
- * Handles both "random" (generates seed) and "random_12345" (uses provided seed).
- */
-export function parseRandomSort(
-  sortField: string,
-  userId: number
-): { sortField: string; randomSeed?: number } {
-  if (sortField.startsWith("random_")) {
-    const seedStr = sortField.slice(7);
-    const parsedSeed = parseInt(seedStr, 10);
-    if (!isNaN(parsedSeed)) {
-      return {
-        sortField: "random",
-        randomSeed: parsedSeed % 1e8,
-      };
-    }
-  }
-
-  if (sortField === "random") {
-    return {
-      sortField: "random",
-      randomSeed: generateDailySeed(userId),
-    };
-  }
-
-  return { sortField };
-}

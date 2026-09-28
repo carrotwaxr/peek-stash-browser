@@ -10,9 +10,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    // Session tokens need a secret; jwtSecret.test.ts deletes it per test
+    // Session tokens need a secret; jwtSecret.test.ts deletes it per test.
+    // Unknown list filter input is a 400 here, so client drift fails tests
     env: {
       JWT_SECRET: "vitest-only-secret-0123456789abcdef0123456789",
+      PEEK_FILTER_POLICY: "reject",
     },
     include: ["**/*.{test,spec}.{js,ts}"],
     exclude: [

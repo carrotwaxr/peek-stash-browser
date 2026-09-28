@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
@@ -14,11 +13,16 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import type { NormalizedGroup } from "../../types/index.js";
 import { entityKey } from "../../utils/entityRef.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -69,40 +73,21 @@ export const findGroups = async (
     FindGroupsResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("group", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/groups", request.dropped);
+
   try {
     const startTime = Date.now();
-    const userId = req.user?.id;
-    const { filter, group_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = filter?.direction || "ASC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its group by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
-    const requestingUser = req.user;
     const applyExclusions = true;
-
-    // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(
-      sortFieldRaw,
-      requestingUser.id
-    );
-
-    // Merge root-level ids with group_filter. The builder reads the
-    // filter as sent, as before: PeekGroupFilter types its criteria as
-    // Stash's, which always name a modifier, where a request may omit it
-    const normalizedIds = ids
-      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
-      : group_filter?.ids;
-    const mergedFilter = {
-      ...group_filter,
-      ids: normalizedIds,
-    } as PeekGroupFilter & Record<string, unknown>;
-
-    // Extract specific instance ID for disambiguation (from group_filter.instance_id)
-    const specificInstanceId = group_filter?.instance_id;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -110,28 +95,28 @@ export const findGroups = async (
     // Use SQL-native query builder
     const { groups, total } = await groupQueryBuilder.execute({
       userId,
-      filters: mergedFilter,
+      filters: toLegacyFilter("group", request.filter),
       applyExclusions,
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      searchQuery,
-      randomSeed,
+      searchQuery: request.q,
+      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups
-    if (ids && ids.length === 1 && !specificInstanceId && groups.length > 1) {
+    if (lookup && !specificInstanceId && groups.length > 1) {
       logger.warn("Ambiguous group lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: groups.length,
         instances: groups.map((g) => g.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple groups found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple groups found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: groups.map((g) => ({
           id: g.id,
           name: g.name,
@@ -144,10 +129,10 @@ export const findGroups = async (
     // For single-entity requests (detail pages), get group with computed counts
     // and its place in the collection hierarchy
     let paginatedGroups = groups;
-    if (ids && ids.length === 1 && paginatedGroups.length === 1) {
+    if (lookup && paginatedGroups.length === 1) {
       const firstGroup = paginatedGroups[0] as (typeof paginatedGroups)[number];
       const [groupWithCounts, hierarchy] = await Promise.all([
-        stashEntityService.getGroup(ids[0] as string, firstGroup.instanceId),
+        stashEntityService.getGroup(firstGroup.id, firstGroup.instanceId),
         groupQueryBuilder.getHierarchy(
           firstGroup.id,
           firstGroup.instanceId,

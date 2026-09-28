@@ -168,6 +168,17 @@ export interface ParsedClipQuery {
   readonly dropped: readonly DroppedInput[];
 }
 
+/** `GET /api/scenes/:id/clips` */
+export interface ParsedSceneClipsQuery {
+  /** The `:id` path parameter, a Stash id */
+  readonly sceneId: string;
+  /** Clips without a generated preview too; false when absent */
+  readonly includeUngenerated: boolean;
+  /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
+  readonly specificInstanceId: string | undefined;
+  readonly dropped: readonly DroppedInput[];
+}
+
 /** The lists with a `/minimal` endpoint (the entity pickers) */
 export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
 

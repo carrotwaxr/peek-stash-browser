@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { findScenes } from "../../controllers/library/scenes.js";
 import prisma from "../../prisma/singleton.js";
+import {
+  reqFor,
+  resFor,
+  testUser,
+} from "../../tests/helpers/controllerTestUtils.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { createApiUser, hideFor } from "../helpers/accessFixture.js";
+import { recordStatements } from "../helpers/statementRecorder.js";
 import type { TestClient } from "../helpers/testClient.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
@@ -10,12 +17,16 @@ import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
  * Pagination Edge Cases Integration Tests
  *
  * Tests pagination behavior including:
- * - Various per_page values (1, 10, 100, 1000)
+ * - Various per_page values (1, 10, 100; 1000 is held to 250)
  * - Empty result sets
  * - Last page handling
- * - Beyond-range page numbers
+ * - Beyond-range page numbers (page 0 and -1 are page 1)
  * - Page navigation consistency
  * - Totals for a user with overlapping exclusion rows
+ *
+ * The replay's library is smaller than 250 scenes, so the clamps are read
+ * from the page statement the scene list binds (its LIMIT and OFFSET), with
+ * the handler run in this process under `recordStatements`.
  */
 
 interface FindScenesResponse {
@@ -70,6 +81,51 @@ async function pageThrough(
     ids.push(...result.ids);
   }
   return { counts, ids };
+}
+
+interface RecordedPage {
+  /** The LIMIT and OFFSET the page statement bound */
+  limit: unknown;
+  offset: unknown;
+  count: number;
+  ids: string[];
+}
+
+/**
+ * Runs the scene list for the admin in this process, recording its
+ * statements: the page statement's LIMIT and OFFSET, and what it answered.
+ */
+async function recordScenePage(filter: {
+  page?: number;
+  per_page?: number;
+}): Promise<RecordedPage> {
+  const admin = await prisma.user.findUniqueOrThrow({
+    where: { username: TEST_ADMIN.username },
+  });
+  const req = reqFor(findScenes, {
+    body: { filter },
+    user: testUser({ id: admin.id, username: admin.username, role: "ADMIN" }),
+  });
+  const res = resFor(findScenes);
+  const recorder = recordStatements();
+  try {
+    await findScenes(req, res);
+  } finally {
+    recorder.restore();
+  }
+  expect(res._getStatus()).toBe(200);
+  const pageStatements = recorder.statements.filter(({ sql }) =>
+    sql.includes("LIMIT ? OFFSET ?")
+  );
+  expect(pageStatements).toHaveLength(1);
+  const { params } = must(pageStatements[0], "the page statement");
+  const { findScenes: found } = res._getOkBody();
+  return {
+    limit: params[params.length - 2],
+    offset: params[params.length - 1],
+    count: found.count,
+    ids: found.scenes.map((s) => s.id),
+  };
 }
 
 describe("Pagination Edge Cases", () => {
@@ -130,7 +186,14 @@ describe("Pagination Edge Cases", () => {
       expect(response.data.findScenes.scenes.length).toBeLessThanOrEqual(100);
     });
 
-    it("handles per_page of 1000", async () => {
+    it("per_page 1000 returns 250 rows and the full count", async () => {
+      const whole = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { filter: {} }
+      );
+      expect(whole.ok).toBe(true);
+      const total = whole.data.findScenes.count;
+
       const response = await adminClient.post<FindScenesResponse>(
         "/api/library/scenes",
         {
@@ -142,8 +205,16 @@ describe("Pagination Edge Cases", () => {
       );
 
       expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-      expect(response.data.findScenes.scenes.length).toBeLessThanOrEqual(1000);
+      expect(response.data.findScenes.count).toBe(total);
+      expect(response.data.findScenes.scenes).toHaveLength(
+        Math.min(250, total)
+      );
+
+      // The library holds fewer than 250 scenes: the statement shows the clamp
+      const recorded = await recordScenePage({ per_page: 1000, page: 1 });
+      expect(recorded.limit).toBe(250);
+      expect(recorded.offset).toBe(0);
+      expect(recorded.count).toBe(total);
     });
 
     it("handles default per_page when not specified", async () => {
@@ -220,7 +291,7 @@ describe("Pagination Edge Cases", () => {
           filter: {
             per_page: 5,
             page: 1,
-            sort: "id",
+            sort: "title",
             direction: "ASC",
           },
         }
@@ -238,7 +309,7 @@ describe("Pagination Edge Cases", () => {
           filter: {
             per_page: 5,
             page: 1,
-            sort: "id",
+            sort: "title",
             direction: "ASC",
           },
         }
@@ -250,7 +321,7 @@ describe("Pagination Edge Cases", () => {
           filter: {
             per_page: 5,
             page: 2,
-            sort: "id",
+            sort: "title",
             direction: "ASC",
           },
         }
@@ -331,36 +402,23 @@ describe("Pagination Edge Cases", () => {
       expect(response.data.findScenes.count).toBe(totalCount);
     });
 
-    it("handles page 0 gracefully", async () => {
+    it.each([0, -1])("page %i answers page 1's rows", async (page) => {
+      const first = await recordScenePage({ per_page: 10, page: 1 });
+      expect(first.ids).toHaveLength(10);
+
       const response = await adminClient.post<FindScenesResponse>(
         "/api/library/scenes",
-        {
-          filter: {
-            per_page: 10,
-            page: 0,
-          },
-        }
+        { filter: { per_page: 10, page } }
+      );
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes.scenes.map((s) => s.id)).toEqual(
+        first.ids
       );
 
-      // Should either treat as page 1 or return error gracefully
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("handles negative page gracefully", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: {
-            per_page: 10,
-            page: -1,
-          },
-        }
-      );
-
-      // Should either treat as page 1 or return error gracefully
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
+      const recorded = await recordScenePage({ per_page: 10, page });
+      expect(recorded.ids).toEqual(first.ids);
+      expect(recorded.limit).toBe(10);
+      expect(recorded.offset).toBe(0);
     });
   });
 
@@ -651,7 +709,7 @@ describe("Pagination Edge Cases", () => {
       const { counts, ids } = await pageThrough(async (page) => {
         const response = await client.post<FindScenesResponse>(
           "/api/library/scenes",
-          { filter: { per_page: 5, page, sort: "id", direction: "ASC" } }
+          { filter: { per_page: 5, page, sort: "title", direction: "ASC" } }
         );
         expect(response.status).toBe(200);
         return {

@@ -52,8 +52,7 @@ describe("Studio API", () => {
       const response = await adminClient.post<FindStudiosResponse>(
         "/api/library/studios",
         {
-          page: 1,
-          per_page: 10,
+          filter: { page: 1, per_page: 10 },
         }
       );
 

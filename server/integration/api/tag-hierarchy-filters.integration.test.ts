@@ -124,44 +124,6 @@ describe("Tag Hierarchy Filters", () => {
       expect(response.data.findTags).toBeDefined();
       expect(response.data.findTags.count).toBeGreaterThan(0);
     });
-
-    it("filters tags with parent_count filter", async () => {
-      // Tags that are children of other tags
-      const response = await adminClient.post<FindTagsResponse>(
-        "/api/library/tags",
-        {
-          filter: { per_page: 50 },
-          tag_filter: {
-            parent_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findTags).toBeDefined();
-    });
-
-    it("filters tags with child_count filter", async () => {
-      // Tags that are parents of other tags
-      const response = await adminClient.post<FindTagsResponse>(
-        "/api/library/tags",
-        {
-          filter: { per_page: 50 },
-          tag_filter: {
-            child_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findTags).toBeDefined();
-    });
   });
 
   describe("tag relationship filtering", () => {
@@ -169,20 +131,14 @@ describe("Tag Hierarchy Filters", () => {
       // First get a tag that has children
       const parentResponse = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
-        {
-          filter: { per_page: 1 },
-          tag_filter: {
-            child_count: {
-              value: 0,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
+        { filter: { per_page: 250 } }
       );
 
       // The library has a tag with children
       const parentTagId = must(
-        parentResponse.data.findTags.tags[0],
+        parentResponse.data.findTags.tags.find(
+          (tag) => (tag.children ?? []).length > 0
+        ),
         "a tag with children"
       ).id;
 

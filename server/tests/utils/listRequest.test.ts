@@ -27,7 +27,10 @@ import {
   parseClipQuery,
   parseListRequest,
   parseMinimalRequest,
+  parseSceneClipsRequest,
+  parseStashId,
   parseStoredSceneQuery,
+  singleIdRef,
 } from "../../utils/listRequest.js";
 import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
 import { logger } from "../../utils/logger.js";
@@ -555,13 +558,45 @@ describe("parseListRequest: filter fields", () => {
         )
       )
     ).toEqual(["scene_filter.instance_id"]);
+    // Not dropped either: the lookup would widen to every instance
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest(
+            "scene",
+            { scene_filter: { instance_id: "bad id!" } },
+            opts("drop")
+          )
+        )
+      )
+    ).toEqual(["scene_filter.instance_id"]);
+  });
+
+  it("drop mode still refuses a bad id: ignoring it would answer a lookup with the whole list", () => {
+    const refused = (body: unknown) =>
+      paths(issuesOf(() => parseListRequest("performer", body, opts("drop"))));
+
+    expect(refused({ ids: ["abc"] })).toEqual(["ids.0"]);
+    expect(
+      refused({ performer_filter: { ids: { value: ["5:bad id!"] } } })
+    ).toEqual(["performer_filter.ids.value.0"]);
+    expect(
+      refused({ performer_filter: { ids: { value: ["5"], extra: 1 } } })
+    ).toEqual(["performer_filter.ids"]);
+    // Every issue of the request is reported with it
+    expect(
+      refused({ ids: ["abc"], performer_filter: { not_a_field: 1 } })
+    ).toEqual(["ids.0", "performer_filter.not_a_field"]);
+    // Other bad input is still dropped
     const dropped = parseListRequest(
-      "scene",
-      { scene_filter: { instance_id: "bad id!" } },
+      "performer",
+      { ids: ["5"], performer_filter: { tags: { value: ["abc"] } } },
       opts("drop")
     );
-    expect(dropped.specificInstanceId).toBeUndefined();
-    expect(paths(dropped.dropped)).toEqual(["scene_filter.instance_id"]);
+    expect(dropped.filter.ids?.refs).toEqual([
+      { id: "5", instanceId: undefined },
+    ]);
+    expect(paths(dropped.dropped)).toEqual(["performer_filter.tags.value.0"]);
   });
 
   it("depth is kept on hierarchical fields and dropped elsewhere", () => {
@@ -1019,6 +1054,17 @@ describe("parseClipQuery", () => {
       { path: "query", message: "Expected an object" },
     ]);
   });
+  it.each([
+    { query: { sceneId: "abc" }, path: "sceneId.0" },
+    { query: { instanceId: "bad id!" }, path: "instanceId" },
+  ])(
+    "drop mode still refuses a bad $path: ignoring it would list every clip",
+    ({ query, path }) => {
+      expect(
+        paths(issuesOf(() => parseClipQuery(query, opts("drop"))))
+      ).toEqual([path]);
+    }
+  );
 });
 
 describe("parseMinimalRequest", () => {
@@ -1086,6 +1132,139 @@ describe("parseMinimalRequest", () => {
     expect(
       issuesOf(() => parseMinimalRequest("studio", 1, opts(policy)))
     ).toEqual([{ path: "body", message: "Expected an object" }]);
+  });
+});
+
+describe("parseListRequest: an empty value", () => {
+  it("is no value in a date or number criterion, as Stash's inputs send it", () => {
+    const parsed = parseListRequest(
+      "performer",
+      {
+        performer_filter: {
+          birthdate: { value: "", modifier: "IS_NULL" },
+          death_date: { value: "", value2: "", modifier: "NOT_NULL" },
+          height: { value: 170, value2: "", modifier: "GREATER_THAN" },
+        },
+      },
+      opts("reject")
+    );
+    expect(parsed.filter).toEqual({
+      birthdate: { modifier: "IS_NULL" },
+      death_date: { modifier: "NOT_NULL" },
+      height: { modifier: "GREATER_THAN", value: 170 },
+    });
+  });
+
+  it("still leaves a comparison without its value", () => {
+    const issues = issuesOf(() =>
+      parseListRequest(
+        "performer",
+        {
+          performer_filter: {
+            birthdate: { value: "", value2: "2000-01-01", modifier: "BETWEEN" },
+          },
+        },
+        opts("reject")
+      )
+    );
+    expect(issues).toEqual([
+      { path: "performer_filter.birthdate.value", message: "Required" },
+    ]);
+  });
+});
+
+describe("parseSceneClipsRequest", () => {
+  it("reads the scene id, includeUngenerated and instanceId", () => {
+    expect(
+      parseSceneClipsRequest(
+        "42",
+        { includeUngenerated: "true", instanceId: "inst-1" },
+        opts("reject")
+      )
+    ).toEqual({
+      sceneId: "42",
+      includeUngenerated: true,
+      specificInstanceId: "inst-1",
+      dropped: [],
+    });
+    expect(parseSceneClipsRequest("42", {}, opts("reject"))).toEqual({
+      sceneId: "42",
+      includeUngenerated: false,
+      specificInstanceId: undefined,
+      dropped: [],
+    });
+  });
+
+  it("a bad value and an unknown parameter are invalid, or dropped", () => {
+    const query = { includeUngenerated: "yes", page: "2" };
+    expect(
+      paths(
+        issuesOf(() =>
+          parseSceneClipsRequest(
+            "42",
+            { ...query, instanceId: "inst 1" },
+            opts("reject")
+          )
+        )
+      )
+    ).toEqual(["includeUngenerated", "page", "instanceId"]);
+
+    const dropped = parseSceneClipsRequest("42", query, opts("drop"));
+    expect(dropped.includeUngenerated).toBe(false);
+    expect(paths(dropped.dropped)).toEqual(["includeUngenerated", "page"]);
+  });
+
+  it("drop mode still refuses a bad instanceId: the scene's clips would come from every instance", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseSceneClipsRequest("42", { instanceId: "inst 1" }, opts("drop"))
+        )
+      )
+    ).toEqual(["instanceId"]);
+  });
+
+  it.each(POLICIES)(
+    "a scene id that is not a Stash id fails (%s)",
+    (policy) => {
+      expect(
+        issuesOf(() => parseSceneClipsRequest("scene-1", {}, opts(policy)))
+      ).toEqual([{ path: "id", message: "Expected an id" }]);
+    }
+  );
+});
+
+describe("parseStashId", () => {
+  it("returns a Stash id and refuses anything else", () => {
+    expect(parseStashId("123", "id")).toBe("123");
+    for (const raw of ["", "12a", "1:inst", "-1", 5, undefined]) {
+      expect(issuesOf(() => parseStashId(raw, "id"))).toEqual([
+        { path: "id", message: "Expected an id" },
+      ]);
+    }
+  });
+});
+
+describe("singleIdRef", () => {
+  const criterion = (
+    refs: RefCriterion["refs"],
+    modifier: RefCriterion["modifier"] = "INCLUDES"
+  ): RefCriterion => ({ refs, modifier, depth: 0 });
+
+  it("is the one ref of an INCLUDES ids criterion", () => {
+    const ref = { id: "5", instanceId: undefined };
+    expect(singleIdRef(criterion([ref]))).toBe(ref);
+    const pair = { id: "5", instanceId: "a" };
+    expect(singleIdRef(criterion([pair]))).toBe(pair);
+  });
+
+  it("is undefined for no criterion, several refs or EXCLUDES", () => {
+    const ref = { id: "5", instanceId: undefined };
+    expect(singleIdRef(undefined)).toBeUndefined();
+    expect(
+      singleIdRef(criterion([ref, { id: "6", instanceId: undefined }]))
+    ).toBeUndefined();
+    expect(singleIdRef(criterion([ref], "EXCLUDES"))).toBeUndefined();
   });
 });
 

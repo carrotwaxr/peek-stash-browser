@@ -43,6 +43,7 @@ paths:
 - Each test file logs in `adminClient` (from `helpers/testClient.ts`) in its own `beforeAll`. Global setup runs in a separate process, so its login doesn't carry over; a test that skips the login gets 401s. `selectTestInstanceOnly()` limits a test to the test instance.
 - A plan test (`EXPLAIN QUERY PLAN`) reads its plans through `helpers/largeLibraryPlanner.ts`, a copy of the test database without `sqlite_stat1` and `sqlite_stat4`: the startup sync's `PRAGMA optimize` records the replay's few-row tables, and SQLite then rightly scans them, where the test pins the plan for a large library. Check the plans with statistics on a prod-snapshot copy.
 - To test a service against real SQLite without depending on Stash data, seed rows under a made-up `stashInstanceId` and spy on the Stash client; `services/StashSyncService.cleanup.integration.test.ts` shows how.
+- The run sets `PEEK_FILTER_POLICY=reject` (global setup; the server and the workers see it), so unknown or invalid list input answers 400 naming its path: assert a refusal with `expectRefused(response, [paths])` from `helpers/refused.ts`. A page holds at most 250 rows: page through for a whole list. `recordStatements` records each raw statement's bound parameters (`params`), so a clamp or bound value is asserted on the statement; the server runs in the global setup's process, so record in-process calls (`reqFor`/`resFor` on the handler), not HTTP requests.
 
 ## E2E (`e2e/`)
 

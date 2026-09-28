@@ -44,10 +44,6 @@ vi.mock("../../../utils/entityInstanceId.js", () => ({
     .mockImplementation((entities: unknown[]) => entities),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
   hydrateEntityTags: vi
     .fn()
@@ -56,13 +52,6 @@ vi.mock("../../../utils/hierarchyUtils.js", () => ({
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
-    sortField: field,
-    randomSeed: undefined,
-  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -137,8 +126,8 @@ describe("findPerformers", () => {
 
   it("returns 400 for ambiguous single-ID lookup (multiple instances)", async () => {
     const performers = [
-      createMockPerformer({ id: "p1", instanceId: "inst1" }),
-      createMockPerformer({ id: "p1", instanceId: "inst2" }),
+      createMockPerformer({ id: "101", instanceId: "inst1" }),
+      createMockPerformer({ id: "101", instanceId: "inst2" }),
     ];
     vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
       performers,
@@ -146,7 +135,7 @@ describe("findPerformers", () => {
     });
 
     const req = reqFor(findPerformers, {
-      body: { ids: ["p1"] },
+      body: { ids: ["101"] },
       user: testUser(),
     });
     const res = resFor(findPerformers);

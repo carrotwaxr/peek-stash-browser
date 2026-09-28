@@ -3,10 +3,11 @@
  *
  * Tests all 3 clip endpoints: getClips (list with filtering/pagination),
  * getClipById (single clip lookup), getClipsForScene (scene-scoped listing).
- * Covers query param parsing, comma-split arrays, random sort integration,
- * pagination math, not-found handling, and error cases.
+ * Covers query param parsing through the request parser (reject mode, from
+ * vitest.config), comma-split arrays, random sort seeds, pagination math and
+ * its clamp, not-found handling, and error cases.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getClipById,
   getClips,
@@ -16,8 +17,9 @@ import {
   type ClipWithRelations,
   clipService,
 } from "../../services/ClipService.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
+import { logger } from "../../utils/logger.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
@@ -29,26 +31,18 @@ vi.mock("../../services/ClipService.js", () => ({
   },
 }));
 
-vi.mock("../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn(),
-}));
-
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockClipService = vi.mocked(clipService);
-const mockParseRandomSort = vi.mocked(parseRandomSort);
+const mockLogger = vi.mocked(logger, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
 describe("Clips Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockParseRandomSort.mockReturnValue({
-      sortField: "stashCreatedAt",
-      randomSeed: undefined,
-    });
   });
 
   // ─── getClips ─────────────────────────────────────────────────────────────
@@ -66,7 +60,6 @@ describe("Clips Controller", () => {
 
       await getClips(req, res);
 
-      expect(mockParseRandomSort).toHaveBeenCalledWith("stashCreatedAt", 1);
       expect(mockClipService.getClips).toHaveBeenCalledWith(
         1,
         expect.objectContaining({
@@ -88,10 +81,6 @@ describe("Clips Controller", () => {
     });
 
     it("passes all query params through to the service", async () => {
-      mockParseRandomSort.mockReturnValue({
-        sortField: "title",
-        randomSeed: undefined,
-      });
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
       const req = reqFor(getClips, {
@@ -102,12 +91,12 @@ describe("Clips Controller", () => {
           sortBy: "title",
           sortDir: "asc",
           isGenerated: "false",
-          sceneId: "scene-42",
-          tagIds: "t1",
-          sceneTagIds: "st1",
-          performerIds: "p1",
-          studioId: "studio-7",
-          q: "search term",
+          sceneId: "42",
+          tagIds: "5",
+          sceneTagIds: "6:inst-1",
+          performerIds: "7",
+          studioId: "8",
+          q: " search term ",
           instanceId: "inst-1",
         },
       });
@@ -115,24 +104,21 @@ describe("Clips Controller", () => {
 
       await getClips(req, res);
 
-      expect(mockParseRandomSort).toHaveBeenCalledWith("title", 1);
-      expect(mockClipService.getClips).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          page: 3,
-          perPage: 10,
-          sortBy: "title",
-          sortDir: "asc",
-          isGenerated: false,
-          sceneId: "scene-42",
-          tagIds: ["t1"],
-          sceneTagIds: ["st1"],
-          performerIds: ["p1"],
-          studioId: "studio-7",
-          q: "search term",
-          allowedInstanceIds: ["inst-1"],
-        })
-      );
+      expect(mockClipService.getClips).toHaveBeenCalledWith(1, {
+        page: 3,
+        perPage: 10,
+        sortBy: "title",
+        sortDir: "asc",
+        isGenerated: false,
+        sceneId: "42",
+        tagIds: ["5"],
+        sceneTagIds: ["6:inst-1"],
+        performerIds: ["7"],
+        studioId: "8",
+        q: "search term",
+        randomSeed: undefined,
+        allowedInstanceIds: ["inst-1"],
+      });
     });
 
     it("splits comma-separated tagIds, sceneTagIds, and performerIds", async () => {
@@ -141,9 +127,9 @@ describe("Clips Controller", () => {
       const req = reqFor(getClips, {
         user: USER,
         query: {
-          tagIds: "t1,t2,t3",
-          sceneTagIds: "st1,st2",
-          performerIds: "p1,p2,p3,p4",
+          tagIds: "1,2,3",
+          sceneTagIds: "4,5:inst-1",
+          performerIds: "6,7,8,9",
         },
       });
       const res = resFor(getClips);
@@ -152,34 +138,98 @@ describe("Clips Controller", () => {
 
       expect(mockClipService.getClips).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({
-          tagIds: ["t1", "t2", "t3"],
-          sceneTagIds: ["st1", "st2"],
-          performerIds: ["p1", "p2", "p3", "p4"],
+        objectContaining({
+          tagIds: ["1", "2", "3"],
+          sceneTagIds: ["4", "5:inst-1"],
+          performerIds: ["6", "7", "8", "9"],
         })
       );
     });
 
-    it("passes randomSeed from parseRandomSort to the service", async () => {
-      mockParseRandomSort.mockReturnValue({
-        sortField: "random",
-        randomSeed: 42,
-      });
+    it("passes the seed of random_<seed> to the service", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = reqFor(getClips, { user: USER, query: { sortBy: "random" } });
+      const req = reqFor(getClips, {
+        user: USER,
+        query: { sortBy: "random_42" },
+      });
       const res = resFor(getClips);
 
       await getClips(req, res);
 
-      expect(mockParseRandomSort).toHaveBeenCalledWith("random", 1);
       expect(mockClipService.getClips).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({
-          sortBy: "random",
-          randomSeed: 42,
-        })
+        objectContaining({ sortBy: "random", randomSeed: 42 })
       );
+    });
+
+    it("holds perPage to 250 and answers with the held value", async () => {
+      mockClipService.getClips.mockResolvedValue({ clips: [], total: 600 });
+
+      const req = reqFor(getClips, {
+        user: USER,
+        query: { perPage: "1000", page: "0" },
+      });
+      const res = resFor(getClips);
+
+      await getClips(req, res);
+
+      expect(mockClipService.getClips).toHaveBeenCalledWith(
+        1,
+        objectContaining({ page: 1, perPage: 250 })
+      );
+      expect(res._getBody()).toMatchObject({
+        page: 1,
+        perPage: 250,
+        totalPages: 3,
+      });
+    });
+
+    it.each([
+      ["perPage", { perPage: "abc" }],
+      ["sortDir", { sortDir: "sideways" }],
+      ["sortBy", { sortBy: "constructor" }],
+      ["tagIds.0", { tagIds: "t1" }],
+      ["instanceId", { instanceId: "../etc" }],
+      ["isGenerated", { isGenerated: "yes" }],
+      ["notAParam", { notAParam: "1" }],
+    ])(
+      "a bad %s answers 400 before any query",
+      async (path, query: Record<string, string>) => {
+        const req = reqFor(getClips, { user: USER, query });
+        const res = resFor(getClips);
+
+        await expect(getClips(req, res)).rejects.toMatchObject({
+          statusCode: 400,
+          issues: [{ path }],
+        });
+        expect(mockClipService.getClips).not.toHaveBeenCalled();
+      }
+    );
+
+    describe("with PEEK_FILTER_POLICY=drop", () => {
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it("an unknown parameter is logged and the request succeeds", async () => {
+        vi.stubEnv("PEEK_FILTER_POLICY", "drop");
+        mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
+
+        const req = reqFor(getClips, {
+          user: USER,
+          query: { clipsB7Unknown: "1" },
+        });
+        const res = resFor(getClips);
+
+        await getClips(req, res);
+
+        expect(res._getStatus()).toBe(200);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          "Unknown filter input ignored",
+          objectContaining({ route: "GET /clips", path: "clipsB7Unknown" })
+        );
+      });
     });
 
     it("calculates totalPages correctly", async () => {
@@ -221,17 +271,17 @@ describe("Clips Controller", () => {
   describe("getClipById", () => {
     it("returns the clip when found", async () => {
       const clip: ClipWithRelations = partialRow({
-        id: "c1",
+        id: "101",
         title: "Test Clip",
       });
       mockClipService.getClipById.mockResolvedValue(clip);
 
-      const req = reqFor(getClipById, { params: { id: "c1" }, user: USER });
+      const req = reqFor(getClipById, { params: { id: "101" }, user: USER });
       const res = resFor(getClipById);
 
       await getClipById(req, res);
 
-      expect(mockClipService.getClipById).toHaveBeenCalledWith("c1", 1);
+      expect(mockClipService.getClipById).toHaveBeenCalledWith("101", 1);
       expect(res._getStatus()).toBe(200);
       expect(res._getBody()).toEqual(clip);
     });
@@ -240,7 +290,7 @@ describe("Clips Controller", () => {
       mockClipService.getClipById.mockResolvedValue(null);
 
       const req = reqFor(getClipById, {
-        params: { id: "nonexistent" },
+        params: { id: "999999" },
         user: USER,
       });
       const res = resFor(getClipById);
@@ -251,10 +301,24 @@ describe("Clips Controller", () => {
       expect(res._getBody()).toMatchObject({ error: "Clip not found" });
     });
 
+    it("an id that is not a Stash id answers 400 before any query", async () => {
+      const req = reqFor(getClipById, {
+        params: { id: "nonexistent" },
+        user: USER,
+      });
+      const res = resFor(getClipById);
+
+      await expect(getClipById(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "id" }],
+      });
+      expect(mockClipService.getClipById).not.toHaveBeenCalled();
+    });
+
     it("returns 500 when the service throws", async () => {
       mockClipService.getClipById.mockRejectedValue(new Error("Unexpected"));
 
-      const req = reqFor(getClipById, { params: { id: "c1" }, user: USER });
+      const req = reqFor(getClipById, { params: { id: "101" }, user: USER });
       const res = resFor(getClipById);
 
       await getClipById(req, res);
@@ -274,7 +338,7 @@ describe("Clips Controller", () => {
       mockClipService.getClipsForScene.mockResolvedValue(clips);
 
       const req = reqFor(getClipsForScene, {
-        params: { id: "scene-1" },
+        params: { id: "42" },
         user: USER,
       });
       const res = resFor(getClipsForScene);
@@ -282,7 +346,7 @@ describe("Clips Controller", () => {
       await getClipsForScene(req, res);
 
       expect(mockClipService.getClipsForScene).toHaveBeenCalledWith(
-        "scene-1",
+        "42",
         1,
         false,
         undefined
@@ -295,7 +359,7 @@ describe("Clips Controller", () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
       const req = reqFor(getClipsForScene, {
-        params: { id: "scene-1" },
+        params: { id: "42" },
         user: USER,
         query: {
           includeUngenerated: "true",
@@ -306,7 +370,7 @@ describe("Clips Controller", () => {
       await getClipsForScene(req, res);
 
       expect(mockClipService.getClipsForScene).toHaveBeenCalledWith(
-        "scene-1",
+        "42",
         1,
         true,
         undefined
@@ -317,7 +381,7 @@ describe("Clips Controller", () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
       const req = reqFor(getClipsForScene, {
-        params: { id: "scene-1" },
+        params: { id: "42" },
         user: USER,
         query: {
           instanceId: "inst-1",
@@ -328,18 +392,37 @@ describe("Clips Controller", () => {
       await getClipsForScene(req, res);
 
       expect(mockClipService.getClipsForScene).toHaveBeenCalledWith(
-        "scene-1",
+        "42",
         1,
         false,
         ["inst-1"]
       );
     });
 
+    it.each([
+      ["id", { id: "scene-1" }, {}],
+      ["includeUngenerated", { id: "42" }, { includeUngenerated: "yes" }],
+      ["instanceId", { id: "42" }, { instanceId: "inst 1" }],
+      ["sort", { id: "42" }, { sort: "title" }],
+    ])(
+      "a bad %s answers 400 before any query",
+      async (path, params: { id: string }, query: Record<string, string>) => {
+        const req = reqFor(getClipsForScene, { params, user: USER, query });
+        const res = resFor(getClipsForScene);
+
+        await expect(getClipsForScene(req, res)).rejects.toMatchObject({
+          statusCode: 400,
+          issues: [{ path }],
+        });
+        expect(mockClipService.getClipsForScene).not.toHaveBeenCalled();
+      }
+    );
+
     it("returns 500 when the service throws", async () => {
       mockClipService.getClipsForScene.mockRejectedValue(new Error("Failed"));
 
       const req = reqFor(getClipsForScene, {
-        params: { id: "scene-1" },
+        params: { id: "42" },
         user: USER,
       });
       const res = resFor(getClipsForScene);

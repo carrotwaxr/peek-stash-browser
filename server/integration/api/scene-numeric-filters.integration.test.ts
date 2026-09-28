@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
 
 /**
@@ -13,8 +14,8 @@ import { adminClient } from "../helpers/testClient.js";
  * - performer_count
  * - tag_count
  * - duration
- * - file_count
- * - interactive_speed
+ * - Stash's file_count and the rating's IS_NULL and NOT_NULL, which Peek
+ *   refuses (400)
  */
 
 interface FindScenesResponse {
@@ -102,42 +103,6 @@ describe("Scene Numeric Filters", () => {
               value: 50,
               value2: 80,
               modifier: "BETWEEN",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters by rating IS_NULL (unrated)", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            rating100: {
-              value: 0,
-              modifier: "IS_NULL",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-    });
-
-    it("filters by rating NOT_NULL (rated)", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            rating100: {
-              value: 0,
-              modifier: "NOT_NULL",
             },
           },
         }
@@ -375,23 +340,32 @@ describe("Scene Numeric Filters", () => {
     });
   });
 
-  describe("file_count filter", () => {
-    it("filters scenes with multiple files", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            file_count: {
-              value: 1,
-              modifier: "GREATER_THAN",
-            },
-          },
-        }
-      );
+  describe("Stash scene filters Peek does not apply", () => {
+    // The request parser refuses them rather than ignore them: the numeric
+    // clause has no IS_NULL or NOT_NULL, and no builder counts files
+    it.each([
+      {
+        name: "rating100 IS_NULL",
+        path: "scene_filter.rating100.modifier",
+        criterion: { rating100: { value: 0, modifier: "IS_NULL" } },
+      },
+      {
+        name: "rating100 NOT_NULL",
+        path: "scene_filter.rating100.modifier",
+        criterion: { rating100: { value: 0, modifier: "NOT_NULL" } },
+      },
+      {
+        name: "file_count",
+        path: "scene_filter.file_count",
+        criterion: { file_count: { value: 1, modifier: "GREATER_THAN" } },
+      },
+    ])("$name answers 400 naming $path", async ({ path, criterion }) => {
+      const response = await adminClient.post("/api/library/scenes", {
+        filter: { per_page: 50 },
+        scene_filter: criterion,
+      });
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
+      expectRefused(response, [path]);
     });
   });
 

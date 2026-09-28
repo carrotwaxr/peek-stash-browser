@@ -43,8 +43,7 @@ describe("Group API", () => {
       const response = await adminClient.post<FindGroupsResponse>(
         "/api/library/groups",
         {
-          page: 1,
-          per_page: 10,
+          filter: { page: 1, per_page: 10 },
         }
       );
 

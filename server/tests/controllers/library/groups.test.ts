@@ -59,10 +59,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
-}));
-
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
   hydrateEntityTags: vi
     .fn()
@@ -71,13 +67,6 @@ vi.mock("../../../utils/hierarchyUtils.js", () => ({
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
-    sortField: field,
-    randomSeed: undefined,
-  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -132,8 +121,8 @@ describe("Groups Controller", () => {
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
       const groups = [
-        createMockGroup({ id: "g1", instanceId: "inst-a" }),
-        createMockGroup({ id: "g1", instanceId: "inst-b" }),
+        createMockGroup({ id: "101", instanceId: "inst-a" }),
+        createMockGroup({ id: "101", instanceId: "inst-b" }),
       ];
       mockGroupQueryBuilder.execute.mockResolvedValue({
         groups,
@@ -141,7 +130,7 @@ describe("Groups Controller", () => {
       });
 
       const req = reqFor(findGroups, {
-        body: { ids: ["g1"], filter: {}, group_filter: {} },
+        body: { ids: ["101"], filter: {}, group_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findGroups);
@@ -171,7 +160,7 @@ describe("Groups Controller", () => {
     });
 
     it("fetches detail counts and hydrates tags for single-ID lookup", async () => {
-      const group = createMockGroup({ id: "g1", instanceId: "default" });
+      const group = createMockGroup({ id: "101", instanceId: "default" });
       mockGroupQueryBuilder.execute.mockResolvedValue({
         groups: [group],
         total: 1,
@@ -183,7 +172,7 @@ describe("Groups Controller", () => {
       });
 
       const req = reqFor(findGroups, {
-        body: { ids: ["g1"], filter: {}, group_filter: {} },
+        body: { ids: ["101"], filter: {}, group_filter: {} },
         user: defaultUser,
       });
       const res = resFor(findGroups);
@@ -192,13 +181,13 @@ describe("Groups Controller", () => {
 
       expect(res._getStatus()).toBe(200);
       expect(mockStashEntityService.getGroup).toHaveBeenCalledWith(
-        "g1",
+        "101",
         "default"
       );
     });
 
     it("attaches the user's view of the hierarchy to a single-ID lookup", async () => {
-      const group = createMockGroup({ id: "g1", instanceId: "inst-a" });
+      const group = createMockGroup({ id: "101", instanceId: "inst-a" });
       mockGroupQueryBuilder.execute.mockResolvedValue({
         groups: [group],
         total: 1,
@@ -216,7 +205,7 @@ describe("Groups Controller", () => {
       mockGroupQueryBuilder.getHierarchy.mockResolvedValueOnce(hierarchy);
 
       const req = reqFor(findGroups, {
-        body: { ids: ["g1"], group_filter: { instance_id: "inst-a" } },
+        body: { ids: ["101"], group_filter: { instance_id: "inst-a" } },
         user: defaultUser,
       });
       const res = resFor(findGroups);
@@ -224,7 +213,7 @@ describe("Groups Controller", () => {
       await findGroups(req, res);
 
       expect(mockGroupQueryBuilder.getHierarchy).toHaveBeenCalledWith(
-        "g1",
+        "101",
         "inst-a",
         defaultUser.id
       );

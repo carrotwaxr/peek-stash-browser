@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -13,11 +12,15 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { PeekPerformerFilter } from "../../types/index.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -30,39 +33,18 @@ export const findPerformers = async (
     FindPerformersResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("performer", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/performers", request.dropped);
+
   try {
     const startTime = Date.now();
-    const userId = req.user?.id;
-    const requestingUser = req.user;
-    const { filter, performer_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
-      | "ASC"
-      | "DESC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
-
-    // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(
-      sortFieldRaw,
-      requestingUser.id
-    );
-
-    // Merge root-level ids with performer_filter. The builder reads the
-    // filter as sent, as before: PeekPerformerFilter types its criteria as
-    // Stash's, which always name a modifier, where a request may omit it
-    const normalizedIds = ids
-      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
-      : performer_filter?.ids;
-    const mergedFilter = {
-      ...performer_filter,
-      ids: normalizedIds,
-    } as PeekPerformerFilter;
-
-    // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
-    const specificInstanceId = performer_filter?.instance_id;
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its performer by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
     const applyExclusions = true;
@@ -72,34 +54,29 @@ export const findPerformers = async (
 
     const { performers, total } = await performerQueryBuilder.execute({
       userId,
-      filters: mergedFilter,
+      filters: toLegacyFilter("performer", request.filter),
       applyExclusions,
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      searchQuery,
-      randomSeed,
+      searchQuery: request.q,
+      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (
-      ids &&
-      ids.length === 1 &&
-      !specificInstanceId &&
-      performers.length > 1
-    ) {
+    if (lookup && !specificInstanceId && performers.length > 1) {
       logger.warn("Ambiguous performer lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: performers.length,
         instances: performers.map((p) => p.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple performers found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple performers found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: performers.map((p) => ({
           id: p.id,
           name: p.name,
@@ -111,7 +88,7 @@ export const findPerformers = async (
 
     // For single-entity requests (detail pages), hydrate tags
     let resultPerformers = performers;
-    if (ids && ids.length === 1 && performers.length === 1) {
+    if (lookup && performers.length === 1) {
       resultPerformers = await hydrateEntityTags(performers);
     }
 

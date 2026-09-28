@@ -104,6 +104,8 @@ export default defineConfig({
             CONFIG_DIR: runDir,
             PEEK_SERVER_PORT: String(ports.server),
             JWT_SECRET: "e2e-test-secret",
+            // Unknown list filter input answers 400, so client drift fails
+            PEEK_FILTER_POLICY: "reject",
             STASH_URL: "", // dotenv never overrides a set variable, so the root .env's Stash is not used
             STASH_API_KEY: "",
           },

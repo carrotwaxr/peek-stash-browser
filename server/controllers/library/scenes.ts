@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -32,16 +31,18 @@ import type {
   TypedResponse,
   WithStashUrl,
 } from "../../types/api/index.js";
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import type { NormalizedScene } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import { readHistory } from "../../utils/historyJson.js";
-import { logger } from "../../utils/logger.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
-  SeededRandom,
-  generateDailySeed,
-  parseRandomSort,
-} from "../../utils/seededRandom.js";
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
+import { logger } from "../../utils/logger.js";
+import { SeededRandom, generateDailySeed } from "../../utils/seededRandom.js";
 import { emptyToNull } from "../../utils/sqlHelpers.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -221,68 +222,49 @@ export const findScenes = async (
   >
 ) => {
   const requestStart = Date.now();
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("scene", req.body, { userId });
+  logDropped("POST /library/scenes", request.dropped);
+
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const { filter, scene_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "created_at";
-    const sortDirection = filter?.direction || "DESC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
-
-    // Parse random sort with seed
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, userId);
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its scene by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Build filters object. The builder reads the filter as sent, as before:
-    // PeekSceneFilter types its criteria as Stash's, which always name a
-    // modifier, where a request may omit it
-    const filters = { ...scene_filter } as PeekSceneFilter;
-    if (ids && ids.length > 0) {
-      filters.ids = { value: coerceEntityRefs(ids), modifier: "INCLUDES" };
-    }
-
-    // Extract specific instance ID for disambiguation (from scene_filter.instance_id)
-    const specificInstanceId = scene_filter?.instance_id;
-
     // Execute query (applyExclusions defaults to true)
     const result = await sceneQueryBuilder.execute({
       userId,
-      filters,
+      filters: toLegacyFilter("scene", request.filter),
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      randomSeed: sortField === "random" ? randomSeed : userId,
-      searchQuery: searchQuery || undefined,
+      randomSeed: request.sort.seed,
+      searchQuery: request.q,
     });
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (
-      ids &&
-      ids.length === 1 &&
-      !specificInstanceId &&
-      result.scenes.length > 1
-    ) {
+    if (lookup && !specificInstanceId && result.scenes.length > 1) {
       logger.warn("Ambiguous scene lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: result.scenes.length,
         instances: result.scenes.map((s) => s.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple scenes found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple scenes found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: result.scenes.map((s) => ({
           id: s.id,
           title: s.title,
@@ -297,7 +279,7 @@ export const findScenes = async (
 
     // The Scene page loads one scene by id: only then build its stream
     // list. Lists keep sceneStreams empty.
-    if (ids?.length === 1) {
+    if (lookup) {
       scenes = await Promise.all(
         scenes.map(async (s) => ({
           ...s,

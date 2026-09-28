@@ -1,4 +1,3 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
@@ -13,11 +12,16 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import type { NormalizedStudio } from "../../types/index.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
+import { toLegacyFilter } from "../../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseListRequest,
+  singleIdRef,
+} from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -29,39 +33,18 @@ export const findStudios = async (
     FindStudiosResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
+  // A ValidationError (400) reaches the central error handler
+  const request = parseListRequest("studio", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/studios", request.dropped);
+
   try {
     const startTime = Date.now();
-    const userId = req.user?.id;
-    const requestingUser = req.user;
-    const { filter, studio_filter, ids } = req.body;
-
-    const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
-      | "ASC"
-      | "DESC";
-    const page = filter?.page || 1;
-    const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || "";
-
-    // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(
-      sortFieldRaw,
-      requestingUser.id
-    );
-
-    // Merge root-level ids with studio_filter. The builder reads the
-    // filter as sent, as before: PeekStudioFilter types its criteria as
-    // Stash's, which always name a modifier, where a request may omit it
-    const normalizedIds = ids
-      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
-      : studio_filter?.ids;
-    const mergedFilter = {
-      ...studio_filter,
-      ids: normalizedIds,
-    } as PeekStudioFilter;
-
-    // Extract specific instance ID for disambiguation (from studio_filter.instance_id)
-    const specificInstanceId = studio_filter?.instance_id;
+    const userId = req.user.id;
+    const { page, perPage, specificInstanceId } = request;
+    // A detail page asks for its studio by id
+    const lookup = singleIdRef(request.filter.ids);
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
     const applyExclusions = true;
@@ -71,28 +54,28 @@ export const findStudios = async (
 
     const { studios, total } = await studioQueryBuilder.execute({
       userId,
-      filters: mergedFilter,
+      filters: toLegacyFilter("studio", request.filter),
       applyExclusions,
       allowedInstanceIds,
       specificInstanceId,
-      sort: sortField,
-      sortDirection,
+      sort: request.sort.field,
+      sortDirection: request.sort.direction,
       page,
       perPage,
-      searchQuery,
-      randomSeed,
+      searchQuery: request.q,
+      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups
-    if (ids && ids.length === 1 && !specificInstanceId && studios.length > 1) {
+    if (lookup && !specificInstanceId && studios.length > 1) {
       logger.warn("Ambiguous studio lookup", {
-        id: ids[0],
+        id: lookup.id,
         matchCount: studios.length,
         instances: studios.map((s) => s.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
-        message: `Multiple studios found with ID ${ids[0]}. Specify instance_id parameter.`,
+        message: `Multiple studios found with ID ${lookup.id}. Specify instance_id parameter.`,
         matches: studios.map((s) => ({
           id: s.id,
           name: s.name,
@@ -104,11 +87,11 @@ export const findStudios = async (
 
     // For single-entity requests (detail pages), get studio with computed counts
     let resultStudios = studios;
-    if (ids && ids.length === 1 && resultStudios.length === 1) {
+    if (lookup && resultStudios.length === 1) {
       // Get studio with computed counts from junction tables
       const firstStudio = resultStudios[0] as (typeof resultStudios)[number];
       const studioWithCounts = await stashEntityService.getStudio(
-        ids[0] as string,
+        firstStudio.id,
         firstStudio.instanceId
       );
       if (studioWithCounts) {
@@ -140,7 +123,7 @@ export const findStudios = async (
     // Hydrate parent/child relationships with names
     // For single-studio requests (detail pages), we need all studios for accurate parent/child lookup
     let hydratedStudios: NormalizedStudio[];
-    if (ids && ids.length === 1) {
+    if (lookup) {
       // Get all studios for hierarchy lookup, then hydrate
       const allStudios = await stashEntityService.getAllStudios();
       const allHydrated = await hydrateStudioRelationships(allStudios);
