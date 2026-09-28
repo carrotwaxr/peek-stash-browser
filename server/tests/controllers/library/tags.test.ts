@@ -1,29 +1,26 @@
 /**
  * Unit Tests for Tags Library Controller
  *
- * Tests findTags, findTagsMinimal and findTagsForScenes.
+ * Tests findTags, findTagsMinimal and findTagTree.
  */
+// --- Imports ---
+import type * as instanceAwareIdModule from "@peek/shared-types/instanceAwareId.js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  findTagTree,
   findTags,
-  findTagsForScenes,
   findTagsMinimal,
 } from "../../../controllers/library/tags.js";
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
+import { ValidationError } from "../../../middleware/errorHandler.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
+import { loadTagTree } from "../../../services/TagTreeService.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
+import { untrusted } from "../../helpers/untrusted.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock(
-  "../../../prisma/singleton.js",
-  () => import("../../helpers/prismaSingletonMock.js")
-);
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
@@ -34,6 +31,10 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 
 vi.mock("../../../services/TagQueryBuilder.js", () => ({
   tagQueryBuilder: { execute: vi.fn() },
+}));
+
+vi.mock("../../../services/TagTreeService.js", () => ({
+  loadTagTree: vi.fn(),
 }));
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
@@ -52,7 +53,8 @@ vi.mock("../../../utils/entityInstanceId.js", () => ({
     .mockImplementation((entities: unknown[]) => entities),
 }));
 
-vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
+vi.mock("@peek/shared-types/instanceAwareId.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof instanceAwareIdModule>()),
   coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
 
@@ -86,7 +88,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma, true);
+const mockLoadTagTree = vi.mocked(loadTagTree);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
 
@@ -356,54 +358,103 @@ describe("Tags Controller", () => {
     });
   });
 
-  // ─── findTagsForScenes ──────────────────────────────────────
+  // ─── findTagTree ────────────────────────────────────────────
 
-  describe("findTagsForScenes", () => {
-    it("returns tags found on matching scenes", async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([
-        { tagId: "t1" },
-        { tagId: "t2" },
-      ]);
-      const allTags = [
-        createMockTag({ id: "t1", name: "Tag1" }),
-        createMockTag({ id: "t2", name: "Tag2" }),
-      ];
-      mockStashEntityService.getAllTags.mockResolvedValue(allTags);
+  describe("findTagTree", () => {
+    const row = {
+      id: "5",
+      instanceId: "inst-a",
+      name: "Five",
+      image_path: null,
+      parents: [],
+      scene_count: 1,
+      image_count: 0,
+      gallery_count: 0,
+      performer_count: 0,
+      created_at: null,
+      updated_at: null,
+      rating100: null,
+      favorite: false,
+      o_counter: 0,
+    };
 
-      const req = reqFor(findTagsForScenes, {
-        body: { performerId: "p1" },
+    it("answers the whole tree on the user's allowed instances", async () => {
+      mockLoadTagTree.mockResolvedValue([row]);
+
+      const req = reqFor(findTagTree, { body: {}, user: defaultUser });
+      const res = resFor(findTagTree);
+
+      await findTagTree(req, res);
+
+      expect(mockLoadTagTree).toHaveBeenCalledWith({
+        userId: defaultUser.id,
+        allowedInstanceIds: ["default"],
+        scope: undefined,
+      });
+      expect(res._getOkBody()).toEqual({ tags: [row] });
+    });
+
+    it("an absent body is the whole tree", async () => {
+      mockLoadTagTree.mockResolvedValue([]);
+
+      const req = reqFor(findTagTree, {
+        body: untrusted<undefined>(undefined),
         user: defaultUser,
       });
-      const res = resFor(findTagsForScenes);
+      const res = resFor(findTagTree);
 
-      await findTagsForScenes(req, res);
+      await findTagTree(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().tags.length).toBeGreaterThanOrEqual(2);
+      expect(must(mockLoadTagTree.mock.calls[0])[0].scope).toBeUndefined();
+      expect(res._getOkBody()).toEqual({ tags: [] });
     });
 
-    it("returns empty tags when no scene tags found", async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    it("parses the scope's refs into pairs; a bare id stays bare", async () => {
+      mockLoadTagTree.mockResolvedValue([]);
 
-      const req = reqFor(findTagsForScenes, { user: defaultUser });
-      const res = resFor(findTagsForScenes);
+      const req = reqFor(findTagTree, {
+        body: {
+          scope: { performer: "12:inst-a", tag: "7", studio: "3:inst-b" },
+        },
+        user: defaultUser,
+      });
+      const res = resFor(findTagTree);
 
-      await findTagsForScenes(req, res);
+      await findTagTree(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().tags).toEqual([]);
+      expect(must(mockLoadTagTree.mock.calls[0])[0].scope).toEqual({
+        performer: { id: "12", instanceId: "inst-a" },
+        tag: { id: "7", instanceId: undefined },
+        studio: { id: "3", instanceId: "inst-b" },
+      });
     });
 
-    it("returns 500 on error", async () => {
-      mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error("SQL error"));
+    it.each([
+      [{ scope: { scene: "1" } }, "scope"],
+      [{ scope: { performer: "abc" } }, "scope.performer"],
+      [{ scope: { group: "1:bad instance" } }, "scope.group"],
+      [{ scope: { tag: 7 } }, "scope.tag"],
+      [{ scope: "1" }, "scope"],
+      [{ extra: true }, ""],
+    ])("%j answers 400 naming %s", async (body, path) => {
+      const req = reqFor(findTagTree, {
+        body: untrusted(body),
+        user: defaultUser,
+      });
+      const res = resFor(findTagTree);
 
-      const req = reqFor(findTagsForScenes, { user: defaultUser });
-      const res = resFor(findTagsForScenes);
+      const error = await findTagTree(req, res).then(
+        () => undefined,
+        (e: unknown) => e
+      );
 
-      await findTagsForScenes(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find tags for scenes");
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(
+        error instanceof ValidationError
+          ? error.issues?.map((i) => i.path)
+          : undefined
+      ).toContain(path);
+      expect(mockLoadTagTree).not.toHaveBeenCalled();
     });
   });
 });

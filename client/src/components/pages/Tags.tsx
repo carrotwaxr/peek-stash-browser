@@ -1,11 +1,9 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { NormalizedTag } from "@peek/shared-types";
-import { useQuery } from "@tanstack/react-query";
-import { type LibrarySearchParams, libraryApi } from "../../api";
+import type { LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
-import { useTagList } from "../../api/hooks";
-import { queryKeys } from "../../api/queryKeys";
+import { useTagList, useTagTree } from "../../api/hooks";
 import { getGridClasses } from "../../constants/grids";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -73,18 +71,11 @@ const Tags = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  // Separate query for hierarchy view (fetches all tags)
-  const allTagsParams: LibrarySearchParams = {
-    filter: { per_page: -1, sort: "name", direction: "ASC" },
-  };
-  const { data: hierarchyRaw, isLoading: hierarchyLoading } = useQuery({
-    queryKey: queryKeys.tags.list(
-      undefined,
-      allTagsParams as Record<string, unknown>
-    ),
-    queryFn: ({ signal }) => libraryApi.findTags(allTagsParams, signal),
-    enabled: activeViewMode === "hierarchy",
-  });
+  // The compact tag tree for the hierarchy view, fetched only there
+  const { data: hierarchyData, isLoading: hierarchyLoading } = useTagTree(
+    undefined,
+    activeViewMode === "hierarchy"
+  );
 
   const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
     setQueryParams(newQuery);
@@ -95,15 +86,7 @@ const Tags = () => {
     | undefined;
   const currentTags = (findTags?.tags as Record<string, unknown>[]) || [];
   const totalCount = (findTags?.count as number) || 0;
-  const hierarchyFindTags = (hierarchyRaw as Record<string, unknown>)
-    ?.findTags as Record<string, unknown> | undefined;
-  const hierarchyTags =
-    (hierarchyFindTags?.tags as Array<{
-      id: string;
-      name?: string;
-      parents?: Array<{ id: string }>;
-      [key: string]: unknown;
-    }>) || [];
+  const hierarchyTags = hierarchyData?.tags ?? [];
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -187,7 +170,7 @@ const Tags = () => {
               // Hierarchy view
               if (viewMode === "hierarchy") {
                 // Show loading if we don't have hierarchy data yet
-                const showLoading = hierarchyLoading || !hierarchyRaw;
+                const showLoading = hierarchyLoading || !hierarchyData;
                 return (
                   <TagHierarchyView
                     tags={hierarchyTags}

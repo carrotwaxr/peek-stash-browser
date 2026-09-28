@@ -1,3 +1,4 @@
+import type { TagTreeScope } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
@@ -25,6 +26,19 @@ export function useTagDetail(id: string | undefined, instanceId?: string) {
     queryKey: queryKeys.tags.detail(instanceId, id),
     queryFn: id
       ? () => libraryApi.findTagById(id, instanceId ?? null)
+      : skipToken,
+  });
+}
+
+/**
+ * The compact tag tree (hierarchy and folder views), whole or scoped; fetched
+ * only while `enabled`
+ */
+export function useTagTree(scope: TagTreeScope | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.tags.tree(scope as Record<string, unknown> | undefined),
+    queryFn: enabled
+      ? ({ signal }) => libraryApi.findTagTree(scope, signal)
       : skipToken,
   });
 }

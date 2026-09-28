@@ -143,4 +143,108 @@ describe("FolderView", () => {
       expect(must(capturedSearchParams).get("folderPath")).toBe("tag1,tag2");
     });
   });
+
+  describe("instances", () => {
+    it("a folder's path and the tag it passes on name the tag's instance", () => {
+      const Wrapper = createWrapper(["/"]);
+      const onFolderPathChange = vi.fn();
+      const tags = [
+        { id: "5", instanceId: "a", name: "Five A", parents: [] },
+        { id: "5", instanceId: "b", name: "Five B", parents: [] },
+      ];
+      const items = [
+        { id: "s1", instanceId: "a", tags: [{ id: "5" }] },
+        { id: "s2", instanceId: "b", tags: [{ id: "5" }] },
+      ];
+
+      render(
+        <FolderView
+          items={items}
+          tags={tags}
+          renderItem={(item) => (
+            <div key={String(item.id)}>{String(item.id)}</div>
+          )}
+          onFolderPathChange={onFolderPathChange}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const folderCard = screen
+        .getAllByRole("button")
+        .find((btn) => btn.querySelector("h3")?.textContent === "Five B");
+      fireEvent.click(must(folderCard));
+
+      expect(must(capturedSearchParams).get("folderPath")).toBe("5:b");
+      expect(onFolderPathChange).toHaveBeenLastCalledWith("5:b");
+    });
+
+    // Tag 5 on A (with child 6) and on B (with child 7)
+    const bookmarkTags = [
+      { id: "5", instanceId: "a", name: "Five A", parents: [] },
+      {
+        id: "6",
+        instanceId: "a",
+        name: "Six A",
+        parents: [{ id: "5" }],
+        scene_count: 1,
+      },
+      { id: "5", instanceId: "b", name: "Five B", parents: [] },
+      {
+        id: "7",
+        instanceId: "b",
+        name: "Seven B",
+        parents: [{ id: "5" }],
+        scene_count: 1,
+      },
+    ];
+    const folderNames = () =>
+      screen
+        .getAllByRole("button")
+        .map((btn) => btn.querySelector("h3")?.textContent)
+        .filter((name) => name !== undefined);
+    const renderAt = (
+      url: string,
+      tags: typeof bookmarkTags,
+      onFolderPathChange = vi.fn()
+    ) =>
+      render(
+        <FolderView
+          items={[]}
+          tags={tags}
+          renderItem={(item) => (
+            <div key={String(item.id)}>{String(item.id)}</div>
+          )}
+          onFolderPathChange={onFolderPathChange}
+        />,
+        { wrapper: createWrapper([url]) }
+      );
+
+    it("a bookmarked folderPath of bare ids opens the same folders", () => {
+      const onFolderPathChange = vi.fn();
+      const onA = bookmarkTags.filter((t) => t.instanceId === "a");
+
+      renderAt("/?folderPath=5", onA, onFolderPathChange);
+
+      expect(folderNames()).toEqual(["Six A"]);
+      expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
+      // Stored the new way from then on
+      expect(must(capturedSearchParams).get("folderPath")).toBe("5:a");
+      expect(onFolderPathChange).toHaveBeenLastCalledWith("5:a");
+    });
+
+    it("a bare id present on two instances follows the page's instance", () => {
+      renderAt("/?instance=b&folderPath=5", bookmarkTags);
+
+      expect(folderNames()).toEqual(["Seven B"]);
+      expect(must(capturedSearchParams).get("folderPath")).toBe("5:b");
+      expect(must(capturedSearchParams).get("instance")).toBe("b");
+    });
+
+    it("without the page's instance, a bare id on two instances opens the first instance's tag", () => {
+      renderAt("/?folderPath=5", bookmarkTags);
+
+      expect(folderNames()).toEqual(["Six A"]);
+      expect(must(capturedSearchParams).get("folderPath")).toBe("5:a");
+    });
+  });
 });

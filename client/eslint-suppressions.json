@@ -429,7 +429,7 @@
   },
   "src/components/pages/Tags.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
+      "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
@@ -1404,11 +1404,6 @@
       "count": 3
     }
   },
-  "src/hooks/useFolderViewTags.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
   "src/hooks/useFullscreen.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 5
@@ -1511,7 +1506,7 @@
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 9
+      "count": 6
     }
   },
   "src/utils/buildTagTree.ts": {

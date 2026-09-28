@@ -176,6 +176,62 @@ export interface FindTagsMinimalResponse {
   tags: Array<{ id: string; name: string; instanceId: string }>;
 }
 
+/**
+ * What a scoped tag tree covers: the scenes of a performer, tag, studio and
+ * collection (all that are given). Each is `"id:instanceId"`, or a bare id
+ * for that id on every instance the user sees.
+ */
+export interface TagTreeScope {
+  performer?: string;
+  tag?: string;
+  studio?: string;
+  group?: string;
+}
+
+/**
+ * POST /api/library/tags/tree - every tag the user can see, compact, for the
+ * Tags page's hierarchy view and the folder view (children are derived on
+ * the client). With a scope, only the tags on the scope's visible scenes and
+ * their visible ancestors.
+ */
+export interface FindTagTreeRequest {
+  scope?: TagTreeScope;
+}
+
+/** A tag in the tree. Its parents and their ids are on its own instance. */
+export interface TagTreeRow {
+  id: string;
+  instanceId: string;
+  name: string;
+  image_path: string | null;
+  /**
+   * The parents in this response: one the user cannot see is left out, so a
+   * tag whose every parent is hidden is a root
+   */
+  parents: Array<{ id: string }>;
+  /**
+   * The tag's scenes (the greater of its own and its performers', as in the
+   * list); with a scope, the scope's visible scenes that carry the tag
+   */
+  scene_count: number;
+  /** With a scope: 0 */
+  image_count: number;
+  /** With a scope: 0 */
+  gallery_count: number;
+  /** With a scope: 0 */
+  performer_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  /** The requesting user's own rating, favorite and O count */
+  rating100: number | null;
+  favorite: boolean;
+  o_counter: number;
+}
+
+export interface FindTagTreeResponse {
+  tags: TagTreeRow[];
+}
+
 // =============================================================================
 // GALLERIES
 // =============================================================================

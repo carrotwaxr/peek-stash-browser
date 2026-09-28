@@ -9,13 +9,17 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
-import { buildFolderTree } from "../../utils/buildFolderTree";
+import {
+  buildFolderTree,
+  resolveFolderPath,
+} from "../../utils/buildFolderTree";
 import FolderBreadcrumb from "./FolderBreadcrumb";
 import FolderCard from "./FolderCard";
 import FolderTreeSidebar from "./FolderTreeSidebar";
 
 interface TagItem {
   id: string;
+  instanceId?: string | null;
   name: string;
   parents?: Array<{ id: string }>;
   image_path?: string | null;
@@ -28,7 +32,8 @@ interface Props {
   gridDensity?: string;
   loading?: boolean;
   emptyMessage?: string;
-  onFolderPathChange?: (tagId: string | null) => void;
+  /** The open folder's tag as "id:instanceId" (its `tagTreeKey`), null at the root */
+  onFolderPathChange?: (tagKey: string | null) => void;
   filters?: Record<string, unknown> | null;
 }
 
@@ -36,6 +41,7 @@ interface Props {
  * Folder view for browsing content by tag hierarchy.
  * Desktop: Split-pane with tree sidebar + content grid
  * Mobile: Stacked with breadcrumb + content grid
+ * The `folderPath` URL parameter lists tag keys ("id:instanceId").
  */
 const FolderView = ({
   items,
@@ -50,10 +56,31 @@ const FolderView = ({
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Parse path from URL
-  const currentPath = useMemo(() => {
+  const urlPath = useMemo(() => {
     const pathParam = searchParams.get("folderPath");
     return pathParam ? pathParam.split(",").filter(Boolean) : [];
   }, [searchParams]);
+  const pageInstanceId = searchParams.get("instance");
+
+  // A path bookmarked with bare ids resolves to the tags' keys once they load
+  const currentPath = useMemo(
+    () => [...resolveFolderPath(urlPath, tags, pageInstanceId)],
+    [urlPath, tags, pageInstanceId]
+  );
+
+  // ...and is stored in the URL the new way from then on
+  useEffect(() => {
+    const resolved = currentPath.join(",");
+    if (resolved === urlPath.join(",")) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("folderPath", resolved);
+        return next;
+      },
+      { replace: true }
+    );
+  }, [currentPath, urlPath, setSearchParams]);
 
   // Track last notified tag to avoid duplicate notifications
   const lastNotifiedTagRef = useRef<string | null | undefined>(undefined);

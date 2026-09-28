@@ -75,6 +75,9 @@ Navigate content through your tag hierarchy as folders.
 - Click into nested tags like browsing directories
 - Three density levels: Small, Medium, Large
 - Available for: Scenes, Galleries, Images
+- On a performer, tag, studio or collection page, the folders are the tags on that page's scenes and their parent tags
+- With several Stash servers, each server's tags are separate folders, even when two share a name or number
+- A tag whose parent tags are all hidden from you shows at the top level
 
 **Navigation:**
 
@@ -91,6 +94,8 @@ A tree view showing parent/child tag relationships (Tags page only).
 - Visual indentation shows hierarchy depth
 - Search filters the tree while showing ancestors
 - **Expand All** / **Collapse All** buttons for quick navigation
+- With several Stash servers, each server's tags stay in their own branches
+- A tag whose parent tags are all hidden from you shows at the top level
 
 **Navigation:**
 

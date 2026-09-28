@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight, Droplets, ExternalLink, Heart } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import { useConfig } from "../../contexts/ConfigContext";
+import { tagTreeKey } from "../../utils/buildTagTree";
 import { getEntityPath } from "../../utils/entityLinks";
 
 interface TagNodeData {
@@ -20,15 +21,16 @@ interface TagNodeData {
   instanceId?: string;
 }
 
+/** Expansion and focus go by the tag's `tagTreeKey` ("id:instanceId") */
 interface TagTreeNodeProps {
   tag: TagNodeData;
   depth?: number;
   isExpanded?: boolean;
   expandedIds?: Set<string>;
-  onToggle: (id: string) => void;
+  onToggle: (key: string) => void;
   isAncestorOnly?: boolean;
   focusedId?: string | null;
-  onFocus?: (id: string) => void;
+  onFocus?: (key: string) => void;
 }
 
 // Color utilities matching CardCountIndicators
@@ -89,17 +91,18 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     const { hasMultipleInstances } = useConfig();
     const children = tag.children ?? [];
     const hasChildren = children.length > 0;
-    const isFocused = focusedId === tag.id;
+    const key = tagTreeKey(tag);
+    const isFocused = focusedId === key;
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         e.stopPropagation();
         if (hasChildren) {
-          onToggle(tag.id);
+          onToggle(key);
         }
-        onFocus?.(tag.id);
+        onFocus?.(key);
       },
-      [hasChildren, onToggle, onFocus, tag.id]
+      [hasChildren, onToggle, onFocus, key]
     );
 
     const handleDoubleClick = useCallback(
@@ -342,10 +345,10 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
           <div role="group">
             {children.map((child) => (
               <TagTreeNode
-                key={`${tag.id}-${child.id}`}
+                key={tagTreeKey(child)}
                 tag={child}
                 depth={depth + 1}
-                isExpanded={expandedIds?.has(child.id) || false}
+                isExpanded={expandedIds?.has(tagTreeKey(child)) || false}
                 expandedIds={expandedIds}
                 onToggle={onToggle}
                 isAncestorOnly={child.isAncestorOnly || false}

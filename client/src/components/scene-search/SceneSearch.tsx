@@ -164,7 +164,7 @@ const SceneSearch = ({
     unknown
   > | null>(null);
 
-  // Track folder tag filter for filtering by selected folder
+  // The open folder's tag as "id:instanceId", for filtering by selected folder
   const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
 
   // Merge timeline/folder filters into permanent filters based on view mode
