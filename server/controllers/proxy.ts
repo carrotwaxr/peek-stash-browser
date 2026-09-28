@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import http from "http";
 import https from "https";
+import { pipeline } from "stream";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
@@ -84,10 +85,9 @@ function getAgentForUrl(urlObj: URL): http.Agent | https.Agent {
  * marks the response destroyed when the client's socket closes. A media
  * request waits on the session check, the access check and the upstream
  * slot queue, and a grid of thumbnails is often abandoned mid-wait.
- * Forwarding such a request would pipe Stash's response into a dead
- * response: the write returns false, the upstream body pauses, `end` never
- * fires and the slot is held until the upstream timeout, and a backlog of
- * those starves every later request.
+ * Forwarding such a request would fetch a response nobody reads and hold a
+ * slot until Stash answers (with the old `pipe`, until the upstream
+ * timeout), and a backlog of those starves every later request.
  */
 function isClientGone(res: Response): boolean {
   return res.destroyed || res.writableEnded;
@@ -141,6 +141,9 @@ function rowInstanceFilter(
  * - Client disconnect cleanup (destroys upstream request)
  * - Double-release guard for concurrency slots
  * - Timeout handling
+ * - Stash failing mid-transfer: once the status and Content-Length are out
+ *   the response can only be cut short, so it is destroyed and the browser
+ *   sees the request fail at once
  * - Private Cache-Control: media belongs to a signed-in user, so a shared
  *   cache must never store it (privateCacheControl keeps Stash's freshness)
  */
@@ -170,7 +173,15 @@ function proxyHttpRequest({
   const httpModule = urlObj.protocol === "https:" ? https : http;
   const agent = getAgentForUrl(urlObj);
 
+  // Stash's response, once it arrives: from then on the pipeline owns `res`
+  let upstreamRes: http.IncomingMessage | undefined;
+  // Who ended the transfer before it completed, for the log: the browser
+  // leaving is routine and Peek's own destroy follows it; Stash failing or
+  // going quiet for `timeoutMs` is logged once, where it is seen
+  let endedBy: "client" | "timeout" | "stash" | undefined;
+
   const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
+    upstreamRes = proxyRes;
     // Forward response headers
     if (proxyRes.headers["content-type"]) {
       res.setHeader("Content-Type", proxyRes.headers["content-type"]);
@@ -189,17 +200,32 @@ function proxyHttpRequest({
     // Set status code
     res.status(proxyRes.statusCode || 200);
 
-    // Stream response back to client
-    proxyRes.pipe(res);
-
-    // Release slot when response ends
-    proxyRes.on("end", releaseOnce);
-    proxyRes.on("error", releaseOnce);
+    // `pipeline` ends `res` when Stash fails mid-body (a reset, a close, or
+    // our destroy at the timeout) by destroying both sides, so the browser
+    // sees the request fail at once; `pipe` left it waiting for the promised
+    // Content-Length until nginx gave up. On a clean end Stash's socket goes
+    // back to the keep-alive agent.
+    pipeline(proxyRes, res, (error) => {
+      releaseOnce();
+      if (!error) return;
+      if (endedBy === "client") {
+        logger.debug(`${label} Client disconnected mid-transfer`);
+      } else if (endedBy === undefined) {
+        // Stash closed the connection mid-body without a socket error
+        logger.warn(`${label} Stash failed mid-transfer`, { error });
+      }
+    });
   });
 
   // When the client disconnects (seek, refresh, navigate away),
   // destroy the upstream request to stop downloading into memory.
   res.on("close", () => {
+    // An unfinished response closing while Stash's side is whole: the
+    // browser left. A Stash failure has already set `endedBy` (a socket
+    // error) or destroyed Stash's response (a clean close mid-body).
+    if (!res.writableFinished && upstreamRes?.destroyed !== true) {
+      endedBy ??= "client";
+    }
     if (!proxyReq.destroyed) {
       proxyReq.destroy();
     }
@@ -209,21 +235,38 @@ function proxyHttpRequest({
   // Handle request errors
   proxyReq.on("error", (error: Error) => {
     releaseOnce();
-    // ECONNRESET is expected when we destroy the request on client disconnect
-    if ((error as NodeJS.ErrnoException).code === "ECONNRESET") {
-      logger.debug(`${label} Upstream request aborted (client disconnected)`);
+    // The ECONNRESET ("socket hang up") that follows our own destroy
+    if (endedBy !== undefined) {
+      logger.debug(`${label} Upstream request ended (${endedBy})`);
       return;
     }
-    logger.error(`${label} Error`, { error: error.message });
+    endedBy = "stash";
+    // The response has started, with its status and length: it can only be
+    // cut short. (The pipeline would end it too, as Stash's response fails.)
+    if (upstreamRes !== undefined) {
+      logger.warn(`${label} Stash failed mid-transfer`, { error });
+      res.destroy();
+      return;
+    }
+    logger.error(`${label} Error`, { error });
     if (!res.headersSent) {
       res.status(500).json({ error: "Proxy request failed" });
     }
   });
 
-  // Set timeout
+  // Stash sent nothing for `timeoutMs`: before its response, answer 504;
+  // after, the response can only be cut short
   proxyReq.setTimeout(timeoutMs, () => {
+    endedBy ??= "timeout";
+    logger.warn(`${label} Stash sent nothing for ${timeoutMs} ms`, {
+      responseStarted: upstreamRes !== undefined,
+    });
     releaseOnce();
     proxyReq.destroy();
+    if (upstreamRes !== undefined) {
+      res.destroy();
+      return;
+    }
     if (!res.headersSent) {
       res.status(504).json({ error: "Proxy request timeout" });
     }

@@ -40,8 +40,6 @@ vi.mock("../../utils/logger.js", () => ({
 interface FakeProxyRes {
   headers: Record<string, string>;
   statusCode: number;
-  pipe: Mock<(destination: unknown) => void>;
-  on: Mock<(event: string, cb: () => void) => void>;
 }
 
 /** The parts of the upstream request the proxy calls. */
@@ -59,9 +57,22 @@ type FakeGet = (
   callback: (res: FakeProxyRes) => void
 ) => FakeProxyReq;
 
-const { mockHttpGet, mockHttpsGet } = vi.hoisted(() => ({
+/** `stream.pipeline(source, destination, callback)` as the proxy calls it. */
+type FakePipeline = (
+  source: unknown,
+  destination: unknown,
+  callback: (error: Error | null) => void
+) => unknown;
+
+const { mockHttpGet, mockHttpsGet, mockPipeline } = vi.hoisted(() => ({
   mockHttpGet: vi.fn<FakeGet>(),
   mockHttpsGet: vi.fn<FakeGet>(),
+  // The transfer completes at once, which frees the concurrency slot; the
+  // real streaming (and Stash failing mid-body) is proxy.http.test.ts's
+  mockPipeline: vi.fn<FakePipeline>((_source, destination, callback) => {
+    callback(null);
+    return destination;
+  }),
 }));
 
 // Mock http and https modules to intercept proxyHttpRequest
@@ -73,6 +84,8 @@ vi.mock("https", () => ({
   default: { get: mockHttpsGet, Agent: vi.fn(() => ({ keepAlive: true })) },
   Agent: vi.fn(() => ({ keepAlive: true })),
 }));
+// Only proxy.ts imports "stream" in this file's module graph
+vi.mock("stream", () => ({ pipeline: mockPipeline }));
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
@@ -84,9 +97,9 @@ const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 const USER = { id: 7, username: "u", role: "USER" };
 
 /**
- * Sets up http.get to simulate a successful proxied response.
- * The mock fires the proxyRes 'end' event synchronously so that the
- * concurrency slot is released, preventing timeouts from slot exhaustion.
+ * Sets up http.get to simulate a successful proxied response. The mocked
+ * `pipeline` completes the transfer at once, so the concurrency slot is
+ * released, preventing timeouts from slot exhaustion.
  * Returns the mock proxyReq object for assertions.
  */
 function setupHttpGetSuccess(headers: Record<string, string> = {}) {
@@ -97,13 +110,6 @@ function setupHttpGetSuccess(headers: Record<string, string> = {}) {
       ...headers,
     },
     statusCode: 200,
-    pipe: vi.fn(),
-    on: vi.fn((event: string, cb: () => void) => {
-      // Fire 'end' immediately so the concurrency slot is released
-      if (event === "end") {
-        cb();
-      }
-    }),
   };
 
   const mockProxyReq: FakeProxyReq = {
@@ -403,7 +409,7 @@ describe("Proxy Controller", () => {
     });
 
     it("constructs correct URL and calls proxyHttpRequest for valid path", async () => {
-      setupHttpGetSuccess();
+      const { mockProxyRes } = setupHttpGetSuccess();
 
       const req = reqFor(proxyStashMedia, {
         query: { path: "/scene/12/vtt/sprite", instanceId: "inst-a" },
@@ -418,6 +424,13 @@ describe("Proxy Controller", () => {
         expect.any(Object),
         expect.any(Function)
       );
+      // Stash's response goes to the client as it is, with Stash's status
+      expect(mockPipeline).toHaveBeenCalledWith(
+        mockProxyRes,
+        res,
+        expect.any(Function)
+      );
+      expect(res.status.mock.calls).toEqual([[200]]);
     });
 
     it("appends apikey with & when path already contains query params", async () => {
