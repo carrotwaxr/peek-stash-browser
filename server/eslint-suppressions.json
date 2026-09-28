@@ -54,11 +54,6 @@
       "count": 2
     }
   },
-  "controllers/ratings.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
-    }
-  },
   "controllers/setup.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
