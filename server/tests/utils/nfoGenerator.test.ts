@@ -72,6 +72,65 @@ describe("generateSceneNfo", () => {
     expect(nfo).not.toContain("<Script>");
   });
 
+  it("details containing ']]>' stay inside the plot", () => {
+    const nfo = generateSceneNfo({
+      id: "123",
+      title: "Test",
+      details: "before ]]><evil/> after",
+      performerNames: [],
+      tagNames: [],
+    });
+
+    expect(nfo).toContain(
+      "<plot><![CDATA[before ]]]]><![CDATA[><evil/> after]]></plot>"
+    );
+  });
+
+  it("a date containing '<' is escaped", () => {
+    const nfo = generateSceneNfo({
+      id: "123",
+      title: "Test",
+      date: "<2024>-01-15&",
+      performerNames: [],
+      tagNames: [],
+    });
+
+    expect(nfo).toContain("<premiered>&lt;2024&gt;-01-15&amp;</premiered>");
+    expect(nfo).toContain("<releasedate>&lt;2024&gt;-01-15&amp;</releasedate>");
+    expect(nfo).toContain("<year>&lt;2024&gt;</year>");
+    expect(nfo).not.toContain("<2024>");
+  });
+
+  it("the id is escaped", () => {
+    const nfo = generateSceneNfo({
+      id: '1&2"<3>',
+      title: "Test",
+      performerNames: [],
+      tagNames: [],
+    });
+
+    expect(nfo).toContain(
+      '<uniqueid type="stash">1&amp;2&quot;&lt;3&gt;</uniqueid>'
+    );
+  });
+
+  it("drops characters XML cannot hold, keeping tabs and line breaks", () => {
+    const nfo = generateSceneNfo({
+      id: "123",
+      title: "a\u0000b\u000bc￾d",
+      details: "x\u0001y\tz\nw",
+      studioName: "S\u001ft",
+      performerNames: ["P\u0008q"],
+      tagNames: ["T\u000cu"],
+    });
+
+    expect(nfo).toContain("<title>abcd</title>");
+    expect(nfo).toContain("<plot><![CDATA[xy\tz\nw]]></plot>");
+    expect(nfo).toContain("<studio>St</studio>");
+    expect(nfo).toContain("<name>Pq</name>");
+    expect(nfo).toContain("<tag>Tu</tag>");
+  });
+
   it("should handle missing optional fields", () => {
     const scene = {
       id: "123",
