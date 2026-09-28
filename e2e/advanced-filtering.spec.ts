@@ -62,6 +62,51 @@ test.describe("Advanced Filtering", () => {
     await expect(page.locator("label", { hasText: /^Gender$/ })).toBeVisible();
   });
 
+  test("Performers: a penis length range shows performers or the empty state, never an error", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    await list.goto("/performers");
+    await list.waitForResults("Performer");
+
+    await list.openFilters();
+    // The physical attributes sit in a section that starts collapsed
+    await page.getByRole("heading", { name: "Performer Attributes" }).click();
+    const range = page
+      .locator("label", { hasText: /^Penis Length/ })
+      .locator("xpath=..");
+    await range.getByPlaceholder("Min").fill("10");
+    await range.getByPlaceholder("Max").fill("20");
+
+    // The list request that carries the range, not the one before it
+    const filtered = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/library/performers" &&
+        r.request().method() === "POST" &&
+        !!(
+          r.request().postDataJSON() as {
+            performer_filter?: { penis_length?: unknown };
+          } | null
+        )?.performer_filter?.penis_length
+    );
+    await page.getByRole("button", { name: "Apply Filters" }).click();
+    const response = await filtered;
+    expect(response.status()).toBe(200);
+    const { findPerformers } = (await response.json()) as {
+      findPerformers: { performers: unknown[] };
+    };
+
+    // The page shows what the range matched. The replay's performers have no
+    // length, so there the grid stays empty (it has no empty-state text).
+    await expect(
+      page.getByRole("button", { name: /^Remove filter:/ })
+    ).toHaveCount(1);
+    await expect(list.cards("Performer")).toHaveCount(
+      findPerformers.performers.length
+    );
+    await expect(page.getByText("Failed to find performers")).toHaveCount(0);
+  });
+
   test("the tags filter panel lists its own filters", async ({ page }) => {
     const list = new ListPage(page);
     await list.goto("/tags");

@@ -195,6 +195,7 @@ export interface NormalizedPerformer {
   measurements: string | null;
   fake_tits: string | null;
   penis_length?: number | null;
+  circumcised?: string | null;
   tattoos: string | null;
   piercings: string | null;
   career_length: string | null;

@@ -79,6 +79,8 @@ function stashPerformerRow(
     weightKg: null,
     measurements: null,
     fakeTits: null,
+    penisLength: null,
+    circumcised: null,
     tattoos: null,
     piercings: null,
     careerLength: null,

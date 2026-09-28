@@ -119,6 +119,8 @@ export interface PerformerQueryRow {
   weightKg: number | null;
   measurements: string | null;
   fakeTits: string | null;
+  penisLength: number | null;
+  circumcised: string | null;
   tattoos: string | null;
   piercings: string | null;
   careerLength: string | null;

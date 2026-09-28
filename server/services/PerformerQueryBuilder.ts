@@ -116,7 +116,8 @@ class PerformerQueryBuilder {
     p.id, p.stashInstanceId, p.name, p.disambiguation, p.gender, p.birthdate, p.favorite AS stashFavorite,
     p.rating100 AS stashRating100, p.sceneCount, p.imageCount, p.galleryCount, p.groupCount,
     p.details, p.aliasList, p.country, p.ethnicity, p.hairColor, p.eyeColor,
-    p.heightCm, p.weightKg, p.measurements, p.fakeTits, p.tattoos, p.piercings,
+    p.heightCm, p.weightKg, p.measurements, p.fakeTits, p.penisLength, p.circumcised,
+    p.tattoos, p.piercings,
     p.careerLength, p.deathDate, p.url, p.imagePath,
     p.stashCreatedAt, p.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -584,6 +585,7 @@ class PerformerQueryBuilder {
       updated_at: `p.stashUpdatedAt ${dir}`,
       birthdate: `p.birthdate ${dir}`,
       height: `p.heightCm ${dir}`,
+      penis_length: `p.penisLength ${dir}`,
 
       // Counts
       scene_count: `p.sceneCount ${dir}`,
@@ -818,11 +820,10 @@ class PerformerQueryBuilder {
     }
 
     if (filters?.penis_length) {
-      // Note: penis_length isn't in the schema, but keeping for API compatibility
-      // This will just not match anything until the field is added
+      // No COALESCE: a performer without a length never matches, as in Stash
       const penisLengthFilter = buildNumericFilter(
         filters.penis_length,
-        "COALESCE(p.penisLength, 0)"
+        "p.penisLength"
       );
       if (penisLengthFilter.sql) {
         whereClauses.push(penisLengthFilter);
@@ -1064,6 +1065,8 @@ class PerformerQueryBuilder {
       weight: row.weightKg || null,
       measurements: row.measurements || null,
       fake_tits: row.fakeTits || null,
+      penis_length: row.penisLength ?? null,
+      circumcised: row.circumcised ?? null,
       tattoos: row.tattoos || null,
       piercings: row.piercings || null,
       career_length: row.careerLength || null,
