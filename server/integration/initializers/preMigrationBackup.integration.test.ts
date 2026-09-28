@@ -43,6 +43,9 @@ const PRE_MIGRATION = new RegExp(
 
 const ROOT = existsSync("/dev/shm") ? "/dev/shm" : os.tmpdir();
 
+/** A stand-in for an older backup: one page, starting with SQLite's header. */
+const SQLITE_FILE = "SQLite format 3\u0000".padEnd(4096, "\u0000");
+
 describe("pre-migration backup", () => {
   let sandbox: MigrationSandbox | undefined;
   let configDir: string;
@@ -150,7 +153,7 @@ describe("pre-migration backup", () => {
       "other.db.backup-20250101-000000-pre-3.0.0",
     ];
     for (const name of [...older, ...kept]) {
-      writeFileSync(path.join(configDir, name), "");
+      writeFileSync(path.join(configDir, name), SQLITE_FILE);
     }
     const db = await oneMigrationBehind();
 
@@ -164,5 +167,38 @@ describe("pre-migration backup", () => {
     expect(files).toEqual(
       [...older.slice(1), ...kept, must(created[0])].sort()
     );
+  });
+
+  it("a start after one killed while copying discards what it left, and the cut-off copy costs no good backup", async () => {
+    const older = [
+      "peek.db.backup-20260101-000000-pre-3.3.6",
+      "peek.db.backup-20260102-000000-pre-3.3.7",
+      "peek.db.backup-20260103-000000-pre-3.3.8",
+    ];
+    // An older version's copy cut off mid-write, with SQLite's journal; one
+    // killed before SQLite's first write, empty; and this version's
+    // temporary with its journal
+    const cutOff = `peek.db.backup-20260104-000000-pre-${VERSION}`;
+    const empty = `peek.db.backup-20260105-000000-pre-${VERSION}`;
+    const partial = `peek.db.backup-20260106-000000-pre-${VERSION}.partial`;
+    for (const name of older) {
+      writeFileSync(path.join(configDir, name), SQLITE_FILE);
+    }
+    writeFileSync(path.join(configDir, empty), "");
+    for (const name of [cutOff, partial]) {
+      writeFileSync(path.join(configDir, name), "SQLite format 3\u0000");
+      writeFileSync(path.join(configDir, `${name}-journal`), "");
+    }
+    const db = await oneMigrationBehind();
+
+    const result = await migrate(db);
+
+    expect(result.applied).toEqual([NEWEST]);
+    const files = readdirSync(configDir).sort();
+    const created = files.filter(
+      (name) => PRE_MIGRATION.test(name) && name !== cutOff && name !== empty
+    );
+    expect(created).toHaveLength(1);
+    expect(files).toEqual([...older.slice(1), must(created[0])].sort());
   });
 });
