@@ -236,6 +236,38 @@ describe("Galleries Controller", () => {
       expect(res._getOkBody().galleries).toHaveLength(2);
     });
 
+    it("returns the first per_page in title order, 50 by default, DESC reversed", async () => {
+      mockStashEntityService.getAllGalleries.mockResolvedValue(
+        Array.from({ length: 60 }, (_, i) =>
+          createMockGallery({
+            id: String(i + 1),
+            title: `Item ${String(i + 1).padStart(2, "0")}`,
+          })
+        )
+      );
+      const run = async (filter: {
+        per_page?: number;
+        direction?: "ASC" | "DESC";
+      }) => {
+        const req = reqFor(findGalleriesMinimal, {
+          body: { filter },
+          user: defaultUser,
+        });
+        const res = resFor(findGalleriesMinimal);
+        await findGalleriesMinimal(req, res);
+        return res._getOkBody().galleries.map((x) => x.id);
+      };
+
+      const byDefault = await run({});
+      expect(byDefault).toHaveLength(50);
+      expect(byDefault.slice(0, 2)).toEqual(["1", "2"]);
+      expect(await run({ per_page: 3, direction: "DESC" })).toEqual([
+        "60",
+        "59",
+        "58",
+      ]);
+    });
+
     it("returns empty when cache is not initialized", async () => {
       mockStashEntityService.getAllGalleries.mockResolvedValue([]);
 

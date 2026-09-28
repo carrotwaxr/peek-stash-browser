@@ -39,11 +39,12 @@ import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
+  parseRecommendedRequest,
+  parseSimilarScenesRequest,
   singleIdRef,
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { SeededRandom, generateDailySeed } from "../../utils/seededRandom.js";
-import { emptyToNull } from "../../utils/sqlHelpers.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -333,22 +334,27 @@ export const findSimilarScenes = async (
   res: TypedResponse<FindSimilarScenesResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
-  try {
-    const { id } = req.params;
-    const page = parseInt(req.query.page ?? "") || 1;
-    const perPage = 12;
-    const userId = req.user?.id;
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "User not authenticated" });
+    return;
+  }
 
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
+  // A ValidationError (400) reaches the central error handler
+  const request = parseSimilarScenesRequest(req.params.id, req.query, {
+    userId,
+  });
+  logDropped("GET /library/scenes/:id/similar", request.dropped);
+
+  try {
+    const { sceneId: id, page } = request;
+    const perPage = 12;
 
     const instanceId = await resolveAccessibleInstanceId(
       userId,
       "scene",
       id,
-      emptyToNull(req.query.instanceId) ?? undefined
+      request.specificInstanceId
     );
     if (!instanceId) {
       res.status(404).json({ error: "Scene not found" });
@@ -425,15 +431,19 @@ export const getRecommendedScenes = async (
   res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const perPage = parseInt(req.query.per_page as string) || 24;
-    const userId = req.user?.id;
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "User not authenticated" });
+    return;
+  }
 
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
+  // page >= 1 and per_page 1..250 (24 when absent); a ValidationError (400)
+  // reaches the central error handler
+  const request = parseRecommendedRequest(req.query, { userId });
+  logDropped("GET /library/scenes/recommended", request.dropped);
+
+  try {
+    const { page, perPage } = request;
 
     // Fetch user ratings, watch history, engagement rankings, and lightweight scoring data in parallel
     const [
@@ -711,7 +721,7 @@ export const getRecommendedScenes = async (
       message: err.message,
       name: err.name,
       stack: err.stack,
-      userId: req.user?.id,
+      userId,
     });
 
     const errorType = err.name || "Unknown error";

@@ -10,6 +10,7 @@
  * - previewCarousel (preview carousel query results)
  * - executeCarouselById (execute saved carousel and return scenes)
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import type { UserCarousel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -25,12 +26,14 @@ import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
 import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { NormalizedScene } from "../../types/index.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { createMockScene } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted before imports
@@ -46,6 +49,11 @@ vi.mock("../../services/SceneQueryBuilder.js", () => ({
   },
 }));
 
+// The user's instances: enabled, selected and past their first sync
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(),
+}));
+
 // Mock library/scenes helpers
 vi.mock("../../controllers/library/scenes.js", () => ({
   addStreamabilityInfo: vi.fn((scenes: unknown[]) => scenes),
@@ -59,6 +67,7 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
+const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -95,6 +104,7 @@ const withStashUrl = (scenes: NormalizedScene[]) =>
 describe("Carousel Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAllowedInstances.mockResolvedValue(["inst-a"]);
   });
 
   // ==========================================================================
@@ -322,6 +332,53 @@ describe("Carousel Controller", () => {
       );
     });
 
+    it("stores the sort and direction as the parser read them", async () => {
+      mockPrisma.userCarousel.count.mockResolvedValue(0);
+      mockPrisma.userCarousel.create.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, carouselPreferences: null })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
+
+      const req = reqFor(createCarousel, {
+        body: { title: "Lower", rules: RULES, sort: "title", direction: "asc" },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
+      await createCarousel(req, res);
+
+      expect(res._getStatus()).toBe(201);
+      expect(mockPrisma.userCarousel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({
+            rules: RULES,
+            sort: "title",
+            direction: "ASC",
+          }),
+        })
+      );
+    });
+
+    it.each([
+      ["rules.not_a_field", { not_a_field: { value: 1 } }, "random"],
+      ["sort", RULES, "bogus"],
+    ])(
+      "a bad %s answers 400 and stores nothing",
+      async (path, rules: object, sort: string) => {
+        const req = reqFor(createCarousel, {
+          body: malformed({ title: "Bad", rules, sort }),
+          user: USER,
+        });
+        const res = resFor(createCarousel);
+
+        await expect(createCarousel(req, res)).rejects.toMatchObject({
+          statusCode: 400,
+          issues: [{ path }],
+        });
+        expect(mockPrisma.userCarousel.create).not.toHaveBeenCalled();
+      }
+    );
+
     it("auto-adds new carousel to user carouselPreferences", async () => {
       mockPrisma.userCarousel.count.mockResolvedValue(2);
       mockPrisma.userCarousel.create.mockResolvedValue({
@@ -434,6 +491,39 @@ describe("Carousel Controller", () => {
       expect(mockPrisma.userCarousel.update).toHaveBeenCalled();
       const body = res._getOkBody();
       expect(body.carousel.title).toBe("Updated Title");
+    });
+
+    it("updates only the parts sent, sort and direction as the parser read them", async () => {
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockPrisma.userCarousel.update.mockResolvedValue(SAMPLE_CAROUSEL);
+
+      const req = reqFor(updateCarousel, {
+        body: { direction: "asc" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
+      await updateCarousel(req, res);
+
+      expect(mockPrisma.userCarousel.update).toHaveBeenCalledWith({
+        where: { id: "1" },
+        data: { direction: "ASC" },
+      });
+    });
+
+    it("direction sideways answers 400 and updates nothing", async () => {
+      const req = reqFor(updateCarousel, {
+        body: { direction: "sideways" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
+
+      await expect(updateCarousel(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "direction" }],
+      });
+      expect(mockPrisma.userCarousel.update).not.toHaveBeenCalled();
     });
 
     it("returns 500 on unexpected error", async () => {
@@ -687,6 +777,106 @@ describe("Carousel Controller", () => {
       await executeCarouselById(req, res);
 
       expect(mockAddStreamability).toHaveBeenCalledWith(scenes, USER);
+    });
+
+    it("lists only the user's instances, with the parsed filter and sort", async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockAddStreamability.mockReturnValue([]);
+      mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
+
+      const req = reqFor(previewCarousel, {
+        body: {
+          rules: {
+            ...RULES,
+            performers: {
+              value: coerceEntityRefs(["7:inst-a"]),
+              modifier: CriterionModifier.Includes,
+            },
+          },
+          sort: "title",
+          direction: "asc",
+        },
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
+      await previewCarousel(req, res);
+
+      expect(mockAllowedInstances).toHaveBeenCalledWith(1);
+      expect(mockQueryBuilder.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 1,
+          allowedInstanceIds: ["inst-a", "inst-b"],
+          filters: {
+            rating100: { value: 80, modifier: "GREATER_THAN" },
+            performers: { value: ["7:inst-a"], modifier: "INCLUDES" },
+          },
+          sort: "title",
+          sortDirection: "ASC",
+          page: 1,
+          randomSeed: undefined,
+        })
+      );
+    });
+
+    it("a random carousel gets a new seed each load", async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockAddStreamability.mockReturnValue([]);
+      const before = Date.now();
+
+      const req = reqFor(previewCarousel, {
+        body: { rules: RULES },
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
+      await previewCarousel(req, res);
+
+      const options = must(mockQueryBuilder.execute.mock.calls[0])[0];
+      expect(options.sort).toBe("random");
+      expect(options.sortDirection).toBe("DESC");
+      expect(options.randomSeed).toBeGreaterThanOrEqual(1 + before);
+    });
+
+    it("a stored carousel's unknown rule key and sort are left out, not refused", async () => {
+      mockPrisma.userCarousel.findFirst.mockResolvedValue({
+        ...SAMPLE_CAROUSEL,
+        rules: { not_a_field: { value: 1 }, favorite: true },
+        sort: "constructor",
+        direction: "DESC",
+      });
+      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockAddStreamability.mockReturnValue([]);
+
+      const req = reqFor(executeCarouselById, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(executeCarouselById);
+      await executeCarouselById(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockQueryBuilder.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { favorite: true },
+          allowedInstanceIds: ["inst-a"],
+          sort: "created_at",
+          sortDirection: "DESC",
+          perPage: 12,
+        })
+      );
+    });
+
+    it("a preview with an unknown rule key answers 400 before any query", async () => {
+      const req = reqFor(previewCarousel, {
+        body: malformed({ rules: { not_a_field: { value: 1 } } }),
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
+
+      await expect(previewCarousel(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "rules.not_a_field" }],
+      });
+      expect(mockQueryBuilder.execute).not.toHaveBeenCalled();
     });
 
     it("passes CAROUSEL_SCENE_LIMIT (12) as perPage to query builder", async () => {

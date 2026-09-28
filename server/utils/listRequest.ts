@@ -1,18 +1,19 @@
 /**
- * The one validated parser for list, clip, minimal and stored carousel
- * requests (item 38). It reads the shared contract (`shared/types/filters`)
- * and hands the query builders `ParsedListRequest` and its kin
- * (`types/parsedFilters.ts`): refs parsed into pairs at the boundary, every
- * modifier present and valid, the sort whitelisted, paging clamped.
+ * The one validated parser for list, clip, minimal, carousel, similar and
+ * recommended requests (item 38). It reads the shared contract
+ * (`shared/types/filters`) and hands the query builders `ParsedListRequest`
+ * and its kin (`types/parsedFilters.ts`): refs parsed into pairs at the
+ * boundary, every modifier present and valid, the sort whitelisted, paging
+ * clamped.
  *
  * Unknown or invalid input follows `PEEK_FILTER_POLICY`: `reject` answers
  * 400 with one issue per problem; `drop` (the default for this release)
  * ignores it and returns a record for `logDropped`. A body that is not an
  * object, and a bad id or instance naming what a request looks up (`ids`,
- * `instance_id`, a clip's `sceneId` and `instanceId`), are a 400 in both:
- * ignoring those would answer a detail page with the whole list. Stored
- * carousel rules always parse leniently: the user cannot fix them by
- * resending.
+ * `instance_id`, a clip's `sceneId` and `instanceId`, a similar-scenes
+ * seed's `instanceId`), are a 400 in both: ignoring those would answer a
+ * detail page with the whole list. Stored carousel rules always parse
+ * leniently: the user cannot fix them by resending.
  */
 import {
   CLIP_PARAMS,
@@ -56,7 +57,9 @@ import type {
   ParsedFilter,
   ParsedListRequest,
   ParsedMinimalRequest,
+  ParsedRecommendedQuery,
   ParsedSceneClipsQuery,
+  ParsedSimilarScenesQuery,
   ParsedSort,
   RefCriterion,
   TextCriterion,
@@ -69,6 +72,7 @@ import { INSTANCE_ID_PATTERN } from "./stashMediaPath.js";
 const PER_PAGE_DEFAULT = 40;
 const CLIP_PER_PAGE_DEFAULT = 24;
 const MINIMAL_PER_PAGE_DEFAULT = 50;
+const RECOMMENDED_PER_PAGE_DEFAULT = 24;
 const Q_MAX_LENGTH = 200;
 /** A random seed is reduced to this, as the list controllers always did */
 const SEED_MODULUS = 1e8;
@@ -93,6 +97,19 @@ export interface StoredQueryOptions {
   readonly perPage?: number;
   /** The seed a random sort uses; the daily seed when absent */
   readonly randomSeed?: number;
+}
+
+export interface CarouselRequestOptions extends StoredQueryOptions {
+  /** Default: `filterPolicy()` */
+  readonly policy?: FilterPolicy;
+}
+
+/** A carousel's rules, sort and direction as a create, update or preview request sends them */
+export interface CarouselRequestInput {
+  /** The scene filter; absent when an update leaves it as it is */
+  readonly rules?: unknown;
+  readonly sort?: unknown;
+  readonly direction?: unknown;
 }
 
 /** What the image does with unknown filter input: `PEEK_FILTER_POLICY`, `reject` or else `drop` */
@@ -790,6 +807,57 @@ export function singleIdRef(
   return ids.refs[0];
 }
 
+// =============================================================================
+// CAROUSELS
+// =============================================================================
+
+/** A carousel's rules, sort and direction, each read at its own path */
+interface CarouselParts {
+  readonly fields: ParsedFieldsResult;
+  readonly sortField: SortField<"scene"> | undefined;
+  readonly direction: SortDirection | undefined;
+}
+
+/** Rules that are undefined were not sent: no criteria */
+function parseCarouselParts(
+  rules: Record<string, unknown> | undefined,
+  sort: unknown,
+  direction: unknown,
+  problems: Problems
+): CarouselParts {
+  return {
+    fields: rules
+      ? parseFields(SCENE_FIELDS, rules, "rules", problems)
+      : { criteria: {}, specificInstanceId: undefined },
+    sortField: parseSortField("scene", sort, "sort", problems),
+    direction: parseDirection(direction, "direction", problems),
+  };
+}
+
+/** The carousel's parts as the scene query the builder runs */
+function carouselQuery(
+  parts: CarouselParts,
+  options: StoredQueryOptions,
+  dropped: DroppedInput[]
+): ParsedListRequest<"scene"> {
+  return {
+    page: clampPage(options.page),
+    perPage: clampPerPage(options.perPage, PER_PAGE_DEFAULT),
+    q: undefined,
+    sort: resolveSort(
+      "scene",
+      parts.sortField,
+      parts.direction,
+      options.userId,
+      options.randomSeed
+    ),
+    // The boundary cast: each criterion was validated by its field's schema
+    filter: parts.fields.criteria as ParsedFilter<"scene">,
+    specificInstanceId: parts.fields.specificInstanceId,
+    dropped,
+  };
+}
+
 /**
  * A carousel's stored rules, sort and direction: the scene filter parsed
  * leniently whatever the policy, with the page the caller wants.
@@ -801,33 +869,39 @@ export function parseStoredSceneQuery(
   options: StoredQueryOptions
 ): ParsedListRequest<"scene"> {
   const problems = new Problems();
-  let fields: ParsedFieldsResult = {
-    criteria: {},
-    specificInstanceId: undefined,
-  };
-  if (isPlainObject(rules)) {
-    fields = parseFields(SCENE_FIELDS, rules, "rules", problems);
-  } else {
-    problems.add("rules", "Expected an object");
-  }
-  const sortField = parseSortField("scene", sort, "sort", problems);
-  const parsedDirection = parseDirection(direction, "direction", problems);
+  const object = isPlainObject(rules) ? rules : undefined;
+  if (!object) problems.add("rules", "Expected an object");
+  const parts = parseCarouselParts(object, sort, direction, problems);
+  return carouselQuery(parts, options, problems.finish("drop"));
+}
 
-  return {
-    page: clampPage(options.page),
-    perPage: clampPerPage(options.perPage, PER_PAGE_DEFAULT),
-    q: undefined,
-    sort: resolveSort(
-      "scene",
-      sortField,
-      parsedDirection,
-      options.userId,
-      options.randomSeed
-    ),
-    filter: fields.criteria as ParsedFilter<"scene">,
-    specificInstanceId: fields.specificInstanceId,
-    dropped: problems.finish("drop"),
-  };
+/**
+ * `POST /api/carousels`, `PUT /api/carousels/:id` and `POST
+ * /api/carousels/preview`: the rules, sort and direction checked against
+ * the scene contract as a scene list request is, by the policy, with the
+ * carousel's page. A part not sent stays out (no criteria, the scene
+ * default sort). Rules that are not an object, and a bad `rules.ids` or
+ * `rules.instance_id`, are a 400 in both policies, as on the scene list.
+ */
+export function parseCarouselRequest(
+  input: CarouselRequestInput,
+  options: CarouselRequestOptions
+): ParsedListRequest<"scene"> {
+  const policy = options.policy ?? filterPolicy();
+  const rules =
+    input.rules === undefined ? undefined : requireObject(input.rules, "rules");
+  const problems = new Problems();
+  const parts = parseCarouselParts(
+    rules,
+    input.sort,
+    input.direction,
+    problems
+  );
+  return carouselQuery(
+    parts,
+    options,
+    problems.finish(policy, ["rules.ids", "rules.instance_id"])
+  );
 }
 
 // =============================================================================
@@ -1028,6 +1102,67 @@ export function parseSceneClipsRequest(
     includeUngenerated: includeUngenerated ?? false,
     specificInstanceId,
     dropped: problems.finish(policy, ["instanceId"]),
+  };
+}
+
+// =============================================================================
+// SIMILAR AND RECOMMENDED SCENES
+// =============================================================================
+
+/** `GET /api/library/scenes/:id/similar`: the seed scene, its instance and the page */
+export function parseSimilarScenesRequest(
+  sceneId: unknown,
+  query: unknown,
+  options: ParseOptions
+): ParsedSimilarScenesQuery {
+  const policy = options.policy ?? filterPolicy();
+  const id = parseStashId(sceneId, "id");
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let page: number | undefined;
+  let specificInstanceId: string | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    ["page", (raw, path) => (page = parseInteger(raw, path, problems))],
+    [
+      "instanceId",
+      (raw, path) => {
+        specificInstanceId = parseInstanceId(raw, path, problems);
+      },
+    ],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+
+  return {
+    sceneId: id,
+    page: clampPage(page),
+    specificInstanceId,
+    // Dropping a bad instance would guess the seed's instance
+    dropped: problems.finish(policy, ["instanceId"]),
+  };
+}
+
+/** `GET /api/library/scenes/recommended`: the page and page size */
+export function parseRecommendedRequest(
+  query: unknown,
+  options: ParseOptions
+): ParsedRecommendedQuery {
+  const policy = options.policy ?? filterPolicy();
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let page: number | undefined;
+  let perPage: number | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    ["page", (raw, path) => (page = parseInteger(raw, path, problems))],
+    ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+
+  return {
+    page: clampPage(page),
+    perPage: clampPerPage(perPage, RECOMMENDED_PER_PAGE_DEFAULT),
+    dropped: problems.finish(policy),
   };
 }
 

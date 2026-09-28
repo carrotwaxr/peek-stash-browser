@@ -24,10 +24,13 @@ import type {
 import {
   filterPolicy,
   logDropped,
+  parseCarouselRequest,
   parseClipQuery,
   parseListRequest,
   parseMinimalRequest,
+  parseRecommendedRequest,
   parseSceneClipsRequest,
+  parseSimilarScenesRequest,
   parseStashId,
   parseStoredSceneQuery,
   singleIdRef,
@@ -1339,6 +1342,220 @@ describe("parseStoredSceneQuery", () => {
     expect(parsed.filter).toEqual({});
     expect(parsed.dropped).toEqual([
       { path: "rules", reason: "Expected an object" },
+    ]);
+  });
+});
+
+describe("parseCarouselRequest", () => {
+  const carouselOpts = (policy: FilterPolicy) => ({
+    userId: USER_ID,
+    policy,
+    perPage: 12,
+    randomSeed: 99,
+  });
+
+  it("reads the rules against the scene contract, with the carousel's page and seed", () => {
+    const parsed = parseCarouselRequest(
+      {
+        rules: {
+          tags: { value: ["284:a"], modifier: "INCLUDES_ALL" },
+          instance_id: "a",
+        },
+        sort: "random",
+        direction: "asc",
+      },
+      carouselOpts("reject")
+    );
+    expect(parsed).toEqual({
+      page: 1,
+      perPage: 12,
+      q: undefined,
+      sort: { field: "random", direction: "ASC", seed: 99 },
+      filter: {
+        tags: {
+          refs: [{ id: "284", instanceId: "a" }],
+          modifier: "INCLUDES_ALL",
+          depth: 0,
+        },
+      },
+      specificInstanceId: "a",
+      dropped: [],
+    });
+  });
+
+  it("parts not sent stay out: no filter and the scene defaults", () => {
+    const parsed = parseCarouselRequest({}, carouselOpts("reject"));
+    expect(parsed.filter).toEqual({});
+    expect(parsed.sort).toEqual({
+      field: "created_at",
+      direction: "DESC",
+      seed: undefined,
+    });
+  });
+
+  it("an unknown rule key, a bogus sort and direction sideways fail at their paths (reject)", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseCarouselRequest(
+            {
+              rules: { not_a_field: { value: 1 } },
+              sort: "bogus",
+              direction: "sideways",
+            },
+            carouselOpts("reject")
+          )
+        )
+      )
+    ).toEqual(["rules.not_a_field", "sort", "direction"]);
+  });
+
+  it("the same input is dropped with records (drop)", () => {
+    const parsed = parseCarouselRequest(
+      {
+        rules: { not_a_field: { value: 1 }, favorite: true },
+        sort: "constructor",
+        direction: "DESC",
+      },
+      carouselOpts("drop")
+    );
+    expect(parsed.filter).toEqual({ favorite: true });
+    expect(parsed.sort.field).toBe("created_at");
+    expect(paths(parsed.dropped)).toEqual(["rules.not_a_field", "sort"]);
+  });
+
+  it("drop mode still refuses a bad rules.ids or rules.instance_id", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseCarouselRequest(
+            { rules: { ids: { value: ["abc"] }, instance_id: "a b" } },
+            carouselOpts("drop")
+          )
+        )
+      )
+    ).toEqual(["rules.ids.value.0", "rules.instance_id"]);
+  });
+
+  it.each(POLICIES)("rules that are not an object fail (%s)", (policy) => {
+    for (const rules of [null, [], "x"]) {
+      expect(
+        issuesOf(() => parseCarouselRequest({ rules }, carouselOpts(policy)))
+      ).toEqual([{ path: "rules", message: "Expected an object" }]);
+    }
+  });
+});
+
+describe("parseSimilarScenesRequest", () => {
+  it("reads the scene id, the page and the seed's instance", () => {
+    expect(
+      parseSimilarScenesRequest(
+        "42",
+        { page: "3", instanceId: "inst-1" },
+        opts("reject")
+      )
+    ).toEqual({
+      sceneId: "42",
+      page: 3,
+      specificInstanceId: "inst-1",
+      dropped: [],
+    });
+    expect(parseSimilarScenesRequest("42", {}, opts("reject"))).toEqual({
+      sceneId: "42",
+      page: 1,
+      specificInstanceId: undefined,
+      dropped: [],
+    });
+    expect(
+      parseSimilarScenesRequest("42", { page: "0" }, opts("reject")).page
+    ).toBe(1);
+  });
+
+  it("page abc and an unknown parameter are invalid, or dropped", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseSimilarScenesRequest(
+            "42",
+            { page: "abc", per_page: "5" },
+            opts("reject")
+          )
+        )
+      )
+    ).toEqual(["page", "per_page"]);
+    const dropped = parseSimilarScenesRequest(
+      "42",
+      { page: "abc", per_page: "5" },
+      opts("drop")
+    );
+    expect(dropped.page).toBe(1);
+    expect(paths(dropped.dropped)).toEqual(["page", "per_page"]);
+  });
+
+  it.each(POLICIES)(
+    "a bad instanceId or scene id fails: the seed would be guessed (%s)",
+    (policy) => {
+      expect(
+        paths(
+          issuesOf(() =>
+            parseSimilarScenesRequest(
+              "42",
+              { instanceId: "inst 1" },
+              opts(policy)
+            )
+          )
+        )
+      ).toEqual(["instanceId"]);
+      expect(
+        issuesOf(() => parseSimilarScenesRequest("s1", {}, opts(policy)))
+      ).toEqual([{ path: "id", message: "Expected an id" }]);
+    }
+  );
+});
+
+describe("parseRecommendedRequest", () => {
+  it("reads page and per_page: 24 by default, held to 1..250", () => {
+    expect(parseRecommendedRequest({}, opts("reject"))).toEqual({
+      page: 1,
+      perPage: 24,
+      dropped: [],
+    });
+    expect(
+      parseRecommendedRequest({ page: "2", per_page: "1000" }, opts("reject"))
+    ).toEqual({ page: 2, perPage: PER_PAGE_MAX, dropped: [] });
+    expect(
+      parseRecommendedRequest({ page: "-1", per_page: "0" }, opts("reject"))
+    ).toEqual({ page: 1, perPage: 1, dropped: [] });
+  });
+
+  it("page abc and an unknown parameter are invalid, or dropped", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseRecommendedRequest(
+            { page: "abc", sort: "title" },
+            opts("reject")
+          )
+        )
+      )
+    ).toEqual(["page", "sort"]);
+    const dropped = parseRecommendedRequest(
+      { page: "abc", per_page: ["1", "2"] },
+      opts("drop")
+    );
+    expect(dropped).toEqual({
+      page: 1,
+      perPage: 24,
+      dropped: [
+        { path: "page", reason: "Expected a number" },
+        { path: "per_page", reason: "Expected a number" },
+      ],
+    });
+  });
+
+  it.each(POLICIES)("a query that is not an object fails (%s)", (policy) => {
+    expect(issuesOf(() => parseRecommendedRequest("x", opts(policy)))).toEqual([
+      { path: "query", message: "Expected an object" },
     ]);
   });
 });

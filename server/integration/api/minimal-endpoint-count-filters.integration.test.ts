@@ -1,12 +1,27 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { createApiUser } from "../helpers/accessFixture.js";
+import { expectRefused } from "../helpers/refused.js";
+import {
+  type TestClient,
+  adminClient,
+  guestClient,
+} from "../helpers/testClient.js";
 
 /**
  * Integration tests for minimal endpoint count_filter functionality.
  *
  * Tests that the count_filter parameter correctly filters entities
  * based on their content counts (scene_count, gallery_count, etc.)
+ *
+ * The requests go through the one parser (item 38) with the server in
+ * reject mode: an unknown count_filter key answers 400, and the page size is
+ * 50 unless the request names one, held to 1..250. The page-size cases seed
+ * 260 rows of each type on a made-up instance (the replay's library is
+ * smaller than a page) for a user who sees every instance, and delete them
+ * before the file ends.
  */
 
 interface MinimalPerformerResponse {
@@ -303,6 +318,118 @@ describe("Minimal Endpoint Count Filters", () => {
       );
       expect(response.ok).toBe(true);
       // Should only return performers matching search AND having scenes
+    });
+  });
+
+  describe("page size", () => {
+    const INSTANCE = "minimal-it";
+    const USERNAME = "minimal_it_user";
+    const SEEDED = 260;
+    let viewer: { id: number; client: TestClient } | undefined;
+
+    const seededIds = Array.from({ length: SEEDED }, (_, i) =>
+      String(7780001 + i)
+    );
+    const named = seededIds.map((id, i) => ({
+      id,
+      stashInstanceId: INSTANCE,
+      name: `Mx ${String(i + 1).padStart(3, "0")}`,
+    }));
+
+    async function clearPageSizeFixture(): Promise<void> {
+      await prisma.user.deleteMany({ where: { username: USERNAME } });
+      const onInstance = { where: { stashInstanceId: INSTANCE } };
+      await prisma.stashPerformer.deleteMany(onInstance);
+      await prisma.stashStudio.deleteMany(onInstance);
+      await prisma.stashTag.deleteMany(onInstance);
+      await prisma.stashGroup.deleteMany(onInstance);
+      await prisma.stashGallery.deleteMany(onInstance);
+      await prisma.stashInstance.deleteMany({ where: { id: INSTANCE } });
+    }
+
+    beforeAll(async () => {
+      await clearPageSizeFixture();
+      await prisma.stashInstance.create({
+        data: {
+          id: INSTANCE,
+          name: INSTANCE,
+          url: "http://127.0.0.1:9/graphql",
+          apiKey: "fixture-key",
+          enabled: true,
+          priority: 940,
+          // Synced: its content shows (a first-syncing instance does not)
+          firstSyncedAt: new Date(),
+        },
+      });
+      await prisma.stashPerformer.createMany({ data: named });
+      await prisma.stashStudio.createMany({ data: named });
+      await prisma.stashTag.createMany({ data: named });
+      await prisma.stashGroup.createMany({ data: named });
+      await prisma.stashGallery.createMany({
+        data: named.map(({ name, ...row }) => ({ ...row, title: name })),
+      });
+      // No instance selection: every enabled instance, this one included
+      viewer = await createApiUser(USERNAME, "minimal_it_pass_1");
+    }, 60000);
+
+    afterAll(async () => {
+      await clearPageSizeFixture();
+    });
+
+    const ENDPOINTS = [
+      {
+        type: "performers",
+        rows: (d: unknown) => (d as MinimalPerformerResponse).performers,
+      },
+      {
+        type: "studios",
+        rows: (d: unknown) => (d as MinimalStudioResponse).studios,
+      },
+      { type: "tags", rows: (d: unknown) => (d as MinimalTagResponse).tags },
+      {
+        type: "groups",
+        rows: (d: unknown) => (d as MinimalGroupResponse).groups,
+      },
+      {
+        type: "galleries",
+        rows: (d: unknown) => (d as MinimalGalleryResponse).galleries,
+      },
+    ];
+
+    it.each(ENDPOINTS)(
+      "minimal: per_page 1000 returns at most 250 ($type)",
+      async ({ type, rows }) => {
+        const { client } = must(viewer, "the viewer");
+
+        const response = await client.post(`/api/library/${type}/minimal`, {
+          filter: { per_page: 1000 },
+        });
+
+        expect(response.status).toBe(200);
+        expect(rows(response.data)).toHaveLength(250);
+      }
+    );
+
+    it.each(ENDPOINTS)(
+      "minimal: without per_page returns 50 ($type)",
+      async ({ type, rows }) => {
+        const { client } = must(viewer, "the viewer");
+
+        const response = await client.post(`/api/library/${type}/minimal`, {});
+
+        expect(response.status).toBe(200);
+        expect(rows(response.data)).toHaveLength(50);
+      }
+    );
+
+    it("minimal: an unknown count_filter key answers 400", async () => {
+      const { client } = must(viewer, "the viewer");
+
+      const response = await client.post("/api/library/performers/minimal", {
+        count_filter: { min_scene_count: 1, min_bogus_count: 1 },
+      });
+
+      expectRefused(response, ["count_filter.min_bogus_count"]);
     });
   });
 });

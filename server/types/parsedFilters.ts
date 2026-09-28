@@ -179,6 +179,26 @@ export interface ParsedSceneClipsQuery {
   readonly dropped: readonly DroppedInput[];
 }
 
+/** `GET /api/library/scenes/:id/similar`: 12 scenes a page */
+export interface ParsedSimilarScenesQuery {
+  /** The `:id` path parameter, a Stash id */
+  readonly sceneId: string;
+  /** >= 1 */
+  readonly page: number;
+  /** The seed's instance (`instanceId`), INSTANCE_ID_PATTERN */
+  readonly specificInstanceId: string | undefined;
+  readonly dropped: readonly DroppedInput[];
+}
+
+/** `GET /api/library/scenes/recommended` */
+export interface ParsedRecommendedQuery {
+  /** >= 1 */
+  readonly page: number;
+  /** 1..PER_PAGE_MAX; 24 when absent */
+  readonly perPage: number;
+  readonly dropped: readonly DroppedInput[];
+}
+
 /** The lists with a `/minimal` endpoint (the entity pickers) */
 export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
 

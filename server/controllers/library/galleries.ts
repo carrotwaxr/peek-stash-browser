@@ -19,6 +19,7 @@ import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
+  parseMinimalRequest,
   singleIdRef,
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
@@ -183,10 +184,17 @@ export const findGalleriesMinimal = async (
   req: TypedAuthRequest<FindGalleriesMinimalRequest>,
   res: TypedResponse<FindGalleriesMinimalResponse | ApiErrorResponse>
 ) => {
+  // q, title order, a page of 50 unless the request names 1..250, and the
+  // count minimums; a ValidationError (400) reaches the central error handler
+  const request = parseMinimalRequest("gallery", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/galleries/minimal", request.dropped);
+
   try {
-    const userId = req.user?.id;
-    const { filter, count_filter } = req.body;
-    const searchQuery = filter?.q || "";
+    const userId = req.user.id;
+    const { q: searchQuery, direction, perPage } = request;
+    const count_filter = request.countFilter;
 
     // Step 1: Get all galleries from cache
     let galleries = await stashEntityService.getAllGalleries();
@@ -233,11 +241,12 @@ export const findGalleriesMinimal = async (
     galleries = galleries.sort((a, b) => {
       const aTitle = (a.title || "").toLowerCase();
       const bTitle = (b.title || "").toLowerCase();
-      return aTitle.localeCompare(bTitle);
+      const comparison = aTitle.localeCompare(bTitle);
+      return direction === "DESC" ? -comparison : comparison;
     });
 
-    // Step 5: Map to minimal shape
-    const minimalGalleries = galleries.map((g) => ({
+    // Step 5: The first page, in the minimal shape (the pickers never page)
+    const minimalGalleries = galleries.slice(0, perPage).map((g) => ({
       id: g.id,
       title: g.title || "", // Galleries use 'title' not 'name'
       instanceId: g.instanceId || "",
