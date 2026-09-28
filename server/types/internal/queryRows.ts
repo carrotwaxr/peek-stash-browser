@@ -505,3 +505,19 @@ export interface ClipRow {
   primaryTagName: string | null;
   primaryTagColor: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// MinimalEntityQuery
+// ---------------------------------------------------------------------------
+
+/** Raw row of an entity picker's search (services/MinimalEntityQuery.ts) */
+export interface MinimalEntityQueryRow {
+  id: string;
+  instanceId: string;
+  /** The name expression; a gallery with no title, file or folder has none */
+  name: string | null;
+  /** Galleries only: what the shown name is built from */
+  title?: string | null;
+  fileBasename?: string | null;
+  folderPath?: string | null;
+}

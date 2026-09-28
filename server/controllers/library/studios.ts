@@ -1,4 +1,4 @@
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
@@ -13,7 +13,6 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import type { NormalizedStudio } from "../../types/index.js";
-import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
@@ -193,99 +192,18 @@ export const findStudios = async (
 };
 
 /**
- * Get minimal studios (id + name only) for filter dropdowns
+ * One page of studios for an entity picker, in name order: the name matched
+ * in SQL, or the ids a picker has selected. A ValidationError (400) reaches
+ * the central error handler.
  */
 export const findStudiosMinimal = async (
   req: TypedAuthRequest<FindStudiosMinimalRequest>,
   res: TypedResponse<FindStudiosMinimalResponse | ApiErrorResponse>
 ) => {
-  // q, name order, a page of 50 unless the request names 1..250, and the
-  // count minimums; a ValidationError (400) reaches the central error handler
-  const request = parseMinimalRequest("studio", req.body, {
-    userId: req.user.id,
-  });
+  const userId = req.user.id;
+  const request = parseMinimalRequest("studio", req.body, { userId });
   logDropped("POST /library/studios/minimal", request.dropped);
 
-  try {
-    const { q: searchQuery, direction: sortDirection, perPage } = request;
-    const count_filter = request.countFilter;
-
-    let studios = await stashEntityService.getAllStudios();
-
-    // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    const userId = req.user?.id;
-    studios = await entityExclusionHelper.filterExcluded(
-      studios,
-      userId,
-      "studio"
-    );
-
-    // Apply count filters (OR logic - pass if ANY condition is met)
-    if (count_filter) {
-      const {
-        min_scene_count,
-        min_gallery_count,
-        min_image_count,
-        min_performer_count,
-        min_group_count,
-      } = count_filter;
-      studios = studios.filter((s) => {
-        const conditions: boolean[] = [];
-        if (min_scene_count !== undefined)
-          conditions.push(s.scene_count >= min_scene_count);
-        if (min_gallery_count !== undefined)
-          conditions.push(s.gallery_count >= min_gallery_count);
-        if (min_image_count !== undefined)
-          conditions.push(s.image_count >= min_image_count);
-        if (min_performer_count !== undefined)
-          conditions.push(s.performer_count >= min_performer_count);
-        if (min_group_count !== undefined)
-          conditions.push(s.group_count >= min_group_count);
-        return conditions.length === 0 || conditions.some((c) => c);
-      });
-    }
-
-    // Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      studios = studios.filter((s) => {
-        const name = s.name || "";
-        const details = s.details || "";
-        return (
-          name.toLowerCase().includes(lowerQuery) ||
-          details.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Name order
-    studios.sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name);
-      return sortDirection === "DESC" ? -comparison : comparison;
-    });
-
-    // The first page: the pickers never page
-    const paginatedStudios = studios.slice(0, perPage);
-
-    // Disambiguate names for entities with same name across different instances
-    // Only non-default instances get suffixed with instance name when duplicates exist
-    const entitiesWithInstance = paginatedStudios.map((s) => ({
-      id: s.id,
-      name: s.name,
-      instanceId: s.instanceId,
-    }));
-    const minimal = disambiguateEntityNames(entitiesWithInstance);
-
-    res.json({
-      studios: minimal,
-    });
-  } catch (error) {
-    logger.error("Error in findStudiosMinimal", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find studios",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
+  const studios = await findMinimalEntities(userId, request);
+  res.json({ studios });
 };

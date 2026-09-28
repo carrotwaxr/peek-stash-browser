@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
-import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
-import { getCache, setCache } from "../../utils/filterCache";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";
 
 /**
- * Searchable select component with caching and debounced search
- * Supports both single and multi-select modes
+ * Searchable select for performers, studios, tags, groups and galleries, in
+ * single or multi-select mode. Its options come from the entity's `/minimal`
+ * endpoint (one page in name order, searched on the server, with the user's
+ * exclusions and instances applied): nothing loads until the dropdown opens,
+ * each search aborts the one before it, and a response for a search that is
+ * no longer current is dropped. Nothing is kept in the browser between
+ * openings, so the list is always the current user's. The selected values'
+ * names are resolved with one minimal request carrying their ids.
  *
  * @param {Object} props
  * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
@@ -24,25 +30,41 @@ interface SelectOption {
   name: string;
 }
 
-/** An entity as the search endpoints return it (the fields read here) */
-interface EntityResult {
-  id: string;
-  instanceId?: string;
-  name?: string;
-  title?: string;
+type EntityType = "performers" | "studios" | "tags" | "groups" | "galleries";
+
+/** Options listed per search: one page */
+const PAGE_SIZE = 50;
+
+/** Ids one request looks up: the server's limit (MINIMAL_IDS_MAX) */
+const IDS_PER_REQUEST = 100;
+
+type FindMinimal = (
+  params: MinimalRequest,
+  signal?: AbortSignal
+) => Promise<MinimalEntity[]>;
+
+/** The entity's `/minimal` endpoint; undefined for a type that has none */
+function minimalFinder(entityType: string): FindMinimal | undefined {
+  const finders: Record<EntityType, FindMinimal> = {
+    performers: libraryApi.findPerformersMinimal,
+    studios: libraryApi.findStudiosMinimal,
+    tags: libraryApi.findTagsMinimal,
+    groups: libraryApi.findGroupsMinimal,
+    galleries: libraryApi.findGalleriesMinimal,
+  };
+  return Object.prototype.hasOwnProperty.call(finders, entityType)
+    ? finders[entityType as EntityType]
+    : undefined;
 }
 
-/** The body of a /library/<entity> search (the lists read here) */
-interface FindResponse {
-  findPerformers?: { performers?: EntityResult[] };
-  findStudios?: { studios?: EntityResult[] };
-  findTags?: { tags?: EntityResult[] };
-  findGroups?: { groups?: EntityResult[] };
-  findGalleries?: { galleries?: EntityResult[] };
-}
+/** An entity as an option: its "id:instanceId" key and its name */
+const toOption = (entity: MinimalEntity): SelectOption => ({
+  id: makeCompositeKey(entity.id, entity.instanceId),
+  name: entity.name || "Unknown",
+});
 
 interface Props {
-  entityType: "performers" | "studios" | "tags" | "groups" | "galleries";
+  entityType: EntityType;
   value: string | string[];
   onChange: (value: string | string[]) => void;
   multi?: boolean;
@@ -69,16 +91,13 @@ const SearchableSelect = ({
   const [options, setOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
-  // Initialize selectedItems as empty - will be populated by useEffect when value has items
-  const [selectedItems, setSelectedItems] = useState<SelectOption[]>(() => {
-    // Ensure we start with empty array if value is empty/undefined
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-      return [];
-    }
-    // If value exists but we don't have names yet, return empty
-    // The useEffect will fetch the names
-    return [];
-  });
+  // Filled by the selected-names effect once it knows their names
+  const [selectedItems, setSelectedItems] = useState<SelectOption[]>([]);
+  // The names resolved so far, read by the selected-names effect
+  const selectedItemsRef = useRef<SelectOption[]>([]);
+  useEffect(() => {
+    selectedItemsRef.current = selectedItems;
+  }, [selectedItems]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -86,162 +105,78 @@ const SearchableSelect = ({
   const prevCountFilterContextRef = useRef(countFilterContext);
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
-  // Fetch items by specific IDs (use full endpoints which support ID filtering)
-  // Groups composite "id:instanceId" keys by instanceId and makes instance-scoped
-  // API calls to avoid ambiguous lookups when the same entity ID exists across
-  // multiple Stash instances.
+  // The selected values' names: one minimal request carrying their ids
+  // ("id:instanceId", or a bare id for that id on every instance), 100 at a
+  // time; no count filter, so a selection that no longer has content keeps
+  // its name
   const fetchItemsByIds = useCallback(
-    async (compositeKeys: string[]) => {
-      // Guard: don't fetch if no IDs provided
-      if (!compositeKeys || compositeKeys.length === 0) {
-        return [];
+    async (
+      compositeKeys: string[],
+      signal: AbortSignal
+    ): Promise<SelectOption[]> => {
+      const find = minimalFinder(entityType);
+      const ids = [...new Set(compositeKeys)];
+      if (!find || ids.length === 0) return [];
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += IDS_PER_REQUEST) {
+        chunks.push(ids.slice(i, i + IDS_PER_REQUEST));
       }
-
-      // Parse composite keys and group by instanceId
-      const parsed = compositeKeys.map(parseCompositeKey);
-      const groups = new Map<string, Array<string | number>>(); // instanceId (or "__bare__") -> [bareId, ...]
-      for (const { id, instanceId } of parsed) {
-        const groupKey = instanceId || "__bare__";
-        const bareIds = groups.get(groupKey);
-        if (bareIds) {
-          bareIds.push(id);
-        } else {
-          groups.set(groupKey, [id]);
-        }
-      }
-
-      // Entity filter key per entity type
-      const filterKeyMap = {
-        performers: "performer_filter",
-        studios: "studio_filter",
-        tags: "tag_filter",
-        groups: "group_filter",
-        galleries: "gallery_filter",
-      };
-
-      // Response extractor per entity type
-      const extractResults: Record<
-        string,
-        (r: FindResponse | null) => EntityResult[]
-      > = {
-        performers: (r) => r?.findPerformers?.performers || [],
-        studios: (r) => r?.findStudios?.studios || [],
-        tags: (r) => r?.findTags?.tags || [],
-        groups: (r) => r?.findGroups?.groups || [],
-        galleries: (r) => r?.findGalleries?.galleries || [],
-      };
-
-      // API method per entity type
-      const apiMethodMap = {
-        performers: libraryApi.findPerformers,
-        studios: libraryApi.findStudios,
-        tags: libraryApi.findTags,
-        groups: libraryApi.findGroups,
-        galleries: libraryApi.findGalleries,
-      };
-
-      const apiMethod = apiMethodMap[entityType];
-      const filterKey = filterKeyMap[entityType];
-      const extract = extractResults[entityType];
-
-      if (!apiMethod || !extract) {
-        return [];
-      }
-
-      // Make one API call per instance group, using allSettled so a single
-      // failing instance doesn't prevent results from healthy instances
-      const promises = [...groups.entries()].map(
-        async ([groupKey, bareIds]) => {
-          const uniqueIds = [...new Set(bareIds)];
-          const params = { ids: uniqueIds };
-
-          // Add instance filter for non-bare groups
-          if (groupKey !== "__bare__" && filterKey) {
-            (params as Record<string, unknown>)[filterKey] = {
-              instance_id: groupKey,
-            };
-          }
-
-          const response = await apiMethod(params as Record<string, unknown>);
-          return extract(response as FindResponse | null);
-        }
+      const pages = await Promise.all(
+        chunks.map((chunk) =>
+          find({ ids: chunk, filter: { per_page: IDS_PER_REQUEST } }, signal)
+        )
       );
-
-      const settled = await Promise.allSettled(promises);
-      const allResults: EntityResult[] = [];
-      for (const result of settled) {
-        if (result.status === "fulfilled") {
-          allResults.push(...result.value);
-        } else {
-          console.error(`Error fetching ${entityType} by IDs:`, result.reason);
-        }
-      }
-
-      // Extract minimal fields with composite key
-      return allResults.map((item) => ({
-        id: makeCompositeKey(item.id, item.instanceId),
-        name: item.name || item.title || "Unknown",
-      }));
+      return pages.flat().map(toOption);
     },
     [entityType]
   );
 
-  // Load selected items' names immediately when value exists (lazy load on page load)
+  // Load the selected items' names when the value changes
   useEffect(() => {
     // Handle empty/null/undefined values - clear selected items
     if (!value || (Array.isArray(value) && value.length === 0)) {
       setSelectedItems([]);
+      setIsLoadingInitial(false);
       return;
     }
 
-    const loadSelectedNames = async () => {
-      const valueArray: string[] = multi
-        ? (value as string[])
-        : [value as string];
+    const valueArray: string[] = multi
+      ? (value as string[])
+      : [value as string];
 
-      // First, try to find in already-loaded options
-      if (options.length > 0) {
-        const selected = options.filter((opt: SelectOption) =>
-          valueArray.includes(opt.id)
-        );
-        if (selected.length === valueArray.length) {
-          setSelectedItems(selected);
-          return;
+    // Names already known: resolved before, or in the options listed now
+    const known = new Map<string, SelectOption>();
+    for (const option of [...selectedItemsRef.current, ...options]) {
+      known.set(option.id, option);
+    }
+    const found = valueArray.flatMap((id) => {
+      const option = known.get(id);
+      return option ? [option] : [];
+    });
+    if (found.length === valueArray.length) {
+      setSelectedItems(found);
+      setIsLoadingInitial(false);
+      return;
+    }
+
+    // Else ask the server; a newer value aborts this request
+    const controller = new AbortController();
+    const { signal } = controller;
+    setIsLoadingInitial(true);
+    fetchItemsByIds(valueArray, signal)
+      .then((results) => {
+        if (!signal.aborted && results.length > 0) setSelectedItems(results);
+      })
+      .catch((error: unknown) => {
+        if (!signal.aborted) {
+          console.error("Error loading selected names:", error);
         }
-      }
-
-      // Try localStorage cache
-      try {
-        const cached = getCache(entityType);
-        if (cached?.data) {
-          const selected = cached.data.filter((opt) =>
-            valueArray.includes(opt.id)
-          );
-
-          // If we found all items in cache, use them
-          if (selected.length === valueArray.length) {
-            setSelectedItems(selected);
-            return;
-          }
-        }
-
-        // Cache miss or incomplete - fetch by IDs from API in background
-        setIsLoadingInitial(true);
-        try {
-          const results = await fetchItemsByIds(valueArray);
-          if (results && results.length > 0) {
-            setSelectedItems(results);
-          }
-        } finally {
-          setIsLoadingInitial(false);
-        }
-      } catch (error) {
-        console.error("Error loading selected names:", error);
-      }
-    };
-
-    // Run immediately (lazy load in background)
-    void loadSelectedNames();
+      })
+      .finally(() => {
+        if (!signal.aborted) setIsLoadingInitial(false);
+      });
+    return () => controller.abort();
   }, [value, options, entityType, multi, fetchItemsByIds]);
 
   // Build count_filter based on context
@@ -258,96 +193,49 @@ const SearchableSelect = ({
     return filterMap[countFilterContext];
   }, [countFilterContext]);
 
-  // Load options from cache or API
+  // Load one page of options. A response that arrives after `signal` was
+  // aborted (the search changed, the dropdown closed) is dropped.
   const loadOptions = useCallback(
-    async (search = "") => {
+    async (search: string, signal: AbortSignal) => {
+      const find = minimalFinder(entityType);
+      if (!find) {
+        setOptions([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        setLoading(true);
-
-        // Build cache key including count filter context
-        const cacheKey = countFilterContext
-          ? `${entityType}_${countFilterContext}`
-          : entityType;
-
-        // If no search term, try cache first
-        if (!search) {
-          const cached = getCache(cacheKey);
-          if (cached?.data) {
-            setOptions(cached.data);
-            setLoading(false);
-            return;
-          }
-        }
-
-        // API method mapping
-        const apiMethods = {
-          performers: libraryApi.findPerformersMinimal,
-          studios: libraryApi.findStudiosMinimal,
-          tags: libraryApi.findTagsMinimal,
-          groups: libraryApi.findGroupsMinimal,
-          galleries: libraryApi.findGalleriesMinimal,
-        };
-
-        // Fetch from API
-        const apiMethod = apiMethods[entityType];
-        if (!apiMethod) {
-          setOptions([]);
-          setLoading(false);
-          return;
-        }
-        const filter = {
-          per_page: 50,
-          sort: "name",
-          direction: "ASC",
-          ...(search ? { q: search } : {}),
-        };
-
         const count_filter = getCountFilter();
-        const rawResults = await apiMethod({ filter, count_filter } as Record<
-          string,
-          unknown
-        >);
-
-        // Transform results to use composite id:instanceId keys
-        const results = (
-          rawResults as Array<{
-            id: string;
-            instanceId?: string;
-            name?: string;
-            title?: string;
-          }>
-        ).map((item) => ({
-          id: makeCompositeKey(item.id, item.instanceId),
-          name: item.name || item.title || "Unknown",
-        }));
-
-        // Cache first page of results (no search = initial batch)
-        if (!search && results.length > 0) {
-          setCache(cacheKey, results);
-        }
-
-        setOptions(results);
+        const rows = await find(
+          {
+            filter: { per_page: PAGE_SIZE, ...(search ? { q: search } : {}) },
+            ...(count_filter ? { count_filter } : {}),
+          },
+          signal
+        );
+        if (signal.aborted) return;
+        setOptions(rows.map(toOption));
+        setLoading(false);
       } catch (error) {
+        if (signal.aborted) return;
         console.error(`Error loading ${entityType}:`, error);
         setOptions([]);
-      } finally {
         setLoading(false);
       }
     },
-    [entityType, countFilterContext, getCountFilter]
+    [entityType, getCountFilter]
   );
 
-  // Debounced search - triggers loadOptions after 300ms of no typing
+  // Options load only while the dropdown is open: when it opens and after
+  // each (debounced) change of the search text. Each run aborts the request
+  // of the run before it.
   useEffect(() => {
-    void loadOptions(debouncedSearchTerm);
-  }, [debouncedSearchTerm, loadOptions]);
-
-  // Load initial options when dropdown opens
-  useEffect(() => {
-    if (isOpen && options.length === 0) {
-      void loadOptions("");
-    }
-  }, [isOpen, options.length, loadOptions]);
+    if (!isOpen) return;
+    const controller = new AbortController();
+    void loadOptions(debouncedSearchTerm, controller.signal);
+    return () => controller.abort();
+  }, [isOpen, debouncedSearchTerm, loadOptions]);
 
   // Reset options when entityType or countFilterContext changes
   useEffect(() => {

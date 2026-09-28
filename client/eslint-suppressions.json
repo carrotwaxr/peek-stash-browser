@@ -6,7 +6,7 @@
   },
   "src/api/library.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 24
+      "count": 14
     }
   },
   "src/api/setup.ts": {
@@ -905,14 +905,6 @@
       "count": 3
     }
   },
-  "src/components/ui/SearchableSelect.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 10
-    }
-  },
   "src/components/ui/Sidebar.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
@@ -1520,11 +1512,6 @@
   "src/utils/entityLinks.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 5
-    }
-  },
-  "src/utils/filterCache.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
     }
   },
   "src/utils/filterConfig.ts": {

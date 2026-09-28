@@ -26,6 +26,8 @@ import {
   type FieldSpec,
   type ListKind,
   MAX_REF_VALUES,
+  MINIMAL_IDS_MAX,
+  MINIMAL_PER_PAGE_MAX,
   type NumberSpec,
   PER_PAGE_MAX,
   PRESENCE_MODIFIERS,
@@ -229,8 +231,12 @@ function clampPage(page: number | undefined): number {
   return Math.max(1, page ?? 1);
 }
 
-function clampPerPage(perPage: number | undefined, fallback: number): number {
-  return Math.min(PER_PAGE_MAX, Math.max(1, perPage ?? fallback));
+function clampPerPage(
+  perPage: number | undefined,
+  fallback: number,
+  max: number = PER_PAGE_MAX
+): number {
+  return Math.min(max, Math.max(1, perPage ?? fallback));
 }
 
 /** Trimmed search text; absent when missing, empty or too long */
@@ -1178,7 +1184,15 @@ const COUNT_FILTER_KEYS: readonly (keyof MinimalCountFilter)[] = [
   "min_group_count",
 ];
 
-/** `POST /api/library/<entities>/minimal`: search text, name order, a page size and count minimums */
+const minimalIdList = z
+  .array(refValue)
+  .max(MINIMAL_IDS_MAX, `At most ${MINIMAL_IDS_MAX} values`);
+
+/**
+ * `POST /api/library/<entities>/minimal` (the entity pickers): search text,
+ * a page size, ids and count minimums; always name order, one page. `ids`
+ * names what the request looks up, so a bad one is a 400 in both policies.
+ */
 export function parseMinimalRequest<E extends MinimalKind>(
   entity: E,
   body: unknown,
@@ -1188,34 +1202,14 @@ export function parseMinimalRequest<E extends MinimalKind>(
   const input = requireObject(body, "body");
   const problems = new Problems();
 
-  const state: PageState = {
-    page: undefined,
-    perPage: undefined,
-    q: undefined,
-    direction: undefined,
-  };
+  let q: string | undefined;
+  let perPage: number | undefined;
+  let ids: readonly FilterRef[] | undefined;
   let countFilter: MinimalCountFilter | undefined;
 
   const pageHandlers = new Map<string, (raw: unknown, path: string) => void>([
-    // Read and ignored: the pickers never page
-    ["page", (raw, path) => (state.page = parseInteger(raw, path, problems))],
-    [
-      "per_page",
-      (raw, path) => (state.perPage = parseInteger(raw, path, problems)),
-    ],
-    [
-      "sort",
-      (raw, path) => {
-        if (raw !== undefined && raw !== null && raw !== "name") {
-          problems.add(path, "Only name");
-        }
-      },
-    ],
-    [
-      "direction",
-      (raw, path) => (state.direction = parseDirection(raw, path, problems)),
-    ],
-    ["q", (raw, path) => (state.q = parseQ(raw, path, problems))],
+    ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
+    ["q", (raw, path) => (q = parseQ(raw, path, problems))],
   ]);
 
   const countHandlers = new Map<string, (raw: unknown, path: string) => void>(
@@ -1245,6 +1239,18 @@ export function parseMinimalRequest<E extends MinimalKind>(
       },
     ],
     [
+      "ids",
+      (raw, path) => {
+        if (raw === undefined || raw === null) return;
+        const result = minimalIdList.safeParse(raw);
+        if (!result.success) {
+          problems.addZod(path, result.error);
+          return;
+        }
+        if (result.data.length > 0) ids = result.data;
+      },
+    ],
+    [
       "count_filter",
       (raw, path) => {
         if (raw === undefined || raw === null) return;
@@ -1261,11 +1267,14 @@ export function parseMinimalRequest<E extends MinimalKind>(
 
   return {
     entity,
-    q: state.q,
-    sort: "name",
-    direction: state.direction ?? "ASC",
-    perPage: clampPerPage(state.perPage, MINIMAL_PER_PAGE_DEFAULT),
+    q,
+    perPage: clampPerPage(
+      perPage,
+      MINIMAL_PER_PAGE_DEFAULT,
+      MINIMAL_PER_PAGE_MAX
+    ),
+    ids,
     countFilter,
-    dropped: problems.finish(policy),
+    dropped: problems.finish(policy, ["ids"]),
   };
 }

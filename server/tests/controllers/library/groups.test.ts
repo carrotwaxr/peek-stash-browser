@@ -2,8 +2,6 @@
  * Unit Tests for Groups Library Controller
  *
  * Tests findGroups and findGroupsMinimal.
- * Note: mergeGroupsWithUserData is private and tested indirectly
- * through findGroupsMinimal.
  */
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -12,23 +10,22 @@ import {
 } from "../../../controllers/library/groups.js";
 // --- Imports ---
 
-import prisma from "../../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
+import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
-vi.mock(
-  "../../../prisma/singleton.js",
-  () => import("../../helpers/prismaSingletonMock.js")
-);
-
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getAllGroups: vi.fn(),
     getGroup: vi.fn(),
   },
 }));
@@ -49,10 +46,8 @@ vi.mock("../../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
-  },
+vi.mock("../../../services/MinimalEntityQuery.js", () => ({
+  findMinimalEntities: vi.fn(),
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
@@ -82,9 +77,9 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGroupQueryBuilder = vi.mocked(groupQueryBuilder);
+const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -92,7 +87,6 @@ const adminUser = testUser({ role: "ADMIN" });
 describe("Groups Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.groupRating.findMany.mockResolvedValue([]);
   });
 
   // ─── findGroups HTTP handler ────────────────────────────────
@@ -283,190 +277,52 @@ describe("Groups Controller", () => {
   // ─── findGroupsMinimal ─────────────────────────────────────
 
   describe("findGroupsMinimal", () => {
-    it("returns minimal groups on happy path", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", name: "Alpha" }),
-        createMockGroup({ id: "g2", name: "Beta" }),
-      ];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-
+    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+      const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
+      mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findGroupsMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().groups).toHaveLength(2);
-    });
-
-    it("returns the first per_page in name order, 50 by default, DESC reversed", async () => {
-      mockStashEntityService.getAllGroups.mockResolvedValue(
-        Array.from({ length: 60 }, (_, i) =>
-          createMockGroup({
-            id: String(i + 1),
-            name: `Item ${String(i + 1).padStart(2, "0")}`,
-          })
-        )
-      );
-      const run = async (filter: {
-        per_page?: number;
-        direction?: "ASC" | "DESC";
-      }) => {
-        const req = reqFor(findGroupsMinimal, {
-          body: { filter },
-          user: defaultUser,
-        });
-        const res = resFor(findGroupsMinimal);
-        await findGroupsMinimal(req, res);
-        return res._getOkBody().groups.map((x) => x.id);
-      };
-
-      const byDefault = await run({});
-      expect(byDefault).toHaveLength(50);
-      expect(byDefault.slice(0, 2)).toEqual(["1", "2"]);
-      expect(await run({ per_page: 3, direction: "DESC" })).toEqual([
-        "60",
-        "59",
-        "58",
-      ]);
-    });
-
-    it("returns empty when cache is not initialized", async () => {
-      mockStashEntityService.getAllGroups.mockResolvedValue([]);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().groups).toEqual([]);
-    });
-
-    it("applies search query filtering", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", name: "Action Movie" }),
-        createMockGroup({ id: "g2", name: "Comedy Special" }),
-      ];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: { q: "action" } },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      expect(res._getOkBody().groups).toHaveLength(1);
-    });
-
-    it("applies count_filter with min_scene_count", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", scene_count: 20 }),
-        createMockGroup({ id: "g2", scene_count: 1 }),
-      ];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: {}, count_filter: { min_scene_count: 5 } },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      expect(res._getOkBody().groups).toHaveLength(1);
-    });
-
-    it("applies count_filter with min_performer_count", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", performer_count: 10 }),
-        createMockGroup({ id: "g2", performer_count: 0 }),
-      ];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: {}, count_filter: { min_performer_count: 5 } },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      expect(res._getOkBody().groups).toHaveLength(1);
-    });
-
-    it("sorts by name", async () => {
-      const groups = [
-        createMockGroup({ id: "g1", name: "Zebra" }),
-        createMockGroup({ id: "g2", name: "Alpha" }),
-      ];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findGroupsMinimal);
-
-      await findGroupsMinimal(req, res);
-
-      const result = res._getOkBody().groups;
-      expect(must(result[0]).name).toBe("Alpha");
-      expect(must(result[1]).name).toBe("Zebra");
-    });
-
-    it("merges user data (ratings/favorites) indirectly", async () => {
-      const groups = [createMockGroup({ id: "g1" })];
-      mockStashEntityService.getAllGroups.mockResolvedValue(groups);
-      mockPrisma.groupRating.findMany.mockResolvedValue([
-        {
-          id: 1,
-          userId: 1,
-          groupId: "g1",
-          instanceId: "default",
-          rating: 75,
-          favorite: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+        body: {
+          ids: ["1:inst-a"],
+          filter: { q: " al ", per_page: 20 },
+          count_filter: { min_scene_count: 1 },
         },
-      ]);
-
-      const req = reqFor(findGroupsMinimal, {
-        body: { filter: {} },
         user: defaultUser,
       });
       const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      const result = res._getOkBody().groups;
-      expect(must(result[0])).toHaveProperty("favorite", true);
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+        entity: "group",
+        q: "al",
+        perPage: 20,
+        ids: [{ id: "1", instanceId: "inst-a" }],
+        countFilter: { min_scene_count: 1 },
+        dropped: [],
+      });
+      expect(res._getOkBody()).toEqual({ groups: rows });
     });
 
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getAllGroups.mockRejectedValue(
-        new Error("cache failure")
-      );
-
+    it("a sort field answers 400 before any query: the pickers always list by name", async () => {
       const req = reqFor(findGroupsMinimal, {
-        body: { filter: {} },
+        body: malformed({ filter: { sort: "name" } }),
         user: defaultUser,
       });
       const res = resFor(findGroupsMinimal);
 
-      await findGroupsMinimal(req, res);
+      await expect(findGroupsMinimal(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path: "filter.sort" }],
+      });
+      expect(mockFindMinimalEntities).not.toHaveBeenCalled();
+    });
 
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find groups");
+    it("a query error reaches the central error handler", async () => {
+      mockFindMinimalEntities.mockRejectedValue(new Error("fail"));
+      const req = reqFor(findGroupsMinimal, { user: defaultUser });
+      const res = resFor(findGroupsMinimal);
+
+      await expect(findGroupsMinimal(req, res)).rejects.toThrow("fail");
     });
   });
 });

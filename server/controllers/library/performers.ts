@@ -1,6 +1,5 @@
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
@@ -12,7 +11,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
@@ -130,96 +128,18 @@ export const findPerformers = async (
 };
 
 /**
- * Get minimal performers (id + name only) for filter dropdowns
+ * One page of performers for an entity picker, in name order: the name and
+ * aliases matched in SQL, or the ids a picker has selected. A
+ * ValidationError (400) reaches the central error handler.
  */
 export const findPerformersMinimal = async (
   req: TypedAuthRequest<FindPerformersMinimalRequest>,
   res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
-  // q, name order, a page of 50 unless the request names 1..250, and the
-  // count minimums; a ValidationError (400) reaches the central error handler
-  const request = parseMinimalRequest("performer", req.body, {
-    userId: req.user.id,
-  });
+  const userId = req.user.id;
+  const request = parseMinimalRequest("performer", req.body, { userId });
   logDropped("POST /library/performers/minimal", request.dropped);
 
-  try {
-    const { q: searchQuery, direction: sortDirection, perPage } = request;
-    const count_filter = request.countFilter;
-
-    let performers = await stashEntityService.getAllPerformers();
-
-    // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    const userId = req.user?.id;
-    performers = await entityExclusionHelper.filterExcluded(
-      performers,
-      userId,
-      "performer"
-    );
-
-    // Apply count filters (OR logic - pass if ANY condition is met)
-    if (count_filter) {
-      const {
-        min_scene_count,
-        min_gallery_count,
-        min_image_count,
-        min_group_count,
-      } = count_filter;
-      performers = performers.filter((p) => {
-        const conditions: boolean[] = [];
-        if (min_scene_count !== undefined)
-          conditions.push(p.scene_count >= min_scene_count);
-        if (min_gallery_count !== undefined)
-          conditions.push(p.gallery_count >= min_gallery_count);
-        if (min_image_count !== undefined)
-          conditions.push(p.image_count >= min_image_count);
-        if (min_group_count !== undefined)
-          conditions.push(p.group_count >= min_group_count);
-        return conditions.length === 0 || conditions.some((c) => c);
-      });
-    }
-
-    // Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      performers = performers.filter((p) => {
-        const name = p.name || "";
-        const aliases = p.alias_list?.join(" ") || "";
-        return (
-          name.toLowerCase().includes(lowerQuery) ||
-          aliases.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Name order
-    performers.sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name);
-      return sortDirection === "DESC" ? -comparison : comparison;
-    });
-
-    // The first page: the pickers never page
-    const paginatedPerformers = performers.slice(0, perPage);
-
-    // Disambiguate names for entities with same name across different instances
-    // Only non-default instances get suffixed with instance name when duplicates exist
-    const entitiesWithInstance = paginatedPerformers.map((p) => ({
-      id: p.id,
-      name: p.name,
-      instanceId: p.instanceId,
-    }));
-    const minimal = disambiguateEntityNames(entitiesWithInstance);
-
-    res.json({
-      performers: minimal,
-    });
-  } catch (error) {
-    logger.error("Error in findPerformersMinimal", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find performers",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
+  const performers = await findMinimalEntities(userId, request);
+  res.json({ performers });
 };

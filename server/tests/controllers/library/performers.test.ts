@@ -7,10 +7,14 @@ import {
   findPerformers,
   findPerformersMinimal,
 } from "../../../controllers/library/performers.js";
-import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
+import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
@@ -18,30 +22,16 @@ import { must } from "../../helpers/must.js";
 // Mocks — declared BEFORE importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getAllPerformers: vi.fn(),
-  },
-}));
-
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
-  },
-}));
-
 vi.mock("../../../services/PerformerQueryBuilder.js", () => ({
   performerQueryBuilder: { execute: vi.fn() },
 }));
 
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
+vi.mock("../../../services/MinimalEntityQuery.js", () => ({
+  findMinimalEntities: vi.fn(),
 }));
 
-vi.mock("../../../utils/entityInstanceId.js", () => ({
-  disambiguateEntityNames: vi
-    .fn()
-    .mockImplementation((entities: unknown[]) => entities),
+vi.mock("../../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
@@ -66,6 +56,8 @@ vi.mock("../../../utils/stashUrl.js", () => ({
       ) => (viewer?.role === "ADMIN" ? `http://stash/performers/${id}` : null)
     ),
 }));
+
+const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -164,85 +156,51 @@ describe("findPerformers", () => {
 });
 
 describe("findPerformersMinimal", () => {
-  it("returns minimal performers with search and sort", async () => {
-    const performers = [
-      createMockPerformer({ id: "p1", name: "Alice" }),
-      createMockPerformer({ id: "p2", name: "Bob" }),
-    ];
-    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(
-      performers
-    );
-
+  it("answers one page from findMinimalEntities, for the parsed request", async () => {
+    const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
+    mockFindMinimalEntities.mockResolvedValue(rows);
     const req = reqFor(findPerformersMinimal, {
-      body: { filter: { q: "alice", sort: "name", direction: "ASC" } },
+      body: {
+        ids: ["1:inst-a"],
+        filter: { q: " al ", per_page: 20 },
+        count_filter: { min_scene_count: 1 },
+      },
       user: testUser(),
     });
     const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 
-    expect(res._getStatus()).toBe(200);
-    const body = res._getOkBody();
-    expect(body.performers).toHaveLength(1);
-    expect(must(body.performers[0]).name).toBe("Alice");
+    expect(mockFindMinimalEntities).toHaveBeenCalledWith(testUser().id, {
+      entity: "performer",
+      q: "al",
+      perPage: 20,
+      ids: [{ id: "1", instanceId: "inst-a" }],
+      countFilter: { min_scene_count: 1 },
+      dropped: [],
+    });
+    expect(res._getOkBody()).toEqual({ performers: rows });
   });
 
-  it("applies count_filter to exclude performers below threshold", async () => {
-    const performers = [
-      createMockPerformer({ id: "p1", scene_count: 10 }),
-      createMockPerformer({ id: "p2", scene_count: 0 }),
-    ];
-    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(
-      performers
-    );
-
+  it("a sort field answers 400 before any query: the pickers always list by name", async () => {
     const req = reqFor(findPerformersMinimal, {
-      body: { count_filter: { min_scene_count: 5 } },
+      body: malformed({ filter: { sort: "name" } }),
       user: testUser(),
     });
     const res = resFor(findPerformersMinimal);
 
-    await findPerformersMinimal(req, res);
-
-    expect(res._getStatus()).toBe(200);
-    expect(res._getOkBody().performers).toHaveLength(1);
-    expect(must(res._getOkBody().performers[0]).id).toBe("p1");
-  });
-
-  it("applies exclusion filtering for admin users", async () => {
-    // An admin's rows hold only their own hides and cascades (item 13)
-    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue([
-      createMockPerformer({ id: "p1" }),
-    ]);
-
-    const req = reqFor(findPerformersMinimal, {
-      user: testUser({ role: "ADMIN" }),
+    await expect(findPerformersMinimal(req, res)).rejects.toMatchObject({
+      statusCode: 400,
+      issues: [{ path: "filter.sort" }],
     });
-    const res = resFor(findPerformersMinimal);
-
-    await findPerformersMinimal(req, res);
-
-    expect(entityExclusionHelper.filterExcluded).toHaveBeenCalledWith(
-      expect.any(Array),
-      1,
-      "performer"
-    );
-    expect(res._getStatus()).toBe(200);
+    expect(mockFindMinimalEntities).not.toHaveBeenCalled();
   });
 
-  it("returns 500 when service throws", async () => {
-    vi.mocked(stashEntityService.getAllPerformers).mockRejectedValue(
-      new Error("fail")
-    );
-
+  it("a query error reaches the central error handler", async () => {
+    mockFindMinimalEntities.mockRejectedValue(new Error("fail"));
     const req = reqFor(findPerformersMinimal, { user: testUser() });
     const res = resFor(findPerformersMinimal);
 
-    await findPerformersMinimal(req, res);
-
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({
-      error: "Failed to find performers",
-    });
+    await expect(findPerformersMinimal(req, res)).rejects.toThrow("fail");
   });
 });

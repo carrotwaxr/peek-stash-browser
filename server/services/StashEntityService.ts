@@ -494,32 +494,6 @@ class StashEntityService {
   // ==================== Performer Queries ====================
 
   /**
-   * Get all performers from cache
-   */
-  async getAllPerformers(): Promise<NormalizedPerformer[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashPerformer.findMany({
-      where: { deletedAt: null },
-      include: {
-        tags: { include: { tag: true } }, // Include full tag data
-      },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => this.transformPerformer(c));
-    const transformTime = Date.now() - transformStart;
-
-    logger.info(
-      `getAllPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
-
-  /**
    * Get performer by ID with computed counts
    * @param id - Performer ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
@@ -683,7 +657,7 @@ class StashEntityService {
     const result = cached.map((c) => this.transformStudio(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(
+    logger.debug(
       `getAllStudios: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
     );
 
@@ -787,7 +761,7 @@ class StashEntityService {
     const result = cached.map((c) => this.transformTag(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(
+    logger.debug(
       `getAllTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
     );
 
@@ -875,22 +849,6 @@ class StashEntityService {
   // ==================== Gallery Queries ====================
 
   /**
-   * Get all galleries from cache
-   */
-  async getAllGalleries(): Promise<NormalizedGallery[]> {
-    const cached = await prisma.stashGallery.findMany({
-      where: { deletedAt: null },
-      include: {
-        performers: { include: { performer: true } },
-        tags: { include: { tag: true } }, // Include full tag data
-        scenes: { include: { scene: true } },
-      },
-    });
-
-    return cached.map((c) => this.transformGallery(c));
-  }
-
-  /**
    * Get gallery by ID with computed counts
    * @param id - Gallery ID
    * @param instanceId - Stash instance ID for multi-instance support
@@ -939,20 +897,6 @@ class StashEntityService {
   }
 
   // ==================== Group Queries ====================
-
-  /**
-   * Get all groups from cache
-   */
-  async getAllGroups(): Promise<NormalizedGroup[]> {
-    const cached = await prisma.stashGroup.findMany({
-      where: { deletedAt: null },
-      include: {
-        tags: { include: { tag: true } }, // Include full tag data
-      },
-    });
-
-    return cached.map((c) => this.transformGroup(c));
-  }
 
   /**
    * Get group by ID with computed counts

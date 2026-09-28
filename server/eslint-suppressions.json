@@ -36,35 +36,9 @@
       "count": 1
     }
   },
-  "controllers/library/galleries.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
-    }
-  },
-  "controllers/library/performers.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
   "controllers/library/scenes.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 5
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "controllers/library/studios.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "controllers/library/tags.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
