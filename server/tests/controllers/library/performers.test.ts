@@ -8,29 +8,19 @@ import {
   applyPerformerFilters,
   findPerformers,
   findPerformersMinimal,
-  mergePerformersWithUserData,
   parseCareerLength,
 } from "../../../controllers/library/performers.js";
 import { CriterionModifier, GenderEnum } from "../../../graphql/types.js";
-import prisma from "../../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
-import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — declared BEFORE importing the module under test
 // ---------------------------------------------------------------------------
-
-vi.mock("../../../prisma/singleton.js", () => ({
-  default: {
-    performerRating: { findMany: vi.fn() },
-  },
-}));
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
@@ -52,12 +42,6 @@ vi.mock("../../../services/PerformerQueryBuilder.js", () => ({
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
-vi.mock("../../../services/UserStatsService.js", () => ({
-  userStatsService: {
-    getPerformerStats: vi.fn().mockResolvedValue(new Map()),
-  },
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
@@ -178,74 +162,7 @@ describe("parseCareerLength", () => {
 });
 
 // ===========================================================================
-// 2. mergePerformersWithUserData
-// ===========================================================================
-
-describe("mergePerformersWithUserData", () => {
-  it("merges ratings and stats onto performers using composite keys", async () => {
-    const performer = createMockPerformer({ id: "p1", instanceId: "inst1" });
-
-    vi.mocked(prisma.performerRating.findMany).mockResolvedValue([
-      partialRow({
-        performerId: "p1",
-        instanceId: "inst1",
-        userId: 1,
-        rating: 80,
-        favorite: true,
-      }),
-    ]);
-
-    const statsMap = new Map([
-      [
-        "p1\0inst1",
-        {
-          oCounter: 5,
-          playCount: 12,
-          lastPlayedAt: "2026-01-01T00:00:00Z",
-          lastOAt: "2026-01-02T00:00:00Z",
-        },
-      ],
-    ]);
-    vi.mocked(userStatsService.getPerformerStats).mockResolvedValue(statsMap);
-
-    const result = await mergePerformersWithUserData([performer], 1);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      rating: 80,
-      rating100: 80,
-      favorite: true,
-      o_counter: 5,
-      play_count: 12,
-      last_played_at: "2026-01-01T00:00:00Z",
-      last_o_at: "2026-01-02T00:00:00Z",
-    });
-  });
-
-  it("returns defaults when no rating or stats exist", async () => {
-    const performer = createMockPerformer({ id: "p2", instanceId: "default" });
-
-    vi.mocked(prisma.performerRating.findMany).mockResolvedValue([]);
-    vi.mocked(userStatsService.getPerformerStats).mockResolvedValue(new Map());
-
-    const result = await mergePerformersWithUserData([performer], 1);
-
-    expect(must(result[0]).o_counter).toBe(0);
-    expect(must(result[0]).play_count).toBe(0);
-    expect(must(result[0]).last_played_at).toBeNull();
-  });
-
-  it("returns empty array for empty input", async () => {
-    vi.mocked(prisma.performerRating.findMany).mockResolvedValue([]);
-    vi.mocked(userStatsService.getPerformerStats).mockResolvedValue(new Map());
-
-    const result = await mergePerformersWithUserData([], 1);
-    expect(result).toEqual([]);
-  });
-});
-
-// ===========================================================================
-// 3. applyPerformerFilters
+// 2. applyPerformerFilters
 // ===========================================================================
 
 describe("applyPerformerFilters", () => {
@@ -570,7 +487,7 @@ describe("applyPerformerFilters", () => {
 });
 
 // ===========================================================================
-// 4. HTTP handlers
+// 3. HTTP handlers
 // ===========================================================================
 
 describe("findPerformers", () => {

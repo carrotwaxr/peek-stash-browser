@@ -1,8 +1,7 @@
 /**
  * Unit Tests for Studios Library Controller
  *
- * Tests mergeStudiosWithUserData, applyStudioFilters (sync), findStudios
- * and findStudiosMinimal.
+ * Tests applyStudioFilters (sync), findStudios and findStudiosMinimal.
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,25 +9,17 @@ import {
   applyStudioFilters,
   findStudios,
   findStudiosMinimal,
-  mergeStudiosWithUserData,
 } from "../../../controllers/library/studios.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
-import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock(
-  "../../../prisma/singleton.js",
-  () => import("../../helpers/prismaSingletonMock.js")
-);
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
@@ -39,10 +30,6 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 
 vi.mock("../../../services/StudioQueryBuilder.js", () => ({
   studioQueryBuilder: { execute: vi.fn() },
-}));
-
-vi.mock("../../../services/UserStatsService.js", () => ({
-  userStatsService: { getStudioStats: vi.fn().mockResolvedValue(new Map()) },
 }));
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
@@ -95,10 +82,8 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockStudioQueryBuilder = vi.mocked(studioQueryBuilder);
-const mockUserStatsService = vi.mocked(userStatsService);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -106,59 +91,6 @@ const adminUser = testUser({ role: "ADMIN" });
 describe("Studios Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // ─── mergeStudiosWithUserData ───────────────────────────────
-
-  describe("mergeStudiosWithUserData", () => {
-    it("returns studios with default stats when no ratings exist", async () => {
-      mockPrisma.studioRating.findMany.mockResolvedValue([]);
-      mockUserStatsService.getStudioStats.mockResolvedValue(new Map());
-
-      const studios = [createMockStudio({ id: "s1" })];
-      const result = await mergeStudiosWithUserData(studios, 1);
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).o_counter).toBe(0);
-      expect(must(result[0]).play_count).toBe(0);
-    });
-
-    it("merges ratings via composite key", async () => {
-      mockPrisma.studioRating.findMany.mockResolvedValue([
-        {
-          id: 1,
-          userId: 1,
-          studioId: "s1",
-          instanceId: "default",
-          rating: 90,
-          favorite: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ]);
-      mockUserStatsService.getStudioStats.mockResolvedValue(new Map());
-
-      const studios = [createMockStudio({ id: "s1", instanceId: "default" })];
-      const result = await mergeStudiosWithUserData(studios, 1);
-
-      expect(must(result[0]).rating).toBe(90);
-      expect(must(result[0]).rating100).toBe(90);
-      expect(must(result[0]).favorite).toBe(true);
-    });
-
-    it("merges pre-computed stats from UserStatsService", async () => {
-      mockPrisma.studioRating.findMany.mockResolvedValue([]);
-      const statsMap = new Map([
-        ["s1\0default", { oCounter: 7, playCount: 20 }],
-      ]);
-      mockUserStatsService.getStudioStats.mockResolvedValue(statsMap);
-
-      const studios = [createMockStudio({ id: "s1", instanceId: "default" })];
-      const result = await mergeStudiosWithUserData(studios, 1);
-
-      expect(must(result[0]).o_counter).toBe(7);
-      expect(must(result[0]).play_count).toBe(20);
-    });
   });
 
   // ─── applyStudioFilters (SYNC function) ─────────────────────

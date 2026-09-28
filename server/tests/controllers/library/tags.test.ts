@@ -1,8 +1,7 @@
 /**
  * Unit Tests for Tags Library Controller
  *
- * Tests mergeTagsWithUserData, applyTagFilters, findTags, findTagsMinimal
- * and findTagsForScenes.
+ * Tests applyTagFilters, findTags, findTagsMinimal and findTagsForScenes.
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +10,6 @@ import {
   findTags,
   findTagsForScenes,
   findTagsMinimal,
-  mergeTagsWithUserData,
 } from "../../../controllers/library/tags.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
@@ -19,7 +17,6 @@ import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
@@ -44,10 +41,6 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 
 vi.mock("../../../services/TagQueryBuilder.js", () => ({
   tagQueryBuilder: { execute: vi.fn() },
-}));
-
-vi.mock("../../../services/UserStatsService.js", () => ({
-  userStatsService: { getTagStats: vi.fn().mockResolvedValue(new Map()) },
 }));
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
@@ -103,7 +96,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
-const mockUserStatsService = vi.mocked(userStatsService);
 
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
@@ -111,59 +103,6 @@ const adminUser = testUser({ role: "ADMIN" });
 describe("Tags Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // ─── mergeTagsWithUserData ───────────────────────────────────
-
-  describe("mergeTagsWithUserData", () => {
-    it("returns tags with default stats when no ratings exist", async () => {
-      mockPrisma.tagRating.findMany.mockResolvedValue([]);
-      mockUserStatsService.getTagStats.mockResolvedValue(new Map());
-
-      const tags = [createMockTag({ id: "t1" })];
-      const result = await mergeTagsWithUserData(tags, 1);
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).o_counter).toBe(0);
-      expect(must(result[0]).play_count).toBe(0);
-    });
-
-    it("merges ratings via composite key (id + instanceId)", async () => {
-      mockPrisma.tagRating.findMany.mockResolvedValue([
-        {
-          id: 1,
-          userId: 1,
-          tagId: "t1",
-          instanceId: "default",
-          rating: 80,
-          favorite: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ]);
-      mockUserStatsService.getTagStats.mockResolvedValue(new Map());
-
-      const tags = [createMockTag({ id: "t1", instanceId: "default" })];
-      const result = await mergeTagsWithUserData(tags, 1);
-
-      expect(must(result[0]).rating).toBe(80);
-      expect(must(result[0]).rating100).toBe(80);
-      expect(must(result[0]).favorite).toBe(true);
-    });
-
-    it("merges pre-computed stats from UserStatsService", async () => {
-      mockPrisma.tagRating.findMany.mockResolvedValue([]);
-      const statsMap = new Map([
-        ["t1\0default", { oCounter: 5, playCount: 10 }],
-      ]);
-      mockUserStatsService.getTagStats.mockResolvedValue(statsMap);
-
-      const tags = [createMockTag({ id: "t1", instanceId: "default" })];
-      const result = await mergeTagsWithUserData(tags, 1);
-
-      expect(must(result[0]).o_counter).toBe(5);
-      expect(must(result[0]).play_count).toBe(10);
-    });
   });
 
   // ─── applyTagFilters ────────────────────────────────────────
