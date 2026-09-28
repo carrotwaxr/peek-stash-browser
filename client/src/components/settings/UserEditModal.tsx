@@ -93,9 +93,7 @@ const UserEditModalContent = ({
       try {
         const response = await getUserGroupMemberships(user.id);
         const groups = response.groups || [];
-        const memberGroupIds = groups.map(
-          (g) => (g as Record<string, unknown>).id as number
-        );
+        const memberGroupIds = groups.map((g) => g.id);
         setUserGroups(memberGroupIds);
       } catch (err) {
         console.error("Failed to load user groups:", err);

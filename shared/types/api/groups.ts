@@ -43,6 +43,19 @@ export interface GroupWithMembers {
   members: GroupMember[];
 }
 
+/**
+ * A group a user belongs to, as its member lists show it: its name and what
+ * it grants
+ */
+export interface UserGroupSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  canShare: boolean;
+  canDownloadFiles: boolean;
+  canDownloadPlaylists: boolean;
+}
+
 // =============================================================================
 // GET ALL GROUPS
 // =============================================================================
@@ -174,14 +187,16 @@ export interface RemoveMemberResponse {
 // GET USER GROUPS (current user)
 // =============================================================================
 
-/** GET /api/user/groups */
+/** GET /api/groups/user/mine: the requesting user's groups */
 export interface GetCurrentUserGroupsResponse {
-  groups: Array<{
-    id: number;
-    name: string;
-    description: string | null;
-    canShare: boolean;
-    canDownloadFiles: boolean;
-    canDownloadPlaylists: boolean;
-  }>;
+  groups: UserGroupSummary[];
+}
+
+// =============================================================================
+// GET USER GROUP MEMBERSHIPS (admin)
+// =============================================================================
+
+/** GET /api/user/:userId/groups: the groups a user belongs to (admin only) */
+export interface GetUserGroupMembershipsResponse {
+  groups: UserGroupSummary[];
 }

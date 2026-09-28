@@ -25,6 +25,7 @@ import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
 import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import type { NormalizedScene } from "../../types/index.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
@@ -86,6 +87,10 @@ const SAMPLE_SCENE = createMockScene({
   rating100: 90,
   instanceId: "instance-1",
 });
+
+/** Scenes as addStreamabilityInfo returns them to a regular user */
+const withStashUrl = (scenes: NormalizedScene[]) =>
+  scenes.map((scene) => ({ ...scene, stashUrl: null }));
 
 describe("Carousel Controller", () => {
   beforeEach(() => {
@@ -522,7 +527,7 @@ describe("Carousel Controller", () => {
         scenes,
         total: scenes.length,
       });
-      mockAddStreamability.mockReturnValue(scenes);
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
 
       const req = reqFor(previewCarousel, {
         body: {
@@ -585,7 +590,7 @@ describe("Carousel Controller", () => {
         scenes,
         total: scenes.length,
       });
-      mockAddStreamability.mockReturnValue(scenes);
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
 
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
@@ -624,7 +629,7 @@ describe("Carousel Controller", () => {
         scenes,
         total: scenes.length,
       });
-      mockAddStreamability.mockReturnValue(scenes);
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
 
       const req = reqFor(previewCarousel, {
         body: {
@@ -642,7 +647,9 @@ describe("Carousel Controller", () => {
 
     it("applies addStreamabilityInfo to results", async () => {
       const rawScenes = [SAMPLE_SCENE];
-      const streamableScenes = [{ ...SAMPLE_SCENE, streamable: true }];
+      const streamableScenes = [
+        { ...SAMPLE_SCENE, streamable: true, stashUrl: null },
+      ];
       mockQueryBuilder.execute.mockResolvedValue({
         scenes: rawScenes,
         total: rawScenes.length,
@@ -670,7 +677,7 @@ describe("Carousel Controller", () => {
         scenes,
         total: scenes.length,
       });
-      mockAddStreamability.mockReturnValue(scenes);
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
 
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
@@ -688,7 +695,7 @@ describe("Carousel Controller", () => {
         scenes,
         total: scenes.length,
       });
-      mockAddStreamability.mockReturnValue(scenes);
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
 
       const req = reqFor(previewCarousel, {
         body: {

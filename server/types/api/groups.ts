@@ -19,4 +19,6 @@ export type {
   RemoveMemberParams,
   RemoveMemberResponse,
   GetCurrentUserGroupsResponse,
+  GetUserGroupMembershipsResponse,
+  UserGroupSummary,
 } from "@peek/shared-types/api/groups.js";

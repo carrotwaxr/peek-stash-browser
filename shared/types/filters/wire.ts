@@ -53,6 +53,13 @@ export interface HierarchicalRefInput<
   depth?: number | null;
 }
 
+/** T when the field offers IS_NULL or NOT_NULL, else never */
+type WithPresence<M extends string, T> = [
+  Extract<M, PresenceModifier>,
+] extends [never]
+  ? never
+  : T;
+
 /** BETWEEN and NOT_BETWEEN also need value2; IS_NULL and NOT_NULL no value */
 export type NumberInput<M extends NumberModifier = NumberModifier> =
   | {
@@ -60,11 +67,14 @@ export type NumberInput<M extends NumberModifier = NumberModifier> =
       value: number;
       value2?: number | null;
     }
-  | {
-      modifier: Extract<M, PresenceModifier>;
-      value?: null;
-      value2?: null;
-    };
+  | WithPresence<
+      M,
+      {
+        modifier: Extract<M, PresenceModifier>;
+        value?: null;
+        value2?: null;
+      }
+    >;
 
 /** Values are YYYY-MM-DD dates or ISO date-times */
 export type DateInput<M extends DateModifier = DateModifier> =
@@ -73,15 +83,18 @@ export type DateInput<M extends DateModifier = DateModifier> =
       value: string;
       value2?: string | null;
     }
-  | {
-      modifier: Extract<M, PresenceModifier>;
-      value?: null;
-      value2?: null;
-    };
+  | WithPresence<
+      M,
+      {
+        modifier: Extract<M, PresenceModifier>;
+        value?: null;
+        value2?: null;
+      }
+    >;
 
 export type TextInput<M extends TextModifier = TextModifier> =
   | { modifier?: Exclude<M, PresenceModifier> | null; value: string }
-  | { modifier: Extract<M, PresenceModifier>; value?: null };
+  | WithPresence<M, { modifier: Extract<M, PresenceModifier>; value?: null }>;
 
 export interface EnumInput<
   V extends string = string,

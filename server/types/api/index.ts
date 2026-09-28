@@ -218,6 +218,8 @@ export type {
   RemoveMemberParams,
   RemoveMemberResponse,
   GetCurrentUserGroupsResponse,
+  GetUserGroupMembershipsResponse,
+  UserGroupSummary,
 } from "@peek/shared-types/api/groups.js";
 
 // Clips endpoint types
@@ -265,22 +267,9 @@ export type {
   SyncStatusResponse,
 } from "@peek/shared-types/api/sync.js";
 
-// ---------------------------------------------------------------------------
-// Server-local API types (dependencies on Express, Prisma, GraphQL)
-// ---------------------------------------------------------------------------
-
-// Express typed helpers
-export type {
-  TypedRequest,
-  TypedAuthRequest,
-  TypedResponse,
-} from "./express.js";
-
-// Proxy controller types
-export type { ProxyOptions } from "./proxy.js";
-
 // Library endpoint types
 export type {
+  WithStashUrl,
   // Scenes
   FindScenesRequest,
   FindScenesResponse,
@@ -289,7 +278,6 @@ export type {
   FindSimilarScenesResponse,
   GetRecommendedScenesQuery,
   GetRecommendedScenesResponse,
-  ScoredSceneId,
   // Performers
   FindPerformersRequest,
   FindPerformersResponse,
@@ -318,7 +306,24 @@ export type {
   // Images
   FindImagesRequest,
   FindImagesResponse,
-} from "./library.js";
+} from "@peek/shared-types/api/library.js";
+
+// ---------------------------------------------------------------------------
+// Server-local API types (dependencies on Express, Prisma, GraphQL)
+// ---------------------------------------------------------------------------
+
+// Express typed helpers
+export type {
+  TypedRequest,
+  TypedAuthRequest,
+  TypedResponse,
+} from "./express.js";
+
+// Proxy controller types
+export type { ProxyOptions } from "./proxy.js";
+
+// Recommendation scoring (server-internal)
+export type { ScoredSceneId } from "./library.js";
 
 // Playlist endpoint types
 export type {

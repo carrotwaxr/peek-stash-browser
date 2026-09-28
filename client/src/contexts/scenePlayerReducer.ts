@@ -1,4 +1,4 @@
-import type { NormalizedScene } from "@peek/shared-types";
+import type { NormalizedScene, WithStashUrl } from "@peek/shared-types";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -39,7 +39,8 @@ interface PlaylistData {
 }
 
 export interface ScenePlayerReducerState {
-  scene: NormalizedScene | null;
+  /** The scene as the scenes list answers it, with its View in Stash link */
+  scene: WithStashUrl<NormalizedScene> | null;
   sceneLoading: boolean;
   sceneError: unknown;
   video: Record<string, unknown> | null;
@@ -127,7 +128,7 @@ export function scenePlayerReducer(
 
     case "LOAD_SCENE_SUCCESS": {
       const payload = action.payload as {
-        scene: NormalizedScene;
+        scene: WithStashUrl<NormalizedScene>;
         oCounter?: number;
       };
       const scene = payload.scene;

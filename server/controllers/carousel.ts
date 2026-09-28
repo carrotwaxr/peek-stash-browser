@@ -20,6 +20,7 @@ import type {
   UpdateCarouselParams,
   UpdateCarouselRequest,
   UpdateCarouselResponse,
+  WithStashUrl,
 } from "../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import { logger } from "../utils/logger.js";
@@ -340,7 +341,7 @@ export async function executeCarouselQuery(
   sort: string,
   direction: string,
   viewer: { role: string } | undefined
-): Promise<NormalizedScene[]> {
+): Promise<WithStashUrl<NormalizedScene>[]> {
   const startTime = Date.now();
 
   // Execute query (applyExclusions defaults to true)

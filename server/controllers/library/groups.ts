@@ -90,14 +90,16 @@ export const findGroups = async (
       requestingUser.id
     );
 
-    // Merge root-level ids with group_filter
+    // Merge root-level ids with group_filter. The builder reads the
+    // filter as sent, as before: PeekGroupFilter types its criteria as
+    // Stash's, which always name a modifier, where a request may omit it
     const normalizedIds = ids
       ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : group_filter?.ids;
-    const mergedFilter: PeekGroupFilter & Record<string, unknown> = {
+    const mergedFilter = {
       ...group_filter,
       ids: normalizedIds,
-    };
+    } as PeekGroupFilter & Record<string, unknown>;
 
     // Extract specific instance ID for disambiguation (from group_filter.instance_id)
     const specificInstanceId = group_filter?.instance_id;

@@ -50,14 +50,16 @@ export const findPerformers = async (
       requestingUser.id
     );
 
-    // Merge root-level ids with performer_filter
+    // Merge root-level ids with performer_filter. The builder reads the
+    // filter as sent, as before: PeekPerformerFilter types its criteria as
+    // Stash's, which always name a modifier, where a request may omit it
     const normalizedIds = ids
       ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : performer_filter?.ids;
-    const mergedFilter: PeekPerformerFilter = {
+    const mergedFilter = {
       ...performer_filter,
       ids: normalizedIds,
-    };
+    } as PeekPerformerFilter;
 
     // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
     const specificInstanceId = performer_filter?.instance_id;
