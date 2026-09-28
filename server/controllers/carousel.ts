@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
   CarouselPreference,
@@ -22,7 +23,14 @@ import type {
   UpdateCarouselResponse,
   WithStashUrl,
 } from "../types/api/index.js";
-import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
+import type { NormalizedScene } from "../types/index.js";
+import type { ParsedListRequest } from "../types/parsedFilters.js";
+import { toLegacyFilter } from "../utils/legacyFilter.js";
+import {
+  logDropped,
+  parseCarouselRequest,
+  parseStoredSceneQuery,
+} from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
 import { addStreamabilityInfo } from "./library/scenes.js";
 
@@ -31,6 +39,13 @@ const MAX_CAROUSELS_PER_USER = 15;
 
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
+
+// What a new carousel sorts by when the request names nothing
+const DEFAULT_CAROUSEL_SORT = "random";
+const DEFAULT_CAROUSEL_DIRECTION = "DESC";
+
+/** A new seed each load, so a random carousel varies from visit to visit */
+const perLoadSeed = (userId: number) => userId + Date.now();
 
 /**
  * Get all custom carousels for the current user
@@ -105,24 +120,36 @@ export const createCarousel = async (
   req: TypedAuthRequest<CreateCarouselRequest>,
   res: TypedResponse<CreateCarouselResponse | ApiErrorResponse>
 ) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { title, icon, rules, sort, direction } = req.body;
+
+  if (!rules || typeof rules !== "object") {
+    res.status(400).json({ error: "Rules are required" });
+    return;
+  }
+
+  // The rules, sort and direction against the scene contract; a
+  // ValidationError (400) reaches the central error handler
+  const request = parseCarouselRequest(
+    {
+      rules,
+      sort: sort ?? DEFAULT_CAROUSEL_SORT,
+      direction: direction ?? DEFAULT_CAROUSEL_DIRECTION,
+    },
+    { userId }
+  );
+  logDropped("POST /carousels", request.dropped);
+
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const { title, icon, rules, sort, direction } = req.body;
-
     // Validate required fields
     if (!title || title.trim() === "") {
       res.status(400).json({ error: "Title is required" });
-      return;
-    }
-
-    if (!rules || typeof rules !== "object") {
-      res.status(400).json({ error: "Rules are required" });
       return;
     }
 
@@ -144,8 +171,9 @@ export const createCarousel = async (
         title: title.trim(),
         icon: icon || "Film",
         rules: rules as unknown as Prisma.InputJsonValue,
-        sort: sort || "random",
-        direction: direction || "DESC",
+        // As the parser read them: a contract sort, direction upper-case
+        sort: request.sort.field,
+        direction: request.sort.direction,
       },
     });
 
@@ -194,17 +222,22 @@ export const updateCarousel = async (
   req: TypedAuthRequest<UpdateCarouselRequest, UpdateCarouselParams>,
   res: TypedResponse<UpdateCarouselResponse | ApiErrorResponse>
 ) => {
+  const userId = req.user?.id;
+  const carouselId = req.params.id;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { title, icon, rules, sort, direction } = req.body;
+
+  // The parts sent, against the scene contract; a ValidationError (400)
+  // reaches the central error handler
+  const request = parseCarouselRequest({ rules, sort, direction }, { userId });
+  logDropped("PUT /carousels/:id", request.dropped);
+
   try {
-    const userId = req.user?.id;
-    const carouselId = req.params.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const { title, icon, rules, sort, direction } = req.body;
-
     // Check ownership
     const existing = await prisma.userCarousel.findFirst({
       where: {
@@ -232,8 +265,8 @@ export const updateCarousel = async (
         ...(rules !== undefined && {
           rules: rules as unknown as Prisma.InputJsonValue,
         }),
-        ...(sort !== undefined && { sort }),
-        ...(direction !== undefined && { direction }),
+        ...(sort !== undefined && { sort: request.sort.field }),
+        ...(direction !== undefined && { direction: request.sort.direction }),
       },
     });
 
@@ -296,29 +329,34 @@ export const previewCarousel = async (
   req: TypedAuthRequest<PreviewCarouselRequest>,
   res: TypedResponse<PreviewCarouselResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user?.id;
+  const userId = req.user?.id;
 
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
 
-    const { rules, sort, direction } = req.body;
+  const { rules, sort, direction } = req.body;
 
-    if (!rules || typeof rules !== "object") {
-      res.status(400).json({ error: "Rules are required" });
-      return;
-    }
+  if (!rules || typeof rules !== "object") {
+    res.status(400).json({ error: "Rules are required" });
+    return;
+  }
 
-    // Execute the carousel query
-    const scenes = await executeCarouselQuery(
-      userId,
+  // A ValidationError (400) reaches the central error handler
+  const query = parseCarouselRequest(
+    {
       rules,
-      sort || "random",
-      direction || "DESC",
-      req.user
-    );
+      sort: sort ?? DEFAULT_CAROUSEL_SORT,
+      direction: direction ?? DEFAULT_CAROUSEL_DIRECTION,
+    },
+    { userId, perPage: CAROUSEL_SCENE_LIMIT, randomSeed: perLoadSeed(userId) }
+  );
+  logDropped("POST /carousels/preview", query.dropped);
+
+  try {
+    // Execute the carousel query
+    const scenes = await executeCarouselQuery(userId, query, req.user);
 
     res.json({ scenes });
   } catch (error) {
@@ -330,30 +368,32 @@ export const previewCarousel = async (
 };
 
 /**
- * Execute a carousel's scene query
- * This is also exported for use by the homepage to render carousel scenes
+ * Runs a carousel's parsed scene query for the user: their exclusions
+ * (applyExclusions defaults to true) and only their instances (enabled,
+ * selected and past their first sync; invariant 11). The routes answer 503
+ * before this when the user has none, since an empty list filters nothing.
  *
  * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
  */
 export async function executeCarouselQuery(
   userId: number,
-  rules: PeekSceneFilter,
-  sort: string,
-  direction: string,
+  query: ParsedListRequest<"scene">,
   viewer: { role: string } | undefined
 ): Promise<WithStashUrl<NormalizedScene>[]> {
   const startTime = Date.now();
 
-  // Execute query (applyExclusions defaults to true)
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
   const result = await sceneQueryBuilder.execute({
     userId,
-    filters: rules,
-    sort,
-    sortDirection: direction.toUpperCase() as "ASC" | "DESC",
-    page: 1,
-    perPage: CAROUSEL_SCENE_LIMIT,
-    // Use different seed per carousel load for variety
-    randomSeed: sort === "random" ? userId + Date.now() : userId,
+    filters: toLegacyFilter("scene", query.filter),
+    allowedInstanceIds,
+    specificInstanceId: query.specificInstanceId,
+    sort: query.sort.field,
+    sortDirection: query.sort.direction,
+    page: query.page,
+    perPage: query.perPage,
+    randomSeed: query.sort.seed,
   });
 
   const scenes = addStreamabilityInfo(result.scenes, viewer);
@@ -396,14 +436,21 @@ export const executeCarouselById = async (
       return;
     }
 
-    // Execute the query
-    const scenes = await executeCarouselQuery(
-      userId,
-      carousel.rules as PeekSceneFilter,
+    // Stored rules parse leniently: what the contract no longer takes is
+    // left out and logged, and a bad sort or direction takes the default
+    const query = parseStoredSceneQuery(
+      carousel.rules,
       carousel.sort,
       carousel.direction,
-      req.user
+      {
+        userId,
+        perPage: CAROUSEL_SCENE_LIMIT,
+        randomSeed: perLoadSeed(userId),
+      }
     );
+    logDropped("GET /carousels/:id/execute", query.dropped);
+
+    const scenes = await executeCarouselQuery(userId, query, req.user);
 
     res.json({
       carousel: {

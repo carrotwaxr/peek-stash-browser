@@ -713,7 +713,7 @@ describe("findSimilarScenes", () => {
 
   it("returns 401 when user is not authenticated", async () => {
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       query: { page: "1" },
     });
     const res = resFor(findSimilarScenes);
@@ -727,7 +727,7 @@ describe("findSimilarScenes", () => {
     mockResolveInstance.mockResolvedValue(null);
 
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       user: testUser(),
       query: { page: "1", instanceId: "inst-b" },
     });
@@ -739,7 +739,7 @@ describe("findSimilarScenes", () => {
     expect(mockResolveInstance).toHaveBeenCalledWith(
       testUser().id,
       "scene",
-      "s1",
+      "101",
       "inst-b"
     );
     expect(
@@ -749,7 +749,7 @@ describe("findSimilarScenes", () => {
 
   it("returns empty result when no candidates found", async () => {
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       user: testUser(),
       query: { page: "1" },
     });
@@ -765,7 +765,7 @@ describe("findSimilarScenes", () => {
     expect(
       mockStashEntityService.getSimilarSceneCandidates
     ).toHaveBeenCalledWith(
-      { id: "s1", instanceId: "inst-a" },
+      { id: "101", instanceId: "inst-a" },
       testUser().id,
       500
     );
@@ -789,7 +789,7 @@ describe("findSimilarScenes", () => {
     });
 
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       user: testUser(),
       query: { page: "2", instanceId: "inst-a" },
     });
@@ -825,7 +825,7 @@ describe("findSimilarScenes", () => {
     });
 
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       user: testUser(),
       query: { page: "1" },
     });
@@ -843,13 +843,36 @@ describe("findSimilarScenes", () => {
     expect(body.count).toBe(2);
   });
 
+  it.each([
+    ["page", { id: "101" }, { page: "abc" }],
+    ["instanceId", { id: "101" }, { instanceId: "not an instance" }],
+    ["per_page", { id: "101" }, { per_page: "5" }],
+    ["id", { id: "s1" }, {}],
+  ])(
+    "a bad %s answers 400 before the seed is resolved",
+    async (path, params: { id: string }, query: Record<string, string>) => {
+      const req = reqFor(findSimilarScenes, {
+        params,
+        user: testUser(),
+        query,
+      });
+      const res = resFor(findSimilarScenes);
+
+      await expect(findSimilarScenes(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path }],
+      });
+      expect(mockResolveInstance).not.toHaveBeenCalled();
+    }
+  );
+
   it("returns 500 on error", async () => {
     mockStashEntityService.getSimilarSceneCandidates.mockRejectedValue(
       new Error("DB error")
     );
 
     const req = reqFor(findSimilarScenes, {
-      params: { id: "s1" },
+      params: { id: "101" },
       user: testUser(),
       query: { page: "1" },
     });
@@ -1041,6 +1064,60 @@ describe("getRecommendedScenes", () => {
       expect(body.scenes.map((s) => s.id)).toEqual(["s1"]);
     });
   });
+
+  it("echoes per_page 1000 as 250 and asks for at most 250 scenes", async () => {
+    mockHasAnyCriteria.mockReturnValue(true);
+    mockScore.mockReturnValue(10);
+    mockStashEntityService.getScenesForScoring.mockResolvedValueOnce(
+      Array.from({ length: 300 }, (_, i) => ({
+        id: String(i + 1),
+        instanceId: "default",
+        studioId: null,
+        performerIds: [],
+        tagIds: [],
+        oCounter: 0,
+        date: null,
+      }))
+    );
+
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1", per_page: "1000" },
+    });
+    const res = resFor(getRecommendedScenes);
+    try {
+      await getRecommendedScenes(req, res);
+    } finally {
+      mockHasAnyCriteria.mockReturnValue(false);
+      mockScore.mockReturnValue(0);
+    }
+
+    expect(res._getStatus()).toBe(200);
+    const body = res._getOkBody();
+    expect(body.perPage).toBe(250);
+    expect(body.count).toBe(300);
+    expect(
+      must(mockSceneQueryBuilder.getByIds.mock.calls[0])[0].ids
+    ).toHaveLength(250);
+  });
+
+  it.each([
+    ["page", { page: "abc" }],
+    ["per_page", { per_page: "many" }],
+    ["sort", { sort: "title" }],
+  ])(
+    "a bad %s answers 400 before any read",
+    async (path, query: Record<string, string>) => {
+      const req = reqFor(getRecommendedScenes, { user: testUser(), query });
+      const res = resFor(getRecommendedScenes);
+
+      await expect(getRecommendedScenes(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [{ path }],
+      });
+      expect(mockPrisma.performerRating.findMany).not.toHaveBeenCalled();
+    }
+  );
 
   it("returns 500 on unexpected error", async () => {
     // Force an error by making prisma throw

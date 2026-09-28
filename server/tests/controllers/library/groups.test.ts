@@ -302,6 +302,38 @@ describe("Groups Controller", () => {
       expect(res._getOkBody().groups).toHaveLength(2);
     });
 
+    it("returns the first per_page in name order, 50 by default, DESC reversed", async () => {
+      mockStashEntityService.getAllGroups.mockResolvedValue(
+        Array.from({ length: 60 }, (_, i) =>
+          createMockGroup({
+            id: String(i + 1),
+            name: `Item ${String(i + 1).padStart(2, "0")}`,
+          })
+        )
+      );
+      const run = async (filter: {
+        per_page?: number;
+        direction?: "ASC" | "DESC";
+      }) => {
+        const req = reqFor(findGroupsMinimal, {
+          body: { filter },
+          user: defaultUser,
+        });
+        const res = resFor(findGroupsMinimal);
+        await findGroupsMinimal(req, res);
+        return res._getOkBody().groups.map((x) => x.id);
+      };
+
+      const byDefault = await run({});
+      expect(byDefault).toHaveLength(50);
+      expect(byDefault.slice(0, 2)).toEqual(["1", "2"]);
+      expect(await run({ per_page: 3, direction: "DESC" })).toEqual([
+        "60",
+        "59",
+        "58",
+      ]);
+    });
+
     it("returns empty when cache is not initialized", async () => {
       mockStashEntityService.getAllGroups.mockResolvedValue([]);
 

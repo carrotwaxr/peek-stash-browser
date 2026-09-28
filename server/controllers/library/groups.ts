@@ -20,6 +20,7 @@ import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
+  parseMinimalRequest,
   singleIdRef,
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
@@ -205,10 +206,17 @@ export const findGroupsMinimal = async (
   req: TypedAuthRequest<FindGroupsMinimalRequest>,
   res: TypedResponse<FindGroupsMinimalResponse | ApiErrorResponse>
 ) => {
+  // q, name order, a page of 50 unless the request names 1..250, and the
+  // count minimums; a ValidationError (400) reaches the central error handler
+  const request = parseMinimalRequest("group", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/groups/minimal", request.dropped);
+
   try {
-    const userId = req.user?.id;
-    const { filter, count_filter } = req.body;
-    const searchQuery = filter?.q || "";
+    const userId = req.user.id;
+    const { q: searchQuery, direction, perPage } = request;
+    const count_filter = request.countFilter;
 
     // Step 1: Get all groups from cache
     let groups = await stashEntityService.getAllGroups();
@@ -257,11 +265,12 @@ export const findGroupsMinimal = async (
     groups = groups.sort((a, b) => {
       const aName = (a.name || "").toLowerCase();
       const bName = (b.name || "").toLowerCase();
-      return aName.localeCompare(bName);
+      const comparison = aName.localeCompare(bName);
+      return direction === "DESC" ? -comparison : comparison;
     });
 
-    // Step 5: Map to minimal shape
-    const minimalGroups = groups.map((g) => ({
+    // Step 5: The first page, in the minimal shape (the pickers never page)
+    const minimalGroups = groups.slice(0, perPage).map((g) => ({
       id: g.id,
       name: g.name,
       instanceId: g.instanceId || "",

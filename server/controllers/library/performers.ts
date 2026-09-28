@@ -18,6 +18,7 @@ import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
+  parseMinimalRequest,
   singleIdRef,
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
@@ -135,12 +136,16 @@ export const findPerformersMinimal = async (
   req: TypedAuthRequest<FindPerformersMinimalRequest>,
   res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
+  // q, name order, a page of 50 unless the request names 1..250, and the
+  // count minimums; a ValidationError (400) reaches the central error handler
+  const request = parseMinimalRequest("performer", req.body, {
+    userId: req.user.id,
+  });
+  logDropped("POST /library/performers/minimal", request.dropped);
+
   try {
-    const { filter, count_filter } = req.body;
-    const searchQuery = filter?.q || "";
-    const sortField = filter?.sort || "name";
-    const sortDirection = filter?.direction || "ASC";
-    const perPage = filter?.per_page || -1; // -1 means all results
+    const { q: searchQuery, direction: sortDirection, perPage } = request;
+    const count_filter = request.countFilter;
 
     let performers = await stashEntityService.getAllPerformers();
 
@@ -187,26 +192,14 @@ export const findPerformersMinimal = async (
       });
     }
 
-    // Sort
+    // Name order
     performers.sort((a, b) => {
-      const aValue = (a as unknown as Record<string, unknown>)[sortField] || "";
-      const bValue = (b as unknown as Record<string, unknown>)[sortField] || "";
-      const comparison =
-        typeof aValue === "string" && typeof bValue === "string"
-          ? aValue.localeCompare(bValue)
-          : aValue > bValue
-            ? 1
-            : aValue < bValue
-              ? -1
-              : 0;
-      return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
+      const comparison = a.name.localeCompare(b.name);
+      return sortDirection === "DESC" ? -comparison : comparison;
     });
 
-    // Paginate (if per_page !== -1)
-    let paginatedPerformers = performers;
-    if (perPage !== -1 && perPage > 0) {
-      paginatedPerformers = performers.slice(0, perPage);
-    }
+    // The first page: the pickers never page
+    const paginatedPerformers = performers.slice(0, perPage);
 
     // Disambiguate names for entities with same name across different instances
     // Only non-default instances get suffixed with instance name when duplicates exist

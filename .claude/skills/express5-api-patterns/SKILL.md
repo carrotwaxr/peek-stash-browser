@@ -71,7 +71,7 @@ The handler maps what reaches it:
 
 Only an `AppError`'s message reaches the client, so write it for them and never pass a caught error's message into one. The handler logs 5xx at ERROR ("Request failed") and the rest at WARN ("Request refused"), with the method, the path (no query string), the user id and the whole error (`{ error }`, which the logger expands to name, message, stack, code and cause); a refused request body is logged by its `type` only, since its message quotes the body. After headers are sent it destroys the response and writes nothing. Use an explicit try/catch only for cleanup or a custom response shape, and check `res.headersSent` before responding from a catch block or a stream event handler.
 
-A list, clip or picker request goes through the parser in `utils/listRequest.ts` before the handler's `try`, so its `ValidationError` reaches the central handler (a `catch` that answers 500 would swallow it); `logDropped(route, request.dropped)` records what drop mode ignored.
+A list, clip, picker, carousel, similar-scenes or recommended request goes through the parser in `utils/listRequest.ts` before the handler's `try`, so its `ValidationError` reaches the central handler (a `catch` that answers 500 would swallow it); `logDropped(route, request.dropped)` records what drop mode ignored.
 
 ## 3. Typed handlers
 
@@ -99,7 +99,7 @@ router.put("/scene/:sceneId", authenticated(updateSceneRating));
 ## 4. Responses
 
 - Errors are `{ error: string }`, optionally with `errorType`, `message`, `details` and `issues` (`ApiErrorResponse`). Produce them by throwing an `AppError` subclass (section 2), not by hand; controllers that still write `res.status(4xx).json({ error })` move to throwing as they're touched. Success bodies are plain `res.json(...)` (`res.status(201).json(...)`, `res.sendStatus(204)`).
-- A 503 with `ready: false` means the cache is still warming (`requireCacheReady`). The client shows its initializing state for it.
+- A 503 with `ready: false` means the cache is still warming (`requireCacheReady`). The client shows its initializing state for it. The carousel preview and execute routes answer it too: `sceneQueryBuilder` treats an empty `allowedInstanceIds` as no filter, so a route that lists scenes for a user must sit behind `requireCacheReady`.
 - Handlers and middleware never return the response: send it, then `return;` on its own line (`res.status(404).json({ error: "Not found" }); return;`). `noImplicitReturns` rejects a handler that returns `res` on some paths and falls off the end on others; older handlers that `return res` on every path move to this form when touched.
 
 ## 5. Middleware order (`server/initializers/api.ts`)
