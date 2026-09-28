@@ -1,11 +1,13 @@
 import type { ComponentProps } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { actAsync } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks are registered)
 // ---------------------------------------------------------------------------
 
+import { ApiError } from "@/api/client";
 import { useConfig } from "@/contexts/ConfigContext";
 import {
   ScenePlayerProvider,
@@ -260,10 +262,33 @@ describe("ScenePlayerContext", () => {
       });
 
       expect(result.current.scene).toBeNull();
-      expect(result.current.sceneError).toBeTruthy();
-      expect((result.current.sceneError as Error).message).toBe(
+      // A 404, so the Scene page shows "Scene not found" and not an error
+      expect(result.current.sceneError).toBeInstanceOf(ApiError);
+      expect((result.current.sceneError as ApiError).status).toBe(404);
+      expect((result.current.sceneError as ApiError).message).toBe(
         "Scene not found"
       );
+    });
+
+    it("retryScene loads the scene again after a failure", async () => {
+      mockPost.mockRejectedValueOnce(new Error("Network error"));
+
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.sceneError).toBeTruthy();
+      });
+      expect(result.current.scene).toBeNull();
+
+      await actAsync(() => result.current.retryScene());
+
+      await waitFor(() => {
+        expect(result.current.scene).toEqual(mockScene);
+      });
+      expect(result.current.sceneError).toBeNull();
+      expect(mockPost).toHaveBeenCalledTimes(2);
     });
 
     it("dispatches LOAD_SCENE_ERROR on API network failure", async () => {

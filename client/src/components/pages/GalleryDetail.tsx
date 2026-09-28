@@ -10,6 +10,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
@@ -21,6 +22,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   FavoriteButton,
   Lightbox,
   LoadingSpinner,
@@ -46,8 +48,6 @@ const PER_PAGE = 100;
 const GalleryDetail = () => {
   const { galleryId } = useParams<{ galleryId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [gallery, setGallery] = useState<Record<string, unknown> | null>(null);
   const [images, setImages] = useState<NormalizedImage[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [imagesLoading, setImagesLoading] = useState(true);
@@ -66,6 +66,14 @@ const GalleryDetail = () => {
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
+
+  const lookup = useEntityLookup(
+    libraryApi.findGalleryById,
+    galleryId,
+    instanceId
+  );
+  const gallery = lookup.entity ?? null;
+  const isLoading = lookup.status === "loading";
 
   // Compute tabs with counts for smart default selection
   // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
@@ -125,26 +133,14 @@ const GalleryDetail = () => {
   // Set page title to gallery name
   usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
 
-  useEffect(() => {
-    const fetchGallery = async () => {
-      try {
-        setIsLoading(true);
-        const galleryData = (await libraryApi.findGalleryById(
-          galleryId!,
-          instanceId
-        )) as Record<string, unknown> | null;
-        setGallery(galleryData);
-        setRating(galleryData?.rating as number | null);
-        setIsFavorite((galleryData?.favorite as boolean) || false);
-      } catch (error) {
-        console.error("Error loading gallery:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void fetchGallery();
-  }, [galleryId, instanceId]);
+  // The rating and favorite controls start from each loaded gallery's,
+  // set while rendering so they never show the previous one's
+  const [controlsFor, setControlsFor] = useState(gallery);
+  if (controlsFor !== gallery) {
+    setControlsFor(gallery);
+    setRating((gallery?.rating as number | null | undefined) ?? null);
+    setIsFavorite(gallery?.favorite === true);
+  }
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -214,7 +210,7 @@ const GalleryDetail = () => {
 
   // No longer using sidebar - all content moved to main header area
 
-  if (isLoading) {
+  if (lookup.status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -222,13 +218,16 @@ const GalleryDetail = () => {
     );
   }
 
-  if (!gallery) {
+  // Found always carries the gallery; the second check narrows it for below
+  if (lookup.status !== "found" || !gallery) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl" style={{ color: "var(--text-primary)" }}>
-          Gallery not found
-        </div>
-      </div>
+      <EntityNotFound
+        entityType="gallery"
+        status={lookup.status === "found" ? "notFound" : lookup.status}
+        matches={lookup.matches}
+        error={lookup.error}
+        onRetry={lookup.retry}
+      />
     );
   }
 

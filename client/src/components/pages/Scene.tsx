@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext";
+import { describeLookupFailure } from "../../hooks/useEntityLookup";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useNavigationState } from "../../hooks/useNavigationState";
@@ -22,8 +18,8 @@ import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
+  EntityNotFound,
   ExternalPlayerButton,
-  Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
 } from "../ui/index";
@@ -33,12 +29,12 @@ import SceneDetails from "./SceneDetails";
 
 // Inner component that reads from context
 const SceneContent = () => {
-  const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
 
   // Read state from context
-  const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
+  const { scene, sceneLoading, sceneError, playlist, retryScene } =
+    useScenePlayer();
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
@@ -138,21 +134,11 @@ const SceneContent = () => {
         className="min-h-screen"
         style={{ backgroundColor: "var(--bg-primary)" }}
       >
-        <Navigation />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <h2
-              className="text-xl mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {(sceneError as { message?: string })?.message ||
-                "Scene not found"}
-            </h2>
-            <Button onClick={() => void navigate("/scenes")} variant="primary">
-              Browse Scenes
-            </Button>
-          </div>
-        </div>
+        <EntityNotFound
+          entityType="scene"
+          {...describeLookupFailure(sceneError)}
+          onRetry={retryScene}
+        />
       </div>
     );
   }

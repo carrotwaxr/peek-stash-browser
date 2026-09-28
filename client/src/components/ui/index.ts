@@ -27,6 +27,7 @@ export { default as ContextSettings } from "./ContextSettings";
 export { default as ContinueWatchingCarousel } from "./ContinueWatchingCarousel";
 export { default as EmptyState } from "./EmptyState";
 export { default as EntityMenu } from "./EntityMenu";
+export { default as EntityNotFound } from "./EntityNotFound";
 export { default as ErrorMessage } from "./ErrorMessage";
 export { default as ExternalPlayerButton } from "./ExternalPlayerButton";
 export { default as FavoriteButton } from "./FavoriteButton";

@@ -3,59 +3,57 @@ import { expect, test } from "@playwright/test";
 /**
  * E2E tests for error handling and edge cases.
  *
- * Covers invalid routes, non-existent entity IDs, and
- * special characters in URL parameters.
+ * Covers invalid routes, detail pages for ids that do not exist, and special
+ * characters in URL parameters. A hidden or restricted entity answers the
+ * same as a missing one; an id on several servers (the choice of servers) is
+ * covered at unit level, since the hermetic run has one library.
  */
+
+/** Each detail page, the name its not-found state gives, and its list page */
+const DETAIL_PAGES = [
+  { path: "/performer", type: "Performer", list: "/performers" },
+  { path: "/studio", type: "Studio", list: "/studios" },
+  { path: "/collection", type: "Collection", list: "/collections" },
+  { path: "/tag", type: "Tag", list: "/tags" },
+  { path: "/gallery", type: "Gallery", list: "/galleries" },
+  { path: "/scene", type: "Scene", list: "/scenes" },
+];
+
+/** No library entity has this id (the replay's ids start at 100001) */
+const UNKNOWN_ID = "99999999";
 
 test.describe("Error States", () => {
   test("non-existent route shows navigation", async ({ page }) => {
     await page.goto("/this-route-does-not-exist-at-all");
-    // App should handle gracefully — either redirect or show navigation
+    // App should handle gracefully: either redirect or show navigation
     await expect(page.getByRole("navigation").first()).toBeVisible({
       timeout: 10_000,
     });
   });
 
-  test("invalid scene ID shows error or redirects gracefully", async ({
-    page,
-  }) => {
-    await page.goto("/scene/99999999");
-    // Should either show error message or redirect
-    await expect(page.getByRole("navigation").first()).toBeVisible({
-      timeout: 10_000,
-    });
-  });
+  for (const { path, type, list } of DETAIL_PAGES) {
+    test(`an unknown id on the ${type.toLowerCase()} page shows "${type} not found" with a way back`, async ({
+      page,
+    }) => {
+      await page.goto(`${path}/${UNKNOWN_ID}`);
 
-  test("invalid performer ID shows error or redirects gracefully", async ({
-    page,
-  }) => {
-    await page.goto("/performer/99999999");
-    await expect(page.getByRole("navigation").first()).toBeVisible({
-      timeout: 10_000,
-    });
-  });
+      await expect(
+        page.getByRole("heading", { level: 1, name: `${type} not found` })
+      ).toBeVisible({ timeout: 10_000 });
 
-  test("invalid gallery ID shows error or redirects gracefully", async ({
-    page,
-  }) => {
-    await page.goto("/gallery/99999999");
-    await expect(page.getByRole("navigation").first()).toBeVisible({
-      timeout: 10_000,
+      const browse = page.getByRole("link", {
+        name: `Browse ${list.slice(1)}`,
+      });
+      await expect(browse).toHaveAttribute("href", list);
+      await browse.click();
+      // The list page may add its own query (sort, page)
+      await expect(page).toHaveURL(new RegExp(`${list}(\\?|$)`));
     });
-  });
-
-  test("invalid tag ID shows error or redirects gracefully", async ({
-    page,
-  }) => {
-    await page.goto("/tag/99999999");
-    await expect(page.getByRole("navigation").first()).toBeVisible({
-      timeout: 10_000,
-    });
-  });
+  }
 
   test("special characters in URL are handled gracefully", async ({ page }) => {
     await page.goto("/scenes?q=%3Cscript%3Ealert(1)%3C/script%3E");
-    // Should not crash — navigation still visible
+    // Should not crash: navigation still visible
     await expect(page.getByRole("navigation").first()).toBeVisible({
       timeout: 10_000,
     });

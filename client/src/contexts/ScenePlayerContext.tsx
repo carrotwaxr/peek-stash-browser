@@ -5,9 +5,11 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useState,
 } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import { apiPost } from "../api";
+import { ApiError } from "../api/client";
 import { getEntityPath } from "../utils/entityLinks";
 import { useConfig } from "./ConfigContext";
 import {
@@ -23,6 +25,8 @@ interface ScenePlayerContextValue extends ScenePlayerState {
   shouldResume: boolean;
   dispatch: Dispatch<{ type: string; payload?: unknown }>;
   loadScene: (sceneId: string, instanceId?: string | null) => Promise<void>;
+  /** Loads the current scene again (after a failed load) */
+  retryScene: () => void;
   nextScene: () => void;
   prevScene: () => void;
   gotoSceneIndex: (index: number, shouldAutoplay?: boolean) => void;
@@ -95,8 +99,9 @@ export function ScenePlayerProvider({
         }>("/library/scenes", requestBody);
         const scene = data?.findScenes?.scenes?.[0];
 
+        // None the user can see: missing, hidden or restricted alike
         if (!scene) {
-          throw new Error("Scene not found");
+          throw new ApiError("Scene not found", 404);
         }
 
         dispatch({
@@ -153,7 +158,13 @@ export function ScenePlayerProvider({
   // EFFECTS (after action creators are defined)
   // ============================================================================
 
-  // Load scene when sceneId or currentIndex changes
+  // Bumped by retryScene to run the load effect again
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retryScene = useCallback(() => {
+    setLoadAttempt((n) => n + 1);
+  }, []);
+
+  // Load scene when sceneId or currentIndex changes, or on retry
   useEffect(() => {
     const playlistScene = state.playlist?.scenes?.[state.currentIndex];
     const effectiveSceneId =
@@ -165,7 +176,14 @@ export function ScenePlayerProvider({
     if (effectiveSceneId) {
       void loadScene(effectiveSceneId, effectiveInstanceId);
     }
-  }, [sceneId, instanceId, state.currentIndex, state.playlist, loadScene]);
+  }, [
+    sceneId,
+    instanceId,
+    state.currentIndex,
+    state.playlist,
+    loadScene,
+    loadAttempt,
+  ]);
 
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
@@ -193,6 +211,7 @@ export function ScenePlayerProvider({
 
     // Complex actions (with side effects)
     loadScene,
+    retryScene,
 
     // Playlist navigation helpers (kept for convenience)
     nextScene,
