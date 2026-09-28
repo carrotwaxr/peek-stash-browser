@@ -9,9 +9,12 @@
  *   value survives later list edits
  * - saves one row per non-empty list with the type's box value on both
  * - notes ids that are in both lists (Always hide wins)
+ * - never saves over a load that failed (CS-11): Save stays off and the
+ *   banner offers Retry
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as api from "../../../src/api";
 import ContentRestrictionsModal from "../../../src/components/settings/ContentRestrictionsModal";
 
 const { mockApiGet, mockApiPut } = vi.hoisted(() => ({
@@ -19,7 +22,9 @@ const { mockApiGet, mockApiPut } = vi.hoisted(() => ({
   mockApiPut: vi.fn(),
 }));
 
-vi.mock("../../../src/api", () => ({
+// The two calls are stubbed; the rest (ApiError, getErrorMessage) is real
+vi.mock("../../../src/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof api>()),
   apiGet: mockApiGet,
   apiPut: mockApiPut,
 }));
@@ -254,7 +259,7 @@ describe("ContentRestrictionsModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("ignores rows it cannot read and keeps the rest", async () => {
+  it("ignores rows of an unknown type or mode and keeps the rest", async () => {
     await renderLoaded([
       {
         entityType: "performers",
@@ -269,18 +274,6 @@ describe("ContentRestrictionsModal", () => {
         restrictEmpty: true,
       },
       {
-        entityType: "studios",
-        mode: "INCLUDE",
-        entityIds: "not json",
-        restrictEmpty: false,
-      },
-      {
-        entityType: "galleries",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify({ id: "1:A" }),
-        restrictEmpty: false,
-      },
-      {
         entityType: "groups",
         mode: "EXCLUDE",
         entityIds: JSON.stringify([3]),
@@ -292,9 +285,6 @@ describe("ContentRestrictionsModal", () => {
     expect(selected(showOnly("tags"))).toEqual([]);
     expect(noItemsBox("tags").checked).toBe(false);
     expect(noItemsBox("tags").disabled).toBe(true);
-    // Unreadable ids load as an empty list
-    expect(selected(showOnly("studios"))).toEqual([]);
-    expect(selected(alwaysHide("galleries"))).toEqual([]);
     expect(noItemsBox("collections").checked).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Save Restrictions" }));
@@ -324,26 +314,94 @@ describe("ContentRestrictionsModal", () => {
     }
   });
 
-  it("shows the load error and keeps the editor usable", async () => {
-    mockApiGet.mockRejectedValue(new Error("Forbidden"));
-    render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
+  it("after a failed restrictions load, Save is disabled and Retry reloads", async () => {
+    mockApiGet
+      .mockRejectedValueOnce(new api.ApiError("Database busy", 503))
+      .mockResolvedValueOnce({
+        restrictions: [
+          {
+            entityType: "tags",
+            mode: "INCLUDE",
+            entityIds: JSON.stringify(["1:A"]),
+            restrictEmpty: true,
+          },
+        ],
+      });
+    const onClose = vi.fn();
+    render(<ContentRestrictionsModal user={user} onClose={onClose} />);
 
-    expect(await screen.findByText("Forbidden")).toBeInTheDocument();
+    expect(await screen.findByText("Database busy")).toBeInTheDocument();
     expect(
       screen.queryByText("Loading restrictions...")
     ).not.toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Save Restrictions" });
+    expect(save).toBeDisabled();
+    // No editor with empty lists that would stand for the user's restrictions
+    expect(
+      screen.queryByRole("listbox", { name: "Show only these tags..." })
+    ).not.toBeInTheDocument();
+    fireEvent.click(save);
+    expect(mockApiPut).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(selected(showOnly("tags"))).toEqual(["1:A"]));
+    expect(mockApiGet).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Database busy")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Save Restrictions" })
     ).toBeEnabled();
+    expect(onClose).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["is not JSON", "not json"],
+    ["is not a list", JSON.stringify({ id: "1:A" })],
+  ])(
+    "a stored list that %s fails the load instead of reading as empty",
+    async (_what, entityIds) => {
+      mockApiGet.mockResolvedValue({
+        restrictions: [
+          {
+            entityType: "tags",
+            mode: "INCLUDE",
+            entityIds: JSON.stringify(["1:A"]),
+            restrictEmpty: true,
+          },
+          {
+            entityType: "studios",
+            mode: "EXCLUDE",
+            entityIds,
+            restrictEmpty: false,
+          },
+        ],
+      });
+      render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
+
+      expect(
+        await screen.findByText(
+          "The stored Studios Always hide list could not be read."
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Save Restrictions" })
+      ).toBeDisabled();
+      expect(
+        screen.queryByRole("listbox", { name: "Show only these tags..." })
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it("shows a generic load error when the failure has no message", async () => {
     mockApiGet.mockRejectedValue(new Error(""));
     render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
 
     expect(
-      await screen.findByText("Failed to load restrictions")
+      await screen.findByText("Something went wrong. Please try again.")
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save Restrictions" })
+    ).toBeDisabled();
   });
 
   it("keeps the modal open and shows the error when saving fails", async () => {
@@ -359,6 +417,11 @@ describe("ContentRestrictionsModal", () => {
     expect(
       screen.getByRole("button", { name: "Save Restrictions" })
     ).toBeEnabled();
+    // A failed save keeps the loaded lists: nothing to retry
+    expect(selected(alwaysHide("tags"))).toEqual(["1:A"]);
+    expect(
+      screen.queryByRole("button", { name: "Retry" })
+    ).not.toBeInTheDocument();
   });
 
   it("shows a generic save error when the failure has no message", async () => {

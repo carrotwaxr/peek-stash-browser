@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut } from "../../../api";
+import { apiGet, apiPut, getErrorMessage } from "../../../api";
 import { migrateCarouselPreferences } from "../../../constants/carousels";
 import { migrateNavPreferences } from "../../../constants/navigation";
 import { showError, showSuccess } from "../../../utils/toast";
+import { ErrorMessage } from "../../ui/index";
 import CarouselSettings from "../CarouselSettings";
 import LandingPageSettings from "../LandingPageSettings";
 import NavigationSettings from "../NavigationSettings";
@@ -26,6 +27,10 @@ interface LandingPagePreference {
 
 const NavigationTab = () => {
   const [loading, setLoading] = useState(true);
+  // After a failed load the editors would show defaults, and saving them
+  // would replace the stored preferences: show Retry instead
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [carouselPreferences, setCarouselPreferences] = useState<
     CarouselPreference[]
   >([]);
@@ -38,6 +43,7 @@ const NavigationTab = () => {
     const loadSettings = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const data = await apiGet<{ settings: Record<string, unknown> }>(
           "/user/settings"
         );
@@ -59,16 +65,18 @@ const NavigationTab = () => {
             randomize: false,
           }
         );
-      } catch {
-        showError("Failed to load navigation settings");
+      } catch (err) {
+        setLoadError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
     };
 
     void loadSettings();
-  }, []);
+  }, [loadAttempt]);
 
+  // Each save reports a failure here and rethrows it, so the editor keeps
+  // its changes marked unsaved
   const saveCarouselPreferences = async (
     newPreferences: CarouselPreference[]
   ) => {
@@ -80,9 +88,8 @@ const NavigationTab = () => {
       setCarouselPreferences(newPreferences);
       showSuccess("Carousel preferences saved successfully!");
     } catch (err) {
-      showError(
-        (err as Error).message || "Failed to save carousel preferences"
-      );
+      showError(getErrorMessage(err, "Failed to save carousel preferences"));
+      throw err;
     }
   };
 
@@ -98,9 +105,8 @@ const NavigationTab = () => {
       // Reload the page to apply nav changes immediately
       window.location.reload();
     } catch (err) {
-      showError(
-        (err as Error).message || "Failed to save navigation preferences"
-      );
+      showError(getErrorMessage(err, "Failed to save navigation preferences"));
+      throw err;
     }
   };
 
@@ -115,9 +121,8 @@ const NavigationTab = () => {
       setLandingPagePreference(newPreference);
       showSuccess("Landing page preference saved successfully!");
     } catch (err) {
-      showError(
-        (err as Error).message || "Failed to save landing page preference"
-      );
+      showError(getErrorMessage(err, "Failed to save landing page preference"));
+      throw err;
     }
   };
 
@@ -129,6 +134,16 @@ const NavigationTab = () => {
       >
         <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ErrorMessage
+        title="Failed to load navigation settings"
+        error={loadError}
+        onRetry={() => setLoadAttempt((n) => n + 1)}
+      />
     );
   }
 
@@ -144,9 +159,7 @@ const NavigationTab = () => {
       >
         <LandingPageSettings
           landingPagePreference={landingPagePreference}
-          onSave={(newPreference) =>
-            void saveLandingPagePreference(newPreference)
-          }
+          onSave={saveLandingPagePreference}
         />
       </div>
 
@@ -160,7 +173,7 @@ const NavigationTab = () => {
       >
         <NavigationSettings
           navPreferences={navPreferences}
-          onSave={(newPreferences) => void saveNavPreferences(newPreferences)}
+          onSave={saveNavPreferences}
         />
       </div>
 
@@ -174,9 +187,7 @@ const NavigationTab = () => {
       >
         <CarouselSettings
           carouselPreferences={carouselPreferences}
-          onSave={(newPreferences) =>
-            void saveCarouselPreferences(newPreferences)
-          }
+          onSave={saveCarouselPreferences}
         />
       </div>
     </div>

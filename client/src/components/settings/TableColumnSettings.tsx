@@ -29,6 +29,7 @@ interface ColumnConfig {
 
 interface Props {
   tableColumnDefaults: Record<string, ColumnConfig> | null;
+  /** Rejects when the save failed, after reporting it. */
   onSave: (defaults: Record<string, ColumnConfig>) => Promise<void>;
 }
 
@@ -109,8 +110,12 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   };
 
   const handleSave = async () => {
-    await onSave(localDefaults);
-    setHasChanges(false);
+    try {
+      await onSave(localDefaults);
+      setHasChanges(false);
+    } catch {
+      // onSave reported the failure; the changes stay marked unsaved
+    }
   };
 
   const handleReset = () => {
