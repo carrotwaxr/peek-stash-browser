@@ -28,6 +28,14 @@ const ENTITY_KEY_RULE = {
 
 const RESTRICTED = [WRITER_RULE, ENTITY_KEY_RULE];
 
+// Handlers and services name their dependencies at the top: an import inside
+// a function hides one from the reader and adds a module lookup to every call
+// (vi.mock is hoisted, so tests mock a top-level import the same way)
+const DYNAMIC_IMPORT_RULE = {
+  selector: "ImportExpression",
+  message: "use a top-level import",
+};
+
 /** The rule's options with every selector but the ones named. */
 const restrictedExcept = (...dropped) => [
   "error",
@@ -113,6 +121,13 @@ export default tseslint.config(
 
       // The writer rule and the entity key rule (RESTRICTED, above)
       "no-restricted-syntax": ["error", ...RESTRICTED],
+    },
+  },
+  // No dynamic imports in handlers and services (DYNAMIC_IMPORT_RULE)
+  {
+    files: ["controllers/**/*.ts", "routes/**/*.ts", "services/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...RESTRICTED, DYNAMIC_IMPORT_RULE],
     },
   },
   // The one place that calls $transaction

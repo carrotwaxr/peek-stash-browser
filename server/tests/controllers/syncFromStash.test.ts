@@ -63,7 +63,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
-// Mock StashInstanceManager — dynamically imported inside syncFromStash
+// Mock StashInstanceManager (syncFromStash reads every instance from it)
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getAll: vi.fn().mockReturnValue([["instance-1", mockStashClient]]),

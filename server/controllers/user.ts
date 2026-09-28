@@ -9,7 +9,12 @@ import {
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
-import type { EntityType } from "../services/UserHiddenEntityService.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  type EntityType,
+  isHideableEntityType,
+  userHiddenEntityService,
+} from "../services/UserHiddenEntityService.js";
 import {
   RESTRICTABLE_ENTITY_TYPES,
   RESTRICTION_MODES,
@@ -1433,9 +1438,6 @@ export const syncFromStash = async (
       groups: { ...defaultSyncOptions.groups, ...options?.groups },
     };
 
-    // Get Stash instances from manager
-    const { stashInstanceManager } =
-      await import("../services/StashInstanceManager.js");
     const allInstances = stashInstanceManager.getAll();
 
     if (allInstances.length === 0) {
@@ -2444,28 +2446,17 @@ export const deleteUserRestrictions = async (
   }
 };
 
-const HIDEABLE_ENTITY_TYPES = [
-  "scene",
-  "performer",
-  "studio",
-  "tag",
-  "group",
-  "gallery",
-  "image",
-] as const;
-
 /**
  * Validate one hide target from a request body. Hidden ids are stored and
  * later reach exclusion queries, so only numeric Stash ids are accepted.
  */
-async function validateHideTarget(target: {
+function validateHideTarget(target: {
   entityType?: unknown;
   entityId?: unknown;
   instanceId?: unknown;
-}): Promise<
+}):
   | { ok: true; entityType: EntityType; entityId: string; instanceId: string }
-  | { ok: false; error: string }
-> {
+  | { ok: false; error: string } {
   const { entityType, entityId, instanceId } = target;
 
   if (!entityType || !entityId) {
@@ -2475,7 +2466,7 @@ async function validateHideTarget(target: {
   if (typeof entityType !== "string") {
     return { ok: false, error: `Invalid entity type: ${typeof entityType}` };
   }
-  if (!(HIDEABLE_ENTITY_TYPES as readonly string[]).includes(entityType)) {
+  if (!isHideableEntityType(entityType)) {
     return { ok: false, error: `Invalid entity type: ${entityType}` };
   }
 
@@ -2491,8 +2482,6 @@ async function validateHideTarget(target: {
     if (typeof instanceId !== "string") {
       return { ok: false, error: "Invalid instanceId" };
     }
-    const { stashInstanceManager } =
-      await import("../services/StashInstanceManager.js");
     if (!stashInstanceManager.getConfig(instanceId)) {
       return { ok: false, error: "Invalid instanceId" };
     }
@@ -2500,10 +2489,19 @@ async function validateHideTarget(target: {
 
   return {
     ok: true,
-    entityType: entityType as EntityType,
+    entityType,
     entityId,
     instanceId: typeof instanceId === "string" ? instanceId : "",
   };
+}
+
+/**
+ * The optional `entityType` filter of the Hidden Items routes: absent or ""
+ * is no filter, a hideable type filters, and anything else is `false`.
+ */
+function hideTypeFilter(value: unknown): EntityType | undefined | false {
+  if (value === undefined || value === "") return undefined;
+  return isHideableEntityType(value) ? value : false;
 }
 
 interface HideTarget {
@@ -2530,8 +2528,6 @@ async function checkHideTargets(
   userId: number,
   targets: HideTarget[]
 ): Promise<HideAccess[]> {
-  const { userHiddenEntityService } =
-    await import("../services/UserHiddenEntityService.js");
   const alreadyHidden = await userHiddenEntityService.findAlreadyHidden(
     userId,
     targets.map(({ entityType, entityId, instanceId }) => ({
@@ -2597,7 +2593,7 @@ export const hideEntity = async (
       return;
     }
 
-    const target = await validateHideTarget(req.body);
+    const target = validateHideTarget(req.body);
     if (!target.ok) {
       res.status(400).json({ error: target.error });
       return;
@@ -2610,9 +2606,6 @@ export const hideEntity = async (
     }
 
     if (access === "hide") {
-      const { userHiddenEntityService } =
-        await import("../services/UserHiddenEntityService.js");
-
       await userHiddenEntityService.hideEntity(
         userId,
         target.entityType,
@@ -2652,31 +2645,15 @@ export const unhideEntity = async (
       return;
     }
 
-    // Validate entity type
-    const validTypes: EntityType[] = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-    ];
-    if (!validTypes.includes(entityType as EntityType)) {
+    if (!isHideableEntityType(entityType)) {
       res.status(400).json({ error: "Invalid entity type" });
       return;
     }
-
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
 
     const unhideInstanceId = req.query.instanceId ?? "";
 
     // Validate instanceId if provided
     if (unhideInstanceId) {
-      const { stashInstanceManager } =
-        await import("../services/StashInstanceManager.js");
       const instance = stashInstanceManager.getConfig(unhideInstanceId);
       if (!instance) {
         res.status(400).json({ error: "Invalid instanceId" });
@@ -2686,7 +2663,7 @@ export const unhideEntity = async (
 
     await userHiddenEntityService.unhideEntity(
       userId,
-      entityType as EntityType,
+      entityType,
       entityId,
       unhideInstanceId
     );
@@ -2716,28 +2693,11 @@ export const unhideAllEntities = async (
       return;
     }
 
-    const { entityType } = req.query;
-
-    // Validate entity type if provided
-    if (entityType) {
-      const validTypes = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ];
-      if (!validTypes.includes(entityType)) {
-        res.status(400).json({ error: "Invalid entity type" });
-        return;
-      }
+    const entityType = hideTypeFilter(req.query.entityType);
+    if (entityType === false) {
+      res.status(400).json({ error: "Invalid entity type" });
+      return;
     }
-
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
 
     const count = await userHiddenEntityService.unhideAll(userId, entityType);
 
@@ -2770,32 +2730,15 @@ export const getHiddenEntities = async (
       return;
     }
 
-    const { entityType } = req.query;
-
-    // Validate entity type if provided
-    if (entityType) {
-      const validTypes: EntityType[] = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ];
-      if (!validTypes.includes(entityType as EntityType)) {
-        res.status(400).json({ error: "Invalid entity type" });
-        return;
-      }
+    const entityType = hideTypeFilter(req.query.entityType);
+    if (entityType === false) {
+      res.status(400).json({ error: "Invalid entity type" });
+      return;
     }
-
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
 
     const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
       userId,
-      entityType as EntityType
+      entityType
     );
 
     res.json({ hiddenEntities });
@@ -2821,10 +2764,6 @@ export const getHiddenEntityIds = async (
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
 
     const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
 
@@ -2873,7 +2812,7 @@ export const hideEntities = async (
     // Validate and check every entity before hiding any
     const targets: HideTarget[] = [];
     for (const [i, entity] of entities.entries()) {
-      const target = await validateHideTarget(entity);
+      const target = validateHideTarget(entity);
       if (!target.ok) {
         res.status(400).json({ error: `entities[${i}]: ${target.error}` });
         return;
@@ -2887,10 +2826,6 @@ export const hideEntities = async (
       return;
     }
     const toHide = targets.filter((_, i) => access[i] === "hide");
-
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
 
     // Hide all entities; the ones already hidden count as hidden
     let successCount = targets.length - toHide.length;

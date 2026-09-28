@@ -23,14 +23,22 @@ type NormalizedEntity =
   | NormalizedGallery
   | NormalizedImage;
 
-export type EntityType =
-  | "scene"
-  | "performer"
-  | "studio"
-  | "tag"
-  | "group"
-  | "gallery"
-  | "image";
+/** The entity types a user can hide: every request's type is checked here. */
+export const HIDEABLE_ENTITY_TYPES = [
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "group",
+  "gallery",
+  "image",
+] as const;
+
+export type EntityType = (typeof HIDEABLE_ENTITY_TYPES)[number];
+
+export function isHideableEntityType(value: unknown): value is EntityType {
+  return (HIDEABLE_ENTITY_TYPES as readonly unknown[]).includes(value);
+}
 
 /**
  * One row of the Hidden Items list. `restricted` rows carry no entity: the
@@ -56,16 +64,6 @@ export interface HiddenEntityIds {
   galleries: Set<string>;
   images: Set<string>;
 }
-
-const HIDEABLE_TYPES: ReadonlySet<string> = new Set<EntityType>([
-  "scene",
-  "performer",
-  "studio",
-  "tag",
-  "group",
-  "gallery",
-  "image",
-]);
 
 /**
  * Service for managing user-hidden entities
@@ -153,8 +151,8 @@ class UserHiddenEntityService {
    * Unhide all entities for a user (optionally filtered by type)
    * @returns Number of entities unhidden
    */
-  async unhideAll(userId: number, entityType?: string): Promise<number> {
-    const where: { userId: number; entityType?: string } = { userId };
+  async unhideAll(userId: number, entityType?: EntityType): Promise<number> {
+    const where: { userId: number; entityType?: EntityType } = { userId };
     if (entityType) {
       where.entityType = entityType;
     }
@@ -238,15 +236,15 @@ class UserHiddenEntityService {
 
     const byType = new Map<EntityType, typeof hiddenEntities>();
     for (const hidden of hiddenEntities) {
-      const type = hidden.entityType as EntityType;
-      const list = byType.get(type) ?? [];
+      // A row of any other type has no entity to show
+      if (!isHideableEntityType(hidden.entityType)) continue;
+      const list = byType.get(hidden.entityType) ?? [];
       list.push(hidden);
-      byType.set(type, list);
+      byType.set(hidden.entityType, list);
     }
     // Row id -> the instance to show the entity from
     const shownOn = new Map<number, string>();
     for (const [type, rows] of byType) {
-      if (!HIDEABLE_TYPES.has(type)) continue;
       const resolved = await resolveVisibleApartFromOwnHides(
         userId,
         type,

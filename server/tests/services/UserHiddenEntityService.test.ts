@@ -3,7 +3,11 @@ import prisma from "../../prisma/singleton.js";
 import { resolveVisibleApartFromOwnHides } from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
+import {
+  HIDEABLE_ENTITY_TYPES,
+  isHideableEntityType,
+  userHiddenEntityService,
+} from "../../services/UserHiddenEntityService.js";
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
 import { entityKey } from "../../utils/entityRef.js";
 import { anyOf } from "../helpers/matchers.js";
@@ -60,6 +64,41 @@ function everyRefVisible() {
     )
   );
 }
+
+const SEVEN_TYPES = [
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "group",
+  "gallery",
+  "image",
+];
+
+describe("HIDEABLE_ENTITY_TYPES", () => {
+  it("lists the seven types a user can hide", () => {
+    expect(HIDEABLE_ENTITY_TYPES).toEqual(SEVEN_TYPES);
+  });
+
+  it.each(SEVEN_TYPES)("isHideableEntityType(%j) is true", (type) => {
+    expect(isHideableEntityType(type)).toBe(true);
+  });
+
+  it.each(["clip", "Scene", "scenes", "", "toString"])(
+    "isHideableEntityType(%j) is false",
+    (type) => {
+      expect(isHideableEntityType(type)).toBe(false);
+    }
+  );
+
+  // One row per case: it.each spreads an array row into arguments
+  it.each([[undefined], [null], [1], [["scene"]], [{ scene: true }]])(
+    "isHideableEntityType(%j), not a string, is false",
+    (value: unknown) => {
+      expect(isHideableEntityType(value)).toBe(false);
+    }
+  );
+});
 
 describe("UserHiddenEntityService", () => {
   beforeEach(() => {
@@ -541,6 +580,34 @@ describe("UserHiddenEntityService", () => {
       expect(mockEntity.getImage).toHaveBeenCalledWith("7", "i");
       expect(result).toHaveLength(7);
       expect(result.every((r) => !r.restricted)).toBe(true);
+    });
+
+    it("returns a stored row of a type no one can hide as restricted, without checking it", async () => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({
+          id: 1,
+          entityType: "clip",
+          entityId: "5",
+          instanceId: "i",
+          hiddenAt: new Date("2026-01-01"),
+        }),
+      ]);
+
+      const result = await userHiddenEntityService.getHiddenEntities(1);
+
+      expect(mockResolveVisible).not.toHaveBeenCalled();
+      expect(result).toEqual([
+        {
+          id: 1,
+          entityType: "clip",
+          entityId: "5",
+          instanceId: "i",
+          hiddenAt: new Date("2026-01-01"),
+          restricted: true,
+          entity: null,
+        },
+      ]);
     });
 
     it("returns instanceId as stored", async () => {
