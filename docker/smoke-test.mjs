@@ -259,6 +259,24 @@ try {
     }
   });
 
+  // nginx.conf's gzip_types; fetch decodes the body but keeps the header
+  await check("API JSON is gzipped", async () => {
+    const response = await fetch(`${base}/api/version`, {
+      headers: { "Accept-Encoding": "gzip" },
+    });
+    expectEqual(response.status, 200, "GET /api/version status");
+    expectEqual(
+      response.headers.get("content-encoding"),
+      "gzip",
+      "content-encoding"
+    );
+    const vary = response.headers.get("vary") ?? "";
+    if (!/accept-encoding/i.test(vary)) {
+      throw new Error(`Vary lacks Accept-Encoding: ${JSON.stringify(vary)}`);
+    }
+    await response.json();
+  });
+
   await check("the server reads the new database through nginx", async () => {
     const body = await (await get("/api/setup/status")).json();
     expectEqual(body.setupComplete, false, "setupComplete");
@@ -314,6 +332,22 @@ try {
       );
     }
   );
+
+  await check("the shell's entry script is gzipped", async () => {
+    const html = await (await get("/")).text();
+    const script = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
+    if (!script) throw new Error("no /assets/*.js script in the shell");
+    const response = await fetch(`${base}${script}`, {
+      headers: { "Accept-Encoding": "gzip" },
+    });
+    expectEqual(response.status, 200, `GET ${script} status`);
+    expectEqual(
+      response.headers.get("content-encoding"),
+      "gzip",
+      "content-encoding"
+    );
+    await response.arrayBuffer();
+  });
 
   await check(
     "the server and nginx workers run as 99, the database belongs to 99:100",
