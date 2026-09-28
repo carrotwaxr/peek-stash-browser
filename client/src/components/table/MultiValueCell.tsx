@@ -12,13 +12,20 @@ interface Props {
   items: MultiValueItem[] | null | undefined;
   maxVisible?: number;
   emptyText?: string;
+  /** How many there are, when `items` holds only some of them */
+  total?: number;
 }
 
 /**
  * Component for displaying multiple values in a table cell with truncation
  * Shows first N items comma-separated, with a "+X more" button that opens a popover
  */
-const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
+const MultiValueCell = ({
+  items,
+  maxVisible = 2,
+  emptyText = "-",
+  total,
+}: Props) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -30,7 +37,10 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   // Split items into visible and hidden (only if we have items)
   const visibleItems = hasItems ? items.slice(0, maxVisible) : [];
   const hiddenItems = hasItems ? items.slice(maxVisible) : [];
-  const hasMore = hiddenItems.length > 0;
+  // Those the total counts but the list leaves out
+  const unlisted = hasItems ? Math.max((total ?? 0) - items.length, 0) : 0;
+  const moreCount = hiddenItems.length + unlisted;
+  const hasMore = moreCount > 0;
 
   // Calculate popover position
   const calculatePosition = useCallback(() => {
@@ -157,6 +167,11 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
             {renderItem(item, true)}
           </div>
         ))}
+        {unlisted > 0 && (
+          <div className="py-1 px-2" style={{ color: "var(--text-muted)" }}>
+            and {unlisted} more
+          </div>
+        )}
       </div>
     </div>
   );
@@ -184,7 +199,7 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
               color: "var(--text-secondary)",
             }}
           >
-            +{hiddenItems.length} more
+            +{moreCount} more
           </button>
         </>
       )}

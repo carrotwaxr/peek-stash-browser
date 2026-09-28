@@ -58,6 +58,16 @@ export interface GalleryRef {
 }
 
 /**
+ * How many related entities of each kind the requesting user can see, on the
+ * performer, studio, tag and collection list endpoints. A card's list of them
+ * holds at most 12 (most shared scenes first, then by name), so a count is
+ * this total, and a tooltip says how many more there are.
+ */
+export type RelationTotals = Partial<
+  Record<"performers" | "studios" | "groups" | "galleries", number>
+>;
+
+/**
  * One link of the collection hierarchy, seen from a group: the group at the
  * other end (always on the same instance) and Stash's description of the
  * link, e.g. "Part 2".
@@ -213,10 +223,12 @@ export interface NormalizedPerformer {
   last_played_at: string | null;
   last_o_at: string | null;
 
-  // Added by PerformerQueryBuilder.populateRelations (optional)
+  // Added by PerformerQueryBuilder.populateRelations (optional): at most 12
+  // of each, and how many there are
   groups?: GroupRef[];
   galleries?: GalleryRef[];
   studios?: StudioRef[];
+  relation_totals?: RelationTotals;
 }
 
 // ─── NormalizedStudio ────────────────────────────────────────────────────────
@@ -245,10 +257,13 @@ export interface NormalizedStudio {
   o_counter: number;
   play_count: number;
 
-  // Added by StudioQueryBuilder.populateRelations (optional)
+  // Added by StudioQueryBuilder.populateRelations (optional): at most 12
+  // of each, and how many there are. The list endpoint counts the
+  // performers without listing them.
   performers?: PerformerRef[];
   groups?: GroupRef[];
   galleries?: GalleryRef[];
+  relation_totals?: RelationTotals;
 }
 
 // ─── NormalizedTag ───────────────────────────────────────────────────────────
@@ -280,11 +295,13 @@ export interface NormalizedTag {
   o_counter: number;
   play_count: number;
 
-  // Added by TagQueryBuilder.populateRelations (optional)
+  // Added by TagQueryBuilder.populateRelations (optional): at most 12 of
+  // each, and how many there are
   performers?: PerformerRef[];
   studios?: StudioRef[];
   groups?: GroupRef[];
   galleries?: GalleryRef[];
+  relation_totals?: RelationTotals;
 }
 
 // ─── NormalizedGroup ─────────────────────────────────────────────────────────
@@ -324,9 +341,11 @@ export interface NormalizedGroup {
   rating: number | null;
   favorite: boolean;
 
-  // Added by GroupQueryBuilder.populateRelations (optional)
+  // Added by GroupQueryBuilder.populateRelations (optional): at most 12 of
+  // each, and how many there are
   performers?: PerformerRef[];
   galleries?: GalleryRef[];
+  relation_totals?: RelationTotals;
 }
 
 // ─── NormalizedGallery ───────────────────────────────────────────────────────

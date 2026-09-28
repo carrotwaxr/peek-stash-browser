@@ -309,6 +309,70 @@ export interface GroupRelationQueryRow {
 }
 
 // ---------------------------------------------------------------------------
+// TooltipRelations (the performer, studio, tag and group cards)
+// ---------------------------------------------------------------------------
+
+/**
+ * One related entity of one parent on the page: the parent's (id, instance)
+ * as `pid`/`pinst`, the entity's id (on the parent's instance), its place in
+ * the parent's list (ROW_NUMBER) and how many the parent has (COUNT OVER).
+ */
+export interface TooltipListRow {
+  pid: string;
+  pinst: string;
+  id: string;
+  rn: bigint;
+  total: bigint;
+}
+
+/** How many related entities one parent on the page has. */
+export interface TooltipTotalRow {
+  pid: string;
+  pinst: string;
+  total: bigint;
+}
+
+/** A related performer's columns. */
+export interface TooltipPerformerRow {
+  name: string;
+  disambiguation: string | null;
+  gender: string | null;
+  imagePath: string | null;
+  favorite: boolean;
+  rating100: number | null;
+}
+
+/** A related studio's columns. */
+export interface TooltipStudioRow {
+  name: string;
+  imagePath: string | null;
+  favorite: boolean;
+  parentId: string | null;
+}
+
+/** A related tag's columns. */
+export interface TooltipTagRow {
+  name: string;
+  imagePath: string | null;
+  favorite: boolean;
+}
+
+/** A related group's columns. */
+export interface TooltipGroupRow {
+  name: string;
+  frontImagePath: string | null;
+  backImagePath: string | null;
+}
+
+/** A related gallery's columns. */
+export interface TooltipGalleryRow {
+  title: string | null;
+  folderPath: string | null;
+  fileBasename: string | null;
+  coverPath: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // ImageQueryBuilder
 // ---------------------------------------------------------------------------
 

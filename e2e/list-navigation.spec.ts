@@ -10,7 +10,25 @@ import { runPrefix } from "./support/names";
  *
  * Empty results (LG-34): a search that matches nothing shows the list's empty
  * state and no card.
+ *
+ * Relationship indicators (item 41.2): the studios with the most scenes, the
+ * heaviest page for tooltip relations, render their cards with counts from
+ * relation_totals; each card lists at most 12 related entities per kind.
  */
+
+/** A studio as the list endpoint sends it, as far as this spec reads it */
+interface StudioJson {
+  name: string;
+  scene_count: number;
+  performers?: unknown[];
+  groups?: unknown[];
+  galleries?: unknown[];
+  relation_totals?: {
+    performers?: number;
+    groups?: number;
+    galleries?: number;
+  };
+}
 
 /** The lists covered here, and their cards' label */
 const LISTS = [
@@ -49,6 +67,53 @@ test.describe("List navigation", () => {
       await expect(titleLink).toHaveAttribute("href", String(href));
     });
   }
+
+  test("Studios sorted by scene count render with relationship indicators", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    const sorted = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/library/studios" &&
+        r.request().method() === "POST" &&
+        (
+          r.request().postDataJSON() as {
+            filter?: { sort?: unknown };
+          } | null
+        )?.filter?.sort === "scenes_count"
+    );
+    await list.goto("/studios?sort=scenes_count&dir=DESC");
+    const response = await sorted;
+    expect(response.status()).toBe(200);
+    const { findStudios } = (await response.json()) as {
+      findStudios: { studios: StudioJson[] };
+    };
+
+    const n = await list.waitForResults("Studio");
+    expect(n).toBe(findStudios.studios.length);
+    for (const studio of findStudios.studios) {
+      expect(studio.relation_totals, studio.name).toBeDefined();
+      // The studio card's performers indicator only counts them
+      expect(studio.performers, studio.name).toBeUndefined();
+      expect(studio.groups?.length ?? 0, studio.name).toBeLessThanOrEqual(12);
+      expect(studio.galleries?.length ?? 0, studio.name).toBeLessThanOrEqual(
+        12
+      );
+    }
+
+    // The first card, the studio with the most scenes, counts its scenes and
+    // the performers relation_totals names
+    const first = requireData(findStudios.studios[0], "a studio");
+    const performers = requireData(
+      first.relation_totals?.performers,
+      "a studio with performers"
+    );
+    const counts = list.cards("Studio").first().locator(".card-indicator-text");
+    await expect(counts.first()).toBeVisible();
+    const shown = await counts.allTextContents();
+    expect(shown).toContain(String(first.scene_count));
+    expect(shown).toContain(String(performers));
+  });
 
   // The other list pages have no empty state yet (LG-13): their empty-results
   // tests come with item 57, one per page here

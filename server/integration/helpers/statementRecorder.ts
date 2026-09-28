@@ -39,9 +39,23 @@ export interface StatementRecorder {
 
 const RAW_METHODS = ["$executeRawUnsafe", "$queryRawUnsafe"] as const;
 
+/** The models whose calls can be recorded besides raw SQL. */
+type RecordedModel =
+  | "stashClip"
+  | "stashScene"
+  | "stashPerformer"
+  | "stashStudio"
+  | "stashTag"
+  | "stashGroup"
+  | "stashGallery"
+  | "scenePerformer"
+  | "sceneGroup"
+  | "sceneGallery"
+  | "studioTag";
+
 /** The model calls to record besides raw SQL: model -> its methods. */
 export type RecordedModels = Partial<
-  Record<"stashClip", ReadonlyArray<"findMany" | "upsert">>
+  Record<RecordedModel, ReadonlyArray<"findMany" | "upsert">>
 >;
 
 /** An interactive transaction's callback and options, as Prisma takes them. */

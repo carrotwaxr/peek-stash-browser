@@ -58,6 +58,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
             entities={group.performers}
             title="Performers"
             parentInstanceId={group.instanceId}
+            total={group.relation_totals?.performers}
           />
         );
 
@@ -73,6 +74,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
             }
             title="Galleries"
             parentInstanceId={group.instanceId}
+            total={group.relation_totals?.galleries}
           />
         );
 
@@ -115,12 +117,16 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         },
         {
           type: "PERFORMERS",
-          count: group.performers?.length || group.performer_count || 0,
+          count:
+            group.relation_totals?.performers ??
+            group.performers?.length ??
+            group.performer_count,
           tooltipContent: performersTooltip,
         },
         {
           type: "GALLERIES",
-          count: group.galleries?.length || 0,
+          count:
+            group.relation_totals?.galleries ?? group.galleries?.length ?? 0,
           tooltipContent: galleriesTooltip,
         },
         {

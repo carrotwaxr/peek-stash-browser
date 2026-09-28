@@ -7,11 +7,8 @@
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
 import type {
-  GalleryRef,
-  GroupRef,
   NormalizedPerformer,
   PeekPerformerFilter,
-  StudioRef,
   TagRef,
 } from "../types/index.js";
 import type { PerformerQueryRow } from "../types/internal/queryRows.js";
@@ -30,21 +27,7 @@ import {
   parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { keepVisibleConditions } from "./EntityAccessService.js";
-
-/** Deduplicate composite key objects by id+stashInstanceId */
-function dedupeKeys(
-  items: { id: string; stashInstanceId: string }[]
-): { id: string; stashInstanceId: string }[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = entityKey(item.id, item.stashInstanceId);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
+import { loadTooltipRelations } from "./TooltipRelations.js";
 
 /** Performers in one of the scenes */
 const PERFORMERS_BY_SCENE: ViaSceneSpec = {
@@ -1103,291 +1086,24 @@ class PerformerQueryBuilder {
   }
 
   /**
-   * Populate performer relations (tags, groups, galleries, studios)
-   * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
+   * The card's relations for the whole page: its tags, and at most
+   * TOOLTIP_LIMIT studios, collections and galleries with how many there
+   * are (TooltipRelations), one statement per relation
    */
   async populateRelations(
     performers: NormalizedPerformer[],
     userId: number
   ): Promise<void> {
-    if (performers.length === 0) return;
-
-    // Build composite where clause to avoid cross-instance collisions
-    const performerWhereClause = performers.map((p) => ({
-      performerId: p.id,
-      performerInstanceId: p.instanceId || "",
-    }));
-
-    // Load all junctions in parallel
-    const [tagJunctions, scenePerformers, galleryPerformers] =
-      await Promise.all([
-        prisma.performerTag.findMany({
-          where: { OR: performerWhereClause },
-        }),
-        // Get scenes this performer appears in to derive groups, studios
-        prisma.scenePerformer.findMany({
-          where: { OR: performerWhereClause },
-          select: {
-            performerId: true,
-            performerInstanceId: true,
-            sceneId: true,
-            sceneInstanceId: true,
-          },
-        }),
-        // Get galleries this performer appears in directly
-        prisma.galleryPerformer.findMany({
-          where: { OR: performerWhereClause },
-          select: {
-            performerId: true,
-            performerInstanceId: true,
-            galleryId: true,
-            galleryInstanceId: true,
-          },
-        }),
-      ]);
-
-    // Get scene IDs and instance IDs for this performer
-    const sceneIds = [...new Set(scenePerformers.map((sp) => sp.sceneId))];
-    const sceneInstanceIds = [
-      ...new Set(scenePerformers.map((sp) => sp.sceneInstanceId)),
-    ];
-
-    // Load related entities from scenes (with instanceId constraints)
-    const [sceneGroups, sceneGalleries, scenes] = await Promise.all([
-      sceneIds.length > 0
-        ? prisma.sceneGroup.findMany({
-            where: {
-              sceneId: { in: sceneIds },
-              sceneInstanceId: { in: sceneInstanceIds },
-            },
-            select: { sceneId: true, groupId: true, groupInstanceId: true },
-          })
-        : [],
-      sceneIds.length > 0
-        ? prisma.sceneGallery.findMany({
-            where: {
-              sceneId: { in: sceneIds },
-              sceneInstanceId: { in: sceneInstanceIds },
-            },
-            select: { sceneId: true, galleryId: true, galleryInstanceId: true },
-          })
-        : [],
-      sceneIds.length > 0
-        ? prisma.stashScene.findMany({
-            where: {
-              id: { in: sceneIds },
-              stashInstanceId: { in: sceneInstanceIds },
-            },
-            select: { id: true, stashInstanceId: true, studioId: true },
-          })
-        : [],
-    ]);
-
-    // Build composite key OR conditions for entity lookups (prevents cross-instance data leakage)
-    const tagOrConditions = dedupeKeys(
-      tagJunctions.map((j) => ({
-        id: j.tagId,
-        stashInstanceId: j.tagInstanceId,
-      }))
+    const relations = await loadTooltipRelations(
+      "performer",
+      performers,
+      userId
     );
-    const groupOrConditions = dedupeKeys(
-      sceneGroups.map((sg) => ({
-        id: sg.groupId,
-        stashInstanceId: sg.groupInstanceId,
-      }))
-    );
-    // Galleries come from direct performer-gallery association (galleryPerformers)
-    // plus any scene-gallery associations (sceneGalleries)
-    const galleryOrConditions = dedupeKeys([
-      ...galleryPerformers.map((gp) => ({
-        id: gp.galleryId,
-        stashInstanceId: gp.galleryInstanceId,
-      })),
-      ...sceneGalleries.map((sg) => ({
-        id: sg.galleryId,
-        stashInstanceId: sg.galleryInstanceId,
-      })),
-    ]);
-    const studioOrConditions = dedupeKeys(
-      scenes.flatMap((s) =>
-        s.studioId
-          ? [{ id: s.studioId, stashInstanceId: s.stashInstanceId }]
-          : []
-      )
-    );
-
-    // Keep only entities this user may see (hidden, restricted, deleted or
-    // on an instance they don't use); the lookups below skip the rest
-    const [
-      visibleTagConditions,
-      visibleGroupConditions,
-      visibleGalleryConditions,
-      visibleStudioConditions,
-    ] = await Promise.all([
-      keepVisibleConditions(userId, "tag", tagOrConditions),
-      keepVisibleConditions(userId, "group", groupOrConditions),
-      keepVisibleConditions(userId, "gallery", galleryOrConditions),
-      keepVisibleConditions(userId, "studio", studioOrConditions),
-    ]);
-
-    // Load all entities in parallel using composite key lookups
-    const [tags, groups, galleries, studios] = await Promise.all([
-      visibleTagConditions.length > 0
-        ? prisma.stashTag.findMany({ where: { OR: visibleTagConditions } })
-        : [],
-      visibleGroupConditions.length > 0
-        ? prisma.stashGroup.findMany({ where: { OR: visibleGroupConditions } })
-        : [],
-      visibleGalleryConditions.length > 0
-        ? prisma.stashGallery.findMany({
-            where: { OR: visibleGalleryConditions },
-          })
-        : [],
-      visibleStudioConditions.length > 0
-        ? prisma.stashStudio.findMany({
-            where: { OR: visibleStudioConditions },
-          })
-        : [],
-    ]);
-
-    // Build lookup maps by entityKey (prevents cross-instance collisions)
-    const tagsByKey = new Map<string, TagRef>(
-      tags.map((t) => [
-        entityKey(t.id, t.stashInstanceId),
-        {
-          id: t.id,
-          instanceId: t.stashInstanceId,
-          name: t.name,
-          image_path: toProxyUrl(t.imagePath, t.stashInstanceId),
-          favorite: t.favorite,
-        },
-      ])
-    );
-
-    const groupsByKey = new Map<string, GroupRef>(
-      groups.map((g) => [
-        entityKey(g.id, g.stashInstanceId),
-        {
-          id: g.id,
-          instanceId: g.stashInstanceId,
-          name: g.name,
-          front_image_path: toProxyUrl(g.frontImagePath, g.stashInstanceId),
-          back_image_path: toProxyUrl(g.backImagePath, g.stashInstanceId),
-        },
-      ])
-    );
-
-    const galleriesByKey = new Map<string, GalleryRef>(
-      galleries.map((g) => [
-        entityKey(g.id, g.stashInstanceId),
-        {
-          id: g.id,
-          instanceId: g.stashInstanceId,
-          title:
-            g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-          cover: toProxyUrl(g.coverPath, g.stashInstanceId),
-        },
-      ])
-    );
-
-    const studiosByKey = new Map<string, StudioRef>(
-      studios.map((s) => [
-        entityKey(s.id, s.stashInstanceId),
-        {
-          id: s.id,
-          instanceId: s.stashInstanceId,
-          name: s.name,
-          image_path: toProxyUrl(s.imagePath, s.stashInstanceId),
-          favorite: s.favorite,
-          parent_studio: s.parentId ? { id: s.parentId } : null,
-        },
-      ])
-    );
-
-    // Build performer -> scene mapping (keyed by entityKey)
-    const scenesByPerformer = new Map<string, Set<string>>();
-    for (const sp of scenePerformers) {
-      const key = entityKey(sp.performerId, sp.performerInstanceId);
-      const set = scenesByPerformer.get(key) ?? new Set();
-      set.add(sp.sceneId);
-      scenesByPerformer.set(key, set);
-    }
-
-    // Build scene -> entities mappings (entity sets by entityKey)
-    const groupsByScene = new Map<string, Set<string>>();
-    for (const sg of sceneGroups) {
-      const set = groupsByScene.get(sg.sceneId) ?? new Set();
-      set.add(entityKey(sg.groupId, sg.groupInstanceId));
-      groupsByScene.set(sg.sceneId, set);
-    }
-
-    const galleriesByScene = new Map<string, Set<string>>();
-    for (const sg of sceneGalleries) {
-      const set = galleriesByScene.get(sg.sceneId) ?? new Set();
-      set.add(entityKey(sg.galleryId, sg.galleryInstanceId));
-      galleriesByScene.set(sg.sceneId, set);
-    }
-
-    const studioByScene = new Map<string, string>();
-    for (const s of scenes) {
-      if (s.studioId)
-        studioByScene.set(s.id, entityKey(s.studioId, s.stashInstanceId));
-    }
-
-    // Build performer -> tags map (keyed by entityKey)
-    const tagsByPerformer = new Map<string, TagRef[]>();
-    for (const junction of tagJunctions) {
-      const tag = tagsByKey.get(
-        entityKey(junction.tagId, junction.tagInstanceId)
-      );
-      if (!tag) continue;
-      const key = entityKey(junction.performerId, junction.performerInstanceId);
-      const list = tagsByPerformer.get(key) ?? [];
-      list.push(tag);
-      tagsByPerformer.set(key, list);
-    }
-
-    // Build performer -> galleries map from direct GalleryPerformer junction (keyed by entityKey)
-    const galleriesByPerformer = new Map<string, Set<string>>();
-    for (const gp of galleryPerformers) {
-      const key = entityKey(gp.performerId, gp.performerInstanceId);
-      const set = galleriesByPerformer.get(key) ?? new Set();
-      set.add(entityKey(gp.galleryId, gp.galleryInstanceId));
-      galleriesByPerformer.set(key, set);
-    }
-
-    // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
-      const performerKey = entityKey(performer.id, performer.instanceId);
-      performer.tags = tagsByPerformer.get(performerKey) ?? [];
-
-      // Derive groups and studios from performer's scenes
-      const performerSceneIds =
-        scenesByPerformer.get(performerKey) ?? new Set();
-
-      const performerGroupKeys = new Set<string>();
-      const performerStudioKeys = new Set<string>();
-
-      for (const sceneId of performerSceneIds) {
-        for (const gkey of groupsByScene.get(sceneId) ?? [])
-          performerGroupKeys.add(gkey);
-        const skey = studioByScene.get(sceneId);
-        if (skey) performerStudioKeys.add(skey);
-      }
-
-      // Galleries come from direct GalleryPerformer association
-      const performerGalleryKeys =
-        galleriesByPerformer.get(performerKey) ?? new Set();
-
-      performer.groups = [...performerGroupKeys]
-        .map((key) => groupsByKey.get(key))
-        .filter((g): g is GroupRef => !!g);
-      performer.galleries = [...performerGalleryKeys]
-        .map((key) => galleriesByKey.get(key))
-        .filter((g): g is GalleryRef => !!g);
-      performer.studios = [...performerStudioKeys]
-        .map((key) => studiosByKey.get(key))
-        .filter((s): s is StudioRef => !!s);
+      Object.assign(
+        performer,
+        relations.get(entityKey(performer.id, performer.instanceId))
+      );
     }
   }
 }

@@ -37,6 +37,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
             entities={tag.performers}
             title="Performers"
             parentInstanceId={tag.instanceId}
+            total={tag.relation_totals?.performers}
           />
         );
 
@@ -48,6 +49,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
             entities={tag.studios}
             title="Studios"
             parentInstanceId={tag.instanceId}
+            total={tag.relation_totals?.studios}
           />
         );
 
@@ -58,6 +60,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
             entities={tag.groups}
             title="Collections"
             parentInstanceId={tag.instanceId}
+            total={tag.relation_totals?.groups}
           />
         );
 
@@ -73,6 +76,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
             }
             title="Galleries"
             parentInstanceId={tag.instanceId}
+            total={tag.relation_totals?.galleries}
           />
         );
 
@@ -110,22 +114,34 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
         },
         {
           type: "GALLERIES",
-          count: tag.galleries?.length || tag.gallery_count || 0,
+          count:
+            tag.relation_totals?.galleries ??
+            tag.galleries?.length ??
+            tag.gallery_count,
           tooltipContent: galleriesTooltip,
         },
         {
           type: "GROUPS",
-          count: tag.groups?.length || tag.group_count || 0,
+          count:
+            tag.relation_totals?.groups ??
+            tag.groups?.length ??
+            tag.group_count,
           tooltipContent: groupsTooltip,
         },
         {
           type: "STUDIOS",
-          count: tag.studios?.length || tag.studio_count || 0,
+          count:
+            tag.relation_totals?.studios ??
+            tag.studios?.length ??
+            tag.studio_count,
           tooltipContent: studiosTooltip,
         },
         {
           type: "PERFORMERS",
-          count: tag.performers?.length || tag.performer_count || 0,
+          count:
+            tag.relation_totals?.performers ??
+            tag.performers?.length ??
+            tag.performer_count,
           tooltipContent: performersTooltip,
         },
       ];

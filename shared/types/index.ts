@@ -5,6 +5,7 @@ export type {
   GroupRef,
   GalleryRef,
   GroupRelationRef,
+  RelationTotals,
   SceneFile,
   ScenePaths,
   SceneStream,

@@ -153,6 +153,8 @@ Settings vary by entity type. Common options include:
 | **Show description** | Display description text |
 | **Show relationships** | Display performer/tag indicators |
 
+With **Show relationships** on, each indicator shows how many related items you can see, and its tooltip lists them with their pictures. On performer, studio, tag and collection cards a tooltip lists up to 12 and says how many more there are: first those sharing the most scenes with the card (on a tag's card, those with the most scenes), then by name. A card's own tags are always listed in full.
+
 **Scene-specific:**
 
 - Show studio code (abbreviated studio name)

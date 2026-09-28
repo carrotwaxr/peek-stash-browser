@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // This file exports both components and utility functions by design
 import { Link } from "react-router-dom";
+import type { NormalizedGroup } from "@peek/shared-types";
 import { Heart } from "lucide-react";
 import {
   getEntityPath as _getEntityPath,
@@ -633,14 +634,15 @@ const groupRenderers: RendererMap = {
   duration: (group) => formatDuration(group.duration),
   scene_count: (group) => <SimpleValueCell value={group.scene_count} />,
   performers: (group, options = {}) => {
-    // Groups don't have performers directly, but scenes in group do
-    // This would need API support to aggregate performers across scenes
+    // The performers of the group's scenes: the list endpoint sends at most
+    // 12, with how many there are in relation_totals
     const items = (group.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
       linkTo: getEntityPath("performer", p, options.hasMultipleInstances),
     }));
-    return <MultiValueCell items={items} />;
+    const { relation_totals } = group as Partial<NormalizedGroup>;
+    return <MultiValueCell items={items} total={relation_totals?.performers} />;
   },
   tags: (group, options = {}) => {
     const items = (group.tags || []).map((t: Entity) => ({
