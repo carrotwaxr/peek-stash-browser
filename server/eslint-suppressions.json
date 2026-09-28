@@ -272,11 +272,6 @@
       "count": 59
     }
   },
-  "services/TimelineService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
   "services/UserStatsService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
