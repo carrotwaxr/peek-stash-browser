@@ -12,7 +12,8 @@ interface NavPreference {
 
 interface Props {
   navPreferences: NavPreference[] | null;
-  onSave: (preferences: NavPreference[]) => void;
+  /** Rejects when the save failed, after reporting it. */
+  onSave: (preferences: NavPreference[]) => Promise<void>;
 }
 
 /**
@@ -80,9 +81,13 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    onSave(preferences);
-    setHasChanges(false);
+  const handleSave = async () => {
+    try {
+      await onSave(preferences);
+      setHasChanges(false);
+    } catch {
+      // onSave reported the failure; the changes stay marked unsaved
+    }
   };
 
   const handleReset = () => {
@@ -203,7 +208,11 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
         >
           Cancel
         </Button>
-        <Button disabled={!hasChanges} onClick={handleSave} variant="primary">
+        <Button
+          disabled={!hasChanges}
+          onClick={() => void handleSave()}
+          variant="primary"
+        >
           Save Changes
         </Button>
       </div>

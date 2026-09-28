@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut } from "../../../api";
+import { apiGet, apiPut, getErrorMessage } from "../../../api";
 import { useUnitPreference } from "../../../contexts/UnitPreferenceContext";
 import { showError, showSuccess } from "../../../utils/toast";
+import { ErrorMessage } from "../../ui/index";
 import CardDisplaySettings from "../CardDisplaySettings";
 import TableColumnSettings from "../TableColumnSettings";
 
 const CustomizationTab = () => {
   const [loading, setLoading] = useState(true);
+  // After a failed load the editors would show defaults, and a table-column
+  // save would replace every stored entity's columns: show Retry instead
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const { unitPreference, setUnitPreference } = useUnitPreference();
   const [preferredPreviewQuality, setPreferredPreviewQuality] =
     useState("sprite");
@@ -22,6 +27,7 @@ const CustomizationTab = () => {
     const loadSettings = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const data = await apiGet<{ settings: Record<string, unknown> }>(
           "/user/settings"
         );
@@ -40,15 +46,15 @@ const CustomizationTab = () => {
             { visible: string[]; order: string[] }
           >) || {}
         );
-      } catch {
-        showError("Failed to load customization settings");
+      } catch (err) {
+        setLoadError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
     };
 
     void loadSettings();
-  }, []);
+  }, [loadAttempt]);
 
   const saveViewPreference = async (key: string, value: string) => {
     try {
@@ -65,10 +71,12 @@ const CustomizationTab = () => {
       }
       showSuccess("View preference saved!");
     } catch (err) {
-      showError((err as Error).message || "Failed to save view preference");
+      showError(getErrorMessage(err, "Failed to save view preference"));
     }
   };
 
+  // Reports a failure and rethrows it, so the editor keeps its changes
+  // marked unsaved
   const saveTableColumnDefaults = async (
     newDefaults: Record<string, { visible: string[]; order: string[] }>
   ) => {
@@ -79,9 +87,8 @@ const CustomizationTab = () => {
       setTableColumnDefaults(newDefaults);
       showSuccess("Table column defaults saved!");
     } catch (err) {
-      showError(
-        (err as Error).message || "Failed to save table column defaults"
-      );
+      showError(getErrorMessage(err, "Failed to save table column defaults"));
+      throw err;
     }
   };
 
@@ -93,6 +100,16 @@ const CustomizationTab = () => {
       >
         <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ErrorMessage
+        title="Failed to load customization settings"
+        error={loadError}
+        onRetry={() => setLoadAttempt((n) => n + 1)}
+      />
     );
   }
 

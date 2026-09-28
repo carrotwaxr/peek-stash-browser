@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut } from "../../api";
-import { Button, Paper, SearchableSelect } from "../ui/index";
+import { apiGet, apiPut, getErrorMessage } from "../../api";
+import { Button, ErrorMessage, Paper, SearchableSelect } from "../ui/index";
 
 interface UserData {
   id: number;
@@ -63,13 +63,24 @@ const DESCRIPTIONS: Record<EntityType, string> = {
   galleries: "Restrict access to specific gallery content.",
 };
 
-function parseStoredIds(entityIds: string): string[] {
+/**
+ * A stored row's ids. A list that cannot be read throws: read as empty, a
+ * save would delete it, and a lost Show-only list shows the user everything.
+ */
+function parseStoredIds(row: StoredRestriction): string[] {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(entityIds);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
+    parsed = JSON.parse(row.entityIds);
   } catch {
-    return [];
+    parsed = undefined;
   }
+  if (!Array.isArray(parsed)) {
+    const list = row.mode === "INCLUDE" ? "Show only" : "Always hide";
+    throw new Error(
+      `The stored ${LABELS[row.entityType]} ${list} list could not be read.`
+    );
+  }
+  return parsed.map(String);
 }
 
 /** The box value the compute will see: the stored or hand-set value, else on with a Show-only list. */
@@ -88,8 +99,12 @@ function effectiveRestrictEmpty(state: TypeState): boolean {
  */
 const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   const [loading, setLoading] = useState(true);
+  // Set while the stored restrictions have not loaded: the editor is hidden
+  // and Save is off, since saving replaces every stored row (CS-11)
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [restrictions, setRestrictions] =
     useState<Record<EntityType, TypeState>>(emptyState);
 
@@ -98,7 +113,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
     const load = async () => {
       try {
         setLoading(true);
-        setError(null);
+        setLoadError(null);
         const data = await apiGet<{ restrictions: StoredRestriction[] }>(
           `/user/${user.id}/restrictions`
         );
@@ -107,9 +122,9 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
           const state = next[row.entityType];
           if (!state) continue;
           if (row.mode === "INCLUDE") {
-            state.include = parseStoredIds(row.entityIds);
+            state.include = parseStoredIds(row);
           } else if (row.mode === "EXCLUDE") {
-            state.exclude = parseStoredIds(row.entityIds);
+            state.exclude = parseStoredIds(row);
           } else {
             continue;
           }
@@ -119,9 +134,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
         }
         if (!cancelled) setRestrictions(next);
       } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message || "Failed to load restrictions");
-        }
+        if (!cancelled) setLoadError(getErrorMessage(err));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -130,7 +143,9 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [user.id]);
+  }, [user.id, loadAttempt]);
+
+  const loaded = !loading && loadError === null;
 
   const setList = (
     entityType: EntityType,
@@ -155,9 +170,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   };
 
   const handleSave = async () => {
+    if (!loaded) return;
     try {
       setSaving(true);
-      setError(null);
+      setSaveError(null);
 
       const restrictionsToSave = ENTITY_TYPES.flatMap((entityType) => {
         const state = restrictions[entityType];
@@ -194,7 +210,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
       onSave?.();
       onClose();
     } catch (err) {
-      setError((err as Error).message || "Failed to save restrictions");
+      setSaveError(getErrorMessage(err, "Failed to save restrictions"));
     } finally {
       setSaving(false);
     }
@@ -410,7 +426,21 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
               </div>
             )}
 
-            {error && (
+            {loadError && (
+              <div className="space-y-2">
+                <ErrorMessage
+                  title="Failed to load restrictions"
+                  error={loadError}
+                  onRetry={() => setLoadAttempt((n) => n + 1)}
+                />
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Nothing can be saved until {user.username}&apos;s restrictions
+                  load.
+                </p>
+              </div>
+            )}
+
+            {saveError && (
               <div
                 className="p-3 rounded-lg text-sm"
                 style={{
@@ -418,11 +448,11 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
                   color: "var(--status-error)",
                 }}
               >
-                {error}
+                {saveError}
               </div>
             )}
 
-            {!loading && (
+            {loaded && (
               <div className="space-y-4">
                 <div
                   className="p-3 rounded-lg"
@@ -461,7 +491,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={() => void handleSave()}
-                disabled={saving || loading}
+                disabled={saving || !loaded}
                 variant="primary"
                 fullWidth
                 loading={saving}

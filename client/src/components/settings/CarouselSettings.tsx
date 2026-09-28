@@ -11,8 +11,9 @@ import {
   Trash2,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { libraryApi } from "../../api";
-import { Button } from "../ui/index";
+import { getErrorMessage, libraryApi } from "../../api";
+import { showError } from "../../utils/toast";
+import { Button, ErrorMessage } from "../ui/index";
 
 /**
  * Carousel metadata mapping fetchKey to display information
@@ -61,7 +62,8 @@ interface CarouselPreference {
 
 interface Props {
   carouselPreferences?: CarouselPreference[];
-  onSave: (preferences: CarouselPreference[]) => void;
+  /** Rejects when the save failed, after reporting it. */
+  onSave: (preferences: CarouselPreference[]) => Promise<void>;
 }
 
 /**
@@ -82,6 +84,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   >(null);
   const [customCarousels, setCustomCarousels] = useState<CustomCarousel[]>([]);
   const [loadingCustom, setLoadingCustom] = useState(true);
+  // Without the custom carousels the merged list drops their places, and a
+  // save would store it that way: show Retry instead of the list
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -89,19 +95,21 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   useEffect(() => {
     const loadCustomCarousels = async () => {
       try {
+        setLoadingCustom(true);
+        setLoadError(null);
         const { carousels } = (await libraryApi.getCarousels()) as {
           carousels: CustomCarousel[];
         };
         setCustomCarousels(carousels || []);
       } catch (err) {
-        console.error("Failed to load custom carousels:", err);
+        setLoadError(getErrorMessage(err));
       } finally {
         setLoadingCustom(false);
       }
     };
 
     void loadCustomCarousels();
-  }, []);
+  }, [loadAttempt]);
 
   // Derive merged preferences at render time instead of via effect
   const preferences = useMemo(() => {
@@ -184,9 +192,13 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    onSave(preferences);
-    setHasChanges(false);
+  const handleSave = async () => {
+    try {
+      await onSave(preferences);
+      setHasChanges(false);
+    } catch {
+      // onSave reported the failure; the changes stay marked unsaved
+    }
   };
 
   const handleReset = () => {
@@ -210,20 +222,28 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     setDeletingId(carouselId);
     try {
       await libraryApi.deleteCarousel(actualId);
-
-      // Remove from custom carousels list
-      setCustomCarousels((prev) => prev.filter((c) => c.id !== actualId));
-
-      // Remove from preferences
-      const updatedPrefs = preferences
-        .filter((p) => p.id !== carouselId)
-        .map((p, idx) => ({ ...p, order: idx }));
-      setUserPreferences(updatedPrefs);
-
-      // Save the updated preferences immediately
-      onSave(updatedPrefs);
     } catch (err) {
-      console.error("Failed to delete carousel:", err);
+      showError(getErrorMessage(err, "Failed to delete carousel"));
+      setDeletingId(null);
+      return;
+    }
+
+    // Remove from custom carousels list
+    setCustomCarousels((prev) => prev.filter((c) => c.id !== actualId));
+
+    // Remove from preferences
+    const updatedPrefs = preferences
+      .filter((p) => p.id !== carouselId)
+      .map((p, idx) => ({ ...p, order: idx }));
+    setUserPreferences(updatedPrefs);
+
+    // Save the updated preferences (and any unsaved changes) immediately
+    try {
+      await onSave(updatedPrefs);
+      setHasChanges(false);
+    } catch {
+      // onSave reported the failure; the order stays marked unsaved
+      setHasChanges(true);
     } finally {
       setDeletingId(null);
     }
@@ -285,6 +305,24 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
         <Loader2
           className="w-6 h-6 animate-spin"
           style={{ color: "var(--accent-primary)" }}
+        />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <h3
+          className="text-lg font-semibold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Homepage Carousels
+        </h3>
+        <ErrorMessage
+          title="Failed to load your custom carousels"
+          error={loadError}
+          onRetry={() => setLoadAttempt((n) => n + 1)}
         />
       </div>
     );
@@ -467,7 +505,11 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
         >
           Cancel
         </Button>
-        <Button disabled={!hasChanges} onClick={handleSave} variant="primary">
+        <Button
+          disabled={!hasChanges}
+          onClick={() => void handleSave()}
+          variant="primary"
+        >
           Save Changes
         </Button>
       </div>

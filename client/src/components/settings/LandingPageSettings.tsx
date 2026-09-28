@@ -9,7 +9,8 @@ interface LandingPagePreference {
 
 interface Props {
   landingPagePreference: LandingPagePreference | null;
-  onSave: (preference: LandingPagePreference) => void;
+  /** Rejects when the save failed, after reporting it. */
+  onSave: (preference: LandingPagePreference) => Promise<void>;
 }
 
 /**
@@ -68,18 +69,22 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validate
     if (randomize && selectedPages.length < 2) {
       setValidationError("Select at least 2 pages for random mode");
       return;
     }
 
-    onSave({
-      pages: selectedPages,
-      randomize,
-    });
-    setHasChanges(false);
+    try {
+      await onSave({
+        pages: selectedPages,
+        randomize,
+      });
+      setHasChanges(false);
+    } catch {
+      // onSave reported the failure; the changes stay marked unsaved
+    }
   };
 
   const handleReset = () => {
@@ -154,7 +159,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
       {/* Save/Reset buttons */}
       {hasChanges && (
         <div className="flex gap-2 pt-2">
-          <Button variant="primary" onClick={handleSave}>
+          <Button variant="primary" onClick={() => void handleSave()}>
             Save
           </Button>
           <Button variant="secondary" onClick={handleReset}>

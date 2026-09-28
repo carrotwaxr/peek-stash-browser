@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut } from "../../../api";
+import { apiGet, apiPut, getErrorMessage } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
-import { Button } from "../../ui/index";
+import { Button, ErrorMessage } from "../../ui/index";
 
 const PlaybackTab = () => {
   const [loading, setLoading] = useState(true);
+  // After a failed load the form would show defaults, and Save would write
+  // them over the stored settings: show Retry instead
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
@@ -16,6 +20,7 @@ const PlaybackTab = () => {
     const loadSettings = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const data = await apiGet<{ settings: Record<string, unknown> }>(
           "/user/settings"
         );
@@ -27,15 +32,15 @@ const PlaybackTab = () => {
         );
         setEnableCast(settings.enableCast !== false);
         setMinimumPlayPercent((settings.minimumPlayPercent as number) ?? 20);
-      } catch {
-        showError("Failed to load playback settings");
+      } catch (err) {
+        setLoadError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
     };
 
     void loadSettings();
-  }, []);
+  }, [loadAttempt]);
 
   const saveSettings = async (e: React.SubmitEvent) => {
     e.preventDefault();
@@ -51,7 +56,7 @@ const PlaybackTab = () => {
 
       showSuccess("Playback settings saved successfully!");
     } catch (err) {
-      showError((err as Error).message || "Failed to save settings");
+      showError(getErrorMessage(err, "Failed to save settings"));
     } finally {
       setSaving(false);
     }
@@ -65,6 +70,16 @@ const PlaybackTab = () => {
       >
         <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ErrorMessage
+        title="Failed to load playback settings"
+        error={loadError}
+        onRetry={() => setLoadAttempt((n) => n + 1)}
+      />
     );
   }
 
