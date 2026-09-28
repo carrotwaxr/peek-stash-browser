@@ -9,6 +9,16 @@
  * 3. Calculate engagement rate: engagementScore / libraryPresence
  * 4. Compute percentile rank within the user's engaged entities
  * 5. Store results in UserEntityRanking table
+ *
+ * Only live entities count: a soft-deleted performer, studio, tag or scene
+ * gets no ranking, and a deleted scene adds nothing to an entity's library
+ * presence or watch time, nor to the average scene duration. The user's
+ * watch history drives each scene lookup (`WatchHistory w CROSS JOIN
+ * StashScene s`): left to itself, SQLite may walk every live scene and probe
+ * the history instead (0.12 s against 0.03 s at 200k scenes).
+ *
+ * `ensureFresh` is the entry point: each user is recomputed at most once an
+ * hour, and callers arriving during a recompute share it.
  */
 import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
@@ -20,7 +30,18 @@ const RANKING_WEIGHTS = {
   playCount: 1,
 };
 
+/** How long a user's rankings stay fresh after a recompute starts */
+const FRESH_FOR_MS = 60 * 60 * 1000;
+
 type EntityType = "performer" | "studio" | "tag" | "scene";
+
+/** One user's last recompute, kept for the life of the process */
+interface Freshness {
+  /** When the last successful recompute started (ms since the epoch); 0 when none is known */
+  computedAt: number;
+  /** The check or recompute in progress, shared by every caller */
+  running?: Promise<void>;
+}
 
 // Raw SQL hands integers back as bigint (a COUNT, a SUM, a COALESCE with a
 // literal), and a column can read as a float (#410): every number here goes
@@ -48,48 +69,119 @@ interface ComputedRanking extends Omit<
 }
 
 class RankingComputeService {
+  private readonly freshness = new Map<number, Freshness>();
+
   /**
-   * Recompute all rankings for a user
-   * Call this on login or after significant engagement changes
+   * Makes the user's rankings at most an hour old. A recompute already
+   * running is joined, not repeated, and one that finds nothing to rank
+   * still counts, so a user with no engagement is recomputed once an hour
+   * rather than on every call. After a restart, the newest ranking row says
+   * when the last recompute ran.
+   *
+   * With `wait` (the stats page), resolves once the rankings are fresh and
+   * rejects when the recompute fails. Without it (login, Recommended),
+   * returns at once and the recompute runs in the background. A failure is
+   * logged either way, and the next call tries again.
    */
-  async recomputeAllRankings(userId: number): Promise<void> {
-    const startTime = Date.now();
-    logger.info("Starting ranking computation", { userId });
-
-    try {
-      // Get average scene duration for normalization
-      const avgSceneDuration = await this.getAverageSceneDuration();
-
-      // Compute rankings for each entity type in parallel
-      await Promise.all([
-        this.computePerformerRankings(userId, avgSceneDuration),
-        this.computeStudioRankings(userId, avgSceneDuration),
-        this.computeTagRankings(userId, avgSceneDuration),
-        this.computeSceneRankings(userId, avgSceneDuration),
-      ]);
-
-      const duration = Date.now() - startTime;
-      logger.info("Ranking computation complete", {
-        userId,
-        durationMs: duration,
-      });
-    } catch (error) {
-      logger.error("Failed to compute rankings", {
-        userId,
-        error: (error as Error).message,
-      });
-      throw error;
+  async ensureFresh(
+    userId: number,
+    { wait = false }: { wait?: boolean } = {}
+  ): Promise<void> {
+    const refresh = this.refresh(userId);
+    if (wait) {
+      await refresh;
+      return;
     }
+    // Already logged by refresh; the next call tries again
+    refresh.catch(() => undefined);
+  }
+
+  private refresh(userId: number): Promise<void> {
+    const known = this.freshness.get(userId);
+    if (known?.running) return known.running;
+    if (known && Date.now() - known.computedAt < FRESH_FOR_MS) {
+      return Promise.resolve();
+    }
+
+    const running = this.recomputeIfStale(userId, known?.computedAt).then(
+      (computedAt) => {
+        this.freshness.set(userId, { computedAt });
+      },
+      (error: unknown) => {
+        // computedAt stays as it was, so the next call tries again
+        this.freshness.set(userId, { computedAt: known?.computedAt ?? 0 });
+        logger.error("Ranking recompute failed", { userId, error });
+        throw error;
+      }
+    );
+    this.freshness.set(userId, {
+      computedAt: known?.computedAt ?? 0,
+      running,
+    });
+    return running;
   }
 
   /**
-   * Get average scene duration for normalizing watch times
+   * Recomputes the user's rankings, unless nothing is known about them yet
+   * (after a restart) and the newest ranking row is under an hour old.
+   * Resolves to the time the rankings in the table were computed.
+   */
+  private async recomputeIfStale(
+    userId: number,
+    knownComputedAt: number | undefined
+  ): Promise<number> {
+    if (knownComputedAt === undefined) {
+      const newest = await prisma.userEntityRanking.findFirst({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      });
+      const writtenAt = newest?.updatedAt.getTime();
+      if (writtenAt !== undefined && Date.now() - writtenAt < FRESH_FOR_MS) {
+        return writtenAt;
+      }
+    }
+    const startedAt = Date.now();
+    await this.recomputeAllRankings(userId);
+    return startedAt;
+  }
+
+  /**
+   * Recompute all rankings for a user, whatever their age. Callers go
+   * through `ensureFresh`, which also logs a failure.
+   */
+  async recomputeAllRankings(userId: number): Promise<void> {
+    const startTime = Date.now();
+    logger.debug("Starting ranking computation", { userId });
+
+    // Get average scene duration for normalization
+    const avgSceneDuration = await this.getAverageSceneDuration();
+
+    // One type after another: run together, the four reads contend for
+    // the pool's connections and the disk
+    let rankings = 0;
+    rankings += await this.computePerformerRankings(userId, avgSceneDuration);
+    rankings += await this.computeStudioRankings(userId, avgSceneDuration);
+    rankings += await this.computeTagRankings(userId, avgSceneDuration);
+    rankings += await this.computeSceneRankings(userId, avgSceneDuration);
+
+    logger.info("Ranking computation complete", {
+      userId,
+      durationMs: Date.now() - startTime,
+      rankings,
+    });
+  }
+
+  /**
+   * Get average live scene duration for normalizing watch times
    */
   private async getAverageSceneDuration(): Promise<number> {
     const result = await prisma.$queryRaw<
       Array<{ avgDuration: number | null }>
     >`
-      SELECT AVG(duration) as avgDuration FROM StashScene WHERE duration > 0
+      SELECT AVG(duration) as avgDuration
+      FROM StashScene
+      WHERE duration > 0 AND deletedAt IS NULL
     `;
     return Number(result[0]?.avgDuration) || 1200; // Default 20 min
   }
@@ -217,12 +309,19 @@ class RankingComputeService {
   }
 
   /**
-   * Compute performer rankings
+   * Compute performer rankings.
+   *
+   * Library presence is the performer's live scenes: all its junction rows
+   * (a covering-index scan) minus those of soft-deleted scenes, which are
+   * few and found from the scene side (`StashScene s CROSS JOIN
+   * ScenePerformer sp`; otherwise SQLite walks every junction row). Joining
+   * every junction row to StashScene for its deletedAt instead costs 0.4 s
+   * at 200k scenes, against 0.1 s this way. At least 1, as before.
    */
   private async computePerformerRankings(
     userId: number,
     avgSceneDuration: number
-  ): Promise<void> {
+  ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         ups.performerId as entityId,
@@ -230,8 +329,12 @@ class RankingComputeService {
         ups.playCount,
         ups.oCounter as oCount,
         COALESCE(dur.totalDuration, 0) as playDuration,
-        COALESCE(lib.sceneCount, 1) as libraryPresence
+        MAX(COALESCE(lib.sceneCount, 0) - COALESCE(gone.sceneCount, 0), 1) as libraryPresence
       FROM UserPerformerStats ups
+      JOIN StashPerformer p
+        ON p.id = ups.performerId
+        AND p.stashInstanceId = ups.instanceId
+        AND p.deletedAt IS NULL
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'performer'
@@ -239,8 +342,10 @@ class RankingComputeService {
         AND (e.instanceId = '' OR e.instanceId = ups.instanceId)
       LEFT JOIN (
         SELECT sp.performerId, sp.performerInstanceId as instanceId, SUM(w.playDuration) as totalDuration
-        FROM ScenePerformer sp
-        JOIN WatchHistory w ON w.sceneId = sp.sceneId AND w.instanceId = sp.sceneInstanceId AND w.userId = ${userId}
+        FROM WatchHistory w
+        CROSS JOIN StashScene s ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND s.deletedAt IS NULL
+        JOIN ScenePerformer sp ON sp.sceneId = w.sceneId AND sp.sceneInstanceId = w.instanceId
+        WHERE w.userId = ${userId}
         GROUP BY sp.performerId, sp.performerInstanceId
       ) dur ON dur.performerId = ups.performerId AND dur.instanceId = ups.instanceId
       LEFT JOIN (
@@ -248,6 +353,13 @@ class RankingComputeService {
         FROM ScenePerformer
         GROUP BY performerId, performerInstanceId
       ) lib ON lib.performerId = ups.performerId AND lib.instanceId = ups.instanceId
+      LEFT JOIN (
+        SELECT sp.performerId, sp.performerInstanceId as instanceId, COUNT(*) as sceneCount
+        FROM StashScene s
+        CROSS JOIN ScenePerformer sp ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
+        WHERE s.deletedAt IS NOT NULL
+        GROUP BY sp.performerId, sp.performerInstanceId
+      ) gone ON gone.performerId = ups.performerId AND gone.instanceId = ups.instanceId
       WHERE ups.userId = ${userId}
         AND e.id IS NULL
         AND (ups.playCount > 0 OR ups.oCounter > 0)
@@ -255,6 +367,7 @@ class RankingComputeService {
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
     await this.upsertRankings(userId, "performer", rankings);
+    return rankings.length;
   }
 
   /**
@@ -263,7 +376,7 @@ class RankingComputeService {
   private async computeStudioRankings(
     userId: number,
     avgSceneDuration: number
-  ): Promise<void> {
+  ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uss.studioId as entityId,
@@ -273,6 +386,10 @@ class RankingComputeService {
         COALESCE(dur.totalDuration, 0) as playDuration,
         COALESCE(lib.sceneCount, 1) as libraryPresence
       FROM UserStudioStats uss
+      JOIN StashStudio st
+        ON st.id = uss.studioId
+        AND st.stashInstanceId = uss.instanceId
+        AND st.deletedAt IS NULL
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'studio'
@@ -280,15 +397,15 @@ class RankingComputeService {
         AND (e.instanceId = '' OR e.instanceId = uss.instanceId)
       LEFT JOIN (
         SELECT s.studioId, s.stashInstanceId as instanceId, SUM(w.playDuration) as totalDuration
-        FROM StashScene s
-        JOIN WatchHistory w ON w.sceneId = s.id AND w.instanceId = s.stashInstanceId AND w.userId = ${userId}
-        WHERE s.studioId IS NOT NULL
+        FROM WatchHistory w
+        CROSS JOIN StashScene s ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND s.deletedAt IS NULL
+        WHERE w.userId = ${userId} AND s.studioId IS NOT NULL
         GROUP BY s.studioId, s.stashInstanceId
       ) dur ON dur.studioId = uss.studioId AND dur.instanceId = uss.instanceId
       LEFT JOIN (
         SELECT studioId, stashInstanceId as instanceId, COUNT(*) as sceneCount
         FROM StashScene
-        WHERE studioId IS NOT NULL
+        WHERE studioId IS NOT NULL AND deletedAt IS NULL
         GROUP BY studioId, stashInstanceId
       ) lib ON lib.studioId = uss.studioId AND lib.instanceId = uss.instanceId
       WHERE uss.userId = ${userId}
@@ -298,15 +415,18 @@ class RankingComputeService {
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
     await this.upsertRankings(userId, "studio", rankings);
+    return rankings.length;
   }
 
   /**
-   * Compute tag rankings
+   * Compute tag rankings. Library presence is counted as for performers:
+   * all the tag's junction rows minus those of soft-deleted scenes (0.15 s
+   * at 200k scenes, against 0.6 s joining every row to StashScene).
    */
   private async computeTagRankings(
     userId: number,
     avgSceneDuration: number
-  ): Promise<void> {
+  ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uts.tagId as entityId,
@@ -314,8 +434,12 @@ class RankingComputeService {
         uts.playCount,
         uts.oCounter as oCount,
         COALESCE(dur.totalDuration, 0) as playDuration,
-        COALESCE(lib.sceneCount, 1) as libraryPresence
+        MAX(COALESCE(lib.sceneCount, 0) - COALESCE(gone.sceneCount, 0), 1) as libraryPresence
       FROM UserTagStats uts
+      JOIN StashTag t
+        ON t.id = uts.tagId
+        AND t.stashInstanceId = uts.instanceId
+        AND t.deletedAt IS NULL
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'tag'
@@ -323,8 +447,10 @@ class RankingComputeService {
         AND (e.instanceId = '' OR e.instanceId = uts.instanceId)
       LEFT JOIN (
         SELECT st.tagId, st.tagInstanceId as instanceId, SUM(w.playDuration) as totalDuration
-        FROM SceneTag st
-        JOIN WatchHistory w ON w.sceneId = st.sceneId AND w.instanceId = st.sceneInstanceId AND w.userId = ${userId}
+        FROM WatchHistory w
+        CROSS JOIN StashScene s ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND s.deletedAt IS NULL
+        JOIN SceneTag st ON st.sceneId = w.sceneId AND st.sceneInstanceId = w.instanceId
+        WHERE w.userId = ${userId}
         GROUP BY st.tagId, st.tagInstanceId
       ) dur ON dur.tagId = uts.tagId AND dur.instanceId = uts.instanceId
       LEFT JOIN (
@@ -332,6 +458,13 @@ class RankingComputeService {
         FROM SceneTag
         GROUP BY tagId, tagInstanceId
       ) lib ON lib.tagId = uts.tagId AND lib.instanceId = uts.instanceId
+      LEFT JOIN (
+        SELECT st.tagId, st.tagInstanceId as instanceId, COUNT(*) as sceneCount
+        FROM StashScene s
+        CROSS JOIN SceneTag st ON st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId
+        WHERE s.deletedAt IS NOT NULL
+        GROUP BY st.tagId, st.tagInstanceId
+      ) gone ON gone.tagId = uts.tagId AND gone.instanceId = uts.instanceId
       WHERE uts.userId = ${userId}
         AND e.id IS NULL
         AND (uts.playCount > 0 OR uts.oCounter > 0)
@@ -339,6 +472,7 @@ class RankingComputeService {
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
     await this.upsertRankings(userId, "tag", rankings);
+    return rankings.length;
   }
 
   /**
@@ -348,21 +482,25 @@ class RankingComputeService {
   private async computeSceneRankings(
     userId: number,
     avgSceneDuration: number
-  ): Promise<void> {
+  ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         w.sceneId as entityId,
-        COALESCE(w.instanceId, '') as instanceId,
+        w.instanceId,
         w.playCount,
         w.oCount,
         w.playDuration,
         1 as libraryPresence
       FROM WatchHistory w
+      CROSS JOIN StashScene s
+        ON s.id = w.sceneId
+        AND s.stashInstanceId = w.instanceId
+        AND s.deletedAt IS NULL
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'scene'
         AND e.entityId = w.sceneId
-        AND (e.instanceId = '' OR e.instanceId = COALESCE(w.instanceId, ''))
+        AND (e.instanceId = '' OR e.instanceId = w.instanceId)
       WHERE w.userId = ${userId}
         AND e.id IS NULL
         AND (w.playCount > 0 OR w.oCount > 0 OR w.playDuration > 0)
@@ -370,6 +508,7 @@ class RankingComputeService {
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
     await this.upsertRankings(userId, "scene", rankings);
+    return rankings.length;
   }
 }
 

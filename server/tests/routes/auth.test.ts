@@ -1,7 +1,8 @@
 /**
  * HTTP tests for the auth routes (sweep item 8): recovery keys are compared by
  * their SHA-256 hash, a recovery-key reset stamps passwordChangedAt, and login
- * issues a token carrying the sign-in time without writing a recovery key.
+ * issues a token carrying the sign-in time without writing a recovery key, and
+ * starts a ranking refresh without waiting for it.
  * The setup-window `/first-time-password` route is gone (sweep item 7).
  *
  * `authRateLimiter` is module-level and counts failed requests per address, so
@@ -21,6 +22,7 @@ import {
 } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import authRoutes from "../../routes/auth.js";
+import rankingComputeService from "../../services/RankingComputeService.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
@@ -38,7 +40,7 @@ vi.mock(
 
 vi.mock("../../services/RankingComputeService.js", () => ({
   default: {
-    recomputeAllRankings: vi.fn().mockResolvedValue(undefined),
+    ensureFresh: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -53,6 +55,7 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+const mockRankingService = vi.mocked(rankingComputeService, true);
 
 // The stored form: SHA-256 hex of the key without dashes, upper case.
 const KEY = generateRecoveryKey();
@@ -178,6 +181,16 @@ describe("auth routes", () => {
 
       expect(res.status).toBe(200);
       expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("login starts a ranking refresh without waiting for it", async () => {
+      const res = await post("/login", {
+        username: "alice",
+        password: PASSWORD,
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(7);
     });
 
     it("login issues a token whose authTime is the sign-in time", async () => {
