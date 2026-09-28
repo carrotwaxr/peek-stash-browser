@@ -270,7 +270,7 @@ export const findGalleries = async (
             image_count: galleryWithCounts.image_count,
           },
         ];
-        logger.info("Computed counts for gallery detail", {
+        logger.debug("Computed counts for gallery detail", {
           galleryId: existingGallery.id,
           galleryTitle: existingGallery.title,
           imageCount: galleryWithCounts.image_count,
@@ -289,7 +289,7 @@ export const findGalleries = async (
       ),
     }));
 
-    logger.info("findGalleries completed", {
+    logger.debug("findGalleries completed", {
       totalTime: `${Date.now() - startTime}ms`,
       totalCount: total,
       returnedCount: galleriesWithStashUrl.length,

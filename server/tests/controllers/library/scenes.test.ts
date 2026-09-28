@@ -37,7 +37,9 @@ import {
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
+import { logger } from "../../../utils/logger.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
+import { objectContaining } from "../../helpers/matchers.js";
 import {
   createMockPerformer,
   createMockScene,
@@ -211,6 +213,7 @@ const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
 const mockScore = vi.mocked(scoreScoringDataByPreferences);
+const mockLogger = vi.mocked(logger, true);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -1746,6 +1749,28 @@ describe("findScenes", () => {
     const body = res._getOkBody();
     expect(body.findScenes.count).toBe(1);
     expect(body.findScenes.scenes).toHaveLength(1);
+  });
+
+  it("findScenes logs its timings at DEBUG, not INFO", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      scenes: [createMockScene({ id: "s1" })],
+      total: 1,
+    });
+
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockLogger.info).not.toHaveBeenCalled();
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      "findScenes complete (SQL path)",
+      objectContaining({ resultCount: 1, total: 1 })
+    );
   });
 
   it("does not send stashUrl to a regular user", async () => {

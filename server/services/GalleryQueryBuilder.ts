@@ -577,7 +577,7 @@ class GalleryQueryBuilder {
 
     const params = [...fromClause.params, ...whereParams, perPage, offset];
 
-    logger.info("GalleryQueryBuilder.execute", {
+    logger.debug("GalleryQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -652,7 +652,7 @@ class GalleryQueryBuilder {
     await this.populateRelations(galleries);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("GalleryQueryBuilder.execute complete", {
+    logger.debug("GalleryQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: galleries.length,

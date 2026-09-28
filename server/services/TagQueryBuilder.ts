@@ -603,7 +603,7 @@ class TagQueryBuilder {
 
     const params = [...fromClause.params, ...whereParams, perPage, offset];
 
-    logger.info("TagQueryBuilder.execute", {
+    logger.debug("TagQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       applyExclusions,
       sort: options.sort,
@@ -676,7 +676,7 @@ class TagQueryBuilder {
     await this.populateRelations(tags, userId);
     const relationsMs = Date.now() - relationsStart;
 
-    logger.info("TagQueryBuilder.execute complete", {
+    logger.debug("TagQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: tags.length,

@@ -30,6 +30,7 @@ import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
+import { logger } from "../../utils/logger.js";
 import {
   malformed,
   reqFor,
@@ -85,6 +86,7 @@ vi.mock("../../utils/logger.js", () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -92,6 +94,7 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
+const mockLogger = vi.mocked(logger, true);
 
 describe("Watch History Controller", () => {
   beforeEach(() => {
@@ -1312,6 +1315,49 @@ describe("Watch History Controller", () => {
       expect(res.status).not.toHaveBeenCalled();
       const update = must(mockPrisma.watchHistory.update.mock.calls[0]);
       expect(update[0].data.playHistory).toEqual([first, second, later]);
+    });
+
+    it("a watch-history ping logs nothing at INFO", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, minimumPlayPercent: 50, syncToStash: false })
+      );
+      // Last played an hour before this session: a new viewing session
+      const record: WatchHistory = partialRow({
+        id: 1,
+        playCount: 0,
+        playDuration: 400,
+        resumeTime: 390,
+        lastPlayedAt: new Date(Date.now() - 60 * 60 * 1000),
+        oHistory: [],
+        playHistory: [],
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
+
+      // A session start, a seek and a play past the threshold: every branch
+      // of the ping that logs
+      const res = resFor(pingWatchHistory);
+      await pingWatchHistory(
+        reqFor(pingWatchHistory, {
+          body: {
+            sceneId: "session-log-level",
+            currentTime: 400,
+            quality: "1080p",
+            sessionStart: new Date(Date.now() - 20 * 1000).toISOString(),
+            seekEvents: [{ from: 100, to: 110 }],
+          },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        "Watch history ping",
+        objectContaining({ userId: 1, sceneId: "session-log-level" })
+      );
     });
   });
 

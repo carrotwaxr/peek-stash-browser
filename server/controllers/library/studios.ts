@@ -123,7 +123,7 @@ export const findStudios = async (
           },
         ];
 
-        logger.info("Computed counts for studio detail", {
+        logger.debug("Computed counts for studio detail", {
           studioId: existingStudio.id,
           studioName: existingStudio.name,
           sceneCount: studioWithCounts.scene_count,
@@ -181,7 +181,7 @@ export const findStudios = async (
       ),
     }));
 
-    logger.info("findStudios completed", {
+    logger.debug("findStudios completed", {
       totalTime: `${Date.now() - startTime}ms`,
       totalCount: total,
       returnedCount: studiosWithStashUrl.length,

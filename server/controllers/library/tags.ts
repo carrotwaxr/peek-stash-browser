@@ -123,7 +123,7 @@ export const findTags = async (
             scene_marker_count: tagWithCounts.scene_marker_count,
           },
         ];
-        logger.info("Computed counts for tag detail", {
+        logger.debug("Computed counts for tag detail", {
           tagId: existingTag.id,
           tagName: existingTag.name,
           sceneCount: tagWithCounts.scene_count,
@@ -168,7 +168,7 @@ export const findTags = async (
       ),
     }));
 
-    logger.info("findTags completed", {
+    logger.debug("findTags completed", {
       totalTime: `${Date.now() - startTime}ms`,
       totalCount: total,
       returnedCount: tagsWithStashUrl.length,
