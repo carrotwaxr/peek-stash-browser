@@ -13,6 +13,7 @@ import type {
   TagRef,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -411,7 +412,7 @@ class ImageQueryBuilder {
         gender: row.gender as string | null,
         favorite: row.favorite as boolean | null,
         rating100: row.rating100 as number | null,
-        image_path: this.transformUrl(
+        image_path: toProxyUrl(
           row.imagePath as string | null,
           row.stashInstanceId as string
         ),
@@ -429,7 +430,7 @@ class ImageQueryBuilder {
         instanceId: row.stashInstanceId as string,
         name: row.name as string,
         favorite: row.favorite as boolean | null,
-        image_path: this.transformUrl(
+        image_path: toProxyUrl(
           row.imagePath as string | null,
           row.stashInstanceId as string
         ),
@@ -446,7 +447,7 @@ class ImageQueryBuilder {
         id: row.id as string,
         instanceId: row.stashInstanceId as string,
         title: row.title as string | null,
-        cover: this.transformUrl(
+        cover: toProxyUrl(
           row.coverPath as string | null,
           row.stashInstanceId as string
         ),
@@ -456,7 +457,7 @@ class ImageQueryBuilder {
     const studiosById = new Map(
       studios.map((s) => [
         s.id,
-        { ...s, image_path: this.transformUrl(s.imagePath, s.stashInstanceId) },
+        { ...s, image_path: toProxyUrl(s.imagePath, s.stashInstanceId) },
       ])
     );
 
@@ -614,15 +615,15 @@ class ImageQueryBuilder {
         (row.title as string) ||
         getImageFallbackTitle(row.filePath as string | null),
       fileSize: row.fileSize != null ? Number(row.fileSize) : null,
-      pathThumbnail: this.transformUrl(
+      pathThumbnail: toProxyUrl(
         row.pathThumbnail as string | null,
         row.stashInstanceId as string
       ),
-      pathPreview: this.transformUrl(
+      pathPreview: toProxyUrl(
         row.pathPreview as string | null,
         row.stashInstanceId as string
       ),
-      pathImage: this.transformUrl(
+      pathImage: toProxyUrl(
         row.pathImage as string | null,
         row.stashInstanceId as string
       ),
@@ -679,48 +680,6 @@ class ImageQueryBuilder {
       page: 1,
       perPage: ids.length,
     });
-  }
-
-  /**
-   * Transform a Stash URL/path to a proxy URL
-   * @param urlOrPath - The URL or path to transform
-   * @param instanceId - Optional Stash instance ID for multi-instance routing
-   */
-  private transformUrl(
-    urlOrPath: string | null,
-    instanceId?: string | null
-  ): string | null {
-    if (!urlOrPath) return null;
-
-    // If it's already a proxy URL, return as-is
-    if (urlOrPath.startsWith("/api/proxy/stash")) {
-      return urlOrPath;
-    }
-
-    // Build base proxy URL
-    let proxyPath: string;
-
-    // If it's a full URL (http://...), extract path + query
-    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-      try {
-        const url = new URL(urlOrPath);
-        const pathWithQuery = url.pathname + url.search;
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-      } catch {
-        // If URL parsing fails, treat as path
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-      }
-    } else {
-      // Otherwise treat as path and encode it
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-
-    // Add instanceId for multi-instance routing
-    if (instanceId) {
-      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-    }
-
-    return proxyPath;
   }
 }
 

@@ -31,6 +31,7 @@ import type {
 } from "../types/index.js";
 import { entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
+import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   STREAM_RESOLUTIONS,
   type StreamResolution,
@@ -2023,23 +2024,17 @@ class StashEntityService {
 
       // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(
-          scene.pathScreenshot,
-          scene.stashInstanceId
-        ),
-        preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
-        sprite: this.transformUrl(
+        screenshot: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
+        preview: toProxyUrl(scene.pathPreview, scene.stashInstanceId),
+        sprite: toProxyUrl(
           scene.pathSprite ? `/scene/${scene.id}/vtt/sprite` : null,
           scene.stashInstanceId
         ),
-        vtt: this.transformUrl(
+        vtt: toProxyUrl(
           scene.pathVtt ? `/scene/${scene.id}/vtt/thumbs` : null,
           scene.stashInstanceId
         ),
-        chapters_vtt: this.transformUrl(
-          scene.pathChaptersVtt,
-          scene.stashInstanceId
-        ),
+        chapters_vtt: toProxyUrl(scene.pathChaptersVtt, scene.stashInstanceId),
         // Always null: Peek serves streams and captions through its own
         // routes, and the media proxy refuses both Stash routes
         stream: null,
@@ -2123,23 +2118,17 @@ class StashEntityService {
 
       // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(
-          scene.pathScreenshot,
-          scene.stashInstanceId
-        ),
-        preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
-        sprite: this.transformUrl(
+        screenshot: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
+        preview: toProxyUrl(scene.pathPreview, scene.stashInstanceId),
+        sprite: toProxyUrl(
           scene.pathSprite ? `/scene/${scene.id}/vtt/sprite` : null,
           scene.stashInstanceId
         ),
-        vtt: this.transformUrl(
+        vtt: toProxyUrl(
           scene.pathVtt ? `/scene/${scene.id}/vtt/thumbs` : null,
           scene.stashInstanceId
         ),
-        chapters_vtt: this.transformUrl(
-          scene.pathChaptersVtt,
-          scene.stashInstanceId
-        ),
+        chapters_vtt: toProxyUrl(scene.pathChaptersVtt, scene.stashInstanceId),
         // Always null: Peek serves streams and captions through its own
         // routes, and the media proxy refuses both Stash routes
         stream: null,
@@ -2283,7 +2272,7 @@ class StashEntityService {
         id: pt.tagId,
         name: pt.tag?.name || "Unknown",
         image_path: pt.tag?.imagePath
-          ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId)
+          ? toProxyUrl(pt.tag.imagePath, pt.tag.stashInstanceId)
           : null,
       })) ?? [];
     return {
@@ -2319,10 +2308,7 @@ class StashEntityService {
       url: performer.url,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      image_path: this.transformUrl(
-        performer.imagePath,
-        performer.stashInstanceId
-      ),
+      image_path: toProxyUrl(performer.imagePath, performer.stashInstanceId),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
     };
@@ -2335,7 +2321,7 @@ class StashEntityService {
         id: st.tagId,
         name: st.tag?.name || "Unknown",
         image_path: st.tag?.imagePath
-          ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId)
+          ? toProxyUrl(st.tag.imagePath, st.tag.stashInstanceId)
           : null,
       })) ?? [];
     return {
@@ -2355,7 +2341,7 @@ class StashEntityService {
       url: studio.url,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      image_path: this.transformUrl(studio.imagePath, studio.stashInstanceId),
+      image_path: toProxyUrl(studio.imagePath, studio.stashInstanceId),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
     };
@@ -2381,7 +2367,7 @@ class StashEntityService {
       parents: tag.parentIds
         ? (JSON.parse(tag.parentIds) as string[]).map((id: string) => ({ id }))
         : [],
-      image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
+      image_path: toProxyUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
     };
@@ -2394,7 +2380,7 @@ class StashEntityService {
         id: gt.tagId,
         name: gt.tag?.name || "Unknown",
         image_path: gt.tag?.imagePath
-          ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
+          ? toProxyUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
           : null,
       })) ?? [];
     return {
@@ -2413,34 +2399,24 @@ class StashEntityService {
       urls: group.urls ? (JSON.parse(group.urls) as string[]) : [],
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      front_image_path: this.transformUrl(
-        group.frontImagePath,
-        group.stashInstanceId
-      ),
-      back_image_path: this.transformUrl(
-        group.backImagePath,
-        group.stashInstanceId
-      ),
+      front_image_path: toProxyUrl(group.frontImagePath, group.stashInstanceId),
+      back_image_path: toProxyUrl(group.backImagePath, group.stashInstanceId),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
       updated_at: group.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 
   private transformGallery(gallery: GalleryInput): NormalizedGallery {
-    const coverUrl = this.transformUrl(
-      gallery.coverPath,
-      gallery.stashInstanceId
-    );
+    const coverUrl = toProxyUrl(gallery.coverPath, gallery.stashInstanceId);
     // Extract tags from junction table relation (if included) or empty array
     // Include image_path for TooltipEntityGrid display
     const tags =
       gallery.tags?.map((gt: GalleryTagWithTag) => ({
         id: gt.tagId,
         name: gt.tag?.name || "Unknown",
-        image_path: this.transformUrl(
-          gt.tag?.imagePath ?? null,
-          gt.tag?.stashInstanceId
-        ),
+        image_path: gt.tag
+          ? toProxyUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
+          : null,
       })) ?? [];
 
     // Transform performers from junction table
@@ -2450,7 +2426,7 @@ class StashEntityService {
         id: gp.performer.id,
         name: gp.performer.name,
         gender: gp.performer.gender,
-        image_path: this.transformUrl(
+        image_path: toProxyUrl(
           gp.performer.imagePath,
           gp.performer.stashInstanceId
         ),
@@ -2463,7 +2439,7 @@ class StashEntityService {
         id: gs.scene.id,
         title: gs.scene.title,
         paths: {
-          screenshot: this.transformUrl(
+          screenshot: toProxyUrl(
             gs.scene.pathScreenshot,
             gs.scene.stashInstanceId
           ),
@@ -2512,7 +2488,7 @@ class StashEntityService {
         id: ip.performer.id,
         name: ip.performer.name,
         gender: ip.performer.gender,
-        image_path: this.transformUrl(
+        image_path: toProxyUrl(
           ip.performer.imagePath,
           ip.performer.stashInstanceId
         ),
@@ -2533,10 +2509,7 @@ class StashEntityService {
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
       urls: ig.gallery.urls ? (JSON.parse(ig.gallery.urls) as string[]) : [],
-      cover: this.transformUrl(
-        ig.gallery.coverPath,
-        ig.gallery.stashInstanceId
-      ),
+      cover: toProxyUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
       studio: ig.gallery.studio
@@ -2550,7 +2523,7 @@ class StashEntityService {
           id: gp.performer.id,
           name: gp.performer.name,
           gender: gp.performer.gender,
-          image_path: this.transformUrl(
+          image_path: toProxyUrl(
             gp.performer.imagePath,
             gp.performer.stashInstanceId
           ),
@@ -2613,47 +2586,6 @@ class StashEntityService {
       stashCreatedAt: image.stashCreatedAt?.toISOString() ?? null,
       stashUpdatedAt: image.stashUpdatedAt?.toISOString() ?? null,
     };
-  }
-
-  /**
-   * Transform a Stash URL/path to a proxy URL
-   * @param urlOrPath - The URL or path to transform
-   * @param instanceId - Optional Stash instance ID for multi-instance routing
-   */
-  private transformUrl(
-    urlOrPath: string | null,
-    instanceId?: string | null
-  ): string | null {
-    if (!urlOrPath) return null;
-
-    // If it's already a proxy URL, return as-is
-    if (urlOrPath.startsWith("/api/proxy/stash")) {
-      return urlOrPath;
-    }
-
-    let proxyPath: string;
-
-    // If it's a full URL (http://...), extract path + query
-    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-      try {
-        const url = new URL(urlOrPath);
-        const pathWithQuery = url.pathname + url.search;
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-      } catch {
-        // If URL parsing fails, treat as path
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-      }
-    } else {
-      // Otherwise treat as path and encode it
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-
-    // Add instanceId for multi-instance routing
-    if (instanceId) {
-      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-    }
-
-    return proxyPath;
   }
 }
 

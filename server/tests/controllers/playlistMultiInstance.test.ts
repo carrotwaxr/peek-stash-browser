@@ -61,10 +61,6 @@ vi.mock("../../services/EntityExclusionHelper.js", () => ({
   },
 }));
 
-vi.mock("../../utils/stashUrlProxy.js", () => ({
-  transformScene: vi.fn((s: unknown) => s),
-}));
-
 vi.mock("../../services/PlaylistAccessService.js", () => ({
   getPlaylistAccess: vi.fn(),
   getUserGroups: vi.fn(),

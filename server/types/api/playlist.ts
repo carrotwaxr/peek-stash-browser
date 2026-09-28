@@ -230,7 +230,7 @@ export interface SharedPlaylistData {
   owner: { id: number; username: string };
   sharedViaGroups: string[];
   sharedAt: string;
-  // Preview items for thumbnail grid - uses Partial<Scene> from transformScene
+  // Preview items for the thumbnail grid: the first four, with their scenes
   items?: PlaylistPreviewItem[];
 }
 

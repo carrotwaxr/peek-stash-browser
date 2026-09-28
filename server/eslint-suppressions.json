@@ -463,11 +463,6 @@
       "count": 1
     }
   },
-  "tests/utils/stashUrlProxy.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 26
-    }
-  },
   "utils/codecDetection.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 3

@@ -33,30 +33,6 @@ describe("ClipService", () => {
     });
   });
 
-  describe("transformUrl", () => {
-    it("appends any instance id, `default` included (the owner's instance id)", () => {
-      const path = `/api/proxy/stash?path=${encodeURIComponent("/x")}`;
-
-      expect(clipService["transformUrl"]("/x", "default")).toContain(
-        "&instanceId=default"
-      );
-      expect(clipService["transformUrl"]("/x", "default")).toBe(
-        `${path}&instanceId=default`
-      );
-      expect(clipService["transformUrl"]("/x", "instance-2")).toBe(
-        `${path}&instanceId=instance-2`
-      );
-    });
-
-    it("leaves the instance out when there is none", () => {
-      const path = `/api/proxy/stash?path=${encodeURIComponent("/x")}`;
-
-      expect(clipService["transformUrl"]("/x")).toBe(path);
-      expect(clipService["transformUrl"]("/x", null)).toBe(path);
-      expect(clipService["transformUrl"](null, "default")).toBeNull();
-    });
-  });
-
   describe("screenshot URL transformation", () => {
     it("should transform screenshotPath to proxy URL", async () => {
       const rawClip = {

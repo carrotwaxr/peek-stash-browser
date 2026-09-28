@@ -1,3 +1,4 @@
+import { toProxyUrl } from "../utils/proxyUrl.js";
 import type {
   ClipQueryOptions as QueryBuilderOptions,
   ClipWithRelations as RawClipWithRelations,
@@ -48,62 +49,17 @@ export interface ClipWithRelations {
 
 export class ClipService {
   /**
-   * Transform URL to proxy format
-   * Handles full URLs (http://...) by extracting path+query
-   * @param urlOrPath - The URL or path to transform
-   * @param instanceId - Optional Stash instance ID for multi-instance routing
-   */
-  private transformUrl(
-    urlOrPath: string | null,
-    instanceId?: string | null
-  ): string | null {
-    if (!urlOrPath) return null;
-
-    // If it's already a proxy URL, return as-is
-    if (urlOrPath.startsWith("/api/proxy/stash")) {
-      return urlOrPath;
-    }
-
-    let proxyPath: string;
-
-    // If it's a full URL (http://...), extract path + query
-    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-      try {
-        const url = new URL(urlOrPath);
-        const pathWithQuery = url.pathname + url.search;
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-      } catch {
-        // If URL parsing fails, treat as path
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-      }
-    } else {
-      // Assume it's a relative path
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-
-    // The instance the proxy serves it from; every id is an ordinary id
-    if (instanceId) {
-      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-    }
-
-    return proxyPath;
-  }
-
-  /**
    * Transform clip from query builder to client-safe format with proxy URLs
    */
   private transformClip(clip: RawClipWithRelations): ClipWithRelations {
     const { screenshotPath, scene, ...rest } = clip;
     return {
       ...rest,
-      screenshotUrl: this.transformUrl(screenshotPath, scene.stashInstanceId),
+      screenshotUrl: toProxyUrl(screenshotPath, scene.stashInstanceId),
       scene: {
         id: scene.id,
         title: scene.title,
-        pathScreenshot: this.transformUrl(
-          scene.pathScreenshot,
-          scene.stashInstanceId
-        ),
+        pathScreenshot: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
         studioId: scene.studioId,
       },
     };

@@ -18,6 +18,7 @@ import type { StudioQueryRow } from "../types/internal/queryRows.js";
 import { entityKey } from "../utils/entityRef.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
+import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   buildDateFilter,
@@ -530,7 +531,7 @@ class StudioQueryBuilder {
       url: row.url || null,
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
-      image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
+      image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
 
       // Counts
       scene_count: row.sceneCount || 0,
@@ -728,7 +729,7 @@ class StudioQueryBuilder {
           id: t.id,
           instanceId: t.stashInstanceId,
           name: t.name,
-          image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+          image_path: toProxyUrl(t.imagePath, t.stashInstanceId),
           favorite: t.favorite,
         },
       ])
@@ -741,7 +742,7 @@ class StudioQueryBuilder {
           id: p.id,
           instanceId: p.stashInstanceId,
           name: p.name,
-          image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
+          image_path: toProxyUrl(p.imagePath, p.stashInstanceId),
         },
       ])
     );
@@ -753,10 +754,7 @@ class StudioQueryBuilder {
           id: g.id,
           instanceId: g.stashInstanceId,
           name: g.name,
-          front_image_path: this.transformUrl(
-            g.frontImagePath,
-            g.stashInstanceId
-          ),
+          front_image_path: toProxyUrl(g.frontImagePath, g.stashInstanceId),
         },
       ])
     );
@@ -769,7 +767,7 @@ class StudioQueryBuilder {
           instanceId: g.stashInstanceId,
           title:
             g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-          cover: this.transformUrl(g.coverPath, g.stashInstanceId),
+          cover: toProxyUrl(g.coverPath, g.stashInstanceId),
         },
       ])
     );
@@ -847,42 +845,6 @@ class StudioQueryBuilder {
         .map((key) => galleriesById.get(key))
         .filter((g): g is GalleryRef => !!g);
     }
-  }
-
-  /**
-   * Transform a Stash URL/path to a proxy URL
-   * @param urlOrPath - The URL or path to transform
-   * @param instanceId - Optional Stash instance ID for multi-instance routing
-   */
-  private transformUrl(
-    urlOrPath: string | null,
-    instanceId?: string | null
-  ): string | null {
-    if (!urlOrPath) return null;
-
-    if (urlOrPath.startsWith("/api/proxy/stash")) {
-      return urlOrPath;
-    }
-
-    let proxyPath: string;
-
-    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
-      try {
-        const url = new URL(urlOrPath);
-        const pathWithQuery = url.pathname + url.search;
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
-      } catch {
-        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-      }
-    } else {
-      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
-    }
-
-    if (instanceId) {
-      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
-    }
-
-    return proxyPath;
   }
 }
 
