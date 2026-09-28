@@ -2,6 +2,24 @@ import type { LandingPagePreference } from "@peek/shared-types";
 import { ENTITY_ICON_NAMES } from "./entityIcons";
 
 /**
+ * The pages a signed-out visitor can open. `App.tsx` declares their routes
+ * from here, and `apiFetch` never sends a 401 on one of them to the login
+ * page: that would reload the login or setup page, or throw the visitor out
+ * of a password reset.
+ */
+export const PUBLIC_ROUTES = {
+  login: "/login",
+  setup: "/setup",
+  forgotPassword: "/forgot-password",
+} as const;
+
+const PUBLIC_PATHS: ReadonlySet<string> = new Set(Object.values(PUBLIC_ROUTES));
+
+/** True on a public page; a trailing slash matches, as the router does. */
+export const isPublicRoute = (pathname: string): boolean =>
+  PUBLIC_PATHS.has(pathname.replace(/(.)\/+$/, "$1"));
+
+/**
  * Navigation item definitions with stable keys
  * These keys should NEVER change even if display names or paths are updated
  */

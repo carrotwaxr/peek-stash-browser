@@ -9,7 +9,7 @@ paths:
 
 - List pages fetch through the TanStack Query hooks in `src/api/hooks/`, keyed by `src/api/queryKeys.ts`. The key factory has an instanceId slot, but the list pages pass none, so every list key is `[entity, undefined, "list", params]`.
 - Detail pages, cards and the lightbox still call `libraryApi` directly. The migration stopped after the list hooks; the detail and rating/favorite hooks have no callers yet.
-- `src/api/client.ts` holds `apiFetch`. A 401 or 403 redirects to login, except for `AUTH_SILENT_ENDPOINTS`, which throw instead so a background ping can't interrupt playback. Add new fire-and-forget endpoints there.
+- `src/api/client.ts` holds `apiFetch`. Only a 401 (a lost session) redirects to login, and never from `AUTH_SILENT_ENDPOINTS` (background pings, which throw so they can't interrupt playback; add new fire-and-forget endpoints there), `/auth/*` endpoints or a page in `PUBLIC_ROUTES` (`constants/navigation.ts`, which `App.tsx` declares its public routes from). A 403 or any other failure throws `ApiError`; show it with `getErrorMessage(err, fallback)`, which adds the wait to a 423 or 429. The server answers 401 only for a lost session.
 - TanStack Query handles cancellation of its own queries. Code that aborts a fetch itself must swallow the `AbortError`; the lightbox prefetch does it with `.catch(() => {})`.
 - The hooks don't wait for auth themselves; `ProtectedRoute` holds back rendering until auth resolves. A component outside it gates its own queries.
 - Entity references in URLs and filter values are `"id:instanceId"`, built by `src/utils/compositeKey.ts`; a bare id means no instance was known.

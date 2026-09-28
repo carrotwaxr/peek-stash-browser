@@ -660,10 +660,10 @@ export const changePassword = async (
       return;
     }
 
-    // Verify current password
+    // 400, not 401: the session is fine, and a 401 sends the client to login
     const validPassword = await bcrypt.compare(currentPassword, user.password);
     if (!validPassword) {
-      res.status(401).json({ error: "Current password is incorrect" });
+      res.status(400).json({ error: "Current password is incorrect" });
       return;
     }
 

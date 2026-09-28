@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { forgotPasswordInit, forgotPasswordReset } from "../../api";
+import {
+  forgotPasswordInit,
+  forgotPasswordReset,
+  getErrorMessage,
+} from "../../api";
 import { Button } from "../ui/index";
 
 const ForgotPasswordPage = () => {
@@ -30,8 +34,10 @@ const ForgotPasswordPage = () => {
           "This account does not have a recovery key set. Please contact an administrator."
         );
       }
-    } catch {
-      setError("Failed to check username. Please try again.");
+    } catch (err) {
+      setError(
+        getErrorMessage(err, "Failed to check username. Please try again.")
+      );
     } finally {
       setLoading(false);
     }
@@ -64,11 +70,8 @@ const ForgotPasswordPage = () => {
     try {
       await forgotPasswordReset(username, recoveryKey, newPassword);
       setSuccess(true);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(
-        axiosErr.response?.data?.error || "Invalid recovery key or username"
-      );
+    } catch (err) {
+      setError(getErrorMessage(err, "Invalid recovery key or username"));
     } finally {
       setLoading(false);
     }

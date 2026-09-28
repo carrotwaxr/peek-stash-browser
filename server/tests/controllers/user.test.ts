@@ -533,7 +533,7 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(404);
     });
 
-    it("returns 401 when current password is incorrect", async () => {
+    it("changePassword answers 400 for a wrong current password", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
@@ -548,8 +548,12 @@ describe("User Controller", () => {
       });
       const res = resFor(changePassword);
       await changePassword(req, res);
-      expect(res._getStatus()).toBe(401);
-      expect(res._getErrorBody().error).toMatch(/incorrect/);
+      // 401 means the session is gone: the client would send the user to
+      // the login page instead of showing this message
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe("Current password is incorrect");
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     it("changes password successfully", async () => {

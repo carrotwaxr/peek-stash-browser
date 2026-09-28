@@ -86,7 +86,7 @@ export const verifyToken = (token: string) => {
   };
 };
 
-// != null, not !== null: a test mock that omits the field passes undefined, and .getTime() on it would throw into the 403 catch.
+// != null, not !== null: a test mock that omits the field passes undefined, and .getTime() on it would throw to the error handler.
 export const tokenPredatesPasswordChange = (
   iat: number | undefined,
   passwordChangedAt: Date | null | undefined
@@ -224,45 +224,53 @@ export const authenticateToken = async (
     return;
   }
 
+  // Every answer here that ends the session is a 401: the client sends a 401,
+  // and only a 401, to the login page. Any other failure (the user lookup on
+  // a busy database, say) goes to the error handler and leaves the session.
+  let decoded: ReturnType<typeof verifyToken>;
   try {
-    const decoded = verifyToken(token as string);
-    const user = await lookupUser({ id: decoded.id });
-    if (!user) {
-      res.status(401).json({ error: "Invalid token. User not found." });
-      return;
-    }
-    const { passwordChangedAt, ...requestUser } = user;
-
-    // A password change or reset ends every session issued before it, and a
-    // session ends 30 days after its password sign-in even while in use
-    if (
-      tokenPredatesPasswordChange(decoded.iat, passwordChangedAt) ||
-      sessionPastMaxAge(decoded.authTime, decoded.iat)
-    ) {
-      res.status(401).json({ error: "Session expired. Please log in again." });
-      return;
-    }
-
-    // Check if token needs refresh (older than threshold)
-    // Only refresh for cookie-based auth (not Bearer tokens from external clients)
-    if (req.cookies?.token && decoded.iat) {
-      const tokenAgeHours = (Date.now() / 1000 - decoded.iat) / 3600;
-      if (tokenAgeHours > TOKEN_REFRESH_THRESHOLD_HOURS) {
-        // Keep the sign-in time, so refreshing never extends the 30 days
-        const newToken = generateToken(
-          { id: user.id, username: user.username, role: user.role },
-          decoded.authTime ?? decoded.iat
-        );
-        setTokenCookie(res, newToken);
-      }
-    }
-
-    // Cast to AuthenticatedRequest to set user property
-    (req as AuthenticatedRequest).user = requestUser;
-    next();
-  } catch {
-    res.status(403).json({ error: "Invalid token." });
+    decoded = verifyToken(token as string);
+  } catch (error) {
+    // Expired, tampered with, or signed with another secret
+    if (!(error instanceof jwt.JsonWebTokenError)) throw error;
+    res.status(401).json({ error: "Invalid token." });
+    return;
   }
+
+  const user = await lookupUser({ id: decoded.id });
+  if (!user) {
+    res.status(401).json({ error: "Invalid token. User not found." });
+    return;
+  }
+  const { passwordChangedAt, ...requestUser } = user;
+
+  // A password change or reset ends every session issued before it, and a
+  // session ends 30 days after its password sign-in even while in use
+  if (
+    tokenPredatesPasswordChange(decoded.iat, passwordChangedAt) ||
+    sessionPastMaxAge(decoded.authTime, decoded.iat)
+  ) {
+    res.status(401).json({ error: "Session expired. Please log in again." });
+    return;
+  }
+
+  // Check if token needs refresh (older than threshold)
+  // Only refresh for cookie-based auth (not Bearer tokens from external clients)
+  if (req.cookies?.token && decoded.iat) {
+    const tokenAgeHours = (Date.now() / 1000 - decoded.iat) / 3600;
+    if (tokenAgeHours > TOKEN_REFRESH_THRESHOLD_HOURS) {
+      // Keep the sign-in time, so refreshing never extends the 30 days
+      const newToken = generateToken(
+        { id: user.id, username: user.username, role: user.role },
+        decoded.authTime ?? decoded.iat
+      );
+      setTokenCookie(res, newToken);
+    }
+  }
+
+  // Cast to AuthenticatedRequest to set user property
+  (req as AuthenticatedRequest).user = requestUser;
+  next();
 };
 
 export const requireAdmin = (

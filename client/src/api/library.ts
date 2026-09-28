@@ -274,7 +274,7 @@ export const libraryApi = {
     };
   },
 
-  // Rating and favorite (delegates to ratings module)
+  // Rating and favorite (PUT /ratings/:type/:id)
   updateRating: async (
     entityType: string,
     entityId: string,

@@ -13,6 +13,7 @@ export {
   apiPut,
   apiDelete,
   ApiError,
+  getErrorMessage,
   REDIRECT_STORAGE_KEY,
   LOGIN_MESSAGE_STORAGE_KEY,
   redirectToLogin,
@@ -21,17 +22,6 @@ export {
 // Library (entity search)
 export { libraryApi, commonFilters, filterHelpers } from "./library";
 export type { LibrarySearchParams } from "./library";
-
-// Ratings
-export {
-  updateSceneRating,
-  updatePerformerRating,
-  updateStudioRating,
-  updateTagRating,
-  updateGalleryRating,
-  updateGroupRating,
-  updateImageRating,
-} from "./ratings";
 
 // Setup
 export { setupApi, userSetupApi } from "./setup";
