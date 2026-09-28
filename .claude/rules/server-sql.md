@@ -64,4 +64,4 @@ A `||` on an id, an instance id or a count needs a `??` review before it changes
 
 SQLite can return `5.0000000001` from an integer column, and BigInt from a large one. Wrap counts in `Math.round(Number(x))` before writing them to an `Int` field (#410), and convert BigInt with `Number()` before JSON.
 
-Prisma's raw queries return `COUNT`, `SUM` and `COALESCE` over integers as `bigint`, a `BIGINT` column such as `fileSize` as `bigint`, and a `BOOLEAN` column as `boolean`. A raw row type says so, and its `Number()` stays: `no-unnecessary-type-conversion` flags one only when the row type wrongly claims `number`.
+Prisma's raw queries return `COUNT`, `SUM` and `COALESCE` over integers as `bigint`, a `BIGINT` column such as `fileSize` as `bigint`, a `BOOLEAN` column as `boolean` (never 0 or 1), and a `DATETIME` column as a `Date`, whether it holds text or epoch milliseconds (text it cannot parse fails the query). A raw row type says so, and its `Number()` stays: `no-unnecessary-type-conversion` flags one only when the row type wrongly claims `number`. A transform writes a `Date` out with `toISOString()`, the string the JSON carried anyway.

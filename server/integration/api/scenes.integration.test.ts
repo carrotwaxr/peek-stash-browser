@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
@@ -13,6 +14,8 @@ interface FindScenesResponse {
     scenes: Array<{
       id: string;
       title?: string;
+      organized?: boolean;
+      created_at?: string | null;
       performers?: Array<{ id: string; name?: string }>;
       tags?: Array<{ id: string; name?: string }>;
       inheritedTagIds?: string[];
@@ -23,10 +26,12 @@ interface FindScenesResponse {
 }
 
 describe("Scene API", () => {
+  let testInstanceId: string;
+
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
     // Select only test instance to avoid ID collisions with other instances
-    await selectTestInstanceOnly();
+    testInstanceId = await selectTestInstanceOnly();
   });
 
   describe("POST /api/library/scenes", () => {
@@ -285,6 +290,42 @@ describe("Scene API", () => {
       for (const id of page2Ids) {
         expect(page1Ids).not.toContain(id);
       }
+    });
+
+    it("carries each scene's organized flag and created date as the cache holds them", async () => {
+      // The replay library marks about half its scenes organized
+      const cached = await prisma.stashScene.findMany({
+        where: { stashInstanceId: testInstanceId, deletedAt: null },
+        select: { id: true, organized: true, stashCreatedAt: true },
+        orderBy: { id: "asc" },
+        take: 50,
+      });
+
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { filter: { per_page: 50 }, ids: cached.map((s) => s.id) }
+      );
+
+      expect(response.ok).toBe(true);
+      const scenes = response.data.findScenes.scenes;
+      expect(scenes.length).toBeGreaterThan(0);
+      // Compared for the scenes the admin sees (another file may leave one hidden)
+      const expected = new Map(
+        cached.map((s) => [
+          s.id,
+          {
+            organized: s.organized,
+            created_at: s.stashCreatedAt?.toISOString() ?? null,
+          },
+        ])
+      );
+      expect(
+        scenes.map((s) => ({
+          id: s.id,
+          organized: s.organized,
+          created_at: s.created_at,
+        }))
+      ).toEqual(scenes.map((s) => ({ id: s.id, ...expected.get(s.id) })));
     });
   });
 

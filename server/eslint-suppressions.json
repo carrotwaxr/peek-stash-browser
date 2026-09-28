@@ -295,7 +295,7 @@
       "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "services/DownloadService.ts": {
@@ -315,12 +315,12 @@
   },
   "services/GalleryQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
+      "count": 13
     }
   },
   "services/GroupQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 17
+      "count": 15
     }
   },
   "services/ImageQueryBuilder.ts": {
@@ -333,7 +333,7 @@
   },
   "services/PerformerQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 31
+      "count": 27
     }
   },
   "services/PlaylistZipService.ts": {
@@ -351,7 +351,7 @@
   },
   "services/SceneQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 17
+      "count": 8
     }
   },
   "services/StashEntityService.ts": {
@@ -369,7 +369,7 @@
   },
   "services/StudioQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 15
+      "count": 13
     }
   },
   "services/TagQueryBuilder.ts": {
@@ -377,7 +377,7 @@
       "count": 4
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 21
+      "count": 19
     }
   },
   "services/TimelineService.ts": {

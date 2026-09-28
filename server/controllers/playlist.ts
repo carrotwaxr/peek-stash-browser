@@ -131,11 +131,7 @@ async function loadItemScenes(
       ...s,
       ...DEFAULT_SCENE_USER_FIELDS,
     }));
-    // Type assertion: cached scenes have o_history as string[] (from DB) vs Date[] in NormalizedScene
-    visibleScenes = await mergeScenesWithUserData(
-      scenesWithDefaults as unknown as NormalizedScene[],
-      userId
-    );
+    visibleScenes = await mergeScenesWithUserData(scenesWithDefaults, userId);
   }
 
   return new Map(visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s]));

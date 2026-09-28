@@ -10,8 +10,10 @@ import { findImages } from "../../../controllers/library/images.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
-import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
-import type { NormalizedImage } from "../../../types/index.js";
+import {
+  type ImageListRow,
+  imageQueryBuilder,
+} from "../../../services/ImageQueryBuilder.js";
 import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { must } from "../../helpers/must.js";
 
@@ -53,32 +55,44 @@ const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
 
-/**
- * A query builder result row. `execute` declares `NormalizedImage[]` but
- * returns hydrated SQL rows of this shape (its `hydrateImages` casts them the
- * same way), which the controller reads; item 74 types the rows honestly.
- */
+/** A row as the query builder's execute returns it, which the controller reads. */
 function createQueryBuilderImage(
-  overrides: Record<string, unknown> = {}
-): NormalizedImage {
-  const row = {
-    id: overrides.id ?? "img1",
-    stashInstanceId: overrides.stashInstanceId ?? "default",
-    instanceId: overrides.instanceId ?? "default",
-    title: overrides.title ?? "Test Image",
+  overrides: Partial<ImageListRow> = {}
+): ImageListRow {
+  return {
+    id: "img1",
+    stashInstanceId: "default",
+    instanceId: "default",
+    title: "Test Image",
+    code: null,
+    details: null,
+    photographer: null,
+    urls: null,
+    date: null,
+    studioId: null,
+    stashRating100: null,
+    stashOCounter: 0,
+    organized: false,
+    filePath: null,
+    width: null,
+    height: null,
+    fileSize: null,
     pathThumbnail: "/api/proxy/image/img1/thumbnail",
     pathPreview: "/api/proxy/image/img1/preview",
     pathImage: "/api/proxy/image/img1/image",
-    userRating: overrides.userRating ?? null,
-    userFavorite: overrides.userFavorite ?? 0,
-    userOCount: overrides.userOCount ?? 0,
-    userViewCount: overrides.userViewCount ?? 0,
-    userLastViewedAt: overrides.userLastViewedAt ?? null,
-    stashRating100: overrides.stashRating100 ?? null,
-    stashOCounter: overrides.stashOCounter ?? 0,
+    stashCreatedAt: null,
+    stashUpdatedAt: null,
+    userRating: null,
+    userFavorite: null,
+    userViewCount: null,
+    userOCount: null,
+    userLastViewedAt: null,
+    performers: [],
+    tags: [],
+    galleries: [],
+    studio: null,
     ...overrides,
   };
-  return row as unknown as NormalizedImage;
 }
 
 describe("Images Controller", () => {

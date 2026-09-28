@@ -29,7 +29,7 @@ import {
   buildNumericFilter,
   parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
@@ -1402,14 +1402,14 @@ class SceneQueryBuilder {
     const scene = {
       id: row.id,
       instanceId: row.stashInstanceId,
-      title: row.title || getSceneFallbackTitle(row.filePath),
-      code: row.code || null,
-      date: row.date || null,
-      details: row.details || null,
-      director: row.director || null,
-      organized: row.organized === 1,
-      created_at: row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt || null,
+      title: emptyToNull(row.title) ?? getSceneFallbackTitle(row.filePath),
+      code: emptyToNull(row.code),
+      date: emptyToNull(row.date),
+      details: emptyToNull(row.details),
+      director: emptyToNull(row.director),
+      organized: row.organized,
+      created_at: row.stashCreatedAt?.toISOString() ?? null,
+      updated_at: row.stashUpdatedAt?.toISOString() ?? null,
 
       // URLs
       urls: parseJsonArray(row.urls),
@@ -1422,14 +1422,15 @@ class SceneQueryBuilder {
       // not the Peek user. Each Peek user starts at 0 for these fields.
       rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
-      favorite: Boolean(row.userFavorite),
+      favorite: row.userFavorite ?? false,
       o_counter: row.userOCount ?? 0,
       play_count: row.userPlayCount ?? 0,
       play_duration: row.userPlayDuration ?? 0,
       resume_time: row.userResumeTime ?? 0,
       play_history: playHistory,
-      o_history: oHistory.map((ts: string) => new Date(ts)),
-      last_played_at: row.userLastPlayedAt || null,
+      // The stored ISO strings, as the JSON carries them
+      o_history: oHistory,
+      last_played_at: row.userLastPlayedAt?.toISOString() ?? null,
       last_o_at: lastOAt,
 
       // File data - build from individual columns
@@ -1438,7 +1439,7 @@ class SceneQueryBuilder {
             {
               path: row.filePath,
               basename:
-                row.filePath.split("/").pop()?.split("\\").pop() ||
+                emptyToNull(row.filePath.split("/").pop()?.split("\\").pop()) ??
                 row.filePath,
               duration: row.duration,
               bit_rate: row.fileBitRate,
