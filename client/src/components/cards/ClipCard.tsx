@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getScenePathWithTime } from "../../utils/entityLinks";
+import {
+  getFilteredListPath,
+  getScenePathWithTime,
+} from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -116,6 +119,15 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
       //     />
       //   );
 
+      // The tags count opens the Tags list through its scene filter, on the
+      // clip's scene and its instance, where the page has one
+      const tagsLink = getFilteredListPath(
+        "/tags",
+        "scenes",
+        { id: clip.sceneId, instanceId: clip.scene?.instanceId },
+        hasMultipleInstances
+      );
+
       return [
         // Performers indicator - needs API enhancement to include scene.performers
         // {
@@ -134,12 +146,19 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
           tooltipContent: tagsTooltip,
           onClick:
             getIndicatorBehavior("clip", "tags") === "nav" &&
-            allTags?.length > 0
-              ? () => navigate(`/tags?sceneId=${clip.sceneId}`)
+            allTags?.length > 0 &&
+            tagsLink
+              ? () => navigate(tagsLink)
               : undefined,
         },
       ];
-    }, [allTags, clip.sceneId, clip.scene?.instanceId, navigate]);
+    }, [
+      allTags,
+      clip.sceneId,
+      clip.scene?.instanceId,
+      navigate,
+      hasMultipleInstances,
+    ]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = clipSettings.showRelationshipIndicators

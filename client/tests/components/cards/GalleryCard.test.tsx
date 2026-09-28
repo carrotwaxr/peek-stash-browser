@@ -1,6 +1,43 @@
 import { createElement } from "react";
-import { describe, expect, it } from "vitest";
+import type * as routerModule from "react-router-dom";
+import type { NormalizedGallery } from "@peek/shared-types";
+import { render } from "@testing-library/react";
+import { must } from "@tests/testUtils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryCard from "../../../src/components/cards/GalleryCard";
+import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
+import { IMAGE_FILTER_OPTIONS } from "../../../src/utils/filterConfig";
+import { parseSearchParams } from "../../../src/utils/urlParams";
+
+const { navigate, baseCardProps } = vi.hoisted(() => ({
+  navigate: vi.fn<(to: string) => void>(),
+  baseCardProps: vi.fn<(props: BaseCardProps) => void>(),
+}));
+
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof routerModule>();
+  return { ...actual, useNavigate: () => navigate };
+});
+vi.mock("../../../src/contexts/ConfigContext", () => ({
+  useConfig: () => ({ hasMultipleInstances: true }),
+}));
+vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
+  useCardDisplaySettings: () => ({
+    getSettings: () => ({ showRelationshipIndicators: true }),
+  }),
+}));
+// Every count set to open a list, as a user's settings could: scenes and
+// images are "nav" by default, performers and tags "rich"
+vi.mock("../../../src/config/indicatorBehaviors", () => ({
+  getIndicatorBehavior: () => "nav",
+}));
+// Captures the indicators GalleryCard hands to BaseCard
+vi.mock("../../../src/components/ui/BaseCard", () => ({
+  BaseCard: (props: BaseCardProps) => {
+    baseCardProps(props);
+    return null;
+  },
+}));
 
 describe("GalleryCard", () => {
   const mockGallery = {
@@ -86,4 +123,54 @@ describe("GalleryCard", () => {
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });
+});
+
+describe("GalleryCard indicator links", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** A gallery on inst-a with something behind every count */
+  const renderCard = () => {
+    render(
+      <GalleryCard
+        gallery={
+          {
+            id: "12",
+            instanceId: "inst-a",
+            title: "Beach",
+            image_count: 25,
+            performers: [{ id: "1", name: "P" }],
+            tags: [{ id: "1", name: "T" }],
+            scenes: [{ id: "4", title: "S", paths: { screenshot: null } }],
+          } as NormalizedGallery
+        }
+      />
+    );
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    return (type: string) =>
+      must(
+        props.indicators?.find((each) => each.type === type),
+        `the ${type} indicator`
+      );
+  };
+
+  it("the images count opens the Images page filtered to the gallery on its instance", () => {
+    must(renderCard()("IMAGES").onClick, "the images link")();
+
+    const to = must(navigate.mock.lastCall, "a navigation")[0];
+    expect(to).toBe("/images?galleryId=12&instance=inst-a");
+    const url = new URL(to, "http://peek.test");
+    const { filters } = parseSearchParams(url.searchParams, [
+      ...IMAGE_FILTER_OPTIONS,
+    ]);
+    expect(filters.galleryIds).toEqual(["12:inst-a"]);
+  });
+
+  it.each(["SCENES", "PERFORMERS", "TAGS"])(
+    "the %s count opens nothing: that list page has no gallery filter",
+    (type) => {
+      expect(renderCard()(type).onClick).toBeUndefined();
+    }
+  );
 });

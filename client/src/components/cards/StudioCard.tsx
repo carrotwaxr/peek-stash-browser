@@ -4,7 +4,7 @@ import type { NormalizedStudio } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
@@ -73,36 +73,36 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
+      // Each count opens its list through that page's studio filter
+      const scenesLink = getFilteredListPath(
+        "/scenes",
+        "studios",
+        studio,
+        hasMultipleInstances
+      );
+      const imagesLink = getFilteredListPath(
+        "/images",
+        "studios",
+        studio,
+        hasMultipleInstances
+      );
+
       return [
         { type: "PLAY_COUNT", count: studio.play_count },
         {
           type: "SCENES",
           count: studio.scene_count,
           onClick:
-            studio.scene_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/scenes?studioId=${studio.id}`,
-                      studio,
-                      hasMultipleInstances
-                    )
-                  )
+            studio.scene_count > 0 && scenesLink
+              ? () => navigate(scenesLink)
               : undefined,
         },
         {
           type: "IMAGES",
           count: studio.image_count,
           onClick:
-            studio.image_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/images?studioId=${studio.id}`,
-                      studio,
-                      hasMultipleInstances
-                    )
-                  )
+            studio.image_count > 0 && imagesLink
+              ? () => navigate(imagesLink)
               : undefined,
         },
         {

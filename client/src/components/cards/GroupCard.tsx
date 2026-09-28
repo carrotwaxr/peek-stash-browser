@@ -4,7 +4,7 @@ import type { NormalizedGroup } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
@@ -78,41 +78,39 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
+      // Each count opens its list through that page's collection filter;
+      // on the Collections page it is "Parent collection", so the
+      // sub-collections count lists this collection's sub-collections
+      const scenesLink = getFilteredListPath(
+        "/scenes",
+        "groups",
+        group,
+        hasMultipleInstances
+      );
+      const subCollectionsLink = getFilteredListPath(
+        "/collections",
+        "groups",
+        group,
+        hasMultipleInstances
+      );
+
       return [
         {
-          // The singular groupId: urlParamsToFilters joins it with the
-          // instance param into "id:instance"; a plural groupIds drops it
           type: "SCENES",
           count: group.scene_count,
           onClick:
-            group.scene_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/scenes?groupId=${group.id}`,
-                      group,
-                      hasMultipleInstances
-                    )
-                  )
+            group.scene_count > 0 && scenesLink
+              ? () => navigate(scenesLink)
               : undefined,
         },
         {
-          // Sub-collections: the singular groupId, with the instance param,
-          // becomes the "Parent collection" filter's "id:instance" value
           type: "GROUPS",
           count: group.sub_group_count,
           countLabel: (count: number) =>
             count === 1 ? "1 sub-collection" : `${count} sub-collections`,
           onClick:
-            group.sub_group_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/collections?groupId=${group.id}`,
-                      group,
-                      hasMultipleInstances
-                    )
-                  )
+            group.sub_group_count > 0 && subCollectionsLink
+              ? () => navigate(subCollectionsLink)
               : undefined,
         },
         {

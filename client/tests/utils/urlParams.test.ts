@@ -5,6 +5,12 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  IMAGE_FILTER_OPTIONS,
+  SCENE_FILTER_OPTIONS,
+  buildImageFilter,
+  buildSceneFilter,
+} from "@/utils/filterConfig";
+import {
   buildSearchParams as _buildSearchParams,
   parseSearchParams,
 } from "@/utils/urlParams";
@@ -375,15 +381,79 @@ describe("parseSearchParams - additional filter types", () => {
     expect(result.timelinePeriod).toBe("2024-01");
   });
 
-  it("skips singularProcessedKeys when parsing standard filters", () => {
-    // When performerId is present, it processes into performerIds
-    // Then the regular performerIds handling (including modifierKey) is skipped
-    const params = new URLSearchParams("performerId=82&instance=server-1");
+  it("a singular param sets the option's value; its modifier and depth are still read", () => {
+    const params = new URLSearchParams(
+      "performerId=82&instance=server-1&performerIdsModifier=EXCLUDES&performerIdsDepth=2"
+    );
     const result = parseSearchParams(params, extendedFilterOptions);
-    // performerIds should come from singular mapping
     expect(result.filters.performerIds).toEqual(["82:server-1"]);
-    // modifierKey is skipped because the key was handled by singular-to-plural mapping
-    expect(result.filters.performerIdsModifier).toBeUndefined();
+    expect(result.filters.performerIdsModifier).toBe("EXCLUDES");
+    expect(result.filters.performerIdsDepth).toBe(2);
+  });
+});
+
+describe("parseSearchParams - a list page reads only the entity params it declares (FILTERS-11)", () => {
+  it("a galleryId param on a page without a galleryIds option is ignored", () => {
+    // The Scenes page has no gallery filter
+    const { filters } = parseSearchParams(
+      new URLSearchParams("galleryId=12&instance=abc"),
+      [...SCENE_FILTER_OPTIONS]
+    );
+    expect(filters).not.toHaveProperty("galleryIds");
+    expect(buildSceneFilter(filters)).not.toHaveProperty("galleries");
+  });
+
+  it("studioId on the Images page sets its Studios filter, studioIds, with the instance", () => {
+    const { filters } = parseSearchParams(
+      new URLSearchParams("studioId=3&instance=abc"),
+      [...IMAGE_FILTER_OPTIONS]
+    );
+    expect(filters.studioIds).toEqual(["3:abc"]);
+    expect(filters).not.toHaveProperty("studioId");
+    expect(buildImageFilter(filters).studios).toEqual({
+      value: ["3:abc"],
+      modifier: "INCLUDES",
+    });
+  });
+
+  it("every entity option reads its key in the singular, with the instance", () => {
+    const options = [
+      { key: "sceneId", type: "searchable-select", multi: false },
+      { key: "sceneTagIds", type: "searchable-select", multi: true },
+    ];
+    const { filters } = parseSearchParams(
+      new URLSearchParams("sceneId=5&sceneTagId=9&instance=abc"),
+      options
+    );
+    expect(filters.sceneId).toBe("5:abc");
+    expect(filters.sceneTagIds).toEqual(["9:abc"]);
+  });
+
+  it("a single-select value that names its instance keeps it beside the page's instance", () => {
+    // A detail page's URL: instance is the page's entity, studioId the
+    // user's filter, written as "id:instance"
+    const { filters } = parseSearchParams(
+      new URLSearchParams("instance=abc&studioId=3:def&studioIdDepth=-1"),
+      [...SCENE_FILTER_OPTIONS]
+    );
+    expect(filters.studioId).toBe("3:def");
+    expect(filters.studioIdDepth).toBe(-1);
+  });
+
+  it("an empty singular param is ignored", () => {
+    const { filters } = parseSearchParams(
+      new URLSearchParams("tagId=&instance=abc"),
+      mockFilterOptions
+    );
+    expect(filters).not.toHaveProperty("tagIds");
+  });
+
+  it("a single-select value is never split on commas", () => {
+    const { filters } = parseSearchParams(
+      new URLSearchParams("studioId=3,4"),
+      mockFilterOptions
+    );
+    expect(filters.studioId).toBe("3,4");
   });
 });
 

@@ -4,7 +4,7 @@ import type { NormalizedPerformer } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import { BaseCard } from "../ui/BaseCard";
 import GenderIcon from "../ui/GenderIcon";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -81,21 +81,28 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
+      // Each count opens its list through that page's performer filter
+      const scenesLink = getFilteredListPath(
+        "/scenes",
+        "performers",
+        performer,
+        hasMultipleInstances
+      );
+      const imagesLink = getFilteredListPath(
+        "/images",
+        "performers",
+        performer,
+        hasMultipleInstances
+      );
+
       return [
         { type: "PLAY_COUNT", count: performer.play_count },
         {
           type: "SCENES",
           count: performer.scene_count,
           onClick:
-            performer.scene_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/scenes?performerId=${performer.id}`,
-                      performer,
-                      hasMultipleInstances
-                    )
-                  )
+            performer.scene_count > 0 && scenesLink
+              ? () => navigate(scenesLink)
               : undefined,
         },
         {
@@ -110,15 +117,8 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
           type: "IMAGES",
           count: performer.image_count,
           onClick:
-            performer.image_count > 0
-              ? () =>
-                  navigate(
-                    appendInstanceParam(
-                      `/images?performerId=${performer.id}`,
-                      performer,
-                      hasMultipleInstances
-                    )
-                  )
+            performer.image_count > 0 && imagesLink
+              ? () => navigate(imagesLink)
               : undefined,
         },
         {

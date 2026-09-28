@@ -5,6 +5,17 @@
  * the instance ID as a query parameter to disambiguate entities with
  * the same ID across different instances.
  */
+import {
+  type FilterOption,
+  GALLERY_FILTER_OPTIONS,
+  GROUP_FILTER_OPTIONS,
+  IMAGE_FILTER_OPTIONS,
+  PERFORMER_FILTER_OPTIONS,
+  SCENE_FILTER_OPTIONS,
+  STUDIO_FILTER_OPTIONS,
+  TAG_FILTER_OPTIONS,
+} from "./filterConfig";
+import { entityParamFor } from "./urlParams";
 
 const ENTITY_PATHS: Record<string, string> = {
   performer: "/performer",
@@ -56,6 +67,74 @@ export function getEntityPath(
 }
 
 /**
+ * Adds the entity's instance to a list link when there are several servers;
+ * the list page joins it with the link's entity param into "id:instance".
+ */
+function appendInstanceParam(
+  url: string,
+  entity: EntityLike,
+  hasMultipleInstances: boolean
+) {
+  if (hasMultipleInstances && entity.instanceId) {
+    return `${url}&instance=${encodeURIComponent(entity.instanceId)}`;
+  }
+  return url;
+}
+
+/** The list pages a card's count can open, with the filters each declares */
+const LIST_PAGE_FILTERS = {
+  "/scenes": SCENE_FILTER_OPTIONS,
+  "/performers": PERFORMER_FILTER_OPTIONS,
+  "/studios": STUDIO_FILTER_OPTIONS,
+  "/tags": TAG_FILTER_OPTIONS,
+  "/collections": GROUP_FILTER_OPTIONS,
+  "/galleries": GALLERY_FILTER_OPTIONS,
+  "/images": IMAGE_FILTER_OPTIONS,
+} satisfies Record<string, readonly FilterOption[]>;
+
+type ListPage = keyof typeof LIST_PAGE_FILTERS;
+
+/** An entity type as the filter options name it (`entityType`) */
+type FilterEntityType =
+  | "scenes"
+  | "performers"
+  | "studios"
+  | "tags"
+  | "groups"
+  | "galleries";
+
+/**
+ * The link a card's count opens: the list page filtered to one entity through
+ * the page's own filter for that entity type, in the singular param the page
+ * reads (`/scenes?tagId=5` for the Scenes page's `tagIds`), with the entity's
+ * instance when there are several servers. Undefined when the page has no
+ * filter for that type, so a count never opens an unfiltered list.
+ *
+ * @param listPage - The list page to open
+ * @param entityType - The card's entity type, as the filter options name it
+ * @param entity - The card's entity, with its instance
+ * @param hasMultipleInstances - Whether multiple Stash instances are configured
+ */
+export function getFilteredListPath(
+  listPage: ListPage,
+  entityType: FilterEntityType,
+  entity: EntityLike,
+  hasMultipleInstances: boolean
+): string | undefined {
+  const options: readonly FilterOption[] = LIST_PAGE_FILTERS[listPage];
+  const option = options.find(
+    (each) =>
+      each.type === "searchable-select" && each.entityType === entityType
+  );
+  if (!option || entity.id == null) return undefined;
+  return appendInstanceParam(
+    `${listPage}?${entityParamFor(option.key)}=${encodeURIComponent(String(entity.id))}`,
+    entity,
+    hasMultipleInstances
+  );
+}
+
+/**
  * Generate a path for a scene detail page with a timestamp.
  * Used for clips and resume points.
  *
@@ -64,27 +143,6 @@ export function getEntityPath(
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} The path to the scene at the specified time
  */
-/**
- * Append instance query parameter to a filter URL for multi-instance disambiguation.
- * Used by card indicator click handlers that navigate to filtered list views
- * (e.g., /scenes?performerId=2&instance=abc-123).
- *
- * @param {string} url - Base URL with existing query params (e.g., "/scenes?performerId=2")
- * @param {Object} entity - Entity object with instanceId
- * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
- * @returns {string} URL with instance param appended if needed
- */
-export function appendInstanceParam(
-  url: string,
-  entity: EntityLike,
-  hasMultipleInstances: boolean
-) {
-  if (hasMultipleInstances && entity?.instanceId) {
-    return `${url}&instance=${encodeURIComponent(entity.instanceId)}`;
-  }
-  return url;
-}
-
 export function getScenePathWithTime(
   scene: EntityLike | string,
   time: number,
