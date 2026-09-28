@@ -19,6 +19,7 @@ import {
   mergeScenesWithUserData,
 } from "../../../controllers/library/scenes.js";
 import prisma from "../../../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../../../services/EntityAccessService.js";
 import type * as recommendationScoringModule from "../../../services/RecommendationScoringService.js";
 import {
   hasAnyCriteria,
@@ -72,7 +73,12 @@ vi.mock("../../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: {
     execute: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
     getByIds: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
+    getByRefs: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
   },
+}));
+
+vi.mock("../../../services/EntityAccessService.js", () => ({
+  resolveAccessibleInstanceId: vi.fn().mockResolvedValue("inst-a"),
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
@@ -168,6 +174,7 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
+const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
 const mockScore = vi.mocked(scoreScoringDataByPreferences);
 const mockLogger = vi.mocked(logger, true);
@@ -662,6 +669,12 @@ describe("findScenes", () => {
 });
 
 describe("findSimilarScenes", () => {
+  beforeEach(() => {
+    mockResolveInstance.mockResolvedValue("inst-a");
+    mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue({ scenes: [], total: 0 });
+  });
+
   it("returns 401 when user is not authenticated", async () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "s1" },
@@ -674,9 +687,31 @@ describe("findSimilarScenes", () => {
     expect(res._getStatus()).toBe(401);
   });
 
-  it("returns empty result when no candidates found", async () => {
-    mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
+  it("404 when the seed is not visible to the user", async () => {
+    mockResolveInstance.mockResolvedValue(null);
 
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      user: testUser(),
+      query: { page: "1", instanceId: "inst-b" },
+    });
+    const res = resFor(findSimilarScenes);
+
+    await findSimilarScenes(req, res);
+
+    expect(res._getStatus()).toBe(404);
+    expect(mockResolveInstance).toHaveBeenCalledWith(
+      testUser().id,
+      "scene",
+      "s1",
+      "inst-b"
+    );
+    expect(
+      mockStashEntityService.getSimilarSceneCandidates
+    ).not.toHaveBeenCalled();
+  });
+
+  it("returns empty result when no candidates found", async () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "s1" },
       user: testUser(),
@@ -690,22 +725,67 @@ describe("findSimilarScenes", () => {
     const body = res._getOkBody();
     expect(body.scenes).toEqual([]);
     expect(body.count).toBe(0);
+    // The seed is passed with the instance the access check resolved
+    expect(
+      mockStashEntityService.getSimilarSceneCandidates
+    ).toHaveBeenCalledWith(
+      { id: "s1", instanceId: "inst-a" },
+      testUser().id,
+      500
+    );
   });
 
-  it("returns paginated similar scenes", async () => {
-    const candidates = [
-      { sceneId: "c1", weight: 10, date: "2025-01-01" },
-      { sceneId: "c2", weight: 8, date: "2025-01-02" },
-    ];
+  it("fetches the page by (id, instance) refs in candidate order", async () => {
+    const candidate = (sceneId: string, weight: number) => ({
+      sceneId,
+      instanceId: "inst-a",
+      weight,
+      date: null,
+    });
+    // 13 candidates: page 2 holds the 13th only
     mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue(
-      candidates
+      Array.from({ length: 13 }, (_, i) => candidate(`c${i + 1}`, 13 - i))
     );
+    const scene13 = createMockScene({ id: "c13", instanceId: "inst-a" });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
+      scenes: [scene13],
+      total: 1,
+    });
 
-    const scene1 = createMockScene({ id: "c1" });
-    const scene2 = createMockScene({ id: "c2" });
-    mockSceneQueryBuilder.getByIds.mockResolvedValue({
-      scenes: [scene2, scene1], // intentionally out of order
-      total: 2,
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      user: testUser(),
+      query: { page: "2", instanceId: "inst-a" },
+    });
+    const res = resFor(findSimilarScenes);
+
+    await findSimilarScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockSceneQueryBuilder.getByRefs).toHaveBeenCalledWith({
+      userId: testUser().id,
+      refs: [{ id: "c13", instanceId: "inst-a" }],
+      allowedInstanceIds: ["default"],
+    });
+    const body = res._getOkBody();
+    expect(body.scenes.map((s) => s.id)).toEqual(["c13"]);
+    expect(body.count).toBe(13);
+    expect(body.page).toBe(2);
+  });
+
+  it("returns paginated similar scenes in score order", async () => {
+    mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([
+      { sceneId: "c1", instanceId: "inst-a", weight: 10, date: "2025-01-01" },
+      { sceneId: "c2", instanceId: "inst-a", weight: 8, date: "2025-01-02" },
+    ]);
+
+    const scene1 = createMockScene({ id: "c1", instanceId: "inst-a" });
+    const scene2 = createMockScene({ id: "c2", instanceId: "inst-a" });
+    // A same-id scene on another instance is not the one the candidate named
+    const other = createMockScene({ id: "c1", instanceId: "inst-b" });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
+      scenes: [scene2, other, scene1], // intentionally out of order
+      total: 3,
     });
 
     const req = reqFor(findSimilarScenes, {
@@ -720,7 +800,10 @@ describe("findSimilarScenes", () => {
     expect(res._getStatus()).toBe(200);
     const body = res._getOkBody();
     // Should preserve score order (c1 first, higher weight)
-    expect(body.scenes.map((s) => s.id)).toEqual(["c1", "c2"]);
+    expect(body.scenes.map((s) => `${s.id}:${s.instanceId}`)).toEqual([
+      "c1:inst-a",
+      "c2:inst-a",
+    ]);
     expect(body.count).toBe(2);
   });
 

@@ -10,6 +10,7 @@ import {
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
@@ -41,6 +42,9 @@ const SceneContent = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // The sidebar column exists from lg up; below it, mount nothing there
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   // Set page title to scene title (with fallback to filename)
   const sceneFiles = scene?.files as Array<Record<string, unknown>> | undefined;
@@ -214,9 +218,11 @@ const SceneContent = () => {
               {playlist ? (
                 <PlaylistSidebar maxHeight={sidebarHeight ?? undefined} />
               ) : (
+                isDesktop &&
                 scene && (
                   <RecommendedSidebar
                     sceneId={scene.id}
+                    instanceId={scene.instanceId}
                     maxHeight={sidebarHeight ?? undefined}
                   />
                 )
@@ -271,6 +277,7 @@ const SceneContent = () => {
               <div className="mt-6">
                 <ScenesLikeThis
                   sceneId={scene.id}
+                  instanceId={scene.instanceId}
                   onCountChange={setSimilarScenesCount}
                 />
               </div>

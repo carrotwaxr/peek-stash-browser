@@ -36,6 +36,10 @@ When viewing a scene, the sidebar shows related recommendations:
 - Same studio
 - Matching tags
 
+### Similar Scenes
+
+The scene page's **Similar Scenes** tab (and the sidebar, which shows its first page) lists scenes that share the scene's performers, studio or tags, the closest matches first. Only scenes from the same server as the scene you are viewing are listed, and never a scene you can't see: hidden and restricted scenes are left out of the list and its count.
+
 ## Building Your Profile
 
 ### Getting Started

@@ -134,3 +134,48 @@ test.describe("Scene Library", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Scene page", () => {
+  interface FoundScenes {
+    findScenes: { scenes: Array<{ id: string; instanceId: string }> };
+  }
+
+  test("a scene page requests similar scenes once", async ({ page }) => {
+    const found = await page.request.post("/api/library/scenes", {
+      data: { filter: { per_page: 1 } },
+    });
+    expect(found.ok(), await found.text()).toBeTruthy();
+    const scene = requireData(
+      ((await found.json()) as FoundScenes).findScenes.scenes[0],
+      "scenes"
+    );
+    const url = `/scene/${scene.id}?instance=${encodeURIComponent(scene.instanceId)}`;
+
+    // Desktop mounts the Recommended sidebar beside the Similar Scenes tab;
+    // mobile has the tab alone. Each layout asks for page 1 once.
+    for (const viewport of [
+      { width: 1280, height: 720 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      let similarRequests = 0;
+      const count = (request: { url(): string }) => {
+        if (request.url().includes("/similar?")) similarRequests += 1;
+      };
+      page.on("request", count);
+      const firstResponse = page.waitForResponse((r) =>
+        r.url().includes("/similar?")
+      );
+      await page.goto(url);
+      await firstResponse;
+      await expect(
+        page.getByRole("button", { name: /^Similar Scenes/ })
+      ).toBeVisible({ timeout: 10_000 });
+      // A second request, if any, follows the first within the same render
+      await page.waitForTimeout(1_000);
+      page.off("request", count);
+
+      expect(similarRequests, `at ${viewport.width}px`).toBe(1);
+    }
+  });
+});

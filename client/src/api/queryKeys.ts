@@ -17,6 +17,8 @@ export const queryKeys = {
       ["scenes", instanceId, "detail", id] as const,
     externalPlayerLink: (instanceId: string | undefined, id: string) =>
       ["scenes", instanceId, "externalPlayerLink", id] as const,
+    similar: (instanceId: string, id: string, page: number) =>
+      ["scenes", instanceId, "similar", id, page] as const,
   },
   performers: {
     all: (instanceId?: string) => ["performers", instanceId] as const,

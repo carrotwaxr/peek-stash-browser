@@ -1,5 +1,6 @@
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import {
@@ -32,7 +33,7 @@ import type {
 } from "../../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
-import { entityKey } from "../../utils/entityRef.js";
+import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import { readHistory } from "../../utils/historyJson.js";
 import { logger } from "../../utils/logger.js";
 import {
@@ -40,6 +41,7 @@ import {
   generateDailySeed,
   parseRandomSort,
 } from "../../utils/seededRandom.js";
+import { emptyToNull } from "../../utils/sqlHelpers.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -328,14 +330,14 @@ export const findScenes = async (
 };
 
 /**
- * Find similar scenes based on weighted scoring
- * Performers: 3 points each
- * Studio: 2 points
- * Tags: 1 point each
+ * "Scenes like this": scenes on the seed's instance sharing its performers
+ * (3 points each), studio (2) or tags (1 each), most shared first.
  *
- * Uses SQL-based candidate selection (max 500 candidates) for scalability:
- * 1. SQL query finds scenes sharing performers, tags, or studio with weights
- * 2. SceneQueryBuilder fetches full scene data for paginated results
+ * The seed is resolved through the user's own access check (404 when it is
+ * hidden, restricted, deleted or on an instance the user doesn't see), the
+ * candidates come from one SQL query with the exclusion anti-join (at most
+ * 500), and the requested page is fetched by (id, instance) refs through the
+ * scene builder, which applies the exclusions and allowed instances again.
  */
 export const findSimilarScenes = async (
   req: TypedAuthRequest<
@@ -348,7 +350,7 @@ export const findSimilarScenes = async (
   const startTime = Date.now();
   try {
     const { id } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
+    const page = parseInt(req.query.page ?? "") || 1;
     const perPage = 12;
     const userId = req.user?.id;
 
@@ -357,66 +359,53 @@ export const findSimilarScenes = async (
       return;
     }
 
-    // Get pre-computed scene exclusions for this user
-    const excludedIds = await entityExclusionHelper.getExcludedIds(
+    const instanceId = await resolveAccessibleInstanceId(
       userId,
-      "scene"
-    );
-
-    // Use SQL-based candidate selection (max 500 candidates)
-    // This replaces loading ALL scenes and scoring in memory
-    const candidates = await stashEntityService.getSimilarSceneCandidates(
+      "scene",
       id,
-      excludedIds,
-      500 // Max candidates
+      emptyToNull(req.query.instanceId) ?? undefined
+    );
+    if (!instanceId) {
+      res.status(404).json({ error: "Scene not found" });
+      return;
+    }
+
+    const candidates = await stashEntityService.getSimilarSceneCandidates(
+      { id, instanceId },
+      userId,
+      500
     );
 
-    // Empty result if no candidates found
-    if (candidates.length === 0) {
-      res.json({
-        scenes: [],
-        count: 0,
-        page,
-        perPage,
-      });
-      return;
-    }
-
-    // Paginate candidate IDs (already sorted by weight desc, date desc from SQL)
+    // The page's refs, in candidate order (weight desc, date desc from SQL)
     const startIndex = (page - 1) * perPage;
-    const paginatedIds = candidates
+    const pageRefs: EntityRef[] = candidates
       .slice(startIndex, startIndex + perPage)
-      .map((c) => c.sceneId);
+      .map((c) => ({ id: c.sceneId, instanceId: c.instanceId }));
 
-    if (paginatedIds.length === 0) {
-      res.json({
-        scenes: [],
-        count: candidates.length,
-        page,
-        perPage,
-      });
+    if (pageRefs.length === 0) {
+      res.json({ scenes: [], count: candidates.length, page, perPage });
       return;
     }
 
-    // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-
-    // Fetch full scene data via SceneQueryBuilder
-    const { scenes } = await sceneQueryBuilder.getByIds({
+    const { scenes } = await sceneQueryBuilder.getByRefs({
       userId,
-      ids: paginatedIds,
+      refs: pageRefs,
       allowedInstanceIds,
     });
 
-    // Preserve score order (getByIds may return in different order)
-    const sceneMap = new Map(scenes.map((s) => [s.id, s]));
-    const orderedScenes = paginatedIds
-      .map((id) => sceneMap.get(id))
+    // Back into candidate order, each scene by its (id, instance)
+    const sceneByKey = new Map(
+      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+    );
+    const orderedScenes = pageRefs
+      .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
       .filter((s): s is NormalizedScene => s !== undefined);
 
     logger.debug("findSimilarScenes completed", {
       totalTime: `${Date.now() - startTime}ms`,
       sceneId: id,
+      instanceId,
       candidateCount: candidates.length,
       resultCount: orderedScenes.length,
       page,
