@@ -12,15 +12,12 @@ import { ApiError } from "../../api/client";
 export const SESSION_EXPIRED_PLAYBACK_MESSAGE =
   "Your session expired while the video was paused. Log in to keep watching.";
 
-/** True only when /auth/check answers 401 or 403. */
+/** True only when /auth/check answers 401. */
 export async function isSessionExpired(): Promise<boolean> {
   try {
     await apiGet("/auth/check");
     return false;
   } catch (error) {
-    return (
-      error instanceof ApiError &&
-      (error.status === 401 || error.status === 403)
-    );
+    return error instanceof ApiError && error.status === 401;
   }
 }

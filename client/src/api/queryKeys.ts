@@ -28,10 +28,6 @@ export const queryKeys = {
       ["performers", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["performers", instanceId, "detail", id] as const,
-    minimal: (
-      instanceId: string | undefined,
-      params: Record<string, unknown>
-    ) => ["performers", instanceId, "minimal", params] as const,
   },
   studios: {
     all: (instanceId?: string) => ["studios", instanceId] as const,
@@ -39,10 +35,6 @@ export const queryKeys = {
       ["studios", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["studios", instanceId, "detail", id] as const,
-    minimal: (
-      instanceId: string | undefined,
-      params: Record<string, unknown>
-    ) => ["studios", instanceId, "minimal", params] as const,
   },
   tags: {
     all: (instanceId?: string) => ["tags", instanceId] as const,
@@ -52,10 +44,6 @@ export const queryKeys = {
       ["tags", undefined, "tree", scope ?? null] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["tags", instanceId, "detail", id] as const,
-    minimal: (
-      instanceId: string | undefined,
-      params: Record<string, unknown>
-    ) => ["tags", instanceId, "minimal", params] as const,
   },
   galleries: {
     all: (instanceId?: string) => ["galleries", instanceId] as const,
@@ -63,10 +51,6 @@ export const queryKeys = {
       ["galleries", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["galleries", instanceId, "detail", id] as const,
-    minimal: (
-      instanceId: string | undefined,
-      params: Record<string, unknown>
-    ) => ["galleries", instanceId, "minimal", params] as const,
   },
   groups: {
     all: (instanceId?: string) => ["groups", instanceId] as const,
@@ -74,10 +58,6 @@ export const queryKeys = {
       ["groups", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["groups", instanceId, "detail", id] as const,
-    minimal: (
-      instanceId: string | undefined,
-      params: Record<string, unknown>
-    ) => ["groups", instanceId, "minimal", params] as const,
   },
   images: {
     all: (instanceId?: string) => ["images", instanceId] as const,

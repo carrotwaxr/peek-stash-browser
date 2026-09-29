@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./themes/fonts";
 import "./index.css";
+import { removeLegacyPickerCaches } from "./utils/removeLegacyPickerCaches";
+
+removeLegacyPickerCaches();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root element");

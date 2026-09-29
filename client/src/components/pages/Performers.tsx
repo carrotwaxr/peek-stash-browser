@@ -82,7 +82,7 @@ const Performers = () => {
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
-  const { isTVMode, tvNavigation, searchControlsProps, gridItemProps } =
+  const { isTVMode, searchControlsProps, gridItemProps } =
     useGridPageTVNavigation({
       items: currentPerformers,
       columns,
@@ -114,26 +114,6 @@ const Performers = () => {
 
   return (
     <PageLayout>
-      {/* TV Mode Zone Indicator (temporary for testing) */}
-      {isTVMode && (
-        <div
-          style={{
-            position: "fixed",
-            top: "10px",
-            right: "10px",
-            zIndex: 9999,
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            color: "white",
-            padding: "8px 12px",
-            borderRadius: "4px",
-            fontSize: "14px",
-            fontFamily: "monospace",
-          }}
-        >
-          Zone: <strong>{tvNavigation.currentZone}</strong>
-        </div>
-      )}
-
       <div ref={pageRef}>
         <PageHeader
           title="Performers"

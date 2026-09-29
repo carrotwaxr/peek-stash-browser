@@ -21,11 +21,8 @@ describe("isSessionExpired", () => {
     vi.clearAllMocks();
   });
 
-  it("is true when /auth/check fails with 401 or 403", async () => {
+  it("is true when /auth/check fails with 401", async () => {
     mockApiGet.mockRejectedValueOnce(new ApiError("No token", 401));
-    await expect(isSessionExpired()).resolves.toBe(true);
-
-    mockApiGet.mockRejectedValueOnce(new ApiError("Invalid token", 403));
     await expect(isSessionExpired()).resolves.toBe(true);
 
     expect(mockApiGet).toHaveBeenCalledWith("/auth/check");

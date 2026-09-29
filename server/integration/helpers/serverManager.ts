@@ -7,10 +7,6 @@ export function setServerInstance(server: Server): void {
   serverInstance = server;
 }
 
-export function getServerInstance(): Server | null {
-  return serverInstance;
-}
-
 export async function stopServer(): Promise<void> {
   const server = serverInstance;
   if (server) {

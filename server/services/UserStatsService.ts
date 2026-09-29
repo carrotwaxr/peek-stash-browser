@@ -23,26 +23,6 @@ import { stashInstanceManager } from "./StashInstanceManager.js";
  * - Expected: 90-95% reduction in request time
  */
 
-interface PerformerStats {
-  performerId: string;
-  oCounter: number;
-  playCount: number;
-  lastPlayedAt: string | null;
-  lastOAt: string | null;
-}
-
-interface StudioStats {
-  studioId: string;
-  oCounter: number;
-  playCount: number;
-}
-
-interface TagStats {
-  tagId: string;
-  oCounter: number;
-  playCount: number;
-}
-
 /** The fields a failure log carries for an error: Prisma code and message. */
 function describeError(error: unknown): {
   code?: string | undefined;
@@ -60,94 +40,6 @@ function describeError(error: unknown): {
 }
 
 class UserStatsService {
-  /**
-   * Get all performer stats for a user
-   * Returns a Map for O(1) lookup by performerId
-   */
-  async getPerformerStats(
-    userId: number
-  ): Promise<Map<string, Omit<PerformerStats, "performerId">>> {
-    const stats = await prisma.userPerformerStats.findMany({
-      where: { userId },
-      select: {
-        performerId: true,
-        instanceId: true,
-        oCounter: true,
-        playCount: true,
-        lastPlayedAt: true,
-        lastOAt: true,
-      },
-    });
-
-    return new Map(
-      stats.map((s) => [
-        entityKey(s.performerId, s.instanceId),
-        {
-          oCounter: s.oCounter,
-          playCount: s.playCount,
-          lastPlayedAt: s.lastPlayedAt?.toISOString() ?? null,
-          lastOAt: s.lastOAt?.toISOString() ?? null,
-        },
-      ])
-    );
-  }
-
-  /**
-   * Get all studio stats for a user
-   * Returns a Map for O(1) lookup by studioId
-   */
-  async getStudioStats(
-    userId: number
-  ): Promise<Map<string, Omit<StudioStats, "studioId">>> {
-    const stats = await prisma.userStudioStats.findMany({
-      where: { userId },
-      select: {
-        studioId: true,
-        instanceId: true,
-        oCounter: true,
-        playCount: true,
-      },
-    });
-
-    return new Map(
-      stats.map((s) => [
-        entityKey(s.studioId, s.instanceId),
-        {
-          oCounter: s.oCounter,
-          playCount: s.playCount,
-        },
-      ])
-    );
-  }
-
-  /**
-   * Get all tag stats for a user
-   * Returns a Map for O(1) lookup by tagId
-   */
-  async getTagStats(
-    userId: number
-  ): Promise<Map<string, Omit<TagStats, "tagId">>> {
-    const stats = await prisma.userTagStats.findMany({
-      where: { userId },
-      select: {
-        tagId: true,
-        instanceId: true,
-        oCounter: true,
-        playCount: true,
-      },
-    });
-
-    return new Map(
-      stats.map((s) => [
-        entityKey(s.tagId, s.instanceId),
-        {
-          oCounter: s.oCounter,
-          playCount: s.playCount,
-        },
-      ])
-    );
-  }
-
   /**
    * Update stats for all entities (performers, studio, tags) in a scene
    * Called when watch history is created or updated

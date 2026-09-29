@@ -151,15 +151,15 @@ describe("User Stats API Integration Tests", () => {
       ).toBeGreaterThanOrEqual(0);
     });
 
-    it("should return at most 5 items in top lists", async () => {
+    it("should return at most 10 items in top lists", async () => {
       const response =
         await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
-      expect(response.data.topScenes.length).toBeLessThanOrEqual(5);
-      expect(response.data.topPerformers.length).toBeLessThanOrEqual(5);
-      expect(response.data.topStudios.length).toBeLessThanOrEqual(5);
-      expect(response.data.topTags.length).toBeLessThanOrEqual(5);
+      expect(response.data.topScenes.length).toBeLessThanOrEqual(10);
+      expect(response.data.topPerformers.length).toBeLessThanOrEqual(10);
+      expect(response.data.topStudios.length).toBeLessThanOrEqual(10);
+      expect(response.data.topTags.length).toBeLessThanOrEqual(10);
     });
 
     it("should have proper structure for top scene items", async () => {

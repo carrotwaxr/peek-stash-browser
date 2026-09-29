@@ -16,10 +16,6 @@ export const STUDIO_FAVORITE_WEIGHT = 3;
 export const STUDIO_RATED_WEIGHT = 2;
 export const TAG_SCENE_FAVORITE_WEIGHT = 1.0;
 export const TAG_SCENE_RATED_WEIGHT = 0.5;
-export const TAG_PERFORMER_FAVORITE_WEIGHT = 0.3;
-export const TAG_PERFORMER_RATED_WEIGHT = 0.15;
-export const TAG_STUDIO_FAVORITE_WEIGHT = 0.5;
-export const TAG_STUDIO_RATED_WEIGHT = 0.25;
 
 // Implicit engagement weights (from watch history / UserEntityRanking)
 // These scale the engagementRate (which is already normalized by library presence)
