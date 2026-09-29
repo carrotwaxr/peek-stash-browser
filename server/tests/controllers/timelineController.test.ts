@@ -17,6 +17,10 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["inst-a"]),
+}));
+
 vi.mock("../../services/TimelineService.js", () => ({
   timelineService: {
     getDistribution: vi.fn(),
@@ -51,6 +55,7 @@ describe("timelineController", () => {
       expect(timelineService.getDistribution).toHaveBeenCalledWith(
         "scene",
         1,
+        ["inst-a"],
         "months",
         undefined
       );
@@ -73,6 +78,7 @@ describe("timelineController", () => {
       expect(timelineService.getDistribution).toHaveBeenCalledWith(
         "scene",
         1,
+        ["inst-a"],
         "months",
         undefined
       );
