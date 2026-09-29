@@ -69,13 +69,15 @@ The handler maps what reaches it:
 | another middleware 4xx (`status` 4xx, `expose` not false) | its 4xx | the status's reason phrase |
 | anything else | 500 | "Internal server error" |
 
+A handler does not try/catch to log and answer 500: the rejection reaches the central handler, which logs it and answers "Internal server error". A service's own error class extends one of the typed errors above (`UnknownInstanceError` extends `NotFoundError`, `MergeTargetError` extends `ValidationError`). Never put a caught error's `message` in `res.json` or `res.send`: lint rejects it (`ERROR_TEXT_RULE` in `server/eslint.config.js`; `middleware/errorHandler.ts` is exempt). Keep a catch only where it must act before the response ends (release a slot, check `headersSent`).
+
 Only an `AppError`'s message reaches the client, so write it for them and never pass a caught error's message into one. The handler logs 5xx at ERROR ("Request failed") and the rest at WARN ("Request refused"), with the method, the path (no query string), the user id and the whole error (`{ error }`, which the logger expands to name, message, stack, code and cause); a refused request body is logged by its `type` only, since its message quotes the body. After headers are sent it destroys the response and writes nothing. Use an explicit try/catch only for cleanup or a custom response shape, and check `res.headersSent` before responding from a catch block or a stream event handler.
 
 A list, clip, picker, carousel, similar-scenes or recommended request goes through the parser in `utils/listRequest.ts` before the handler's `try`, so its `ValidationError` reaches the central handler (a `catch` that answers 500 would swallow it); `logDropped(route, request.dropped)` records what drop mode ignored.
 
 ## 3. Typed handlers
 
-`server/types/api/express.ts` provides `TypedRequest<TBody, TParams, TQuery>`, `TypedAuthRequest<...>` (where `req.user` is guaranteed) and `TypedResponse<T>`. Request and response types live in `shared/types/api/` and are re-exported from `server/types/api/`.
+`server/types/api/express.ts` provides `TypedRequest<TBody, TParams, TQuery>`, `TypedAuthRequest<...>` (where `req.user` is guaranteed: `authenticated()` answers 401 `Unauthorized` without a signed-in user and never calls the handler, so a handler reads `req.user.id` with no check of its own; an admin handler checks no role, because `requireAdmin` runs first on each admin route, all listed in `server/tests/helpers/adminRoutes.ts`) and `TypedResponse<T>`. Request and response types live in `shared/types/api/` and are re-exported from `server/types/api/`.
 
 ```typescript
 export async function updateSceneRating(
