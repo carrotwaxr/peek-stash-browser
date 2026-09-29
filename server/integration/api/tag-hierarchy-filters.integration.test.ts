@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
  * Tag Hierarchy Filters Integration Tests
@@ -28,6 +28,7 @@ interface FindTagsResponse {
   findTags: {
     tags: Array<{
       id: string;
+      instanceId: string;
       name: string;
       parent_count?: number;
       child_count?: number;
@@ -162,18 +163,22 @@ describe("Tag Hierarchy Filters", () => {
     });
 
     it("returns tag by ID with relationships", async () => {
+      // A detail page names the tag's instance: the second library of a
+      // multi-instance run reuses the test library's ids, so a bare id can
+      // match a tag on each instance (the ambiguous-lookup 400)
+      const instanceId = await findTestInstanceId();
       const response = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
         {
-          ids: [TEST_ENTITIES.tagWithEntities],
+          ids: [`${TEST_ENTITIES.tagWithEntities}:${instanceId}`],
         }
       );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags.tags).toHaveLength(1);
-      expect(must(response.data.findTags.tags[0]).id).toBe(
-        TEST_ENTITIES.tagWithEntities
-      );
+      const tag = must(response.data.findTags.tags[0]);
+      expect(tag.id).toBe(TEST_ENTITIES.tagWithEntities);
+      expect(tag.instanceId).toBe(instanceId);
     });
   });
 

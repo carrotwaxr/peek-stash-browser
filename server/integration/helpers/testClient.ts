@@ -167,19 +167,12 @@ export const guestClient = new TestClient();
 let cachedTestInstanceId: string | null = null;
 
 /**
- * Select only the primary test instance for the current user.
- * This ensures tests that query by ID only get results from the test instance,
- * not from other instances (e.g., production) that may have been added.
- *
- * Call this in beforeAll for tests that filter by specific entity IDs.
+ * The primary test instance's id (highest priority / first configured),
+ * leaving the admin's instance selection as it is. For a test that names the
+ * instance in its refs (`id:instance`) whatever the selection.
  */
-export async function selectTestInstanceOnly(): Promise<string> {
-  if (cachedTestInstanceId) {
-    await adminClient.put("/api/user/stash-instances", {
-      instanceIds: [cachedTestInstanceId],
-    });
-    return cachedTestInstanceId;
-  }
+export async function findTestInstanceId(): Promise<string> {
+  if (cachedTestInstanceId) return cachedTestInstanceId;
 
   // Get all instances
   const instancesResponse = await adminClient.get<{
@@ -190,19 +183,30 @@ export async function selectTestInstanceOnly(): Promise<string> {
     throw new Error("No Stash instances configured");
   }
 
-  // Find the test instance (highest priority / first configured)
   const testInstance = instancesResponse.data.instances.reduce((a, b) =>
     a.priority < b.priority ? a : b
   );
 
   cachedTestInstanceId = testInstance.id;
+  return cachedTestInstanceId;
+}
+
+/**
+ * Select only the primary test instance for the current user.
+ * This ensures tests that query by ID only get results from the test instance,
+ * not from other instances (e.g., production) that may have been added.
+ *
+ * Call this in beforeAll for tests that filter by specific entity IDs.
+ */
+export async function selectTestInstanceOnly(): Promise<string> {
+  const instanceId = await findTestInstanceId();
 
   // Set user's instance selection to only test instance
   await adminClient.put("/api/user/stash-instances", {
-    instanceIds: [cachedTestInstanceId],
+    instanceIds: [instanceId],
   });
 
-  return cachedTestInstanceId;
+  return instanceId;
 }
 
 /**
