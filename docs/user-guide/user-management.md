@@ -250,6 +250,8 @@ Stash keeps O and play dates from version 0.25 on; on an older Stash the O and p
 
 Only items that have the field set in Stash are read, in pages, so the import stays quick on large libraries.
 
+Stash keeps one set of ratings, favorites, counters and dates for everyone who syncs to it: when several Peek users have Sync to Stash on, Stash's O counts, plays and watch time add up all of their activity (see the table below). Import only into the Peek user whose activity Stash holds, or expect that user to receive the others' activity too.
+
 Once the import has written anything, the user's stats rankings and Recommended list are worked out again from the imported data the next time they open the stats page or Recommended, rather than within the hour.
 
 ### Sync to Stash (Export)
