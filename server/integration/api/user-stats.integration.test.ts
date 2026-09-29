@@ -1,7 +1,45 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { arrayContaining } from "../../tests/helpers/matchers.js";
+import { must } from "../../tests/helpers/must.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
-import { TEST_ADMIN } from "../fixtures/testEntities.js";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { createApiUser } from "../helpers/accessFixture.js";
+import {
+  TestClient,
+  adminClient,
+  findTestInstanceId,
+} from "../helpers/testClient.js";
+
+/** How long the server may take to answer a stats page, recompute included */
+const SERVER_STATS_MS = 10_000;
+
+/**
+ * The user's stats page. It awaits the user's ranking recompute in the
+ * server process (`ensureFresh` with `wait`), joining one a login started.
+ */
+async function statsOf(client: TestClient, who: string) {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `GET /api/user-stats for ${who} did not answer within ${SERVER_STATS_MS} ms`
+        )
+      );
+    }, SERVER_STATS_MS);
+  });
+  try {
+    const response = await Promise.race([
+      client.get<UserStatsResponse>("/api/user-stats"),
+      timeout,
+    ]);
+    expect(response.status, `GET /api/user-stats for ${who}`).toBe(200);
+    return response.data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 describe("User Stats API Integration Tests", () => {
   beforeAll(async () => {
@@ -231,6 +269,56 @@ describe("User Stats API Integration Tests", () => {
         expect(url).not.toMatch(/^https?:\/\//);
         expect(url).toContain("/api/proxy/stash");
       }
+    });
+  });
+
+  // The server keeps each user's rankings for an hour; a history clear
+  // forgets them in the server process, reached here over HTTP
+  describe("after clearing watch history", () => {
+    const USERNAME = "stats_it_clear";
+    const sceneId = TEST_ENTITIES.sceneWithRelations;
+    let viewer: { id: number; client: TestClient } | undefined;
+    let instanceId: string;
+
+    beforeAll(async () => {
+      instanceId = await findTestInstanceId();
+      viewer = await createApiUser(USERNAME, "stats_it_clear_pass_1");
+      // Joins the login's recompute: the viewer is fresh for an hour
+      await statsOf(viewer.client, USERNAME);
+    });
+
+    afterAll(async () => {
+      if (viewer) await adminClient.delete(`/api/user/${viewer.id}`);
+    });
+
+    it("the next stats page ranks new engagement at once", async () => {
+      const { client } = must(viewer, USERNAME);
+      const pressO = () =>
+        client.post("/api/watch-history/increment-o", { sceneId, instanceId });
+      const performers = (
+        await prisma.scenePerformer.findMany({
+          where: { sceneId, sceneInstanceId: instanceId },
+          select: { performerId: true },
+        })
+      )
+        .map((row) => `${row.performerId}:${instanceId}`)
+        .sort();
+      expect(
+        performers.length,
+        `performers of scene ${sceneId}`
+      ).toBeGreaterThan(0);
+
+      expect((await pressO()).status).toBe(200);
+      // Within the hour, the O is not ranked yet
+      expect((await statsOf(client, USERNAME)).topPerformers).toEqual([]);
+
+      expect((await client.delete("/api/watch-history")).status).toBe(200);
+      expect((await pressO()).status).toBe(200);
+
+      const { topPerformers } = await statsOf(client, USERNAME);
+      const ranked = topPerformers.map((p) => `${p.id}:${p.instanceId}`);
+      expect(ranked).toHaveLength(Math.min(performers.length, 5));
+      expect(performers).toEqual(arrayContaining(ranked));
     });
   });
 });

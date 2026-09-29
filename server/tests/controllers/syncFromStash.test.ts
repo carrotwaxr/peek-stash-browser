@@ -12,6 +12,8 @@ import type { WatchHistory } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { recommendationService } from "../../services/RecommendationService.js";
 import { IMPORT_PAGE_SIZE } from "../../services/StashImportService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
@@ -85,9 +87,19 @@ vi.mock("../../services/UserStatsService.js", () => ({
   },
 }));
 
+// The per-user caches an import that wrote something drops
+vi.mock("../../services/RankingComputeService.js", () => ({
+  rankingComputeService: { forget: vi.fn() },
+}));
+vi.mock("../../services/RecommendationService.js", () => ({
+  recommendationService: { forget: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockStats = vi.mocked(userStatsService, true);
+const mockRankings = vi.mocked(rankingComputeService, true);
+const mockRecommendations = vi.mocked(recommendationService, true);
 
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 const USER = { id: 2, username: "testuser", role: "USER" };
@@ -95,6 +107,11 @@ const TARGET_USER_ID = 2;
 const INSTANCE = "instance-1";
 const PAGE_SIZE = IMPORT_PAGE_SIZE;
 const GT_ZERO = { value: 0, modifier: "GREATER_THAN" };
+/** The play pass: scenes with plays, watch time or a resume point in Stash */
+const PLAY_PASS = {
+  play_count: GT_ZERO,
+  OR: { play_duration: GT_ZERO, OR: { resume_time: GT_ZERO } },
+};
 
 /** Every type off: a case switches on the one it tests. */
 const NOTHING = {
@@ -138,6 +155,8 @@ interface StashEntity {
   play_count?: number | null;
   o_history?: string[];
   play_history?: string[];
+  play_duration?: number | null;
+  resume_time?: number | null;
 }
 
 interface ImportedType {
@@ -300,6 +319,8 @@ function scene(
     play_count?: number | null;
     o_history?: string[];
     play_history?: string[];
+    play_duration?: number | null;
+    resume_time?: number | null;
   }
 ): StashEntity {
   return { ...bare, id, rating100: null, ...history };
@@ -362,6 +383,8 @@ function historyRow(fields: {
   playCount?: number;
   playHistory?: string[];
   lastPlayedAt?: Date | null;
+  playDuration?: number;
+  resumeTime?: number | null;
 }): WatchHistory {
   return partialRow<WatchHistory>({
     userId: TARGET_USER_ID,
@@ -371,6 +394,8 @@ function historyRow(fields: {
     playCount: 0,
     playHistory: [],
     lastPlayedAt: null,
+    playDuration: 0,
+    resumeTime: null,
     ...fields,
   });
 }
@@ -856,7 +881,7 @@ describe("syncFromStash", () => {
       expect(mockStats.rebuildAllStatsForUser).not.toHaveBeenCalled();
     });
 
-    it("imports plays with the play_count filter: merged dates, the count rule and the latest play", async () => {
+    it("imports plays with the play pass filter: merged dates, the count rule and the latest play", async () => {
       mockStashClient.findScenes.mockResolvedValue(
         page(SCENE, [scene("1", { play_count: 2, play_history: [STASH_T, U] })])
       );
@@ -871,7 +896,7 @@ describe("syncFromStash", () => {
       await run(only(SCENE, { playCount: true }));
       expect(mockStashClient.findScenes).toHaveBeenCalledWith({
         filter: { page: 1, per_page: PAGE_SIZE },
-        scene_filter: { play_count: GT_ZERO },
+        scene_filter: PLAY_PASS,
       });
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         objectContaining({
@@ -889,6 +914,81 @@ describe("syncFromStash", () => {
           }),
         })
       );
+    });
+
+    it("reads scenes with watch time or a resume point but no plays in the one play pass", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [scene("1", { play_duration: 300 })])
+      );
+      await run(only(SCENE, { playCount: true }));
+      expect(mockStashClient.findScenes).toHaveBeenCalledTimes(1);
+      expect(mockStashClient.findScenes).toHaveBeenCalledWith({
+        filter: { page: 1, per_page: PAGE_SIZE },
+        scene_filter: PLAY_PASS,
+      });
+    });
+
+    it("keeps the larger play duration and a Peek resume point, and takes Stash's resume point when Peek has none", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [
+          // Stash watched longer; Peek has no resume point
+          scene("1", { play_duration: 900, resume_time: 60 }),
+          // Peek watched longer and holds a resume point: nothing to write
+          scene("2", { play_duration: 300, resume_time: 50 }),
+          // Peek's 0 is the start of the scene, so no resume point
+          scene("3", { play_duration: 100, resume_time: 70 }),
+          // New to Peek: watch time and a resume point, no plays
+          scene("4", { play_duration: 400, resume_time: 30 }),
+        ])
+      );
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        historyRow({ sceneId: "1", playDuration: 500, resumeTime: null }),
+        historyRow({ sceneId: "2", playDuration: 500, resumeTime: 120 }),
+        historyRow({ sceneId: "3", playDuration: 200, resumeTime: 0 }),
+      ]);
+      const res = await run(only(SCENE, { playCount: true }));
+
+      const where = (sceneId: string) => ({
+        userId_instanceId_sceneId: {
+          userId: TARGET_USER_ID,
+          instanceId: INSTANCE,
+          sceneId,
+        },
+      });
+      const plays = { playCount: 0, playHistory: [], lastPlayedAt: null };
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledTimes(3);
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          where: where("1"),
+          update: { ...plays, playDuration: 900, resumeTime: 60 },
+        })
+      );
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          where: where("3"),
+          update: { ...plays, resumeTime: 70 },
+        })
+      );
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          where: where("4"),
+          create: {
+            userId: TARGET_USER_ID,
+            instanceId: INSTANCE,
+            sceneId: "4",
+            oCount: 0,
+            oHistory: [],
+            ...plays,
+            playDuration: 400,
+            resumeTime: 30,
+          },
+        })
+      );
+      expect(res._getOkBody().stats.scenes).toEqual({
+        checked: 4,
+        created: 1,
+        updated: 2,
+      });
     });
 
     it("never moves lastPlayedAt back: a Peek play in progress stays the latest", async () => {
@@ -1055,6 +1155,65 @@ describe("syncFromStash", () => {
         })
       );
       expect(res._getOkBody().stats.scenes.created).toBe(2);
+    });
+  });
+
+  // ─── Rankings and Recommended ───
+
+  describe("rankings and the Recommended list", () => {
+    it("calls forget for the imported user once, after the stats rebuild: rankings and the Recommended list", async () => {
+      const stash2 = stashStub();
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [scene("1", { o_counter: 1, o_history: [T] })])
+      );
+      stash2.findScenes.mockResolvedValue(
+        page(SCENE, [scene("1", { o_counter: 1, o_history: [U] })])
+      );
+      mockInstanceManager.getAll.mockReturnValue([
+        ["instance-1", partialRow(mockStashClient)],
+        ["instance-2", partialRow(stash2)],
+      ]);
+      await run(only(SCENE, { oCounter: true }));
+
+      expect(mockRankings.forget).toHaveBeenCalledTimes(1);
+      expect(mockRankings.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      expect(mockRecommendations.forget).toHaveBeenCalledTimes(1);
+      expect(mockRecommendations.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      // The rankings are computed from the rebuilt stats
+      const rebuilt = must(
+        mockStats.rebuildAllStatsForUser.mock.invocationCallOrder[0]
+      );
+      expect(
+        must(mockRankings.forget.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(rebuilt);
+    });
+
+    it("forgets the user's rankings and Recommended list after an import that wrote only ratings", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [rated("1", 80)])
+      );
+      await run(only(SCENE, { rating: true }));
+
+      expect(mockRankings.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      expect(mockRecommendations.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+    });
+
+    it("forgets nothing after an import that wrote nothing", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [
+          scene("1", { rating100: 80, o_counter: 1, o_history: [T] }),
+        ])
+      );
+      setExisting(SCENE, [{ id: "1", rating: 80 }]);
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        historyRow({ sceneId: "1", oCount: 1, oHistory: [T] }),
+      ]);
+      await run(only(SCENE, { rating: true, oCounter: true }));
+
+      expect(mockPrisma.sceneRating.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
+      expect(mockRankings.forget).not.toHaveBeenCalled();
+      expect(mockRecommendations.forget).not.toHaveBeenCalled();
     });
   });
 

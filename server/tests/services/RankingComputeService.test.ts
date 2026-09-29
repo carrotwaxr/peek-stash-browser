@@ -10,6 +10,7 @@ import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { dbWrite } from "../../utils/dbWrite.js";
 import { logger } from "../../utils/logger.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -79,6 +80,52 @@ function getWrittenRankings(
     }
   }
   return [];
+}
+
+/**
+ * The entity ids of each ranking batch of `entityType` that reached the
+ * database, in commit order. A batch's statements are built before its
+ * writer-queue unit runs, so a built `createMany` counts only once the
+ * unit hands it to `$transaction`.
+ */
+function committedRankings(entityType: string): string[][] {
+  const createMany = mockPrisma.userEntityRanking.createMany.mock;
+  const batches: string[][] = [];
+  for (const [ops] of mockPrisma.$transaction.mock.calls) {
+    const statements: unknown[] = Array.isArray(ops) ? ops : [];
+    for (const statement of statements) {
+      const index = createMany.results.findIndex(
+        (result) => result.value === statement
+      );
+      if (index < 0) continue;
+      const data = must(
+        must(createMany.calls[index])[0],
+        "createMany args"
+      ).data;
+      const rows = Array.isArray(data) ? data : [data];
+      if (rows[0]?.entityType === entityType) {
+        batches.push(rows.map((row) => row.entityId));
+      }
+    }
+  }
+  return batches;
+}
+
+/** One performer's stats row as the ranking query returns it */
+function performerStats(entityId: string) {
+  return {
+    entityId,
+    instanceId: "inst1",
+    playCount: 1,
+    oCount: 1,
+    playDuration: 600,
+    libraryPresence: 1,
+  };
+}
+
+/** The SQL of a `$queryRaw` tagged-template call */
+function sqlOf(query: unknown): string {
+  return Array.isArray(query) ? query.join("?") : "";
 }
 
 describe("RankingComputeService", () => {
@@ -734,7 +781,7 @@ describe("RankingComputeService", () => {
       expect(recomputes()).toBe(2);
     });
 
-    it("a recompute running when forget is called does not mark the user fresh when it lands", async () => {
+    it("a recompute running when forget is called stops, writes nothing and does not mark the user fresh", async () => {
       let release: () => void = () => undefined;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
@@ -746,20 +793,115 @@ describe("RankingComputeService", () => {
         })
       );
 
-      await rankingComputeService.ensureFresh(109);
+      const first = rankingComputeService["refresh"](109);
       rankingComputeService.forget(109);
       release();
-      // The first recompute lands: its three types written, then logged
-      await vi.waitFor(() => {
-        expect(logger.info).toHaveBeenCalledWith(
-          "Ranking computation complete",
-          objectContaining({ userId: 109 })
-        );
-      });
+      await first;
 
+      // It read the average duration, then stopped before the first type
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith(
+        "Ranking recompute stopped: the user was forgotten",
+        { userId: 109 }
+      );
+
+      // Not marked fresh: the next call recomputes, all three types
       await rankingComputeService.ensureFresh(109, { wait: true });
 
-      expect(recomputes()).toBe(2);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(
+        1 + QUERIES_PER_RECOMPUTE
+      );
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(3);
+    });
+
+    it("a recompute started before forget does not overwrite the one after it", async () => {
+      // The first recompute reads the performers before an import and is
+      // slow to land; the second, started after forget, reads them after it
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let performerReads = 0;
+      mockPrisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof prisma.$queryRaw>(async (query) => {
+          if (!sqlOf(query).includes("FROM UserPerformerStats")) return [];
+          performerReads++;
+          if (performerReads === 1) {
+            await gate;
+            return [performerStats("before-import")];
+          }
+          return [performerStats("after-import")];
+        })
+      );
+
+      const before = rankingComputeService["refresh"](111);
+      await vi.waitFor(() => {
+        expect(performerReads).toBe(1);
+      });
+      rankingComputeService.forget(111);
+      await rankingComputeService.ensureFresh(111, { wait: true });
+      release();
+      await before;
+
+      // Only the newer recompute's performers reach the table
+      expect(committedRankings("performer")).toEqual([["after-import"]]);
+    });
+
+    it("a ranking batch waiting in the writer queue when forget is called writes nothing", async () => {
+      mockPrisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof prisma.$queryRaw>((query) =>
+          sqlOf(query).includes("FROM UserPerformerStats")
+            ? [performerStats("before-import")]
+            : []
+        )
+      );
+      // Another unit holds the writer queue, so the recompute's first batch
+      // is built and waits behind it
+      let release: () => void = () => undefined;
+      const holder = dbWrite(
+        "test.hold",
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          })
+      );
+
+      const running = rankingComputeService["refresh"](112);
+      await vi.waitFor(() => {
+        expect(mockPrisma.userEntityRanking.createMany).toHaveBeenCalled();
+      });
+      rankingComputeService.forget(112);
+      release();
+      await holder;
+      await running;
+
+      // The batch saw the forget when its unit started
+      expect(committedRankings("performer")).toEqual([]);
+    });
+
+    it("a clearing write waiting in the writer queue when forget is called deletes nothing", async () => {
+      // No performer to rank: the recompute's first write clears the type
+      let release: () => void = () => undefined;
+      const holder = dbWrite(
+        "test.hold",
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          })
+      );
+
+      const running = rankingComputeService["refresh"](113);
+      // The average duration and the performers read; the clear is queued
+      await vi.waitFor(() => {
+        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
+      });
+      rankingComputeService.forget(113);
+      release();
+      await holder;
+      await running;
+
+      expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
     });
 
     it("forget of a user the service never saw is harmless", async () => {

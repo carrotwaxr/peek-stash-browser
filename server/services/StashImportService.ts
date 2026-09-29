@@ -13,14 +13,23 @@
  * favorite, and an unrated one never clears a Peek rating.
  *
  * Scene history runs a pass for O counts (`o_counter > 0`) and one for
- * plays (`play_count > 0`); a scene the O pass handled is skipped by the
- * play pass. Per scene, the stored history is `mergeHistory` of Peek's and
- * Stash's dates; the count is the merged length, never lower than Stash's
- * counter (Stash counted before it kept dates) nor than Peek's count (Peek
- * counted plays before it kept dates); `lastPlayedAt` is the latest merged
- * play, never earlier than it was. Each page is one `dbWriteTransaction`
- * that reads the rows it merges into, so an O or a play the user records
- * meanwhile waits for it and is never merged away.
+ * plays (`play_count > 0`, or watch time or a resume point without plays);
+ * a scene the O pass handled is skipped by the play pass. Per scene, the
+ * stored history is `mergeHistory` of Peek's and Stash's dates; the count
+ * is the merged length, never lower than Stash's counter (Stash counted
+ * before it kept dates) nor than Peek's count (Peek counted plays before it
+ * kept dates); `lastPlayedAt` is the latest merged play, never earlier than
+ * it was. With the plays come the watch time, the larger of Peek's and
+ * Stash's (Sync to Stash adds Peek's to Stash's, so a sum would count it
+ * twice), and the resume point, Peek's own or Stash's when Peek has none.
+ * Each page is one `dbWriteTransaction` that reads the rows it merges into,
+ * so an O or a play the user records meanwhile waits for it and is never
+ * merged away.
+ *
+ * An import that wrote anything makes the user's rankings and Recommended
+ * list stale: both are forgotten once the import (and the stats rebuild
+ * after its history) is written, so the next stats page or Recommended
+ * page computes them from the imported data.
  *
  * The stats per type count entities once: read from Stash (`checked`),
  * given a row (`created`) or a changed one (`updated`).
@@ -48,6 +57,8 @@ import type {
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { mergeHistory, readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { rankingComputeService } from "./RankingComputeService.js";
+import { recommendationService } from "./RecommendationService.js";
 import { userStatsService } from "./UserStatsService.js";
 
 /** Entities per Stash page, and rows per writer-queue unit. */
@@ -93,14 +104,35 @@ const GREATER_THAN_ZERO: IntCriterionInput = {
   modifier: CriterionModifier.GreaterThan,
 };
 
-/** The criteria an import pass sends: one field, set on the type's filter. */
+/**
+ * The criteria an import pass sends: one field set on the type's filter,
+ * or for the play pass fields joined by Stash's `OR` sub-filter.
+ */
 interface Criteria {
   rating100?: IntCriterionInput;
   favorite?: boolean;
   filter_favorites?: boolean;
   o_counter?: IntCriterionInput;
   play_count?: IntCriterionInput;
+  play_duration?: IntCriterionInput;
+  resume_time?: IntCriterionInput;
+  OR?: Criteria;
 }
+
+/**
+ * The play pass: scenes with plays, watch time or a resume point in Stash.
+ * Stash's player adds watch time as it plays but a play only past the
+ * minimum play percent, and Sync to Stash sends Peek's watch time and
+ * resume point on every progress report but a play only once Peek counts
+ * one, so many watched scenes hold no play count.
+ */
+const PLAY_PASS: Criteria = {
+  play_count: GREATER_THAN_ZERO,
+  OR: {
+    play_duration: GREATER_THAN_ZERO,
+    OR: { resume_time: GREATER_THAN_ZERO },
+  },
+};
 
 /** A Stash entity as the import reads it. */
 interface ImportedEntity {
@@ -114,6 +146,10 @@ interface ImportedScene extends ImportedEntity {
   play_count?: number | null;
   o_history: string[];
   play_history: string[];
+  /** Seconds watched in all */
+  play_duration?: number | null;
+  /** Seconds into the scene where playback left off */
+  resume_time?: number | null;
 }
 
 interface StashPage<E> {
@@ -355,6 +391,7 @@ function ratingDiffers(row: ExistingRating, change: RatingChange): boolean {
   );
 }
 
+/** Imports the type's ratings and favorites from one instance; true when a row was written. */
 async function importRatings(
   target: RatingTarget,
   source: ImportSource,
@@ -362,7 +399,8 @@ async function importRatings(
   key: RowKey,
   options: { rating?: boolean; favorite?: boolean },
   counter: TypeCounter
-): Promise<void> {
+): Promise<boolean> {
+  let wrote = false;
   for (const pass of ratingPasses(target, options)) {
     const fetch = (filter: FindFilterType) =>
       source.list(stash, filter, pass.criteria);
@@ -392,14 +430,22 @@ async function importRatings(
       }
       if (ops.length > 0) {
         await dbWriteBatch(`syncFromStash.${target.type}`, ops);
+        wrote = true;
       }
     }
   }
+  return wrote;
 }
 
 type HistoryRow = Pick<
   Prisma.WatchHistoryGetPayload<object>,
-  "oCount" | "oHistory" | "playCount" | "playHistory" | "lastPlayedAt"
+  | "oCount"
+  | "oHistory"
+  | "playCount"
+  | "playHistory"
+  | "lastPlayedAt"
+  | "playDuration"
+  | "resumeTime"
 >;
 
 interface HistoryChange {
@@ -408,6 +454,8 @@ interface HistoryChange {
   playCount?: number;
   playHistory?: string[];
   lastPlayedAt?: Date | null;
+  playDuration?: number;
+  resumeTime?: number;
 }
 
 function sameList(a: string[], b: string[]): boolean {
@@ -466,6 +514,18 @@ function historyChange(
     ) {
       changed = true;
     }
+    // Written only when Stash's raises Peek's: never lowered, never
+    // replaced. A resume point of 0 is the start of the scene, so none.
+    const playDuration = scene.play_duration ?? 0;
+    if (playDuration > (row?.playDuration ?? 0)) {
+      change.playDuration = playDuration;
+      changed = true;
+    }
+    const resumeTime = scene.resume_time ?? 0;
+    if (resumeTime > 0 && (row?.resumeTime ?? 0) <= 0) {
+      change.resumeTime = resumeTime;
+      changed = true;
+    }
   }
   return changed ? change : null;
 }
@@ -479,7 +539,7 @@ async function importSceneHistory(
 ): Promise<boolean> {
   const passes: Criteria[] = [];
   if (options.oCounter) passes.push({ o_counter: GREATER_THAN_ZERO });
-  if (options.playCount) passes.push({ play_count: GREATER_THAN_ZERO });
+  if (options.playCount) passes.push(PLAY_PASS);
   const { userId, instanceId } = key;
   // Scenes an earlier pass merged; the same payload served both options
   const done = new Set<string>();
@@ -558,7 +618,9 @@ function emptyStats(): SyncStats {
  * Imports `userId`'s data from every instance given, one type at a time
  * per instance. An instance whose import fails is logged and skipped; the
  * others still run. After a history import that wrote something, the
- * user's per-entity stats are rebuilt from their history.
+ * user's per-entity stats are rebuilt from their history. After an import
+ * that wrote anything, the user's rankings and Recommended list are
+ * forgotten, so the next stats and Recommended pages compute them again.
  */
 export async function importFromStash(
   userId: number,
@@ -567,6 +629,7 @@ export async function importFromStash(
 ): Promise<SyncStats> {
   const stats = emptyStats();
   let historyWrote = false;
+  let ratingsWrote = false;
 
   for (const [instanceId, stash] of instances) {
     const key: RowKey = { userId, instanceId };
@@ -576,14 +639,15 @@ export async function importFromStash(
         const source = IMPORT_SOURCES[target.type];
         const counter = new TypeCounter();
         try {
-          await importRatings(
-            target,
-            source,
-            stash,
-            key,
-            options[source.key],
-            counter
-          );
+          ratingsWrote =
+            (await importRatings(
+              target,
+              source,
+              stash,
+              key,
+              options[source.key],
+              counter
+            )) || ratingsWrote;
           if (target.type === "scene") {
             historyWrote =
               (await importSceneHistory(stash, key, options.scenes, counter)) ||
@@ -609,6 +673,13 @@ export async function importFromStash(
         error,
       });
     }
+  }
+
+  if (historyWrote || ratingsWrote) {
+    // Last, once everything is written: a recompute started before this
+    // read the data from before the import
+    rankingComputeService.forget(userId);
+    recommendationService.forget(userId);
   }
 
   return stats;

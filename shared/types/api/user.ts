@@ -340,7 +340,8 @@ export interface SyncFromStashParams extends Record<string, string> {
 /**
  * What to import, per type. An option Stash has no field for on the type
  * (a scene favorite, a tag rating) is ignored. `oCounter` imports O counts
- * with their dates, `playCount` play counts with their dates.
+ * with their dates, `playCount` play counts with their dates, the watch
+ * time and the resume point.
  */
 export interface SyncFromStashOptions {
   scenes: {

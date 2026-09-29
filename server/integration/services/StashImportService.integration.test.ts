@@ -59,6 +59,37 @@ function stubClient(scene: {
   });
 }
 
+/** A scene with watch time and a resume point in Stash, and no plays. */
+interface WatchedScene {
+  id: string;
+  play_duration: number;
+  resume_time: number;
+}
+
+/** A Stash whose findScenes answers `scenes` for any filter. */
+function stubWatched(scenes: WatchedScene[]): StashClient {
+  return partialRow<StashClient>({
+    findScenes: () =>
+      Promise.resolve({
+        findScenes: {
+          count: scenes.length,
+          duration: 0,
+          filesize: 0,
+          scenes: scenes.map((scene) =>
+            partialRow({
+              rating100: null,
+              o_counter: 0,
+              o_history: [],
+              play_count: 0,
+              play_history: [],
+              ...scene,
+            })
+          ),
+        },
+      }),
+  });
+}
+
 describeWithDb("importFromStash (real SQLite)", () => {
   let userId: number;
 
@@ -132,5 +163,61 @@ describeWithDb("importFromStash (real SQLite)", () => {
     expect(b.instanceId).toBe(INSTANCE_B);
     expect(readHistory(b.oHistory)).toEqual([T]);
     expect(b.oCount).toBe(1);
+  });
+
+  it("imports watch time and resume points: the larger watch time, a Peek resume point kept, Stash's taken when Peek has none", async () => {
+    // Peek watched 8 for less and has no resume point; 9 longer, with one
+    await prisma.watchHistory.createMany({
+      data: [
+        { userId, instanceId: INSTANCE_A, sceneId: "8", playDuration: 500 },
+        {
+          userId,
+          instanceId: INSTANCE_A,
+          sceneId: "9",
+          playDuration: 800,
+          resumeTime: 120,
+        },
+      ],
+    });
+    const options = defaultImportOptions();
+    for (const key of Object.keys(options) as Array<keyof typeof options>) {
+      const fields: Record<string, boolean> = options[key];
+      for (const field of Object.keys(fields)) fields[field] = false;
+    }
+    options.scenes.playCount = true;
+
+    const stats = await importFromStash(userId, options, [
+      [
+        INSTANCE_A,
+        stubWatched([
+          { id: "8", play_duration: 900, resume_time: 60 },
+          { id: "9", play_duration: 300, resume_time: 50 },
+          { id: "10", play_duration: 400, resume_time: 30 },
+        ]),
+      ],
+    ]);
+
+    // 9 already holds more: nothing to write
+    expect(stats.scenes).toEqual({ checked: 3, created: 1, updated: 1 });
+    const rows = await prisma.watchHistory.findMany({
+      where: {
+        userId,
+        instanceId: INSTANCE_A,
+        sceneId: { in: ["8", "9", "10"] },
+      },
+      orderBy: { sceneId: "asc" },
+    });
+    expect(
+      rows.map((row) => [
+        row.sceneId,
+        row.playDuration,
+        row.resumeTime,
+        row.playCount,
+      ])
+    ).toEqual([
+      ["10", 400, 30, 0],
+      ["8", 900, 60, 0],
+      ["9", 800, 120, 0],
+    ]);
   });
 });
