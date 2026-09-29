@@ -15,6 +15,7 @@
  * IMPORTANT: The second instance is READ-ONLY. No modifications allowed.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { objectContaining } from "../../tests/helpers/matchers.js";
 import { must } from "../../tests/helpers/must.js";
 import type { SyncStatusResponse } from "../../types/api/sync.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
@@ -628,52 +629,74 @@ describe("Multi-Instance Support", () => {
         // Select all instances
         await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
-        // Filter by a performer that exists in test instance
-        const response = await adminClient.post<{
-          findScenes: {
-            count: number;
-            scenes: Array<{ id: string; performers: Array<{ id: string }> }>;
-          };
-        }>("/api/library/scenes", {
-          filter: { per_page: 50 },
-          scene_filter: {
-            performers: {
-              value: [TEST_ENTITIES.performerWithScenes],
-              modifier: "INCLUDES",
+        const scenesWith = async (value: string) => {
+          const response = await adminClient.post<{
+            findScenes: {
+              count: number;
+              scenes: Array<{
+                id: string;
+                instanceId: string;
+                performers: Array<{ id: string; instanceId: string }>;
+              }>;
+            };
+          }>("/api/library/scenes", {
+            filter: { per_page: 50 },
+            scene_filter: {
+              performers: { value: [value], modifier: "INCLUDES" },
             },
-          },
-        });
+          });
+          expect(response.ok).toBe(true);
+          return response.data.findScenes;
+        };
 
-        expect(response.ok).toBe(true);
-
-        // Results should only be from test instance (the performer is from test instance)
-        // This verifies that junction table queries correctly match instance IDs
-        for (const scene of response.data.findScenes.scenes) {
-          expect(scene.performers.map((p) => p.id)).toContain(
-            TEST_ENTITIES.performerWithScenes
+        // The test instance's performer, named with its instance: the second
+        // library reuses the test library's ids, so only the instance in the
+        // value keeps its same-id performer's scenes out. This verifies that
+        // junction table queries correctly match instance IDs
+        const own = await scenesWith(
+          `${TEST_ENTITIES.performerWithScenes}:${testInstanceId}`
+        );
+        expect(own.scenes.length).toBeGreaterThan(0);
+        for (const scene of own.scenes) {
+          expect(scene.instanceId).toBe(testInstanceId);
+          expect(scene.performers).toContainEqual(
+            objectContaining({
+              id: TEST_ENTITIES.performerWithScenes,
+              instanceId: testInstanceId,
+            })
           );
         }
+
+        // A bare id matches the performer with that id on every instance
+        const bare = await scenesWith(TEST_ENTITIES.performerWithScenes);
+        expect(bare.count).toBeGreaterThan(own.count);
       });
 
       it("filtering by test instance tag only returns matching scenes", async function () {
         await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
-        const response = await adminClient.post<{
-          findScenes: { count: number };
-        }>("/api/library/scenes", {
-          filter: { per_page: 50 },
-          scene_filter: {
-            tags: {
-              value: [TEST_ENTITIES.tagWithEntities],
-              modifier: "INCLUDES",
-            },
-          },
-        });
+        const countWith = async (value: string) => {
+          const response = await adminClient.post<{
+            findScenes: { count: number };
+          }>("/api/library/scenes", {
+            filter: { per_page: 50 },
+            scene_filter: { tags: { value: [value], modifier: "INCLUDES" } },
+          });
+          expect(response.ok).toBe(true);
+          return response.data.findScenes.count;
+        };
 
-        expect(response.ok).toBe(true);
-        // The tag is from test instance, so only test instance scenes should match
-        expect(response.data.findScenes.count).toBeLessThanOrEqual(
-          testInstanceSceneCount
+        // The tag named with the test instance: only test instance scenes
+        // match, though the second library has a tag with the same id
+        const own = await countWith(
+          `${TEST_ENTITIES.tagWithEntities}:${testInstanceId}`
+        );
+        expect(own).toBeGreaterThan(0);
+        expect(own).toBeLessThanOrEqual(testInstanceSceneCount);
+
+        // A bare id matches the tag with that id on every instance
+        expect(await countWith(TEST_ENTITIES.tagWithEntities)).toBeGreaterThan(
+          own
         );
       });
     }

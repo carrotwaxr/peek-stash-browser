@@ -595,9 +595,10 @@ function referencedIds(value: unknown): string[] {
  *
  * Every id moves by idOffset, and so does every run of digits in a string
  * that equals an entity id (names such as "Scene 100003", file names, media
- * URLs), so the second library is the first one renumbered and shares no id
- * with it. Scenes are then added up to sceneCount, numbered after the moved
- * ones, each a copy of a moved scene taken in turn: it keeps its performers,
+ * URLs): with a non-zero offset the second library is the first one
+ * renumbered and shares no id with it; with 0 it keeps the first's ids.
+ * Scenes are then added up to sceneCount, numbered after the moved ones,
+ * each a copy of a moved scene taken in turn: it keeps its performers,
  * studio and tags, drops its groups and galleries, gets fingerprints of its
  * own, and counts in the scene_count of its performers, studio and tags.
  */
@@ -665,15 +666,17 @@ export function deriveSecondLibrary(
 }
 
 /**
- * The second instance's ids start after the test library's; item 34's PR
- * should set this to 0 (bare tag ids match every instance until then).
+ * 0: the second instance reuses the test library's ids, as two Stash
+ * servers do, so every replay run crosses same-id entities on two
+ * instances. A bare id in a filter matches the entity with that id on
+ * every instance; a test that means one instance names it (`id:instance`).
  */
-export const SECOND_ID_OFFSET = 100000;
+export const SECOND_ID_OFFSET = 0;
 
 /**
  * The second Stash of multi-instance runs, as the integration suite and
- * `stash:replay --library second` serve it: the test library renumbered,
- * with more than ten times its scenes, as multi-instance asserts.
+ * `stash:replay --library second` serve it: the test library under the same
+ * ids, with more than ten times its scenes, as multi-instance asserts.
  */
 export function secondLibraryOf(test: ReplayLibrary): ReplayLibrary {
   return deriveSecondLibrary(test, {
