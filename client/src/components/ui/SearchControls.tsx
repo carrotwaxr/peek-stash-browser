@@ -55,6 +55,17 @@ import {
   ZoomSlider,
 } from "./index";
 
+/**
+ * Whether a collection filter names at least one collection and includes it:
+ * a list of ids, or `{ value, modifier }` with any modifier but EXCLUDES.
+ */
+function hasIncludingCollection(filter: unknown): boolean {
+  if (Array.isArray(filter)) return filter.length > 0;
+  if (typeof filter !== "object" || filter === null) return false;
+  const { value, modifier } = filter as { value?: unknown; modifier?: unknown };
+  return Array.isArray(value) && value.length > 0 && modifier !== "EXCLUDES";
+}
+
 const buildFilter = (
   artifactType: string,
   filters: Record<string, any>,
@@ -890,14 +901,23 @@ const SearchControls = ({
     );
   }, [filters]);
 
-  const groupFilters = filters?.groups;
+  const groupFilters: unknown = filters.groups;
+  const groupIds: unknown = filters.groupIds;
+  const groupIdsModifier: unknown = filters.groupIdsModifier;
+  const permanentGroups = permanentFilters.groups;
 
   const sortOptions = useMemo(() => {
     const baseOptions = getSortOptions(artifactType);
 
-    // For scenes, conditionally include scene_index based on group filter
+    // For scenes, include scene_index (Scene Number) only beside a collection
+    // filter that includes: the collection page's permanent `groups`
+    // ({ value, modifier }), the panel's `groupIds` with its modifier, or a
+    // list of ids. The server answers 400 for the sort without one.
     if (artifactType === "scene") {
-      const hasGroupFilter = groupFilters?.length > 0;
+      const hasGroupFilter =
+        hasIncludingCollection(permanentGroups) ||
+        hasIncludingCollection(groupFilters) ||
+        hasIncludingCollection({ value: groupIds, modifier: groupIdsModifier });
       if (hasGroupFilter) {
         return SCENE_SORT_OPTIONS; // Full list with scene_index
       }
@@ -905,7 +925,7 @@ const SearchControls = ({
     }
 
     return baseOptions;
-  }, [artifactType, groupFilters]);
+  }, [artifactType, groupFilters, groupIds, groupIdsModifier, permanentGroups]);
 
   // Show loading state while fetching default presets
   if (isLoadingPresets) {

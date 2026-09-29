@@ -263,6 +263,33 @@ describe("parseListRequest: sort", () => {
     expect(paths(dropped.dropped)).toEqual(["filter.sort"]);
   });
 
+  it("scene_index needs an including groups criterion: a 400 in reject mode, the default sort in drop mode", () => {
+    const body = (modifier?: string) => ({
+      filter: { sort: "scene_index" },
+      scene_filter:
+        modifier === undefined
+          ? {}
+          : { groups: { value: ["7:inst"], modifier } },
+    });
+    for (const modifier of [undefined, "EXCLUDES"]) {
+      expect(
+        paths(
+          issuesOf(() =>
+            parseListRequest("scene", body(modifier), opts("reject"))
+          )
+        )
+      ).toEqual(["filter.sort"]);
+      const dropped = parseListRequest("scene", body(modifier), opts("drop"));
+      expect(dropped.sort.field).toBe("created_at");
+      expect(paths(dropped.dropped)).toEqual(["filter.sort"]);
+    }
+    for (const modifier of ["INCLUDES", "INCLUDES_ALL"]) {
+      const parsed = parseListRequest("scene", body(modifier), opts("reject"));
+      expect(parsed.sort.field).toBe("scene_index");
+      expect(parsed.dropped).toEqual([]);
+    }
+  });
+
   it("direction asc is ASC; sideways is invalid", () => {
     expect(
       parseListRequest(

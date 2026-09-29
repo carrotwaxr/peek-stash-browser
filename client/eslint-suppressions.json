@@ -855,17 +855,11 @@
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1
     },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 6
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 8
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
+      "count": 7
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 8

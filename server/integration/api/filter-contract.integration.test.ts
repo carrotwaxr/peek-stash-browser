@@ -59,18 +59,11 @@ import { recordStatements } from "../helpers/statementRecorder.js";
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
-// Why each known gap fails, and the task that closes it
-const NO_SORT = "the sort map has no expression, so the default sort applies";
-
 /**
  * The cases failing at this commit: `"<list> filter <option>: <sample>"` or
- * `"<list> sort <value>"`, each with why. B12 wires the last two sorts and
- * deletes their entries.
+ * `"<list> sort <value>"`, each with why. Empty since B12.
  */
-const KNOWN_GAPS: Readonly<Record<string, string>> = {
-  "scene sort last_o_at": `${NO_SORT} (B12)`,
-  "scene sort scene_index": `${NO_SORT} (B12)`,
-};
+const KNOWN_GAPS: Readonly<Record<string, string>> = {};
 
 const PER_PAGE = 24;
 /** The client sends the random sort with an 8-digit seed (`SearchControls`) */

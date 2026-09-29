@@ -301,6 +301,43 @@ describe("SearchControls", () => {
       expect(query.filter.sort).toBe("rating");
     });
 
+    describe("Scene Number", () => {
+      const sortValues = () =>
+        Array.from(
+          must(screen.getAllByRole("combobox")[0]).querySelectorAll("option")
+        ).map((option) => option.value);
+
+      it("is not offered without a collection filter", () => {
+        renderSearchControls();
+        expect(sortValues()).not.toContain("scene_index");
+      });
+
+      it("is offered on the collection page, whose permanent filter is { value, modifier }", () => {
+        renderSearchControls({
+          permanentFilters: {
+            groups: { value: ["7:inst"], modifier: "INCLUDES" },
+          },
+        });
+        expect(sortValues()).toContain("scene_index");
+      });
+
+      it("is offered when the panel's collection filter includes", () => {
+        renderSearchControls(
+          {},
+          { filters: { groupIds: ["7:inst"], groupIdsModifier: "INCLUDES" } }
+        );
+        expect(sortValues()).toContain("scene_index");
+      });
+
+      it("is not offered when the collection filter excludes or is empty", () => {
+        renderSearchControls(
+          {},
+          { filters: { groupIds: ["7:inst"], groupIdsModifier: "EXCLUDES" } }
+        );
+        expect(sortValues()).not.toContain("scene_index");
+      });
+    });
+
     it("generates random seed for random sort", async () => {
       const user = userEvent.setup();
       const onQueryChange = vi.fn();

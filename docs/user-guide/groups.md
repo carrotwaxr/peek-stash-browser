@@ -70,7 +70,7 @@ Conditional sections appear when data is available:
 
 **Scenes**
 
-Shows all scenes in the group, sorted by scene number (position within the group) by default. Full scene search and filtering available.
+Shows all scenes in the group, sorted by scene number (position within the group) by default. Full scene search and filtering available. Scene Number appears in the sort list only while a collection filter is active, and scenes without a number in that collection come last.
 
 **Performers**
 
