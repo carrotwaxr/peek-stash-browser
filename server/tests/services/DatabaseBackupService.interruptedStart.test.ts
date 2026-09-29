@@ -167,6 +167,70 @@ describe("DatabaseBackupService after an interrupted start", () => {
     expect(logger.warn).toHaveBeenCalledWith(stringContaining(cutOff));
   });
 
+  it("the backup just written survives a clock stepped back behind three older stamps", async () => {
+    // The host's clock read earlier than the last three starts (no RTC
+    // before NTP syncs), so the new stamp sorts oldest
+    const later = [
+      `${BASE}.backup-20261001-130559-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20261001-140010-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20261001-155612-pre-3.4.0-beta.1`,
+    ];
+    for (const name of later) seed(name);
+
+    const backup =
+      await databaseBackupService.createPreMigrationBackup(VERSION);
+
+    expect(backup.filename).toBe(FINAL);
+    // The new one and the two newest of the others: three kept
+    expect(filesInDir()).toEqual([FINAL, ...later.slice(1)]);
+  });
+
+  it("an older -journal beside the backup just completed does not make it incomplete", async () => {
+    const older = [
+      `${BASE}.backup-20260925-130559-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-140010-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-155612-pre-3.4.0-beta.1`,
+    ];
+    for (const name of older) seed(name);
+    // A SQLite client's leftover journal, from before the copy
+    const realRename = fs.promises.rename.bind(fs.promises);
+    const rename = vi.spyOn(fs.promises, "rename");
+    rename.mockImplementation(async (from, to) => {
+      await realRename(from, to);
+      if (String(to).endsWith(FINAL)) {
+        const journal = `${String(to)}-journal`;
+        fs.writeFileSync(journal, "");
+        const past = new Date(Date.now() - 60_000);
+        fs.utimesSync(journal, past, past);
+      }
+    });
+
+    try {
+      await databaseBackupService.createPreMigrationBackup(VERSION);
+    } finally {
+      rename.mockRestore();
+    }
+
+    // Counted as complete: the oldest of the four was pruned, not the new one
+    expect(backupNamed()).toEqual([...older.slice(1), FINAL]);
+    expect(fs.existsSync(path.join(dir, `${FINAL}-journal`))).toBe(true);
+  });
+
+  it("a -journal newer than a backup marks it incomplete", async () => {
+    seed(FINAL);
+    const journal = path.join(dir, `${FINAL}-journal`);
+    seed(`${FINAL}-journal`, "");
+    const past = new Date(Date.now() - 60_000);
+    fs.utimesSync(path.join(dir, FINAL), past, past);
+    expect(fs.statSync(journal).mtimeMs).toBeGreaterThan(
+      fs.statSync(path.join(dir, FINAL)).mtimeMs
+    );
+
+    const listed = await databaseBackupService.listPreMigrationBackups();
+
+    expect(listed).toEqual([]);
+  });
+
   it("a 0-byte pre-migration backup is not counted and is removed", async () => {
     const complete = [
       `${BASE}.backup-20260925-130559-pre-3.4.0-beta.1`,

@@ -209,14 +209,30 @@ function unreadableState(error: unknown): BackupFileState {
  * first write, a file shorter than SQLite's 100-byte header or without its
  * first 16 bytes. Manual and pre-migration backups are checked; legacy ones,
  * copied by `start.sh`, are complete. Reads only the 100-byte header.
+ *
+ * The backup `justCompleted` (the one a running backup has just renamed into
+ * place) is complete whatever an older `-journal` beside it says: only a
+ * journal newer than the backup marks it incomplete.
  */
 async function backupFileState(
   dir: string,
   filename: string,
   kind: BackupKind,
-  present: ReadonlySet<string>
+  present: ReadonlySet<string>,
+  justCompleted?: string
 ): Promise<BackupFileState> {
-  if (present.has(`${filename}-journal`)) return "incomplete";
+  if (present.has(`${filename}-journal`)) {
+    if (filename !== justCompleted) return "incomplete";
+    try {
+      const [backup, journal] = await Promise.all([
+        fs.stat(path.join(dir, filename)),
+        fs.stat(path.join(dir, `${filename}-journal`)),
+      ]);
+      if (journal.mtimeMs > backup.mtimeMs) return "incomplete";
+    } catch (error) {
+      return unreadableState(error);
+    }
+  }
   if (kind === "legacy") return "complete";
   let handle: FileHandle;
   try {
@@ -260,7 +276,8 @@ function compareText(a: string, b: string): number {
 async function completePreMigrationBackups(
   dir: string,
   names: readonly string[],
-  base: string
+  base: string,
+  justCompleted?: string
 ): Promise<PreMigrationName[]> {
   const present = new Set(names);
   const pattern = BACKUP_PATTERNS.preMigration(base);
@@ -268,7 +285,13 @@ async function completePreMigrationBackups(
   for (const filename of names) {
     const groups = pattern.exec(filename)?.groups;
     if (groups === undefined) continue;
-    const state = await backupFileState(dir, filename, "preMigration", present);
+    const state = await backupFileState(
+      dir,
+      filename,
+      "preMigration",
+      present,
+      justCompleted
+    );
     if (state !== "complete") continue;
     backups.push({
       filename,
@@ -612,7 +635,7 @@ class DatabaseBackupService {
     logger.info(
       `Backed up the database to ${backupPath} before migrating (${formatSize(stat.size)}, ${seconds.toFixed(1)} s)`
     );
-    await this.prunePreMigrationBackups(dir, base);
+    await this.prunePreMigrationBackups(dir, base, filename);
     return {
       filename,
       kind: "preMigration",
@@ -662,19 +685,25 @@ class DatabaseBackupService {
 
   /**
    * Deletes all but the newest `PRE_MIGRATION_BACKUPS_KEPT` complete
-   * pre-migration backups of `base` in `dir`. One cut off partway is not
-   * counted, so it never costs a good backup its place.
+   * pre-migration backups of `base` in `dir`, the one just written
+   * (`justWritten`) always among those kept and never deleted, whatever its
+   * stamp says (a clock stepped back sorts it oldest). One cut off partway is
+   * not counted, so it never costs a good backup its place.
    */
   private async prunePreMigrationBackups(
     dir: string,
-    base: string
+    base: string,
+    justWritten: string
   ): Promise<void> {
-    const backups = await completePreMigrationBackups(
-      dir,
-      await fs.readdir(dir),
-      base
-    );
-    const old = backups.slice(0, -PRE_MIGRATION_BACKUPS_KEPT);
+    const others = (
+      await completePreMigrationBackups(
+        dir,
+        await fs.readdir(dir),
+        base,
+        justWritten
+      )
+    ).filter(({ filename }) => filename !== justWritten);
+    const old = others.slice(0, -(PRE_MIGRATION_BACKUPS_KEPT - 1));
     for (const { filename: name } of old) {
       try {
         await fs.unlink(path.join(dir, name));
