@@ -943,6 +943,22 @@ describe("Watch History Controller", () => {
       expect(res.status).toHaveBeenCalledWith(401);
     });
 
+    it("a database failure reaches the error handler", async () => {
+      mockPrisma.watchHistory.deleteMany.mockRejectedValue(
+        new Error("DB down")
+      );
+
+      const res = resFor(clearAllWatchHistory);
+      await expect(
+        clearAllWatchHistory(
+          reqFor(clearAllWatchHistory, { user: testUser({ id: 1 }) }),
+          res
+        )
+      ).rejects.toThrow("DB down");
+
+      expect(res.json).not.toHaveBeenCalled();
+    });
+
     it("should delete all watch history and stats for user", async () => {
       mockPrisma.watchHistory.deleteMany.mockResolvedValue({
         count: 10,

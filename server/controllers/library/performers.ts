@@ -36,81 +36,71 @@ export const findPerformers = async (
   });
   logDropped("POST /library/performers", request.dropped);
 
-  try {
-    const startTime = Date.now();
-    const userId = req.user.id;
-    const { page, perPage, specificInstanceId } = request;
-    // A detail page asks for its performer by id
-    const lookup = singleIdRef(request.filter.ids);
+  const startTime = Date.now();
+  const userId = req.user.id;
+  const { page, perPage, specificInstanceId } = request;
+  // A detail page asks for its performer by id
+  const lookup = singleIdRef(request.filter.ids);
 
-    // Exclusions apply to every user; an admin's rows hold only their own hides
-    const applyExclusions = true;
+  // Exclusions apply to every user; an admin's rows hold only their own hides
+  const applyExclusions = true;
 
-    // Get user's allowed instance IDs for multi-instance filtering
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  // Get user's allowed instance IDs for multi-instance filtering
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const { items: performers, total } = await performerQueryBuilder.execute({
-      userId,
-      allowedInstanceIds,
-      request,
-      applyExclusions,
+  const { items: performers, total } = await performerQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    request,
+    applyExclusions,
+  });
+
+  // Check for ambiguous results on single-ID lookups
+  // This happens when the same ID exists in multiple Stash instances
+  if (lookup && !specificInstanceId && performers.length > 1) {
+    logger.warn("Ambiguous performer lookup", {
+      id: lookup.id,
+      matchCount: performers.length,
+      instances: performers.map((p) => p.instanceId),
     });
-
-    // Check for ambiguous results on single-ID lookups
-    // This happens when the same ID exists in multiple Stash instances
-    if (lookup && !specificInstanceId && performers.length > 1) {
-      logger.warn("Ambiguous performer lookup", {
-        id: lookup.id,
-        matchCount: performers.length,
-        instances: performers.map((p) => p.instanceId),
-      });
-      res.status(400).json({
-        error: "Ambiguous lookup",
-        message: `Multiple performers found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: performers.map((p) => ({
-          id: p.id,
-          name: p.name,
-          instanceId: p.instanceId,
-        })),
-      });
-      return;
-    }
-
-    // Add stashUrl to each performer; its tags come with the row, named on
-    // their own instance
-    const performersWithStashUrl = performers.map((performer) => ({
-      ...performer,
-      stashUrl: buildStashEntityUrl(
-        "performer",
-        performer.id,
-        performer.instanceId,
-        req.user
-      ),
-    }));
-
-    logger.debug("findPerformers completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      totalCount: total,
-      returnedCount: performersWithStashUrl.length,
-      page,
-      perPage,
+    res.status(400).json({
+      error: "Ambiguous lookup",
+      message: `Multiple performers found with ID ${lookup.id}. Specify instance_id parameter.`,
+      matches: performers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        instanceId: p.instanceId,
+      })),
     });
-
-    res.json({
-      findPerformers: {
-        count: total,
-        performers: performersWithStashUrl,
-      },
-    });
-  } catch (error) {
-    logger.error("Error in findPerformers", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find performers",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return;
   }
+
+  // Add stashUrl to each performer; its tags come with the row, named on
+  // their own instance
+  const performersWithStashUrl = performers.map((performer) => ({
+    ...performer,
+    stashUrl: buildStashEntityUrl(
+      "performer",
+      performer.id,
+      performer.instanceId,
+      req.user
+    ),
+  }));
+
+  logger.debug("findPerformers completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    totalCount: total,
+    returnedCount: performersWithStashUrl.length,
+    page,
+    perPage,
+  });
+
+  res.json({
+    findPerformers: {
+      count: total,
+      performers: performersWithStashUrl,
+    },
+  });
 };
 
 /**

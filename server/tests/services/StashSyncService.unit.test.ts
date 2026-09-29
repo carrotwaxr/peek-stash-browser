@@ -27,7 +27,11 @@ import {
   stashInstanceManager,
 } from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
-import { objectContaining, stringContaining } from "../helpers/matchers.js";
+import {
+  anyOf,
+  objectContaining,
+  stringContaining,
+} from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -1581,6 +1585,36 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
       `${PREVIEW}?apikey=key-b`,
     ]);
+  });
+
+  it("marks the generated clips in batches through the writer queue", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockReturnValueOnce({
+      baseUrl: "http://stash-b:9999",
+      apiKey: "key-b",
+    });
+    const ids = Array.from({ length: 450 }, (_, i) => String(i));
+    mockPrisma.stashClip.findMany.mockResolvedValue(
+      ids.map((id) => partialRow({ id, previewPath: `${PREVIEW}/${id}` }))
+    );
+    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(
+      new Map(ids.map((id) => [`${PREVIEW}/${id}?apikey=key-b`, true]))
+    );
+    mockPrisma.stashClip.update.mockResolvedValue(partialRow({}));
+
+    expect(await stashSyncService.reProbeUngeneratedClips("inst-b")).toEqual({
+      checked: 450,
+      updated: 450,
+    });
+
+    // 200 + 200 + 50: no unit holds the write lock for the whole library
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.stashClip.update).toHaveBeenCalledTimes(450);
+    expect(mockPrisma.stashClip.update).toHaveBeenCalledWith({
+      where: { id_stashInstanceId: { id: "449", stashInstanceId: "inst-b" } },
+      data: { isGenerated: true, generationCheckedAt: anyOf(Date) },
+    });
   });
 
   it("skips an instance that is not loaded, and logs it", async () => {

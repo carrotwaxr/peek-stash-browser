@@ -20,6 +20,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { errorHandler } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import authRoutes from "../../routes/auth.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
@@ -78,6 +79,7 @@ describe("auth routes", () => {
     fixtureHash = await bcrypt.hash(PASSWORD, 4);
     ({ baseUrl, close } = await startTestApp((app) => {
       app.use("/api/auth", authRoutes);
+      app.use(errorHandler);
     }));
   });
 
@@ -148,6 +150,17 @@ describe("auth routes", () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ hasRecoveryKey: true });
     });
+  });
+
+  it("a database failure answers 500 with fixed text and never its message", async () => {
+    mockPrisma.user.findUnique.mockRejectedValue(
+      new Error("SQLITE_BUSY at /data/peek.db")
+    );
+
+    const res = await post("/forgot-password/init", { username: "alice" });
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error" });
   });
 
   it("POST /api/auth/first-time-password is gone", async () => {

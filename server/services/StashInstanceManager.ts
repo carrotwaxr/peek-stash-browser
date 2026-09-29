@@ -1,5 +1,6 @@
 import type { StashInstance } from "@prisma/client";
 import { StashClient } from "../graphql/StashClient.js";
+import { NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
@@ -7,12 +8,11 @@ import { emptyToNull } from "../utils/sqlHelpers.js";
 /**
  * A request named a Stash instance that is not loaded: disabled, deleted or
  * never configured. Media from it is not found (invariant 11: a disabled
- * instance never shows).
+ * instance never shows), and left to the central handler it answers 404.
  */
-export class UnknownInstanceError extends Error {
+export class UnknownInstanceError extends NotFoundError {
   constructor(readonly instanceId: string) {
     super(`Stash instance not found: ${instanceId}`);
-    this.name = "UnknownInstanceError";
   }
 }
 

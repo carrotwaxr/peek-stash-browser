@@ -53,21 +53,14 @@ export const getUserCarousels = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetUserCarouselsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const carousels = await prisma.userCarousel.findMany({
-      where: { userId },
-      orderBy: { createdAt: "asc" },
-    });
+  const carousels = await prisma.userCarousel.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
 
-    res.json({ carousels });
-  } catch (error) {
-    logger.error("Error getting user carousels", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get carousels" });
-  }
+  res.json({ carousels });
 };
 
 /**
@@ -77,29 +70,22 @@ export const getCarousel = async (
   req: TypedAuthRequest<unknown, GetCarouselParams>,
   res: TypedResponse<GetCarouselResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const carouselId = req.params.id;
+  const userId = req.user.id;
+  const carouselId = req.params.id;
 
-    const carousel = await prisma.userCarousel.findFirst({
-      where: {
-        id: carouselId,
-        userId,
-      },
-    });
+  const carousel = await prisma.userCarousel.findFirst({
+    where: {
+      id: carouselId,
+      userId,
+    },
+  });
 
-    if (!carousel) {
-      res.status(404).json({ error: "Carousel not found" });
-      return;
-    }
-
-    res.json({ carousel });
-  } catch (error) {
-    logger.error("Error getting carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get carousel" });
+  if (!carousel) {
+    res.status(404).json({ error: "Carousel not found" });
+    return;
   }
+
+  res.json({ carousel });
 };
 
 /**
@@ -130,73 +116,66 @@ export const createCarousel = async (
   );
   logDropped("POST /carousels", request.dropped);
 
-  try {
-    // Validate required fields
-    if (!title || title.trim() === "") {
-      res.status(400).json({ error: "Title is required" });
-      return;
-    }
+  // Validate required fields
+  if (!title || title.trim() === "") {
+    res.status(400).json({ error: "Title is required" });
+    return;
+  }
 
-    // Check carousel limit
-    const count = await prisma.userCarousel.count({
-      where: { userId },
+  // Check carousel limit
+  const count = await prisma.userCarousel.count({
+    where: { userId },
+  });
+
+  if (count >= MAX_CAROUSELS_PER_USER) {
+    res.status(400).json({
+      error: `Maximum ${MAX_CAROUSELS_PER_USER} custom carousels allowed`,
     });
+    return;
+  }
 
-    if (count >= MAX_CAROUSELS_PER_USER) {
-      res.status(400).json({
-        error: `Maximum ${MAX_CAROUSELS_PER_USER} custom carousels allowed`,
-      });
-      return;
-    }
+  const carousel = await prisma.userCarousel.create({
+    data: {
+      userId,
+      title: title.trim(),
+      icon: icon || "Film",
+      rules: rules as unknown as Prisma.InputJsonValue,
+      // As the parser read them: a contract sort, direction upper-case
+      sort: request.sort.field,
+      direction: request.sort.direction,
+    },
+  });
 
-    const carousel = await prisma.userCarousel.create({
+  // Add the new carousel to the user's carouselPreferences so it shows on homepage immediately
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { carouselPreferences: true },
+  });
+
+  const existingPrefs =
+    (user?.carouselPreferences as CarouselPreference[] | null) ?? [];
+  const customCarouselId = `custom-${carousel.id}`;
+
+  // Only add if not already present
+  if (!existingPrefs.find((p) => p.id === customCarouselId)) {
+    const maxOrder = existingPrefs.reduce(
+      (max, p) => Math.max(max, p.order),
+      -1
+    );
+    const newPrefs = [
+      ...existingPrefs,
+      { id: customCarouselId, enabled: true, order: maxOrder + 1 },
+    ];
+
+    await prisma.user.update({
+      where: { id: userId },
       data: {
-        userId,
-        title: title.trim(),
-        icon: icon || "Film",
-        rules: rules as unknown as Prisma.InputJsonValue,
-        // As the parser read them: a contract sort, direction upper-case
-        sort: request.sort.field,
-        direction: request.sort.direction,
+        carouselPreferences: newPrefs as unknown as Prisma.InputJsonValue,
       },
     });
-
-    // Add the new carousel to the user's carouselPreferences so it shows on homepage immediately
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { carouselPreferences: true },
-    });
-
-    const existingPrefs =
-      (user?.carouselPreferences as CarouselPreference[] | null) ?? [];
-    const customCarouselId = `custom-${carousel.id}`;
-
-    // Only add if not already present
-    if (!existingPrefs.find((p) => p.id === customCarouselId)) {
-      const maxOrder = existingPrefs.reduce(
-        (max, p) => Math.max(max, p.order),
-        -1
-      );
-      const newPrefs = [
-        ...existingPrefs,
-        { id: customCarouselId, enabled: true, order: maxOrder + 1 },
-      ];
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          carouselPreferences: newPrefs as unknown as Prisma.InputJsonValue,
-        },
-      });
-    }
-
-    res.status(201).json({ carousel });
-  } catch (error) {
-    logger.error("Error creating carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to create carousel" });
   }
+
+  res.status(201).json({ carousel });
 };
 
 /**
@@ -216,46 +195,39 @@ export const updateCarousel = async (
   const request = parseCarouselRequest({ rules, sort, direction }, { userId });
   logDropped("PUT /carousels/:id", request.dropped);
 
-  try {
-    // Check ownership
-    const existing = await prisma.userCarousel.findFirst({
-      where: {
-        id: carouselId,
-        userId,
-      },
-    });
+  // Check ownership
+  const existing = await prisma.userCarousel.findFirst({
+    where: {
+      id: carouselId,
+      userId,
+    },
+  });
 
-    if (!existing) {
-      res.status(404).json({ error: "Carousel not found" });
-      return;
-    }
-
-    // Validate title if provided
-    if (title !== undefined && title.trim() === "") {
-      res.status(400).json({ error: "Title cannot be empty" });
-      return;
-    }
-
-    const carousel = await prisma.userCarousel.update({
-      where: { id: carouselId },
-      data: {
-        ...(title !== undefined && { title: title.trim() }),
-        ...(icon !== undefined && { icon }),
-        ...(rules !== undefined && {
-          rules: rules as unknown as Prisma.InputJsonValue,
-        }),
-        ...(sort !== undefined && { sort: request.sort.field }),
-        ...(direction !== undefined && { direction: request.sort.direction }),
-      },
-    });
-
-    res.json({ carousel });
-  } catch (error) {
-    logger.error("Error updating carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update carousel" });
+  if (!existing) {
+    res.status(404).json({ error: "Carousel not found" });
+    return;
   }
+
+  // Validate title if provided
+  if (title !== undefined && title.trim() === "") {
+    res.status(400).json({ error: "Title cannot be empty" });
+    return;
+  }
+
+  const carousel = await prisma.userCarousel.update({
+    where: { id: carouselId },
+    data: {
+      ...(title !== undefined && { title: title.trim() }),
+      ...(icon !== undefined && { icon }),
+      ...(rules !== undefined && {
+        rules: rules as unknown as Prisma.InputJsonValue,
+      }),
+      ...(sort !== undefined && { sort: request.sort.field }),
+      ...(direction !== undefined && { direction: request.sort.direction }),
+    },
+  });
+
+  res.json({ carousel });
 };
 
 /**
@@ -265,34 +237,27 @@ export const deleteCarousel = async (
   req: TypedAuthRequest<unknown, DeleteCarouselParams>,
   res: TypedResponse<DeleteCarouselResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const carouselId = req.params.id;
+  const userId = req.user.id;
+  const carouselId = req.params.id;
 
-    // Check ownership
-    const existing = await prisma.userCarousel.findFirst({
-      where: {
-        id: carouselId,
-        userId,
-      },
-    });
+  // Check ownership
+  const existing = await prisma.userCarousel.findFirst({
+    where: {
+      id: carouselId,
+      userId,
+    },
+  });
 
-    if (!existing) {
-      res.status(404).json({ error: "Carousel not found" });
-      return;
-    }
-
-    await prisma.userCarousel.delete({
-      where: { id: carouselId },
-    });
-
-    res.json({ success: true, message: "Carousel deleted" });
-  } catch (error) {
-    logger.error("Error deleting carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to delete carousel" });
+  if (!existing) {
+    res.status(404).json({ error: "Carousel not found" });
+    return;
   }
+
+  await prisma.userCarousel.delete({
+    where: { id: carouselId },
+  });
+
+  res.json({ success: true, message: "Carousel deleted" });
 };
 
 /**
@@ -323,17 +288,10 @@ export const previewCarousel = async (
   );
   logDropped("POST /carousels/preview", query.dropped);
 
-  try {
-    // Execute the carousel query
-    const scenes = await executeCarouselQuery(userId, query, req.user);
+  // Execute the carousel query
+  const scenes = await executeCarouselQuery(userId, query, req.user);
 
-    res.json({ scenes });
-  } catch (error) {
-    logger.error("Error previewing carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to preview carousel" });
-  }
+  res.json({ scenes });
 };
 
 /**
@@ -377,51 +335,44 @@ export const executeCarouselById = async (
   req: TypedAuthRequest<unknown, ExecuteCarouselByIdParams>,
   res: TypedResponse<ExecuteCarouselByIdResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const carouselId = req.params.id;
+  const userId = req.user.id;
+  const carouselId = req.params.id;
 
-    // Get the carousel
-    const carousel = await prisma.userCarousel.findFirst({
-      where: {
-        id: carouselId,
-        userId,
-      },
-    });
+  // Get the carousel
+  const carousel = await prisma.userCarousel.findFirst({
+    where: {
+      id: carouselId,
+      userId,
+    },
+  });
 
-    if (!carousel) {
-      res.status(404).json({ error: "Carousel not found" });
-      return;
-    }
-
-    // Stored rules parse leniently: what the contract no longer takes is
-    // left out and logged, and a bad sort or direction takes the default
-    const query = parseStoredSceneQuery(
-      carousel.rules,
-      carousel.sort,
-      carousel.direction,
-      {
-        userId,
-        perPage: CAROUSEL_SCENE_LIMIT,
-        randomSeed: perLoadSeed(userId),
-      }
-    );
-    logDropped("GET /carousels/:id/execute", query.dropped);
-
-    const scenes = await executeCarouselQuery(userId, query, req.user);
-
-    res.json({
-      carousel: {
-        id: carousel.id,
-        title: carousel.title,
-        icon: carousel.icon,
-      },
-      scenes,
-    });
-  } catch (error) {
-    logger.error("Error executing carousel", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to execute carousel query" });
+  if (!carousel) {
+    res.status(404).json({ error: "Carousel not found" });
+    return;
   }
+
+  // Stored rules parse leniently: what the contract no longer takes is
+  // left out and logged, and a bad sort or direction takes the default
+  const query = parseStoredSceneQuery(
+    carousel.rules,
+    carousel.sort,
+    carousel.direction,
+    {
+      userId,
+      perPage: CAROUSEL_SCENE_LIMIT,
+      randomSeed: perLoadSeed(userId),
+    }
+  );
+  logDropped("GET /carousels/:id/execute", query.dropped);
+
+  const scenes = await executeCarouselQuery(userId, query, req.user);
+
+  res.json({
+    carousel: {
+      id: carousel.id,
+      title: carousel.title,
+      icon: carousel.icon,
+    },
+    scenes,
+  });
 };

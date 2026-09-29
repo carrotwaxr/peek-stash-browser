@@ -6,6 +6,7 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
@@ -36,11 +37,23 @@ vi.mock("../../services/SyncScheduler.js", () => ({
 }));
 
 // Mock StashInstanceManager
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    getAllEnabled: vi.fn(() => [{ id: "instance-1", name: "Test Instance" }]),
-  },
-}));
+vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof stashInstanceManagerModule>();
+  return {
+    UnknownInstanceError: actual.UnknownInstanceError,
+    stashInstanceManager: {
+      getAllEnabled: vi.fn(() => [{ id: "instance-1", name: "Test Instance" }]),
+      get: vi.fn((id: string) =>
+        id === "custom-instance" ? { id } : undefined
+      ),
+    },
+  };
+});
+
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -120,6 +133,22 @@ describe("POST /api/sync/reprobe-clips", () => {
     expect(mockSyncService.reProbeUngeneratedClips).toHaveBeenCalledWith(
       "custom-instance"
     );
+  });
+
+  it("a named instance that is not loaded reaches the error handler as a 404", async () => {
+    const handler = await getReprobeHandler();
+    const req = reqFor(handler, {
+      body: { instanceId: "gone" },
+      user: { id: 1, username: "admin", role: "ADMIN" },
+    });
+    const res = resFor(handler);
+
+    await expect(handler(req, res, () => {})).rejects.toMatchObject({
+      statusCode: 404,
+    });
+
+    expect(mockSyncService.reProbeUngeneratedClips).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
   });
 
   it("returns 409 when sync is in progress", async () => {

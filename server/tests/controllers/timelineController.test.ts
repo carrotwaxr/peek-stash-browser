@@ -108,7 +108,7 @@ describe("timelineController", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Invalid granularity" });
     });
 
-    it("returns 500 when service throws an error", async () => {
+    it("a database failure reaches the error handler", async () => {
       vi.mocked(timelineService.getDistribution).mockRejectedValue(
         new Error("Database connection failed")
       );
@@ -121,12 +121,10 @@ describe("timelineController", () => {
 
       const res = resFor(getDateDistribution);
 
-      await getDateDistribution(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to fetch date distribution",
-      });
+      await expect(getDateDistribution(req, res)).rejects.toThrow(
+        "Database connection failed"
+      );
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

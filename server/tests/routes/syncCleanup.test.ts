@@ -16,6 +16,7 @@ import {
 } from "vitest";
 import type { StashClient } from "../../graphql/StashClient.js";
 import type * as authModule from "../../middleware/auth.js";
+import { errorHandler } from "../../middleware/errorHandler.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { logger } from "../../utils/logger.js";
@@ -69,6 +70,11 @@ vi.mock("../../services/SyncScheduler.js", () => ({
   syncScheduler: {},
 }));
 
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
+
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: { get: vi.fn() },
 }));
@@ -93,6 +99,7 @@ describe("POST /api/sync/cleanup", () => {
     const { default: syncRoutes } = await import("../../routes/sync.js");
     ({ baseUrl, close } = await startTestApp((app) => {
       app.use("/api/sync", syncRoutes);
+      app.use(errorHandler);
     }));
   });
 
@@ -167,7 +174,7 @@ describe("POST /api/sync/cleanup", () => {
     const res = await post({ instanceId: "inst-a", entityType: "scene" });
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error });
+    expect(await res.json()).toEqual({ error, errorType: "CONFLICT" });
   });
 
   it.each([

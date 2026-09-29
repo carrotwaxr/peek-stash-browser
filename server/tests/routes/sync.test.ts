@@ -64,6 +64,22 @@ describe("sync routes", () => {
     });
   });
 
+  it("a failing status lookup reaches the error handler", async () => {
+    mockSyncService.getSyncStatus.mockRejectedValue(new Error("DB down"));
+    const handler = findHandler(await syncRouter(), "get", "/status");
+    const res = resFor(handler);
+
+    await expect(
+      handler(
+        reqFor(handler, { user: testUser({ role: "ADMIN" }) }),
+        res,
+        () => {}
+      )
+    ).rejects.toThrow("DB down");
+
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
   it("has no POST /notify route", async () => {
     const router = await syncRouter();
 

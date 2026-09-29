@@ -221,7 +221,18 @@ function logContext(req: ErrorRequest, err: unknown): LogContext {
           type: clientError.bodyType,
           status: clientError.status,
         };
-  return { method: req.method, route: req.path, userId: req.user?.id, error };
+  const context: LogContext = {
+    method: req.method,
+    route: req.path,
+    userId: req.user?.id,
+    error,
+  };
+  // What was refused: each invalid field's path and message, so a drifted
+  // filter shows in the log, never the value the request sent
+  if (err instanceof ValidationError && err.issues !== undefined) {
+    context.issues = err.issues.map(({ path, message }) => ({ path, message }));
+  }
+  return context;
 }
 
 /**

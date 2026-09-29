@@ -363,7 +363,7 @@ describe("findScenes", () => {
     expect(body.matches).toHaveLength(2);
   });
 
-  it("returns 500 on unexpected error", async () => {
+  it("a failure reaches the error handler: unexpected error", async () => {
     mockSceneQueryBuilder.execute.mockRejectedValue(new Error("DB down"));
 
     const req = reqFor(findScenes, {
@@ -372,10 +372,9 @@ describe("findScenes", () => {
     });
     const res = resFor(findScenes);
 
-    await findScenes(req, res);
+    await expect(findScenes(req, res)).rejects.toThrow("DB down");
 
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({ error: "Failed to find scenes" });
+    expect(res.json).not.toHaveBeenCalled();
   });
 
   describe("with PEEK_FILTER_POLICY=drop", () => {
@@ -603,7 +602,7 @@ describe("findSimilarScenes", () => {
     }
   );
 
-  it("returns 500 on error", async () => {
+  it("a failure reaches the error handler: error", async () => {
     mockStashEntityService.getSimilarSceneCandidates.mockRejectedValue(
       new Error("DB error")
     );
@@ -615,9 +614,9 @@ describe("findSimilarScenes", () => {
     });
     const res = resFor(findSimilarScenes);
 
-    await findSimilarScenes(req, res);
+    await expect(findSimilarScenes(req, res)).rejects.toThrow("DB error");
 
-    expect(res._getStatus()).toBe(500);
+    expect(res.json).not.toHaveBeenCalled();
   });
 });
 
@@ -821,7 +820,7 @@ describe("getRecommendedScenes", () => {
     }
   );
 
-  it("returns 500 on unexpected error", async () => {
+  it("a failure reaches the error handler: unexpected error", async () => {
     mockRecommendationService.getRankedRefs.mockRejectedValue(
       new Error("DB down")
     );
@@ -832,11 +831,8 @@ describe("getRecommendedScenes", () => {
     });
     const res = resFor(getRecommendedScenes);
 
-    await getRecommendedScenes(req, res);
+    await expect(getRecommendedScenes(req, res)).rejects.toThrow("DB down");
 
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({
-      error: "Failed to get recommended scenes",
-    });
+    expect(res.json).not.toHaveBeenCalled();
   });
 });

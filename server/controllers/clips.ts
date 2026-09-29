@@ -17,7 +17,6 @@ import {
   parseSceneClipsRequest,
   parseStashId,
 } from "../utils/listRequest.js";
-import { logger } from "../utils/logger.js";
 
 /**
  * GET /api/clips
@@ -32,28 +31,23 @@ export const getClips = async (
   const request = parseClipQuery(req.query, { userId: req.user.id });
   logDropped("GET /clips", request.dropped);
 
-  try {
-    const userId = req.user.id;
-    const { page, perPage } = request;
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const userId = req.user.id;
+  const { page, perPage } = request;
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const result = await clipService.getClips({
-      userId,
-      allowedInstanceIds,
-      request,
-    });
+  const result = await clipService.getClips({
+    userId,
+    allowedInstanceIds,
+    request,
+  });
 
-    res.json({
-      clips: result.clips,
-      total: result.total,
-      page,
-      perPage,
-      totalPages: Math.ceil(result.total / perPage),
-    });
-  } catch (error) {
-    logger.error("Failed to get clips", { error });
-    res.status(500).json({ error: "Failed to get clips" });
-  }
+  res.json({
+    clips: result.clips,
+    total: result.total,
+    page,
+    perPage,
+    totalPages: Math.ceil(result.total / perPage),
+  });
 };
 
 /**
@@ -67,26 +61,21 @@ export const getClipById = async (
   // A ValidationError (400) reaches the central error handler
   const id = parseStashId(req.params.id, "id");
 
-  try {
-    const userId = req.user.id;
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const userId = req.user.id;
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const clip = await clipService.getClipById({
-      userId,
-      allowedInstanceIds,
-      id,
-    });
+  const clip = await clipService.getClipById({
+    userId,
+    allowedInstanceIds,
+    id,
+  });
 
-    if (!clip) {
-      res.status(404).json({ error: "Clip not found" });
-      return;
-    }
-
-    res.json(clip);
-  } catch (error) {
-    logger.error("Failed to get clip", { error });
-    res.status(500).json({ error: "Failed to get clip" });
+  if (!clip) {
+    res.status(404).json({ error: "Clip not found" });
+    return;
   }
+
+  res.json(clip);
 };
 
 /**
@@ -104,21 +93,16 @@ export const getClipsForScene = async (
   });
   logDropped("GET /scenes/:id/clips", request.dropped);
 
-  try {
-    const userId = req.user.id;
-    const { sceneId, includeUngenerated, specificInstanceId } = request;
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const userId = req.user.id;
+  const { sceneId, includeUngenerated, specificInstanceId } = request;
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const clips = await clipService.getClipsForScene({
-      userId,
-      allowedInstanceIds,
-      scene: { id: sceneId, instanceId: specificInstanceId },
-      includeUngenerated,
-    });
+  const clips = await clipService.getClipsForScene({
+    userId,
+    allowedInstanceIds,
+    scene: { id: sceneId, instanceId: specificInstanceId },
+    includeUngenerated,
+  });
 
-    res.json({ clips });
-  } catch (error) {
-    logger.error("Failed to get clips for scene", { error });
-    res.status(500).json({ error: "Failed to get clips" });
-  }
+  res.json({ clips });
 };

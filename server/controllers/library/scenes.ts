@@ -75,79 +75,69 @@ export const findScenes = async (
   const request = parseListRequest("scene", req.body, { userId });
   logDropped("POST /library/scenes", request.dropped);
 
-  try {
-    const { specificInstanceId } = request;
-    // A detail page asks for its scene by id
-    const lookup = singleIdRef(request.filter.ids);
+  const { specificInstanceId } = request;
+  // A detail page asks for its scene by id
+  const lookup = singleIdRef(request.filter.ids);
 
-    // Get user's allowed instance IDs for multi-instance filtering
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  // Get user's allowed instance IDs for multi-instance filtering
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Execute query (applyExclusions defaults to true)
-    const result = await sceneQueryBuilder.execute({
-      userId,
-      allowedInstanceIds,
-      request,
+  // Execute query (applyExclusions defaults to true)
+  const result = await sceneQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    request,
+  });
+
+  // Check for ambiguous results on single-ID lookups
+  // This happens when the same ID exists in multiple Stash instances
+  if (lookup && !specificInstanceId && result.items.length > 1) {
+    logger.warn("Ambiguous scene lookup", {
+      id: lookup.id,
+      matchCount: result.items.length,
+      instances: result.items.map((s) => s.instanceId),
     });
-
-    // Check for ambiguous results on single-ID lookups
-    // This happens when the same ID exists in multiple Stash instances
-    if (lookup && !specificInstanceId && result.items.length > 1) {
-      logger.warn("Ambiguous scene lookup", {
-        id: lookup.id,
-        matchCount: result.items.length,
-        instances: result.items.map((s) => s.instanceId),
-      });
-      res.status(400).json({
-        error: "Ambiguous lookup",
-        message: `Multiple scenes found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: result.items.map((s) => ({
-          id: s.id,
-          title: s.title,
-          instanceId: s.instanceId,
-        })),
-      });
-      return;
-    }
-
-    // Add streamability info
-    let scenes = addStreamabilityInfo(result.items, req.user);
-
-    // The Scene page loads one scene by id: only then build its stream
-    // list. Lists keep sceneStreams empty.
-    if (lookup) {
-      scenes = await Promise.all(
-        scenes.map(async (s) => ({
-          ...s,
-          sceneStreams: await stashEntityService.getPlaybackStreams(
-            s.id,
-            s.instanceId
-          ),
-        }))
-      );
-    }
-
-    logger.debug("findScenes complete (SQL path)", {
-      totalTimeMs: Date.now() - requestStart,
-      resultCount: scenes.length,
-      total: result.total,
+    res.status(400).json({
+      error: "Ambiguous lookup",
+      message: `Multiple scenes found with ID ${lookup.id}. Specify instance_id parameter.`,
+      matches: result.items.map((s) => ({
+        id: s.id,
+        title: s.title,
+        instanceId: s.instanceId,
+      })),
     });
-
-    res.json({
-      findScenes: {
-        count: result.total,
-        scenes,
-      },
-    });
-  } catch (error) {
-    logger.error("Error in findScenes", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find scenes",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return;
   }
+
+  // Add streamability info
+  let scenes = addStreamabilityInfo(result.items, req.user);
+
+  // The Scene page loads one scene by id: only then build its stream
+  // list. Lists keep sceneStreams empty.
+  if (lookup) {
+    scenes = await Promise.all(
+      scenes.map(async (s) => ({
+        ...s,
+        sceneStreams: await stashEntityService.getPlaybackStreams(
+          s.id,
+          s.instanceId
+        ),
+      }))
+    );
+  }
+
+  logger.debug("findScenes complete (SQL path)", {
+    totalTimeMs: Date.now() - requestStart,
+    resultCount: scenes.length,
+    total: result.total,
+  });
+
+  res.json({
+    findScenes: {
+      count: result.total,
+      scenes,
+    },
+  });
 };
 
 /**
@@ -176,72 +166,67 @@ export const findSimilarScenes = async (
   });
   logDropped("GET /library/scenes/:id/similar", request.dropped);
 
-  try {
-    const { sceneId: id, page } = request;
-    const perPage = 12;
+  const { sceneId: id, page } = request;
+  const perPage = 12;
 
-    const instanceId = await resolveAccessibleInstanceId(
-      userId,
-      "scene",
-      id,
-      request.specificInstanceId
-    );
-    if (!instanceId) {
-      res.status(404).json({ error: "Scene not found" });
-      return;
-    }
-
-    const candidates = await stashEntityService.getSimilarSceneCandidates(
-      { id, instanceId },
-      userId,
-      500
-    );
-
-    // The page's refs, in candidate order (weight desc, date desc from SQL)
-    const startIndex = (page - 1) * perPage;
-    const pageRefs: EntityRef[] = candidates
-      .slice(startIndex, startIndex + perPage)
-      .map((c) => ({ id: c.sceneId, instanceId: c.instanceId }));
-
-    if (pageRefs.length === 0) {
-      res.json({ scenes: [], count: candidates.length, page, perPage });
-      return;
-    }
-
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-    const scenes = await sceneQueryBuilder.getByRefs({
-      userId,
-      refs: pageRefs,
-      allowedInstanceIds,
-    });
-
-    // Back into candidate order, each scene by its (id, instance)
-    const sceneByKey = new Map(
-      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
-    );
-    const orderedScenes = pageRefs
-      .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
-      .filter((s): s is NormalizedScene => s !== undefined);
-
-    logger.debug("findSimilarScenes completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      sceneId: id,
-      instanceId,
-      candidateCount: candidates.length,
-      resultCount: orderedScenes.length,
-      page,
-    });
-
-    res.json({
-      scenes: orderedScenes,
-      count: candidates.length,
-      page,
-      perPage,
-    });
-  } catch (error) {
-    logger.error("Error finding similar scenes:", { error: error as Error });
-    res.status(500).json({ error: "Failed to find similar scenes" });
+  const instanceId = await resolveAccessibleInstanceId(
+    userId,
+    "scene",
+    id,
+    request.specificInstanceId
+  );
+  if (!instanceId) {
+    res.status(404).json({ error: "Scene not found" });
+    return;
   }
+
+  const candidates = await stashEntityService.getSimilarSceneCandidates(
+    { id, instanceId },
+    userId,
+    500
+  );
+
+  // The page's refs, in candidate order (weight desc, date desc from SQL)
+  const startIndex = (page - 1) * perPage;
+  const pageRefs: EntityRef[] = candidates
+    .slice(startIndex, startIndex + perPage)
+    .map((c) => ({ id: c.sceneId, instanceId: c.instanceId }));
+
+  if (pageRefs.length === 0) {
+    res.json({ scenes: [], count: candidates.length, page, perPage });
+    return;
+  }
+
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const scenes = await sceneQueryBuilder.getByRefs({
+    userId,
+    refs: pageRefs,
+    allowedInstanceIds,
+  });
+
+  // Back into candidate order, each scene by its (id, instance)
+  const sceneByKey = new Map(
+    scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+  );
+  const orderedScenes = pageRefs
+    .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
+    .filter((s): s is NormalizedScene => s !== undefined);
+
+  logger.debug("findSimilarScenes completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    sceneId: id,
+    instanceId,
+    candidateCount: candidates.length,
+    resultCount: orderedScenes.length,
+    page,
+  });
+
+  res.json({
+    scenes: orderedScenes,
+    count: candidates.length,
+    page,
+    perPage,
+  });
 };
 
 /**
@@ -267,87 +252,71 @@ export const getRecommendedScenes = async (
   const request = parseRecommendedRequest(req.query, { userId });
   logDropped("GET /library/scenes/recommended", request.dropped);
 
-  try {
-    const { page, perPage } = request;
+  const { page, perPage } = request;
 
-    // Rankings over an hour old are recomputed in the background; this
-    // request scores with the ones stored
-    void rankingComputeService.ensureFresh(userId);
+  // Rankings over an hour old are recomputed in the background; this
+  // request scores with the ones stored
+  void rankingComputeService.ensureFresh(userId);
 
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-    const { refs, criteria } = await recommendationService.getRankedRefs(
-      userId,
-      allowedInstanceIds
-    );
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { refs, criteria } = await recommendationService.getRankedRefs(
+    userId,
+    allowedInstanceIds
+  );
 
-    if (!hasAnyCriteria(criteria)) {
-      res.json({
-        scenes: [],
-        count: 0,
-        page,
-        perPage,
-        message: "No recommendations yet",
-        criteria,
-      });
-      return;
-    }
-
-    if (refs.length === 0) {
-      res.json({
-        scenes: [],
-        count: 0,
-        page,
-        perPage,
-        message: "No matching recommendations found",
-        criteria,
-      });
-      return;
-    }
-
-    const startIndex = (page - 1) * perPage;
-    const pageRefs = refs.slice(startIndex, startIndex + perPage);
-
-    const scenes = await sceneQueryBuilder.getByRefs({
-      userId,
-      refs: pageRefs,
-      allowedInstanceIds,
-    });
-
-    // Back in ranked order: getByRefs returns the page in no particular order
-    const sceneByKey = new Map(
-      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
-    );
-    const orderedScenes = pageRefs
-      .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
-      .filter((s): s is NormalizedScene => s !== undefined);
-
-    logger.debug("getRecommendedScenes completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      userId,
-      candidateCount: refs.length,
-      resultCount: orderedScenes.length,
-      page,
-    });
-
+  if (!hasAnyCriteria(criteria)) {
     res.json({
-      scenes: orderedScenes,
-      count: refs.length,
+      scenes: [],
+      count: 0,
       page,
       perPage,
+      message: "No recommendations yet",
+      criteria,
     });
-  } catch (error) {
-    const err = error as Error;
-    logger.error("Error getting recommended scenes:", {
-      message: err.message,
-      name: err.name,
-      stack: err.stack,
-      userId,
-    });
-
-    const errorType = err.name || "Unknown error";
-    res.status(500).json({
-      error: "Failed to get recommended scenes",
-      errorType,
-    });
+    return;
   }
+
+  if (refs.length === 0) {
+    res.json({
+      scenes: [],
+      count: 0,
+      page,
+      perPage,
+      message: "No matching recommendations found",
+      criteria,
+    });
+    return;
+  }
+
+  const startIndex = (page - 1) * perPage;
+  const pageRefs = refs.slice(startIndex, startIndex + perPage);
+
+  const scenes = await sceneQueryBuilder.getByRefs({
+    userId,
+    refs: pageRefs,
+    allowedInstanceIds,
+  });
+
+  // Back in ranked order: getByRefs returns the page in no particular order
+  const sceneByKey = new Map(
+    scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+  );
+  const orderedScenes = pageRefs
+    .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
+    .filter((s): s is NormalizedScene => s !== undefined);
+
+  logger.debug("getRecommendedScenes completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    userId,
+    candidateCount: refs.length,
+    resultCount: orderedScenes.length,
+    page,
+  });
+
+  res.json({
+    scenes: orderedScenes,
+    count: refs.length,
+    page,
+    perPage,
+  });
 };

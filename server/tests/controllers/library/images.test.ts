@@ -455,7 +455,7 @@ describe("Images Controller", () => {
       expect(callArgs.applyExclusions).toBe(true);
     });
 
-    it("returns 500 when query builder throws", async () => {
+    it("a failure reaches the error handler: query builder throws", async () => {
       mockImageQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(findImages, {
@@ -464,10 +464,9 @@ describe("Images Controller", () => {
       });
       const res = resFor(findImages);
 
-      await findImages(req, res);
+      await expect(findImages(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find images");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

@@ -216,92 +216,85 @@ function ratingHandler<T extends RatingEntityType>(target: RatingTarget<T>) {
     req: TypedAuthRequest<UpdateRatingRequest, Record<`${T}Id`, string>>,
     res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
   ): Promise<void> {
-    try {
-      const userId = req.user.id;
-      const entityId = req.params[param];
-      const { instanceId: requestInstanceId, ...change } = req.body;
-      const { rating, favorite } = change;
+    const userId = req.user.id;
+    const entityId = req.params[param];
+    const { instanceId: requestInstanceId, ...change } = req.body;
+    const { rating, favorite } = change;
 
-      if (!entityId) {
-        res.status(400).json({ error: `Missing ${param}` });
-        return;
-      }
-      if (
-        rating !== undefined &&
-        rating !== null &&
-        (typeof rating !== "number" || rating < 0 || rating > 100)
-      ) {
-        res
-          .status(400)
-          .json({ error: "Rating must be a number between 0 and 100" });
-        return;
-      }
-      if (favorite !== undefined && typeof favorite !== "boolean") {
-        res.status(400).json({ error: "Favorite must be a boolean" });
-        return;
-      }
-      if (
-        requestInstanceId !== undefined &&
-        (typeof requestInstanceId !== "string" || requestInstanceId === "")
-      ) {
-        res
-          .status(400)
-          .json({ error: "instanceId must be a non-empty string" });
-        return;
-      }
+    if (!entityId) {
+      res.status(400).json({ error: `Missing ${param}` });
+      return;
+    }
+    if (
+      rating !== undefined &&
+      rating !== null &&
+      (typeof rating !== "number" || rating < 0 || rating > 100)
+    ) {
+      res
+        .status(400)
+        .json({ error: "Rating must be a number between 0 and 100" });
+      return;
+    }
+    if (favorite !== undefined && typeof favorite !== "boolean") {
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
+    }
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
+    }
 
-      // The user's sync setting, and the entity's instance if they can see it
-      const [user, instanceId] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: { syncToStash: true },
-        }),
-        resolveAccessibleInstanceId(userId, type, entityId, requestInstanceId),
-      ]);
-      if (!instanceId) {
-        res.status(404).json({ error: `${label} not found` });
-        return;
-      }
+    // The user's sync setting, and the entity's instance if they can see it
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      resolveAccessibleInstanceId(userId, type, entityId, requestInstanceId),
+    ]);
+    if (!instanceId) {
+      res.status(404).json({ error: `${label} not found` });
+      return;
+    }
 
-      const row = await dbWrite(`rating.${type}`, () =>
-        target.upsert({ userId, instanceId, entityId }, change)
-      );
-      logger.debug(`${label} rating updated`, {
-        userId,
-        [param]: entityId,
-        instanceId,
-        rating,
-        favorite,
-      });
+    const row = await dbWrite(`rating.${type}`, () =>
+      target.upsert({ userId, instanceId, entityId }, change)
+    );
+    logger.debug(`${label} rating updated`, {
+      userId,
+      [param]: entityId,
+      instanceId,
+      rating,
+      favorite,
+    });
 
-      const input = user?.syncToStash
-        ? stashInput(target.stash, entityId, change)
-        : null;
-      if (input) {
-        try {
-          const stash = stashInstanceManager.getForSync(instanceId);
-          if (stash) {
-            await target.stashUpdate(stash, input);
-            logger.info(`Synced ${type} rating to Stash`, {
-              ...input,
-              instanceId,
-            });
-          }
-        } catch (stashError) {
-          // Peek's row is the record: the request still succeeds
-          logger.error(`Failed to sync ${type} rating to Stash`, {
-            [param]: entityId,
+    const input = user?.syncToStash
+      ? stashInput(target.stash, entityId, change)
+      : null;
+    if (input) {
+      try {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await target.stashUpdate(stash, input);
+          logger.info(`Synced ${type} rating to Stash`, {
+            ...input,
             instanceId,
-            error: stashError,
           });
         }
+      } catch (stashError) {
+        // Peek's row is the record: the request still succeeds
+        logger.error(`Failed to sync ${type} rating to Stash`, {
+          [param]: entityId,
+          instanceId,
+          error: stashError,
+        });
       }
-
-      res.json({ success: true, rating: row });
-    } catch (error) {
-      logger.error(`Error updating ${type} rating`, { error });
-      res.status(500).json({ error: `Failed to update ${type} rating` });
     }
+
+    res.json({ success: true, rating: row });
   };
 }
 

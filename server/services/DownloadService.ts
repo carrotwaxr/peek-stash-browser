@@ -1,4 +1,5 @@
 import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
+import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { safeFileName } from "../utils/contentDisposition.js";
 import { entityKey, pairsJson } from "../utils/entityRef.js";
@@ -283,11 +284,11 @@ WHERE s.deletedAt IS NULL`,
     });
 
     if (!download) {
-      throw new Error("Download not found");
+      throw new NotFoundError("Download not found");
     }
 
     if (download.userId !== userId) {
-      throw new Error("Not authorized to delete this download");
+      throw new ForbiddenError("Access denied");
     }
 
     await prisma.download.delete({

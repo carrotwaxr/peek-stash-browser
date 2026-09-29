@@ -186,16 +186,16 @@ describe("UserStats Controller", () => {
       expect(events).toEqual(["rankings fresh", "stats read"]);
     });
 
-    it("returns 500 without reading stats when the recompute fails", async () => {
+    it("a failure reaches the error handler: without reading stats when the recompute fails", async () => {
       mockRankingService.ensureFresh.mockRejectedValue(
         new Error("disk I/O error")
       );
       const req = reqFor(getUserStats, { user: USER });
       const res = resFor(getUserStats);
 
-      await getUserStats(req, res);
+      await expect(getUserStats(req, res)).rejects.toThrow("disk I/O error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
       expect(mockStatsService.getUserStats).not.toHaveBeenCalled();
     });
   });
@@ -234,7 +234,7 @@ describe("UserStats Controller", () => {
   // ─── Error handling ───────────────────────────────────────────────────────
 
   describe("error handling", () => {
-    it("returns 500 when the stats service throws", async () => {
+    it("a failure reaches the error handler: the stats service throws", async () => {
       mockStatsService.getUserStats.mockRejectedValue(
         new Error("Service failure")
       );
@@ -242,9 +242,9 @@ describe("UserStats Controller", () => {
       const req = reqFor(getUserStats, { user: USER });
       const res = resFor(getUserStats);
 
-      await getUserStats(req, res);
+      await expect(getUserStats(req, res)).rejects.toThrow("Service failure");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

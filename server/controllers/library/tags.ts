@@ -41,110 +41,100 @@ export const findTags = async (
   const request = parseListRequest("tag", req.body, { userId: req.user.id });
   logDropped("POST /library/tags", request.dropped);
 
-  try {
-    const startTime = Date.now();
-    const userId = req.user.id;
-    const { page, perPage, specificInstanceId } = request;
-    // A detail page asks for its tag by id
-    const lookup = singleIdRef(request.filter.ids);
+  const startTime = Date.now();
+  const userId = req.user.id;
+  const { page, perPage, specificInstanceId } = request;
+  // A detail page asks for its tag by id
+  const lookup = singleIdRef(request.filter.ids);
 
-    // Get user's allowed instance IDs for multi-instance filtering
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  // Get user's allowed instance IDs for multi-instance filtering
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const { items: tags, total } = await tagQueryBuilder.execute({
-      userId,
-      allowedInstanceIds,
-      request,
-      // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
-      // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.
-      applyExclusions: true,
+  const { items: tags, total } = await tagQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    request,
+    // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
+    // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.
+    applyExclusions: true,
+  });
+
+  // Check for ambiguous results on single-ID lookups
+  // This happens when the same ID exists in multiple Stash instances
+  if (lookup && !specificInstanceId && tags.length > 1) {
+    logger.warn("Ambiguous tag lookup", {
+      id: lookup.id,
+      matchCount: tags.length,
+      instances: tags.map((t) => t.instanceId),
     });
-
-    // Check for ambiguous results on single-ID lookups
-    // This happens when the same ID exists in multiple Stash instances
-    if (lookup && !specificInstanceId && tags.length > 1) {
-      logger.warn("Ambiguous tag lookup", {
-        id: lookup.id,
-        matchCount: tags.length,
-        instances: tags.map((t) => t.instanceId),
-      });
-      res.status(400).json({
-        error: "Ambiguous lookup",
-        message: `Multiple tags found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: tags.map((t) => ({
-          id: t.id,
-          name: t.name,
-          instanceId: t.instanceId,
-        })),
-      });
-      return;
-    }
-
-    // For single-entity requests (detail pages), get tag with computed counts
-    let resultTags = tags;
-    if (lookup && resultTags.length === 1) {
-      const firstTag = resultTags[0] as (typeof resultTags)[number];
-      const tagWithCounts = await stashEntityService.getTag(
-        firstTag.id,
-        firstTag.instanceId
-      );
-      if (tagWithCounts) {
-        const existingTag = firstTag;
-        resultTags = [
-          {
-            ...existingTag,
-            scene_count: tagWithCounts.scene_count,
-            image_count: tagWithCounts.image_count,
-            gallery_count: tagWithCounts.gallery_count,
-            performer_count: tagWithCounts.performer_count,
-            studio_count: tagWithCounts.studio_count,
-            group_count: tagWithCounts.group_count,
-            scene_marker_count: tagWithCounts.scene_marker_count,
-          },
-        ];
-        logger.debug("Computed counts for tag detail", {
-          tagId: existingTag.id,
-          tagName: existingTag.name,
-          sceneCount: tagWithCounts.scene_count,
-          imageCount: tagWithCounts.image_count,
-          galleryCount: tagWithCounts.gallery_count,
-          performerCount: tagWithCounts.performer_count,
-          studioCount: tagWithCounts.studio_count,
-          groupCount: tagWithCounts.group_count,
-        });
-      }
-    }
-
-    // Add stashUrl to each tag; its parents and children come with the row,
-    // as the viewer may see them
-    const tagsWithStashUrl = resultTags.map((tag) => ({
-      ...tag,
-      stashUrl: buildStashEntityUrl("tag", tag.id, tag.instanceId, req.user),
-    }));
-
-    logger.debug("findTags completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      totalCount: total,
-      returnedCount: tagsWithStashUrl.length,
-      page,
-      perPage,
+    res.status(400).json({
+      error: "Ambiguous lookup",
+      message: `Multiple tags found with ID ${lookup.id}. Specify instance_id parameter.`,
+      matches: tags.map((t) => ({
+        id: t.id,
+        name: t.name,
+        instanceId: t.instanceId,
+      })),
     });
-
-    res.json({
-      findTags: {
-        count: total,
-        tags: tagsWithStashUrl,
-      },
-    });
-  } catch (error) {
-    logger.error("Error in findTags", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find tags",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return;
   }
+
+  // For single-entity requests (detail pages), get tag with computed counts
+  let resultTags = tags;
+  if (lookup && resultTags.length === 1) {
+    const firstTag = resultTags[0] as (typeof resultTags)[number];
+    const tagWithCounts = await stashEntityService.getTag(
+      firstTag.id,
+      firstTag.instanceId
+    );
+    if (tagWithCounts) {
+      const existingTag = firstTag;
+      resultTags = [
+        {
+          ...existingTag,
+          scene_count: tagWithCounts.scene_count,
+          image_count: tagWithCounts.image_count,
+          gallery_count: tagWithCounts.gallery_count,
+          performer_count: tagWithCounts.performer_count,
+          studio_count: tagWithCounts.studio_count,
+          group_count: tagWithCounts.group_count,
+          scene_marker_count: tagWithCounts.scene_marker_count,
+        },
+      ];
+      logger.debug("Computed counts for tag detail", {
+        tagId: existingTag.id,
+        tagName: existingTag.name,
+        sceneCount: tagWithCounts.scene_count,
+        imageCount: tagWithCounts.image_count,
+        galleryCount: tagWithCounts.gallery_count,
+        performerCount: tagWithCounts.performer_count,
+        studioCount: tagWithCounts.studio_count,
+        groupCount: tagWithCounts.group_count,
+      });
+    }
+  }
+
+  // Add stashUrl to each tag; its parents and children come with the row,
+  // as the viewer may see them
+  const tagsWithStashUrl = resultTags.map((tag) => ({
+    ...tag,
+    stashUrl: buildStashEntityUrl("tag", tag.id, tag.instanceId, req.user),
+  }));
+
+  logger.debug("findTags completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    totalCount: total,
+    returnedCount: tagsWithStashUrl.length,
+    page,
+    perPage,
+  });
+
+  res.json({
+    findTags: {
+      count: total,
+      tags: tagsWithStashUrl,
+    },
+  });
 };
 
 /**

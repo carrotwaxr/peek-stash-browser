@@ -179,6 +179,12 @@ function proxyHttpRequest({
   // leaving is routine and Peek's own destroy follows it; Stash failing or
   // going quiet for `timeoutMs` is logged once, where it is seen
   let endedBy: "client" | "timeout" | "stash" | undefined;
+  // The response reached the browser whole (`finish`: every byte handed to
+  // the socket), as opposed to closing first
+  let responseFinished = false;
+  res.on("finish", () => {
+    responseFinished = true;
+  });
 
   const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
     upstreamRes = proxyRes;
@@ -220,10 +226,16 @@ function proxyHttpRequest({
   // When the client disconnects (seek, refresh, navigate away),
   // destroy the upstream request to stop downloading into memory.
   res.on("close", () => {
-    // An unfinished response closing while Stash's side is whole: the
-    // browser left. A Stash failure has already set `endedBy` (a socket
-    // error) or destroyed Stash's response (a clean close mid-body).
-    if (!res.writableFinished && upstreamRes?.destroyed !== true) {
+    // A response that closes before it finished, while Stash's side is whole
+    // or was whole when it ended: the browser left. That includes Stash
+    // having sent its last byte while the browser still had bytes to read
+    // (Stash's response is destroyed after `end`, but `complete`). A Stash
+    // failure has already set `endedBy` (a socket error) or destroyed an
+    // incomplete response (a clean close mid-body). `writableFinished`
+    // is not the test: it reads true once the socket is gone.
+    const stashFailed =
+      upstreamRes?.destroyed === true && !upstreamRes.complete;
+    if (!responseFinished && !stashFailed) {
       endedBy ??= "client";
     }
     if (!proxyReq.destroyed) {

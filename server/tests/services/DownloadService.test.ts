@@ -494,9 +494,10 @@ describe("DownloadService", () => {
     it("should throw if download not found", async () => {
       vi.mocked(prisma.download.findUnique).mockResolvedValue(null);
 
-      await expect(service.deleteDownload(999, 1)).rejects.toThrow(
-        "Download not found"
-      );
+      await expect(service.deleteDownload(999, 1)).rejects.toMatchObject({
+        statusCode: 404,
+        message: "Download not found",
+      });
     });
 
     it("should throw if user does not own the download", async () => {
@@ -507,9 +508,10 @@ describe("DownloadService", () => {
 
       vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload);
 
-      await expect(service.deleteDownload(1, 1)).rejects.toThrow(
-        "Not authorized to delete this download"
-      );
+      await expect(service.deleteDownload(1, 1)).rejects.toMatchObject({
+        statusCode: 403,
+        message: "Access denied",
+      });
     });
   });
 });

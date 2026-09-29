@@ -127,77 +127,70 @@ export const getUserSettings = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetUserSettingsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        preferredQuality: true,
-        preferredPlaybackMode: true,
-        preferredPreviewQuality: true,
-        enableCast: true,
-        theme: true,
-        carouselPreferences: true,
-        navPreferences: true,
-        filterPresets: true,
-        minimumPlayPercent: true,
-        syncToStash: true,
-        hideConfirmationDisabled: true,
-        unitPreference: true,
-        wallPlayback: true,
-        tableColumnDefaults: true,
-        cardDisplaySettings: true,
-        landingPagePreference: true,
-        lightboxDoubleTapAction: true,
-      },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      preferredQuality: true,
+      preferredPlaybackMode: true,
+      preferredPreviewQuality: true,
+      enableCast: true,
+      theme: true,
+      carouselPreferences: true,
+      navPreferences: true,
+      filterPresets: true,
+      minimumPlayPercent: true,
+      syncToStash: true,
+      hideConfirmationDisabled: true,
+      unitPreference: true,
+      wallPlayback: true,
+      tableColumnDefaults: true,
+      cardDisplaySettings: true,
+      landingPagePreference: true,
+      lightboxDoubleTapAction: true,
+    },
+  });
 
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    res.json({
-      settings: {
-        preferredQuality: user.preferredQuality ?? "auto",
-        preferredPlaybackMode: user.preferredPlaybackMode ?? "auto",
-        preferredPreviewQuality: user.preferredPreviewQuality ?? null,
-        enableCast: user.enableCast,
-        theme: user.theme ?? "dark",
-        carouselPreferences:
-          (user.carouselPreferences as CarouselPreference[] | null) ??
-          getDefaultCarouselPreferences(),
-        navPreferences: (user.navPreferences as NavPreference[] | null) ?? null,
-        minimumPlayPercent: user.minimumPlayPercent,
-        syncToStash: user.syncToStash,
-        hideConfirmationDisabled: user.hideConfirmationDisabled,
-        unitPreference: user.unitPreference ?? "metric",
-        wallPlayback: user.wallPlayback ?? "autoplay",
-        tableColumnDefaults:
-          (user.tableColumnDefaults as Record<
-            string,
-            TableColumnsConfig
-          > | null) ?? null,
-        cardDisplaySettings:
-          (user.cardDisplaySettings as Record<string, unknown> | null) ?? null,
-        landingPagePreference:
-          (user.landingPagePreference as LandingPagePreference | null) ?? {
-            pages: ["home"],
-            randomize: false,
-          },
-        lightboxDoubleTapAction: user.lightboxDoubleTapAction ?? "favorite",
-      },
-    });
-  } catch (error) {
-    logger.error("Error getting user settings", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get user settings" });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+
+  res.json({
+    settings: {
+      preferredQuality: user.preferredQuality ?? "auto",
+      preferredPlaybackMode: user.preferredPlaybackMode ?? "auto",
+      preferredPreviewQuality: user.preferredPreviewQuality ?? null,
+      enableCast: user.enableCast,
+      theme: user.theme ?? "dark",
+      carouselPreferences:
+        (user.carouselPreferences as CarouselPreference[] | null) ??
+        getDefaultCarouselPreferences(),
+      navPreferences: (user.navPreferences as NavPreference[] | null) ?? null,
+      minimumPlayPercent: user.minimumPlayPercent,
+      syncToStash: user.syncToStash,
+      hideConfirmationDisabled: user.hideConfirmationDisabled,
+      unitPreference: user.unitPreference ?? "metric",
+      wallPlayback: user.wallPlayback ?? "autoplay",
+      tableColumnDefaults:
+        (user.tableColumnDefaults as Record<
+          string,
+          TableColumnsConfig
+        > | null) ?? null,
+      cardDisplaySettings:
+        (user.cardDisplaySettings as Record<string, unknown> | null) ?? null,
+      landingPagePreference:
+        (user.landingPagePreference as LandingPagePreference | null) ?? {
+          pages: ["home"],
+          randomize: false,
+        },
+      lightboxDoubleTapAction: user.lightboxDoubleTapAction ?? "favorite",
+    },
+  });
 };
 
 /**
@@ -207,410 +200,395 @@ export const updateUserSettings = async (
   req: TypedAuthRequest<UpdateUserSettingsBody, UpdateUserSettingsParams>,
   res: TypedResponse<UpdateUserSettingsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const currentUserId = req.user.id;
-    const currentUserRole = req.user.role;
+  const currentUserId = req.user.id;
+  const currentUserRole = req.user.role;
 
-    // Determine target user ID
-    // If userId param provided (admin updating another user), use that
-    // Otherwise, user is updating their own settings
-    let targetUserId = currentUserId;
-    if (req.params.userId) {
-      // Admin updating another user's settings (or admin updating themselves via ServerSettings)
-      if (currentUserRole !== "ADMIN") {
-        res
-          .status(403)
-          .json({ error: "Only admins can update other users' settings" });
-        return;
-      }
-      targetUserId = parseInt(req.params.userId);
-    }
-
-    const {
-      preferredQuality,
-      preferredPlaybackMode,
-      preferredPreviewQuality,
-      enableCast,
-      theme,
-      carouselPreferences,
-      navPreferences,
-      minimumPlayPercent,
-      syncToStash,
-      unitPreference,
-      wallPlayback,
-      tableColumnDefaults,
-      cardDisplaySettings,
-      landingPagePreference,
-      lightboxDoubleTapAction,
-    } = req.body;
-
-    // Validate values
-    const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
-    const validPlaybackModes = ["auto", "direct", "transcode"];
-    const validPreviewQualities = ["sprite", "webp", "mp4"];
-
-    if (preferredQuality && !validQualities.includes(preferredQuality)) {
-      res.status(400).json({ error: "Invalid quality setting" });
+  // Determine target user ID
+  // If userId param provided (admin updating another user), use that
+  // Otherwise, user is updating their own settings
+  let targetUserId = currentUserId;
+  if (req.params.userId) {
+    // Admin updating another user's settings (or admin updating themselves via ServerSettings)
+    if (currentUserRole !== "ADMIN") {
+      res
+        .status(403)
+        .json({ error: "Only admins can update other users' settings" });
       return;
     }
-
-    if (
-      preferredPlaybackMode &&
-      !validPlaybackModes.includes(preferredPlaybackMode)
-    ) {
-      res.status(400).json({ error: "Invalid playback mode setting" });
-      return;
-    }
-
-    if (
-      preferredPreviewQuality &&
-      !validPreviewQualities.includes(preferredPreviewQuality)
-    ) {
-      res.status(400).json({ error: "Invalid preview quality setting" });
-      return;
-    }
-
-    // Validate minimumPlayPercent if provided
-    if (minimumPlayPercent !== undefined) {
-      if (
-        typeof minimumPlayPercent !== "number" ||
-        minimumPlayPercent < 0 ||
-        minimumPlayPercent > 100
-      ) {
-        res.status(400).json({
-          error: "Minimum play percent must be a number between 0 and 100",
-        });
-        return;
-      }
-    }
-
-    // Validate syncToStash if provided. Only an admin may change it, on their
-    // own settings (/settings) or on anyone's (/:userId/settings); a regular
-    // user's own request is refused.
-    if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
-      res.status(400).json({ error: "Sync to Stash must be a boolean" });
-      return;
-    }
-
-    if (syncToStash !== undefined && currentUserRole !== "ADMIN") {
-      res.status(403).json({ error: "Only admins can change Sync to Stash" });
-      return;
-    }
-
-    // Validate unitPreference if provided
-    if (unitPreference !== undefined) {
-      const validUnits = ["metric", "imperial"];
-      if (!validUnits.includes(unitPreference)) {
-        res
-          .status(400)
-          .json({ error: "Unit preference must be 'metric' or 'imperial'" });
-        return;
-      }
-    }
-
-    // Validate wallPlayback if provided
-    if (wallPlayback !== undefined) {
-      const validWallPlayback = ["autoplay", "hover", "static"];
-      if (!validWallPlayback.includes(wallPlayback)) {
-        res.status(400).json({
-          error: "Wall playback must be 'autoplay', 'hover', or 'static'",
-        });
-        return;
-      }
-    }
-
-    // Validate carousel preferences if provided
-    if (carouselPreferences !== undefined) {
-      if (!Array.isArray(carouselPreferences)) {
-        res
-          .status(400)
-          .json({ error: "Carousel preferences must be an array" });
-        return;
-      }
-
-      // Validate each carousel preference
-      for (const pref of carouselPreferences) {
-        if (
-          typeof pref.id !== "string" ||
-          typeof pref.enabled !== "boolean" ||
-          typeof pref.order !== "number"
-        ) {
-          res.status(400).json({ error: "Invalid carousel preference format" });
-          return;
-        }
-      }
-    }
-
-    // Validate navigation preferences if provided
-    if (navPreferences !== undefined) {
-      if (!Array.isArray(navPreferences)) {
-        res
-          .status(400)
-          .json({ error: "Navigation preferences must be an array" });
-        return;
-      }
-
-      // Validate each navigation preference
-      for (const pref of navPreferences) {
-        if (
-          typeof pref.id !== "string" ||
-          typeof pref.enabled !== "boolean" ||
-          typeof pref.order !== "number"
-        ) {
-          res
-            .status(400)
-            .json({ error: "Invalid navigation preference format" });
-          return;
-        }
-      }
-    }
-
-    // Validate table column defaults if provided
-    if (tableColumnDefaults !== undefined) {
-      if (
-        tableColumnDefaults !== null &&
-        typeof tableColumnDefaults !== "object"
-      ) {
-        res
-          .status(400)
-          .json({ error: "Table column defaults must be an object or null" });
-        return;
-      }
-
-      if (tableColumnDefaults !== null) {
-        const validEntityTypes = [
-          "scene",
-          "performer",
-          "studio",
-          "tag",
-          "group",
-          "gallery",
-          "image",
-        ];
-
-        for (const [entityType, config] of Object.entries(
-          tableColumnDefaults
-        )) {
-          if (!validEntityTypes.includes(entityType)) {
-            res.status(400).json({
-              error: `Invalid entity type in table column defaults: ${entityType}`,
-            });
-            return;
-          }
-
-          const typedConfig = config;
-          if (
-            !typedConfig ||
-            !Array.isArray(typedConfig.visible) ||
-            !Array.isArray(typedConfig.order)
-          ) {
-            res.status(400).json({
-              error: `Invalid table column config for ${entityType}: must have visible and order arrays`,
-            });
-            return;
-          }
-
-          // Validate that arrays contain strings
-          if (
-            !typedConfig.visible.every((v: unknown) => typeof v === "string")
-          ) {
-            res.status(400).json({
-              error: `Invalid visible columns for ${entityType}: must be string array`,
-            });
-            return;
-          }
-          if (!typedConfig.order.every((v: unknown) => typeof v === "string")) {
-            res.status(400).json({
-              error: `Invalid column order for ${entityType}: must be string array`,
-            });
-            return;
-          }
-        }
-      }
-    }
-
-    // Validate card display settings if provided
-    if (cardDisplaySettings !== undefined) {
-      if (
-        cardDisplaySettings !== null &&
-        typeof cardDisplaySettings !== "object"
-      ) {
-        res
-          .status(400)
-          .json({ error: "Card display settings must be an object or null" });
-        return;
-      }
-    }
-
-    // Validate landing page preference if provided
-    if (landingPagePreference !== undefined) {
-      if (
-        landingPagePreference !== null &&
-        typeof landingPagePreference !== "object"
-      ) {
-        res
-          .status(400)
-          .json({ error: "Landing page preference must be an object or null" });
-        return;
-      }
-
-      if (landingPagePreference !== null) {
-        if (
-          !Array.isArray(landingPagePreference.pages) ||
-          landingPagePreference.pages.length === 0
-        ) {
-          res.status(400).json({
-            error: "Landing page preference must have at least one page",
-          });
-          return;
-        }
-
-        if (typeof landingPagePreference.randomize !== "boolean") {
-          res.status(400).json({
-            error: "Landing page preference randomize must be a boolean",
-          });
-          return;
-        }
-
-        // Validate minimum pages for randomize mode
-        if (
-          landingPagePreference.randomize &&
-          landingPagePreference.pages.length < 2
-        ) {
-          res
-            .status(400)
-            .json({ error: "Random mode requires at least 2 pages selected" });
-          return;
-        }
-
-        // Validate page keys
-        const validPageKeys = [
-          "home",
-          "scenes",
-          "performers",
-          "studios",
-          "tags",
-          "collections",
-          "galleries",
-          "images",
-          "playlists",
-          "recommended",
-          "watch-history",
-          "user-stats",
-        ];
-        for (const pageKey of landingPagePreference.pages) {
-          if (!validPageKeys.includes(pageKey)) {
-            res
-              .status(400)
-              .json({ error: `Invalid landing page key: ${pageKey}` });
-            return;
-          }
-        }
-      }
-    }
-
-    // Validate lightboxDoubleTapAction if provided
-    if (lightboxDoubleTapAction !== undefined) {
-      const validActions = ["favorite", "o_counter", "fullscreen"];
-      if (!validActions.includes(lightboxDoubleTapAction)) {
-        res.status(400).json({
-          error:
-            "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'",
-        });
-        return;
-      }
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: targetUserId },
-      data: {
-        ...(preferredQuality !== undefined && { preferredQuality }),
-        ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
-        ...(preferredPreviewQuality !== undefined && {
-          preferredPreviewQuality,
-        }),
-        ...(enableCast !== undefined && { enableCast }),
-        ...(theme !== undefined && { theme }),
-        ...(carouselPreferences !== undefined && {
-          carouselPreferences: carouselPreferences as never,
-        }),
-        ...(navPreferences !== undefined && {
-          navPreferences: navPreferences as never,
-        }),
-        ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
-        ...(syncToStash !== undefined && { syncToStash }),
-        ...(unitPreference !== undefined && { unitPreference }),
-        ...(wallPlayback !== undefined && { wallPlayback }),
-        ...(tableColumnDefaults !== undefined && {
-          tableColumnDefaults: tableColumnDefaults as never,
-        }),
-        ...(cardDisplaySettings !== undefined && {
-          cardDisplaySettings: cardDisplaySettings as never,
-        }),
-        ...(landingPagePreference !== undefined && {
-          landingPagePreference: landingPagePreference as never,
-        }),
-        ...(lightboxDoubleTapAction !== undefined && {
-          lightboxDoubleTapAction,
-        }),
-      },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        preferredQuality: true,
-        preferredPlaybackMode: true,
-        enableCast: true,
-        theme: true,
-        carouselPreferences: true,
-        navPreferences: true,
-        minimumPlayPercent: true,
-        syncToStash: true,
-        wallPlayback: true,
-        tableColumnDefaults: true,
-        cardDisplaySettings: true,
-        landingPagePreference: true,
-        lightboxDoubleTapAction: true,
-      },
-    });
-
-    res.json({
-      success: true as const,
-      settings: {
-        preferredQuality: updatedUser.preferredQuality ?? "auto",
-        preferredPlaybackMode: updatedUser.preferredPlaybackMode ?? "auto",
-        theme: updatedUser.theme ?? "dark",
-        carouselPreferences:
-          (updatedUser.carouselPreferences as CarouselPreference[] | null) ??
-          getDefaultCarouselPreferences(),
-        navPreferences:
-          (updatedUser.navPreferences as NavPreference[] | null) ?? null,
-        minimumPlayPercent: updatedUser.minimumPlayPercent,
-        syncToStash: updatedUser.syncToStash,
-        wallPlayback: updatedUser.wallPlayback ?? "autoplay",
-        tableColumnDefaults:
-          (updatedUser.tableColumnDefaults as Record<
-            string,
-            TableColumnsConfig
-          > | null) ?? null,
-        cardDisplaySettings:
-          (updatedUser.cardDisplaySettings as Record<string, unknown> | null) ??
-          null,
-        landingPagePreference:
-          (updatedUser.landingPagePreference as LandingPagePreference | null) ?? {
-            pages: ["home"],
-            randomize: false,
-          },
-        lightboxDoubleTapAction:
-          updatedUser.lightboxDoubleTapAction ?? "favorite",
-      },
-    });
-  } catch (error) {
-    logger.error("Error updating user settings", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update user settings" });
+    targetUserId = parseInt(req.params.userId);
   }
+
+  const {
+    preferredQuality,
+    preferredPlaybackMode,
+    preferredPreviewQuality,
+    enableCast,
+    theme,
+    carouselPreferences,
+    navPreferences,
+    minimumPlayPercent,
+    syncToStash,
+    unitPreference,
+    wallPlayback,
+    tableColumnDefaults,
+    cardDisplaySettings,
+    landingPagePreference,
+    lightboxDoubleTapAction,
+  } = req.body;
+
+  // Validate values
+  const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
+  const validPlaybackModes = ["auto", "direct", "transcode"];
+  const validPreviewQualities = ["sprite", "webp", "mp4"];
+
+  if (preferredQuality && !validQualities.includes(preferredQuality)) {
+    res.status(400).json({ error: "Invalid quality setting" });
+    return;
+  }
+
+  if (
+    preferredPlaybackMode &&
+    !validPlaybackModes.includes(preferredPlaybackMode)
+  ) {
+    res.status(400).json({ error: "Invalid playback mode setting" });
+    return;
+  }
+
+  if (
+    preferredPreviewQuality &&
+    !validPreviewQualities.includes(preferredPreviewQuality)
+  ) {
+    res.status(400).json({ error: "Invalid preview quality setting" });
+    return;
+  }
+
+  // Validate minimumPlayPercent if provided
+  if (minimumPlayPercent !== undefined) {
+    if (
+      typeof minimumPlayPercent !== "number" ||
+      minimumPlayPercent < 0 ||
+      minimumPlayPercent > 100
+    ) {
+      res.status(400).json({
+        error: "Minimum play percent must be a number between 0 and 100",
+      });
+      return;
+    }
+  }
+
+  // Validate syncToStash if provided. Only an admin may change it, on their
+  // own settings (/settings) or on anyone's (/:userId/settings); a regular
+  // user's own request is refused.
+  if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
+    res.status(400).json({ error: "Sync to Stash must be a boolean" });
+    return;
+  }
+
+  if (syncToStash !== undefined && currentUserRole !== "ADMIN") {
+    res.status(403).json({ error: "Only admins can change Sync to Stash" });
+    return;
+  }
+
+  // Validate unitPreference if provided
+  if (unitPreference !== undefined) {
+    const validUnits = ["metric", "imperial"];
+    if (!validUnits.includes(unitPreference)) {
+      res
+        .status(400)
+        .json({ error: "Unit preference must be 'metric' or 'imperial'" });
+      return;
+    }
+  }
+
+  // Validate wallPlayback if provided
+  if (wallPlayback !== undefined) {
+    const validWallPlayback = ["autoplay", "hover", "static"];
+    if (!validWallPlayback.includes(wallPlayback)) {
+      res.status(400).json({
+        error: "Wall playback must be 'autoplay', 'hover', or 'static'",
+      });
+      return;
+    }
+  }
+
+  // Validate carousel preferences if provided
+  if (carouselPreferences !== undefined) {
+    if (!Array.isArray(carouselPreferences)) {
+      res.status(400).json({ error: "Carousel preferences must be an array" });
+      return;
+    }
+
+    // Validate each carousel preference
+    for (const pref of carouselPreferences) {
+      if (
+        typeof pref.id !== "string" ||
+        typeof pref.enabled !== "boolean" ||
+        typeof pref.order !== "number"
+      ) {
+        res.status(400).json({ error: "Invalid carousel preference format" });
+        return;
+      }
+    }
+  }
+
+  // Validate navigation preferences if provided
+  if (navPreferences !== undefined) {
+    if (!Array.isArray(navPreferences)) {
+      res
+        .status(400)
+        .json({ error: "Navigation preferences must be an array" });
+      return;
+    }
+
+    // Validate each navigation preference
+    for (const pref of navPreferences) {
+      if (
+        typeof pref.id !== "string" ||
+        typeof pref.enabled !== "boolean" ||
+        typeof pref.order !== "number"
+      ) {
+        res.status(400).json({ error: "Invalid navigation preference format" });
+        return;
+      }
+    }
+  }
+
+  // Validate table column defaults if provided
+  if (tableColumnDefaults !== undefined) {
+    if (
+      tableColumnDefaults !== null &&
+      typeof tableColumnDefaults !== "object"
+    ) {
+      res
+        .status(400)
+        .json({ error: "Table column defaults must be an object or null" });
+      return;
+    }
+
+    if (tableColumnDefaults !== null) {
+      const validEntityTypes = [
+        "scene",
+        "performer",
+        "studio",
+        "tag",
+        "group",
+        "gallery",
+        "image",
+      ];
+
+      for (const [entityType, config] of Object.entries(tableColumnDefaults)) {
+        if (!validEntityTypes.includes(entityType)) {
+          res.status(400).json({
+            error: `Invalid entity type in table column defaults: ${entityType}`,
+          });
+          return;
+        }
+
+        const typedConfig = config;
+        if (
+          !typedConfig ||
+          !Array.isArray(typedConfig.visible) ||
+          !Array.isArray(typedConfig.order)
+        ) {
+          res.status(400).json({
+            error: `Invalid table column config for ${entityType}: must have visible and order arrays`,
+          });
+          return;
+        }
+
+        // Validate that arrays contain strings
+        if (!typedConfig.visible.every((v: unknown) => typeof v === "string")) {
+          res.status(400).json({
+            error: `Invalid visible columns for ${entityType}: must be string array`,
+          });
+          return;
+        }
+        if (!typedConfig.order.every((v: unknown) => typeof v === "string")) {
+          res.status(400).json({
+            error: `Invalid column order for ${entityType}: must be string array`,
+          });
+          return;
+        }
+      }
+    }
+  }
+
+  // Validate card display settings if provided
+  if (cardDisplaySettings !== undefined) {
+    if (
+      cardDisplaySettings !== null &&
+      typeof cardDisplaySettings !== "object"
+    ) {
+      res
+        .status(400)
+        .json({ error: "Card display settings must be an object or null" });
+      return;
+    }
+  }
+
+  // Validate landing page preference if provided
+  if (landingPagePreference !== undefined) {
+    if (
+      landingPagePreference !== null &&
+      typeof landingPagePreference !== "object"
+    ) {
+      res
+        .status(400)
+        .json({ error: "Landing page preference must be an object or null" });
+      return;
+    }
+
+    if (landingPagePreference !== null) {
+      if (
+        !Array.isArray(landingPagePreference.pages) ||
+        landingPagePreference.pages.length === 0
+      ) {
+        res.status(400).json({
+          error: "Landing page preference must have at least one page",
+        });
+        return;
+      }
+
+      if (typeof landingPagePreference.randomize !== "boolean") {
+        res.status(400).json({
+          error: "Landing page preference randomize must be a boolean",
+        });
+        return;
+      }
+
+      // Validate minimum pages for randomize mode
+      if (
+        landingPagePreference.randomize &&
+        landingPagePreference.pages.length < 2
+      ) {
+        res
+          .status(400)
+          .json({ error: "Random mode requires at least 2 pages selected" });
+        return;
+      }
+
+      // Validate page keys
+      const validPageKeys = [
+        "home",
+        "scenes",
+        "performers",
+        "studios",
+        "tags",
+        "collections",
+        "galleries",
+        "images",
+        "playlists",
+        "recommended",
+        "watch-history",
+        "user-stats",
+      ];
+      for (const pageKey of landingPagePreference.pages) {
+        if (!validPageKeys.includes(pageKey)) {
+          res
+            .status(400)
+            .json({ error: `Invalid landing page key: ${pageKey}` });
+          return;
+        }
+      }
+    }
+  }
+
+  // Validate lightboxDoubleTapAction if provided
+  if (lightboxDoubleTapAction !== undefined) {
+    const validActions = ["favorite", "o_counter", "fullscreen"];
+    if (!validActions.includes(lightboxDoubleTapAction)) {
+      res.status(400).json({
+        error:
+          "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'",
+      });
+      return;
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: targetUserId },
+    data: {
+      ...(preferredQuality !== undefined && { preferredQuality }),
+      ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
+      ...(preferredPreviewQuality !== undefined && {
+        preferredPreviewQuality,
+      }),
+      ...(enableCast !== undefined && { enableCast }),
+      ...(theme !== undefined && { theme }),
+      ...(carouselPreferences !== undefined && {
+        carouselPreferences: carouselPreferences as never,
+      }),
+      ...(navPreferences !== undefined && {
+        navPreferences: navPreferences as never,
+      }),
+      ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
+      ...(syncToStash !== undefined && { syncToStash }),
+      ...(unitPreference !== undefined && { unitPreference }),
+      ...(wallPlayback !== undefined && { wallPlayback }),
+      ...(tableColumnDefaults !== undefined && {
+        tableColumnDefaults: tableColumnDefaults as never,
+      }),
+      ...(cardDisplaySettings !== undefined && {
+        cardDisplaySettings: cardDisplaySettings as never,
+      }),
+      ...(landingPagePreference !== undefined && {
+        landingPagePreference: landingPagePreference as never,
+      }),
+      ...(lightboxDoubleTapAction !== undefined && {
+        lightboxDoubleTapAction,
+      }),
+    },
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      preferredQuality: true,
+      preferredPlaybackMode: true,
+      enableCast: true,
+      theme: true,
+      carouselPreferences: true,
+      navPreferences: true,
+      minimumPlayPercent: true,
+      syncToStash: true,
+      wallPlayback: true,
+      tableColumnDefaults: true,
+      cardDisplaySettings: true,
+      landingPagePreference: true,
+      lightboxDoubleTapAction: true,
+    },
+  });
+
+  res.json({
+    success: true as const,
+    settings: {
+      preferredQuality: updatedUser.preferredQuality ?? "auto",
+      preferredPlaybackMode: updatedUser.preferredPlaybackMode ?? "auto",
+      theme: updatedUser.theme ?? "dark",
+      carouselPreferences:
+        (updatedUser.carouselPreferences as CarouselPreference[] | null) ??
+        getDefaultCarouselPreferences(),
+      navPreferences:
+        (updatedUser.navPreferences as NavPreference[] | null) ?? null,
+      minimumPlayPercent: updatedUser.minimumPlayPercent,
+      syncToStash: updatedUser.syncToStash,
+      wallPlayback: updatedUser.wallPlayback ?? "autoplay",
+      tableColumnDefaults:
+        (updatedUser.tableColumnDefaults as Record<
+          string,
+          TableColumnsConfig
+        > | null) ?? null,
+      cardDisplaySettings:
+        (updatedUser.cardDisplaySettings as Record<string, unknown> | null) ??
+        null,
+      landingPagePreference:
+        (updatedUser.landingPagePreference as LandingPagePreference | null) ?? {
+          pages: ["home"],
+          randomize: false,
+        },
+      lightboxDoubleTapAction:
+        updatedUser.lightboxDoubleTapAction ?? "favorite",
+    },
+  });
 };
 
 /**
@@ -620,62 +598,55 @@ export const changePassword = async (
   req: TypedAuthRequest<ChangePasswordBody>,
   res: TypedResponse<ChangePasswordResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const { currentPassword, newPassword } = req.body;
+  const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      res
-        .status(400)
-        .json({ error: "Current password and new password are required" });
-      return;
-    }
-
-    const passwordValidation = validatePassword(newPassword);
-    if (!passwordValidation.valid) {
-      res.status(400).json({ error: passwordValidation.errors.join(". ") });
-      return;
-    }
-
-    // Get current user with password
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // 400, not 401: the session is fine, and a 401 sends the client to login
-    const validPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!validPassword) {
-      res.status(400).json({ error: "Current password is incorrect" });
-      return;
-    }
-
-    // Signs out every other session of this user
-    await setUserPassword(userId, newPassword);
-
-    // The current password was just proven: this session gets a fresh token,
-    // and its 30 days restart
-    setTokenCookie(
-      res,
-      generateToken({
-        id: userId,
-        username: req.user.username,
-        role: req.user.role,
-      })
-    );
-
-    res.json({ success: true, message: "Password changed successfully" });
-  } catch (error) {
-    logger.error("Error changing password", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to change password" });
+  if (!currentPassword || !newPassword) {
+    res
+      .status(400)
+      .json({ error: "Current password and new password are required" });
+    return;
   }
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    res.status(400).json({ error: passwordValidation.errors.join(". ") });
+    return;
+  }
+
+  // Get current user with password
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // 400, not 401: the session is fine, and a 401 sends the client to login
+  const validPassword = await bcrypt.compare(currentPassword, user.password);
+  if (!validPassword) {
+    res.status(400).json({ error: "Current password is incorrect" });
+    return;
+  }
+
+  // Signs out every other session of this user
+  await setUserPassword(userId, newPassword);
+
+  // The current password was just proven: this session gets a fresh token,
+  // and its 30 days restart
+  setTokenCookie(
+    res,
+    generateToken({
+      id: userId,
+      username: req.user.username,
+      role: req.user.role,
+    })
+  );
+
+  res.json({ success: true, message: "Password changed successfully" });
 };
 
 /**
@@ -686,26 +657,19 @@ export const getRecoveryKey = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetRecoveryKeyResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { recoveryKeyHash: true },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { recoveryKeyHash: true },
+  });
 
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
-  } catch (error) {
-    logger.error("Error getting recovery key", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get recovery key" });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+
+  res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
 };
 
 /**
@@ -717,46 +681,39 @@ export const regenerateRecoveryKey = async (
   req: TypedAuthRequest<RegenerateRecoveryKeyBody>,
   res: TypedResponse<RegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    // Express 5 leaves req.body undefined when the request has no body
-    const { currentPassword } = req.body ?? {};
-    if (!currentPassword) {
-      res.status(400).json({ error: "Current password is required" });
-      return;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { password: true },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // 400, not 401: the client treats 401 as a lost session
-    const validPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!validPassword) {
-      res.status(400).json({ error: "Current password is incorrect" });
-      return;
-    }
-
-    const newKey = generateRecoveryKey();
-    await prisma.user.update({
-      where: { id: userId },
-      data: { recoveryKeyHash: hashRecoveryKey(newKey) },
-    });
-
-    res.json({ recoveryKey: formatRecoveryKey(newKey) });
-  } catch (error) {
-    logger.error("Error regenerating recovery key", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to regenerate recovery key" });
+  // Express 5 leaves req.body undefined when the request has no body
+  const { currentPassword } = req.body ?? {};
+  if (!currentPassword) {
+    res.status(400).json({ error: "Current password is required" });
+    return;
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { password: true },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // 400, not 401: the client treats 401 as a lost session
+  const validPassword = await bcrypt.compare(currentPassword, user.password);
+  if (!validPassword) {
+    res.status(400).json({ error: "Current password is incorrect" });
+    return;
+  }
+
+  const newKey = generateRecoveryKey();
+  await prisma.user.update({
+    where: { id: userId },
+    data: { recoveryKeyHash: hashRecoveryKey(newKey) },
+  });
+
+  res.json({ recoveryKey: formatRecoveryKey(newKey) });
 };
 
 /**
@@ -766,42 +723,35 @@ export const getAllUsers = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetAllUsersResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-        syncToStash: true,
-        groupMemberships: {
-          select: {
-            group: {
-              select: { id: true, name: true },
-            },
+  // Check if user is admin
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+      syncToStash: true,
+      groupMemberships: {
+        select: {
+          group: {
+            select: { id: true, name: true },
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-    res.json({
-      users: users.map((u) => ({
-        ...u,
-        groups: u.groupMemberships.map((m) => m.group),
-        groupMemberships: undefined,
-      })),
-    });
-  } catch (error) {
-    logger.error("Error getting all users", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get users" });
-  }
+  res.json({
+    users: users.map((u) => ({
+      ...u,
+      groups: u.groupMemberships.map((m) => m.group),
+      groupMemberships: undefined,
+    })),
+  });
 };
 
 /**
@@ -811,61 +761,54 @@ export const createUser = async (
   req: TypedAuthRequest<CreateUserBody>,
   res: TypedResponse<CreateUserResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const { username, password, role } = req.body;
+  // Check if user is admin
+  const { username, password, role } = req.body;
 
-    if (!username || !password) {
-      res.status(400).json({ error: "Username and password are required" });
-      return;
-    }
-
-    if (password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters" });
-      return;
-    }
-
-    if (role && role !== "ADMIN" && role !== "USER") {
-      res.status(400).json({ error: "Role must be either ADMIN or USER" });
-      return;
-    }
-
-    // Check if username already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { username },
-    });
-
-    if (existingUser) {
-      res.status(409).json({ error: "Username already exists" });
-      return;
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user with default carousel preferences
-    const newUser = await prisma.user.create({
-      data: {
-        username,
-        password: hashedPassword,
-        role: (role || "USER") as "ADMIN" | "USER",
-        carouselPreferences: getDefaultCarouselPreferences() as never,
-      },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        createdAt: true,
-      },
-    });
-
-    res.status(201).json({ success: true, user: newUser });
-  } catch (error) {
-    logger.error("Error creating user", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to create user" });
+  if (!username || !password) {
+    res.status(400).json({ error: "Username and password are required" });
+    return;
   }
+
+  if (password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+
+  if (role && role !== "ADMIN" && role !== "USER") {
+    res.status(400).json({ error: "Role must be either ADMIN or USER" });
+    return;
+  }
+
+  // Check if username already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { username },
+  });
+
+  if (existingUser) {
+    res.status(409).json({ error: "Username already exists" });
+    return;
+  }
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Create user with default carousel preferences
+  const newUser = await prisma.user.create({
+    data: {
+      username,
+      password: hashedPassword,
+      role: (role || "USER") as "ADMIN" | "USER",
+      carouselPreferences: getDefaultCarouselPreferences() as never,
+    },
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+
+  res.status(201).json({ success: true, user: newUser });
 };
 
 /**
@@ -875,56 +818,49 @@ export const deleteUser = async (
   req: TypedAuthRequest<never, DeleteUserParams>,
   res: TypedResponse<DeleteUserResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const { userId } = req.params;
-    const userIdInt = parseInt(userId, 10);
+  // Check if user is admin
+  const { userId } = req.params;
+  const userIdInt = parseInt(userId, 10);
 
-    if (isNaN(userIdInt)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    // Prevent admin from deleting themselves
-    if (userIdInt === req.user.id) {
-      res.status(400).json({ error: "Cannot delete your own account" });
-      return;
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userIdInt },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // The user's delete cascades to every per-user table but four, which
-    // hold userId with no relation to User (a foreign key would need a
-    // rebuild of each table): their rows go in the same unit. On a
-    // 200k-scene library the heaviest user (42k rows: 18k plays, 6k stats
-    // and rankings, 5k exclusions) held the lock 0.15 to 0.44 s, and 0.46
-    // to 0.56 s with its exclusions raised to 181k, so one unit is enough.
-    const byUser = { where: { userId: userIdInt } };
-    await dbWriteBatch("user.delete", [
-      prisma.userPerformerStats.deleteMany(byUser),
-      prisma.userStudioStats.deleteMany(byUser),
-      prisma.userTagStats.deleteMany(byUser),
-      prisma.userEntityRanking.deleteMany(byUser),
-      prisma.user.delete({ where: { id: userIdInt } }),
-    ]);
-    rankingComputeService.forget(userIdInt);
-    recommendationService.forget(userIdInt);
-
-    res.json({ success: true, message: "User deleted successfully" });
-  } catch (error) {
-    logger.error("Error deleting user", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to delete user" });
+  if (isNaN(userIdInt)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  // Prevent admin from deleting themselves
+  if (userIdInt === req.user.id) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userIdInt },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // The user's delete cascades to every per-user table but four, which
+  // hold userId with no relation to User (a foreign key would need a
+  // rebuild of each table): their rows go in the same unit. On a
+  // 200k-scene library the heaviest user (42k rows: 18k plays, 6k stats
+  // and rankings, 5k exclusions) held the lock 0.15 to 0.44 s, and 0.46
+  // to 0.56 s with its exclusions raised to 181k, so one unit is enough.
+  const byUser = { where: { userId: userIdInt } };
+  await dbWriteBatch("user.delete", [
+    prisma.userPerformerStats.deleteMany(byUser),
+    prisma.userStudioStats.deleteMany(byUser),
+    prisma.userTagStats.deleteMany(byUser),
+    prisma.userEntityRanking.deleteMany(byUser),
+    prisma.user.delete({ where: { id: userIdInt } }),
+  ]);
+  rankingComputeService.forget(userIdInt);
+  recommendationService.forget(userIdInt);
+
+  res.json({ success: true, message: "User deleted successfully" });
 };
 
 /**
@@ -934,51 +870,44 @@ export const updateUserRole = async (
   req: TypedAuthRequest<UpdateUserRoleBody, UpdateUserRoleParams>,
   res: TypedResponse<UpdateUserRoleResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const { userId } = req.params;
-    const { role } = req.body;
-    const userIdInt = parseInt(userId, 10);
+  // Check if user is admin
+  const { userId } = req.params;
+  const { role } = req.body;
+  const userIdInt = parseInt(userId, 10);
 
-    if (isNaN(userIdInt)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    if (!role || (role !== "ADMIN" && role !== "USER")) {
-      res.status(400).json({ error: "Role must be either ADMIN or USER" });
-      return;
-    }
-
-    // Prevent admin from changing their own role
-    if (userIdInt === req.user.id) {
-      res.status(400).json({ error: "Cannot change your own role" });
-      return;
-    }
-
-    // Update user role
-    const updatedUser = await prisma.user.update({
-      where: { id: userIdInt },
-      data: { role },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        updatedAt: true,
-      },
-    });
-
-    // Restrictions apply by role (item 13): promotion drops the restricted
-    // and empty rows, demotion applies the kept restriction rows again.
-    await exclusionComputationService.recomputeForUser(userIdInt);
-
-    res.json({ success: true, user: updatedUser });
-  } catch (error) {
-    logger.error("Error updating user role", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update user role" });
+  if (isNaN(userIdInt)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  if (!role || (role !== "ADMIN" && role !== "USER")) {
+    res.status(400).json({ error: "Role must be either ADMIN or USER" });
+    return;
+  }
+
+  // Prevent admin from changing their own role
+  if (userIdInt === req.user.id) {
+    res.status(400).json({ error: "Cannot change your own role" });
+    return;
+  }
+
+  // Update user role
+  const updatedUser = await prisma.user.update({
+    where: { id: userIdInt },
+    data: { role },
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      updatedAt: true,
+    },
+  });
+
+  // Restrictions apply by role (item 13): promotion drops the restricted
+  // and empty rows, demotion applies the kept restriction rows again.
+  await exclusionComputationService.recomputeForUser(userIdInt);
+
+  res.json({ success: true, user: updatedUser });
 };
 
 /**
@@ -988,36 +917,29 @@ export const getFilterPresets = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetFilterPresetsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        filterPresets: true,
-      },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      filterPresets: true,
+    },
+  });
 
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // Return empty preset structure if none exists
-    const presets = (user.filterPresets as FilterPresets | null) ?? {
-      scene: [],
-      performer: [],
-      studio: [],
-      tag: [],
-    };
-
-    res.json({ presets });
-  } catch (error) {
-    logger.error("Error getting filter presets", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get filter presets" });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+
+  // Return empty preset structure if none exists
+  const presets = (user.filterPresets as FilterPresets | null) ?? {
+    scene: [],
+    performer: [],
+    studio: [],
+    tag: [],
+  };
+
+  res.json({ presets });
 };
 
 /**
@@ -1027,251 +949,47 @@ export const saveFilterPreset = async (
   req: TypedAuthRequest<SaveFilterPresetBody>,
   res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const {
-      artifactType,
-      context,
-      name,
-      filters,
-      sort,
-      direction,
-      viewMode,
-      zoomLevel,
-      gridDensity,
-      tableColumns,
-      perPage,
-      setAsDefault,
-    } = req.body;
+  const {
+    artifactType,
+    context,
+    name,
+    filters,
+    sort,
+    direction,
+    viewMode,
+    zoomLevel,
+    gridDensity,
+    tableColumns,
+    perPage,
+    setAsDefault,
+  } = req.body;
 
-    // Validate required fields
-    if (!artifactType || !name || !filters || !sort || !direction) {
-      res.status(400).json({ error: "Missing required fields" });
-      return;
-    }
-
-    // Validate artifact type
-    const validTypes = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-      "clip",
-    ];
-    if (!validTypes.includes(artifactType)) {
-      res.status(400).json({ error: "Invalid artifact type" });
-      return;
-    }
-
-    // Validate context if provided (used for setAsDefault)
-    if (context) {
-      const validContexts = [
-        "scene",
-        "scene_performer",
-        "scene_tag",
-        "scene_studio",
-        "scene_group",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-        "clip",
-      ];
-      if (!validContexts.includes(context)) {
-        res.status(400).json({ error: "Invalid context" });
-        return;
-      }
-    }
-
-    // Get current presets and defaults
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { filterPresets: true, defaultFilterPresets: true },
-    });
-
-    const currentPresets = (user?.filterPresets as FilterPresets | null) ?? {};
-    const currentDefaults =
-      (user?.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
-
-    // Create new preset
-    const newPreset = {
-      id: randomUUID(),
-      name,
-      filters,
-      sort,
-      direction,
-      viewMode: viewMode || "grid",
-      zoomLevel: zoomLevel || "medium",
-      gridDensity: gridDensity || "comfortable",
-      tableColumns: tableColumns || null,
-      perPage: perPage || null,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Add preset to the appropriate artifact type array
-    currentPresets[artifactType] = [
-      ...(currentPresets[artifactType] ?? []),
-      newPreset,
-    ];
-
-    // If setAsDefault is true, set this preset as default for the context
-    if (setAsDefault) {
-      const defaultContext = context || artifactType;
-      currentDefaults[defaultContext] = newPreset.id;
-    }
-
-    // Update user
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        filterPresets: currentPresets as never,
-        defaultFilterPresets: currentDefaults as never,
-      },
-    });
-
-    res.json({ success: true, preset: newPreset });
-  } catch (error) {
-    logger.error("Error saving filter preset", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to save filter preset" });
+  // Validate required fields
+  if (!artifactType || !name || !filters || !sort || !direction) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
   }
-};
 
-/**
- * Delete a filter preset
- */
-export const deleteFilterPreset = async (
-  req: TypedAuthRequest<never, DeleteFilterPresetParams>,
-  res: TypedResponse<DeleteFilterPresetResponse | ApiErrorResponse>
-) => {
-  try {
-    const userId = req.user.id;
-
-    const { artifactType, presetId } = req.params;
-
-    // Validate artifact type
-    const validTypes = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-      "clip",
-    ];
-    if (!artifactType || !validTypes.includes(artifactType)) {
-      res.status(400).json({ error: "Invalid artifact type" });
-      return;
-    }
-
-    // Get current presets and defaults
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { filterPresets: true, defaultFilterPresets: true },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    const currentPresets = (user.filterPresets as FilterPresets) || {};
-    const currentDefaults =
-      (user.defaultFilterPresets as DefaultFilterPresets) || {};
-
-    // Remove preset from the appropriate artifact type array
-    currentPresets[artifactType] = (currentPresets[artifactType] ?? []).filter(
-      (preset: FilterPreset) => preset.id !== presetId
-    );
-
-    // If this was the default preset, clear the default
-    if (currentDefaults[artifactType] === presetId) {
-      currentDefaults[artifactType] = undefined;
-    }
-
-    // Update user
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        filterPresets: currentPresets as never,
-        defaultFilterPresets: currentDefaults as never,
-      },
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    logger.error("Error deleting filter preset", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to delete filter preset" });
+  // Validate artifact type
+  const validTypes = [
+    "scene",
+    "performer",
+    "studio",
+    "tag",
+    "group",
+    "gallery",
+    "image",
+    "clip",
+  ];
+  if (!validTypes.includes(artifactType)) {
+    res.status(400).json({ error: "Invalid artifact type" });
+    return;
   }
-};
 
-/**
- * Get default filter presets
- */
-export const getDefaultFilterPresets = async (
-  req: TypedAuthRequest,
-  res: TypedResponse<GetDefaultFilterPresetsResponse | ApiErrorResponse>
-) => {
-  try {
-    const userId = req.user.id;
-
-    // Get user's default presets
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        defaultFilterPresets: true,
-      },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // Return empty object if no defaults set
-    const defaults =
-      (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
-
-    res.json({ defaults });
-  } catch (error) {
-    logger.error("Error getting default filter presets", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get default filter presets" });
-  }
-};
-
-/**
- * Set default filter preset for a context
- * Context can be an artifact type (scene, performer, etc.) or a scene grid context
- * (scene_performer, scene_tag, scene_studio, scene_group)
- */
-export const setDefaultFilterPreset = async (
-  req: TypedAuthRequest<SetDefaultFilterPresetBody>,
-  res: TypedResponse<SetDefaultFilterPresetResponse | ApiErrorResponse>
-) => {
-  try {
-    const userId = req.user.id;
-
-    const { context, presetId } = req.body;
-
-    // Validate required fields
-    if (!context) {
-      res.status(400).json({ error: "Missing context" });
-      return;
-    }
-
-    // Validate context - includes base types and scene grid contexts
+  // Validate context if provided (used for setAsDefault)
+  if (context) {
     const validContexts = [
       "scene",
       "scene_performer",
@@ -1283,61 +1001,237 @@ export const setDefaultFilterPreset = async (
       "tag",
       "group",
       "gallery",
+      "image",
+      "clip",
     ];
     if (!validContexts.includes(context)) {
       res.status(400).json({ error: "Invalid context" });
       return;
     }
+  }
 
-    // Get current defaults
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { defaultFilterPresets: true, filterPresets: true },
-    });
+  // Get current presets and defaults
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { filterPresets: true, defaultFilterPresets: true },
+  });
 
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
+  const currentPresets = (user?.filterPresets as FilterPresets | null) ?? {};
+  const currentDefaults =
+    (user?.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
+
+  // Create new preset
+  const newPreset = {
+    id: randomUUID(),
+    name,
+    filters,
+    sort,
+    direction,
+    viewMode: viewMode || "grid",
+    zoomLevel: zoomLevel || "medium",
+    gridDensity: gridDensity || "comfortable",
+    tableColumns: tableColumns || null,
+    perPage: perPage || null,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Add preset to the appropriate artifact type array
+  currentPresets[artifactType] = [
+    ...(currentPresets[artifactType] ?? []),
+    newPreset,
+  ];
+
+  // If setAsDefault is true, set this preset as default for the context
+  if (setAsDefault) {
+    const defaultContext = context || artifactType;
+    currentDefaults[defaultContext] = newPreset.id;
+  }
+
+  // Update user
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      filterPresets: currentPresets as never,
+      defaultFilterPresets: currentDefaults as never,
+    },
+  });
+
+  res.json({ success: true, preset: newPreset });
+};
+
+/**
+ * Delete a filter preset
+ */
+export const deleteFilterPreset = async (
+  req: TypedAuthRequest<never, DeleteFilterPresetParams>,
+  res: TypedResponse<DeleteFilterPresetResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+
+  const { artifactType, presetId } = req.params;
+
+  // Validate artifact type
+  const validTypes = [
+    "scene",
+    "performer",
+    "studio",
+    "tag",
+    "group",
+    "gallery",
+    "image",
+    "clip",
+  ];
+  if (!artifactType || !validTypes.includes(artifactType)) {
+    res.status(400).json({ error: "Invalid artifact type" });
+    return;
+  }
+
+  // Get current presets and defaults
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { filterPresets: true, defaultFilterPresets: true },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const currentPresets = (user.filterPresets as FilterPresets) || {};
+  const currentDefaults =
+    (user.defaultFilterPresets as DefaultFilterPresets) || {};
+
+  // Remove preset from the appropriate artifact type array
+  currentPresets[artifactType] = (currentPresets[artifactType] ?? []).filter(
+    (preset: FilterPreset) => preset.id !== presetId
+  );
+
+  // If this was the default preset, clear the default
+  if (currentDefaults[artifactType] === presetId) {
+    currentDefaults[artifactType] = undefined;
+  }
+
+  // Update user
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      filterPresets: currentPresets as never,
+      defaultFilterPresets: currentDefaults as never,
+    },
+  });
+
+  res.json({ success: true });
+};
+
+/**
+ * Get default filter presets
+ */
+export const getDefaultFilterPresets = async (
+  req: TypedAuthRequest,
+  res: TypedResponse<GetDefaultFilterPresetsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+
+  // Get user's default presets
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      defaultFilterPresets: true,
+    },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Return empty object if no defaults set
+  const defaults =
+    (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
+
+  res.json({ defaults });
+};
+
+/**
+ * Set default filter preset for a context
+ * Context can be an artifact type (scene, performer, etc.) or a scene grid context
+ * (scene_performer, scene_tag, scene_studio, scene_group)
+ */
+export const setDefaultFilterPreset = async (
+  req: TypedAuthRequest<SetDefaultFilterPresetBody>,
+  res: TypedResponse<SetDefaultFilterPresetResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+
+  const { context, presetId } = req.body;
+
+  // Validate required fields
+  if (!context) {
+    res.status(400).json({ error: "Missing context" });
+    return;
+  }
+
+  // Validate context - includes base types and scene grid contexts
+  const validContexts = [
+    "scene",
+    "scene_performer",
+    "scene_tag",
+    "scene_studio",
+    "scene_group",
+    "performer",
+    "studio",
+    "tag",
+    "group",
+    "gallery",
+  ];
+  if (!validContexts.includes(context)) {
+    res.status(400).json({ error: "Invalid context" });
+    return;
+  }
+
+  // Get current defaults
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { defaultFilterPresets: true, filterPresets: true },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const currentDefaults =
+    (user.defaultFilterPresets as DefaultFilterPresets) || {};
+  const currentPresets = (user.filterPresets as FilterPresets) || {};
+
+  // If presetId is provided, validate it exists
+  // For scene grid contexts (scene_performer, etc.), validate against "scene" presets
+  if (presetId) {
+    const artifactType = context.startsWith("scene_") ? "scene" : context;
+    const presetExists = (currentPresets[artifactType] ?? []).some(
+      (preset: FilterPreset) => preset.id === presetId
+    );
+
+    if (!presetExists) {
+      res.status(400).json({ error: "Preset not found" });
       return;
     }
 
-    const currentDefaults =
-      (user.defaultFilterPresets as DefaultFilterPresets) || {};
-    const currentPresets = (user.filterPresets as FilterPresets) || {};
-
-    // If presetId is provided, validate it exists
-    // For scene grid contexts (scene_performer, etc.), validate against "scene" presets
-    if (presetId) {
-      const artifactType = context.startsWith("scene_") ? "scene" : context;
-      const presetExists = (currentPresets[artifactType] ?? []).some(
-        (preset: FilterPreset) => preset.id === presetId
-      );
-
-      if (!presetExists) {
-        res.status(400).json({ error: "Preset not found" });
-        return;
-      }
-
-      currentDefaults[context] = presetId;
-    } else {
-      // If presetId is null/undefined, clear the default
-      currentDefaults[context] = undefined;
-    }
-
-    // Update user
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        defaultFilterPresets: currentDefaults as never,
-      },
-    });
-
-    res.json({ success: true, defaults: currentDefaults });
-  } catch (error) {
-    logger.error("Error setting default filter preset", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to set default filter preset" });
+    currentDefaults[context] = presetId;
+  } else {
+    // If presetId is null/undefined, clear the default
+    currentDefaults[context] = undefined;
   }
+
+  // Update user
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      defaultFilterPresets: currentDefaults as never,
+    },
+  });
+
+  res.json({ success: true, defaults: currentDefaults });
 };
 
 /**
@@ -1350,39 +1244,33 @@ export const syncFromStash = async (
   res: TypedResponse<SyncFromStashResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
-  try {
-    const targetUserId = parseInt(req.params.userId);
-    if (isNaN(targetUserId)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
 
-    const options = importOptionsFrom(req.body.options);
-    const instances = stashInstanceManager.getAll();
-    if (instances.length === 0) {
-      res.status(400).json({ error: "No Stash instances configured" });
-      return;
-    }
-
-    const stats = await importFromStash(targetUserId, options, instances);
-
-    logger.info("syncFromStash completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      targetUserId,
-      ...stats,
-    });
-
-    res.json({
-      success: true,
-      message: "Successfully synced ratings and favorites from Stash",
-      stats,
-    });
-  } catch (error) {
-    logger.error("Error syncing from Stash:", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    res.status(500).json({ error: "Failed to sync from Stash" });
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  const options = importOptionsFrom(req.body.options);
+  const instances = stashInstanceManager.getAll();
+  if (instances.length === 0) {
+    res.status(400).json({ error: "No Stash instances configured" });
+    return;
+  }
+
+  const stats = await importFromStash(targetUserId, options, instances);
+
+  logger.info("syncFromStash completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    targetUserId,
+    ...stats,
+  });
+
+  res.json({
+    success: true,
+    message: "Successfully synced ratings and favorites from Stash",
+    stats,
+  });
 };
 
 /**
@@ -1392,19 +1280,12 @@ export const getUserRestrictions = async (
   req: TypedAuthRequest<never, GetUserRestrictionsParams>,
   res: TypedResponse<{ restrictions: unknown[] } | ApiErrorResponse>
 ) => {
-  try {
-    const { userId } = req.params;
-    const restrictions = await prisma.userContentRestriction.findMany({
-      where: { userId: parseInt(userId) },
-    });
+  const { userId } = req.params;
+  const restrictions = await prisma.userContentRestriction.findMany({
+    where: { userId: parseInt(userId) },
+  });
 
-    res.json({ restrictions });
-  } catch (error) {
-    logger.error("Error getting user restrictions", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get content restrictions" });
-  }
+  res.json({ restrictions });
 };
 
 /**
@@ -1415,129 +1296,119 @@ export const updateUserRestrictions = async (
   req: TypedAuthRequest<UpdateUserRestrictionsBody, GetUserRestrictionsParams>,
   res: TypedResponse<UpdateUserRestrictionsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const { userId } = req.params;
-    const { restrictions } = req.body;
-    const targetUserId = parseInt(userId);
-    if (isNaN(targetUserId)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
+  const { userId } = req.params;
+  const { restrictions } = req.body;
+  const targetUserId = parseInt(userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
 
-    // Restrictions apply to non-admin accounts only (item 13)
-    const target = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { role: true },
-    });
-    if (!target) {
-      res.status(404).json({ error: "User not found" });
+  // Restrictions apply to non-admin accounts only (item 13)
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { role: true },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!restrictionsApplyTo(target.role)) {
+    res
+      .status(400)
+      .json({ error: "Content restrictions do not apply to administrators" });
+    return;
+  }
+
+  // Validate input
+  if (!Array.isArray(restrictions)) {
+    res.status(400).json({ error: "Restrictions must be an array" });
+    return;
+  }
+
+  // Validate each restriction: one row per (type, mode), a non-empty list of
+  // "id" or "id:instanceId" strings, and an optional boolean restrictEmpty
+  const seenPairs = new Set<string>();
+  const rows: Array<{
+    userId: number;
+    entityType: string;
+    mode: RestrictionMode;
+    entityIds: string;
+    restrictEmpty: boolean;
+  }> = [];
+  for (const r of restrictions) {
+    if (
+      !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
+    ) {
+      res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
       return;
     }
-    if (!restrictionsApplyTo(target.role)) {
+    if (!(RESTRICTION_MODES as readonly string[]).includes(r.mode)) {
+      res.status(400).json({ error: `Invalid mode: ${r.mode}` });
+      return;
+    }
+    const mode = r.mode as RestrictionMode;
+    const pair = compositeKey(r.entityType, mode);
+    if (seenPairs.has(pair)) {
+      res.status(400).json({
+        error: `Only one ${mode} list is allowed for ${r.entityType}`,
+      });
+      return;
+    }
+    seenPairs.add(pair);
+    if (!Array.isArray(r.entityIds) || r.entityIds.length === 0) {
+      res.status(400).json({
+        error: `entityIds for ${r.entityType} ${mode} must be a non-empty array`,
+      });
+      return;
+    }
+    for (const id of r.entityIds) {
+      if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
+        res.status(400).json({
+          error: `Invalid entity id in ${r.entityType} ${mode}: ${id}`,
+        });
+        return;
+      }
+    }
+    if (r.restrictEmpty !== undefined && typeof r.restrictEmpty !== "boolean") {
       res
         .status(400)
-        .json({ error: "Content restrictions do not apply to administrators" });
+        .json({ error: "restrictEmpty must be a boolean when present" });
       return;
     }
-
-    // Validate input
-    if (!Array.isArray(restrictions)) {
-      res.status(400).json({ error: "Restrictions must be an array" });
-      return;
-    }
-
-    // Validate each restriction: one row per (type, mode), a non-empty list of
-    // "id" or "id:instanceId" strings, and an optional boolean restrictEmpty
-    const seenPairs = new Set<string>();
-    const rows: Array<{
-      userId: number;
-      entityType: string;
-      mode: RestrictionMode;
-      entityIds: string;
-      restrictEmpty: boolean;
-    }> = [];
-    for (const r of restrictions) {
-      if (
-        !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
-      ) {
-        res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
-        return;
-      }
-      if (!(RESTRICTION_MODES as readonly string[]).includes(r.mode)) {
-        res.status(400).json({ error: `Invalid mode: ${r.mode}` });
-        return;
-      }
-      const mode = r.mode as RestrictionMode;
-      const pair = compositeKey(r.entityType, mode);
-      if (seenPairs.has(pair)) {
-        res.status(400).json({
-          error: `Only one ${mode} list is allowed for ${r.entityType}`,
-        });
-        return;
-      }
-      seenPairs.add(pair);
-      if (!Array.isArray(r.entityIds) || r.entityIds.length === 0) {
-        res.status(400).json({
-          error: `entityIds for ${r.entityType} ${mode} must be a non-empty array`,
-        });
-        return;
-      }
-      for (const id of r.entityIds) {
-        if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
-          res.status(400).json({
-            error: `Invalid entity id in ${r.entityType} ${mode}: ${id}`,
-          });
-          return;
-        }
-      }
-      if (
-        r.restrictEmpty !== undefined &&
-        typeof r.restrictEmpty !== "boolean"
-      ) {
-        res
-          .status(400)
-          .json({ error: "restrictEmpty must be a boolean when present" });
-        return;
-      }
-      rows.push({
-        userId: targetUserId,
-        entityType: r.entityType,
-        mode,
-        entityIds: JSON.stringify(r.entityIds),
-        restrictEmpty: r.restrictEmpty ?? defaultRestrictEmpty(mode),
-      });
-    }
-
-    // Replace the stored rows in one batch transaction, so a failed insert
-    // rolls the delete back and the user keeps their old restrictions. A batch
-    // holds SQLite's write lock for just these two statements.
-    await dbWriteBatch("restrictions.save", [
-      prisma.userContentRestriction.deleteMany({
-        where: { userId: targetUserId },
-      }),
-      ...(rows.length > 0
-        ? [prisma.userContentRestriction.createMany({ data: rows })]
-        : []),
-    ]);
-
-    // Recompute exclusions for this user once the new rows are committed
-    await exclusionComputationService.recomputeForUser(targetUserId);
-
-    const saved = await prisma.userContentRestriction.findMany({
-      where: { userId: targetUserId },
+    rows.push({
+      userId: targetUserId,
+      entityType: r.entityType,
+      mode,
+      entityIds: JSON.stringify(r.entityIds),
+      restrictEmpty: r.restrictEmpty ?? defaultRestrictEmpty(mode),
     });
-
-    res.json({
-      success: true,
-      message: "Content restrictions updated successfully",
-      restrictions: saved,
-    });
-  } catch (error) {
-    logger.error("Error updating user restrictions", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update content restrictions" });
   }
+
+  // Replace the stored rows in one batch transaction, so a failed insert
+  // rolls the delete back and the user keeps their old restrictions. A batch
+  // holds SQLite's write lock for just these two statements.
+  await dbWriteBatch("restrictions.save", [
+    prisma.userContentRestriction.deleteMany({
+      where: { userId: targetUserId },
+    }),
+    ...(rows.length > 0
+      ? [prisma.userContentRestriction.createMany({ data: rows })]
+      : []),
+  ]);
+
+  // Recompute exclusions for this user once the new rows are committed
+  await exclusionComputationService.recomputeForUser(targetUserId);
+
+  const saved = await prisma.userContentRestriction.findMany({
+    where: { userId: targetUserId },
+  });
+
+  res.json({
+    success: true,
+    message: "Content restrictions updated successfully",
+    restrictions: saved,
+  });
 };
 
 /**
@@ -1547,27 +1418,20 @@ export const deleteUserRestrictions = async (
   req: TypedAuthRequest<never, DeleteUserRestrictionsParams>,
   res: TypedResponse<DeleteUserRestrictionsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const { userId } = req.params;
-    const targetUserId = parseInt(userId);
+  const { userId } = req.params;
+  const targetUserId = parseInt(userId);
 
-    await prisma.userContentRestriction.deleteMany({
-      where: { userId: targetUserId },
-    });
+  await prisma.userContentRestriction.deleteMany({
+    where: { userId: targetUserId },
+  });
 
-    // Recompute exclusions for this user after restriction removal
-    await exclusionComputationService.recomputeForUser(targetUserId);
+  // Recompute exclusions for this user after restriction removal
+  await exclusionComputationService.recomputeForUser(targetUserId);
 
-    res.json({
-      success: true,
-      message: "All content restrictions removed successfully",
-    });
-  } catch (error) {
-    logger.error("Error deleting user restrictions", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to delete content restrictions" });
-  }
+  res.json({
+    success: true,
+    message: "All content restrictions removed successfully",
+  });
 };
 
 /**
@@ -1709,37 +1573,30 @@ export const hideEntity = async (
   req: TypedAuthRequest<HideEntityBody>,
   res: TypedResponse<HideEntityResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const target = validateHideTarget(req.body);
-    if (!target.ok) {
-      res.status(400).json({ error: target.error });
-      return;
-    }
-
-    const [access] = await checkHideTargets(userId, [target]);
-    if (access === "not-found") {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-
-    if (access === "hide") {
-      await userHiddenEntityService.hideEntity(
-        userId,
-        target.entityType,
-        target.entityId,
-        target.instanceId
-      );
-    }
-
-    res.json({ success: true, message: "Entity hidden successfully" });
-  } catch (error) {
-    logger.error("Error hiding entity", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to hide entity" });
+  const target = validateHideTarget(req.body);
+  if (!target.ok) {
+    res.status(400).json({ error: target.error });
+    return;
   }
+
+  const [access] = await checkHideTargets(userId, [target]);
+  if (access === "not-found") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  if (access === "hide") {
+    await userHiddenEntityService.hideEntity(
+      userId,
+      target.entityType,
+      target.entityId,
+      target.instanceId
+    );
+  }
+
+  res.json({ success: true, message: "Entity hidden successfully" });
 };
 
 /**
@@ -1749,46 +1606,39 @@ export const unhideEntity = async (
   req: TypedAuthRequest<never, UnhideEntityParams, UnhideEntityQuery>,
   res: TypedResponse<UnhideEntityResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const { entityType, entityId } = req.params;
+  const { entityType, entityId } = req.params;
 
-    if (!entityType || !entityId) {
-      res.status(400).json({ error: "Entity type and entity ID are required" });
-      return;
-    }
-
-    if (!isHideableEntityType(entityType)) {
-      res.status(400).json({ error: "Invalid entity type" });
-      return;
-    }
-
-    const unhideInstanceId = req.query.instanceId ?? "";
-
-    // Validate instanceId if provided
-    if (unhideInstanceId) {
-      const instance = stashInstanceManager.getConfig(unhideInstanceId);
-      if (!instance) {
-        res.status(400).json({ error: "Invalid instanceId" });
-        return;
-      }
-    }
-
-    await userHiddenEntityService.unhideEntity(
-      userId,
-      entityType,
-      entityId,
-      unhideInstanceId
-    );
-
-    res.json({ success: true, message: "Entity restored successfully" });
-  } catch (error) {
-    logger.error("Error unhiding entity", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to restore entity" });
+  if (!entityType || !entityId) {
+    res.status(400).json({ error: "Entity type and entity ID are required" });
+    return;
   }
+
+  if (!isHideableEntityType(entityType)) {
+    res.status(400).json({ error: "Invalid entity type" });
+    return;
+  }
+
+  const unhideInstanceId = req.query.instanceId ?? "";
+
+  // Validate instanceId if provided
+  if (unhideInstanceId) {
+    const instance = stashInstanceManager.getConfig(unhideInstanceId);
+    if (!instance) {
+      res.status(400).json({ error: "Invalid instanceId" });
+      return;
+    }
+  }
+
+  await userHiddenEntityService.unhideEntity(
+    userId,
+    entityType,
+    entityId,
+    unhideInstanceId
+  );
+
+  res.json({ success: true, message: "Entity restored successfully" });
 };
 
 /**
@@ -1799,28 +1649,21 @@ export const unhideAllEntities = async (
   req: TypedAuthRequest<never, Record<string, string>, UnhideAllEntitiesQuery>,
   res: TypedResponse<UnhideAllEntitiesResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const entityType = hideTypeFilter(req.query.entityType);
-    if (entityType === false) {
-      res.status(400).json({ error: "Invalid entity type" });
-      return;
-    }
-
-    const count = await userHiddenEntityService.unhideAll(userId, entityType);
-
-    res.json({
-      success: true,
-      message: `${count} items restored successfully`,
-      count,
-    });
-  } catch (error) {
-    logger.error("Error unhiding all entities", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to restore all items" });
+  const entityType = hideTypeFilter(req.query.entityType);
+  if (entityType === false) {
+    res.status(400).json({ error: "Invalid entity type" });
+    return;
   }
+
+  const count = await userHiddenEntityService.unhideAll(userId, entityType);
+
+  res.json({
+    success: true,
+    message: `${count} items restored successfully`,
+    count,
+  });
 };
 
 /**
@@ -1831,27 +1674,20 @@ export const getHiddenEntities = async (
   req: TypedAuthRequest<never, Record<string, string>, GetHiddenEntitiesQuery>,
   res: TypedResponse<{ hiddenEntities: unknown[] } | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const entityType = hideTypeFilter(req.query.entityType);
-    if (entityType === false) {
-      res.status(400).json({ error: "Invalid entity type" });
-      return;
-    }
-
-    const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
-      userId,
-      entityType
-    );
-
-    res.json({ hiddenEntities });
-  } catch (error) {
-    logger.error("Error getting hidden entities", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get hidden entities" });
+  const entityType = hideTypeFilter(req.query.entityType);
+  if (entityType === false) {
+    res.status(400).json({ error: "Invalid entity type" });
+    return;
   }
+
+  const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
+    userId,
+    entityType
+  );
+
+  res.json({ hiddenEntities });
 };
 
 /**
@@ -1861,29 +1697,22 @@ export const getHiddenEntityIds = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetHiddenEntityIdsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
+  const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
 
-    // Convert Sets to arrays for JSON serialization
-    const result = {
-      scenes: Array.from(hiddenIds.scenes),
-      performers: Array.from(hiddenIds.performers),
-      studios: Array.from(hiddenIds.studios),
-      tags: Array.from(hiddenIds.tags),
-      groups: Array.from(hiddenIds.groups),
-      galleries: Array.from(hiddenIds.galleries),
-      images: Array.from(hiddenIds.images),
-    };
+  // Convert Sets to arrays for JSON serialization
+  const result = {
+    scenes: Array.from(hiddenIds.scenes),
+    performers: Array.from(hiddenIds.performers),
+    studios: Array.from(hiddenIds.studios),
+    tags: Array.from(hiddenIds.tags),
+    groups: Array.from(hiddenIds.groups),
+    galleries: Array.from(hiddenIds.galleries),
+    images: Array.from(hiddenIds.images),
+  };
 
-    res.json({ hiddenIds: result });
-  } catch (error) {
-    logger.error("Error getting hidden entity IDs", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get hidden entity IDs" });
-  }
+  res.json({ hiddenIds: result });
 };
 
 /**
@@ -1893,67 +1722,60 @@ export const hideEntities = async (
   req: TypedAuthRequest<HideEntitiesBody>,
   res: TypedResponse<HideEntitiesResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const { entities } = req.body;
+  const { entities } = req.body;
 
-    if (!Array.isArray(entities) || entities.length === 0) {
-      res.status(400).json({ error: "entities must be a non-empty array" });
-      return;
-    }
-
-    // Validate and check every entity before hiding any
-    const targets: HideTarget[] = [];
-    for (const [i, entity] of entities.entries()) {
-      const target = validateHideTarget(entity);
-      if (!target.ok) {
-        res.status(400).json({ error: `entities[${i}]: ${target.error}` });
-        return;
-      }
-      targets.push(target);
-    }
-    const access = await checkHideTargets(userId, targets);
-    const notFound = access.indexOf("not-found");
-    if (notFound !== -1) {
-      res.status(404).json({ error: `entities[${notFound}]: Not found` });
-      return;
-    }
-    const toHide = targets.filter((_, i) => access[i] === "hide");
-
-    // Hide all entities; the ones already hidden count as hidden
-    let successCount = targets.length - toHide.length;
-    let failCount = 0;
-
-    for (const target of toHide) {
-      try {
-        await userHiddenEntityService.hideEntity(
-          userId,
-          target.entityType,
-          target.entityId,
-          target.instanceId
-        );
-        successCount++;
-      } catch (error) {
-        failCount++;
-        logger.error(`Failed to hide ${target.entityType} ${target.entityId}`, {
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      message: `${successCount} entities hidden successfully`,
-      successCount,
-      failCount,
-    });
-  } catch (error) {
-    logger.error("Error hiding entities", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to hide entities" });
+  if (!Array.isArray(entities) || entities.length === 0) {
+    res.status(400).json({ error: "entities must be a non-empty array" });
+    return;
   }
+
+  // Validate and check every entity before hiding any
+  const targets: HideTarget[] = [];
+  for (const [i, entity] of entities.entries()) {
+    const target = validateHideTarget(entity);
+    if (!target.ok) {
+      res.status(400).json({ error: `entities[${i}]: ${target.error}` });
+      return;
+    }
+    targets.push(target);
+  }
+  const access = await checkHideTargets(userId, targets);
+  const notFound = access.indexOf("not-found");
+  if (notFound !== -1) {
+    res.status(404).json({ error: `entities[${notFound}]: Not found` });
+    return;
+  }
+  const toHide = targets.filter((_, i) => access[i] === "hide");
+
+  // Hide all entities; the ones already hidden count as hidden
+  let successCount = targets.length - toHide.length;
+  let failCount = 0;
+
+  for (const target of toHide) {
+    try {
+      await userHiddenEntityService.hideEntity(
+        userId,
+        target.entityType,
+        target.entityId,
+        target.instanceId
+      );
+      successCount++;
+    } catch (error) {
+      failCount++;
+      logger.error(`Failed to hide ${target.entityType} ${target.entityId}`, {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `${successCount} entities hidden successfully`,
+    successCount,
+    failCount,
+  });
 };
 
 /**
@@ -1963,32 +1785,23 @@ export const updateHideConfirmation = async (
   req: TypedAuthRequest<UpdateHideConfirmationBody>,
   res: TypedResponse<UpdateHideConfirmationResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const { hideConfirmationDisabled } = req.body;
+  const { hideConfirmationDisabled } = req.body;
 
-    if (typeof hideConfirmationDisabled !== "boolean") {
-      res
-        .status(400)
-        .json({ error: "hideConfirmationDisabled must be a boolean" });
-      return;
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { hideConfirmationDisabled },
-    });
-
-    res.json({ success: true, hideConfirmationDisabled });
-  } catch (error) {
-    logger.error("Error updating hide confirmation preference", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+  if (typeof hideConfirmationDisabled !== "boolean") {
     res
-      .status(500)
-      .json({ error: "Failed to update hide confirmation preference" });
+      .status(400)
+      .json({ error: "hideConfirmationDisabled must be a boolean" });
+    return;
   }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { hideConfirmationDisabled },
+  });
+
+  res.json({ success: true, hideConfirmationDisabled });
 };
 
 /**
@@ -1998,21 +1811,14 @@ export const getUserPermissions = async (
   req: TypedAuthRequest,
   res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
-  try {
-    const permissions = await resolveUserPermissions(req.user.id);
+  const permissions = await resolveUserPermissions(req.user.id);
 
-    if (!permissions) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    res.json({ permissions });
-  } catch (error) {
-    logger.error("Error getting user permissions", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get permissions" });
+  if (!permissions) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+
+  res.json({ permissions });
 };
 
 /**
@@ -2022,27 +1828,20 @@ export const getAnyUserPermissions = async (
   req: TypedAuthRequest<never, GetUserPermissionsParams>,
   res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
-  try {
-    const userId = parseInt(req.params.userId);
-    if (isNaN(userId)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    const permissions = await resolveUserPermissions(userId);
-
-    if (!permissions) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    res.json({ permissions });
-  } catch (error) {
-    logger.error("Error getting user permissions", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get permissions" });
+  const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  const permissions = await resolveUserPermissions(userId);
+
+  if (!permissions) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  res.json({ permissions });
 };
 
 /**
@@ -2055,64 +1854,57 @@ export const updateUserPermissionOverrides = async (
   >,
   res: TypedResponse<{ success: true; permissions: unknown } | ApiErrorResponse>
 ) => {
+  const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  const {
+    canShareOverride,
+    canDownloadFilesOverride,
+    canDownloadPlaylistsOverride,
+  } = req.body;
+
+  // Validate values (must be boolean or null)
+  const validateOverride = (value: unknown): boolean | null | undefined => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === "boolean") return value;
+    throw new Error("Invalid override value");
+  };
+
   try {
-    const userId = parseInt(req.params.userId);
-    if (isNaN(userId)) {
-      res.status(400).json({ error: "Invalid user ID" });
+    const updates: Record<string, boolean | null> = {};
+
+    const shareOverride = validateOverride(canShareOverride);
+    if (shareOverride !== undefined) updates.canShareOverride = shareOverride;
+
+    const filesOverride = validateOverride(canDownloadFilesOverride);
+    if (filesOverride !== undefined)
+      updates.canDownloadFilesOverride = filesOverride;
+
+    const playlistsOverride = validateOverride(canDownloadPlaylistsOverride);
+    if (playlistsOverride !== undefined)
+      updates.canDownloadPlaylistsOverride = playlistsOverride;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "No valid updates provided" });
       return;
     }
 
-    const {
-      canShareOverride,
-      canDownloadFilesOverride,
-      canDownloadPlaylistsOverride,
-    } = req.body;
-
-    // Validate values (must be boolean or null)
-    const validateOverride = (value: unknown): boolean | null | undefined => {
-      if (value === undefined) return undefined;
-      if (value === null) return null;
-      if (typeof value === "boolean") return value;
-      throw new Error("Invalid override value");
-    };
-
-    try {
-      const updates: Record<string, boolean | null> = {};
-
-      const shareOverride = validateOverride(canShareOverride);
-      if (shareOverride !== undefined) updates.canShareOverride = shareOverride;
-
-      const filesOverride = validateOverride(canDownloadFilesOverride);
-      if (filesOverride !== undefined)
-        updates.canDownloadFilesOverride = filesOverride;
-
-      const playlistsOverride = validateOverride(canDownloadPlaylistsOverride);
-      if (playlistsOverride !== undefined)
-        updates.canDownloadPlaylistsOverride = playlistsOverride;
-
-      if (Object.keys(updates).length === 0) {
-        res.status(400).json({ error: "No valid updates provided" });
-        return;
-      }
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: updates,
-      });
-
-      // Return updated permissions
-      const permissions = await resolveUserPermissions(userId);
-      res.json({ success: true, permissions });
-    } catch {
-      res.status(400).json({
-        error: "Invalid override value - must be true, false, or null",
-      });
-    }
-  } catch (error) {
-    logger.error("Error updating permission overrides", {
-      error: error instanceof Error ? error.message : "Unknown error",
+    await prisma.user.update({
+      where: { id: userId },
+      data: updates,
     });
-    res.status(500).json({ error: "Failed to update permission overrides" });
+
+    // Return updated permissions
+    const permissions = await resolveUserPermissions(userId);
+    res.json({ success: true, permissions });
+  } catch {
+    res.status(400).json({
+      error: "Invalid override value - must be true, false, or null",
+    });
   }
 };
 
@@ -2123,25 +1915,18 @@ export const getUserGroupMemberships = async (
   req: TypedAuthRequest<never, GetUserGroupMembershipsParams>,
   res: TypedResponse<GetUserGroupMembershipsResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = parseInt(req.params.userId);
-    if (isNaN(userId)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    const memberships = await prisma.userGroupMembership.findMany({
-      where: { userId },
-      include: { group: { select: USER_GROUP_SUMMARY_SELECT } },
-    });
-
-    res.json({ groups: memberships.map((m) => m.group) });
-  } catch (error) {
-    logger.error("Error getting user group memberships", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get user group memberships" });
+  const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  const memberships = await prisma.userGroupMembership.findMany({
+    where: { userId },
+    include: { group: { select: USER_GROUP_SUMMARY_SELECT } },
+  });
+
+  res.json({ groups: memberships.map((m) => m.group) });
 };
 
 /**
@@ -2151,48 +1936,41 @@ export const adminResetPassword = async (
   req: TypedAuthRequest<AdminResetPasswordBody, AdminResetPasswordParams>,
   res: TypedResponse<AdminResetPasswordResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const { userId } = req.params;
-    const { newPassword } = req.body;
-    const userIdInt = parseInt(userId, 10);
+  // Check if user is admin
+  const { userId } = req.params;
+  const { newPassword } = req.body;
+  const userIdInt = parseInt(userId, 10);
 
-    if (isNaN(userIdInt)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    if (!newPassword) {
-      res.status(400).json({ error: "New password is required" });
-      return;
-    }
-
-    const passwordValidation = validatePassword(newPassword);
-    if (!passwordValidation.valid) {
-      res.status(400).json({ error: passwordValidation.errors.join(". ") });
-      return;
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userIdInt },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // Also signs the user out everywhere
-    await setUserPassword(userIdInt, newPassword);
-
-    res.json({ success: true });
-  } catch (error) {
-    logger.error("Error resetting user password", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to reset user password" });
+  if (isNaN(userIdInt)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  if (!newPassword) {
+    res.status(400).json({ error: "New password is required" });
+    return;
+  }
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    res.status(400).json({ error: passwordValidation.errors.join(". ") });
+    return;
+  }
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userIdInt },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Also signs the user out everywhere
+  await setUserPassword(userIdInt, newPassword);
+
+  res.json({ success: true });
 };
 
 /**
@@ -2202,40 +1980,33 @@ export const adminRegenerateRecoveryKey = async (
   req: TypedAuthRequest<never, AdminRegenerateRecoveryKeyParams>,
   res: TypedResponse<AdminRegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
-  try {
-    // Check if user is admin
-    const { userId } = req.params;
-    const userIdInt = parseInt(userId, 10);
+  // Check if user is admin
+  const { userId } = req.params;
+  const userIdInt = parseInt(userId, 10);
 
-    if (isNaN(userIdInt)) {
-      res.status(400).json({ error: "Invalid user ID" });
-      return;
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userIdInt },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // Only the hash is stored; the admin passes the key on
-    const newKey = generateRecoveryKey();
-    await prisma.user.update({
-      where: { id: userIdInt },
-      data: { recoveryKeyHash: hashRecoveryKey(newKey) },
-    });
-
-    res.json({ recoveryKey: formatRecoveryKey(newKey) });
-  } catch (error) {
-    logger.error("Error regenerating user recovery key", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to regenerate user recovery key" });
+  if (isNaN(userIdInt)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
   }
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userIdInt },
+  });
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Only the hash is stored; the admin passes the key on
+  const newKey = generateRecoveryKey();
+  await prisma.user.update({
+    where: { id: userIdInt },
+    data: { recoveryKeyHash: hashRecoveryKey(newKey) },
+  });
+
+  res.json({ recoveryKey: formatRecoveryKey(newKey) });
 };
 
 // =============================================================================
@@ -2257,36 +2028,29 @@ export const getUserStashInstances = async (
     | ApiErrorResponse
   >
 ) => {
-  try {
-    const userId = req.user.id;
-    // Get user's selected instances
-    const userSelections = await prisma.userStashInstance.findMany({
-      where: { userId },
-      select: { instanceId: true },
-    });
-    const selectedInstanceIds = userSelections.map((s) => s.instanceId);
+  const userId = req.user.id;
+  // Get user's selected instances
+  const userSelections = await prisma.userStashInstance.findMany({
+    where: { userId },
+    select: { instanceId: true },
+  });
+  const selectedInstanceIds = userSelections.map((s) => s.instanceId);
 
-    // Get all enabled instances for the selection UI
-    const availableInstances = await prisma.stashInstance.findMany({
-      where: { enabled: true },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-      },
-      orderBy: { priority: "asc" },
-    });
+  // Get all enabled instances for the selection UI
+  const availableInstances = await prisma.stashInstance.findMany({
+    where: { enabled: true },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+    },
+    orderBy: { priority: "asc" },
+  });
 
-    res.json({
-      selectedInstanceIds,
-      availableInstances,
-    });
-  } catch (error) {
-    logger.error("Error getting user Stash instances", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get Stash instance selection" });
-  }
+  res.json({
+    selectedInstanceIds,
+    availableInstances,
+  });
 };
 
 /**
@@ -2303,67 +2067,58 @@ export const updateUserStashInstances = async (
     { success: true; selectedInstanceIds: string[] } | ApiErrorResponse
   >
 ) => {
-  try {
-    const userId = req.user.id;
-    const { instanceIds } = req.body;
-    if (!Array.isArray(instanceIds)) {
-      res.status(400).json({ error: "instanceIds must be an array" });
+  const userId = req.user.id;
+  const { instanceIds } = req.body;
+  if (!Array.isArray(instanceIds)) {
+    res.status(400).json({ error: "instanceIds must be an array" });
+    return;
+  }
+
+  // Validate that all instance IDs exist and are enabled
+  if (instanceIds.length > 0) {
+    const validInstances = await prisma.stashInstance.findMany({
+      where: {
+        id: { in: instanceIds },
+        enabled: true,
+      },
+      select: { id: true },
+    });
+
+    const validIds = new Set(validInstances.map((i) => i.id));
+    const invalidIds = instanceIds.filter((id) => !validIds.has(id));
+
+    if (invalidIds.length > 0) {
+      res.status(400).json({
+        error: "Invalid instance IDs",
+        details: invalidIds.join(", "),
+      });
       return;
     }
-
-    // Validate that all instance IDs exist and are enabled
-    if (instanceIds.length > 0) {
-      const validInstances = await prisma.stashInstance.findMany({
-        where: {
-          id: { in: instanceIds },
-          enabled: true,
-        },
-        select: { id: true },
-      });
-
-      const validIds = new Set(validInstances.map((i) => i.id));
-      const invalidIds = instanceIds.filter((id) => !validIds.has(id));
-
-      if (invalidIds.length > 0) {
-        res.status(400).json({
-          error: "Invalid instance IDs",
-          details: invalidIds.join(", "),
-        });
-        return;
-      }
-    }
-
-    // Delete existing selections
-    await prisma.userStashInstance.deleteMany({
-      where: { userId },
-    });
-
-    // Create new selections (if any)
-    if (instanceIds.length > 0) {
-      await prisma.userStashInstance.createMany({
-        data: instanceIds.map((instanceId) => ({
-          userId,
-          instanceId,
-        })),
-      });
-    }
-
-    // The user's scope changed: their exclusion rows must cover it before
-    // anything on the added instances is listed to them
-    await exclusionComputationService.recomputeForUser(userId);
-
-    res.json({
-      success: true,
-      selectedInstanceIds: instanceIds,
-    });
-  } catch (error) {
-    logger.error("Error updating user Stash instances", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res
-      .status(500)
-      .json({ error: "Failed to update Stash instance selection" });
   }
+
+  // Delete existing selections
+  await prisma.userStashInstance.deleteMany({
+    where: { userId },
+  });
+
+  // Create new selections (if any)
+  if (instanceIds.length > 0) {
+    await prisma.userStashInstance.createMany({
+      data: instanceIds.map((instanceId) => ({
+        userId,
+        instanceId,
+      })),
+    });
+  }
+
+  // The user's scope changed: their exclusion rows must cover it before
+  // anything on the added instances is listed to them
+  await exclusionComputationService.recomputeForUser(userId);
+
+  res.json({
+    success: true,
+    selectedInstanceIds: instanceIds,
+  });
 };
 
 /**
@@ -2381,44 +2136,37 @@ export const getSetupStatus = async (
     | ApiErrorResponse
   >
 ) => {
-  try {
-    const userId = req.user.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        setupCompleted: true,
-      },
-    });
+  const userId = req.user.id;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      setupCompleted: true,
+    },
+  });
 
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // Get enabled instances for selection
-    const instances = await prisma.stashInstance.findMany({
-      where: { enabled: true },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-      },
-      orderBy: { priority: "asc" },
-    });
-
-    const instanceCount = instances.length;
-
-    res.json({
-      setupCompleted: user.setupCompleted,
-      instances,
-      instanceCount,
-    });
-  } catch (error) {
-    logger.error("Error getting setup status", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get setup status" });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+
+  // Get enabled instances for selection
+  const instances = await prisma.stashInstance.findMany({
+    where: { enabled: true },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+    },
+    orderBy: { priority: "asc" },
+  });
+
+  const instanceCount = instances.length;
+
+  res.json({
+    setupCompleted: user.setupCompleted,
+    instances,
+    instanceCount,
+  });
 };
 
 /**
@@ -2429,86 +2177,79 @@ export const completeSetup = async (
   req: TypedAuthRequest<CompleteSetupBody>,
   res: TypedResponse<CompleteSetupResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const { selectedInstanceIds } = req.body;
+  const userId = req.user.id;
+  const { selectedInstanceIds } = req.body;
 
-    // Check if multi-instance - require at least one selection
-    const instanceCount = await prisma.stashInstance.count({
-      where: { enabled: true },
-    });
+  // Check if multi-instance - require at least one selection
+  const instanceCount = await prisma.stashInstance.count({
+    where: { enabled: true },
+  });
 
-    if (instanceCount >= 2) {
-      if (
-        !Array.isArray(selectedInstanceIds) ||
-        selectedInstanceIds.length === 0
-      ) {
-        res.status(400).json({
-          error: "At least one Stash instance must be selected",
-        });
-        return;
-      }
-
-      // Validate instance IDs
-      const validInstances = await prisma.stashInstance.findMany({
-        where: {
-          id: { in: selectedInstanceIds },
-          enabled: true,
-        },
-        select: { id: true },
+  if (instanceCount >= 2) {
+    if (
+      !Array.isArray(selectedInstanceIds) ||
+      selectedInstanceIds.length === 0
+    ) {
+      res.status(400).json({
+        error: "At least one Stash instance must be selected",
       });
-
-      const validIds = new Set(validInstances.map((i) => i.id));
-      const invalidIds = selectedInstanceIds.filter(
-        (id: string) => !validIds.has(id)
-      );
-
-      if (invalidIds.length > 0) {
-        res.status(400).json({
-          error: "Invalid instance IDs",
-          details: invalidIds.join(", "),
-        });
-        return;
-      }
-
-      // Delete existing selections and create new ones
-      await prisma.userStashInstance.deleteMany({
-        where: { userId },
-      });
-
-      await prisma.userStashInstance.createMany({
-        data: selectedInstanceIds.map((instanceId: string) => ({
-          userId,
-          instanceId,
-        })),
-      });
-
-      // The user's scope changed with the selection (see
-      // updateUserStashInstances)
-      await exclusionComputationService.recomputeForUser(userId);
+      return;
     }
 
-    // Mark setup as complete and issue the first recovery key. The
-    // conditional update issues at most one key per user: a repeated call
-    // leaves the saved key alone and returns none.
-    const key = generateRecoveryKey();
-    const { count } = await prisma.user.updateMany({
-      where: { id: userId, setupCompleted: false },
-      data: {
-        setupCompleted: true,
-        setupCompletedAt: new Date(),
-        recoveryKeyHash: hashRecoveryKey(key),
+    // Validate instance IDs
+    const validInstances = await prisma.stashInstance.findMany({
+      where: {
+        id: { in: selectedInstanceIds },
+        enabled: true,
       },
+      select: { id: true },
     });
 
-    res.json({
-      success: true,
-      recoveryKey: count === 1 ? formatRecoveryKey(key) : null,
+    const validIds = new Set(validInstances.map((i) => i.id));
+    const invalidIds = selectedInstanceIds.filter(
+      (id: string) => !validIds.has(id)
+    );
+
+    if (invalidIds.length > 0) {
+      res.status(400).json({
+        error: "Invalid instance IDs",
+        details: invalidIds.join(", "),
+      });
+      return;
+    }
+
+    // Delete existing selections and create new ones
+    await prisma.userStashInstance.deleteMany({
+      where: { userId },
     });
-  } catch (error) {
-    logger.error("Error completing setup", {
-      error: error instanceof Error ? error.message : "Unknown error",
+
+    await prisma.userStashInstance.createMany({
+      data: selectedInstanceIds.map((instanceId: string) => ({
+        userId,
+        instanceId,
+      })),
     });
-    res.status(500).json({ error: "Failed to complete setup" });
+
+    // The user's scope changed with the selection (see
+    // updateUserStashInstances)
+    await exclusionComputationService.recomputeForUser(userId);
   }
+
+  // Mark setup as complete and issue the first recovery key. The
+  // conditional update issues at most one key per user: a repeated call
+  // leaves the saved key alone and returns none.
+  const key = generateRecoveryKey();
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, setupCompleted: false },
+    data: {
+      setupCompleted: true,
+      setupCompletedAt: new Date(),
+      recoveryKeyHash: hashRecoveryKey(key),
+    },
+  });
+
+  res.json({
+    success: true,
+    recoveryKey: count === 1 ? formatRecoveryKey(key) : null,
+  });
 };

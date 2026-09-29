@@ -10,6 +10,10 @@ import {
   startPlaylistDownload,
   startSceneDownload,
 } from "../../controllers/download.js";
+import {
+  ForbiddenError,
+  NotFoundError,
+} from "../../middleware/errorHandler.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
@@ -530,6 +534,24 @@ describe("Download Controller", () => {
   });
 
   describe("getUserDownloads", () => {
+    it("a database failure reaches the error handler", async () => {
+      const res = resFor(getUserDownloads);
+      mockDownloadService.getUserDownloads.mockRejectedValue(
+        new Error("DB down")
+      );
+
+      await expect(
+        getUserDownloads(
+          reqFor(getUserDownloads, {
+            user: { id: 1, username: "testuser", role: "USER" },
+          }),
+          res
+        )
+      ).rejects.toThrow("DB down");
+
+      expect(res.json).not.toHaveBeenCalled();
+    });
+
     it("should return serialized downloads for the user", async () => {
       const res = resFor(getUserDownloads);
 
@@ -1125,44 +1147,45 @@ describe("Download Controller", () => {
       });
     });
 
-    it("should return 404 if download not found", async () => {
+    it("a download that is not found reaches the error handler as a 404", async () => {
       const res = resFor(deleteDownload);
 
       mockDownloadService.deleteDownload.mockRejectedValue(
-        new Error("Download not found")
+        new NotFoundError("Download not found")
       );
 
-      await deleteDownload(
-        reqFor(deleteDownload, {
-          user: { id: 1, username: "testuser", role: "USER" },
-          params: { id: "999" },
-        }),
-        res
-      );
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Download not found",
+      await expect(
+        deleteDownload(
+          reqFor(deleteDownload, {
+            user: { id: 1, username: "testuser", role: "USER" },
+            params: { id: "999" },
+          }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: "Download not found",
       });
+      expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("should return 403 if user not authorized", async () => {
+    it("another user's download reaches the error handler as a 403", async () => {
       const res = resFor(deleteDownload);
 
       mockDownloadService.deleteDownload.mockRejectedValue(
-        new Error("Not authorized to delete this download")
+        new ForbiddenError("Access denied")
       );
 
-      await deleteDownload(
-        reqFor(deleteDownload, {
-          user: { id: 1, username: "testuser", role: "USER" },
-          params: { id: "1" },
-        }),
-        res
-      );
-
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: "Access denied" });
+      await expect(
+        deleteDownload(
+          reqFor(deleteDownload, {
+            user: { id: 1, username: "testuser", role: "USER" },
+            params: { id: "1" },
+          }),
+          res
+        )
+      ).rejects.toMatchObject({ statusCode: 403, message: "Access denied" });
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 

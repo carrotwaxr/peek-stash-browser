@@ -455,13 +455,16 @@ describe("Ratings Controller", () => {
         );
       });
 
-      it(`returns 500 "Failed to update ${c.type} rating" when the database throws`, async () => {
+      it("a database failure reaches the error handler", async () => {
         mockPrisma.user.findUnique.mockRejectedValue(new Error("DB down"));
-        const res = await send({ rating: 50 });
-        expect(res._getStatus()).toBe(500);
-        expect(res._getErrorBody().error).toBe(
-          `Failed to update ${c.type} rating`
-        );
+        const req = reqFor(c.handler, {
+          body: { rating: 50 },
+          params,
+          user: USER,
+        });
+        const res = resFor(c.handler);
+        await expect(c.handler(req, res)).rejects.toThrow("DB down");
+        expect(res.json).not.toHaveBeenCalled();
       });
     });
 

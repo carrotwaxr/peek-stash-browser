@@ -119,14 +119,14 @@ describe("Custom Theme Controller", () => {
       );
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findMany.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(getUserCustomThemes, { user: USER });
       const res = resFor(getUserCustomThemes);
-      await getUserCustomThemes(req, res);
+      await expect(getUserCustomThemes(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -173,14 +173,14 @@ describe("Custom Theme Controller", () => {
       expect(res._getBody()).toEqual(expect.objectContaining({ theme }));
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findFirst.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(getCustomTheme, { params: { id: "1" }, user: USER });
       const res = resFor(getCustomTheme);
-      await getCustomTheme(req, res);
+      await expect(getCustomTheme(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -467,7 +467,7 @@ describe("Custom Theme Controller", () => {
       );
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findFirst.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(createCustomTheme, {
@@ -475,9 +475,9 @@ describe("Custom Theme Controller", () => {
         user: USER,
       });
       const res = resFor(createCustomTheme);
-      await createCustomTheme(req, res);
+      await expect(createCustomTheme(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -664,7 +664,7 @@ describe("Custom Theme Controller", () => {
       );
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findFirst.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(updateCustomTheme, {
@@ -673,9 +673,9 @@ describe("Custom Theme Controller", () => {
         user: USER,
       });
       const res = resFor(updateCustomTheme);
-      await updateCustomTheme(req, res);
+      await expect(updateCustomTheme(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -733,7 +733,7 @@ describe("Custom Theme Controller", () => {
       );
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findFirst.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(deleteCustomTheme, {
@@ -741,9 +741,9 @@ describe("Custom Theme Controller", () => {
         user: USER,
       });
       const res = resFor(deleteCustomTheme);
-      await deleteCustomTheme(req, res);
+      await expect(deleteCustomTheme(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -868,7 +868,7 @@ describe("Custom Theme Controller", () => {
       );
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.customTheme.findFirst.mockRejectedValue(new Error("DB fail"));
 
       const req = reqFor(duplicateCustomTheme, {
@@ -876,9 +876,9 @@ describe("Custom Theme Controller", () => {
         user: USER,
       });
       const res = resFor(duplicateCustomTheme);
-      await duplicateCustomTheme(req, res);
+      await expect(duplicateCustomTheme(req, res)).rejects.toThrow("DB fail");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

@@ -278,7 +278,7 @@ describe("Stats Controller", () => {
       });
     });
 
-    it("returns 500 when fullSync throws synchronously", () => {
+    it("a synchronous failure reaches the error handler", () => {
       mockSyncService.fullSync.mockImplementation(() => {
         throw new Error("Sync failed hard");
       });
@@ -286,13 +286,8 @@ describe("Stats Controller", () => {
       const req = reqFor(refreshCache);
       const res = resFor(refreshCache);
 
-      refreshCache(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody()).toMatchObject({
-        success: false,
-        message: "Failed to refresh cache",
-      });
+      expect(() => refreshCache(req, res)).toThrow("Sync failed hard");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });
