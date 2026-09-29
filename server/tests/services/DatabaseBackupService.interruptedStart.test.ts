@@ -216,6 +216,88 @@ describe("DatabaseBackupService after an interrupted start", () => {
     expect(fs.existsSync(path.join(dir, `${FINAL}-journal`))).toBe(true);
   });
 
+  /**
+   * A backup just completed with a -journal beside it whose `stat` fails
+   * with `code`: the older backups are three complete ones.
+   */
+  async function backupWithJournalStatFailing(code: string): Promise<string[]> {
+    const older = [
+      `${BASE}.backup-20260925-130559-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-140010-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-155612-pre-3.4.0-beta.1`,
+    ];
+    for (const name of older) seed(name);
+    const realRename = fs.promises.rename.bind(fs.promises);
+    const rename = vi.spyOn(fs.promises, "rename");
+    rename.mockImplementation(async (from, to) => {
+      await realRename(from, to);
+      if (String(to).endsWith(FINAL)) {
+        fs.writeFileSync(`${String(to)}-journal`, "");
+      }
+    });
+    const realStat = fs.promises.stat.bind(fs.promises);
+    const stat = vi.spyOn(fs.promises, "stat");
+    stat.mockImplementation(((target: fs.PathLike, ...rest: unknown[]) => {
+      if (String(target).endsWith("-journal")) {
+        return Promise.reject(Object.assign(new Error(code), { code }));
+      }
+      return (realStat as (...args: unknown[]) => Promise<fs.Stats>)(
+        target,
+        ...rest
+      );
+    }) as typeof fs.promises.stat);
+    try {
+      await databaseBackupService.createPreMigrationBackup(VERSION);
+    } finally {
+      rename.mockRestore();
+      stat.mockRestore();
+    }
+    return older;
+  }
+
+  it("a backup just completed with a -journal written after it does not cost the backup just written", async () => {
+    const older = [
+      `${BASE}.backup-20260925-130559-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-140010-pre-3.4.0-beta.1`,
+      `${BASE}.backup-20260925-155612-pre-3.4.0-beta.1`,
+    ];
+    for (const name of older) seed(name);
+    const realRename = fs.promises.rename.bind(fs.promises);
+    const rename = vi.spyOn(fs.promises, "rename");
+    rename.mockImplementation(async (from, to) => {
+      await realRename(from, to);
+      if (String(to).endsWith(FINAL)) {
+        const journal = `${String(to)}-journal`;
+        fs.writeFileSync(journal, "");
+        const past = new Date(Date.now() - 60_000);
+        fs.utimesSync(String(to), past, past);
+      }
+    });
+
+    try {
+      await databaseBackupService.createPreMigrationBackup(VERSION);
+    } finally {
+      rename.mockRestore();
+    }
+
+    // Its journal is newer, so it is not counted, yet the file just written
+    // is never pruned: the oldest of the others goes
+    expect(backupNamed()).toEqual([...older.slice(1), FINAL]);
+  });
+
+  it("a backup just completed whose -journal cannot be read for permissions is counted as complete", async () => {
+    const older = await backupWithJournalStatFailing("EACCES");
+
+    expect(backupNamed()).toEqual([...older.slice(1), FINAL]);
+  });
+
+  it("a backup just completed whose -journal vanished while checked does not stop the backup or cost it", async () => {
+    const older = await backupWithJournalStatFailing("ENOENT");
+
+    // The backup just written is kept, and the oldest of the rest pruned
+    expect(backupNamed()).toEqual([...older.slice(1), FINAL]);
+  });
+
   it("a -journal newer than a backup marks it incomplete", async () => {
     seed(FINAL);
     const journal = path.join(dir, `${FINAL}-journal`);

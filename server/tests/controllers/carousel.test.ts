@@ -513,6 +513,33 @@ describe("Carousel Controller", () => {
       });
     });
 
+    it("a full update saves the icon, the rules, the sort field and the direction", async () => {
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockPrisma.userCarousel.update.mockResolvedValue(SAMPLE_CAROUSEL);
+
+      const req = reqFor(updateCarousel, {
+        body: {
+          title: "  New  ",
+          icon: "star",
+          rules: RULES,
+          sort: "rating",
+          direction: "DESC",
+        },
+        params: { id: "1" },
+        user: USER,
+      });
+      await updateCarousel(req, resFor(updateCarousel));
+
+      const data = mockPrisma.userCarousel.update.mock.calls[0]?.[0].data;
+      expect(data).toMatchObject({
+        title: "New",
+        icon: "star",
+        rules: RULES,
+        direction: "DESC",
+      });
+      expect(data).toHaveProperty("sort");
+    });
+
     it("direction sideways answers 400 and updates nothing", async () => {
       const req = reqFor(updateCarousel, {
         body: { direction: "sideways" },

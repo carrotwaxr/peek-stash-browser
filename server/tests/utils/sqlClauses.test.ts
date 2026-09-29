@@ -1167,3 +1167,116 @@ describe("buildEpochDateFilter", () => {
     ).toEqual({ sql: "", params: [] });
   });
 });
+
+describe("buildEpochDateFilter edge values", () => {
+  const COL = "w.lastPlayedAt";
+  const DAY = 86_400_000;
+  const day1 = Date.parse("2026-03-01");
+  const day2 = Date.parse("2026-03-05");
+
+  it("an EQUALS date-only value binds its whole UTC day as epoch milliseconds", () => {
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: "EQUALS" }, COL)
+    ).toEqual({
+      sql: `(${COL} >= ? AND ${COL} < ?)`,
+      params: [day1, day1 + DAY],
+    });
+  });
+
+  it("a NOT_EQUALS date-only value keeps unplayed rows and rows outside the day", () => {
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: "NOT_EQUALS" }, COL)
+    ).toEqual({
+      sql: `(${COL} IS NULL OR ${COL} < ? OR ${COL} >= ?)`,
+      params: [day1, day1 + DAY],
+    });
+  });
+
+  it("a BETWEEN last-played filter binds both bounds as epoch milliseconds, the end day included", () => {
+    expect(
+      buildEpochDateFilter(
+        { value: "2026-03-01", value2: "2026-03-05", modifier: "BETWEEN" },
+        COL
+      )
+    ).toEqual({
+      sql: `(${COL} >= ? AND ${COL} < ?)`,
+      params: [day1, day2 + DAY],
+    });
+  });
+
+  it("a BETWEEN without a second date is a lower bound only", () => {
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: "BETWEEN" }, COL)
+    ).toEqual({ sql: `${COL} >= ?`, params: [day1] });
+  });
+
+  it("a NOT_BETWEEN filter keeps unplayed rows and rows outside both bounds", () => {
+    expect(
+      buildEpochDateFilter(
+        { value: "2026-03-01", value2: "2026-03-05", modifier: "NOT_BETWEEN" },
+        COL
+      )
+    ).toEqual({
+      sql: `(${COL} IS NULL OR ${COL} < ? OR ${COL} >= ?)`,
+      params: [day1, day2 + DAY],
+    });
+  });
+
+  it("a NOT_BETWEEN without a second date is an upper bound only", () => {
+    expect(
+      buildEpochDateFilter(
+        { value: "2026-03-01", modifier: "NOT_BETWEEN" },
+        COL
+      )
+    ).toEqual({ sql: `${COL} < ?`, params: [day1] });
+  });
+
+  it("an ISO date-time is the instant, not a day", () => {
+    const at = Date.parse("2026-03-01T10:00:00Z");
+    expect(
+      buildEpochDateFilter(
+        { value: "2026-03-01T10:00:00Z", modifier: "EQUALS" },
+        COL
+      ).params
+    ).toEqual([at, at + 1]);
+  });
+
+  it("an unparsable date, an unknown modifier or a null modifier adds no clause", () => {
+    expect(
+      buildEpochDateFilter({ value: "not a date", modifier: "EQUALS" }, COL)
+    ).toEqual({ sql: "", params: [] });
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: "WHATEVER" }, COL)
+    ).toEqual({ sql: "", params: [] });
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: null }, COL)
+    ).toEqual({ sql: "", params: [] });
+  });
+
+  it("no filter adds no clause, and a filter without a modifier is a GREATER_THAN", () => {
+    expect(buildEpochDateFilter(undefined, COL)).toEqual({
+      sql: "",
+      params: [],
+    });
+    expect(buildEpochDateFilter(null, COL)).toEqual({ sql: "", params: [] });
+    expect(buildEpochDateFilter({ value: "2026-03-01" }, COL)).toEqual({
+      sql: `${COL} > ?`,
+      params: [day1],
+    });
+  });
+
+  it("a LESS_THAN date binds the start of its day", () => {
+    expect(
+      buildEpochDateFilter({ value: "2026-03-01", modifier: "LESS_THAN" }, COL)
+    ).toEqual({ sql: `${COL} < ?`, params: [day1] });
+  });
+
+  it("an IS_NULL or NOT_NULL modifier needs no date", () => {
+    expect(buildEpochDateFilter({ modifier: "IS_NULL" }, COL).sql).toBe(
+      `${COL} IS NULL`
+    );
+    expect(buildEpochDateFilter({ modifier: "NOT_NULL" }, COL).sql).toBe(
+      `${COL} IS NOT NULL`
+    );
+  });
+});
