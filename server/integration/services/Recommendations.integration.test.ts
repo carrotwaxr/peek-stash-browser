@@ -8,6 +8,10 @@
  * Every user favorites performers, so the fixture's exclusions, instance
  * selection and watch history decide what is recommended. Every seeded row
  * is deleted before the file ends.
+ *
+ * Each viewer logs in, and the login starts a ranking recompute in the
+ * server process (global setup's), which this worker cannot await: a viewer
+ * is ready once that recompute has finished (`createViewer`).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getRecommendedScenes } from "../../controllers/library/scenes.js";
@@ -30,7 +34,7 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
-import { adminClient } from "../helpers/testClient.js";
+import { type TestClient, adminClient } from "../helpers/testClient.js";
 
 const { A, B, OFF } = FX;
 const { SAME, GLOBAL, DELETED, ON_OFF, B_ONLY, VISIBLE_A } = FX_ID;
@@ -39,18 +43,58 @@ const EXTRA = "7700011";
 /** A scene "synced" during the file */
 const NEW = "7700012";
 const PASSWORD = "access_it_rec_pass_1";
+/** How long the server may take to finish a viewer's ranking recompute */
+const SERVER_RANKINGS_MS = 10_000;
 
 interface Viewer {
   id: number;
   username: string;
+  client: TestClient;
 }
 
 const users: Viewer[] = [];
 
+/**
+ * Waits until the ranking recompute the viewer's login started in the
+ * server process has finished (routes/auth.ts starts it without awaiting).
+ * Left running, it lands between a test's steps and rewrites the viewer's
+ * UserEntityRanking rows (it deletes a row a test added, as the viewer has
+ * no stats), which is part of the Recommended stamp. GET /api/user-stats
+ * awaits the same recompute (`ensureFresh` with `wait` joins the running
+ * one) and leaves the viewer fresh for an hour, so the server starts no
+ * other during the file. Polling the ranking rows cannot tell: with nothing
+ * to rank, the recompute writes nothing.
+ */
+async function awaitServerRankings(viewer: Viewer): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `The server's ranking recompute for ${viewer.username} did not finish within ${SERVER_RANKINGS_MS} ms`
+        )
+      );
+    }, SERVER_RANKINGS_MS);
+  });
+  try {
+    const stats = await Promise.race([
+      viewer.client.get("/api/user-stats"),
+      timeout,
+    ]);
+    expect(
+      stats.status,
+      "GET /api/user-stats, which awaits the server's ranking recompute"
+    ).toBe(200);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function createViewer(username: string): Promise<Viewer> {
-  const { id } = await createApiUser(username, PASSWORD);
-  const viewer = { id, username };
+  const { id, client } = await createApiUser(username, PASSWORD);
+  const viewer = { id, username, client };
   users.push(viewer);
+  await awaitServerRankings(viewer);
   return viewer;
 }
 

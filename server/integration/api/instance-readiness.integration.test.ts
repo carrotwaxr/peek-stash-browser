@@ -35,7 +35,7 @@ const describeReplay =
 
 /** The instance this file adds, and removes again */
 const NEW = "readiness-it";
-/** The Always-hide tag on it: the test library's restrictable tag, renumbered */
+/** The Always-hide tag on it: the test library's restrictable tag, on the second library */
 const TAG = String(Number(TEST_ENTITIES.restrictableTag) + SECOND_ID_OFFSET);
 const PASSWORD = "Readiness-IT-password-1";
 
@@ -255,7 +255,7 @@ describeReplay("an instance on its first sync", () => {
       data: { userId: onlyNew.id, instanceId: NEW },
     });
 
-    // The second library's scenes are renumbered test scenes
+    // The second library's scenes are the test scenes, moved by SECOND_ID_OFFSET
     sceneId = String(
       Number(TEST_ENTITIES.sceneWithRelations) + SECOND_ID_OFFSET
     );
