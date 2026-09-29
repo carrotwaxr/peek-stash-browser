@@ -112,7 +112,8 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
         <Paper.Header>
           <Paper.Title>Sync from Stash</Paper.Title>
           <Paper.Subtitle className="mt-1">
-            Import ratings, favorites, O counts and plays for {user.username}
+            Import ratings, favorites, O counts, plays, watch time and resume
+            points for {user.username}
           </Paper.Subtitle>
         </Paper.Header>
         <Paper.Body>
@@ -146,6 +147,11 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                   already holds are kept, and a date Stash got from Peek is not
                   counted twice
                 </li>
+                <li>
+                  Plays also bring watch time (the larger of Peek&apos;s and
+                  Stash&apos;s) and a resume point for scenes without one in
+                  Peek
+                </li>
                 <li>May take several minutes for large libraries</li>
               </ul>
             </div>
@@ -166,7 +172,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                     onChange={() => toggleSyncOption("scenes", "oCounter")}
                   />
                   <SyncCheckbox
-                    label="Play count and dates"
+                    label="Plays, watch time and resume points"
                     checked={syncOptions.scenes.playCount}
                     onChange={() => toggleSyncOption("scenes", "playCount")}
                   />

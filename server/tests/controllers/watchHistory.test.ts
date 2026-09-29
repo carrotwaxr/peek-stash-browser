@@ -27,6 +27,8 @@ import {
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
+import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { recommendationService } from "../../services/RecommendationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
@@ -74,6 +76,14 @@ vi.mock("../../services/EntityAccessService.js", () => ({
 }));
 
 // Mock UserStatsService
+// The per-user caches a history clear drops
+vi.mock("../../services/RankingComputeService.js", () => ({
+  rankingComputeService: { forget: vi.fn() },
+}));
+vi.mock("../../services/RecommendationService.js", () => ({
+  recommendationService: { forget: vi.fn() },
+}));
+
 vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     updateStatsForScene: vi.fn().mockResolvedValue(undefined),
@@ -982,6 +992,37 @@ describe("Watch History Controller", () => {
             rankings: 20,
           },
         })
+      );
+    });
+
+    it("calls forget after the batch: the rankings recompute and Recommended rescores at once", async () => {
+      for (const table of [
+        mockPrisma.watchHistory,
+        mockPrisma.userPerformerStats,
+        mockPrisma.userStudioStats,
+        mockPrisma.userTagStats,
+        mockPrisma.userEntityRanking,
+      ]) {
+        table.deleteMany.mockResolvedValue({ count: 1 });
+      }
+      const res = resFor(clearAllWatchHistory);
+      await clearAllWatchHistory(
+        reqFor(clearAllWatchHistory, {
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      const rankings = vi.mocked(rankingComputeService, true);
+      const recommendations = vi.mocked(recommendationService, true);
+      expect(rankings.forget).toHaveBeenCalledTimes(1);
+      expect(rankings.forget).toHaveBeenCalledWith(1);
+      expect(recommendations.forget).toHaveBeenCalledTimes(1);
+      expect(recommendations.forget).toHaveBeenCalledWith(1);
+      // After the unit: a recompute started before it read the old history
+      const batch = must(mockPrisma.$transaction.mock.invocationCallOrder[0]);
+      expect(must(rankings.forget.mock.invocationCallOrder[0])).toBeGreaterThan(
+        batch
       );
     });
   });

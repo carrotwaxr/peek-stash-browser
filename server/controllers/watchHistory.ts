@@ -1,6 +1,8 @@
 import type { WatchHistory } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../services/EntityAccessService.js";
+import { rankingComputeService } from "../services/RankingComputeService.js";
+import { recommendationService } from "../services/RecommendationService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
 import type {
@@ -628,6 +630,11 @@ export async function clearAllWatchHistory(
       prisma.userTagStats.deleteMany({ where: { userId } }),
       prisma.userEntityRanking.deleteMany({ where: { userId } }),
     ]);
+    // After the unit: the next stats page recomputes the rankings at once
+    // rather than within the hour, and a recompute still running from
+    // before stops without marking the user fresh. Recommended rescores.
+    rankingComputeService.forget(userId);
+    recommendationService.forget(userId);
 
     logger.info("Watch history and stats cleared", {
       userId,

@@ -9,6 +9,7 @@ import {
   DB_WRITE_TX,
   dbWrite,
   dbWriteBatch,
+  dbWriteBatchIf,
   dbWriteTransaction,
   isDatabaseBusy,
 } from "../../utils/dbWrite.js";
@@ -260,6 +261,36 @@ describe("dbWrite", () => {
       { count: 2 },
       { count: 0 },
     ]);
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(ops);
+  });
+
+  it("dbWriteBatchIf asks when the unit starts, and writes nothing once unwanted", async () => {
+    const ops = [mockPrisma.sceneRating.deleteMany({ where: { userId: 1 } })];
+    mockPrisma.$transaction.mockResolvedValue([{ count: 1 }]);
+    let wanted = true;
+    let release = () => {};
+    const holder = dbWrite(
+      "holder",
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+
+    // Queued behind the holder while wanted, unwanted by the time it starts
+    const skipped = dbWriteBatchIf("rankings", () => wanted, ops);
+    wanted = false;
+    await flush();
+    release();
+    await holder;
+
+    await expect(skipped).resolves.toBeNull();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+
+    wanted = true;
+    await expect(
+      dbWriteBatchIf("rankings", () => wanted, ops)
+    ).resolves.toEqual([{ count: 1 }]);
     expect(mockPrisma.$transaction).toHaveBeenCalledWith(ops);
   });
 });

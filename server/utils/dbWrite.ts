@@ -173,3 +173,20 @@ export function dbWriteBatch<T extends Prisma.PrismaPromise<unknown>[]>(
 ) {
   return dbWrite(label, () => prisma.$transaction(ops));
 }
+
+/**
+ * `dbWriteBatch` for a batch that something done while it waits its turn
+ * can make obsolete (the rankings of a user forgotten meanwhile): `wanted`
+ * is asked when the unit starts, and when it answers false nothing is
+ * written and the unit resolves to null. It answers from memory, with no
+ * query, so the unit still makes no Node round trip under the lock.
+ */
+export function dbWriteBatchIf<T extends Prisma.PrismaPromise<unknown>[]>(
+  label: string,
+  wanted: () => boolean,
+  ops: [...T]
+) {
+  return dbWrite(label, async () =>
+    wanted() ? prisma.$transaction(ops) : null
+  );
+}

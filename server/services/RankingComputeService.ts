@@ -25,10 +25,13 @@
  * (0.12 s against 0.03 s at 200k scenes).
  *
  * `ensureFresh` is the entry point: each user is recomputed at most once an
- * hour, and callers arriving during a recompute share it.
+ * hour, and callers arriving during a recompute share it. `forget` makes the
+ * next call recompute at once (after an import, a history clear, a user
+ * deletion); a recompute already running then writes nothing more, since
+ * it read what came before, and the one started after it has the last word.
  */
 import prisma from "../prisma/singleton.js";
-import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatchIf } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /** Engagement score = oCount × 5 + watched time / average scene length + plays */
@@ -42,6 +45,15 @@ export const RANKING_WEIGHTS = {
 const FRESH_FOR_MS = 60 * 60 * 1000;
 
 type EntityType = "performer" | "studio" | "tag";
+
+/**
+ * Whether the recompute is still the user's: false once `forget` was called
+ * after it started. Asked from memory, so a write unit can ask it when it
+ * starts.
+ */
+type StillCurrent = () => boolean;
+
+const ALWAYS_CURRENT: StillCurrent = () => true;
 
 /**
  * The percentile of the entity at `index` (0 = the most engaged) among
@@ -115,9 +127,11 @@ class RankingComputeService {
 
   /**
    * Forgets when the user's rankings were computed: the next `ensureFresh`
-   * recomputes them, and a recompute running now records nothing when it
-   * lands. For a deleted user, and after a change to what the rankings are
-   * computed from. The user stays known, as stale, rather than removed: an
+   * recomputes them. A recompute running now read what came before, so it
+   * stops: a write of it still waiting in the writer queue writes nothing,
+   * it starts no other, and it records nothing. For a deleted user, and
+   * after a change to what the rankings are computed from, once that change
+   * is written. The user stays known, as stale, rather than removed: an
    * unknown user's freshness is read from their newest ranking row (after a
    * restart), which cannot tell that anything changed since.
    */
@@ -133,14 +147,18 @@ class RankingComputeService {
     }
 
     const entry: Freshness = { computedAt: known?.computedAt ?? 0 };
-    // Only while the entry is still the user's: after `forget`, a recompute
-    // that started before it records nothing
+    // The entry stays the user's until the recompute lands, unless `forget`
+    // replaces it: a recompute that started before `forget` then writes and
+    // records nothing more
+    const current: StillCurrent = () => this.freshness.get(userId) === entry;
     const record = (computedAt: number) => {
-      if (this.freshness.get(userId) === entry) {
-        this.freshness.set(userId, { computedAt });
-      }
+      if (current()) this.freshness.set(userId, { computedAt });
     };
-    entry.running = this.recomputeIfStale(userId, known?.computedAt).then(
+    entry.running = this.recomputeIfStale(
+      userId,
+      known?.computedAt,
+      current
+    ).then(
       (computedAt) => {
         record(computedAt);
       },
@@ -162,7 +180,8 @@ class RankingComputeService {
    */
   private async recomputeIfStale(
     userId: number,
-    knownComputedAt: number | undefined
+    knownComputedAt: number | undefined,
+    current: StillCurrent
   ): Promise<number> {
     if (knownComputedAt === undefined) {
       const newest = await prisma.userEntityRanking.findFirst({
@@ -176,15 +195,19 @@ class RankingComputeService {
       }
     }
     const startedAt = Date.now();
-    await this.recomputeAllRankings(userId);
+    await this.recomputeAllRankings(userId, current);
     return startedAt;
   }
 
   /**
    * Recompute all rankings for a user, whatever their age. Callers go
-   * through `ensureFresh`, which also logs a failure.
+   * through `ensureFresh`, which also logs a failure. Once `current` says
+   * no, the recompute stops and writes nothing more.
    */
-  async recomputeAllRankings(userId: number): Promise<void> {
+  async recomputeAllRankings(
+    userId: number,
+    current: StillCurrent = ALWAYS_CURRENT
+  ): Promise<void> {
     const startTime = Date.now();
     logger.debug("Starting ranking computation", { userId });
 
@@ -193,10 +216,21 @@ class RankingComputeService {
 
     // One type after another: run together, the reads contend for the
     // pool's connections and the disk
+    const types = [
+      () => this.computePerformerRankings(userId, avgSceneDuration, current),
+      () => this.computeStudioRankings(userId, avgSceneDuration, current),
+      () => this.computeTagRankings(userId, avgSceneDuration, current),
+    ];
     let rankings = 0;
-    rankings += await this.computePerformerRankings(userId, avgSceneDuration);
-    rankings += await this.computeStudioRankings(userId, avgSceneDuration);
-    rankings += await this.computeTagRankings(userId, avgSceneDuration);
+    for (const compute of types) {
+      if (!current()) {
+        logger.debug("Ranking recompute stopped: the user was forgotten", {
+          userId,
+        });
+        return;
+      }
+      rankings += await compute();
+    }
 
     logger.info("Ranking computation complete", {
       userId,
@@ -297,19 +331,25 @@ class RankingComputeService {
   }
 
   /**
-   * Upsert rankings into database
+   * Replaces the user's rankings of the type, unless `current` says no
+   * when the write unit starts: a recompute that started before `forget`
+   * read what came before, and one started after it may already have
+   * written, so this write would put the old rankings back.
    */
   private async upsertRankings(
     userId: number,
     entityType: EntityType,
-    rankings: ComputedRanking[]
+    rankings: ComputedRanking[],
+    current: StillCurrent
   ): Promise<void> {
     if (rankings.length === 0) {
       // Clear any existing rankings for this entity type
-      await dbWrite("rankings", () =>
-        prisma.userEntityRanking.deleteMany({
-          where: { userId, entityType },
-        })
+      await dbWrite("rankings", async () =>
+        current()
+          ? prisma.userEntityRanking.deleteMany({
+              where: { userId, entityType },
+            })
+          : null
       );
       return;
     }
@@ -319,7 +359,7 @@ class RankingComputeService {
     // The last one removes them again when the user was deleted while this
     // recompute ran: the table has no foreign key to User to refuse them,
     // and deleteUser's unit runs either before this one or after it.
-    await dbWriteBatch("rankings", [
+    await dbWriteBatchIf("rankings", current, [
       prisma.userEntityRanking.deleteMany({
         where: { userId, entityType },
       }),
@@ -358,7 +398,8 @@ class RankingComputeService {
    */
   private async computePerformerRankings(
     userId: number,
-    avgSceneDuration: number
+    avgSceneDuration: number,
+    current: StillCurrent
   ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
@@ -404,7 +445,7 @@ class RankingComputeService {
     `;
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
-    await this.upsertRankings(userId, "performer", rankings);
+    await this.upsertRankings(userId, "performer", rankings, current);
     return rankings.length;
   }
 
@@ -413,7 +454,8 @@ class RankingComputeService {
    */
   private async computeStudioRankings(
     userId: number,
-    avgSceneDuration: number
+    avgSceneDuration: number,
+    current: StillCurrent
   ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
@@ -452,7 +494,7 @@ class RankingComputeService {
     `;
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
-    await this.upsertRankings(userId, "studio", rankings);
+    await this.upsertRankings(userId, "studio", rankings, current);
     return rankings.length;
   }
 
@@ -463,7 +505,8 @@ class RankingComputeService {
    */
   private async computeTagRankings(
     userId: number,
-    avgSceneDuration: number
+    avgSceneDuration: number,
+    current: StillCurrent
   ): Promise<number> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
@@ -509,7 +552,7 @@ class RankingComputeService {
     `;
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
-    await this.upsertRankings(userId, "tag", rankings);
+    await this.upsertRankings(userId, "tag", rankings, current);
     return rankings.length;
   }
 }
