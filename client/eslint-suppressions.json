@@ -1727,18 +1727,13 @@
   },
   "tests/components/pages/Tags.test.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     },
     "@typescript-eslint/no-unsafe-call": {
       "count": 2
-    }
-  },
-  "tests/components/scene-search/SceneSearch.test.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
     }
   },
   "tests/components/settings/CardDisplaySettings.test.tsx": {
