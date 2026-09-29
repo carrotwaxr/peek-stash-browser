@@ -14,6 +14,7 @@ import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { careerYearsSql } from "../../utils/sqlClauses.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -202,6 +203,28 @@ describe("PerformerQueryBuilder", () => {
       expect(pageStatement().sql).toMatch(/ORDER BY\s+p\.penisLength DESC,/);
     });
 
+    it.each([
+      ["weight", "p.weightKg ASC"],
+      ["measurements", "p.measurements COLLATE NOCASE ASC"],
+      ["career_length", `${careerYearsSql("p.careerLength")} ASC NULLS LAST`],
+    ] as const)("sorts by %s, then by name", async (field, expr) => {
+      await run({ sort: { field, direction: "ASC", seed: undefined } });
+
+      expect(pageStatement().sql).toContain(
+        `ORDER BY ${expr}, p.name COLLATE NOCASE ASC, p.id ASC, p.stashInstanceId ASC`
+      );
+    });
+
+    it("career_length DESC lists performers without a value last too", async () => {
+      await run({
+        sort: { field: "career_length", direction: "DESC", seed: undefined },
+      });
+
+      expect(pageStatement().sql).toContain(
+        `ORDER BY ${careerYearsSql("p.careerLength")} DESC NULLS LAST, p.name`
+      );
+    });
+
     it("binds a random sort's seed and never interpolates it", async () => {
       await run({
         sort: { field: "random", direction: "ASC", seed: 87654321 },
@@ -359,6 +382,7 @@ describe("PerformerQueryBuilder", () => {
           tattoos: { modifier: "EXCLUDES", value: "rose" },
           piercings: { modifier: "NOT_NULL" },
           measurements: { modifier: "EQUALS", value: "34C" },
+          career_length: { modifier: "BETWEEN", value: 8, value2: 10 },
           birthdate: { modifier: "GREATER_THAN", value: "1990-01-01" },
           death_date: { modifier: "IS_NULL" },
           created_at: { modifier: "LESS_THAN", value: "2026-01-01" },
@@ -380,6 +404,7 @@ describe("PerformerQueryBuilder", () => {
         "(p.tattoos IS NULL OR LOWER(p.tattoos) NOT LIKE LOWER(?))",
         "(p.piercings IS NOT NULL AND p.piercings != '')",
         "LOWER(p.measurements) = LOWER(?)",
+        `${careerYearsSql("p.careerLength")} BETWEEN ? AND ?`,
         "p.birthdate > ?",
         "p.deathDate IS NULL",
         "p.stashCreatedAt < ?",

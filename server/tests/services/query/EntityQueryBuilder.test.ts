@@ -158,6 +158,24 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
 const builder = new FakeBuilder();
 
 /**
+ * The fake builder with a tiebreak on every key but its default, as the
+ * name-sorted lists have one on every key but the name
+ */
+class TiebreakBuilder extends FakeBuilder {
+  protected override readonly spec: EntitySpec = {
+    table: "StashScene",
+    alias: "s",
+    entityType: "scene",
+    userJoins: [],
+    selectColumns: () => ({ sql: "s.id, s.stashInstanceId", params: [] }),
+    defaultSort: "created_at",
+    tiebreak: (field) => (field === "created_at" ? undefined : "s.title ASC"),
+  };
+}
+
+const tiebroken = new TiebreakBuilder();
+
+/**
  * A clip-shaped builder: a parent row joined on a unique key, the parent's
  * own exclusion join with the viewer's id, and the parent's conditions.
  */
@@ -458,6 +476,29 @@ describe("EntityQueryBuilder", () => {
       "ORDER BY s.stashCreatedAt ASC, s.id ASC, s.stashInstanceId ASC"
     );
   });
+
+  it.each([
+    // The map's key keeps its own tiebreak
+    ["scene_index", "COALESCE(sgi.sceneIndex, ?) ASC, s.title ASC"],
+    // A key the map lacks orders as the default sort, with the default's
+    // tiebreak (none), not the requested key's
+    ["last_o_at", "s.stashCreatedAt ASC"],
+  ] as const)(
+    "the tiebreak follows the key the page is ordered by (%s)",
+    async (field, terms) => {
+      await tiebroken.execute({
+        userId: 1,
+        allowedInstanceIds: ["inst-a"],
+        request: request({
+          sort: { field, direction: "ASC", seed: undefined },
+        }),
+      });
+
+      expect(must(statements()[0]).sql).toContain(
+        `ORDER BY ${terms}, s.id ASC, s.stashInstanceId ASC\n`
+      );
+    }
+  );
 
   // L8: a clause can take the shape that suits the page's order (the scene
   // tag filter reads SceneTag by its tag index when the sort has no index)

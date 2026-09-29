@@ -12,12 +12,18 @@
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ClipRow, ClipTagRefRow } from "../types/internal/queryRows.js";
-import type { ClipListRequest, FilterRef } from "../types/parsedFilters.js";
+import type {
+  ClipListRequest,
+  FilterRef,
+  RefCriterion,
+} from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type RefClauseOptions,
+  allOf,
   anyOf,
   exclusionJoin,
   refClause,
@@ -174,6 +180,37 @@ const SCENE_STUDIO: ColumnTarget = {
   instanceCol: "stashInstanceId",
 };
 
+/**
+ * A tag on the clip itself: its primary tag or one of its tag list. Has ANY
+ * is either holding any of the refs; Has ALL each ref held by one or the
+ * other (one OR per ref, AND-ed), so a clip with T1 as its primary tag and
+ * T2 in its list has both; Has NONE neither holding any (the primary tag's
+ * EXCLUDES keeps a clip without one). An OR of the two EXCLUDES would keep a
+ * clip holding a ref in only one of them.
+ */
+function clipTagClause(
+  criterion: RefCriterion,
+  opts: (name: string) => RefClauseOptions
+): FilterClause {
+  const { refs } = criterion;
+  const either = (matched: readonly FilterRef[], prefix: string) =>
+    anyOf([
+      refClause(PRIMARY_TAG, matched, "INCLUDES", opts(`${prefix}primary_tag`)),
+      refClause(CLIP_TAGS, matched, "INCLUDES", opts(`${prefix}clip_tags`)),
+    ]);
+  switch (criterion.modifier) {
+    case "INCLUDES":
+      return either(refs, "");
+    case "INCLUDES_ALL":
+      return allOf(refs.map((ref, i) => either([ref], `all${i}_`)));
+    case "EXCLUDES":
+      return allOf([
+        refClause(PRIMARY_TAG, refs, "EXCLUDES", opts("primary_tag")),
+        refClause(CLIP_TAGS, refs, "EXCLUDES", opts("clip_tags")),
+      ]);
+  }
+}
+
 class ClipQueryBuilder extends EntityQueryBuilder<
   ClipRow,
   ClipWithRelations,
@@ -224,16 +261,16 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search and the filter parameters. The five ref filters match
-   * INCLUDES whatever the modifier, as before the port (B11 wires
-   * INCLUDES_ALL and EXCLUDES on tags, scene tags and performers).
+   * The search and the filter parameters. The clip's tags, its scene's tags
+   * and its scene's performers take Has ANY, Has ALL and Has NONE; the scene
+   * and the studio are single-valued (INCLUDES only).
    */
   protected filterClauses(
     filter: ClipListRequest["filter"],
     q: string | undefined,
     ctx: QueryContext
   ): Promise<FilterClause[]> {
-    const opts = (name: string) => ({
+    const opts = (name: string): RefClauseOptions => ({
       name,
       allowedInstanceIds: ctx.allowedInstanceIds,
     });
@@ -255,33 +292,15 @@ class ClipQueryBuilder extends EntityQueryBuilder<
         refClause(CLIP_SCENE, filter.sceneId.refs, "INCLUDES", opts("scene"))
       );
     }
-    if (filter.tagIds) {
-      const { refs } = filter.tagIds;
-      clauses.push(
-        anyOf([
-          refClause(PRIMARY_TAG, refs, "INCLUDES", opts("primary_tag")),
-          refClause(CLIP_TAGS, refs, "INCLUDES", opts("clip_tags")),
-        ])
-      );
-    }
+    if (filter.tagIds) clauses.push(clipTagClause(filter.tagIds, opts));
     if (filter.sceneTagIds) {
-      clauses.push(
-        refClause(
-          SCENE_TAGS,
-          filter.sceneTagIds.refs,
-          "INCLUDES",
-          opts("scene_tags")
-        )
-      );
+      const { refs, modifier } = filter.sceneTagIds;
+      clauses.push(refClause(SCENE_TAGS, refs, modifier, opts("scene_tags")));
     }
     if (filter.performerIds) {
+      const { refs, modifier } = filter.performerIds;
       clauses.push(
-        refClause(
-          SCENE_PERFORMERS,
-          filter.performerIds.refs,
-          "INCLUDES",
-          opts("performers")
-        )
+        refClause(SCENE_PERFORMERS, refs, modifier, opts("performers"))
       );
     }
     if (filter.studioId) {

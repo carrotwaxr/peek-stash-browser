@@ -17,6 +17,7 @@ import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
  * - play_count filter
  * - scene_count filter
  * - name text search
+ * - synopsis and director text filters
  */
 
 interface FindGroupsResponse {
@@ -25,6 +26,8 @@ interface FindGroupsResponse {
       id: string;
       instanceId: string;
       name: string;
+      synopsis?: string | null;
+      director?: string | null;
       favorite?: boolean;
       rating100?: number | null;
       scene_count?: number;
@@ -294,6 +297,77 @@ describe("Group Filters", () => {
         expectRefused(response, [`group_filter.${field}`]);
       }
     );
+  });
+
+  describe("synopsis and director filters", () => {
+    type Group = FindGroupsResponse["findGroups"]["groups"][number];
+
+    const listed = async (groupFilter: Record<string, unknown>) => {
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        { filter: { per_page: 250 }, group_filter: groupFilter }
+      );
+      expect(response.ok).toBe(true);
+      return response.data.findGroups;
+    };
+    const keys = (groups: readonly Group[]) =>
+      groups.map((g) => `${g.id}:${g.instanceId}`).sort();
+
+    /** A group holding the field, and the library's groups without it */
+    async function subjects(field: "synopsis" | "director") {
+      const all = await listed({});
+      const holder = must(
+        all.groups.find((g) => (g[field] ?? "") !== ""),
+        `a group with a ${field}`
+      );
+      const without = all.groups.filter((g) => (g[field] ?? "") === "");
+      expect(without.length, `a group without a ${field}`).toBeGreaterThan(0);
+      return { all, text: must(holder[field]), holder, without };
+    }
+
+    it("synopsis INCLUDES lists only groups whose synopsis holds the text", async () => {
+      const { text, holder, without } = await subjects("synopsis");
+      const needle = text.slice(0, -2).toUpperCase();
+
+      const { groups, count } = await listed({
+        synopsis: { value: needle, modifier: "INCLUDES" },
+      });
+
+      expect(count).toBe(groups.length);
+      expect(keys(groups)).toContain(`${holder.id}:${holder.instanceId}`);
+      expect(
+        groups.filter((g) => !(g.synopsis ?? "").toUpperCase().includes(needle))
+      ).toEqual([]);
+      const listedKeys = keys(groups);
+      expect(keys(without).filter((key) => listedKeys.includes(key))).toEqual(
+        []
+      );
+    });
+
+    it("director EQUALS lists only groups with that director", async () => {
+      const { text } = await subjects("director");
+
+      const { groups } = await listed({
+        director: { value: text.toLowerCase(), modifier: "EQUALS" },
+      });
+
+      expect(groups.length).toBeGreaterThan(0);
+      expect(
+        groups.filter(
+          (g) => (g.director ?? "").toLowerCase() !== text.toLowerCase()
+        )
+      ).toEqual([]);
+    });
+
+    it("director IS_NULL lists the groups without one, and NOT_NULL the rest", async () => {
+      const { all, without } = await subjects("director");
+
+      const missing = await listed({ director: { modifier: "IS_NULL" } });
+      const present = await listed({ director: { modifier: "NOT_NULL" } });
+
+      expect(keys(missing.groups)).toEqual(keys(without));
+      expect(missing.count + present.count).toBe(all.count);
+    });
   });
 
   describe("scene_count filter", () => {

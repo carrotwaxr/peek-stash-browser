@@ -26,6 +26,7 @@ import {
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
+  careerYearsSql,
   noClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -126,6 +127,9 @@ const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
 /** A performer's age today, from the birthdate, as SQLite computes it */
 const AGE = `CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER)`;
 
+/** The years of the performer's career, from Stash's free-text career field */
+const CAREER_YEARS = careerYearsSql("p.careerLength");
+
 /**
  * A number derived from a date column (a year, an age): a performer without
  * the date matches only NOT_EQUALS. The other modifiers the contract allows
@@ -199,8 +203,8 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
   protected readonly spec = PERFORMER_SPEC;
 
   /**
-   * The sort expressions. measurements, weight and career_length have none
-   * yet (B11) and fall back to the name.
+   * The sort expressions. career_length lists performers without a value
+   * last in both directions.
    */
   protected sortMap(dir: SortDirection): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
@@ -214,7 +218,10 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       updated_at: column("p.stashUpdatedAt"),
       birthdate: column("p.birthdate"),
       height: column("p.heightCm"),
+      weight: column("p.weightKg"),
+      measurements: column("p.measurements COLLATE NOCASE"),
       penis_length: column("p.penisLength"),
+      career_length: { sql: `${CAREER_YEARS} ${dir} NULLS LAST`, params: [] },
 
       // Counts
       scene_count: column("p.sceneCount"),
@@ -235,10 +242,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /**
-   * The performer filter's clauses, one per criterion the request carried.
-   * `career_length` is declared in the contract but has no clause yet (B11).
-   */
+  /** The performer filter's clauses, one per criterion the request carried */
   protected async filterClauses(
     filter: ParsedFilter<"performer">,
     q: string | undefined,
@@ -297,6 +301,11 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     if (filter.penis_length) {
       // No COALESCE: a performer without a length never matches, as in Stash
       push(buildNumericFilter(filter.penis_length, "p.penisLength"));
+    }
+
+    // Career: a performer without a value never matches
+    if (filter.career_length) {
+      push(buildNumericFilter(filter.career_length, CAREER_YEARS));
     }
 
     // Compared whole, ignoring case

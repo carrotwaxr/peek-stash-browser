@@ -297,19 +297,80 @@ describe("ClipQueryBuilder", () => {
       ]);
     });
 
-    it("the three ref filters match INCLUDES whatever the modifier (B11 wires the others)", async () => {
+    it("tags Has ALL is one OR of the primary tag and the tag list per ref, AND-ed", async () => {
+      await run({
+        filter: { tagIds: criterion([ref("5"), ref("6")], "INCLUDES_ALL") },
+      });
+
+      const { sql, params } = statement(0);
+      const either =
+        "(((c.primaryTagId = ? AND c.primaryTagInstanceId = ?)) OR EXISTS (SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId AND ((ct.tagId = ? AND ct.tagInstanceId = ?))))";
+      expect(sql).toContain(`(${either} AND ${either})`);
+      expect(params.slice(4, 12)).toEqual([
+        "5",
+        "inst-a",
+        "5",
+        "inst-a",
+        "6",
+        "inst-a",
+        "6",
+        "inst-a",
+      ]);
+    });
+
+    it("tags Has NONE holds neither in the primary tag nor the list, keeping a clip with no primary tag", async () => {
+      await run({
+        filter: { tagIds: criterion([ref("5"), bare("6")], "EXCLUDES") },
+      });
+
+      const { sql, params } = statement(0);
+      expect(sql).toContain(
+        "((c.primaryTagId IS NULL OR NOT ((c.primaryTagId = ? AND c.primaryTagInstanceId = ?) OR (c.primaryTagId = ?))) AND NOT EXISTS (SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId AND ((ct.tagId = ? AND ct.tagInstanceId = ?) OR (ct.tagId = ?))))"
+      );
+      expect(params.slice(4, 10)).toEqual([
+        "5",
+        "inst-a",
+        "6",
+        "5",
+        "inst-a",
+        "6",
+      ]);
+    });
+
+    it("tags Has NONE above the inline limit is the AND of two matched-set NOT INs", async () => {
+      const many = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
+      await run({ filter: { tagIds: criterion(many, "EXCLUDES") } });
+
+      const { sql, params } = statement(0);
+      const refsJson = pairsJson(
+        many.map((r) => ({ id: r.id, instanceId: "inst-a" }))
+      );
+      expect(params.slice(0, 2)).toEqual([refsJson, refsJson]);
+      positions(sql, [
+        "WITH primary_tag_refs(id, inst) AS MATERIALIZED",
+        "primary_tag_matched(id, inst) AS MATERIALIZED",
+        "clip_tags_refs(id, inst) AS MATERIALIZED",
+        "clip_tags_matched(id, inst) AS MATERIALIZED",
+        "FROM StashClip c",
+        "((c.id || ':' || c.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM primary_tag_matched) AND (c.id || ':' || c.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM clip_tags_matched))",
+      ]);
+    });
+
+    it("scene tags and performers take Has ALL and Has NONE on the clip's scene", async () => {
       await run({
         filter: {
-          tagIds: criterion([ref("5")], "EXCLUDES"),
+          sceneTagIds: criterion([ref("20")], "EXCLUDES"),
           performerIds: criterion([ref("10"), ref("11")], "INCLUDES_ALL"),
         },
       });
 
       const { sql } = statement(0);
-      expect(sql).not.toContain("NOT ");
       expect(sql).toContain(
-        "EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND ((sp.performerId = ? AND sp.performerInstanceId = ?) OR (sp.performerId = ? AND sp.performerInstanceId = ?)))"
+        "NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?)))"
       );
+      const performer =
+        "EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))";
+      expect(sql).toContain(`(${performer} AND ${performer})`);
     });
 
     it("scene tags match the clip's scene's tags by (id, instance)", async () => {

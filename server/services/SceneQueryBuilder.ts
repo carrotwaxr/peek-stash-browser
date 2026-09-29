@@ -173,10 +173,10 @@ const SCENE_STUDIO: ColumnTarget = {
 };
 
 /**
- * The pixel height each resolution names; SEVEN_K and HUGE have none yet
- * (B11), so they filter nothing.
+ * The pixel height each resolution names; SEVEN_K and HUGE take Stash's
+ * range minimums. PR 9 moves the filter to Stash's ranges.
  */
-const RESOLUTION_HEIGHTS: Partial<Record<Resolution, number>> = {
+const RESOLUTION_HEIGHTS: Readonly<Record<Resolution, number>> = {
   VERY_LOW: 144,
   LOW: 240,
   R360P: 360,
@@ -189,7 +189,9 @@ const RESOLUTION_HEIGHTS: Partial<Record<Resolution, number>> = {
   FOUR_K: 2160,
   FIVE_K: 2880,
   SIX_K: 3240,
+  SEVEN_K: 3584,
   EIGHT_K: 4320,
+  HUGE: 6144,
 };
 
 /**
@@ -257,11 +259,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /**
-   * The scene filter's clauses, one per criterion the request carried.
-   * `director` and `organized` are declared in the contract but have no
-   * clause yet (B11).
-   */
+  /** The scene filter's clauses, one per criterion the request carried */
   protected async filterClauses(
     filter: ParsedFilter<"scene">,
     q: string | undefined,
@@ -288,6 +286,9 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       push(buildNumericFilter(filter.duration, "COALESCE(s.duration, 0)"));
     }
     if (filter.resolution) push(this.resolutionClause(filter.resolution));
+    if (filter.organized !== undefined) {
+      push({ sql: "s.organized = ?", params: [filter.organized ? 1 : 0] });
+    }
 
     // Related entities
     if (filter.performers) {
@@ -315,6 +316,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     // Text
     if (filter.title) push(buildTextFilter(filter.title, "s.title"));
     if (filter.details) push(buildTextFilter(filter.details, "s.details"));
+    if (filter.director) push(buildTextFilter(filter.director, "s.director"));
 
     // Dates
     if (filter.date) push(buildDateFilter(filter.date, "s.date"));
@@ -415,7 +417,6 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
   private resolutionClause(criterion: EnumCriterion<Resolution>): FilterClause {
     const height = RESOLUTION_HEIGHTS[criterion.value];
-    if (height === undefined) return noClause();
     const col = "COALESCE(s.fileHeight, 0)";
     const operator = {
       EQUALS: "=",
