@@ -3,9 +3,9 @@ import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
+  findTestInstanceId,
   guestClient,
   selectAllInstances,
-  selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
 interface DistributionResponse {
@@ -84,7 +84,10 @@ describe("Timeline API", () => {
 
   /**
    * The detail pages send "id:instanceId" (item 34b, UD-04): the timeline on
-   * a performer's or studio's page filters by the pair
+   * a performer's or studio's page filters by the pair. A bare id matches the
+   * entity with that id on every instance; the second library of a
+   * multi-instance run reuses the test library's ids, so there the bare id's
+   * bars count both libraries
    */
   describe("filters by instance-qualified id", () => {
     /** An instance no server has: its composite ids must match nothing */
@@ -95,24 +98,57 @@ describe("Timeline API", () => {
       ["scene", "studioId", TEST_ENTITIES.studioWithScenes],
       ["image", "performerId", TEST_ENTITIES.performerWithScenes],
     ] as const;
+    type Bars = DistributionResponse["distribution"];
     let instanceId: string;
+    /** Every configured instance: the test one, and the second if added */
+    let instanceIds: string[];
+    /** The admin's instance selection before this block, put back after it */
+    let savedSelection: string[];
 
     /** `id:instanceId` as the query string carries it */
     const pair = (id: string, instance: string): string =>
       encodeURIComponent(`${id}:${instance}`);
 
+    /** Bars added period by period, in period order as the server sends them */
+    const sumBars = (lists: Bars[]): Bars => {
+      const counts = new Map<string, number>();
+      for (const { period, count } of lists.flat()) {
+        counts.set(period, (counts.get(period) ?? 0) + count);
+      }
+      return [...counts]
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([period, count]) => ({ period, count }));
+    };
+
+    const total = (bars: Bars): number =>
+      bars.reduce((sum, bar) => sum + bar.count, 0);
+
     beforeAll(async () => {
-      instanceId = await selectTestInstanceOnly();
+      instanceId = await findTestInstanceId();
+      const instances = await adminClient.get<{
+        instances: Array<{ id: string }>;
+      }>("/api/setup/stash-instances");
+      expect(instances.ok).toBe(true);
+      instanceIds = instances.data.instances.map((i) => i.id);
+      const selection = await adminClient.get<{
+        selectedInstanceIds: string[];
+      }>("/api/user/stash-instances");
+      expect(selection.ok).toBe(true);
+      savedSelection = selection.data.selectedInstanceIds;
+      // Every instance selected, so a bare id means all of them
+      await selectAllInstances();
     });
 
     afterAll(async () => {
-      await selectAllInstances();
+      await adminClient.put("/api/user/stash-instances", {
+        instanceIds: savedSelection,
+      });
     });
 
     async function distribution(
       entityType: string,
       query: string
-    ): Promise<DistributionResponse["distribution"]> {
+    ): Promise<Bars> {
       const path = `/api/timeline/${entityType}/distribution?granularity=years&${query}`;
       const response = await adminClient.get<DistributionResponse>(path);
       expect(response.status, path).toBe(200);
@@ -128,15 +164,29 @@ describe("Timeline API", () => {
     });
 
     it.each(CASES)(
-      "%s bars by %s: the bare id returns the same bars as the pair",
+      "%s bars by %s: each pair counts its own instance, the bare id every instance",
       async (entityType, filter, id) => {
         const bare = await distribution(entityType, `${filter}=${id}`);
-        const composite = await distribution(
+        const own = await distribution(
           entityType,
           `${filter}=${pair(id, instanceId)}`
         );
-        expect(bare.length).toBeGreaterThan(0);
-        expect(composite).toEqual(bare);
+        const others = await Promise.all(
+          instanceIds
+            .filter((other) => other !== instanceId)
+            .map((other) =>
+              distribution(entityType, `${filter}=${pair(id, other)}`)
+            )
+        );
+        expect(own.length).toBeGreaterThan(0);
+        // With one instance configured, the bare id's bars are the pair's
+        expect(bare).toEqual(sumBars([own, ...others]));
+        // The pair leaves out another instance's entity with the same id: the
+        // bare id counts more exactly when another instance has matching rows
+        expect(
+          total(bare) > total(own),
+          `bare ${total(bare)}, pair ${total(own)}`
+        ).toBe(others.some((bars) => bars.length > 0));
       }
     );
 
