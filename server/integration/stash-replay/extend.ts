@@ -241,7 +241,7 @@ export function extend(shape: RecordedShape): LibraryGraph {
       absent?: string[];
       lengths?: Record<string, number>;
       files?: FileShape[];
-      values?: Record<string, unknown>;
+      values?: Record<string, unknown> | undefined;
     } = {}
   ): GraphEntity => {
     const absent = options.absent ?? [];

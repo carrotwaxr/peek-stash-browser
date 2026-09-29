@@ -678,7 +678,7 @@ export async function saveActivity(
       playHistory: [],
     },
     update: {
-      resumeTime: resumeTime,
+      ...(resumeTime !== undefined ? { resumeTime } : {}),
       playDuration: { increment: playDuration || 0 },
       lastPlayedAt: now,
     },

@@ -22,7 +22,10 @@ function makeFetchResponse(opts: {
   headers?: Record<string, string>;
   body?: ReadableStream | null;
 }): globalThis.Response {
-  return new Response(opts.body ?? null, { headers: opts.headers });
+  return new Response(
+    opts.body ?? null,
+    opts.headers ? { headers: opts.headers } : {}
+  );
 }
 
 function makeExpressResponse() {

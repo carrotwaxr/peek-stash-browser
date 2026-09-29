@@ -88,7 +88,7 @@ export interface IncomingEntity {
    * rewrote for it. A junction left out was not rewritten for this entity,
    * so it is not compared.
    */
-  links?: Partial<Record<JunctionName, readonly string[]>>;
+  links?: Partial<Record<JunctionName, readonly string[]>> | undefined;
 }
 
 export interface DetectChangesOptions {
@@ -119,7 +119,7 @@ export interface DetectChangesOptions {
    * updated_at and may sit where the diff does not look (an image's links
    * and studio, a clip's primary tag)
    */
-  markChanged?: boolean;
+  markChanged?: boolean | undefined;
 }
 
 /** Refs without duplicates, in first-seen order. */

@@ -421,7 +421,9 @@ class MergeReconciliationService {
             playCountTransferred: sourceHistory?.playCount ?? 0,
             playDurationTransferred: sourceHistory?.playDuration ?? 0,
             oCountTransferred: sourceHistory?.oCount ?? 0,
-            ratingTransferred: sourceRating?.rating,
+            ...(sourceRating?.rating !== undefined
+              ? { ratingTransferred: sourceRating.rating }
+              : {}),
             favoriteTransferred: sourceRating?.favorite ?? false,
             reconciledBy,
             automatic: reconciledBy === null,
