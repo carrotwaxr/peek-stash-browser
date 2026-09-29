@@ -14,7 +14,10 @@ import {
 } from "@peek/shared-types/filters/index.js";
 import type { Download, Prisma, StashInstance, User } from "@prisma/client";
 import type { UserPermissions } from "../../services/PermissionService.js";
-import type { ParsedListRequest } from "../../types/parsedFilters.js";
+import type {
+  ClipListRequest,
+  ParsedListRequest,
+} from "../../types/parsedFilters.js";
 
 /** A user with their groups, as `groupMemberships: { include: { group: true } }` returns it. */
 export type UserWithGroups = Prisma.UserGetPayload<{
@@ -158,6 +161,26 @@ export function parsedListRequest<E extends EntityKind>(
     perPage: 10,
     q: undefined,
     sort: { field: sort.field, direction: sort.direction, seed: undefined },
+    filter: {},
+    specificInstanceId: undefined,
+    dropped: [],
+    ...overrides,
+  };
+}
+
+/**
+ * A clip list request as the clip builder takes it: page 1 of 24, newest
+ * first (the clips' default sort), no filter (`isGenerated` absent: every
+ * clip), no search. Pass only the parts a test changes.
+ */
+export function parsedClipRequest(
+  overrides: Partial<ClipListRequest> = {}
+): ClipListRequest {
+  return {
+    page: 1,
+    perPage: 24,
+    q: undefined,
+    sort: { field: "stashCreatedAt", direction: "DESC", seed: undefined },
     filter: {},
     specificInstanceId: undefined,
     dropped: [],

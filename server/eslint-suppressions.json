@@ -239,14 +239,6 @@
       "count": 1
     }
   },
-  "services/ClipQueryBuilder.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
-    }
-  },
   "services/DownloadService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2

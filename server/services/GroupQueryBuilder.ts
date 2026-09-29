@@ -30,15 +30,13 @@ import {
   type JunctionTarget,
   type SqlFragment,
   type ViaSceneSpec,
-  refClause,
-  viaSceneClause,
-} from "../utils/sqlClauses.js";
-import {
   buildDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
-} from "../utils/sqlFilterBuilders.js";
+  refClause,
+  viaSceneClause,
+} from "../utils/sqlClauses.js";
 import {
   emptyToNull,
   likeContains,

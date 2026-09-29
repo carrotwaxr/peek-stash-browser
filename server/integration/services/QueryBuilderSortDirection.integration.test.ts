@@ -2,11 +2,11 @@
  * Integration tests for sort-direction handling in the image and clip query
  * builders (item 3), and for the scene builder's title order (item 67 (c)).
  *
- * Both builders put the sort direction into ORDER BY (the image builder
- * through the base, which takes ASC or else DESC). These tests run
- * against the real test SQLite database with a hostile direction whose
- * subquery overflows (abs() of the minimum 64-bit integer), so SQLite raises
- * "integer overflow" if the text ever reaches the query.
+ * Both builders put the sort direction into ORDER BY through the base,
+ * which takes ASC or else DESC. These tests run against the real test
+ * SQLite database with a hostile direction whose subquery overflows (abs()
+ * of the minimum 64-bit integer), so SQLite raises "integer overflow" if
+ * the text ever reaches the query.
  *
  * The scene list sorts by title through the stored `titleSort`, written by
  * sync: the order must be the order of the titles the list shows, ASCII
@@ -26,6 +26,7 @@ import {
   type SyncEntityOf,
 } from "../../services/StashSyncService.js";
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
+import { parsedClipRequest } from "../../tests/helpers/fixtures.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -174,14 +175,19 @@ describeWithDb("Query builder sort direction (integration)", () => {
   });
 
   it("clip builder ignores a hostile direction", async () => {
-    const result = await clipQueryBuilder.getClips({
+    const result = await clipQueryBuilder.execute({
       userId: TEST_USER_ID,
-      sortBy: "stashCreatedAt",
-      sortDir: HOSTILE_DIRECTION as never,
       allowedInstanceIds: [TEST_INSTANCE],
+      request: parsedClipRequest({
+        sort: {
+          field: "stashCreatedAt",
+          direction: HOSTILE_DIRECTION as never,
+          seed: undefined,
+        },
+      }),
     });
 
-    expect(result.clips.map((c) => c.id)).toEqual(["2", "1"]);
+    expect(result.items.map((c) => c.id)).toEqual(["2", "1"]);
   });
 
   it.each(["ASC", "DESC"] as const)(

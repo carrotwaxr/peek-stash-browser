@@ -602,12 +602,12 @@ describeWithDb("Tooltip relations (integration)", () => {
       expect(gallery.studio?.name, gallery.instanceId).toBe(name);
     }
 
-    const clips = await clipQueryBuilder.getClipsForScene(
-      FX_ID.SAME,
-      v,
-      true,
-      both
-    );
+    const clips = await clipQueryBuilder.getClipsForScene({
+      userId: v,
+      allowedInstanceIds: both,
+      scene: { id: FX_ID.SAME, instanceId: undefined },
+      includeUngenerated: true,
+    });
     expect(clips.map((c) => c.scene.stashInstanceId).sort()).toEqual(both);
     for (const clip of clips) {
       const inst = clip.scene.stashInstanceId;

@@ -384,7 +384,7 @@ The backend uses SQL-based query builders with pre-computed exclusions for effic
 
 #### Query Builders
 
-Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs. They extend one base, `services/query/EntityQueryBuilder.ts`, which builds the list and count statements from an entity spec (table, per-user joins, columns, tiebreak) and owns what every list shares: the `deletedAt` filter, the exclusion join with the instance, the allowed-instances filter (an empty list matches nothing), the `ids` filter as (id, instance) pairs, the random sort with its seed bound, and the joined `COUNT(*)`. The clause helpers in `utils/sqlClauses.ts` (`refClause`, `idClause`, `viaSceneClause`, `instanceClause`, `randomOrder`, `combine`) match every ref as an (id, instance) pair, inline up to `PAIR_INLINE_LIMIT` refs and through a materialized set above it. The scene, performer, studio, tag, gallery, group and image builders are on the base; the clip builder follows in the next task.
+Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs. They extend one base, `services/query/EntityQueryBuilder.ts`, which builds the list and count statements from an entity spec (table, per-user joins, columns, tiebreak) and owns what every list shares: the `deletedAt` filter, the exclusion join with the instance, the allowed-instances filter (an empty list matches nothing), the `ids` filter as (id, instance) pairs, the random sort with its seed bound, and the joined `COUNT(*)`. The clause helpers in `utils/sqlClauses.ts` (`refClause`, `idClause`, `viaSceneClause`, `instanceClause`, `randomOrder`, `combine`) match every ref as an (id, instance) pair, inline up to `PAIR_INLINE_LIMIT` refs and through a materialized set above it; the same module holds the exclusion join and the per-field number, date, text and favorite clauses. Every builder is on the base. A clip lists only while its scene does: the clip builder joins the scene, and the viewer's exclusions apply to the clip and to its scene.
 
 | Query Builder | Entity |
 |---------------|--------|
@@ -395,6 +395,7 @@ Each entity type has a dedicated query builder that handles filtering, sorting, 
 | `GroupQueryBuilder.ts` | Groups |
 | `GalleryQueryBuilder.ts` | Galleries |
 | `ImageQueryBuilder.ts` | Images |
+| `ClipQueryBuilder.ts` | Clips (scene markers) |
 
 #### Other Services
 

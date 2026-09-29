@@ -1,4 +1,5 @@
 import { clipService } from "../services/ClipService.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   GetClipByIdParams,
   GetClipByIdResponse,
@@ -10,7 +11,6 @@ import type {
 } from "../types/api/clips.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
-import { toLegacyClipFilter } from "../utils/legacyFilter.js";
 import {
   logDropped,
   parseClipQuery,
@@ -21,7 +21,8 @@ import { logger } from "../utils/logger.js";
 
 /**
  * GET /api/clips
- * Browse clips with filtering
+ * Browse clips with filtering, on the user's instances (the `instanceId`
+ * parameter narrows them to one)
  */
 export const getClips = async (
   req: TypedAuthRequest<never, Record<string, string>, GetClipsQuery>,
@@ -33,17 +34,13 @@ export const getClips = async (
 
   try {
     const userId = req.user.id;
-    const { page, perPage, specificInstanceId } = request;
+    const { page, perPage } = request;
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const result = await clipService.getClips(userId, {
-      ...toLegacyClipFilter(request.filter),
-      page,
-      perPage,
-      sortBy: request.sort.field,
-      sortDir: request.sort.direction === "ASC" ? "asc" : "desc",
-      q: request.q,
-      randomSeed: request.sort.seed,
-      allowedInstanceIds: specificInstanceId ? [specificInstanceId] : undefined,
+    const result = await clipService.getClips({
+      userId,
+      allowedInstanceIds,
+      request,
     });
 
     res.json({
@@ -61,7 +58,7 @@ export const getClips = async (
 
 /**
  * GET /api/clips/:id
- * Get single clip
+ * Get single clip, on the user's instances, with their exclusions
  */
 export const getClipById = async (
   req: TypedAuthRequest<never, GetClipByIdParams>,
@@ -72,8 +69,13 @@ export const getClipById = async (
 
   try {
     const userId = req.user.id;
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const clip = await clipService.getClipById(id, userId);
+    const clip = await clipService.getClipById({
+      userId,
+      allowedInstanceIds,
+      id,
+    });
 
     if (!clip) {
       res.status(404).json({ error: "Clip not found" });
@@ -89,7 +91,8 @@ export const getClipById = async (
 
 /**
  * GET /api/scenes/:id/clips
- * Get clips for a scene
+ * Get clips for a scene: the scene on the `instanceId` parameter's instance,
+ * else its id on every instance the user sees
  */
 export const getClipsForScene = async (
   req: TypedAuthRequest<never, GetClipsForSceneParams, GetClipsForSceneQuery>,
@@ -104,13 +107,14 @@ export const getClipsForScene = async (
   try {
     const userId = req.user.id;
     const { sceneId, includeUngenerated, specificInstanceId } = request;
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const clips = await clipService.getClipsForScene(
-      sceneId,
+    const clips = await clipService.getClipsForScene({
       userId,
+      allowedInstanceIds,
+      scene: { id: sceneId, instanceId: specificInstanceId },
       includeUngenerated,
-      specificInstanceId ? [specificInstanceId] : undefined
-    );
+    });
 
     res.json({ clips });
   } catch (error) {
