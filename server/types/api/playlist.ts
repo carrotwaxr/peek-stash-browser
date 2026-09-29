@@ -4,7 +4,6 @@
  *
  * Request and response types for /api/playlists/* endpoints.
  */
-import type { Scene } from "../../graphql/types.js";
 import type { NormalizedScene } from "../index.js";
 
 // =============================================================================
@@ -12,7 +11,9 @@ import type { NormalizedScene } from "../index.js";
 // =============================================================================
 
 /**
- * Playlist item with optional scene data (can be raw Scene or NormalizedScene)
+ * A playlist item with its scene: the viewer's view of the scene (their own
+ * rating, favorite, O and play fields), or null when the viewer cannot see
+ * it (hidden, restricted, deleted, or on an instance they do not use)
  */
 export interface PlaylistItemWithScene {
   id: number;
@@ -21,16 +22,26 @@ export interface PlaylistItemWithScene {
   sceneId: string;
   position: number;
   addedAt: Date;
-  scene?: Scene | NormalizedScene | null;
+  scene: NormalizedScene | null;
+}
+
+/** A preview's scene: what the playlists page shows of it */
+export interface PlaylistPreviewScene {
+  id: string;
+  instanceId: string;
+  title: string | null;
+  paths: { screenshot: string | null };
 }
 
 /**
- * Simplified playlist item for preview thumbnails (only needs scene screenshot)
+ * One of the first four items of a playlist the viewer can see, for the
+ * preview thumbnails
  */
 export interface PlaylistPreviewItem {
-  instanceId: string | null;
   sceneId: string;
-  scene?: Partial<Scene> | NormalizedScene | null;
+  instanceId: string;
+  position: number;
+  scene: PlaylistPreviewScene;
 }
 
 /**
@@ -58,11 +69,25 @@ export interface PlaylistData {
 // =============================================================================
 
 /**
+ * A playlist on the playlists page and in the add-to-playlist menu: its
+ * previews and count are what the viewer can see (invariant 3)
+ */
+export interface PlaylistSummary extends Omit<
+  PlaylistData,
+  "_count" | "items"
+> {
+  /** How many of the playlist's items the viewer can see */
+  _count: { items: number };
+  /** The first four items the viewer can see, in position order */
+  items: PlaylistPreviewItem[];
+}
+
+/**
  * GET /api/playlists
  * Get all playlists for current user
  */
 export interface GetUserPlaylistsResponse {
-  playlists: PlaylistData[];
+  playlists: PlaylistSummary[];
 }
 
 // =============================================================================
@@ -77,8 +102,23 @@ export interface GetPlaylistParams extends Record<string, string> {
   id: string;
 }
 
+/**
+ * Without `page` and `per_page`, every item, in position order, with null
+ * for the scenes the viewer cannot see. With either, one page of the items
+ * the viewer can see: `page` from 1, `per_page` 1..100 (50 when absent).
+ */
+export interface GetPlaylistQuery extends Record<string, string | undefined> {
+  page?: string;
+  per_page?: string;
+}
+
 export interface GetPlaylistResponse {
   playlist: PlaylistData;
+  /** How many of the playlist's items the viewer can see */
+  totalItems: number;
+  /** The page read, when the request asked for one */
+  page?: number;
+  perPage?: number;
   isOwner?: boolean;
   accessLevel?: "owner" | "shared";
   sharedViaGroups?: string[];
@@ -226,12 +266,13 @@ export interface SharedPlaylistData {
   id: number;
   name: string;
   description: string | null;
+  /** How many of the playlist's items the viewer can see */
   sceneCount: number;
   owner: { id: number; username: string };
   sharedViaGroups: string[];
   sharedAt: string;
-  // Preview items for the thumbnail grid: the first four, with their scenes
-  items?: PlaylistPreviewItem[];
+  /** The first four items the viewer can see, in position order */
+  items: PlaylistPreviewItem[];
 }
 
 export interface GetSharedPlaylistsResponse {

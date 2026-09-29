@@ -28,6 +28,7 @@ import {
   parseClipQuery,
   parseListRequest,
   parseMinimalRequest,
+  parsePlaylistItemsRequest,
   parseRecommendedRequest,
   parseSceneClipsRequest,
   parseSimilarScenesRequest,
@@ -1645,6 +1646,72 @@ describe("parseRecommendedRequest", () => {
     expect(issuesOf(() => parseRecommendedRequest("x", opts(policy)))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);
+  });
+});
+
+describe("parsePlaylistItemsRequest", () => {
+  it("without page and per_page, every item: no paging", () => {
+    expect(parsePlaylistItemsRequest({}, opts("reject"))).toEqual({
+      paging: undefined,
+      dropped: [],
+    });
+  });
+
+  it("reads page and per_page: 50 by default, held to 1..100", () => {
+    expect(
+      parsePlaylistItemsRequest({ page: "2", per_page: "2" }, opts("reject"))
+    ).toEqual({ paging: { page: 2, perPage: 2 }, dropped: [] });
+    expect(parsePlaylistItemsRequest({ page: "3" }, opts("reject"))).toEqual({
+      paging: { page: 3, perPage: 50 },
+      dropped: [],
+    });
+    expect(
+      parsePlaylistItemsRequest({ per_page: "10" }, opts("reject"))
+    ).toEqual({ paging: { page: 1, perPage: 10 }, dropped: [] });
+    expect(
+      parsePlaylistItemsRequest({ page: "2", per_page: "500" }, opts("reject"))
+    ).toEqual({ paging: { page: 2, perPage: 100 }, dropped: [] });
+    expect(
+      parsePlaylistItemsRequest({ page: "-1", per_page: "0" }, opts("reject"))
+    ).toEqual({ paging: { page: 1, perPage: 1 }, dropped: [] });
+  });
+
+  it("page abc and an unknown parameter are invalid, or dropped", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parsePlaylistItemsRequest(
+            { page: "abc", sort: "title" },
+            opts("reject")
+          )
+        )
+      )
+    ).toEqual(["page", "sort"]);
+    // Nothing valid left: every item, as without paging
+    expect(
+      parsePlaylistItemsRequest({ page: "abc", sort: "title" }, opts("drop"))
+    ).toEqual({
+      paging: undefined,
+      dropped: [
+        { path: "page", reason: "Expected a number" },
+        { path: "sort", reason: "Unknown query parameter" },
+      ],
+    });
+    expect(
+      parsePlaylistItemsRequest(
+        { page: ["1", "2"], per_page: "5" },
+        opts("drop")
+      )
+    ).toEqual({
+      paging: { page: 1, perPage: 5 },
+      dropped: [{ path: "page", reason: "Expected a number" }],
+    });
+  });
+
+  it.each(POLICIES)("a query that is not an object fails (%s)", (policy) => {
+    expect(
+      issuesOf(() => parsePlaylistItemsRequest("x", opts(policy)))
+    ).toEqual([{ path: "query", message: "Expected an object" }]);
   });
 });
 

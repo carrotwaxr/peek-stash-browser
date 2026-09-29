@@ -63,6 +63,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
   ParsedMinimalRequest,
+  ParsedPlaylistItemsQuery,
   ParsedRecommendedQuery,
   ParsedSceneClipsQuery,
   ParsedSimilarScenesQuery,
@@ -79,6 +80,9 @@ const PER_PAGE_DEFAULT = 40;
 const CLIP_PER_PAGE_DEFAULT = 24;
 const MINIMAL_PER_PAGE_DEFAULT = 50;
 const RECOMMENDED_PER_PAGE_DEFAULT = 24;
+const PLAYLIST_ITEMS_PER_PAGE_DEFAULT = 50;
+/** A playlist page's most items */
+const PLAYLIST_ITEMS_PER_PAGE_MAX = 100;
 const Q_MAX_LENGTH = 200;
 /** A random seed is reduced to this, as the list controllers always did */
 const SEED_MODULUS = 1e8;
@@ -1173,6 +1177,48 @@ export function parseRecommendedRequest(
     page: clampPage(page),
     perPage: clampPerPage(perPage, RECOMMENDED_PER_PAGE_DEFAULT),
     dropped: problems.finish(policy),
+  };
+}
+
+// =============================================================================
+// PLAYLIST ITEMS
+// =============================================================================
+
+/**
+ * `GET /api/playlists/:id`: a page of the items the viewer can see, or
+ * every item when neither `page` nor `per_page` is sent (the playlist page
+ * reads them all until it pages)
+ */
+export function parsePlaylistItemsRequest(
+  query: unknown,
+  options: ParseOptions
+): ParsedPlaylistItemsQuery {
+  const policy = options.policy ?? filterPolicy();
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let page: number | undefined;
+  let perPage: number | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    ["page", (raw, path) => (page = parseInteger(raw, path, problems))],
+    ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+  const dropped = problems.finish(policy);
+
+  return {
+    paging:
+      page === undefined && perPage === undefined
+        ? undefined
+        : {
+            page: clampPage(page),
+            perPage: clampPerPage(
+              perPage,
+              PLAYLIST_ITEMS_PER_PAGE_DEFAULT,
+              PLAYLIST_ITEMS_PER_PAGE_MAX
+            ),
+          },
+    dropped,
   };
 }
 

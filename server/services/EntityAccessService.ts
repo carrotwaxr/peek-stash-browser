@@ -3,9 +3,9 @@
  *
  * The single read helper for decisions about one id, or a batch of ids, that
  * came in a request (ratings, history writes, downloads and media) or that a
- * query builder loads for tooltips (keepVisibleConditions). The list
- * builders keep their LEFT JOIN on UserExcludedEntity, and in-memory reads
- * keep entityExclusionHelper.filterExcluded.
+ * query builder loads for tooltips (keepVisibleConditions). Lists and
+ * reads of many entities keep their LEFT JOIN on UserExcludedEntity (the
+ * query builders, the tag tree, the pickers, the playlist reads).
  *
  * An entity (entityId, instanceId) is accessible to userId when all of these
  * hold:

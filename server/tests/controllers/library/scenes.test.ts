@@ -16,7 +16,6 @@ import {
   findScenes,
   findSimilarScenes,
   getRecommendedScenes,
-  mergeScenesWithUserData,
 } from "../../../controllers/library/scenes.js";
 import prisma from "../../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../../services/EntityAccessService.js";
@@ -34,14 +33,8 @@ import {
   testUser,
 } from "../../helpers/controllerTestUtils.js";
 import { objectContaining } from "../../helpers/matchers.js";
-import {
-  createMockPerformer,
-  createMockScene,
-  createMockStudio,
-  createMockTag,
-} from "../../helpers/mockDataGenerators.js";
+import { createMockScene } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
-import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — must precede imports of the module under test
@@ -144,11 +137,6 @@ const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-  mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-  mockPrisma.performerRating.findMany.mockResolvedValue([]);
-  mockPrisma.studioRating.findMany.mockResolvedValue([]);
-  mockPrisma.tagRating.findMany.mockResolvedValue([]);
   mockPrisma.userEntityRanking.findMany.mockResolvedValue([]);
   mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
 });
@@ -219,211 +207,7 @@ describe("addStreamabilityInfo", () => {
   });
 });
 
-// ===== 2. mergeScenesWithUserData =====
-
-describe("mergeScenesWithUserData", () => {
-  it("merges watch history into scenes", async () => {
-    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([
-      partialRow({
-        id: 1,
-        userId: 1,
-        sceneId: "s1",
-        instanceId: "inst1",
-        oCount: 3,
-        playCount: 10,
-        playDuration: 5000,
-        resumeTime: 120,
-        playHistory: JSON.stringify(["2025-06-01T00:00:00Z"]),
-        oHistory: JSON.stringify(["2025-05-01T00:00:00Z"]),
-        lastPlayedAt: new Date("2025-06-01"),
-      }),
-    ]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]).toMatchObject({
-      o_counter: 3,
-      play_count: 10,
-      play_duration: 5000,
-      resume_time: 120,
-    });
-  });
-
-  it("reads histories stored as JSON-encoded strings", async () => {
-    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([
-      partialRow({
-        sceneId: "s1",
-        instanceId: "inst1",
-        playHistory: JSON.stringify([
-          "2025-06-01T00:00:00Z",
-          "2025-06-02T00:00:00Z",
-        ]),
-        oHistory: JSON.stringify(["2025-05-01T00:00:00Z"]),
-      }),
-    ]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]).toMatchObject({
-      play_history: ["2025-06-01T00:00:00Z", "2025-06-02T00:00:00Z"],
-      o_history: ["2025-05-01T00:00:00Z"],
-      last_played_at: "2025-06-02T00:00:00Z",
-      last_o_at: "2025-05-01T00:00:00Z",
-    });
-  });
-
-  it("reads a malformed history as an empty list", async () => {
-    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([
-      partialRow({
-        sceneId: "s1",
-        instanceId: "inst1",
-        oCount: 1,
-        playHistory: "not json",
-        oHistory: "not json",
-      }),
-    ]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]).toMatchObject({
-      o_counter: 1,
-      play_history: [],
-      o_history: [],
-      last_played_at: null,
-      last_o_at: null,
-    });
-  });
-
-  it("merges scene ratings (rating100 and favorite)", async () => {
-    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([
-      {
-        id: 1,
-        userId: 1,
-        sceneId: "s1",
-        instanceId: "inst1",
-        rating: 85,
-        favorite: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]).toMatchObject({
-      rating: 85,
-      rating100: 85,
-      favorite: true,
-    });
-  });
-
-  it("updates nested performer favorites", async () => {
-    const p1 = createMockPerformer({ id: "p1", instanceId: "inst1" });
-    const p2 = createMockPerformer({ id: "p2", instanceId: "inst1" });
-    const scenes = [
-      createMockScene({ id: "s1", instanceId: "inst1", performers: [p1, p2] }),
-    ];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([
-      {
-        id: 1,
-        userId: 1,
-        performerId: "p1",
-        instanceId: "inst1",
-        rating: null,
-        favorite: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(must(must(result[0]).performers[0]).favorite).toBe(true);
-    expect(must(must(result[0]).performers[1]).favorite).toBe(false);
-  });
-
-  it("updates nested studio favorite", async () => {
-    const studio = createMockStudio({ id: "st1", instanceId: "inst1" });
-    const scenes = [createMockScene({ id: "s1", instanceId: "inst1", studio })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([
-      {
-        id: 1,
-        userId: 1,
-        studioId: "st1",
-        instanceId: "inst1",
-        rating: null,
-        favorite: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(must(must(result[0]).studio).favorite).toBe(true);
-  });
-
-  it("updates nested tag favorites", async () => {
-    const t1 = createMockTag({ id: "t1", instanceId: "inst1" });
-    const scenes = [
-      createMockScene({ id: "s1", instanceId: "inst1", tags: [t1] }),
-    ];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([
-      {
-        id: 1,
-        userId: 1,
-        tagId: "t1",
-        instanceId: "inst1",
-        rating: null,
-        favorite: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-
-    const result = await mergeScenesWithUserData(scenes, 1);
-    expect(must(must(result[0]).tags[0]).favorite).toBe(true);
-  });
-
-  it("uses targeted query for small scene sets (< 100)", async () => {
-    const scenes = [createMockScene({ id: "s1" })];
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    await mergeScenesWithUserData(scenes, 1);
-
-    // Watch history and scene ratings should filter by sceneId
-    expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith({
-      where: { userId: 1, sceneId: { in: ["s1"] } },
-    });
-    expect(mockPrisma.sceneRating.findMany).toHaveBeenCalledWith({
-      where: { userId: 1, sceneId: { in: ["s1"] } },
-    });
-  });
-});
-
-// ===== 3. HTTP handlers =====
+// ===== 2. HTTP handlers =====
 
 describe("findScenes", () => {
   it("returns 401 when user is not authenticated", async () => {

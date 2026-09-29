@@ -1,12 +1,14 @@
 import prisma from "../prisma/singleton.js";
-import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import {
   getPlaylistAccess,
   getUserGroups,
 } from "../services/PlaylistAccessService.js";
-import { stashEntityService } from "../services/StashEntityService.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  loadPlaylistItems,
+  loadPlaylistPreviews,
+} from "../services/PlaylistQueryService.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   AddSceneToPlaylistParams,
   AddSceneToPlaylistRequest,
@@ -18,6 +20,7 @@ import type {
   DeletePlaylistResponse,
   DuplicatePlaylistResponse,
   GetPlaylistParams,
+  GetPlaylistQuery,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
   GetSharedPlaylistsResponse,
@@ -35,111 +38,17 @@ import type {
   UpdatePlaylistSharesRequest,
   UpdatePlaylistSharesResponse,
 } from "../types/api/index.js";
-import type { NormalizedScene } from "../types/index.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import {
   getEntityInstanceId,
   getEntityInstanceIds,
 } from "../utils/entityInstanceId.js";
-import { entityKey } from "../utils/entityRef.js";
+import { logDropped, parsePlaylistItemsRequest } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
-import { emptyToNull } from "../utils/sqlHelpers.js";
-import { mergeScenesWithUserData } from "./library/scenes.js";
 
 /**
- * Default user fields for scenes (when no user data is merged yet).
- * These override any values from Stash to ensure Peek user data takes precedence.
- */
-const DEFAULT_SCENE_USER_FIELDS = {
-  rating: null,
-  rating100: null,
-  favorite: false,
-  o_counter: 0,
-  play_count: 0,
-  play_duration: 0,
-  resume_time: 0,
-  play_history: [] as string[],
-  o_history: [] as string[],
-  last_played_at: null,
-  last_o_at: null,
-};
-
-/** What a playlist item stores about its scene. */
-interface PlaylistItemRef {
-  sceneId: string;
-  instanceId: string | null;
-}
-
-/**
- * The instance of an item's scene. An item saved before multi-instance has
- * none (the backfill left none on prod): it is the default instance's
- * scene. The loader fetches by it and the handlers look up by it, so an
- * item finds the scene fetched for it.
- */
-function itemInstanceId(item: PlaylistItemRef): string {
-  return (
-    emptyToNull(item.instanceId) ?? stashInstanceManager.getDefaultConfig().id
-  );
-}
-
-/** The key of an item's scene in loadItemScenes' map. */
-function itemSceneKey(item: PlaylistItemRef): string {
-  return entityKey(item.sceneId, itemInstanceId(item));
-}
-
-/**
- * The scenes a playlist's items point at, visible to userId, keyed by
- * entityKey. The viewer's exclusions apply (restrictions and hidden items,
- * never the playlist owner's). withUserData replaces the rating, favorite,
- * O and play fields with the viewer's own.
- */
-async function loadItemScenes(
-  items: ReadonlyArray<PlaylistItemRef>,
-  userId: number,
-  options: { withUserData: boolean }
-): Promise<Map<string, NormalizedScene>> {
-  if (items.length === 0) return new Map();
-
-  // Fetch from the cache with relations, one query per instance
-  const idsByInstance = new Map<string, string[]>();
-  for (const item of items) {
-    const instanceId = itemInstanceId(item);
-    const ids = idsByInstance.get(instanceId);
-    if (ids) {
-      ids.push(item.sceneId);
-    } else {
-      idsByInstance.set(instanceId, [item.sceneId]);
-    }
-  }
-  const scenes: NormalizedScene[] = [];
-  for (const [instanceId, ids] of idsByInstance) {
-    scenes.push(
-      ...(await stashEntityService.getScenesByIdsWithRelations(ids, instanceId))
-    );
-  }
-
-  let visibleScenes = await entityExclusionHelper.filterExcluded(
-    scenes,
-    userId,
-    "scene"
-  );
-
-  if (options.withUserData) {
-    // Reset user-specific fields to defaults, then merge the viewer's
-    // WatchHistory and SceneRating
-    const scenesWithDefaults = visibleScenes.map((s) => ({
-      ...s,
-      ...DEFAULT_SCENE_USER_FIELDS,
-    }));
-    visibleScenes = await mergeScenesWithUserData(scenesWithDefaults, userId);
-  }
-
-  return new Map(visibleScenes.map((s) => [entityKey(s.id, s.instanceId), s]));
-}
-
-/**
- * Get all playlists for current user
- * Includes first 4 items with scene preview data for thumbnail display
+ * Get all playlists for current user, each with the first four items and
+ * the item count the user can see (PlaylistQueryService)
  */
 export const getUserPlaylists = async (
   req: TypedAuthRequest,
@@ -157,58 +66,27 @@ export const getUserPlaylists = async (
       where: {
         userId,
       },
-      include: {
-        _count: {
-          select: { items: true },
-        },
-        items: {
-          orderBy: {
-            position: "asc",
-          },
-          take: 4, // Only fetch first 4 items for preview
-        },
-      },
       orderBy: {
         updatedAt: "desc",
       },
     });
 
-    // Fetch scene details for preview items from cache
-    const playlistsWithScenes = await Promise.all(
-      playlists.map(async (playlist) => {
-        if (playlist.items.length === 0) {
-          return playlist;
-        }
+    const previews = await loadPlaylistPreviews({
+      userId,
+      allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+      playlistIds: playlists.map((p) => p.id),
+    });
 
-        try {
-          const scenes = await loadItemScenes(playlist.items, userId, {
-            withUserData: false,
-          });
-
-          // Attach scene data to each playlist item (only paths.screenshot needed for preview)
-          const itemsWithScenes = playlist.items.map((item) => ({
-            ...item,
-            scene: scenes.get(itemSceneKey(item)) ?? null,
-          }));
-
-          return {
-            ...playlist,
-            items: itemsWithScenes,
-          };
-        } catch (cacheError) {
-          logger.error(`Error fetching scenes for playlist ${playlist.id}`, {
-            error:
-              cacheError instanceof Error
-                ? cacheError.message
-                : "Unknown error",
-          });
-          // Return playlist without scene details if cache fails
-          return playlist;
-        }
-      })
-    );
-
-    res.json({ playlists: playlistsWithScenes });
+    res.json({
+      playlists: playlists.map((playlist) => {
+        const preview = previews.get(playlist.id);
+        return {
+          ...playlist,
+          _count: { items: preview?.visibleCount ?? 0 },
+          items: preview?.items ?? [],
+        };
+      }),
+    });
   } catch (error) {
     logger.error("Error getting playlists", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -218,7 +96,9 @@ export const getUserPlaylists = async (
 };
 
 /**
- * Get playlists shared with current user (not owned by them)
+ * Get playlists shared with current user (not owned by them), each with the
+ * first four items and the item count this user can see: their own
+ * exclusions and instances, never the owner's (invariant 10)
  */
 export const getSharedPlaylists = async (
   req: TypedAuthRequest,
@@ -265,55 +145,24 @@ export const getSharedPlaylists = async (
             },
           },
         },
-        _count: {
-          select: { items: true },
-        },
-        items: {
-          orderBy: {
-            position: "asc",
-          },
-          take: 4, // Only fetch first 4 items for preview thumbnails
-        },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    // Fetch scene details for preview items from cache
-    const playlistsWithScenes = await Promise.all(
-      sharedPlaylists.map(async (p) => {
-        let itemsWithScenes: Array<{
-          instanceId: string | null;
-          sceneId: string;
-          scene: NormalizedScene | null;
-        }> = [];
+    const previews = await loadPlaylistPreviews({
+      userId,
+      allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+      playlistIds: sharedPlaylists.map((p) => p.id),
+    });
 
-        if (p.items.length > 0) {
-          try {
-            const scenes = await loadItemScenes(p.items, userId, {
-              withUserData: false,
-            });
-
-            // Attach scene data to each playlist item
-            itemsWithScenes = p.items.map((item) => ({
-              instanceId: item.instanceId,
-              sceneId: item.sceneId,
-              scene: scenes.get(itemSceneKey(item)) ?? null,
-            }));
-          } catch (cacheError) {
-            logger.error(`Error fetching scenes for shared playlist ${p.id}`, {
-              error:
-                cacheError instanceof Error
-                  ? cacheError.message
-                  : "Unknown error",
-            });
-          }
-        }
-
+    res.json({
+      playlists: sharedPlaylists.map((p) => {
+        const preview = previews.get(p.id);
         return {
           id: p.id,
           name: p.name,
           description: p.description,
-          sceneCount: p._count.items,
+          sceneCount: preview?.visibleCount ?? 0,
           owner: { id: p.user.id, username: p.user.username },
           sharedViaGroups: p.shares.map((s) => s.group.name),
           sharedAt:
@@ -326,12 +175,10 @@ export const getSharedPlaylists = async (
                   )
                   .toISOString()
               : new Date().toISOString(),
-          items: itemsWithScenes,
+          items: preview?.items ?? [],
         };
-      })
-    );
-
-    res.json({ playlists: playlistsWithScenes });
+      }),
+    });
   } catch (error) {
     logger.error("Error getting shared playlists", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -341,20 +188,26 @@ export const getSharedPlaylists = async (
 };
 
 /**
- * Get single playlist with items and scene details from cache
+ * Get single playlist with its items and their scenes as this user sees
+ * them: every item without `page` and `per_page`, else one page of the
+ * items the user can see (PlaylistQueryService.loadPlaylistItems)
  */
 export const getPlaylist = async (
-  req: TypedAuthRequest<unknown, GetPlaylistParams>,
+  req: TypedAuthRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
   res: TypedResponse<GetPlaylistResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user?.id;
-    const playlistId = parseInt(req.params.id);
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
 
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+  // A ValidationError (400) reaches the central error handler
+  const request = parsePlaylistItemsRequest(req.query, { userId });
+  logDropped("GET /playlists/:id", request.dropped);
+
+  try {
+    const playlistId = parseInt(req.params.id);
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -370,13 +223,6 @@ export const getPlaylist = async (
 
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
-      include: {
-        items: {
-          orderBy: {
-            position: "asc",
-          },
-        },
-      },
     });
 
     if (!playlist) {
@@ -384,52 +230,22 @@ export const getPlaylist = async (
       return;
     }
 
-    // Fetch scene details from cache for all items
-    if (playlist.items.length > 0) {
-      try {
-        const scenes = await loadItemScenes(playlist.items, userId, {
-          withUserData: true,
-        });
+    const { paging } = request;
+    const { items, totalItems } = await loadPlaylistItems({
+      userId,
+      allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+      playlistId,
+      paging,
+    });
 
-        // Attach scene data to each playlist item
-        // Note: Items with restricted/hidden scenes will have scene: null
-        const itemsWithScenes = playlist.items.map((item) => ({
-          ...item,
-          scene: scenes.get(itemSceneKey(item)) ?? null,
-        }));
-
-        res.json({
-          playlist: {
-            ...playlist,
-            items: itemsWithScenes,
-          },
-          isOwner: access.level === "owner",
-          accessLevel: access.level,
-          sharedViaGroups:
-            access.level === "shared" ? access.groups : undefined,
-        });
-      } catch (cacheError) {
-        logger.error("Error fetching scenes from cache", {
-          error:
-            cacheError instanceof Error ? cacheError.message : "Unknown error",
-        });
-        // Return playlist without scene details if cache fails
-        res.json({
-          playlist,
-          isOwner: access.level === "owner",
-          accessLevel: access.level,
-          sharedViaGroups:
-            access.level === "shared" ? access.groups : undefined,
-        });
-      }
-    } else {
-      res.json({
-        playlist,
-        isOwner: access.level === "owner",
-        accessLevel: access.level,
-        sharedViaGroups: access.level === "shared" ? access.groups : undefined,
-      });
-    }
+    res.json({
+      playlist: { ...playlist, items },
+      totalItems,
+      ...(paging && { page: paging.page, perPage: paging.perPage }),
+      isOwner: access.level === "owner",
+      accessLevel: access.level,
+      sharedViaGroups: access.level === "shared" ? access.groups : undefined,
+    });
   } catch (error) {
     logger.error("Error getting playlist", {
       error: error instanceof Error ? error.message : "Unknown error",

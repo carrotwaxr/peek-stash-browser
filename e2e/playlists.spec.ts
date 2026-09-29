@@ -135,6 +135,69 @@ test.describe("Playlist CRUD", () => {
     ).toBeVisible();
   });
 
+  test("the add-to-playlist menu opens with one /playlists request and lists the playlists", async ({
+    page,
+  }) => {
+    const found = await mustOk(
+      await page.request.post("/api/library/scenes", {
+        data: { filter: { per_page: 1 } },
+      }),
+      "POST /api/library/scenes"
+    );
+    const { findScenes } = (await found.json()) as {
+      findScenes: { scenes: { id: string; instanceId: string }[] };
+    };
+    const scene = requireData(findScenes.scenes[0], "a scene");
+
+    const name = uniqueName("playlist");
+    const created = await mustOk(
+      await page.request.post("/api/playlists", { data: { name } }),
+      "POST /api/playlists"
+    );
+    const { playlist } = (await created.json()) as { playlist: PlaylistRow };
+    await mustOk(
+      await page.request.post(`/api/playlists/${playlist.id}/items`, {
+        data: { sceneId: scene.id },
+      }),
+      `POST /api/playlists/${playlist.id}/items`
+    );
+
+    let playlistRequests = 0;
+    const count = (request: { url(): string; method(): string }) => {
+      if (
+        request.method() === "GET" &&
+        new URL(request.url()).pathname === "/api/playlists"
+      ) {
+        playlistRequests += 1;
+      }
+    };
+    page.on("request", count);
+    try {
+      await page.goto(
+        `/scene/${scene.id}?instance=${encodeURIComponent(scene.instanceId)}`
+      );
+      // The Scene page lays its controls out once per breakpoint; one shows
+      const button = page.locator('button[title="Add to playlist"]:visible');
+      await expect(button).toBeVisible({ timeout: 10_000 });
+      expect(playlistRequests, "before the menu opens").toBe(0);
+
+      const listed = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === "/api/playlists"
+      );
+      await button.click();
+      await listed;
+
+      const entry = page.getByRole("button", { name: new RegExp(name) });
+      await expect(entry).toBeVisible();
+      await expect(entry).toContainText("1 videos");
+      // A second request, if any, follows the first within the same render
+      await page.waitForTimeout(1_000);
+    } finally {
+      page.off("request", count);
+    }
+    expect(playlistRequests).toBe(1);
+  });
+
   test("shared tab shows empty state", async ({ page }) => {
     await gotoPlaylists(page);
 

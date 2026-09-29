@@ -336,9 +336,13 @@ export type { ScoredSceneId } from "./library.js";
 // Playlist endpoint types
 export type {
   PlaylistItemWithScene,
+  PlaylistPreviewItem,
+  PlaylistPreviewScene,
   PlaylistData,
+  PlaylistSummary,
   GetUserPlaylistsResponse,
   GetPlaylistParams,
+  GetPlaylistQuery,
   GetPlaylistResponse,
   CreatePlaylistRequest,
   CreatePlaylistResponse,
