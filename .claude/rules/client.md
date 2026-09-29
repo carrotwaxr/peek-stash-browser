@@ -22,4 +22,4 @@ It reads the URL once on mount and afterwards only writes it; reading it back ag
 
 - Provider order in `App.tsx`: Auth, Theme, QueryClient, Config, UnitPreference, TVMode, CardDisplaySettings. The root providers load user data only while `isAuthenticated`; `ConfigProvider` reads only the public `/setup/status`.
 - New code uses theme CSS variables (`var(--bg-card)`, `var(--accent-primary)`). About 50 Tailwind palette classes remain, mostly spinners, grays and status colors; don't copy them. The `visual-style` skill has the full system.
-- `src/utils/filterConfig.ts` (3,600+ lines) defines every entity's filter options, so a change there reaches every search page.
+- `src/utils/filterConfig.ts` (3,600+ lines) defines every entity's filter options, so a change there reaches every search page. Its option keys, modifier and hierarchy keys and sort values follow `shared/types/filters` (`UI_KEYS`, `SORTS`); `tests/utils/filterContract.test.ts` fails when they drift, so a new option starts in the contract.
