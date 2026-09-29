@@ -13,6 +13,7 @@ paths:
   - "server/services/TooltipRelations.ts"
   - "server/services/MinimalEntityQuery.ts"
   - "server/services/RecommendationService.ts"
+  - "server/services/PlaylistQueryService.ts"
   - "server/utils/entityInstanceId.ts"
   - "server/utils/instanceUtils.ts"
   - "server/utils/dbWrite.ts"
@@ -48,6 +49,7 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 ## Lookups
 
 - The per-entity getters `get<Entity>(id, instanceId)` and most `get<Entity>sByIds` require an instanceId. Many other `StashEntityService` methods (name maps, counts, `getAll*`, cross-entity lookups) ignore instances; check before relying on one.
+- `SceneQueryBuilder.getByRefs` binds an OR of (id, instance) pairs: about 0.2 ms a ref up to 1,000 refs, superlinear beyond (2,000 refs 1.8 s) and failing to prepare near 10,000. Read at most a list page (`PER_PAGE_MAX`) of refs per call.
 - `getEntityInstanceId()` takes a bare id. If the id exists on several instances it returns the alphabetically first `stashInstanceId` and only logs. If it finds nothing, or the lookup throws, it returns the first configured instance. Prefer an instanceId from the request.
 - In-memory maps key on `entityKey(id, instanceId)` from `utils/entityRef.ts` (`` `${id}\0${instanceId}` ``), and a key of other parts (type, id and instance; a relation's two ids) on `compositeKey(...)`. The module also holds `EntityRef`, `distinctRefs` and `pairsJson`. Lint rejects a template or string holding `\0` anywhere else in the server source.
 - A query that drives from a bound JSON list (`json_each(?)`) into an entity table joins it with `CROSS JOIN`, so SQLite keeps `json_each` as the outer loop and looks each ref up by primary key. A plain `JOIN` can make it scan the table and re-read the JSON for every row (27.7 s for 5,000 refs against 26k scenes; 10 ms with `CROSS JOIN`). Check with `EXPLAIN QUERY PLAN`: `SCAN j`, then `SEARCH x USING ... PRIMARY KEY`.
