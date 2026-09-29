@@ -36,11 +36,11 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Each tag and studio expands to itself and one descendant, "99"
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-}));
+// Each ref expands to itself and one descendant, "99", on its own instance
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
@@ -272,7 +272,7 @@ describe("GroupQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["10", "inst-a", "11"]));
     });
 
-    it("studios match the group's studio column, the selected studio on its instance and its descendants on every instance", async () => {
+    it("studios match the group's studio column, the selected studio and its descendants on its instance", async () => {
       await run({
         filter: {
           studios: { refs: [ref("41")], modifier: "INCLUDES", depth: 1 },
@@ -281,13 +281,14 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ?))"
+        "((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ? AND g.stashInstanceId = ?))"
       );
       expect(sql).not.toContain("g.studioId IN (");
-      expect(params).toEqual(arrayContaining(["41", "inst-a", "99"]));
+      expect(params).toEqual(arrayContaining(["41", "inst-a", "99", "inst-a"]));
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
-    it("tags match GroupTag pairs, the selected tag on its instance and its descendants on every instance", async () => {
+    it("tags match GroupTag pairs, the selected tag and its descendants on its instance", async () => {
       await run({
         filter: {
           tags: { refs: [ref("284")], modifier: "EXCLUDES", depth: -1 },
@@ -296,9 +297,12 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /NOT EXISTS \(SELECT 1 FROM GroupTag (\w+) WHERE \1\.groupId = g\.id AND \1\.groupInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \?\)\)\)/
+        /NOT EXISTS \(SELECT 1 FROM GroupTag (\w+) WHERE \1\.groupId = g\.id AND \1\.groupInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
       );
-      expect(params).toEqual(arrayContaining(["284", "inst-a", "99"]));
+      expect(params).toEqual(
+        arrayContaining(["284", "inst-a", "99", "inst-a"])
+      );
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
     it("scenes match through SceneGroup, performers through their scenes, each with the scene live", async () => {

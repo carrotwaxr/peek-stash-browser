@@ -34,10 +34,10 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 // Mock hierarchy utils
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
-  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
-}));
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 // Mock titleUtils
 vi.mock("../../utils/titleUtils.js", () => ({

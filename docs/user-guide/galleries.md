@@ -23,7 +23,7 @@ Galleries support five view modes:
 | **Title** | Text search on gallery title |
 | **Performers** | Filter by performers. Supports ANY / ALL / NONE modifiers |
 | **Studio** | Filter by studio, including sub-studios |
-| **Tags** | Filter by tags with hierarchy support |
+| **Tags** | Filter by tags, with "Include sub-tags". With sub-tags on, "has all of" matches a gallery tagged with any sub-tag of each chosen tag |
 | **Rating** | 0-100 range slider |
 | **Image Count** | Range filter for number of images |
 | **Favorites** | Show only favorited galleries |

@@ -18,11 +18,12 @@ import type {
   RefCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
-import { expandTagIds } from "../utils/hierarchyUtils.js";
+import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   type JunctionTarget,
+  type SqlFragment,
   type SqlParam,
   type ViaSceneSpec,
   buildDateFilter,
@@ -43,7 +44,6 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
 } from "./query/EntityQueryBuilder.js";
 
 // Column list for SELECT - all StashTag fields plus user data
@@ -221,7 +221,7 @@ class TagQueryBuilder extends EntityQueryBuilder<
     }
 
     // Related entities
-    if (filter.parents) push(await this.parentClause(filter.parents));
+    if (filter.parents) push(await this.parentClause(filter.parents, ctx));
     if (filter.performers) {
       push(junction("performers", PERFORMER_TAGS, filter.performers));
     }
@@ -255,32 +255,57 @@ class TagQueryBuilder extends EntityQueryBuilder<
 
   /**
    * The parents filter on the `parentIds` JSON list, with the parents'
-   * descendants to the depth: INCLUDES any of them, INCLUDES_ALL every one,
-   * EXCLUDES none (a tag with no parents included)
+   * descendants to the depth: INCLUDES any of them, INCLUDES_ALL one of
+   * each chosen parent's own group, EXCLUDES none (a tag with no parents
+   * included)
    */
-  private async parentClause(criterion: RefCriterion): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
+  private async parentClause(
+    criterion: RefCriterion,
+    ctx: QueryContext
+  ): Promise<FilterClause> {
+    /** The OR chain of the refs' conditions, unwrapped */
+    const anyOf = (refs: readonly FilterRef[]): SqlFragment => {
+      const conditions = refs.map(parentCondition);
+      return {
+        sql: conditions.map((c) => c.sql).join(" OR "),
+        params: conditions.flatMap((c) => c.params),
+      };
+    };
+    // Each ref keeps its instance through the expansion, and a bare ref
+    // expands on every allowed instance (utils/hierarchyUtils.ts)
+    if (criterion.modifier === "INCLUDES_ALL") {
+      // One group per chosen parent, each with its own descendants: under
+      // any descendant of each (QUERIES-08)
+      const groups = await expandRefsEach(
+        "tag",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds
+      );
+      const each = groups.map((group) => {
+        const c = anyOf(group);
+        return group.length > 1 ? { ...c, sql: `(${c.sql})` } : c;
+      });
+      return {
+        sql: `(${each.map((c) => c.sql).join(" AND ")})`,
+        params: each.flatMap((c) => c.params),
+      };
+    }
+    const any = anyOf(
+      await expandRefs(
+        "tag",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds
+      )
     );
-    const conditions = refs.map(parentCondition);
-    const params = conditions.flatMap((c) => c.params);
     switch (criterion.modifier) {
       case "INCLUDES":
-        return {
-          sql: `(${conditions.map((c) => c.sql).join(" OR ")})`,
-          params,
-        };
-      case "INCLUDES_ALL":
-        return {
-          sql: `(${conditions.map((c) => c.sql).join(" AND ")})`,
-          params,
-        };
+        return { sql: `(${any.sql})`, params: any.params };
       case "EXCLUDES":
         return {
-          sql: `(t.parentIds IS NULL OR NOT (${conditions.map((c) => c.sql).join(" OR ")}))`,
-          params,
+          sql: `(t.parentIds IS NULL OR NOT (${any.sql}))`,
+          params: any.params,
         };
     }
   }

@@ -1,195 +1,172 @@
 /**
  * Hierarchy Utilities
  *
- * Functions for working with hierarchical entities (tags and studios).
- * Used to expand filter selections to include child entities when
- * "Include sub-tags" or "Include sub-studios" options are enabled.
+ * The expansion behind the hierarchical ref filters (tags and studios,
+ * item 34b): "Include sub-tags" and "Include sub-studios" add each chosen
+ * entity's descendants to the filter. Every ref keeps its instance through
+ * it: a ref with an instance expands within that instance's tree, a bare
+ * legacy id on every allowed instance, and each descendant carries the
+ * instance it was found on, since two Stash servers reuse small ids. The
+ * hierarchy is one slim load per request over the involved instances (id,
+ * instance and the parent list of every live row), expanded in memory.
  *
- * Depth parameter:
- *   0 or undefined: No hierarchy (exact match only)
- *   -1: All descendants (infinite depth)
- *   1, 2, 3...: Specific depth levels
+ * Depth: 0 none (the refs as they are), -1 every descendant, n that many
+ * levels.
+ *
+ * The hydrators below serve the tag and studio detail pages (C10 moves them
+ * into the builders).
  */
+import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
+import type { FilterRef } from "../types/parsedFilters.js";
+import { type EntityRef, entityKey } from "./entityRef.js";
+import { parseJsonArray } from "./sqlHelpers.js";
+
+export type HierarchyKind = "tag" | "studio";
+
+/** The children of each entity, by the parent's key, for the instances loaded */
+type Children = Map<string, EntityRef[]>;
+
+function isBare(ref: FilterRef): boolean {
+  return ref.instanceId === undefined || ref.instanceId === "";
+}
 
 /**
- * Get all descendant tag IDs for a given tag ID
- *
- * @param tagId - The parent tag ID to start from
- * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
- * @returns Set of tag IDs including the original and all descendants up to depth
+ * The live rows' parent links of the instances, as children by parent: one
+ * statement selecting three columns, whatever the number of refs.
  */
-export async function getDescendantTagIds(
-  tagId: string,
+async function loadChildren(
+  kind: HierarchyKind,
+  instanceIds: readonly string[]
+): Promise<Children> {
+  const children: Children = new Map();
+  const add = (parentId: string, child: EntityRef) => {
+    const key = entityKey(parentId, child.instanceId);
+    const list = children.get(key);
+    if (list === undefined) children.set(key, [child]);
+    else list.push(child);
+  };
+  const where = { stashInstanceId: { in: [...instanceIds] }, deletedAt: null };
+  if (kind === "tag") {
+    const rows = await prisma.stashTag.findMany({
+      where,
+      select: { id: true, stashInstanceId: true, parentIds: true },
+    });
+    for (const row of rows) {
+      // A parent list that is not JSON reads as no parents
+      for (const parentId of parseJsonArray<unknown>(row.parentIds)) {
+        add(String(parentId), { id: row.id, instanceId: row.stashInstanceId });
+      }
+    }
+  } else {
+    const rows = await prisma.stashStudio.findMany({
+      where,
+      select: { id: true, stashInstanceId: true, parentId: true },
+    });
+    for (const row of rows) {
+      if (row.parentId !== null) {
+        add(row.parentId, { id: row.id, instanceId: row.stashInstanceId });
+      }
+    }
+  }
+  return children;
+}
+
+/** The root, then its descendants to the depth, breadth first, each once */
+function withDescendants(
+  children: Children,
+  root: EntityRef,
   depth: number
-): Promise<Set<string>> {
-  const result = new Set<string>();
-  result.add(tagId);
-
-  // depth 0 or undefined means no hierarchy
-  if (depth === 0) {
-    return result;
-  }
-
-  const allTags = await stashEntityService.getAllTags();
-
-  // Build a map of tag ID to its children by inverting parent relationships
-  // Tags store parents, not children, so we invert to get children
-  const childrenMap = new Map<string, string[]>();
-  for (const tag of allTags) {
-    if (tag.parents && Array.isArray(tag.parents)) {
-      for (const parent of tag.parents) {
-        const parentId = parent.id;
-        if (!childrenMap.has(parentId)) {
-          childrenMap.set(parentId, []);
-        }
-        childrenMap.get(parentId)?.push(tag.id);
+): EntityRef[] {
+  const seen = new Set([entityKey(root.id, root.instanceId)]);
+  const result = [root];
+  let frontier = [root];
+  for (
+    let level = 0;
+    frontier.length > 0 && (depth === -1 || level < depth);
+    level++
+  ) {
+    const next: EntityRef[] = [];
+    for (const parent of frontier) {
+      for (const child of children.get(
+        entityKey(parent.id, parent.instanceId)
+      ) ?? []) {
+        const key = entityKey(child.id, child.instanceId);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(child);
+        next.push(child);
       }
     }
+    frontier = next;
   }
-  // BFS to collect descendants up to depth
-  const queue: { id: string; currentDepth: number }[] = [
-    { id: tagId, currentDepth: 0 },
-  ];
-
-  while (queue.length > 0) {
-    const item = queue.shift();
-    if (!item) continue;
-    const { id, currentDepth } = item;
-
-    // Check if we've reached the depth limit (depth -1 means infinite)
-    if (depth !== -1 && currentDepth >= depth) {
-      continue;
-    }
-
-    const children = childrenMap.get(id) ?? [];
-    for (const childId of children) {
-      if (!result.has(childId)) {
-        result.add(childId);
-        queue.push({ id: childId, currentDepth: currentDepth + 1 });
-      }
-    }
-  }
-
   return result;
 }
 
 /**
- * Get all descendant studio IDs for a given studio ID
- *
- * @param studioId - The parent studio ID to start from
- * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
- * @returns Set of studio IDs including the original and all descendants up to depth
+ * One group per selected ref: the ref with its descendants to the depth,
+ * for a filter that needs every selected entity ("has all of": any
+ * descendant of each). A ref with an instance expands within that
+ * instance's tree; a bare ref becomes one root per allowed instance, each
+ * with that instance's descendants. Only allowed instances are loaded, once
+ * for all the refs; a ref on another instance, and every ref at depth 0 or
+ * with no allowed instance, stays as it is in a group of its own.
  */
-export async function getDescendantStudioIds(
-  studioId: string,
-  depth: number
-): Promise<Set<string>> {
-  const result = new Set<string>();
-  result.add(studioId);
-
-  // depth 0 or undefined means no hierarchy
-  if (depth === 0) {
-    return result;
+export async function expandRefsEach(
+  kind: HierarchyKind,
+  refs: readonly FilterRef[],
+  depth: number,
+  allowedInstanceIds: readonly string[]
+): Promise<readonly (readonly FilterRef[])[]> {
+  if (depth === 0 || allowedInstanceIds.length === 0) {
+    return refs.map((ref) => [ref]);
   }
-
-  const allStudios = await stashEntityService.getAllStudios();
-
-  // Build a map of studio ID to its children by inverting parent relationships
-  // Studios store parent_studio, not child_studios, so we invert to get children
-  const childrenMap = new Map<string, string[]>();
-  for (const studio of allStudios) {
-    if (studio.parent_studio?.id) {
-      const parentId = studio.parent_studio.id;
-      if (!childrenMap.has(parentId)) {
-        childrenMap.set(parentId, []);
-      }
-      childrenMap.get(parentId)?.push(studio.id);
+  const allowed = new Set(allowedInstanceIds);
+  const involved = new Set<string>();
+  for (const ref of refs) {
+    if (isBare(ref)) {
+      for (const instanceId of allowedInstanceIds) involved.add(instanceId);
+    } else if (ref.instanceId !== undefined && allowed.has(ref.instanceId)) {
+      involved.add(ref.instanceId);
     }
   }
-
-  // BFS to collect descendants up to depth
-  const queue: { id: string; currentDepth: number }[] = [
-    { id: studioId, currentDepth: 0 },
-  ];
-
-  while (queue.length > 0) {
-    const item = queue.shift();
-    if (!item) continue;
-    const { id, currentDepth } = item;
-
-    // Check if we've reached the depth limit (depth -1 means infinite)
-    if (depth !== -1 && currentDepth >= depth) {
-      continue;
+  const children =
+    involved.size === 0
+      ? new Map<string, EntityRef[]>()
+      : await loadChildren(kind, [...involved]);
+  return refs.map((ref): readonly FilterRef[] => {
+    const { id, instanceId } = ref;
+    if (isBare(ref)) {
+      return allowedInstanceIds.flatMap((instanceId) =>
+        withDescendants(children, { id, instanceId }, depth)
+      );
     }
+    if (instanceId === undefined || !allowed.has(instanceId)) return [ref];
+    return withDescendants(children, { id, instanceId }, depth);
+  });
+}
 
-    const children = childrenMap.get(id) ?? [];
-    for (const childId of children) {
-      if (!result.has(childId)) {
-        result.add(childId);
-        queue.push({ id: childId, currentDepth: currentDepth + 1 });
-      }
-    }
+/**
+ * The refs with their descendants to the depth as one set, each once, in
+ * the refs' order (see expandRefsEach): the refs themselves at depth 0.
+ */
+export async function expandRefs(
+  kind: HierarchyKind,
+  refs: readonly FilterRef[],
+  depth: number,
+  allowedInstanceIds: readonly string[]
+): Promise<readonly FilterRef[]> {
+  if (depth === 0) return refs;
+  const groups = await expandRefsEach(kind, refs, depth, allowedInstanceIds);
+  const seen = new Set<string>();
+  const result: FilterRef[] = [];
+  for (const ref of groups.flat()) {
+    const key = entityKey(ref.id, ref.instanceId ?? "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(ref);
   }
-
   return result;
-}
-
-/**
- * Expand tag IDs to include descendants based on depth
- *
- * @param tagIds - Array of tag IDs to expand
- * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
- * @returns Array of expanded tag IDs (original + descendants)
- */
-export async function expandTagIds(
-  tagIds: string[],
-  depth: number
-): Promise<string[]> {
-  if (depth === 0 || !tagIds || tagIds.length === 0) {
-    return tagIds;
-  }
-
-  const expandedSet = new Set<string>();
-  // parseEntityRef returns a falsy ref as it is, so an id from request JSON
-  // can be null or 0 here: String() keeps it a string
-  const ids: readonly unknown[] = tagIds;
-  for (const tagId of ids) {
-    const descendants = await getDescendantTagIds(String(tagId), depth);
-    for (const id of descendants) {
-      expandedSet.add(id);
-    }
-  }
-
-  return Array.from(expandedSet);
-}
-
-/**
- * Expand studio IDs to include descendants based on depth
- *
- * @param studioIds - Array of studio IDs to expand
- * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
- * @returns Array of expanded studio IDs (original + descendants)
- */
-export async function expandStudioIds(
-  studioIds: string[],
-  depth: number
-): Promise<string[]> {
-  if (depth === 0 || !studioIds || studioIds.length === 0) {
-    return studioIds;
-  }
-
-  const expandedSet = new Set<string>();
-  // As in expandTagIds: an id from request JSON can be null or 0 here
-  const ids: readonly unknown[] = studioIds;
-  for (const studioId of ids) {
-    const descendants = await getDescendantStudioIds(String(studioId), depth);
-    for (const id of descendants) {
-      expandedSet.add(id);
-    }
-  }
-
-  return Array.from(expandedSet);
 }
 
 /**

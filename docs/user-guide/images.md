@@ -128,6 +128,8 @@ Filter to see images from specific galleries:
 !!! note "Inherited Tags"
     Images can inherit tags from their parent gallery, performers, and studio.
 
+With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has all of" matches an image tagged with any sub-tag of each chosen tag. With more than one Stash server, a tag or studio picked from one server (and its sub-tags or sub-studios) matches only that server's content.
+
 ### Combined Filters
 
 Combine multiple filters for precise results:

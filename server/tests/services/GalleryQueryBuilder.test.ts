@@ -35,11 +35,11 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Each tag and studio expands to itself and one descendant, "99"
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-}));
+// Each ref expands to itself and one descendant, "99", on its own instance
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 vi.mock("../../utils/titleUtils.js", () => ({
   getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
@@ -282,7 +282,7 @@ describe("GalleryQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
     });
 
-    it("studios match the gallery's studio column, the selected studio on its instance and its descendants on every instance", async () => {
+    it("studios match the gallery's studio column, the selected studio and its descendants on its instance", async () => {
       await run({
         filter: {
           studios: { refs: [ref("41")], modifier: "EXCLUDES", depth: -1 },
@@ -291,12 +291,13 @@ describe("GalleryQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(g.studioId IS NULL OR NOT ((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ?)))"
+        "(g.studioId IS NULL OR NOT ((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ? AND g.stashInstanceId = ?)))"
       );
-      expect(params).toEqual(arrayContaining(["41", "inst-a", "99"]));
+      expect(params).toEqual(arrayContaining(["41", "inst-a", "99", "inst-a"]));
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
-    it("tags match GalleryTag pairs, the selected tag on its instance and its descendants on every instance", async () => {
+    it("tags match GalleryTag pairs, the selected tag and its descendants on its instance", async () => {
       await run({
         filter: {
           tags: { refs: [ref("284")], modifier: "INCLUDES", depth: 1 },
@@ -305,9 +306,12 @@ describe("GalleryQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /EXISTS \(SELECT 1 FROM GalleryTag (\w+) WHERE \1\.galleryId = g\.id AND \1\.galleryInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \?\)\)\)/
+        /EXISTS \(SELECT 1 FROM GalleryTag (\w+) WHERE \1\.galleryId = g\.id AND \1\.galleryInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
       );
-      expect(params).toEqual(arrayContaining(["284", "inst-a", "99"]));
+      expect(params).toEqual(
+        arrayContaining(["284", "inst-a", "99", "inst-a"])
+      );
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
     it("performers match GalleryPerformer pairs; INCLUDES_ALL needs every one", async () => {

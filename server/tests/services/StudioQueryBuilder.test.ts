@@ -33,10 +33,11 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Each tag expands to itself and one descendant, "99"
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-}));
+// Each ref expands to itself and one descendant, "99", on its own instance
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
@@ -231,7 +232,7 @@ describe("StudioQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
     });
 
-    it("tags match StudioTag pairs, the selected tag on its instance and its descendants on every instance", async () => {
+    it("tags match StudioTag pairs, the selected tag and its descendants on its instance", async () => {
       await run({
         filter: {
           tags: { refs: [ref("284")], modifier: "EXCLUDES", depth: 1 },
@@ -240,9 +241,12 @@ describe("StudioQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /NOT EXISTS \(SELECT 1 FROM StudioTag (\w+) WHERE \1\.studioId = s\.id AND \1\.studioInstanceId = s\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \?\)\)\)/
+        /NOT EXISTS \(SELECT 1 FROM StudioTag (\w+) WHERE \1\.studioId = s\.id AND \1\.studioInstanceId = s\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
       );
-      expect(params).toEqual(arrayContaining(["284", "inst-a", "99"]));
+      expect(params).toEqual(
+        arrayContaining(["284", "inst-a", "99", "inst-a"])
+      );
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
     });
 
     it("the viewer's numbers, the counts and the text and date fields each reach SQL", async () => {

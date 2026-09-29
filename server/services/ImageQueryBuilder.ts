@@ -19,13 +19,11 @@ import type { ImageListItem } from "../types/index.js";
 import type { ImageQueryRow } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
-  allOf,
   buildDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
@@ -42,7 +40,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import {
   GALLERY_REF,
@@ -208,28 +206,9 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const opts = { name: "tags", allowedInstanceIds: ctx.allowedInstanceIds };
-    if (criterion.depth !== 0 && criterion.modifier === "INCLUDES_ALL") {
-      const groups = await Promise.all(
-        criterion.refs.map((ref) =>
-          expandRefs([ref], criterion.depth, expandTagIds)
-        )
-      );
-      return allOf(
-        groups.map((group, i) =>
-          refClause(IMAGE_TAGS, group, "INCLUDES", {
-            ...opts,
-            name: `tags_${i}`,
-          })
-        )
-      );
-    }
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(IMAGE_TAGS, refs, criterion.modifier, opts);
+    return hierarchicalRefClause("tag", IMAGE_TAGS, criterion, ctx, {
+      name: "tags",
+    });
   }
 
   /**
@@ -241,14 +220,8 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandStudioIds
-    );
-    return refClause(IMAGE_STUDIO, refs, criterion.modifier, {
+    return hierarchicalRefClause("studio", IMAGE_STUDIO, criterion, ctx, {
       name: "studios",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

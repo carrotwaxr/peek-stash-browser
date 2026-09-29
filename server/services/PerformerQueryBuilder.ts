@@ -17,7 +17,6 @@ import type {
   TextCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
-import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
@@ -28,7 +27,6 @@ import {
   buildNumericFilter,
   buildTextFilter,
   noClause,
-  refClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
@@ -42,7 +40,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 
 // Column list for SELECT - all StashPerformer fields plus user data
@@ -356,14 +354,8 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(PERFORMER_TAGS, refs, criterion.modifier, {
+    return hierarchicalRefClause("tag", PERFORMER_TAGS, criterion, ctx, {
       name: "tags",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

@@ -34,10 +34,11 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Each tag expands to itself and one descendant, "99"
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-}));
+// Each ref expands to itself and one descendant, "99", on its own instance
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
@@ -224,7 +225,7 @@ describe("TagQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
     });
 
-    it("the parents filter on tags keeps the instance of each ref; a bare ref and a descendant keep the LIKE alone", async () => {
+    it("the parents filter on tags keeps the instance of each ref through expansion; a bare ref expands on every allowed instance", async () => {
       await run({
         filter: {
           parents: {
@@ -236,12 +237,25 @@ describe("TagQueryBuilder", () => {
       });
 
       const { sql, params } = pageStatement();
+      // 10 and its descendant on inst-a; 20 and its descendant on each
+      // allowed instance
       expect(sql).toContain(
-        "((t.stashInstanceId = ? AND t.parentIds LIKE ?) OR t.parentIds LIKE ? OR t.parentIds LIKE ?)"
+        "((t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?))"
       );
-      expect(params).toEqual(
-        arrayContaining(["inst-a", '%"10"%', '%"20"%', '%"99"%'])
-      );
+      expect(sql).not.toContain("OR t.parentIds LIKE ?");
+      const first = params.indexOf('%"10"%') - 1;
+      expect(params.slice(first, first + 10)).toEqual([
+        "inst-a",
+        '%"10"%',
+        "inst-a",
+        '%"99"%',
+        "inst-a",
+        '%"20"%',
+        "inst-b",
+        '%"20"%',
+        "inst-b",
+        '%"99"%',
+      ]);
     });
 
     it("parents INCLUDES_ALL needs every ref, and EXCLUDES keeps tags with no parents", async () => {

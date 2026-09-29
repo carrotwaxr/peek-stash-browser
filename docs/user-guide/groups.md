@@ -22,7 +22,7 @@ Groups support two view modes:
 | **Director** | Text search on director name |
 | **Performers** | Performers in any scene within the group. Supports ANY / ALL / NONE modifiers |
 | **Studio** | Filter by studio |
-| **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers |
+| **Tags** | Filter by tags. Supports ANY / ALL / NONE modifiers, with "Include sub-tags": "all of" then matches a collection tagged with any sub-tag of each chosen tag |
 | **Rating** | 0-100 range slider |
 | **Scene Count** | Range filter for number of scenes |
 | **Duration** | Range filter for total duration in minutes |

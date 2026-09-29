@@ -31,14 +31,12 @@ import type {
   RefCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { readHistory } from "../utils/historyJson.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
-  allOf,
   buildDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
@@ -57,7 +55,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import {
   GALLERY_REF,
@@ -377,32 +375,10 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const opts = {
+    return hierarchicalRefClause("tag", SCENE_TAGS, criterion, ctx, {
       name: "tags",
-      allowedInstanceIds: ctx.allowedInstanceIds,
       inheritedJson: "inheritedTagIds",
-    };
-    if (criterion.depth !== 0 && criterion.modifier === "INCLUDES_ALL") {
-      const groups = await Promise.all(
-        criterion.refs.map((ref) =>
-          expandRefs([ref], criterion.depth, expandTagIds)
-        )
-      );
-      return allOf(
-        groups.map((group, i) =>
-          refClause(SCENE_TAGS, group, "INCLUDES", {
-            ...opts,
-            name: `tags_${i}`,
-          })
-        )
-      );
-    }
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(SCENE_TAGS, refs, criterion.modifier, opts);
+    });
   }
 
   /** The studio filter, with the studios' descendants to the depth */
@@ -410,14 +386,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandStudioIds
-    );
-    return refClause(SCENE_STUDIO, refs, criterion.modifier, {
+    return hierarchicalRefClause("studio", SCENE_STUDIO, criterion, ctx, {
       name: "studios",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

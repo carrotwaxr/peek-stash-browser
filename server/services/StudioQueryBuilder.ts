@@ -12,7 +12,6 @@ import type { NormalizedStudio, TagRef } from "../types/index.js";
 import type { StudioQueryRow } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
-import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
@@ -21,7 +20,6 @@ import {
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
-  refClause,
 } from "../utils/sqlClauses.js";
 import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
@@ -30,7 +28,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 
 // Column list for SELECT - all StashStudio fields plus user data
@@ -160,14 +158,8 @@ class StudioQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(STUDIO_TAGS, refs, criterion.modifier, {
+    return hierarchicalRefClause("tag", STUDIO_TAGS, criterion, ctx, {
       name: "tags",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 
