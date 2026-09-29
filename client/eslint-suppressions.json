@@ -687,11 +687,6 @@
       "count": 5
     }
   },
-  "src/components/ui/BaseGrid.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
   "src/components/ui/CardComponents.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
@@ -1282,18 +1277,8 @@
       "count": 2
     }
   },
-  "src/constants/appIcons.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
-    }
-  },
   "src/constants/carousels.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "src/constants/entityIcons.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
@@ -1489,7 +1474,7 @@
   },
   "src/utils/filterConfig.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 4
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 28

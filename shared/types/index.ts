@@ -28,7 +28,6 @@ export {
   parseEntityRef,
   isEntityRef,
   assertEntityRef,
-  coerceEntityRefs,
 } from "./instanceAwareId.js";
 
 // API contract types

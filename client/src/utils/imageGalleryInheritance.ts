@@ -271,40 +271,6 @@ export function getEffectiveImageMetadata(
 }
 
 /**
- * Enrich an image object with effective metadata fields.
- * Adds all effective* fields to the image.
- *
- * @param {Object} image - Image object
- * @returns {Object} Image with added effective* fields
- */
-export function enrichImageWithInheritedMetadata(
-  image: ImageObject | null | undefined
-) {
-  if (!image) return image;
-
-  const {
-    effectivePerformers,
-    effectiveTags,
-    effectiveStudio,
-    effectiveDate,
-    effectiveDetails,
-    effectivePhotographer,
-    effectiveUrls,
-  } = getEffectiveImageMetadata(image);
-
-  return {
-    ...image,
-    effectivePerformers,
-    effectiveTags,
-    effectiveStudio,
-    effectiveDate,
-    effectiveDetails,
-    effectivePhotographer,
-    effectiveUrls,
-  };
-}
-
-/**
  * Get image title with fallback chain: title → filename from filePath → Image {id}
  * @param {Object} image - Image object
  * @returns {string|null} Title string or null

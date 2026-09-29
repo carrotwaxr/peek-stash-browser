@@ -2315,13 +2315,6 @@ export const CAROUSEL_FILTER_DEFINITIONS = [
 ];
 
 /**
- * Get a carousel filter definition by key
- */
-export const getCarouselFilterDefinition = (key: string) => {
-  return CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === key);
-};
-
-/**
  * Convert carousel rules (stored format) to filter state (UI format).
  * The stored format is the API-ready filter object.
  * The UI format matches what buildSceneFilter expects as input.
@@ -2527,14 +2520,4 @@ const dateRangeFromApi = (
   if (modifier === "GREATER_THAN") return { start };
   if (modifier === "LESS_THAN") return { end: start };
   return {};
-};
-
-/**
- * Count active filters in a carousel's rules
- */
-export const countCarouselRules = (
-  rules: Record<string, any> | null | undefined
-): number => {
-  if (!rules || typeof rules !== "object") return 0;
-  return Object.keys(rules).length;
 };
