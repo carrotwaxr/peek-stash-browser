@@ -28,6 +28,7 @@ import {
   objectContaining,
   stringContaining,
 } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -618,6 +619,43 @@ describe("Download Controller", () => {
           }),
         ],
       });
+    });
+
+    it("returns no server file path and no internal error text", async () => {
+      const res = resFor(getUserDownloads);
+      const failed = downloadRow({
+        id: 3,
+        status: "FAILED",
+        filePath: "/config/downloads/user-1/download-3.zip",
+        error: "ENOENT: no such file or directory, open '/config/x.zip'",
+      });
+      const refused = downloadRow({
+        id: 4,
+        status: "FAILED",
+        error: "No scenes you can download",
+      });
+      mockDownloadService.getUserDownloads.mockResolvedValue([failed, refused]);
+
+      await getUserDownloads(
+        reqFor(getUserDownloads, {
+          user: { id: 1, username: "testuser", role: "USER" },
+        }),
+        res
+      );
+
+      const body = must(vi.mocked(res.json).mock.calls[0])[0] as {
+        downloads: object[];
+      };
+      expect(body.downloads[0]).not.toHaveProperty("filePath");
+      expect(body.downloads[0]).toMatchObject({
+        status: "FAILED",
+        error: "The download failed",
+      });
+      // A reason written for the user stays
+      expect(body.downloads[1]).toMatchObject({
+        error: "No scenes you can download",
+      });
+      expect(JSON.stringify(body)).not.toContain("/config");
     });
 
     it("should return 401 if user is not authenticated", async () => {

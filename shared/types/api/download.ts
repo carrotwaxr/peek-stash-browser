@@ -24,7 +24,6 @@ export interface SerializedDownload {
   instanceId: string;
   fileName: string;
   fileSize: string | null;
-  filePath: string | null;
   progress: number;
   error: string | null;
   createdAt: Date;
