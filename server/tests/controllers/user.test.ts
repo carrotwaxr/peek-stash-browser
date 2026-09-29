@@ -176,12 +176,12 @@ describe("User Controller", () => {
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
     });
 
-    it("returns 500 on database error", async () => {
+    it("a failure reaches the error handler: database error", async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error("DB error"));
       const req = reqFor(getUserSettings, { user: USER });
       const res = resFor(getUserSettings);
-      await getUserSettings(req, res);
-      expect(res._getStatus()).toBe(500);
+      await expect(getUserSettings(req, res)).rejects.toThrow("DB error");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -1079,9 +1079,9 @@ describe("User Controller", () => {
       mockPrisma.user.delete.mockRejectedValue(new Error("disk I/O error"));
       const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
       const res = resFor(deleteUser);
-      await deleteUser(req, res);
+      await expect(deleteUser(req, res)).rejects.toThrow("disk I/O error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
       expect(mockRankings.forget).not.toHaveBeenCalled();
       expect(mockRecommendations.forget).not.toHaveBeenCalled();
     });
@@ -1522,9 +1522,11 @@ describe("User Controller", () => {
         user: ADMIN,
       });
       const res = resFor(updateUserRestrictions);
-      await updateUserRestrictions(req, res);
+      await expect(updateUserRestrictions(req, res)).rejects.toThrow(
+        "UNIQUE constraint failed"
+      );
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
       expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
     });
   });

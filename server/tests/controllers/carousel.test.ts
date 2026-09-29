@@ -141,14 +141,14 @@ describe("Carousel Controller", () => {
       expect(Array.isArray(body.carousels || body)).toBe(true);
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.findMany.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(getUserCarousels, { user: USER });
       const res = resFor(getUserCarousels);
-      await getUserCarousels(req, res);
+      await expect(getUserCarousels(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -185,16 +185,16 @@ describe("Carousel Controller", () => {
       expect(body.carousel.id).toBe(SAMPLE_CAROUSEL.id);
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.findFirst.mockRejectedValue(
         new Error("DB error")
       );
 
       const req = reqFor(getCarousel, { params: { id: "1" }, user: USER });
       const res = resFor(getCarousel);
-      await getCarousel(req, res);
+      await expect(getCarousel(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -417,7 +417,7 @@ describe("Carousel Controller", () => {
       );
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.count.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(createCarousel, {
@@ -425,9 +425,9 @@ describe("Carousel Controller", () => {
         user: USER,
       });
       const res = resFor(createCarousel);
-      await createCarousel(req, res);
+      await expect(createCarousel(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -528,7 +528,7 @@ describe("Carousel Controller", () => {
       expect(mockPrisma.userCarousel.update).not.toHaveBeenCalled();
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.findFirst.mockRejectedValue(
         new Error("DB error")
       );
@@ -539,9 +539,9 @@ describe("Carousel Controller", () => {
         user: USER,
       });
       const res = resFor(updateCarousel);
-      await updateCarousel(req, res);
+      await expect(updateCarousel(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -579,16 +579,16 @@ describe("Carousel Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.findFirst.mockRejectedValue(
         new Error("DB error")
       );
 
       const req = reqFor(deleteCarousel, { params: { id: "1" }, user: USER });
       const res = resFor(deleteCarousel);
-      await deleteCarousel(req, res);
+      await expect(deleteCarousel(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -636,7 +636,7 @@ describe("Carousel Controller", () => {
       expect(body.scenes || body).toBeDefined();
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockQueryBuilder.execute.mockRejectedValue(new Error("Query failed"));
 
       const req = reqFor(previewCarousel, {
@@ -644,9 +644,9 @@ describe("Carousel Controller", () => {
         user: USER,
       });
       const res = resFor(previewCarousel);
-      await previewCarousel(req, res);
+      await expect(previewCarousel(req, res)).rejects.toThrow("Query failed");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -695,7 +695,7 @@ describe("Carousel Controller", () => {
       expect(body.scenes || body.carousel).toBeDefined();
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockQueryBuilder.execute.mockRejectedValue(new Error("Execution failed"));
 
@@ -704,9 +704,11 @@ describe("Carousel Controller", () => {
         user: USER,
       });
       const res = resFor(executeCarouselById);
-      await executeCarouselById(req, res);
+      await expect(executeCarouselById(req, res)).rejects.toThrow(
+        "Execution failed"
+      );
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 

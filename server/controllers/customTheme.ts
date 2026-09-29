@@ -17,7 +17,6 @@ import type {
   UpdateCustomThemeRequest,
   UpdateCustomThemeResponse,
 } from "../types/api/index.js";
-import { logger } from "../utils/logger.js";
 
 /**
  * Validate hex color format
@@ -87,28 +86,21 @@ export const getUserCustomThemes = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetUserCustomThemesResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    const themes = await prisma.customTheme.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        config: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+  const themes = await prisma.customTheme.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      config: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
-    res.json({ themes });
-  } catch (error) {
-    logger.error("Error getting custom themes", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get custom themes" });
-  }
+  res.json({ themes });
 };
 
 /**
@@ -118,34 +110,27 @@ export const getCustomTheme = async (
   req: TypedAuthRequest<unknown, GetCustomThemeParams>,
   res: TypedResponse<GetCustomThemeResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const themeId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const themeId = parseInt(req.params.id);
 
-    if (isNaN(themeId)) {
-      res.status(400).json({ error: "Invalid theme ID" });
-      return;
-    }
-
-    const theme = await prisma.customTheme.findFirst({
-      where: {
-        id: themeId,
-        userId, // Only allow accessing own themes
-      },
-    });
-
-    if (!theme) {
-      res.status(404).json({ error: "Theme not found" });
-      return;
-    }
-
-    res.json({ theme });
-  } catch (error) {
-    logger.error("Error getting custom theme", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to get custom theme" });
+  if (isNaN(themeId)) {
+    res.status(400).json({ error: "Invalid theme ID" });
+    return;
   }
+
+  const theme = await prisma.customTheme.findFirst({
+    where: {
+      id: themeId,
+      userId, // Only allow accessing own themes
+    },
+  });
+
+  if (!theme) {
+    res.status(404).json({ error: "Theme not found" });
+    return;
+  }
+
+  res.json({ theme });
 };
 
 /**
@@ -155,58 +140,49 @@ export const createCustomTheme = async (
   req: TypedAuthRequest<CreateCustomThemeRequest>,
   res: TypedResponse<CreateCustomThemeResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const { name, config } = req.body;
+  const userId = req.user.id;
+  const { name, config } = req.body;
 
-    // Validate name
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      res.status(400).json({ error: "Theme name is required" });
-      return;
-    }
-
-    if (name.length > 50) {
-      res
-        .status(400)
-        .json({ error: "Theme name must be 50 characters or less" });
-      return;
-    }
-
-    // Validate config
-    if (!validateThemeConfig(config)) {
-      res.status(400).json({ error: "Invalid theme configuration" });
-      return;
-    }
-
-    // Check for duplicate name
-    const existing = await prisma.customTheme.findFirst({
-      where: {
-        userId,
-        name: name.trim(),
-      },
-    });
-
-    if (existing) {
-      res.status(409).json({ error: "A theme with this name already exists" });
-      return;
-    }
-
-    // Create theme
-    const theme = await prisma.customTheme.create({
-      data: {
-        userId,
-        name: name.trim(),
-        config: config as object,
-      },
-    });
-
-    res.status(201).json({ theme });
-  } catch (error) {
-    logger.error("Error creating custom theme", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to create custom theme" });
+  // Validate name
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    res.status(400).json({ error: "Theme name is required" });
+    return;
   }
+
+  if (name.length > 50) {
+    res.status(400).json({ error: "Theme name must be 50 characters or less" });
+    return;
+  }
+
+  // Validate config
+  if (!validateThemeConfig(config)) {
+    res.status(400).json({ error: "Invalid theme configuration" });
+    return;
+  }
+
+  // Check for duplicate name
+  const existing = await prisma.customTheme.findFirst({
+    where: {
+      userId,
+      name: name.trim(),
+    },
+  });
+
+  if (existing) {
+    res.status(409).json({ error: "A theme with this name already exists" });
+    return;
+  }
+
+  // Create theme
+  const theme = await prisma.customTheme.create({
+    data: {
+      userId,
+      name: name.trim(),
+      config: config as object,
+    },
+  });
+
+  res.status(201).json({ theme });
 };
 
 /**
@@ -216,84 +192,75 @@ export const updateCustomTheme = async (
   req: TypedAuthRequest<UpdateCustomThemeRequest, UpdateCustomThemeParams>,
   res: TypedResponse<UpdateCustomThemeResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const themeId = parseInt(req.params.id);
-    const { name, config } = req.body;
+  const userId = req.user.id;
+  const themeId = parseInt(req.params.id);
+  const { name, config } = req.body;
 
-    if (isNaN(themeId)) {
-      res.status(400).json({ error: "Invalid theme ID" });
+  if (isNaN(themeId)) {
+    res.status(400).json({ error: "Invalid theme ID" });
+    return;
+  }
+
+  // Verify ownership
+  const existing = await prisma.customTheme.findFirst({
+    where: {
+      id: themeId,
+      userId,
+    },
+  });
+
+  if (!existing) {
+    res.status(404).json({ error: "Theme not found" });
+    return;
+  }
+
+  // Validate updates
+  const updates: { name?: string; config?: object } = {};
+
+  if (name !== undefined) {
+    if (typeof name !== "string" || name.trim().length === 0) {
+      res.status(400).json({ error: "Theme name cannot be empty" });
+      return;
+    }
+    if (name.length > 50) {
+      res
+        .status(400)
+        .json({ error: "Theme name must be 50 characters or less" });
       return;
     }
 
-    // Verify ownership
-    const existing = await prisma.customTheme.findFirst({
+    // Check for duplicate name (excluding current theme)
+    const duplicate = await prisma.customTheme.findFirst({
       where: {
-        id: themeId,
         userId,
+        name: name.trim(),
+        id: { not: themeId },
       },
     });
 
-    if (!existing) {
-      res.status(404).json({ error: "Theme not found" });
+    if (duplicate) {
+      res.status(409).json({ error: "A theme with this name already exists" });
       return;
     }
 
-    // Validate updates
-    const updates: { name?: string; config?: object } = {};
-
-    if (name !== undefined) {
-      if (typeof name !== "string" || name.trim().length === 0) {
-        res.status(400).json({ error: "Theme name cannot be empty" });
-        return;
-      }
-      if (name.length > 50) {
-        res
-          .status(400)
-          .json({ error: "Theme name must be 50 characters or less" });
-        return;
-      }
-
-      // Check for duplicate name (excluding current theme)
-      const duplicate = await prisma.customTheme.findFirst({
-        where: {
-          userId,
-          name: name.trim(),
-          id: { not: themeId },
-        },
-      });
-
-      if (duplicate) {
-        res
-          .status(409)
-          .json({ error: "A theme with this name already exists" });
-        return;
-      }
-
-      updates.name = name.trim();
-    }
-
-    if (config !== undefined) {
-      if (!validateThemeConfig(config)) {
-        res.status(400).json({ error: "Invalid theme configuration" });
-        return;
-      }
-      updates.config = config as object;
-    }
-
-    // Update theme
-    const theme = await prisma.customTheme.update({
-      where: { id: themeId },
-      data: updates,
-    });
-
-    res.json({ theme });
-  } catch (error) {
-    logger.error("Error updating custom theme", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update custom theme" });
+    updates.name = name.trim();
   }
+
+  if (config !== undefined) {
+    if (!validateThemeConfig(config)) {
+      res.status(400).json({ error: "Invalid theme configuration" });
+      return;
+    }
+    updates.config = config as object;
+  }
+
+  // Update theme
+  const theme = await prisma.customTheme.update({
+    where: { id: themeId },
+    data: updates,
+  });
+
+  res.json({ theme });
 };
 
 /**
@@ -303,40 +270,33 @@ export const deleteCustomTheme = async (
   req: TypedAuthRequest<unknown, DeleteCustomThemeParams>,
   res: TypedResponse<DeleteCustomThemeResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const themeId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const themeId = parseInt(req.params.id);
 
-    if (isNaN(themeId)) {
-      res.status(400).json({ error: "Invalid theme ID" });
-      return;
-    }
-
-    // Verify ownership
-    const existing = await prisma.customTheme.findFirst({
-      where: {
-        id: themeId,
-        userId,
-      },
-    });
-
-    if (!existing) {
-      res.status(404).json({ error: "Theme not found" });
-      return;
-    }
-
-    // Delete theme
-    await prisma.customTheme.delete({
-      where: { id: themeId },
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    logger.error("Error deleting custom theme", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to delete custom theme" });
+  if (isNaN(themeId)) {
+    res.status(400).json({ error: "Invalid theme ID" });
+    return;
   }
+
+  // Verify ownership
+  const existing = await prisma.customTheme.findFirst({
+    where: {
+      id: themeId,
+      userId,
+    },
+  });
+
+  if (!existing) {
+    res.status(404).json({ error: "Theme not found" });
+    return;
+  }
+
+  // Delete theme
+  await prisma.customTheme.delete({
+    where: { id: themeId },
+  });
+
+  res.json({ success: true });
 };
 
 /**
@@ -346,55 +306,48 @@ export const duplicateCustomTheme = async (
   req: TypedAuthRequest<unknown, DuplicateCustomThemeParams>,
   res: TypedResponse<DuplicateCustomThemeResponse | ApiErrorResponse>
 ) => {
-  try {
-    const userId = req.user.id;
-    const themeId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const themeId = parseInt(req.params.id);
 
-    if (isNaN(themeId)) {
-      res.status(400).json({ error: "Invalid theme ID" });
-      return;
-    }
-
-    // Get original theme
-    const original = await prisma.customTheme.findFirst({
-      where: {
-        id: themeId,
-        userId,
-      },
-    });
-
-    if (!original) {
-      res.status(404).json({ error: "Theme not found" });
-      return;
-    }
-
-    // Generate unique name
-    let newName = `${original.name} (Copy)`;
-    let counter = 1;
-
-    while (
-      await prisma.customTheme.findFirst({
-        where: { userId, name: newName },
-      })
-    ) {
-      counter++;
-      newName = `${original.name} (Copy ${counter})`;
-    }
-
-    // Create duplicate
-    const theme = await prisma.customTheme.create({
-      data: {
-        userId,
-        name: newName,
-        config: original.config as object,
-      },
-    });
-
-    res.status(201).json({ theme });
-  } catch (error) {
-    logger.error("Error duplicating custom theme", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to duplicate custom theme" });
+  if (isNaN(themeId)) {
+    res.status(400).json({ error: "Invalid theme ID" });
+    return;
   }
+
+  // Get original theme
+  const original = await prisma.customTheme.findFirst({
+    where: {
+      id: themeId,
+      userId,
+    },
+  });
+
+  if (!original) {
+    res.status(404).json({ error: "Theme not found" });
+    return;
+  }
+
+  // Generate unique name
+  let newName = `${original.name} (Copy)`;
+  let counter = 1;
+
+  while (
+    await prisma.customTheme.findFirst({
+      where: { userId, name: newName },
+    })
+  ) {
+    counter++;
+    newName = `${original.name} (Copy ${counter})`;
+  }
+
+  // Create duplicate
+  const theme = await prisma.customTheme.create({
+    data: {
+      userId,
+      name: newName,
+      config: original.config as object,
+    },
+  });
+
+  res.status(201).json({ theme });
 };

@@ -237,6 +237,27 @@ describe("errorHandler", () => {
     });
   });
 
+  it("a refused request's log names the invalid paths and messages, never a value", () => {
+    handle(
+      new ValidationError("Invalid request", {
+        issues: [
+          {
+            path: "scene_filter.performers.modifier",
+            message: "Invalid option: expected one of INCLUDES|EXCLUDES",
+          },
+          { path: "per_page", message: "Too big: expected <= 250" },
+        ],
+      })
+    );
+
+    const line = onlyLine();
+    expect(line).toContain("[WARN] Request refused");
+    expect(line).toContain("scene_filter.performers.modifier");
+    expect(line).toContain("Invalid option: expected one of INCLUDES|EXCLUDES");
+    expect(line).toContain("per_page");
+    expect(line).toContain("Too big: expected <= 250");
+  });
+
   it("AppErrors answer their own status, text and type", () => {
     expect(handle(new NotFoundError("Scene not found"))._getBody()).toEqual({
       error: "Scene not found",

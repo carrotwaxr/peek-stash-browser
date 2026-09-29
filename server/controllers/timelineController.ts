@@ -12,7 +12,6 @@ import type {
   GetDateDistributionQuery,
   GetDateDistributionResponse,
 } from "../types/api/timeline.js";
-import { logger } from "../utils/logger.js";
 
 const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
 const VALID_GRANULARITIES: Granularity[] = ["years", "months", "weeks", "days"];
@@ -46,19 +45,11 @@ export async function getDateDistribution(
     return;
   }
 
-  try {
-    const distribution = await timelineService.getDistribution(
-      entityType as TimelineEntityType,
-      userId,
-      granularity as Granularity,
-      Object.keys(filters).length > 0 ? filters : undefined
-    );
-    res.json({ distribution });
-  } catch (error) {
-    logger.error("Error fetching date distribution", {
-      error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    res.status(500).json({ error: "Failed to fetch date distribution" });
-  }
+  const distribution = await timelineService.getDistribution(
+    entityType as TimelineEntityType,
+    userId,
+    granularity as Granularity,
+    Object.keys(filters).length > 0 ? filters : undefined
+  );
+  res.json({ distribution });
 }

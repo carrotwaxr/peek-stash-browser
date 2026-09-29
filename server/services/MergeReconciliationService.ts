@@ -9,6 +9,7 @@
  * target is a live scene of the same instance with the same phash.
  */
 import type { Prisma } from "@prisma/client";
+import { ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
@@ -76,12 +77,7 @@ export interface SceneRef {
  * A reconcile target that is not a live scene on the source's instance (or
  * is the source itself). The routes answer it with 400.
  */
-export class MergeTargetError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MergeTargetError";
-  }
-}
+export class MergeTargetError extends ValidationError {}
 
 /** How far back each scene cleanup looks for deletions left unreconciled */
 export const MERGE_CATCH_UP_MS = 24 * 60 * 60 * 1000;

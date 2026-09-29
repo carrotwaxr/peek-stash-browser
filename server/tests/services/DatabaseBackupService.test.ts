@@ -449,7 +449,10 @@ describe("DatabaseBackupService", () => {
         databaseBackupService.deleteBackup(
           "peek-stash-browser.db.backup-20260117-093045"
         )
-      ).rejects.toThrow("Invalid backup filename");
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Invalid backup filename",
+      });
 
       vi.useRealTimers();
     });
@@ -590,7 +593,7 @@ describe("DatabaseBackupService", () => {
       expect(fs.unlink).not.toHaveBeenCalled();
     });
 
-    it("should throw error if file does not exist", async () => {
+    it("a backup that is not there is a 404, with no path in its text", async () => {
       vi.mocked(fs.unlink).mockRejectedValue(
         Object.assign(new Error("ENOENT"), { code: "ENOENT" })
       );
@@ -602,7 +605,10 @@ describe("DatabaseBackupService", () => {
         databaseBackupService.deleteBackup(
           "peek-stash-browser.db.backup-20260118-104532"
         )
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: "Backup not found",
+      });
     });
   });
 });

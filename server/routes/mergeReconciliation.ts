@@ -19,7 +19,6 @@ import {
   requireAdmin,
 } from "../middleware/auth.js";
 import {
-  MergeTargetError,
   type SceneRef,
   mergeReconciliationService,
 } from "../services/MergeReconciliationService.js";
@@ -51,19 +50,12 @@ function orphanRef(ref: unknown, res: Response): SceneRef | null {
 router.get(
   "/orphaned-scenes",
   authenticated(async (req, res) => {
-    try {
-      const orphans =
-        await mergeReconciliationService.findOrphanedScenesWithActivity();
-      res.json({
-        scenes: orphans,
-        totalCount: orphans.length,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to fetch orphaned scenes",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const orphans =
+      await mergeReconciliationService.findOrphanedScenesWithActivity();
+    res.json({
+      scenes: orphans,
+      totalCount: orphans.length,
+    });
   })
 );
 
@@ -76,15 +68,9 @@ router.get(
   authenticated(async (req, res) => {
     const orphan = orphanRef(req.params.ref, res);
     if (!orphan) return;
-    try {
-      const matches = await mergeReconciliationService.findPhashMatches(orphan);
-      res.json({ matches });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to fetch matches",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+
+    const matches = await mergeReconciliationService.findPhashMatches(orphan);
+    res.json({ matches });
   })
 );
 
@@ -105,28 +91,17 @@ router.post(
       return;
     }
 
-    try {
-      const result = await mergeReconciliationService.reconcileScene(
-        orphan,
-        { id: targetSceneId, instanceId: orphan.instanceId },
-        null, // Chosen by the admin, not matched by phash
-        req.user.id // Admin who initiated
-      );
+    const result = await mergeReconciliationService.reconcileScene(
+      orphan,
+      { id: targetSceneId, instanceId: orphan.instanceId },
+      null, // Chosen by the admin, not matched by phash
+      req.user.id // Admin who initiated
+    );
 
-      res.json({
-        ok: true,
-        ...result,
-      });
-    } catch (error) {
-      if (error instanceof MergeTargetError) {
-        res.status(400).json({ error: error.message });
-        return;
-      }
-      res.status(500).json({
-        error: "Failed to reconcile scene",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    res.json({
+      ok: true,
+      ...result,
+    });
   })
 );
 
@@ -139,20 +114,13 @@ router.post(
   authenticated(async (req, res) => {
     const orphan = orphanRef(req.params.ref, res);
     if (!orphan) return;
-    try {
-      const result =
-        await mergeReconciliationService.discardOrphanedData(orphan);
 
-      res.json({
-        ok: true,
-        ...result,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to discard orphaned data",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const result = await mergeReconciliationService.discardOrphanedData(orphan);
+
+    res.json({
+      ok: true,
+      ...result,
+    });
   })
 );
 
@@ -164,47 +132,39 @@ router.post(
 router.post(
   "/reconcile-all",
   authenticated(async (req: AuthenticatedRequest, res) => {
-    try {
-      const orphans =
-        await mergeReconciliationService.findOrphanedScenesWithActivity();
-      let reconciled = 0;
-      let skipped = 0;
+    const orphans =
+      await mergeReconciliationService.findOrphanedScenesWithActivity();
+    let reconciled = 0;
+    let skipped = 0;
 
-      for (const orphan of orphans) {
-        if (!orphan.phash) {
-          skipped++;
-          continue;
-        }
-
-        const source = { id: orphan.id, instanceId: orphan.instanceId };
-        const matches =
-          await mergeReconciliationService.findPhashMatches(source);
-        const [only] = matches;
-
-        if (matches.length === 1 && only) {
-          await mergeReconciliationService.reconcileScene(
-            source,
-            { id: only.sceneId, instanceId: orphan.instanceId },
-            orphan.phash,
-            req.user.id
-          );
-          reconciled++;
-        } else {
-          skipped++;
-        }
+    for (const orphan of orphans) {
+      if (!orphan.phash) {
+        skipped++;
+        continue;
       }
 
-      res.json({
-        ok: true,
-        reconciled,
-        skipped,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to reconcile all",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      const source = { id: orphan.id, instanceId: orphan.instanceId };
+      const matches = await mergeReconciliationService.findPhashMatches(source);
+      const [only] = matches;
+
+      if (matches.length === 1 && only) {
+        await mergeReconciliationService.reconcileScene(
+          source,
+          { id: only.sceneId, instanceId: orphan.instanceId },
+          orphan.phash,
+          req.user.id
+        );
+        reconciled++;
+      } else {
+        skipped++;
+      }
     }
+
+    res.json({
+      ok: true,
+      reconciled,
+      skipped,
+    });
   })
 );
 

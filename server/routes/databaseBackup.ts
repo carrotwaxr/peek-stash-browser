@@ -46,18 +46,11 @@ router.get(
       _req,
       res: TypedResponse<ListDatabaseBackupsResponse | ApiErrorResponse>
     ) => {
-      try {
-        const backups = await databaseBackupService.listBackups();
-        res.json({
-          backups: backups.map(toDatabaseBackup),
-          directory: databaseBackupService.getBackupDir(),
-        });
-      } catch (error) {
-        res.status(500).json({
-          error: "Failed to list backups",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
+      const backups = await databaseBackupService.listBackups();
+      res.json({
+        backups: backups.map(toDatabaseBackup),
+        directory: databaseBackupService.getBackupDir(),
+      });
     }
   )
 );
@@ -73,15 +66,8 @@ router.post(
       _req,
       res: TypedResponse<CreateDatabaseBackupResponse | ApiErrorResponse>
     ) => {
-      try {
-        const backup = await databaseBackupService.createBackup();
-        res.json({ backup: toDatabaseBackup(backup) });
-      } catch (error) {
-        res.status(500).json({
-          error: "Failed to create backup",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
+      const backup = await databaseBackupService.createBackup();
+      res.json({ backup: toDatabaseBackup(backup) });
     }
   )
 );
@@ -97,18 +83,9 @@ router.delete(
       req,
       res: TypedResponse<DeleteDatabaseBackupResponse | ApiErrorResponse>
     ) => {
-      try {
-        const { filename } = req.params;
-        await databaseBackupService.deleteBackup(filename as string);
-        res.json({ ok: true });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const status = message.includes("Invalid") ? 400 : 500;
-        res.status(status).json({
-          error: "Failed to delete backup",
-          message,
-        });
-      }
+      const { filename } = req.params;
+      await databaseBackupService.deleteBackup(filename as string);
+      res.json({ ok: true });
     }
   )
 );

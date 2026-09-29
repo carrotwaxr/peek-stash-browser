@@ -167,7 +167,7 @@ describe("Galleries Controller", () => {
       expect(res._getErrorBody().error).toBe("Ambiguous lookup");
     });
 
-    it("returns 500 when query builder throws", async () => {
+    it("a failure reaches the error handler: query builder throws", async () => {
       mockGalleryQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(findGalleries, {
@@ -176,10 +176,9 @@ describe("Galleries Controller", () => {
       });
       const res = resFor(findGalleries);
 
-      await findGalleries(req, res);
+      await expect(findGalleries(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find galleries");
+      expect(res.json).not.toHaveBeenCalled();
     });
 
     it("fetches detail counts for single-ID lookup", async () => {

@@ -279,15 +279,15 @@ describe("Clips Controller", () => {
       expect(res._getBody()).toMatchObject({ totalPages: 0, total: 0 });
     });
 
-    it("returns 500 when the service throws", async () => {
+    it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClips.mockRejectedValue(new Error("DB down"));
 
       const req = reqFor(getClips, { user: USER });
       const res = resFor(getClips);
 
-      await getClips(req, res);
+      await expect(getClips(req, res)).rejects.toThrow("DB down");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -344,15 +344,15 @@ describe("Clips Controller", () => {
       expect(mockClipService.getClipById).not.toHaveBeenCalled();
     });
 
-    it("returns 500 when the service throws", async () => {
+    it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClipById.mockRejectedValue(new Error("Unexpected"));
 
       const req = reqFor(getClipById, { params: { id: "101" }, user: USER });
       const res = resFor(getClipById);
 
-      await getClipById(req, res);
+      await expect(getClipById(req, res)).rejects.toThrow("Unexpected");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -447,7 +447,7 @@ describe("Clips Controller", () => {
       }
     );
 
-    it("returns 500 when the service throws", async () => {
+    it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClipsForScene.mockRejectedValue(new Error("Failed"));
 
       const req = reqFor(getClipsForScene, {
@@ -456,9 +456,9 @@ describe("Clips Controller", () => {
       });
       const res = resFor(getClipsForScene);
 
-      await getClipsForScene(req, res);
+      await expect(getClipsForScene(req, res)).rejects.toThrow("Failed");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

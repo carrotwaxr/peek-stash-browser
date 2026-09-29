@@ -228,32 +228,19 @@ export const refreshCache = (
   _req: TypedRequest,
   res: TypedResponse<RefreshCacheResponse | ApiErrorResponse>
 ) => {
-  try {
-    if (stashSyncService.isSyncing()) {
-      res.status(409).json({ error: "A sync is already running" });
-      return;
-    }
-
-    logger.info("Manual cache refresh triggered by admin");
-    // Trigger a full sync (non-blocking - runs in background)
-    stashSyncService.fullSync().catch((err: unknown) => {
-      logSyncFailure("Background full sync failed", err);
-    });
-
-    res.json({
-      success: true,
-      message: "Cache refresh initiated",
-    });
-  } catch (error) {
-    logger.error("Error refreshing cache", {
-      error: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to refresh cache",
-      error: "Failed to refresh cache",
-    });
+  if (stashSyncService.isSyncing()) {
+    res.status(409).json({ error: "A sync is already running" });
+    return;
   }
+
+  logger.info("Manual cache refresh triggered by admin");
+  // Trigger a full sync (non-blocking - runs in background)
+  stashSyncService.fullSync().catch((err: unknown) => {
+    logSyncFailure("Background full sync failed", err);
+  });
+
+  res.json({
+    success: true,
+    message: "Cache refresh initiated",
+  });
 };
