@@ -164,6 +164,36 @@ describe("useLibraryReady", () => {
     expect(stats).toHaveBeenCalledOnce();
   });
 
+  it("becoming ready does not refetch an external player link or a non-library query", async () => {
+    stubApi({ "/library/ready": () => jsonResponse(200, { ready: true }) });
+    const link = vi.fn().mockResolvedValue({ url: "x" });
+    const other = vi.fn().mockResolvedValue({});
+    const sceneList = vi.fn().mockResolvedValue({ findScenes: { scenes: [] } });
+
+    renderHook(
+      () => {
+        useQuery({
+          queryKey: queryKeys.scenes.externalPlayerLink("a", "7"),
+          queryFn: link,
+        });
+        useQuery({ queryKey: [42, "odd"], queryFn: other });
+        useQuery({
+          queryKey: queryKeys.scenes.list(undefined, { page: 1 }),
+          queryFn: sceneList,
+        });
+        return useLibraryReady();
+      },
+      { wrapper: wrapperFor(client) }
+    );
+    await settle();
+    await actAsync(() => markLibraryNotReady(client));
+    await advance(LIBRARY_READY_POLL_MS + 100);
+
+    expect(sceneList).toHaveBeenCalledTimes(2);
+    expect(link).toHaveBeenCalledOnce();
+    expect(other).toHaveBeenCalledOnce();
+  });
+
   it("marking it not ready twice does not push the next check back", async () => {
     const fetchMock = stubApi({
       "/library/ready": () => jsonResponse(200, { ready: true }),
