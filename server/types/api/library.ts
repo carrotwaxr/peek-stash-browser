@@ -58,6 +58,7 @@ export type {
  */
 export interface ScoredSceneId {
   id: string;
+  instanceId: string;
   score: number;
   oCounter: number;
 }

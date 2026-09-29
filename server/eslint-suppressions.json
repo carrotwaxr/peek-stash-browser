@@ -293,14 +293,6 @@
       "count": 1
     }
   },
-  "services/RecommendationScoringService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 11
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
-    }
-  },
   "services/SceneQueryBuilder.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 8

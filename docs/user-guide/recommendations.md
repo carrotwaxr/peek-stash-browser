@@ -28,6 +28,8 @@ The page shows:
 - Pagination for browsing more results
 - Your current activity stats
 
+The list stays the same while you page through it, so a scene never appears on two pages. It is scored again when your ratings, favorites, plays or hidden items change, when the library syncs, and each new day (the order within a score band is shuffled daily). Hidden and restricted scenes are never listed or counted, and every page is full.
+
 ### Recommended Sidebar
 
 When viewing a scene, the sidebar shows related recommendations:

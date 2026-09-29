@@ -85,6 +85,22 @@ export interface SceneQueryRow {
   userPlayHistory: Prisma.JsonValue | null;
 }
 
+/**
+ * Raw row of `StashEntityService.getScenesForScoring`: the scene's ids, its
+ * junction ids as comma-separated lists (null with none), and the user's
+ * watch data from a LEFT JOIN on WatchHistory (wh).
+ */
+export interface SceneScoringRow {
+  id: string;
+  stashInstanceId: string;
+  studioId: string | null;
+  oCounter: number;
+  performerIds: string | null;
+  tagIds: string | null;
+  playCount: number | null;
+  lastPlayedAt: Date | null;
+}
+
 // ---------------------------------------------------------------------------
 // PerformerQueryBuilder
 // ---------------------------------------------------------------------------

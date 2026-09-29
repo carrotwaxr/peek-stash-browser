@@ -1,6 +1,6 @@
 // server/services/RecommendationScoringService.ts
-import type { NormalizedScene, SceneScoringData } from "../types/index.js";
-import { entityKey } from "../utils/entityRef.js";
+import type { SceneScoringData } from "../types/index.js";
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import type { SeededRandom } from "../utils/seededRandom.js";
 
 // Configuration constants
@@ -27,27 +27,21 @@ export const IMPLICIT_PERFORMER_WEIGHT = 3;
 export const IMPLICIT_STUDIO_WEIGHT = 2;
 export const IMPLICIT_TAG_WEIGHT = 0.8;
 
+/** A user's rating of one scene on one instance */
 export interface SceneRatingInput {
   sceneId: string;
+  instanceId: string;
   rating: number | null;
   favorite: boolean;
 }
 
-export interface EntityPreferences {
-  favoritePerformers: Set<string>;
-  highlyRatedPerformers: Set<string>;
-  favoriteStudios: Set<string>;
-  highlyRatedStudios: Set<string>;
-  favoriteTags: Set<string>;
-  highlyRatedTags: Set<string>;
-  // Derived weights from scenes (accumulated per entity)
-  derivedPerformerWeights: Map<string, number>;
-  derivedStudioWeights: Map<string, number>;
-  derivedTagWeights: Map<string, number>;
-  // Implicit weights from watch history engagement (from UserEntityRanking)
-  implicitPerformerWeights: Map<string, number>;
-  implicitStudioWeights: Map<string, number>;
-  implicitTagWeights: Map<string, number>;
+/**
+ * One scene as the scoring pass reads it: its ids (all on the scene's
+ * instance) and the user's watch data on it, from `getScenesForScoring`.
+ */
+export interface ScoringScene extends SceneScoringData {
+  playCount: number;
+  lastPlayedAt: Date | null;
 }
 
 export interface UserCriteriaCounts {
@@ -94,76 +88,19 @@ export function calculateSceneWeightMultiplier(
 }
 
 /**
- * Build derived entity weights from rated/favorited scenes
- */
-export function buildDerivedWeightsFromScenes(
-  sceneRatings: SceneRatingInput[],
-  getSceneById: (sceneId: string) => NormalizedScene | undefined
-): {
-  derivedPerformerWeights: Map<string, number>;
-  derivedStudioWeights: Map<string, number>;
-  derivedTagWeights: Map<string, number>;
-} {
-  const derivedPerformerWeights = new Map<string, number>();
-  const derivedStudioWeights = new Map<string, number>();
-  const derivedTagWeights = new Map<string, number>();
-
-  for (const sceneRating of sceneRatings) {
-    const multiplier = calculateSceneWeightMultiplier(
-      sceneRating.rating,
-      sceneRating.favorite
-    );
-
-    if (multiplier === 0) continue;
-
-    const scene = getSceneById(sceneRating.sceneId);
-    if (!scene) continue;
-
-    // Accumulate performer weights
-    if (scene.performers) {
-      for (const performer of scene.performers) {
-        const performerId = performer.id;
-        const current = derivedPerformerWeights.get(performerId) || 0;
-        derivedPerformerWeights.set(performerId, current + multiplier);
-      }
-    }
-
-    // Accumulate studio weight
-    if (scene.studio) {
-      const studioId = scene.studio.id;
-      const current = derivedStudioWeights.get(studioId) || 0;
-      derivedStudioWeights.set(studioId, current + multiplier);
-    }
-
-    // Accumulate tag weights (scene tags only, not performer/studio tags)
-    if (scene.tags) {
-      for (const tag of scene.tags) {
-        const tagId = tag.id;
-        const current = derivedTagWeights.get(tagId) || 0;
-        derivedTagWeights.set(tagId, current + multiplier);
-      }
-    }
-  }
-
-  return {
-    derivedPerformerWeights,
-    derivedStudioWeights,
-    derivedTagWeights,
-  };
-}
-
-/**
  * Ranking data from UserEntityRanking table
  */
 export interface EntityRankingData {
   entityId: string;
+  instanceId: string;
   entityType: string;
   engagementRate: number;
   percentileRank: number;
 }
 
 /**
- * Build implicit entity weights from UserEntityRanking data
+ * Build implicit entity weights from UserEntityRanking data, keyed by
+ * entityKey(entityId, instanceId).
  * Uses engagementRate (already normalized by library presence) as the weight
  * Only includes entities above a minimum percentile threshold
  */
@@ -186,16 +123,17 @@ export function buildImplicitWeightsFromRankings(
     // Use engagementRate as the weight (already normalized by library presence)
     // Scale by percentile to give more weight to top-ranked entities
     const weight = ranking.engagementRate * (ranking.percentileRank / 100);
+    const key = entityKey(ranking.entityId, ranking.instanceId);
 
     switch (ranking.entityType) {
       case "performer":
-        implicitPerformerWeights.set(ranking.entityId, weight);
+        implicitPerformerWeights.set(key, weight);
         break;
       case "studio":
-        implicitStudioWeights.set(ranking.entityId, weight);
+        implicitStudioWeights.set(key, weight);
         break;
       case "tag":
-        implicitTagWeights.set(ranking.entityId, weight);
+        implicitTagWeights.set(key, weight);
         break;
       // scenes are not used as preference signals
     }
@@ -206,170 +144,6 @@ export function buildImplicitWeightsFromRankings(
     implicitStudioWeights,
     implicitTagWeights,
   };
-}
-
-/**
- * Score a scene based on user preferences (explicit + derived)
- * Returns the base score before watch status modifiers
- */
-export function scoreSceneByPreferences(
-  scene: NormalizedScene,
-  prefs: EntityPreferences
-): number {
-  let baseScore = 0;
-
-  // Score performers with diminishing returns (sqrt scaling)
-  const instId = scene.instanceId || "";
-  if (scene.performers) {
-    let favoritePerformerCount = 0;
-    let highlyRatedPerformerCount = 0;
-    let derivedPerformerWeight = 0;
-    let implicitPerformerWeight = 0;
-
-    for (const performer of scene.performers) {
-      const performerId = performer.id;
-      const perfKey = entityKey(performerId, instId);
-
-      if (prefs.favoritePerformers.has(perfKey)) {
-        favoritePerformerCount++;
-      } else if (prefs.highlyRatedPerformers.has(perfKey)) {
-        highlyRatedPerformerCount++;
-      }
-
-      // Add derived weight
-      const derived = prefs.derivedPerformerWeights.get(performerId);
-      if (derived) {
-        derivedPerformerWeight += derived;
-      }
-
-      // Add implicit engagement weight
-      const implicit = prefs.implicitPerformerWeights?.get(performerId);
-      if (implicit) {
-        implicitPerformerWeight += implicit;
-      }
-    }
-
-    if (favoritePerformerCount > 0) {
-      baseScore +=
-        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerCount);
-    }
-    if (highlyRatedPerformerCount > 0) {
-      baseScore +=
-        PERFORMER_RATED_WEIGHT * Math.sqrt(highlyRatedPerformerCount);
-    }
-    if (derivedPerformerWeight > 0) {
-      // Apply sqrt to accumulated derived weight, scale by favorite weight
-      baseScore +=
-        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
-    }
-    if (implicitPerformerWeight > 0) {
-      // Implicit engagement signal from watch history
-      baseScore +=
-        IMPLICIT_PERFORMER_WEIGHT * Math.sqrt(implicitPerformerWeight);
-    }
-  }
-
-  // Score studio (using composite key for multi-instance)
-  if (scene.studio) {
-    const studioId = scene.studio.id;
-    const studioKey = entityKey(studioId, instId);
-
-    if (prefs.favoriteStudios.has(studioKey)) {
-      baseScore += STUDIO_FAVORITE_WEIGHT;
-    } else if (prefs.highlyRatedStudios.has(studioKey)) {
-      baseScore += STUDIO_RATED_WEIGHT;
-    }
-
-    // Add derived studio weight
-    const derivedStudio = prefs.derivedStudioWeights.get(studioId);
-    if (derivedStudio) {
-      baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
-    }
-
-    // Add implicit engagement weight
-    const implicitStudio = prefs.implicitStudioWeights?.get(studioId);
-    if (implicitStudio) {
-      baseScore += IMPLICIT_STUDIO_WEIGHT * Math.sqrt(implicitStudio);
-    }
-  }
-
-  // Score tags with source weighting
-  const sceneTags = new Set<string>();
-  const performerTags = new Set<string>();
-  const studioTags = new Set<string>();
-
-  (scene.tags || []).forEach((t) => sceneTags.add(t.id));
-  (scene.performers || []).forEach((p) => {
-    (p.tags ?? []).forEach((t) => performerTags.add(t.id));
-  });
-  if (scene.studio?.tags) {
-    scene.studio.tags.forEach((t) => studioTags.add(t.id));
-  }
-
-  let favoriteSceneTagCount = 0;
-  let favoritePerformerTagCount = 0;
-  let favoriteStudioTagCount = 0;
-  let ratedSceneTagCount = 0;
-  let ratedPerformerTagCount = 0;
-  let ratedStudioTagCount = 0;
-  let derivedTagWeight = 0;
-  let implicitTagWeight = 0;
-
-  for (const tagId of sceneTags) {
-    const tagKey = entityKey(tagId, instId);
-    if (prefs.favoriteTags.has(tagKey)) favoriteSceneTagCount++;
-    else if (prefs.highlyRatedTags.has(tagKey)) ratedSceneTagCount++;
-
-    const derived = prefs.derivedTagWeights.get(tagId);
-    if (derived) derivedTagWeight += derived;
-
-    const implicit = prefs.implicitTagWeights?.get(tagId);
-    if (implicit) implicitTagWeight += implicit;
-  }
-
-  for (const tagId of performerTags) {
-    if (!sceneTags.has(tagId)) {
-      const tagKey = entityKey(tagId, instId);
-      if (prefs.favoriteTags.has(tagKey)) favoritePerformerTagCount++;
-      else if (prefs.highlyRatedTags.has(tagKey)) ratedPerformerTagCount++;
-    }
-  }
-
-  for (const tagId of studioTags) {
-    if (!sceneTags.has(tagId) && !performerTags.has(tagId)) {
-      const tagKey = entityKey(tagId, instId);
-      if (prefs.favoriteTags.has(tagKey)) favoriteStudioTagCount++;
-      else if (prefs.highlyRatedTags.has(tagKey)) ratedStudioTagCount++;
-    }
-  }
-
-  if (favoriteSceneTagCount > 0) {
-    baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(favoriteSceneTagCount);
-  }
-  if (favoritePerformerTagCount > 0) {
-    baseScore +=
-      TAG_PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerTagCount);
-  }
-  if (favoriteStudioTagCount > 0) {
-    baseScore += TAG_STUDIO_FAVORITE_WEIGHT * Math.sqrt(favoriteStudioTagCount);
-  }
-  if (ratedSceneTagCount > 0) {
-    baseScore += TAG_SCENE_RATED_WEIGHT * Math.sqrt(ratedSceneTagCount);
-  }
-  if (ratedPerformerTagCount > 0) {
-    baseScore += TAG_PERFORMER_RATED_WEIGHT * Math.sqrt(ratedPerformerTagCount);
-  }
-  if (ratedStudioTagCount > 0) {
-    baseScore += TAG_STUDIO_RATED_WEIGHT * Math.sqrt(ratedStudioTagCount);
-  }
-  if (derivedTagWeight > 0) {
-    baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(derivedTagWeight);
-  }
-  if (implicitTagWeight > 0) {
-    baseScore += IMPLICIT_TAG_WEIGHT * Math.sqrt(implicitTagWeight);
-  }
-
-  return baseScore;
 }
 
 /**
@@ -418,7 +192,9 @@ export function hasAnyCriteria(counts: UserCriteriaCounts): boolean {
 
 /**
  * Lightweight entity preferences for scoring (excludes performer/studio tag data)
- * Used with SceneScoringData for efficient two-phase query architecture
+ * Used with SceneScoringData for efficient two-phase query architecture.
+ * Every set and map is keyed by entityKey(id, instanceId): two Stash servers
+ * reuse small ids, and a favorite on one says nothing about the other.
  */
 export interface LightweightEntityPreferences {
   favoritePerformers: Set<string>;
@@ -437,12 +213,12 @@ export interface LightweightEntityPreferences {
 }
 
 /**
- * Build derived entity weights from rated/favorited scenes using lightweight scoring data
- * Works with SceneScoringData (IDs only) instead of full NormalizedScene objects
+ * Build derived entity weights from rated/favorited scenes using lightweight
+ * scoring data, keyed by entityKey(id, the rated scene's instance).
  */
 export function buildDerivedWeightsFromScoringData(
-  sceneRatings: SceneRatingInput[],
-  getScoringDataById: (sceneId: string) => SceneScoringData | undefined
+  sceneRatings: readonly SceneRatingInput[],
+  getScoringData: (ref: EntityRef) => SceneScoringData | undefined
 ): {
   derivedPerformerWeights: Map<string, number>;
   derivedStudioWeights: Map<string, number>;
@@ -460,25 +236,38 @@ export function buildDerivedWeightsFromScoringData(
 
     if (multiplier === 0) continue;
 
-    const scoringData = getScoringDataById(sceneRating.sceneId);
+    const scoringData = getScoringData({
+      id: sceneRating.sceneId,
+      instanceId: sceneRating.instanceId,
+    });
     if (!scoringData) continue;
+    const instanceId = scoringData.instanceId;
 
     // Accumulate performer weights
     for (const performerId of scoringData.performerIds) {
-      const current = derivedPerformerWeights.get(performerId) || 0;
-      derivedPerformerWeights.set(performerId, current + multiplier);
+      const key = entityKey(performerId, instanceId);
+      derivedPerformerWeights.set(
+        key,
+        (derivedPerformerWeights.get(key) ?? 0) + multiplier
+      );
     }
 
     // Accumulate studio weight
     if (scoringData.studioId) {
-      const current = derivedStudioWeights.get(scoringData.studioId) || 0;
-      derivedStudioWeights.set(scoringData.studioId, current + multiplier);
+      const key = entityKey(scoringData.studioId, instanceId);
+      derivedStudioWeights.set(
+        key,
+        (derivedStudioWeights.get(key) ?? 0) + multiplier
+      );
     }
 
     // Accumulate tag weights (scene tags only - no performer/studio tags in lightweight data)
     for (const tagId of scoringData.tagIds) {
-      const current = derivedTagWeights.get(tagId) || 0;
-      derivedTagWeights.set(tagId, current + multiplier);
+      const key = entityKey(tagId, instanceId);
+      derivedTagWeights.set(
+        key,
+        (derivedTagWeights.get(key) ?? 0) + multiplier
+      );
     }
   }
 
@@ -506,7 +295,7 @@ export function scoreScoringDataByPreferences(
   let derivedPerformerWeight = 0;
   let implicitPerformerWeight = 0;
 
-  const sceneInstId = scoringData.instanceId || "";
+  const sceneInstId = scoringData.instanceId;
   for (const performerId of scoringData.performerIds) {
     const performerKey = entityKey(performerId, sceneInstId);
     if (prefs.favoritePerformers.has(performerKey)) {
@@ -515,12 +304,12 @@ export function scoreScoringDataByPreferences(
       highlyRatedPerformerCount++;
     }
 
-    const derived = prefs.derivedPerformerWeights.get(performerId);
+    const derived = prefs.derivedPerformerWeights.get(performerKey);
     if (derived) {
       derivedPerformerWeight += derived;
     }
 
-    const implicit = prefs.implicitPerformerWeights?.get(performerId);
+    const implicit = prefs.implicitPerformerWeights.get(performerKey);
     if (implicit) {
       implicitPerformerWeight += implicit;
     }
@@ -548,14 +337,12 @@ export function scoreScoringDataByPreferences(
       baseScore += STUDIO_RATED_WEIGHT;
     }
 
-    const derivedStudio = prefs.derivedStudioWeights.get(scoringData.studioId);
+    const derivedStudio = prefs.derivedStudioWeights.get(studioKey);
     if (derivedStudio) {
       baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
     }
 
-    const implicitStudio = prefs.implicitStudioWeights?.get(
-      scoringData.studioId
-    );
+    const implicitStudio = prefs.implicitStudioWeights.get(studioKey);
     if (implicitStudio) {
       baseScore += IMPLICIT_STUDIO_WEIGHT * Math.sqrt(implicitStudio);
     }
@@ -575,12 +362,12 @@ export function scoreScoringDataByPreferences(
       ratedTagCount++;
     }
 
-    const derived = prefs.derivedTagWeights.get(tagId);
+    const derived = prefs.derivedTagWeights.get(tagKey);
     if (derived) {
       derivedTagWeight += derived;
     }
 
-    const implicit = prefs.implicitTagWeights?.get(tagId);
+    const implicit = prefs.implicitTagWeights.get(tagKey);
     if (implicit) {
       implicitTagWeight += implicit;
     }

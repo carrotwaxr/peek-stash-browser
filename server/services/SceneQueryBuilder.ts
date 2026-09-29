@@ -54,13 +54,6 @@ export interface SceneQueryResult {
   total: number;
 }
 
-// Query by IDs options
-export interface SceneByIdsOptions {
-  userId: number;
-  ids: string[];
-  allowedInstanceIds?: string[]; // Multi-instance filtering
-}
-
 // Query by (id, instance) refs
 export interface SceneByRefsOptions {
   userId: number;
@@ -1908,32 +1901,6 @@ class SceneQueryBuilder {
       // Cover as simple string URL for consistency
       cover: coverUrl,
     };
-  }
-
-  /**
-   * Get scenes by IDs with full relations
-   * Used after scoring to fetch the final paginated results
-   */
-  async getByIds(options: SceneByIdsOptions): Promise<SceneQueryResult> {
-    const { userId, ids, allowedInstanceIds } = options;
-
-    if (ids.length === 0) {
-      return { scenes: [], total: 0 };
-    }
-
-    // Use execute with ID filter
-    return this.execute({
-      userId,
-      filters: {
-        ids: { value: coerceEntityRefs(ids), modifier: "INCLUDES" },
-      },
-      applyExclusions: false, // IDs already filtered, don't double-exclude
-      allowedInstanceIds, // Pass through for multi-instance filtering
-      sort: "created_at", // Default sort, results will be reordered by caller if needed
-      sortDirection: "DESC",
-      page: 1,
-      perPage: ids.length, // Get all requested IDs
-    });
   }
 
   /**

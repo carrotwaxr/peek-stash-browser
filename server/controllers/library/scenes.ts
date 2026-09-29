@@ -1,18 +1,8 @@
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
-import {
-  type EntityRankingData,
-  type LightweightEntityPreferences,
-  type SceneRatingInput,
-  buildDerivedWeightsFromScoringData,
-  buildImplicitWeightsFromRankings,
-  countUserCriteria,
-  diversifyByScoreTier,
-  hasAnyCriteria,
-  scoreScoringDataByPreferences,
-} from "../../services/RecommendationScoringService.js";
+import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
+import { recommendationService } from "../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
@@ -26,7 +16,6 @@ import type {
   FindSimilarScenesResponse,
   GetRecommendedScenesQuery,
   GetRecommendedScenesResponse,
-  ScoredSceneId,
   TypedAuthRequest,
   TypedResponse,
   WithStashUrl,
@@ -44,7 +33,6 @@ import {
   singleIdRef,
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
-import { SeededRandom, generateDailySeed } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -415,12 +403,12 @@ export const findSimilarScenes = async (
 };
 
 /**
- * Get recommended scenes based on user preferences and watch history
- * Uses favorites, ratings (80+), watch status, and engagement quality
- *
- * Two-phase query architecture:
- * 1. Lightweight scoring: Score all scenes using IDs only (SceneScoringData)
- * 2. Full fetch: Get complete scene data for paginated results via SceneQueryBuilder
+ * Recommended scenes: the user's ranked list (`RecommendationService`,
+ * scored once per change to their ratings, plays, hidden items or rankings
+ * or to the library), one page of it fetched through the scene builder by
+ * (id, instance) and put back in ranked order. The list already honours the
+ * user's exclusions and instances, so every page is full and the count is
+ * what the user can see.
  */
 export const getRecommendedScenes = async (
   req: TypedAuthRequest<
@@ -445,273 +433,68 @@ export const getRecommendedScenes = async (
   try {
     const { page, perPage } = request;
 
-    // Fetch user ratings, watch history, engagement rankings, and lightweight scoring data in parallel
-    const [
-      performerRatings,
-      studioRatings,
-      tagRatings,
-      sceneRatings,
-      watchHistory,
-      allScoringData,
-      exclusionData,
-      engagementRankings,
-    ] = await Promise.all([
-      prisma.performerRating.findMany({ where: { userId } }),
-      prisma.studioRating.findMany({ where: { userId } }),
-      prisma.tagRating.findMany({ where: { userId } }),
-      prisma.sceneRating.findMany({ where: { userId } }),
-      prisma.watchHistory.findMany({ where: { userId } }),
-      stashEntityService.getScenesForScoring(),
-      entityExclusionHelper.getExclusionData(userId, "scene"),
-      // Fetch implicit engagement signals from pre-computed rankings
-      prisma.userEntityRanking.findMany({
-        where: { userId, entityType: { in: ["performer", "studio", "tag"] } },
-        select: {
-          entityId: true,
-          entityType: true,
-          engagementRate: true,
-          percentileRank: true,
-        },
-      }),
-    ]);
-
     // Rankings over an hour old are recomputed in the background; this
     // request scores with the ones stored
     void rankingComputeService.ensureFresh(userId);
 
-    // Build sets of favorite and highly-rated entities using composite keys (id + instanceId)
-    // to prevent cross-instance favorites from influencing recommendations for the wrong instance
-    const favoritePerformers = new Set(
-      performerRatings
-        .filter((r) => r.favorite)
-        .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
-    );
-    const highlyRatedPerformers = new Set(
-      performerRatings
-        .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
-    );
-    const favoriteStudios = new Set(
-      studioRatings
-        .filter((r) => r.favorite)
-        .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
-    );
-    const highlyRatedStudios = new Set(
-      studioRatings
-        .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
-    );
-    const favoriteTags = new Set(
-      tagRatings
-        .filter((r) => r.favorite)
-        .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
-    );
-    const highlyRatedTags = new Set(
-      tagRatings
-        .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+    const { refs, criteria } = await recommendationService.getRankedRefs(
+      userId,
+      allowedInstanceIds
     );
 
-    // Count user criteria for feedback
-    const criteriaCounts = countUserCriteria(
-      performerRatings,
-      studioRatings,
-      tagRatings,
-      sceneRatings
-    );
-
-    // Check if user has any criteria (now includes scenes)
-    if (!hasAnyCriteria(criteriaCounts)) {
+    if (!hasAnyCriteria(criteria)) {
       res.json({
         scenes: [],
         count: 0,
         page,
         perPage,
         message: "No recommendations yet",
-        criteria: criteriaCounts,
+        criteria,
       });
       return;
     }
 
-    // Build watch history map
-    const watchMap = new Map(
-      watchHistory.map((wh) => {
-        const playHistory = readHistory(wh.playHistory);
-        const lastEntry = playHistory[playHistory.length - 1];
-        const lastPlayedAt = lastEntry != null ? new Date(lastEntry) : null;
-
-        return [
-          wh.sceneId,
-          {
-            playCount: wh.playCount || 0,
-            lastPlayedAt,
-          },
-        ];
-      })
-    );
-
-    // Filter excluded scenes from scoring data (instance-aware)
-    const scoringData = allScoringData.filter(
-      (s) =>
-        !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData)
-    );
-
-    // Build derived weights from rated/favorited scenes using lightweight data
-    const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map(
-      (r) => ({
-        sceneId: r.sceneId,
-        rating: r.rating,
-        favorite: r.favorite,
-      })
-    );
-
-    const scoringDataMap = new Map(scoringData.map((s) => [s.id, s]));
-    const getScoringDataById = (id: string) => scoringDataMap.get(id);
-
-    const { derivedPerformerWeights, derivedStudioWeights, derivedTagWeights } =
-      buildDerivedWeightsFromScoringData(
-        sceneRatingsForDerived,
-        getScoringDataById
-      );
-
-    // Build implicit weights from engagement rankings (top 50% by percentile)
-    const rankingData: EntityRankingData[] = engagementRankings.map((r) => ({
-      entityId: r.entityId,
-      entityType: r.entityType,
-      engagementRate: r.engagementRate,
-      percentileRank: r.percentileRank,
-    }));
-
-    const {
-      implicitPerformerWeights,
-      implicitStudioWeights,
-      implicitTagWeights,
-    } = buildImplicitWeightsFromRankings(rankingData, 50);
-
-    // Build entity preferences object
-    const prefs: LightweightEntityPreferences = {
-      favoritePerformers,
-      highlyRatedPerformers,
-      favoriteStudios,
-      highlyRatedStudios,
-      favoriteTags,
-      highlyRatedTags,
-      derivedPerformerWeights,
-      derivedStudioWeights,
-      derivedTagWeights,
-      implicitPerformerWeights,
-      implicitStudioWeights,
-      implicitTagWeights,
-    };
-
-    // Phase 1: Score all scenes using lightweight data
-    const scoredScenes: ScoredSceneId[] = [];
-    const now = new Date();
-
-    for (const data of scoringData) {
-      const baseScore = scoreScoringDataByPreferences(data, prefs);
-
-      // Skip if no base score (doesn't match any criteria)
-      if (baseScore === 0) continue;
-
-      // Watch status modifier (reduced dominance: was +100/-100, now +30/-30)
-      let adjustedScore = baseScore;
-      const watchData = watchMap.get(data.id);
-      if (!watchData || watchData.playCount === 0) {
-        // Never watched
-        adjustedScore += 30;
-      } else if (watchData.lastPlayedAt) {
-        const daysSinceWatched =
-          (now.getTime() - watchData.lastPlayedAt.getTime()) /
-          (24 * 60 * 60 * 1000);
-
-        if (daysSinceWatched > 14) {
-          // Not recently watched
-          adjustedScore += 20;
-        } else if (daysSinceWatched >= 1) {
-          // Recently watched (1-14 days)
-          adjustedScore -= 10;
-        } else {
-          // Very recently watched (<24 hours)
-          adjustedScore -= 30;
-        }
-      }
-
-      // Engagement quality multiplier
-      const engagementMultiplier = 1.0 + Math.min(data.oCounter, 10) * 0.03;
-      const finalScore = adjustedScore * engagementMultiplier;
-
-      // Only include scenes with positive final scores
-      if (finalScore > 0) {
-        scoredScenes.push({
-          id: data.id,
-          score: finalScore,
-          oCounter: data.oCounter,
-        });
-      }
-    }
-
-    // Sort by score descending
-    scoredScenes.sort((a, b) => b.score - a.score);
-
-    // Add diversity through score tier randomization: 10% bands, shuffled
-    // within each. The seed is per user and changes daily, so the order holds
-    // across pages (no duplicates) and refreshes each day.
-    const diversifiedScenes = diversifyByScoreTier(
-      scoredScenes,
-      new SeededRandom(generateDailySeed(userId))
-    );
-
-    // Cap at top 500 recommendations
-    const cappedScenes = diversifiedScenes.slice(0, 500);
-
-    // If no recommendations after scoring, include criteria for feedback
-    if (cappedScenes.length === 0) {
+    if (refs.length === 0) {
       res.json({
         scenes: [],
         count: 0,
         page,
         perPage,
         message: "No matching recommendations found",
-        criteria: criteriaCounts,
+        criteria,
       });
       return;
     }
 
-    // Paginate scene IDs
     const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    const paginatedIds = cappedScenes
-      .slice(startIndex, endIndex)
-      .map((s) => s.id);
+    const pageRefs = refs.slice(startIndex, startIndex + perPage);
 
-    // Get user's allowed instance IDs for multi-instance filtering
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-
-    // Fetch full scene data via SceneQueryBuilder
-    const { scenes } = await sceneQueryBuilder.getByIds({
+    const { scenes } = await sceneQueryBuilder.getByRefs({
       userId,
-      ids: paginatedIds,
+      refs: pageRefs,
       allowedInstanceIds,
     });
 
-    // Preserve score order (getByIds returns in arbitrary order)
-    const sceneMap = new Map(scenes.map((s) => [s.id, s]));
-    const orderedScenes = paginatedIds
-      .map((id) => sceneMap.get(id))
+    // Back in ranked order: getByRefs returns the page in no particular order
+    const sceneByKey = new Map(
+      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+    );
+    const orderedScenes = pageRefs
+      .map((ref) => sceneByKey.get(entityKey(ref.id, ref.instanceId)))
       .filter((s): s is NormalizedScene => s !== undefined);
 
     logger.debug("getRecommendedScenes completed", {
       totalTime: `${Date.now() - startTime}ms`,
       userId,
-      candidateCount: cappedScenes.length,
+      candidateCount: refs.length,
       resultCount: orderedScenes.length,
       page,
     });
 
     res.json({
       scenes: orderedScenes,
-      count: cappedScenes.length,
+      count: refs.length,
       page,
       perPage,
     });
