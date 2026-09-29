@@ -99,7 +99,7 @@ router.put("/scene/:sceneId", authenticated(updateSceneRating));
 ## 4. Responses
 
 - Errors are `{ error: string }`, optionally with `errorType`, `message`, `details` and `issues` (`ApiErrorResponse`). Produce them by throwing an `AppError` subclass (section 2), not by hand; controllers that still write `res.status(4xx).json({ error })` move to throwing as they're touched. Success bodies are plain `res.json(...)` (`res.status(201).json(...)`, `res.sendStatus(204)`).
-- A 503 with `ready: false` means the cache is still warming (`requireCacheReady`). The client shows its initializing state for it. The carousel preview and execute routes answer it too: `sceneQueryBuilder` treats an empty `allowedInstanceIds` as no filter, so a route that lists scenes for a user must sit behind `requireCacheReady`.
+- A 503 with `ready: false` means none of the user's instances has finished its first sync (`requireCacheReady`, answering from `isLibraryReady`). The client shows its sync notice and re-checks `GET /api/library/ready` every 5 s; it does not retry the request itself. Every list route, the carousel preview and execute routes included, sits behind `requireCacheReady`; the base query builder also matches nothing for an empty `allowedInstanceIds`.
 - Handlers and middleware never return the response: send it, then `return;` on its own line (`res.status(404).json({ error: "Not found" }); return;`). `noImplicitReturns` rejects a handler that returns `res` on some paths and falls off the end on others; older handlers that `return res` on every path move to this form when touched.
 
 ## 5. Middleware order (`server/initializers/api.ts`)
