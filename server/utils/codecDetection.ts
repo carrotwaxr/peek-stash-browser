@@ -28,8 +28,8 @@ const STREAMABLE_CONTAINERS = new Set(["mp4", "m4v", "mov", "webm"]);
 export interface StreamabilityResult {
   isStreamable: boolean;
   reasons: string[];
-  videoCodec?: string;
-  audioCodec?: string;
+  videoCodec?: string | undefined;
+  audioCodec?: string | undefined;
   container?: string;
 }
 

@@ -231,7 +231,8 @@ export const testStashConnection = async (
       res.json({
         success: true,
         message: "Connection successful",
-        ...(isAdmin && { version: versionString }),
+        ...(isAdmin &&
+          versionString !== undefined && { version: versionString }),
       });
     } else {
       logger.error("Stash connection test got an empty configuration");

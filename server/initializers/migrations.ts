@@ -587,7 +587,7 @@ export interface PrismaCliOptions {
   /** Where `schema.prisma` and `migrations/` are; `./prisma` by default. */
   prismaDir?: string;
   /** The database the CLI acts on; the server's `DATABASE_URL` by default. */
-  databaseUrl?: string;
+  databaseUrl?: string | undefined;
 }
 
 /**

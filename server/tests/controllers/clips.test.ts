@@ -161,7 +161,7 @@ describe("Clips Controller", () => {
       await getClips(req, res);
 
       const ids = (criterion?: {
-        refs: readonly { id: string; instanceId?: string }[];
+        refs: readonly { id: string; instanceId?: string | undefined }[];
       }) =>
         criterion?.refs.map((r) =>
           r.instanceId ? `${r.id}:${r.instanceId}` : r.id

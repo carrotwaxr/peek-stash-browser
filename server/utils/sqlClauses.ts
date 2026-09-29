@@ -682,9 +682,9 @@ export function viaSceneClause(
 export function buildNumericFilter(
   filter:
     | {
-        value?: number | null;
-        value2?: number | null;
-        modifier?: string | null;
+        value?: number | null | undefined;
+        value2?: number | null | undefined;
+        modifier?: string | null | undefined;
       }
     | undefined
     | null,

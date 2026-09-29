@@ -90,7 +90,7 @@ type Hierarchy = Record<string, SubGroupLink[]>;
 interface StubStash {
   hierarchy: Hierarchy;
   /** When set, the hierarchy request fails with it */
-  failure?: Error;
+  failure?: Error | undefined;
   /** The variables of every hierarchy request */
   hierarchyRequests: unknown[];
   /** Every group page's filter: only counts, when nothing changed */

@@ -271,7 +271,7 @@ export function createMockPerformers(count: number): NormalizedPerformer[] {
         instanceId: "default",
         name: `Performer ${i}`,
         gender: must(genders[i % genders.length]),
-        country: countries[i % countries.length],
+        country: must(countries[i % countries.length]),
         favorite: i % 5 === 0, // Every 5th performer is a favorite
         rating: i % 3 === 0 ? ((i % 5) + 1) * 20 : null, // Some have ratings
         scene_count: i * 3,
@@ -430,7 +430,7 @@ export function createMockScenes(
         title: `Scene ${i}`,
         details: i % 2 === 0 ? `Details for scene ${i}` : null,
         performers: scenePerformers,
-        studio: studio,
+        ...(studio !== undefined ? { studio } : {}),
         tags: sceneTags,
         groups: sceneGroups,
         favorite: i % 10 === 0,

@@ -21,7 +21,7 @@ export type StashTarget =
       mode: "live";
       source: "STASH_TEST" | "STASH_URL";
       primary: StashEndpoint;
-      second?: StashEndpoint;
+      second?: StashEndpoint | undefined;
     };
 
 export class StashTargetError extends Error {

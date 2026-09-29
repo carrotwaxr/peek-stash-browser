@@ -214,7 +214,7 @@ export const getPlaylist = async (
     ...(paging && { page: paging.page, perPage: paging.perPage }),
     isOwner: access.level === "owner",
     accessLevel: access.level,
-    sharedViaGroups: access.level === "shared" ? access.groups : undefined,
+    ...(access.level === "shared" ? { sharedViaGroups: access.groups } : {}),
   });
 };
 

@@ -4,7 +4,7 @@ export interface SceneNfoInput {
   details?: string | null;
   date?: string | null;
   rating100?: number | null;
-  studioName?: string | null;
+  studioName?: string | null | undefined;
   performerNames: string[];
   tagNames: string[];
   fileName?: string;
