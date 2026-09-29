@@ -7,6 +7,11 @@
  * to download; the owner hides nothing and gets every live scene on an
  * enabled instance.
  *
+ * SAME@A also carries what its NFO names: performers VISIBLE_A and HIDDEN_A
+ * (the viewer hid HIDDEN_A), tags VISIBLE_A and a soft-deleted one, studio
+ * SAME@A, Stash's own rating 90 and the viewer's rating 40 (the owner has
+ * none).
+ *
  * The zip and the file route run in this worker: CONFIG_DIR points at a temp
  * directory, fetch is stubbed, and the instance manager answers only for A
  * and B.
@@ -43,6 +48,7 @@ import {
   FX_ID,
   clearAccessFixture,
   hideFixtureDefaults,
+  hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
 
@@ -59,6 +65,21 @@ const BASE_URLS: Record<string, string> = {
 
 // The file route is requested over real HTTP; Stash is the stubbed fetch
 const realFetch = globalThis.fetch;
+
+/** A soft-deleted tag on A, one of SAME@A's tags */
+const TAG_DELETED = "7700009";
+
+/**
+ * The NFO titled `title` in a zip's bytes: the entries are stored (zlib
+ * level 0), so each NFO is plain text in the file
+ */
+function nfoTitled(zip: string, title: string): string {
+  const nfos = zip.match(/<movie>[\s\S]*?<\/movie>/g) ?? [];
+  return must(
+    nfos.find((nfo) => nfo.includes(`<title>${title}</title>`)),
+    `the NFO titled ${title}`
+  );
+}
 
 describe("Download access (integration)", () => {
   let owner: number;
@@ -115,6 +136,45 @@ describe("Download access (integration)", () => {
       },
     });
     playlistId = playlist.id;
+
+    // What SAME@A's NFO names. Junction rows go with the fixture's scenes.
+    await prisma.stashTag.create({
+      data: {
+        id: TAG_DELETED,
+        stashInstanceId: FX.A,
+        name: "Deleted tag",
+        deletedAt: new Date(),
+      },
+    });
+    await prisma.stashScene.update({
+      where: {
+        id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.A },
+      },
+      data: { studioId: FX_ID.SAME, rating100: 90 },
+    });
+    const onSameA = { sceneId: FX_ID.SAME, sceneInstanceId: FX.A };
+    await prisma.scenePerformer.createMany({
+      data: [FX_ID.VISIBLE_A, FX_ID.HIDDEN_A].map((performerId) => ({
+        ...onSameA,
+        performerId,
+        performerInstanceId: FX.A,
+      })),
+    });
+    await prisma.sceneTag.createMany({
+      data: [FX_ID.VISIBLE_A, TAG_DELETED].map((tagId) => ({
+        ...onSameA,
+        tagId,
+        tagInstanceId: FX.A,
+      })),
+    });
+    await prisma.sceneRating.create({
+      data: {
+        userId: viewer,
+        instanceId: FX.A,
+        sceneId: FX_ID.SAME,
+        rating: 40,
+      },
+    });
 
     configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-dl-access-"));
     process.env.CONFIG_DIR = configDir;
@@ -212,6 +272,78 @@ describe("Download access (integration)", () => {
       `http://stash-a.test/scene/${FX_ID.SAME}/stream`,
       `http://stash-a.test/scene/${FX_ID.GLOBAL}/stream`,
     ]);
+  });
+
+  describe("the NFO names what the downloading user may see", () => {
+    /** Builds this user's zip of the playlist; its bytes as text */
+    async function zipText(userId: number): Promise<string> {
+      const download = await downloadService.createPlaylistDownload(
+        userId,
+        playlistId
+      );
+      await playlistZipService.createZip(download.id);
+      const row = await prisma.download.findUnique({
+        where: { id: download.id },
+      });
+      if (row?.status !== "COMPLETED") {
+        throw new Error(`zip ${download.id} is ${row?.status}: ${row?.error}`);
+      }
+      return fs
+        .readFileSync(must(row.filePath, "the zip's file path"))
+        .toString("latin1");
+    }
+
+    it("a performer the viewer excluded is not named in the NFO", async () => {
+      const nfo = nfoTitled(await zipText(viewer), `A-${FX_ID.SAME}`);
+
+      expect(nfo).toContain(`<name>A-${FX_ID.VISIBLE_A}</name>`);
+      expect(nfo).not.toContain(`A-${FX_ID.HIDDEN_A}`);
+      expect(nfo).toContain(`<studio>A-${FX_ID.SAME}</studio>`);
+
+      // The downloader's exclusions, not the playlist owner's: the owner hid
+      // nothing, so their NFO names the performer
+      const ownerNfo = nfoTitled(await zipText(owner), `A-${FX_ID.SAME}`);
+      expect(ownerNfo).toContain(`<name>A-${FX_ID.HIDDEN_A}</name>`);
+    });
+
+    it("a soft-deleted tag is not named", async () => {
+      const nfo = nfoTitled(await zipText(owner), `A-${FX_ID.SAME}`);
+
+      expect(nfo).toContain(`<tag>A-${FX_ID.VISIBLE_A}</tag>`);
+      expect(nfo).not.toContain("Deleted tag");
+    });
+
+    it("a studio the viewer hid is not named", async () => {
+      await hideFor(viewer, "studio", FX_ID.SAME, FX.A);
+      try {
+        const nfo = nfoTitled(await zipText(viewer), `A-${FX_ID.SAME}`);
+
+        expect(nfo).toContain("<studio></studio>");
+        expect(nfo).not.toContain(`A-${FX_ID.SAME}</studio>`);
+      } finally {
+        const key = {
+          userId: viewer,
+          entityType: "studio",
+          entityId: FX_ID.SAME,
+          instanceId: FX.A,
+        };
+        await prisma.userHiddenEntity.deleteMany({ where: key });
+        await prisma.userExcludedEntity.deleteMany({ where: key });
+      }
+    });
+
+    it("the NFO's rating is the viewer's, not Stash's", async () => {
+      const nfo = nfoTitled(await zipText(viewer), `A-${FX_ID.SAME}`);
+
+      expect(nfo).toContain("<criticrating>40</criticrating>");
+      expect(nfo).toContain("<rating>4</rating>");
+      expect(nfo).toContain("<userrating>4</userrating>");
+
+      // No rating of the owner's: none written, never Stash's 90
+      const ownerNfo = nfoTitled(await zipText(owner), `A-${FX_ID.SAME}`);
+      expect(ownerNfo).toContain("<criticrating></criticrating>");
+      expect(ownerNfo).toContain("<rating></rating>");
+    });
   });
 
   it("the legacy-download migration expires scene and image rows with no instance", async () => {

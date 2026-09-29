@@ -87,11 +87,9 @@ The included `playlist.m3u` file lets you play scenes in order using any media p
 Each scene includes a `.nfo` file with Kodi-compatible metadata:
 
 - Title and description
-- Performers
-- Studio
-- Tags
-- Runtime
-- Date added
+- Release date
+- Performers, studio and tags: only those you can see, as in Peek
+- Your rating, if you rated the scene (never the rating stored in Stash)
 
 These files allow Kodi and similar media managers to display proper metadata for your downloaded scenes.
 
