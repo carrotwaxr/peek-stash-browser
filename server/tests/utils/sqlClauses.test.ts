@@ -15,6 +15,7 @@ import {
   type ViaSceneSpec,
   anyOf,
   buildDateFilter,
+  buildEpochDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
@@ -1095,5 +1096,74 @@ describe("buildFavoriteFilter", () => {
     const result = buildFavoriteFilter(false);
     expect(result.sql).toBe("(r.favorite = 0 OR r.favorite IS NULL)");
     expect(result.params).toEqual([]);
+  });
+});
+
+describe("buildEpochDateFilter", () => {
+  const col = "w.lastPlayedAt";
+  const day = Date.UTC(2026, 8, 25);
+  const next = day + 86_400_000;
+
+  it("binds GREATER_THAN and LESS_THAN as epoch milliseconds", () => {
+    expect(
+      buildEpochDateFilter(
+        { modifier: "GREATER_THAN", value: "2026-09-25" },
+        col
+      )
+    ).toEqual({ sql: "w.lastPlayedAt > ?", params: [day] });
+    expect(
+      buildEpochDateFilter({ modifier: "LESS_THAN", value: "2026-09-25" }, col)
+    ).toEqual({ sql: "w.lastPlayedAt < ?", params: [day] });
+  });
+
+  it("EQUALS is the UTC day, NOT_EQUALS its complement", () => {
+    expect(
+      buildEpochDateFilter({ modifier: "EQUALS", value: "2026-09-25" }, col)
+        .params
+    ).toEqual([day, next]);
+    const not = buildEpochDateFilter(
+      { modifier: "NOT_EQUALS", value: "2026-09-25" },
+      col
+    );
+    expect(not.sql).toContain("IS NULL");
+    expect(not.params).toEqual([day, next]);
+  });
+
+  it("BETWEEN includes the last day", () => {
+    expect(
+      buildEpochDateFilter(
+        { modifier: "BETWEEN", value: "2026-09-20", value2: "2026-09-25" },
+        col
+      ).params
+    ).toEqual([Date.UTC(2026, 8, 20), next]);
+    expect(
+      buildEpochDateFilter(
+        { modifier: "NOT_BETWEEN", value: "2026-09-20", value2: "2026-09-25" },
+        col
+      ).params
+    ).toEqual([Date.UTC(2026, 8, 20), next]);
+  });
+
+  it("an ISO date-time is the instant", () => {
+    const at = Date.parse("2026-09-25T12:00:00Z");
+    expect(
+      buildEpochDateFilter(
+        { modifier: "GREATER_THAN", value: "2026-09-25T12:00:00Z" },
+        col
+      ).params
+    ).toEqual([at]);
+  });
+
+  it("IS_NULL and NOT_NULL bind nothing; an unparsable value is no clause", () => {
+    expect(buildEpochDateFilter({ modifier: "IS_NULL" }, col)).toEqual({
+      sql: "w.lastPlayedAt IS NULL",
+      params: [],
+    });
+    expect(buildEpochDateFilter({ modifier: "NOT_NULL" }, col).params).toEqual(
+      []
+    );
+    expect(
+      buildEpochDateFilter({ modifier: "EQUALS", value: "nope" }, col)
+    ).toEqual({ sql: "", params: [] });
   });
 });

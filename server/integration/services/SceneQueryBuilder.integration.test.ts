@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
@@ -271,5 +271,116 @@ describeWithDb("SceneQueryBuilder Integration", () => {
       expect(scene.rating100).toBeNull();
       expect(scene.favorite).toBe(false);
     }
+  });
+});
+
+describeWithDb("SceneQueryBuilder last_played_at filter", () => {
+  let userId: number;
+  let played: { id: string; stashInstanceId: string };
+  let instances: string[];
+
+  beforeAll(async () => {
+    instances = (
+      await prisma.stashInstance.findMany({ select: { id: true } })
+    ).map((row) => row.id);
+    played = must(
+      await prisma.stashScene.findFirst({
+        where: { deletedAt: null },
+        select: { id: true, stashInstanceId: true },
+      })
+    );
+    const user = await prisma.user.create({
+      data: {
+        username: "last-played-it-user",
+        password: "not-a-real-hash",
+        role: "USER",
+      },
+    });
+    userId = user.id;
+    // Prisma stores the DateTime as epoch milliseconds
+    await prisma.watchHistory.create({
+      data: {
+        userId,
+        sceneId: played.id,
+        instanceId: played.stashInstanceId,
+        playCount: 1,
+        lastPlayedAt: new Date("2026-09-25T12:00:00Z"),
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+  });
+
+  const found = async (
+    last_played_at: NonNullable<
+      ParsedListRequest<"scene">["filter"]["last_played_at"]
+    >
+  ): Promise<boolean> => {
+    const { items } = await sceneQueryBuilder.execute({
+      userId,
+      allowedInstanceIds: instances,
+      applyExclusions: false,
+      request: {
+        ...request({ ...byCreated, seed: undefined }, 1, 5),
+        filter: {
+          ids: {
+            modifier: "INCLUDES",
+            depth: 0,
+            refs: [{ id: played.id, instanceId: played.stashInstanceId }],
+          },
+          last_played_at,
+        },
+      },
+    });
+    return items.some(
+      (scene) =>
+        scene.id === played.id && scene.instanceId === played.stashInstanceId
+    );
+  };
+
+  it("GREATER_THAN matches a play after the date only", async () => {
+    expect(await found({ modifier: "GREATER_THAN", value: "2026-09-01" })).toBe(
+      true
+    );
+    expect(await found({ modifier: "GREATER_THAN", value: "2026-10-01" })).toBe(
+      false
+    );
+  });
+
+  it("LESS_THAN matches a play before the date only", async () => {
+    expect(await found({ modifier: "LESS_THAN", value: "2026-09-01" })).toBe(
+      false
+    );
+    expect(await found({ modifier: "LESS_THAN", value: "2026-10-01" })).toBe(
+      true
+    );
+  });
+
+  it("EQUALS matches the play's day", async () => {
+    expect(await found({ modifier: "EQUALS", value: "2026-09-25" })).toBe(true);
+    expect(await found({ modifier: "EQUALS", value: "2026-09-24" })).toBe(
+      false
+    );
+    expect(await found({ modifier: "NOT_EQUALS", value: "2026-09-25" })).toBe(
+      false
+    );
+  });
+
+  it("BETWEEN includes the last day; NOT_BETWEEN is its complement", async () => {
+    const between = (value: string, value2: string) =>
+      ({ modifier: "BETWEEN", value, value2 }) as const;
+    const notBetween = (value: string, value2: string) =>
+      ({ modifier: "NOT_BETWEEN", value, value2 }) as const;
+    expect(await found(between("2026-09-20", "2026-09-25"))).toBe(true);
+    expect(await found(between("2026-09-26", "2026-09-30"))).toBe(false);
+    expect(await found(notBetween("2026-09-20", "2026-09-25"))).toBe(false);
+    expect(await found(notBetween("2026-09-26", "2026-09-30"))).toBe(true);
+  });
+
+  it("IS_NULL and NOT_NULL", async () => {
+    expect(await found({ modifier: "NOT_NULL" })).toBe(true);
+    expect(await found({ modifier: "IS_NULL" })).toBe(false);
   });
 });

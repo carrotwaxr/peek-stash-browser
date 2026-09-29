@@ -38,6 +38,7 @@ import {
   type FilterClause,
   type JunctionTarget,
   buildDateFilter,
+  buildEpochDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
@@ -380,7 +381,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       push(buildDateFilter(filter.updated_at, "s.stashUpdatedAt"));
     }
     if (filter.last_played_at) {
-      push(buildDateFilter(filter.last_played_at, "w.lastPlayedAt"));
+      push(buildEpochDateFilter(filter.last_played_at, "w.lastPlayedAt"));
     }
 
     // Numbers
