@@ -144,6 +144,16 @@ export class RecommendationService {
     return result;
   }
 
+  /**
+   * Forgets the user's list, whatever its stamp: their next page scores
+   * again. For a deleted user, and for a change the stamp cannot see. A
+   * computation running now still answers the pages waiting on it, and is
+   * not kept.
+   */
+  forget(userId: number): void {
+    this.entries.delete(userId);
+  }
+
   /** Forgets every list (tests) */
   clear(): void {
     this.entries.clear();

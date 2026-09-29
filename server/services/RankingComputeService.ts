@@ -113,6 +113,18 @@ class RankingComputeService {
     refresh.catch(() => undefined);
   }
 
+  /**
+   * Forgets when the user's rankings were computed: the next `ensureFresh`
+   * recomputes them, and a recompute running now records nothing when it
+   * lands. For a deleted user, and after a change to what the rankings are
+   * computed from. The user stays known, as stale, rather than removed: an
+   * unknown user's freshness is read from their newest ranking row (after a
+   * restart), which cannot tell that anything changed since.
+   */
+  forget(userId: number): void {
+    this.freshness.set(userId, { computedAt: 0 });
+  }
+
   private refresh(userId: number): Promise<void> {
     const known = this.freshness.get(userId);
     if (known?.running) return known.running;
@@ -120,22 +132,27 @@ class RankingComputeService {
       return Promise.resolve();
     }
 
-    const running = this.recomputeIfStale(userId, known?.computedAt).then(
-      (computedAt) => {
+    const entry: Freshness = { computedAt: known?.computedAt ?? 0 };
+    // Only while the entry is still the user's: after `forget`, a recompute
+    // that started before it records nothing
+    const record = (computedAt: number) => {
+      if (this.freshness.get(userId) === entry) {
         this.freshness.set(userId, { computedAt });
+      }
+    };
+    entry.running = this.recomputeIfStale(userId, known?.computedAt).then(
+      (computedAt) => {
+        record(computedAt);
       },
       (error: unknown) => {
         // computedAt stays as it was, so the next call tries again
-        this.freshness.set(userId, { computedAt: known?.computedAt ?? 0 });
+        record(entry.computedAt);
         logger.error("Ranking recompute failed", { userId, error });
         throw error;
       }
     );
-    this.freshness.set(userId, {
-      computedAt: known?.computedAt ?? 0,
-      running,
-    });
-    return running;
+    this.freshness.set(userId, entry);
+    return entry.running;
   }
 
   /**
@@ -297,8 +314,11 @@ class RankingComputeService {
       return;
     }
 
-    // Replace this user's rankings of the type in one batch: both statements
-    // are built first, so the unit makes no Node round trip under the lock
+    // Replace this user's rankings of the type in one batch: the statements
+    // are built first, so the unit makes no Node round trip under the lock.
+    // The last one removes them again when the user was deleted while this
+    // recompute ran: the table has no foreign key to User to refuse them,
+    // and deleteUser's unit runs either before this one or after it.
     await dbWriteBatch("rankings", [
       prisma.userEntityRanking.deleteMany({
         where: { userId, entityType },
@@ -318,6 +338,11 @@ class RankingComputeService {
           percentileRank: r.percentileRank,
         })),
       }),
+      prisma.$executeRaw`
+        DELETE FROM UserEntityRanking
+        WHERE userId = ${userId}
+          AND NOT EXISTS (SELECT 1 FROM "User" WHERE id = ${userId})
+      `,
     ]);
   }
 

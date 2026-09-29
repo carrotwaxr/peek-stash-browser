@@ -79,6 +79,7 @@ const MIGRATIONS = [
   "005_recompute_exclusions_studio_instance",
   "006_rebuild_derived_after_sync_semantics",
   "007_drop_scene_rankings",
+  "008_delete_orphaned_user_rows",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -89,7 +90,7 @@ const appliedAllBut = (...pending: string[]) =>
     appliedAt: new Date(),
   }));
 
-/** Every migration before 006 applied, and 007 */
+/** Every migration applied but 006 */
 const APPLIED_BEFORE_006 = appliedAllBut(
   "006_rebuild_derived_after_sync_semantics"
 );
@@ -104,6 +105,8 @@ describe("DataMigrationService", () => {
     });
     // Migration 007: no user holds a stored scene ranking
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    // Migration 008: no row of a deleted user left
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -153,6 +156,11 @@ describe("DataMigrationService", () => {
           name: "007_drop_scene_rankings",
           appliedAt: new Date(),
         },
+        {
+          id: 8,
+          name: "008_delete_orphaned_user_rows",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -186,8 +194,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All seven migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(7);
+      // All eight migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(8);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -209,10 +217,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "007_drop_scene_rankings" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "008_delete_orphaned_user_rows" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 007 pending
+      // 001 already applied, 002 to 008 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -231,8 +242,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 007 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(6);
+      // 001 is skipped; 002 to 008 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(7);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -369,6 +380,64 @@ describe("DataMigrationService", () => {
       );
       mockPrisma.$queryRaw.mockResolvedValue([{ userId: 1 }]);
       mockPrisma.userEntityRanking.deleteMany.mockRejectedValue(
+        new Error("disk I/O error")
+      );
+
+      const service = await importFresh();
+      await expect(service.runPendingMigrations()).rejects.toThrow(
+        "disk I/O error"
+      );
+      expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
+    });
+
+    it("deletes the rows of users that no longer exist in migration 008, table by table, a chunk a unit until one comes back short", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("008_delete_orphaned_user_rows")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      mockPrisma.$executeRawUnsafe
+        .mockResolvedValueOnce(5000)
+        .mockResolvedValueOnce(3);
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      const calls = mockPrisma.$executeRawUnsafe.mock.calls.map(
+        ([sql, ...params]) => ({
+          table: /DELETE FROM "(\w+)"/.exec(sql)?.[1],
+          sql: sql
+            .replace(/\s+/g, " ")
+            .replace(/\( /g, "(")
+            .replace(/ \)/g, ")"),
+          params,
+        })
+      );
+      // A full chunk of performer stats, then a short one; one each for
+      // the other three
+      expect(calls.map((call) => call.table)).toEqual([
+        "UserPerformerStats",
+        "UserPerformerStats",
+        "UserStudioStats",
+        "UserTagStats",
+        "UserEntityRanking",
+      ]);
+      for (const call of calls) {
+        // Only rows whose user is gone, at most a chunk at a time
+        expect(call.sql).toContain(
+          `WHERE id IN (SELECT t.id FROM "${call.table}" t WHERE NOT EXISTS (SELECT 1 FROM "User" u WHERE u.id = t.userId) LIMIT ?)`
+        );
+        expect(call.params).toEqual([5000]);
+      }
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
+        data: { name: "008_delete_orphaned_user_rows" },
+      });
+    });
+
+    it("does not mark 008 as applied when a delete throws", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("008_delete_orphaned_user_rows")
+      );
+      mockPrisma.$executeRawUnsafe.mockRejectedValue(
         new Error("disk I/O error")
       );
 

@@ -42,6 +42,7 @@ function rankingTx() {
   const table = mockPrisma.userEntityRanking;
   table.deleteMany.mockResolvedValue({ count: 0 });
   table.createMany.mockResolvedValue({ count: 1 });
+  mockPrisma.$executeRaw.mockResolvedValue(0);
   return { userEntityRanking: table };
 }
 
@@ -414,6 +415,43 @@ describe("RankingComputeService", () => {
     });
   });
 
+  describe("a user deleted while the recompute runs", () => {
+    it("each written batch ends by deleting the rows it wrote unless the user still exists", async () => {
+      setupRankingMocks({
+        performerStats: [
+          {
+            entityId: "p1",
+            instanceId: "i1",
+            playCount: 1,
+            oCount: 0,
+            playDuration: 60,
+            libraryPresence: 1,
+          },
+        ],
+      });
+
+      await rankingComputeService.recomputeAllRankings(9);
+
+      // One written type (performers); the empty ones only delete
+      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+      const [strings, ...values] = must(mockPrisma.$executeRaw.mock.calls[0]);
+      const sql = Array.isArray(strings) ? strings.join("?") : "";
+      expect(sql.replace(/\s+/g, " ")).toContain(
+        'DELETE FROM UserEntityRanking WHERE userId = ? AND NOT EXISTS (SELECT 1 FROM "User" WHERE id = ?)'
+      );
+      expect(values).toEqual([9, 9]);
+      // In the same batch as the write, after it
+      const order = [
+        must(
+          mockPrisma.userEntityRanking.createMany.mock.invocationCallOrder[0]
+        ),
+        must(mockPrisma.$executeRaw.mock.invocationCallOrder[0]),
+      ];
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("query order", () => {
     it("reads one entity type after another, never two at once", async () => {
       // Run together, the reads contend for the pool and the disk: at 200k
@@ -672,6 +710,63 @@ describe("RankingComputeService", () => {
 
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(QUERIES_PER_RECOMPUTE);
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(3);
+    });
+
+    it("after forget, the next call recomputes at once, even with a ranking row under an hour old", async () => {
+      await rankingComputeService.ensureFresh(108, { wait: true });
+      expect(recomputes()).toBe(1);
+      // The rows that recompute wrote: after a restart they would count
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+        partialRow({ updatedAt: new Date(now) })
+      );
+      later(MINUTE_MS);
+
+      rankingComputeService.forget(108);
+      await rankingComputeService.ensureFresh(108, { wait: true });
+
+      expect(recomputes()).toBe(2);
+      // Forgotten is not unknown: the ranking table is not read again
+      expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledTimes(1);
+
+      // The new recompute counts as usual
+      later(MINUTE_MS);
+      await rankingComputeService.ensureFresh(108, { wait: true });
+      expect(recomputes()).toBe(2);
+    });
+
+    it("a recompute running when forget is called does not mark the user fresh when it lands", async () => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mockPrisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof prisma.$queryRaw>(async () => {
+          await gate;
+          return [];
+        })
+      );
+
+      await rankingComputeService.ensureFresh(109);
+      rankingComputeService.forget(109);
+      release();
+      // The first recompute lands: its three types written, then logged
+      await vi.waitFor(() => {
+        expect(logger.info).toHaveBeenCalledWith(
+          "Ranking computation complete",
+          objectContaining({ userId: 109 })
+        );
+      });
+
+      await rankingComputeService.ensureFresh(109, { wait: true });
+
+      expect(recomputes()).toBe(2);
+    });
+
+    it("forget of a user the service never saw is harmless", async () => {
+      rankingComputeService.forget(110);
+      await rankingComputeService.ensureFresh(110, { wait: true });
+
+      expect(recomputes()).toBe(1);
     });
 
     it("without wait, a failed recompute is logged and not thrown", async () => {

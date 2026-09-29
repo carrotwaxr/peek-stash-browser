@@ -24,6 +24,56 @@ interface Migration {
 }
 
 /**
+ * The per-user tables with no relation to User, so a user's delete never
+ * cascaded to them. deleteUser deletes their rows itself; a foreign key
+ * with ON DELETE CASCADE would need each table rebuilt.
+ */
+const UNLINKED_USER_TABLES = [
+  "UserPerformerStats",
+  "UserStudioStats",
+  "UserTagStats",
+  "UserEntityRanking",
+] as const;
+
+type UnlinkedUserTable = (typeof UNLINKED_USER_TABLES)[number];
+
+/** Rows deleted per write unit */
+const ORPHAN_CHUNK = 5000;
+
+/**
+ * Deletes the rows of users that no longer exist from the unlinked
+ * per-user tables (migration 008), table by table, up to `chunkSize` rows a
+ * write unit until a chunk comes back short. Each chunk finds its rows by
+ * scanning the table and probing User's primary key.
+ */
+export async function deleteOrphanedUserRows(
+  chunkSize: number = ORPHAN_CHUNK
+): Promise<Record<UnlinkedUserTable, number>> {
+  const deleted: Record<UnlinkedUserTable, number> = {
+    UserPerformerStats: 0,
+    UserStudioStats: 0,
+    UserTagStats: 0,
+    UserEntityRanking: 0,
+  };
+  for (const table of UNLINKED_USER_TABLES) {
+    const sql = `
+      DELETE FROM "${table}" WHERE id IN (
+        SELECT t.id FROM "${table}" t
+        WHERE NOT EXISTS (SELECT 1 FROM "User" u WHERE u.id = t.userId)
+        LIMIT ?
+      )`;
+    for (;;) {
+      const count = await dbWrite("migration.orphanedUserRows", () =>
+        prisma.$executeRawUnsafe(sql, chunkSize)
+      );
+      deleted[table] += count;
+      if (count < chunkSize) break;
+    }
+  }
+  return deleted;
+}
+
+/**
  * A migration that recomputes every user's exclusions once, after a change to
  * what the computation reads. A failure leaves it pending for the next start.
  */
@@ -216,6 +266,20 @@ const migrations: Migration[] = [
         users: users.length,
         rows,
       });
+    },
+  },
+  // Deleting a user left their rows in the four per-user tables with no
+  // relation to User; deleteUser now deletes them with the user
+  {
+    name: "008_delete_orphaned_user_rows",
+    description:
+      "Delete the stats and rankings of users that no longer exist (UserPerformerStats, UserStudioStats, UserTagStats, UserEntityRanking)",
+    run: async () => {
+      const deleted = await deleteOrphanedUserRows();
+      logger.info(
+        "[Migration 008] Deleted the stats and rankings of deleted users",
+        deleted
+      );
     },
   },
 ];

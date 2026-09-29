@@ -26,6 +26,8 @@ import {
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { recommendationService } from "../../services/RecommendationService.js";
 import type { UserRestriction } from "../../types/api/index.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
@@ -83,8 +85,18 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
+// The per-user caches deleteUser drops
+vi.mock("../../services/RankingComputeService.js", () => ({
+  rankingComputeService: { forget: vi.fn() },
+}));
+vi.mock("../../services/RecommendationService.js", () => ({
+  recommendationService: { forget: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
 const mockExclusions = vi.mocked(exclusionComputationService);
+const mockRankings = vi.mocked(rankingComputeService, true);
+const mockRecommendations = vi.mocked(recommendationService, true);
 const mockBcrypt = vi.mocked(bcrypt);
 const mockValidatePassword = vi.mocked(validatePassword);
 
@@ -998,6 +1010,63 @@ describe("User Controller", () => {
       await deleteUser(req, res);
       expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: 3 } });
+    });
+
+    it("deletes the user's rows in the four tables with no relation to User, with the user, in one unit", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      const byUser = { where: { userId: 3 } };
+      expect(mockPrisma.userPerformerStats.deleteMany).toHaveBeenCalledWith(
+        byUser
+      );
+      expect(mockPrisma.userStudioStats.deleteMany).toHaveBeenCalledWith(
+        byUser
+      );
+      expect(mockPrisma.userTagStats.deleteMany).toHaveBeenCalledWith(byUser);
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith(
+        byUser
+      );
+      // One batch: the four deletes and the user's (whose cascades take
+      // every other per-user table)
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      const [ops] = must(mockPrisma.$transaction.mock.calls[0]);
+      expect(Array.isArray(ops) ? ops.length : 0).toBe(5);
+    });
+
+    it("drops the deleted user from the ranking and Recommended caches, after the delete", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      expect(mockRankings.forget).toHaveBeenCalledExactlyOnceWith(3);
+      expect(mockRecommendations.forget).toHaveBeenCalledExactlyOnceWith(3);
+      const deletedAt = must(
+        mockPrisma.$transaction.mock.invocationCallOrder[0]
+      );
+      expect(
+        must(mockRankings.forget.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(deletedAt);
+      expect(
+        must(mockRecommendations.forget.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(deletedAt);
+    });
+
+    it("a failed delete answers 500 and forgets nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockRejectedValue(new Error("disk I/O error"));
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      expect(res._getStatus()).toBe(500);
+      expect(mockRankings.forget).not.toHaveBeenCalled();
+      expect(mockRecommendations.forget).not.toHaveBeenCalled();
     });
   });
 
