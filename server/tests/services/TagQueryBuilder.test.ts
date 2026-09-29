@@ -3,21 +3,28 @@
  * statements it records for a parsed request. The base owns the instance
  * filter, the exclusion join, the `ids` pairs, the random sort and the
  * joined count; this file pins what the tag adds on top (its per-user joins,
- * sort map and tiebreak, filter clauses, search and parent names) and that
- * the base's clauses reach its statements.
+ * sort map and tiebreak, filter clauses, search, parents and children) and
+ * that the base's clauses reach its statements.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
+import type * as nestedRefsModule from "../../services/query/nestedRefs.js";
+import {
+  TAG_REF,
+  loadRefsByKey,
+  loadTagChildren,
+} from "../../services/query/nestedRefs.js";
+import type { TagRef } from "../../types/index.js";
 import type { TagQueryRow } from "../../types/internal/queryRows.js";
 import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -44,7 +51,24 @@ vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
 }));
 
+// The parents' and children's loads (their SQL is nestedRefs.test.ts's)
+vi.mock("../../services/query/nestedRefs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof nestedRefsModule>()),
+  loadRefsByKey: vi.fn(() => Promise.resolve(new Map())),
+  loadTagChildren: vi.fn(() => Promise.resolve(new Map())),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockLoadRefsByKey = vi.mocked(loadRefsByKey);
+const mockLoadTagChildren = vi.mocked(loadTagChildren);
+
+/** A tag's ref as nestedRefs builds it */
+const tagRefOf = (id: string, instanceId: string, name: string): TagRef => ({
+  id,
+  instanceId,
+  name,
+  image_path: null,
+});
 
 const ALLOWED = ["inst-a", "inst-b"];
 const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
@@ -116,7 +140,6 @@ describe("TagQueryBuilder", () => {
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // page
       .mockResolvedValueOnce([{ total: 0n }]); // count
-    mockPrisma.stashTag.findMany.mockResolvedValue([]);
   });
 
   describe("the statement", () => {
@@ -365,21 +388,16 @@ describe("TagQueryBuilder", () => {
   });
 
   describe("rows", () => {
-    it("a row reads as the viewer's tag, with the larger scene count and its parents named on its own instance", async () => {
+    it("a row reads as the viewer's tag, with the larger scene count", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([tagRow()])
         .mockResolvedValueOnce([{ total: 1n }]);
-      mockPrisma.stashTag.findMany.mockResolvedValue([
-        partialRow({ id: "10", stashInstanceId: "inst-a", name: "Places" }),
-        partialRow({ id: "11", stashInstanceId: "inst-b", name: "Elsewhere" }),
-      ]);
 
       const result = await run();
 
       expect(result).toMatchObject({ total: 1 });
-      const tag = must(result.items[0]);
-      expect(tag).toMatchObject({
+      expect(must(result.items[0])).toMatchObject({
         id: "1",
         instanceId: "inst-a",
         description: null,
@@ -394,20 +412,74 @@ describe("TagQueryBuilder", () => {
         o_counter: 0,
         play_count: 5,
         image_path: null,
-        // "11" exists only on inst-b: not this tag's parent
-        parents: [
-          { id: "10", name: "Places" },
-          { id: "11", name: "Unknown" },
-        ],
       });
-      expect(mockPrisma.stashTag.findMany).toHaveBeenCalledWith(
-        objectContaining({
-          where: {
-            id: { in: ["10", "11"] },
-            stashInstanceId: { in: ["inst-a"] },
-          },
-        })
+    });
+
+    it("parents are the visible ones on the tag's own instance, in the tag's order; children come by name", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          tagRow({ parentIds: '["11","10","12"]' }),
+          tagRow({ id: "1", stashInstanceId: "inst-b", parentIds: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 2n }]);
+      // "12" is hidden, deleted or missing: nestedRefs leaves it out
+      mockLoadRefsByKey.mockResolvedValueOnce(
+        new Map([
+          [entityKey("10", "inst-a"), tagRefOf("10", "inst-a", "Places")],
+          [entityKey("11", "inst-a"), tagRefOf("11", "inst-a", "Beaches")],
+        ])
       );
+      mockLoadTagChildren.mockResolvedValueOnce(
+        new Map([
+          [
+            entityKey("1", "inst-b"),
+            [tagRefOf("7", "inst-b", "sand"), tagRefOf("5", "inst-b", "Dunes")],
+          ],
+        ])
+      );
+
+      const { items } = await run();
+
+      // One load each for the page, with the viewer and the parents on
+      // their tag's instance
+      expect(mockLoadRefsByKey).toHaveBeenCalledTimes(1);
+      expect(mockLoadRefsByKey).toHaveBeenCalledWith(
+        TAG_REF,
+        [
+          { id: "11", instanceId: "inst-a" },
+          { id: "10", instanceId: "inst-a" },
+          { id: "12", instanceId: "inst-a" },
+        ],
+        objectContaining({ userId: 1, applyExclusions: true })
+      );
+      expect(mockLoadTagChildren).toHaveBeenCalledTimes(1);
+      expect(mockLoadTagChildren).toHaveBeenCalledWith(
+        [
+          objectContaining({ id: "1", instanceId: "inst-a" }),
+          objectContaining({ id: "1", instanceId: "inst-b" }),
+        ],
+        objectContaining({ userId: 1, applyExclusions: true })
+      );
+
+      const [onA, onB] = [must(items[0]), must(items[1])];
+      expect(onA.parents).toEqual([
+        tagRefOf("11", "inst-a", "Beaches"),
+        tagRefOf("10", "inst-a", "Places"),
+      ]);
+      expect(onA.children).toEqual([]);
+      expect(onB.parents).toEqual([]);
+      expect(onB.children).toEqual([
+        tagRefOf("5", "inst-b", "Dunes"),
+        tagRefOf("7", "inst-b", "sand"),
+      ]);
+    });
+
+    it("an empty page loads no parents or children", async () => {
+      await run();
+
+      expect(mockLoadRefsByKey).not.toHaveBeenCalled();
+      expect(mockLoadTagChildren).not.toHaveBeenCalled();
     });
   });
 });

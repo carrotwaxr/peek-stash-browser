@@ -645,32 +645,6 @@ class StashEntityService {
   }
 
   /**
-   * Get all studios from cache
-   */
-  async getAllStudios(): Promise<NormalizedStudio[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashStudio.findMany({
-      where: { deletedAt: null },
-      include: {
-        tags: { include: { tag: true } }, // Include full tag data
-      },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => this.transformStudio(c));
-    const transformTime = Date.now() - transformStart;
-
-    logger.debug(
-      `getAllStudios: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
-
-  /**
    * Get studio by ID with computed counts
    * @param id - Studio ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
@@ -750,29 +724,6 @@ class StashEntityService {
   }
 
   // ==================== Tag Queries ====================
-
-  /**
-   * Get all tags from cache
-   */
-  async getAllTags(): Promise<NormalizedTag[]> {
-    const startTotal = Date.now();
-
-    const queryStart = Date.now();
-    const cached = await prisma.stashTag.findMany({
-      where: { deletedAt: null },
-    });
-    const queryTime = Date.now() - queryStart;
-
-    const transformStart = Date.now();
-    const result = cached.map((c) => this.transformTag(c));
-    const transformTime = Date.now() - transformStart;
-
-    logger.debug(
-      `getAllTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
-    );
-
-    return result;
-  }
 
   /**
    * Get tag by ID with computed counts

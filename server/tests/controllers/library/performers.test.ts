@@ -34,12 +34,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
-vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  hydrateEntityTags: vi
-    .fn()
-    .mockImplementation((items) => Promise.resolve(items)),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -144,6 +138,33 @@ describe("findPerformers", () => {
 
     expect(res._getStatus()).toBe(400);
     expect(res._getBody()).toMatchObject({ error: "Ambiguous lookup" });
+  });
+
+  it("a single-ID lookup answers the builder's row, its tags as the builder named them", async () => {
+    const tags = [
+      { id: "7", instanceId: "inst1", name: "Beach", image_path: null },
+    ];
+    const performer = createMockPerformer({
+      id: "101",
+      instanceId: "inst1",
+      tags,
+    });
+    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
+      items: [performer],
+      total: 1,
+    });
+
+    const req = reqFor(findPerformers, {
+      body: { ids: ["101"], performer_filter: { instance_id: "inst1" } },
+      user: testUser(),
+    });
+    const res = resFor(findPerformers);
+
+    await findPerformers(req, res);
+
+    expect(res._getOkBody().findPerformers.performers).toEqual([
+      { ...performer, stashUrl: null },
+    ]);
   });
 
   it("returns 500 when query builder throws", async () => {

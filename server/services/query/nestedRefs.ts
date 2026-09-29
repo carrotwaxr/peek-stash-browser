@@ -182,6 +182,20 @@ export const GALLERY_REF: NestedEntity<GalleryRefRow, GalleryRef> = {
   toRef: (row) => galleryRef(row, row.stashInstanceId),
 };
 
+/**
+ * Refs in name order, case-insensitively, then by id: a list with no order
+ * of its own (a tag's or a studio's children), sorted in place
+ */
+export function byName<Ref extends { id: string; name: string }>(
+  refs: Ref[]
+): Ref[] {
+  return refs.sort(
+    (a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id, undefined, { numeric: true })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The loads
 // ---------------------------------------------------------------------------
@@ -250,7 +264,8 @@ ${visible.where}`,
 /**
  * The visible entities among the refs, by entityKey (one the viewer cannot
  * see, or that is gone, is absent): a row's own studio, a scene's inherited
- * tags. One statement, each distinct ref looked up by primary key.
+ * tags, a tag's parents. One statement, each distinct ref looked up by
+ * primary key.
  */
 export async function loadRefsByKey<Row, Ref>(
   entity: NestedEntity<Row, Ref>,
@@ -276,4 +291,44 @@ ${visible.where}`,
     byKey.set(entityKey(row.id, row.stashInstanceId), entity.toRef(row));
   }
   return byKey;
+}
+
+/**
+ * Each parent tag's visible children, by the parent's entityKey (a parent
+ * with none is absent): the live tags on the parent's own instance whose
+ * `parentIds` list names it, with no exclusion row for the viewer. A tag's
+ * parents are a JSON list with no index, so the one statement reads every
+ * live tag of the page's instances once (`json_each` over each list) and
+ * keeps the children of the page's (id, instance) pairs.
+ */
+export async function loadTagChildren(
+  parents: readonly EntityRef[],
+  viewer: NestedViewer
+): Promise<Map<string, TagRef[]>> {
+  const byParent = new Map<string, TagRef[]>();
+  const page = distinctRefs(parents);
+  if (page.length === 0) return byParent;
+
+  const visible = visibility("tag", viewer);
+  const rows = await prisma.$queryRawUnsafe<
+    Array<NestedParentRow & RefKeyRow & TagRefRow>
+  >(
+    `${pairs("page", "pid", "pinst")}
+SELECT je.value AS pid, x.stashInstanceId AS pinst, x.id, x.stashInstanceId, ${TAG_REF.columns}
+FROM StashTag x
+CROSS JOIN json_each(x.parentIds) je${visible.join}
+${visible.where}
+  AND x.stashInstanceId IN (SELECT pinst FROM page)
+  AND (je.value, x.stashInstanceId) IN (SELECT pid, pinst FROM page)`,
+    pairsJson(page),
+    ...visible.params
+  );
+
+  for (const row of rows) {
+    const key = entityKey(row.pid, row.pinst);
+    const list = byParent.get(key) ?? [];
+    list.push(TAG_REF.toRef(row));
+    byParent.set(key, list);
+  }
+  return byParent;
 }

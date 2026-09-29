@@ -4,12 +4,11 @@
  * The tag builder on the base (`query/EntityQueryBuilder.ts`): this file
  * declares the tag's spec (table, per-user joins, columns, tiebreak), its
  * filter clauses from the parsed request, its sort map, its row transform
- * and its relations (with its parents' names). The instance filter, the
- * exclusion join, the `ids` filter, the random sort and the count are the
- * base's.
+ * and its relations (with its parents and children). The instance filter,
+ * the exclusion join, the `ids` filter, the random sort and the count are
+ * the base's.
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
-import prisma from "../prisma/singleton.js";
 import type { NormalizedTag } from "../types/index.js";
 import type { TagQueryRow } from "../types/internal/queryRows.js";
 import type {
@@ -45,6 +44,12 @@ import {
   type QueryContext,
   type SortExpr,
 } from "./query/EntityQueryBuilder.js";
+import {
+  TAG_REF,
+  byName,
+  loadRefsByKey,
+  loadTagChildren,
+} from "./query/nestedRefs.js";
 
 // Column list for SELECT - all StashTag fields plus user data
 const SELECT_COLUMNS = `
@@ -335,10 +340,9 @@ class TagQueryBuilder extends EntityQueryBuilder<
       name: row.name,
       description: emptyToNull(row.description),
       aliases: parseJsonArray(row.aliases),
-      parents: parseJsonArray(row.parentIds).map((id: string) => ({
-        id,
-        name: "",
-      })),
+      // The parent ids; populateRelations keeps the ones the viewer may
+      // see, as their refs
+      parents: parseJsonArray(row.parentIds).map((id) => ({ id })),
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
@@ -365,8 +369,8 @@ class TagQueryBuilder extends EntityQueryBuilder<
       o_counter: row.userOCounter ?? 0,
       play_count: row.userPlayCount ?? 0,
 
-      // Relations
-      children: [] as NormalizedTag[],
+      // Relations: loaded for the page
+      children: [],
     };
 
     return tag as NormalizedTag;
@@ -375,7 +379,8 @@ class TagQueryBuilder extends EntityQueryBuilder<
   /**
    * The card's relations for the whole page: at most TOOLTIP_LIMIT
    * performers, studios, collections and galleries with how many there are
-   * (TooltipRelations), one statement per relation; and its parents' names
+   * (TooltipRelations), one statement per relation; and its parents and
+   * children (nestedRefs), one statement each
    */
   protected async populateRelations(
     tags: NormalizedTag[],
@@ -385,38 +390,40 @@ class TagQueryBuilder extends EntityQueryBuilder<
 
     const [relations] = await Promise.all([
       loadTooltipRelations("tag", tags, ctx.userId),
-      this.hydrateParentNames(tags),
+      this.hydrateHierarchy(tags, ctx),
     ]);
     for (const tag of tags) {
       Object.assign(tag, relations.get(entityKey(tag.id, tag.instanceId)));
     }
   }
 
-  /** The names of the page's parent tags, on each tag's own instance */
-  private async hydrateParentNames(tags: NormalizedTag[]): Promise<void> {
-    const parentIds = new Set(
-      tags.flatMap((tag) => tag.parents.map((parent) => parent.id))
-    );
-    if (parentIds.size === 0) return;
-
-    const parentTags = await prisma.stashTag.findMany({
-      where: {
-        id: { in: [...parentIds] },
-        stashInstanceId: { in: [...new Set(tags.map((t) => t.instanceId))] },
-      },
-      select: { id: true, stashInstanceId: true, name: true },
-    });
-    const names = new Map(
-      parentTags.map((parent) => [
-        entityKey(parent.id, parent.stashInstanceId),
-        emptyToNull(parent.name) ?? "Unknown",
-      ])
-    );
-    for (const tag of tags) {
-      tag.parents = tag.parents.map((parent) => ({
+  /**
+   * The page's parents and children, on each tag's own instance: only the
+   * live ones the viewer may see (a hidden or deleted parent is left out),
+   * the parents in the tag's order, the children by name
+   */
+  private async hydrateHierarchy(
+    tags: NormalizedTag[],
+    ctx: QueryContext
+  ): Promise<void> {
+    const parentRefs = tags.flatMap((tag) =>
+      tag.parents.map((parent) => ({
         id: parent.id,
-        name: names.get(entityKey(parent.id, tag.instanceId)) ?? "Unknown",
-      }));
+        instanceId: tag.instanceId,
+      }))
+    );
+    const [parents, children] = await Promise.all([
+      loadRefsByKey(TAG_REF, parentRefs, ctx),
+      loadTagChildren(tags, ctx),
+    ]);
+    for (const tag of tags) {
+      tag.parents = tag.parents.flatMap((parent) => {
+        const visible = parents.get(entityKey(parent.id, tag.instanceId));
+        return visible ? [visible] : [];
+      });
+      tag.children = byName(
+        children.get(entityKey(tag.id, tag.instanceId)) ?? []
+      );
     }
   }
 }

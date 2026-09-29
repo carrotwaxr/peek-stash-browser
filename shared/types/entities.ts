@@ -264,6 +264,10 @@ export interface NormalizedStudio {
   groups?: GroupRef[];
   galleries?: GalleryRef[];
   relation_totals?: RelationTotals;
+  // Also there: `parent_studio` as the parent's ref (null when the user
+  // cannot see it) and the children the user can see, on the studio's own
+  // instance, by name
+  child_studios?: StudioRef[];
 }
 
 // ─── NormalizedTag ───────────────────────────────────────────────────────────
@@ -302,6 +306,10 @@ export interface NormalizedTag {
   groups?: GroupRef[];
   galleries?: GalleryRef[];
   relation_totals?: RelationTotals;
+  // Also there: `parents` as the refs of the parents the user can see, in
+  // the tag's order, and the children the user can see, on the tag's own
+  // instance, by name
+  children?: TagRef[];
 }
 
 // ─── NormalizedGroup ─────────────────────────────────────────────────────────

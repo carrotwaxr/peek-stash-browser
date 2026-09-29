@@ -26,7 +26,6 @@ import { must } from "../../helpers/must.js";
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getAllStudios: vi.fn(),
     getStudio: vi.fn(),
   },
 }));
@@ -41,12 +40,6 @@ vi.mock("../../../services/MinimalEntityQuery.js", () => ({
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
-vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  hydrateStudioRelationships: vi
-    .fn()
-    .mockImplementation((studios) => Promise.resolve(studios)),
 }));
 
 vi.mock("../../../utils/logger.js", () => ({
@@ -199,7 +192,6 @@ describe("Studios Controller", () => {
         performer_count: 25,
         group_count: 5,
       });
-      mockStashEntityService.getAllStudios.mockResolvedValue([studio]);
 
       const req = reqFor(findStudios, {
         body: { ids: ["101"], filter: {}, studio_filter: {} },
@@ -214,6 +206,54 @@ describe("Studios Controller", () => {
         "101",
         "default"
       );
+    });
+    it("a detail answers the builder's row with the detail counts: the viewer's favorite, rating and stats, parent and children kept", async () => {
+      const parent = {
+        id: "100",
+        instanceId: "inst-b",
+        name: "Network",
+        image_path: null,
+        parent_studio: null,
+      };
+      const child = { ...parent, id: "102", name: "Imprint" };
+      const studio = createMockStudio({
+        id: "101",
+        instanceId: "inst-b",
+        favorite: false,
+        rating: 20,
+        rating100: 20,
+        o_counter: 3,
+        play_count: 4,
+        parent_studio: parent,
+        child_studios: [child],
+      });
+      mockStudioQueryBuilder.execute.mockResolvedValue({
+        items: [studio],
+        total: 1,
+      });
+      // Stash's own favorite and rating, with the detail counts
+      mockStashEntityService.getStudio.mockResolvedValue({
+        ...createMockStudio({
+          id: "101",
+          instanceId: "inst-b",
+          favorite: true,
+          rating100: 90,
+        }),
+        scene_count: 100,
+        group_count: 5,
+      });
+
+      const req = reqFor(findStudios, {
+        body: { ids: ["101"], studio_filter: { instance_id: "inst-b" } },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
+
+      await findStudios(req, res);
+
+      expect(res._getOkBody().findStudios.studios).toEqual([
+        { ...studio, scene_count: 100, group_count: 5, stashUrl: null },
+      ]);
     });
   });
 

@@ -54,12 +54,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
-vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  hydrateEntityTags: vi
-    .fn()
-    .mockImplementation((items) => Promise.resolve(items)),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -159,14 +153,18 @@ describe("Groups Controller", () => {
       expect(res._getErrorBody().error).toBe("Failed to find groups");
     });
 
-    it("fetches detail counts and hydrates tags for single-ID lookup", async () => {
-      const group = createMockGroup({ id: "101", instanceId: "default" });
+    it("fetches detail counts for single-ID lookup, keeping the builder's tags", async () => {
+      const tags = [
+        { id: "7", instanceId: "default", name: "Beach", image_path: null },
+      ];
+      const group = createMockGroup({ id: "101", instanceId: "default", tags });
       mockGroupQueryBuilder.execute.mockResolvedValue({
         items: [group],
         total: 1,
       });
       mockStashEntityService.getGroup.mockResolvedValue({
         ...group,
+        tags: [{ id: "7", name: "Unknown", image_path: null }],
         scene_count: 15,
         performer_count: 8,
       });
@@ -184,6 +182,11 @@ describe("Groups Controller", () => {
         "101",
         "default"
       );
+      expect(res._getOkBody().findGroups.groups[0]).toMatchObject({
+        scene_count: 15,
+        performer_count: 8,
+        tags,
+      });
     });
 
     it("attaches the user's view of the hierarchy to a single-ID lookup", async () => {
