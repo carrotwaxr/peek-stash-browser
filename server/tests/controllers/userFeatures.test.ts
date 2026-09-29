@@ -326,6 +326,65 @@ describe("User Controller — Features", () => {
       expect(body.preset.createdAt).toBeDefined();
     });
 
+    it("empty display fields take the defaults and a per page of 0 is kept", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
+
+      const req = reqFor(saveFilterPreset, {
+        body: {
+          artifactType: "scene",
+          name: "Empty fields",
+          filters: {},
+          sort: "rating",
+          direction: "DESC",
+          viewMode: "",
+          zoomLevel: "",
+          gridDensity: "",
+          perPage: 0,
+        },
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
+      await saveFilterPreset(req, res);
+      const body = res._getOkBody();
+      expect(body.preset.viewMode).toBe("grid");
+      expect(body.preset.zoomLevel).toBe("medium");
+      expect(body.preset.gridDensity).toBe("comfortable");
+      expect(body.preset.perPage).toBe(0);
+    });
+
+    it("an empty context makes the preset the default for its artifact type", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
+
+      const req = reqFor(saveFilterPreset, {
+        body: {
+          artifactType: "scene",
+          context: "",
+          name: "Default one",
+          filters: {},
+          sort: "rating",
+          direction: "DESC",
+          setAsDefault: true,
+        },
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
+      await saveFilterPreset(req, res);
+      const body = res._getOkBody();
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({
+            defaultFilterPresets: { scene: body.preset.id },
+          }),
+        })
+      );
+    });
+
     it("sets preset as default when setAsDefault is true", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({

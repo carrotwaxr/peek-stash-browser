@@ -1,6 +1,7 @@
 /**
  * Utilities for computing display titles with fallback logic.
  */
+import { emptyToNull } from "./sqlHelpers.js";
 
 /**
  * Strip file extension from a filename.
@@ -17,7 +18,7 @@ export function stripExtension(filename: string): string {
  * @returns The basename (filename only)
  */
 export function extractBasename(filePath: string): string {
-  return filePath.split(/[\\/]/).pop() || filePath;
+  return emptyToNull(filePath.split(/[\\/]/).pop()) ?? filePath;
 }
 
 /**

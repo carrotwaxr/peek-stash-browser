@@ -211,6 +211,32 @@ describe("Groups Controller", () => {
       expect(res.status).toHaveBeenCalledWith(409);
     });
 
+    it("stores an empty description as null", async () => {
+      mockPrisma.userGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.userGroup.create.mockResolvedValue({
+        id: 3,
+        name: "Quiet",
+        description: null,
+        canShare: false,
+        canDownloadFiles: false,
+        canDownloadPlaylists: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await createGroup(
+        reqFor(createGroup, {
+          user: testUser({ id: 1, role: "ADMIN" }),
+          body: { name: "Quiet", description: "" },
+        }),
+        resFor(createGroup)
+      );
+
+      expect(mockPrisma.userGroup.create).toHaveBeenCalledWith({
+        data: objectContaining({ description: null }),
+      });
+    });
+
     it("should create group with permissions", async () => {
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
       mockPrisma.userGroup.create.mockResolvedValue({

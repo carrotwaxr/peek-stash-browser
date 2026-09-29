@@ -27,7 +27,7 @@ export function generateRecoveryKey(): string {
  * @returns Formatted key like XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
  */
 export function formatRecoveryKey(key: string): string {
-  return key.match(/.{1,4}/g)?.join("-") || key;
+  return key.match(/.{1,4}/g)?.join("-") ?? key;
 }
 
 /**

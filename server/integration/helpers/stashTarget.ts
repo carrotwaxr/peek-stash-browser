@@ -72,7 +72,7 @@ export function stashHost(url: string): string {
 export function resolveStashTarget(fileEnv: Env, shellEnv: Env): StashTarget {
   const read = (key: string): string | undefined => {
     const value = key in shellEnv ? shellEnv[key] : fileEnv[key];
-    return value ? value : undefined;
+    return value === undefined || value === "" ? undefined : value;
   };
   if (read("STASH_REPLAY") === "1") {
     return { mode: "replay" };

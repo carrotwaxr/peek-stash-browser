@@ -172,7 +172,7 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.o_counter || 0).toBeGreaterThan(0);
+        expect(tag.o_counter ?? 0).toBeGreaterThan(0);
       }
     });
 
@@ -194,7 +194,7 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.o_counter || 0).toBe(0);
+        expect(tag.o_counter ?? 0).toBe(0);
       }
     });
   });
@@ -218,7 +218,7 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.play_count || 0).toBeGreaterThan(0);
+        expect(tag.play_count ?? 0).toBeGreaterThan(0);
       }
     });
   });
@@ -242,7 +242,7 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.scene_count || 0).toBeGreaterThan(5);
+        expect(tag.scene_count ?? 0).toBeGreaterThan(5);
       }
     });
 
@@ -264,7 +264,7 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.scene_count || 0).toBe(0);
+        expect(tag.scene_count ?? 0).toBe(0);
       }
     });
   });
@@ -359,7 +359,7 @@ describe("Tag Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
 
-      const counts = response.data.findTags.tags.map((t) => t.scene_count || 0);
+      const counts = response.data.findTags.tags.map((t) => t.scene_count ?? 0);
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
       }
@@ -414,8 +414,8 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        expect(tag.scene_count || 0).toBeGreaterThan(1);
-        expect(tag.o_counter || 0).toBeGreaterThan(0);
+        expect(tag.scene_count ?? 0).toBeGreaterThan(1);
+        expect(tag.o_counter ?? 0).toBeGreaterThan(0);
       }
     });
   });
