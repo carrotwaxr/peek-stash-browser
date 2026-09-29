@@ -19,6 +19,7 @@ import {
   buildNumericFilter,
   buildTextFilter,
   combine,
+  countForms,
   exclusionJoin,
   idClause,
   instanceClause,
@@ -28,6 +29,7 @@ import {
   specificInstanceClause,
   viaSceneClause,
 } from "../../utils/sqlClauses.js";
+import { must } from "../helpers/must.js";
 
 /** Groups holding one of the scenes: SceneGroup, keyed by the group */
 const GROUPS_BY_SCENE: ViaSceneSpec = {
@@ -423,13 +425,17 @@ describe("refClause", () => {
       );
     });
 
-    it("above the inline limit it is the matched set, as for an indexed sort", () => {
+    it("above the inline limit it is the matched set, as when the sort is not said", () => {
       const refs = many(PAIR_INLINE_LIMIT + 1);
+      const matched = refClause(SCENE_TAGS, refs, "INCLUDES", SORTED);
 
-      expect(refClause(SCENE_TAGS, refs, "INCLUDES", SORTED)).toEqual(
+      expect(matched.sql).toBe(
+        "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM tags_matched)"
+      );
+      expect(matched).toEqual(
         refClause(SCENE_TAGS, refs, "INCLUDES", {
-          ...SORTED,
-          sortedByIndex: true,
+          ...OPTS,
+          inheritedJson: "inheritedTagIds",
         })
       );
     });
@@ -449,6 +455,65 @@ describe("refClause", () => {
           inheritedJson: "inheritedTagIds",
         })
       ).toEqual(walked);
+    });
+  });
+
+  describe("a large set under an indexed sort (sortedByIndex true, L9)", () => {
+    const WALKED = {
+      ...OPTS,
+      inheritedJson: "inheritedTagIds",
+      sortedByIndex: true,
+    };
+
+    it("reads the junction rows of the refs list by the ref index as a row-value IN, and the inherited arm probes the list", () => {
+      const refs = [...many(PAIR_INLINE_LIMIT), bare("bare")];
+      const clause = refClause(SCENE_TAGS, refs, "INCLUDES", WALKED);
+
+      expect(clause.sql).toBe(
+        "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value, s.stashInstanceId) IN (SELECT id, inst FROM tags_refs)))"
+      );
+      expect(clause.params).toEqual([]);
+      // Only the refs: no matched set is built, and a bare ref is one pair per allowed instance
+      expect(clause.ctes).toHaveLength(1);
+      const refsCte = must(clause.ctes?.[0]);
+      expect(refsCte.name).toBe("tags_refs");
+      const bound = JSON.parse(String(refsCte.params[0])) as string[][];
+      expect(bound.filter(([id]) => id === "bare")).toEqual([
+        ["bare", A],
+        ["bare", B],
+      ]);
+    });
+
+    it("without an inherited list it is the row-value IN alone", () => {
+      const clause = refClause(
+        SCENE_TAGS,
+        many(PAIR_INLINE_LIMIT + 1),
+        "INCLUDES",
+        { ...OPTS, sortedByIndex: true }
+      );
+
+      expect(clause.sql).toBe(
+        "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst)"
+      );
+    });
+
+    it("EXCLUDES keeps the matched set's NOT IN", () => {
+      const refs = many(PAIR_INLINE_LIMIT + 1);
+
+      expect(refClause(SCENE_TAGS, refs, "EXCLUDES", WALKED)).toEqual(
+        refClause(SCENE_TAGS, refs, "EXCLUDES", {
+          ...WALKED,
+          sortedByIndex: false,
+        })
+      );
+    });
+
+    it("up to the inline limit it keeps the correlated EXISTS", () => {
+      const refs = many(PAIR_INLINE_LIMIT);
+
+      expect(refClause(SCENE_TAGS, refs, "INCLUDES", WALKED).sql).toMatch(
+        /^\(EXISTS \(SELECT 1 FROM SceneTag st WHERE/
+      );
     });
   });
 
@@ -592,6 +657,23 @@ describe("combine", () => {
         { sql: "JOIN d ON d.id = s.id AND d.k = ?", params: ["k"] },
       ],
     });
+  });
+});
+
+describe("countForms", () => {
+  it("takes each clause's count form, or the clause itself when it has none", () => {
+    const counted = {
+      sql: "c = ?",
+      params: [3],
+      ctes: [{ name: "c3", sql: "c3(id) AS (SELECT ?)", params: ["y"] }],
+    };
+
+    expect(
+      countForms([
+        { sql: "a = ?", params: [1], count: counted },
+        { sql: "b = ?", params: [2] },
+      ])
+    ).toEqual([counted, { sql: "b = ?", params: [2] }]);
   });
 });
 

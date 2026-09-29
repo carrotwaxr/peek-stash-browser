@@ -52,6 +52,10 @@ const tagRow = (id: string, stashInstanceId: string, parent?: string) =>
 const tagClause = (criterion: RefCriterion, sortField = "created_at") =>
   sceneQueryBuilder["tagClause"](criterion, { ...CTX, sortField });
 
+/** The small tag-index form (L8) of ref 284 on instance-1 */
+const IN_FORM =
+  "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?)))";
+
 /** The bare term of the inline shape, which matches an id on every instance */
 const BARE_TERM = "(st.tagId = ?)";
 
@@ -230,6 +234,11 @@ describe("SceneQueryBuilder tag clause", () => {
 
         expect(result.sql).toContain("EXISTS (SELECT 1 FROM SceneTag st WHERE");
         expect(result.sql).not.toContain("IN (SELECT st.sceneId");
+        // L9: the count walks no order, so it reads the tag index
+        expect(result.count).toEqual({
+          sql: IN_FORM,
+          params: ["284", "instance-1", "284", "instance-1"],
+        });
       }
     );
 
@@ -248,9 +257,9 @@ describe("SceneQueryBuilder tag clause", () => {
           sortField
         );
 
-        expect(result.sql).toBe(
-          "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?)))"
-        );
+        expect(result.sql).toBe(IN_FORM);
+        // The count reads the same form: no count form of its own
+        expect(result.count).toBeUndefined();
         expect(result.params).toEqual([
           "284",
           "instance-1",
@@ -260,13 +269,53 @@ describe("SceneQueryBuilder tag clause", () => {
       }
     );
 
-    it("a sort with no index keeps the NOT EXISTS for EXCLUDES", async () => {
+    it.each(["rating", "created_at"])(
+      "EXCLUDES keeps the NOT EXISTS for the page and the count (%s)",
+      async (sortField) => {
+        const result = await tagClause(
+          { refs: [ref("284")], modifier: "EXCLUDES", depth: 0 },
+          sortField
+        );
+
+        expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
+        expect(result.count).toBeUndefined();
+      }
+    );
+
+    // L9: above the inline limit an indexed sort's page reads the refs
+    // list's junction rows by the tag index and walks the sort index; the
+    // count and a sort with no index read the matched set
+    const manyRefs = Array.from({ length: 65 }, (_, i) => ref(String(i + 1)));
+
+    it("more than 64 refs under an indexed sort: the page reads the refs list, the count the matched set", async () => {
       const result = await tagClause(
-        { refs: [ref("284")], modifier: "EXCLUDES", depth: 0 },
+        { refs: manyRefs, modifier: "INCLUDES", depth: 0 },
+        "created_at"
+      );
+
+      expect(result.sql).toBe(
+        "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value, s.stashInstanceId) IN (SELECT id, inst FROM tags_refs)))"
+      );
+      expect(result.ctes?.map((c) => c.name)).toEqual(["tags_refs"]);
+      expect(result.count?.sql).toBe(
+        "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM tags_matched)"
+      );
+      expect(result.count?.ctes?.map((c) => c.name)).toEqual([
+        "tags_refs",
+        "tags_matched",
+      ]);
+    });
+
+    it("more than 64 refs under a sort with no index: the matched set for both", async () => {
+      const result = await tagClause(
+        { refs: manyRefs, modifier: "INCLUDES", depth: 0 },
         "rating"
       );
 
-      expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
+      expect(result.sql).toBe(
+        "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM tags_matched)"
+      );
+      expect(result.count).toBeUndefined();
     });
   });
 
@@ -303,6 +352,13 @@ describe("SceneQueryBuilder tag clause", () => {
       expect(result.sql).toMatch(/^\(.* AND .*\)$/s);
       expect(result.sql.match(/FROM SceneTag st/g)).toHaveLength(2);
       expect(result.sql).not.toContain(BARE_TERM);
+      // The count's form (L9): the same two groups, each read from the tag index
+      expect(
+        result.count?.sql.match(
+          /\(s\.id, s\.stashInstanceId\) IN \(SELECT st\.sceneId/g
+        )
+      ).toHaveLength(2);
+      expect(result.count?.params).toEqual(result.params);
       expect(result.params).toEqual([
         "284",
         "instance-1",

@@ -119,6 +119,24 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
         ],
       });
     }
+    if (filter.details) {
+      // A clause whose count reads the same rows in another shape (L9)
+      clauses.push({
+        sql: "s.details = ?",
+        params: ["page-form"],
+        count: {
+          sql: "s.id IN (SELECT id FROM cc WHERE ? = 1)",
+          params: ["count-form"],
+          ctes: [
+            {
+              name: "cc",
+              sql: "cc(id) AS MATERIALIZED (SELECT ?)",
+              params: ["count-cte"],
+            },
+          ],
+        },
+      });
+    }
     if (q !== undefined) {
       clauses.push({ sql: "s.title LIKE ?", params: [`%${q}%`] });
     }
@@ -341,6 +359,37 @@ describe("EntityQueryBuilder", () => {
       "sort-join-param",
       "inst-a",
       "where-param",
+    ]);
+  });
+
+  it("a clause's count form is the count statement's: the page binds the clause, the count its count form with its CTE", async () => {
+    await builder.execute({
+      userId: 1,
+      allowedInstanceIds: ["inst-a"],
+      request: request({
+        filter: { details: { modifier: "EQUALS", value: "x" } },
+      }),
+    });
+
+    const [page, count] = statements();
+    expect(must(page).sql).toContain("s.details = ?");
+    expect(must(page).sql).not.toContain("cc");
+    expect(must(page).params).toContain("page-form");
+    expect(must(page).params).not.toContain("count-form");
+
+    expect(must(count).sql).toMatch(
+      /^WITH cc\(id\) AS MATERIALIZED \(SELECT \?\)\nSELECT COUNT\(\*\) AS total\n/
+    );
+    expect(must(count).sql).toContain(
+      "s.id IN (SELECT id FROM cc WHERE ? = 1)"
+    );
+    expect(must(count).sql).not.toContain("s.details = ?");
+    expect(must(count).params).toEqual([
+      "count-cte",
+      1,
+      1,
+      "inst-a",
+      "count-form",
     ]);
   });
 

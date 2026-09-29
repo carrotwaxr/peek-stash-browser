@@ -7,14 +7,18 @@
  *
  * A ref set has two shapes. Up to PAIR_INLINE_LIMIT refs are bound inline
  * as OR-ed pairs inside one correlated EXISTS (or on the row itself; or,
- * for a junction INCLUDES on a list whose sort has no index, one row-value
- * IN over the junction's ref index: see junctionInList). Above
- * it the refs travel as one JSON parameter into a materialized CTE, and the
- * matched entities into a second one; the list matches them with a
- * row-value IN on its primary key (INCLUDES) or a single-column key NOT IN
- * (EXCLUDES, see matchedSetClause). Never a ref list inside a correlated
- * subquery (re-evaluated per row, 12 s at 200k scenes) and never a
- * row-value `NOT IN (subquery)` (78 s: the set is scanned per row).
+ * for a junction INCLUDES read in no order, a count or a sort with no
+ * index, one row-value IN over the junction's ref index: see
+ * junctionInList). Above it the refs travel as one JSON parameter into a
+ * materialized CTE, and the matched entities into a second one; the list
+ * matches them with a row-value IN on its primary key (INCLUDES) or a
+ * single-column key NOT IN (EXCLUDES, see matchedSetClause); a junction
+ * INCLUDES on a page walking a sort index reads the refs list's junction
+ * rows instead (junctionRefsList). Never a ref list inside a correlated
+ * subquery (re-evaluated per row, 12 s at 200k scenes; a materialized CTE
+ * probed with IN from one is built once, plan `LIST SUBQUERY`, as in
+ * junctionRefsList's inherited arm) and never a row-value
+ * `NOT IN (subquery)` (78 s: the set is scanned per row).
  *
  * The exclusion join, the instance filters and the per-field clauses
  * (numbers, dates, text, favorites) the builders share live here too.
@@ -46,6 +50,13 @@ export interface FilterClause {
   params: SqlParam[];
   ctes?: Cte[];
   joins?: SqlFragment[];
+  /**
+   * The clause the count statement uses instead: the same rows in a shape
+   * for reading every match in no order (the scene tag filter under an
+   * indexed sort, L9). Absent: the count uses this one. `allOf` and `anyOf`
+   * drop it, which leaves their count on the page's form: the same rows.
+   */
+  count?: FilterClause;
 }
 
 /**
@@ -193,13 +204,15 @@ export interface RefClauseOptions {
   /** Most refs matched inline; Infinity keeps every set inline. Default PAIR_INLINE_LIMIT. */
   readonly inlineLimit?: number;
   /**
-   * Whether the list's sort reads its order from an index (default true),
-   * for a junction INCLUDES up to the inline limit. With an index the page
-   * walks it and stops at the page, probing each row with the correlated
-   * EXISTS. Without one (a per-user sort, random) every match is read and
-   * sorted anyway, so the matches are read once from the junction's ref
-   * index as a row-value IN (junctionInList). Neither the large shape nor
-   * EXCLUDES changes.
+   * How the statement reads its rows, for a junction INCLUDES. `true`: in
+   * a sort index's order, stopping at the page. Up to the inline limit
+   * that is the correlated EXISTS per row; above it the junction rows of
+   * the refs list, read by the ref index as a row-value IN
+   * (junctionRefsList), with no matched set to build first. `false`: every
+   * match, in no order (a count, or a sort with no index). Up to the limit
+   * the matches are read once from the junction's ref index as a row-value
+   * IN (junctionInList); above it the matched set. Absent: the default
+   * shapes (the EXISTS, the matched set). EXCLUDES never changes (L8, L9).
    */
   readonly sortedByIndex?: boolean;
 }
@@ -228,17 +241,19 @@ function junctionIncludes(
 }
 
 /**
- * The inline INCLUDES of a junction target for a list read whole and
- * sorted: the listed rows named by the junction rows holding the refs, as a
+ * The inline INCLUDES of a junction target read in no order (a count, or
+ * a page sorted by no index): the listed rows named by the junction rows
+ * holding the refs, as a
  * row-value IN that SQLite builds once from the junction's ref index (every
  * scene holding the tag, by `SceneTag_tagId_tagInstanceId_idx`) and probes
  * per row, where the correlated EXISTS searches the junction's primary key
  * per row. At 200k scenes a page by rating filtered on a tag of 46k scenes
  * takes 255 ms against 358, on a tag of 634 scenes 173 against 332, and
- * their counts 195 against 233 and 104 against 185 (L8). Under a sort with
- * an index the EXISTS stays: the page walks the index and stops at the page
- * (2 ms, where building the list first costs 30). The inherited arm stays a
- * per-row EXISTS: its list is a JSON column, which no index reads.
+ * their counts 195 against 233 and 104 against 185 (L8). A page under a
+ * sort with an index keeps the EXISTS: it walks the index and stops at the
+ * page (2 ms, where building the list first costs 30); its count, which
+ * walks nothing, takes this form (L9). The inherited arm stays a per-row
+ * EXISTS: its list is a JSON column, which no index reads.
  */
 function junctionInList(
   target: JunctionTarget,
@@ -260,6 +275,27 @@ function junctionInList(
     sql: `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE ${inherited.sql}))`,
     params: [...p.params, ...inherited.params],
   };
+}
+
+/**
+ * The large INCLUDES of a junction target for a page walking a sort index:
+ * the listed rows named by the junction rows of the refs list (read by the
+ * junction's ref index, one probe per ref), as a row-value IN SQLite builds
+ * once and probes as the page walks the sort index; the inherited arm
+ * probes the refs list per row. No matched set is built first: at 200k
+ * scenes a tag whose subtree is 72 tags pages in 407 ms against 842, a set
+ * of 72 rare tags in 9 against 145 (L9). The count and a sort with no index
+ * keep the matched set, faster for a rare set there.
+ */
+function junctionRefsList(
+  target: JunctionTarget,
+  refsName: string,
+  inheritedJson: string | undefined
+): string {
+  const { alias: j, parentAlias: x } = target;
+  const direct = `(${x}.id, ${x}.stashInstanceId) IN (SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${refsName} r CROSS JOIN ${target.table} ${j} ON ${j}.${target.refIdCol} = r.id AND ${j}.${target.refInstanceCol} = r.inst)`;
+  if (inheritedJson === undefined) return direct;
+  return `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE (je.value, ${x}.stashInstanceId) IN (SELECT id, inst FROM ${refsName})))`;
 }
 
 /** The large shape's matched set: the listed rows holding any of the refs */
@@ -357,6 +393,17 @@ export function refClause(
   const limit = opts.inlineLimit ?? PAIR_INLINE_LIMIT;
   if (refs.length > limit) {
     const refsName = `${opts.name}_refs`;
+    if (
+      modifier === "INCLUDES" &&
+      target.kind === "junction" &&
+      opts.sortedByIndex === true
+    ) {
+      return {
+        sql: junctionRefsList(target, refsName, opts.inheritedJson),
+        params: [],
+        ctes: [refsCte(refsName, refs, opts.allowedInstanceIds)],
+      };
+    }
     const setName = `${opts.name}_matched`;
     return matchedSetClause(target.parentAlias, setName, modifier, [
       refsCte(refsName, refs, opts.allowedInstanceIds),
@@ -485,6 +532,11 @@ export interface CombinedClauses {
   params: SqlParam[];
   ctes: Cte[];
   joins: SqlFragment[];
+}
+
+/** Each clause's count form (FilterClause.count), or the clause itself */
+export function countForms(clauses: readonly FilterClause[]): FilterClause[] {
+  return clauses.map((c) => c.count ?? c);
 }
 
 /** The clauses as one WHERE, with their CTEs and joins gathered in order */
