@@ -432,7 +432,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     }
 
     // Text search across title, details, path, performers, studio, tags
-    if (q !== undefined) push(this.buildSearchQueryFilter(q));
+    if (q !== undefined) push(this.buildSearchQueryFilter(q, ctx));
 
     return clauses;
   }
@@ -501,10 +501,22 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * text matches itself. LOWER() on both sides folds ASCII case only, as
    * SQLite's LIKE does.
    */
-  private buildSearchQueryFilter(searchQuery: string): FilterClause {
+  private buildSearchQueryFilter(
+    searchQuery: string,
+    ctx: QueryContext
+  ): FilterClause {
     const query = searchQuery.trim();
     if (query === "") return noClause();
     const like = "LIKE LOWER(?) ESCAPE '\\'";
+    const pattern = likeContains(query);
+
+    // A name matches only through a live entity the viewer can see, on its
+    // own instance, as the lists show it
+    const visible = (excl: string, entityType: string, alias: string) =>
+      ctx.applyExclusions
+        ? `AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ${excl} WHERE ${excl}.userId = ? AND ${excl}.entityType = '${entityType}' AND ${excl}.entityId = ${alias}.id AND (${excl}.instanceId = '' OR ${excl}.instanceId = ${alias}.stashInstanceId))`
+        : "";
+    const visibleParams = ctx.applyExclusions ? [ctx.userId] : [];
 
     const sql = `(
       LOWER(s.title) ${like} OR
@@ -514,23 +526,41 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         SELECT 1 FROM ScenePerformer sp
         INNER JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
         WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
+        AND p.deletedAt IS NULL
+        ${visible("xp", "performer", "p")}
         AND LOWER(p.name) ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM StashStudio st
         WHERE st.id = s.studioId AND st.stashInstanceId = s.stashInstanceId
+        AND st.deletedAt IS NULL
+        ${visible("xs", "studio", "st")}
         AND LOWER(st.name) ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM SceneTag stag
         INNER JOIN StashTag t ON stag.tagId = t.id AND stag.tagInstanceId = t.stashInstanceId
         WHERE stag.sceneId = s.id AND stag.sceneInstanceId = s.stashInstanceId
+        AND t.deletedAt IS NULL
+        ${visible("xt", "tag", "t")}
         AND LOWER(t.name) ${like}
       )
     )`;
 
-    const pattern = likeContains(query);
-    return { sql, params: Array.from({ length: 6 }, () => pattern) };
+    return {
+      sql,
+      params: [
+        pattern,
+        pattern,
+        pattern,
+        ...visibleParams,
+        pattern,
+        ...visibleParams,
+        pattern,
+        ...visibleParams,
+        pattern,
+      ],
+    };
   }
 
   /**

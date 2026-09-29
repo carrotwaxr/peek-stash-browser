@@ -264,6 +264,49 @@ describe("SceneQueryBuilder", () => {
       expect(params.filter((p) => p === "%100\\%\\_x%")).toHaveLength(6);
     });
 
+    it("matches performer, studio and tag names only for live entities the viewer can see", async () => {
+      await run({ q: "abc" }, { applyExclusions: true });
+
+      const { sql, params } = pageStatement();
+      for (const [alias, type, excl] of [
+        ["p", "performer", "xp"],
+        ["st", "studio", "xs"],
+        ["t", "tag", "xt"],
+      ] as const) {
+        expect(sql).toContain(`${alias}.deletedAt IS NULL`);
+        expect(sql).toContain(
+          `NOT EXISTS (SELECT 1 FROM UserExcludedEntity ${excl} WHERE ${excl}.userId = ? AND ${excl}.entityType = '${type}' AND ${excl}.entityId = ${alias}.id AND (${excl}.instanceId = '' OR ${excl}.instanceId = ${alias}.stashInstanceId))`
+        );
+      }
+      // The user id binds where each exclusion check sits: after the three
+      // scene columns, then one per relation arm, each before its pattern
+      const at = params.indexOf("%abc%");
+      const search = params.slice(at, at + 9);
+      expect(search).toEqual([
+        "%abc%",
+        "%abc%",
+        "%abc%",
+        1,
+        "%abc%",
+        1,
+        "%abc%",
+        1,
+        "%abc%",
+      ]);
+    });
+
+    it("still skips soft-deleted names when exclusions are off", async () => {
+      await run({ q: "abc" }, { applyExclusions: false });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("p.deletedAt IS NULL");
+      expect(sql).toContain("st.deletedAt IS NULL");
+      expect(sql).toContain("t.deletedAt IS NULL");
+      expect(sql).not.toContain("xp.userId");
+      const at = params.indexOf("%abc%");
+      expect(params.slice(at, at + 6)).toEqual(Array(6).fill("%abc%"));
+    });
+
     it("does not add search filter without a search query", async () => {
       await run({ q: undefined });
 
