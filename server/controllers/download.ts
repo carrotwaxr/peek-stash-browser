@@ -570,8 +570,9 @@ export async function retryDownload(
       });
     }
 
-    // The zip is rebuilt from the items the user may see now
-    // (getDownloadablePlaylistItems), so only the playlist needs checking here
+    // The zip is rebuilt from the scenes the user may see now
+    // (PlaylistZipService reads them as this user), so only the playlist
+    // needs checking here
     if (!(await resolveUserPermissions(userId))?.canDownloadPlaylists) {
       return res
         .status(403)

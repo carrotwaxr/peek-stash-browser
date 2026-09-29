@@ -4,16 +4,25 @@ import * as path from "path";
 import { Readable } from "stream";
 import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
+import type { NormalizedScene } from "../types/index.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { safeFileName, uniqueFileName } from "../utils/contentDisposition.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { downloadService } from "./DownloadService.js";
+import { loadPlaylistItems } from "./PlaylistQueryService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
+import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
 
 /**
  * Service for creating zip archives of playlists.
  * Streams video files from Stash and includes NFO metadata files.
+ *
+ * The zip holds what the user who asked for it may see when it is built:
+ * their exclusions and allowed instances, not the playlist owner's
+ * (invariants 3 and 10). Each scene comes from the scene builder, so its NFO
+ * names only live performers, tags and a studio that user may see, and
+ * carries that user's rating, never Stash's.
  */
 export class PlaylistZipService {
   /**
@@ -54,6 +63,23 @@ export class PlaylistZipService {
   }
 
   /**
+   * The playlist's scenes this user may see, in playlist order, read through
+   * the playlist's one item read (the scene builder, a page of refs a call)
+   */
+  private async readScenes(
+    userId: number,
+    playlistId: number
+  ): Promise<NormalizedScene[]> {
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+    const { items } = await loadPlaylistItems({
+      userId,
+      allowedInstanceIds,
+      playlistId,
+    });
+    return items.flatMap((item) => (item.scene ? [item.scene] : []));
+  }
+
+  /**
    * Create a zip archive for a download
    */
   async createZip(downloadId: number): Promise<void> {
@@ -77,12 +103,9 @@ export class PlaylistZipService {
       throw new Error(`Playlist not found: ${download.playlistId}`);
     }
 
-    // Only the scenes the requester may see, each on its own instance
-    const items = await downloadService.getDownloadablePlaylistItems(
-      download.userId,
-      download.playlistId
-    );
-    if (items.length === 0) {
+    // Only the scenes the requester may see now, each on its own instance
+    const scenes = await this.readScenes(download.userId, download.playlistId);
+    if (scenes.length === 0) {
       await downloadService.markFailed(
         downloadId,
         "No scenes you can download"
@@ -94,7 +117,7 @@ export class PlaylistZipService {
       downloadId,
       playlistId: playlist.id,
       playlistName: playlist.name,
-      itemCount: items.length,
+      itemCount: scenes.length,
     });
 
     // Mark as processing
@@ -127,59 +150,13 @@ export class PlaylistZipService {
       // Pipe archive to file
       archive.pipe(output);
 
-      // Process each playlist item
-      const totalItems = items.length;
+      // Process each scene
+      const totalItems = scenes.length;
       let processedItems = 0;
 
-      for (const item of items) {
-        // Get scene with relations for NFO generation
-        const scene = await prisma.stashScene.findFirst({
-          where: {
-            id: item.sceneId,
-            stashInstanceId: item.instanceId,
-            deletedAt: null,
-          },
-          include: {
-            performers: {
-              include: {
-                performer: {
-                  select: { name: true },
-                },
-              },
-            },
-            tags: {
-              include: {
-                tag: {
-                  select: { name: true },
-                },
-              },
-            },
-          },
-        });
-
-        if (!scene) {
-          logger.warn(`Scene not found, skipping`, { sceneId: item.sceneId });
-          processedItems++;
-          continue;
-        }
-
-        // Get studio name if scene has a studio
-        let studioName: string | undefined;
-        if (scene.studioId) {
-          // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-          const studio = await prisma.stashStudio.findFirst({
-            where: {
-              id: scene.studioId,
-              ...(scene.stashInstanceId
-                ? { stashInstanceId: scene.stashInstanceId }
-                : {}),
-            },
-            select: { name: true },
-          });
-          studioName = studio?.name;
-        }
-
-        const sceneTitle = scene.title || scene.id;
+      for (const scene of scenes) {
+        // The title Peek shows (the title, else the file name), else the id
+        const sceneTitle = scene.title ?? scene.id;
         const sanitizedTitle = uniqueFileName(
           safeFileName(sceneTitle),
           takenNames
@@ -198,10 +175,11 @@ export class PlaylistZipService {
           title: scene.title,
           details: scene.details,
           date: scene.date,
-          rating100: scene.rating100,
-          studioName,
-          performerNames: scene.performers.map((p) => p.performer.name),
-          tagNames: scene.tags.map((t) => t.tag.name),
+          // The requester's rating; none of theirs writes none
+          rating100: scene.rating,
+          studioName: scene.studio?.name,
+          performerNames: scene.performers.map((p) => p.name),
+          tagNames: scene.tags.map((t) => t.name),
           fileName: videoFileName,
         });
 
@@ -214,7 +192,7 @@ export class PlaylistZipService {
         // instance disabled or deleted since the list was read throws
         // UnknownInstanceError, and the download fails below.
         const { baseUrl, apiKey } = stashInstanceManager.getCredentials(
-          scene.stashInstanceId
+          scene.instanceId
         );
         const streamUrl = `${baseUrl}/scene/${scene.id}/stream`;
 
@@ -253,7 +231,7 @@ export class PlaylistZipService {
         // Track for M3U
         m3uItems.push({
           title: sceneTitle,
-          duration: scene.duration,
+          duration: scene.files[0]?.duration ?? null,
           fileName: videoFileName,
         });
 

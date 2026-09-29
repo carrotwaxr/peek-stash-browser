@@ -249,11 +249,6 @@
       "count": 5
     }
   },
-  "services/PlaylistZipService.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "services/StashEntityService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 30
