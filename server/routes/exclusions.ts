@@ -71,7 +71,8 @@ router.post(
       message: `Recomputed exclusions for ${result.success} users${result.failed > 0 ? `, ${result.failed} failed` : ""}`,
       success: result.success,
       failed: result.failed,
-      errors: result.errors,
+      // The caught text is in the log; the response names the users only
+      errors: result.errors.map(({ userId }) => ({ userId })),
     });
   })
 );
