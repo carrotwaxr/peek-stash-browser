@@ -199,6 +199,9 @@ const BATCH_SIZE = 500; // Number of entities to fetch per page
  */
 const ALL_INSTANCES = "";
 
+/** Clips a re-probe marks generated in one write unit. */
+const REPROBE_PAGE_SIZE = 200;
+
 /** The lock is held: a sync or an instance deletion is running. */
 export class SyncBusyError extends Error {
   constructor(readonly job: SyncJob) {
@@ -4710,28 +4713,27 @@ class StashSyncService extends EventEmitter {
       Array.from(urlMap.keys())
     );
 
-    // Update clips that are now generated
-    let updated = 0;
+    // Update clips that are now generated, one batch per page
+    const generatedIds: string[] = [];
     for (const [url, isGenerated] of results) {
-      if (isGenerated) {
-        const clipId = urlMap.get(url);
-        if (clipId) {
-          await prisma.stashClip.update({
-            where: {
-              id_stashInstanceId: {
-                id: clipId,
-                stashInstanceId,
-              },
-            },
-            data: {
-              isGenerated: true,
-              generationCheckedAt: new Date(),
-            },
-          });
-          updated++;
-        }
-      }
+      const clipId = isGenerated ? urlMap.get(url) : undefined;
+      if (clipId) generatedIds.push(clipId);
     }
+    for (let i = 0; i < generatedIds.length; i += REPROBE_PAGE_SIZE) {
+      const checkedAt = new Date();
+      await dbWriteBatch(
+        "clip.reprobe",
+        generatedIds.slice(i, i + REPROBE_PAGE_SIZE).map((clipId) =>
+          prisma.stashClip.update({
+            where: {
+              id_stashInstanceId: { id: clipId, stashInstanceId },
+            },
+            data: { isGenerated: true, generationCheckedAt: checkedAt },
+          })
+        )
+      );
+    }
+    const updated = generatedIds.length;
 
     const duration = Date.now() - startTime;
     logger.info(

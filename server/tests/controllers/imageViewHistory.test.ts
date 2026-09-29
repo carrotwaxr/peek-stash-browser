@@ -385,7 +385,7 @@ describe("Image View History Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.user.findUnique.mockRejectedValue(
         new Error("DB connection lost")
       );
@@ -395,9 +395,11 @@ describe("Image View History Controller", () => {
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
-      await incrementImageOCounter(req, res);
+      await expect(incrementImageOCounter(req, res)).rejects.toThrow(
+        "DB connection lost"
+      );
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -503,7 +505,7 @@ describe("Image View History Controller", () => {
       expect(body.viewCount).toBe(6);
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.imageViewHistory.findUnique.mockRejectedValue(
         new Error("Query failed")
       );
@@ -513,9 +515,9 @@ describe("Image View History Controller", () => {
         user: USER,
       });
       const res = resFor(recordImageView);
-      await recordImageView(req, res);
+      await expect(recordImageView(req, res)).rejects.toThrow("Query failed");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -677,7 +679,7 @@ describe("Image View History Controller", () => {
       );
     });
 
-    it("returns 500 on unexpected error", async () => {
+    it("a failure reaches the error handler: unexpected error", async () => {
       mockPrisma.imageViewHistory.findUnique.mockRejectedValue(
         new Error("DB timeout")
       );
@@ -687,9 +689,9 @@ describe("Image View History Controller", () => {
         user: USER,
       });
       const res = resFor(getImageViewHistory);
-      await getImageViewHistory(req, res);
+      await expect(getImageViewHistory(req, res)).rejects.toThrow("DB timeout");
 
-      expect(res._getStatus()).toBe(500);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

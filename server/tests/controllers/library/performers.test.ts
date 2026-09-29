@@ -167,7 +167,7 @@ describe("findPerformers", () => {
     ]);
   });
 
-  it("returns 500 when query builder throws", async () => {
+  it("a failure reaches the error handler: query builder throws", async () => {
     vi.mocked(performerQueryBuilder.execute).mockRejectedValue(
       new Error("DB down")
     );
@@ -175,12 +175,9 @@ describe("findPerformers", () => {
     const req = reqFor(findPerformers, { user: testUser() });
     const res = resFor(findPerformers);
 
-    await findPerformers(req, res);
+    await expect(findPerformers(req, res)).rejects.toThrow("DB down");
 
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({
-      error: "Failed to find performers",
-    });
+    expect(res.json).not.toHaveBeenCalled();
   });
 });
 

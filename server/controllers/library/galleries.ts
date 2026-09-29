@@ -37,104 +37,94 @@ export const findGalleries = async (
   });
   logDropped("POST /library/galleries", request.dropped);
 
-  try {
-    const startTime = Date.now();
-    const userId = req.user.id;
-    const { page, perPage, specificInstanceId } = request;
-    // A detail page asks for its gallery by id
-    const lookup = singleIdRef(request.filter.ids);
+  const startTime = Date.now();
+  const userId = req.user.id;
+  const { page, perPage, specificInstanceId } = request;
+  // A detail page asks for its gallery by id
+  const lookup = singleIdRef(request.filter.ids);
 
-    // Exclusions apply to every user; an admin's rows hold only their own hides
-    const applyExclusions = true;
+  // Exclusions apply to every user; an admin's rows hold only their own hides
+  const applyExclusions = true;
 
-    // Get user's allowed instance IDs for multi-instance filtering
-    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  // Get user's allowed instance IDs for multi-instance filtering
+  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Use SQL-native query builder
-    const { items: galleries, total } = await galleryQueryBuilder.execute({
-      userId,
-      allowedInstanceIds,
-      request,
-      applyExclusions,
+  // Use SQL-native query builder
+  const { items: galleries, total } = await galleryQueryBuilder.execute({
+    userId,
+    allowedInstanceIds,
+    request,
+    applyExclusions,
+  });
+
+  // Check for ambiguous results on single-ID lookups
+  if (lookup && !specificInstanceId && galleries.length > 1) {
+    logger.warn("Ambiguous gallery lookup", {
+      id: lookup.id,
+      matchCount: galleries.length,
+      instances: galleries.map((g) => g.instanceId),
     });
-
-    // Check for ambiguous results on single-ID lookups
-    if (lookup && !specificInstanceId && galleries.length > 1) {
-      logger.warn("Ambiguous gallery lookup", {
-        id: lookup.id,
-        matchCount: galleries.length,
-        instances: galleries.map((g) => g.instanceId),
-      });
-      res.status(400).json({
-        error: "Ambiguous lookup",
-        message: `Multiple galleries found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: galleries.map((g) => ({
-          id: g.id,
-          title: g.title,
-          instanceId: g.instanceId,
-        })),
-      });
-      return;
-    }
-
-    // For single-entity requests (detail pages), get gallery with computed counts
-    let paginatedGalleries = galleries;
-    if (lookup && paginatedGalleries.length === 1) {
-      const existingGallery =
-        paginatedGalleries[0] as (typeof paginatedGalleries)[number];
-      const galleryWithCounts = await stashEntityService.getGallery(
-        existingGallery.id,
-        existingGallery.instanceId
-      );
-      if (galleryWithCounts) {
-        paginatedGalleries = [
-          {
-            ...existingGallery,
-            image_count: galleryWithCounts.image_count,
-          },
-        ];
-        logger.debug("Computed counts for gallery detail", {
-          galleryId: existingGallery.id,
-          galleryTitle: existingGallery.title,
-          imageCount: galleryWithCounts.image_count,
-        });
-      }
-    }
-
-    // Add stashUrl to each gallery
-    const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
-      ...gallery,
-      stashUrl: buildStashEntityUrl(
-        "gallery",
-        gallery.id,
-        gallery.instanceId,
-        req.user
-      ),
-    }));
-
-    logger.debug("findGalleries completed", {
-      totalTime: `${Date.now() - startTime}ms`,
-      totalCount: total,
-      returnedCount: galleriesWithStashUrl.length,
-      page,
-      perPage,
+    res.status(400).json({
+      error: "Ambiguous lookup",
+      message: `Multiple galleries found with ID ${lookup.id}. Specify instance_id parameter.`,
+      matches: galleries.map((g) => ({
+        id: g.id,
+        title: g.title,
+        instanceId: g.instanceId,
+      })),
     });
-
-    res.json({
-      findGalleries: {
-        count: total,
-        galleries: galleriesWithStashUrl,
-      },
-    });
-  } catch (error) {
-    logger.error("Error in findGalleries", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find galleries",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return;
   }
+
+  // For single-entity requests (detail pages), get gallery with computed counts
+  let paginatedGalleries = galleries;
+  if (lookup && paginatedGalleries.length === 1) {
+    const existingGallery =
+      paginatedGalleries[0] as (typeof paginatedGalleries)[number];
+    const galleryWithCounts = await stashEntityService.getGallery(
+      existingGallery.id,
+      existingGallery.instanceId
+    );
+    if (galleryWithCounts) {
+      paginatedGalleries = [
+        {
+          ...existingGallery,
+          image_count: galleryWithCounts.image_count,
+        },
+      ];
+      logger.debug("Computed counts for gallery detail", {
+        galleryId: existingGallery.id,
+        galleryTitle: existingGallery.title,
+        imageCount: galleryWithCounts.image_count,
+      });
+    }
+  }
+
+  // Add stashUrl to each gallery
+  const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
+    ...gallery,
+    stashUrl: buildStashEntityUrl(
+      "gallery",
+      gallery.id,
+      gallery.instanceId,
+      req.user
+    ),
+  }));
+
+  logger.debug("findGalleries completed", {
+    totalTime: `${Date.now() - startTime}ms`,
+    totalCount: total,
+    returnedCount: galleriesWithStashUrl.length,
+    page,
+    perPage,
+  });
+
+  res.json({
+    findGalleries: {
+      count: total,
+      galleries: galleriesWithStashUrl,
+    },
+  });
 };
 
 /**

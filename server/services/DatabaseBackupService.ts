@@ -18,6 +18,7 @@ import type { DatabaseBackupKind } from "@peek/shared-types/api/databaseBackup.j
 import type { PrismaClient } from "@prisma/client";
 import fs, { type FileHandle } from "fs/promises";
 import path from "path";
+import { NotFoundError, ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
@@ -693,14 +694,21 @@ class DatabaseBackupService {
   async deleteBackup(filename: string): Promise<void> {
     // Security: only a backup of this database, by the patterns
     if (!parseBackupName(filename, await getDatabaseBaseName())) {
-      throw new Error("Invalid backup filename");
+      throw new ValidationError("Invalid backup filename");
     }
 
     const dataDir = this.getBackupDir();
     const filePath = path.join(dataDir, filename);
 
     logger.info(`Deleting backup: ${filename}`);
-    await fs.unlink(filePath);
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new NotFoundError("Backup not found");
+      }
+      throw error;
+    }
     logger.info(`Backup deleted: ${filename}`);
   }
 

@@ -3,6 +3,7 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ValidationError } from "../../middleware/errorHandler.js";
 import { databaseBackupService } from "../../services/DatabaseBackupService.js";
 import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
@@ -106,7 +107,23 @@ describe("Database Backup Routes", () => {
       });
     });
 
-    it("should return 500 on service error", async () => {
+    it("a failed backup reaches the error handler", async () => {
+      mockService.createBackup.mockRejectedValue(new Error("Disk full"));
+
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
+
+      const handler = findHandler(router, "post", "/database/backup");
+      const req = reqFor(handler, {
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
+      const res = resFor(handler);
+
+      await expect(handler(req, res, () => {})).rejects.toThrow("Disk full");
+      expect(res.json).not.toHaveBeenCalled();
+    });
+
+    it("a service failure reaches the error handler", async () => {
       mockService.listBackups.mockRejectedValue(new Error("Disk error"));
 
       const { default: router } =
@@ -118,13 +135,8 @@ describe("Database Backup Routes", () => {
       });
       const res = resFor(handler);
 
-      await handler(req, res, () => {});
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to list backups",
-        message: "Disk error",
-      });
+      await expect(handler(req, res, () => {})).rejects.toThrow("Disk error");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -191,9 +203,9 @@ describe("Database Backup Routes", () => {
       expect(res.json).toHaveBeenCalledWith({ ok: true });
     });
 
-    it("should return 400 for invalid filename", async () => {
+    it("an invalid filename reaches the error handler as a 400", async () => {
       mockService.deleteBackup.mockRejectedValue(
-        new Error("Invalid backup filename")
+        new ValidationError("Invalid backup filename")
       );
 
       const { default: router } =
@@ -210,9 +222,11 @@ describe("Database Backup Routes", () => {
       });
       const res = resFor(handler);
 
-      await handler(req, res, () => {});
-
-      expect(res.status).toHaveBeenCalledWith(400);
+      await expect(handler(req, res, () => {})).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Invalid backup filename",
+      });
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

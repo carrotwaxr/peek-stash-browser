@@ -25,41 +25,34 @@ router.post(
   "/recompute/:userId",
   requireAdmin,
   authenticated(async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId as string, 10);
-      if (isNaN(userId)) {
-        res.status(400).json({
-          error: "Invalid user ID",
-          message: "User ID must be a number",
-        });
-        return;
-      }
-
-      // Check if user exists
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
+    const userId = parseInt(req.params.userId as string, 10);
+    if (isNaN(userId)) {
+      res.status(400).json({
+        error: "Invalid user ID",
+        message: "User ID must be a number",
       });
-      if (!user) {
-        res.status(404).json({
-          error: "User not found",
-          message: `No user with ID ${userId}`,
-        });
-        return;
-      }
-
-      await exclusionComputationService.recomputeForUser(userId);
-
-      res.json({
-        ok: true,
-        message: `Recomputed exclusions for user ${userId}`,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to recompute exclusions",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      return;
     }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      res.status(404).json({
+        error: "User not found",
+        message: `No user with ID ${userId}`,
+      });
+      return;
+    }
+
+    await exclusionComputationService.recomputeForUser(userId);
+
+    res.json({
+      ok: true,
+      message: `Recomputed exclusions for user ${userId}`,
+    });
   })
 );
 
@@ -71,22 +64,15 @@ router.post(
   "/recompute-all",
   requireAdmin,
   authenticated(async (req, res) => {
-    try {
-      const result = await exclusionComputationService.recomputeAllUsers();
+    const result = await exclusionComputationService.recomputeAllUsers();
 
-      res.json({
-        ok: result.failed === 0,
-        message: `Recomputed exclusions for ${result.success} users${result.failed > 0 ? `, ${result.failed} failed` : ""}`,
-        success: result.success,
-        failed: result.failed,
-        errors: result.errors,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to recompute exclusions",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    res.json({
+      ok: result.failed === 0,
+      message: `Recomputed exclusions for ${result.success} users${result.failed > 0 ? `, ${result.failed} failed` : ""}`,
+      success: result.success,
+      failed: result.failed,
+      errors: result.errors,
+    });
   })
 );
 
@@ -98,19 +84,12 @@ router.get(
   "/stats",
   requireAdmin,
   authenticated(async (req, res) => {
-    try {
-      const stats = await prisma.userExcludedEntity.groupBy({
-        by: ["userId", "entityType", "reason"],
-        _count: true,
-      });
+    const stats = await prisma.userExcludedEntity.groupBy({
+      by: ["userId", "entityType", "reason"],
+      _count: true,
+    });
 
-      res.json(stats);
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to get exclusion stats",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    res.json(stats);
   })
 );
 

@@ -163,7 +163,7 @@ describe("Studios Controller", () => {
       expect(res._getErrorBody().error).toBe("Ambiguous lookup");
     });
 
-    it("returns 500 when query builder throws", async () => {
+    it("a failure reaches the error handler: query builder throws", async () => {
       mockStudioQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(findStudios, {
@@ -172,10 +172,9 @@ describe("Studios Controller", () => {
       });
       const res = resFor(findStudios);
 
-      await findStudios(req, res);
+      await expect(findStudios(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find studios");
+      expect(res.json).not.toHaveBeenCalled();
     });
 
     it("fetches detail counts for single-ID lookup", async () => {

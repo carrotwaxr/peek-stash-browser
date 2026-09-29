@@ -221,20 +221,17 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
-    it("should return 500 on service error", async () => {
+    it("a service failure reaches the error handler", async () => {
       mockService.findOrphanedScenesWithActivity.mockRejectedValue(
         new Error("Database error")
       );
 
       const handler = await routeHandler("get", "/orphaned-scenes");
       const res = resFor(handler);
-      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to fetch orphaned scenes",
-        message: "Database error",
-      });
+      await expect(
+        handler(reqFor(handler, { user: ADMIN }), res, vi.fn())
+      ).rejects.toThrow("Database error");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -280,7 +277,7 @@ describe("Merge Reconciliation Routes", () => {
       expect(mockService.findPhashMatches).not.toHaveBeenCalled();
     });
 
-    it("should return 500 on service error", async () => {
+    it("a service failure reaches the error handler", async () => {
       mockService.findPhashMatches.mockRejectedValue(
         new Error("Lookup failed")
       );
@@ -294,13 +291,8 @@ describe("Merge Reconciliation Routes", () => {
         user: ADMIN,
       });
       const res = resFor(handler);
-      await handler(req, res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to fetch matches",
-        message: "Lookup failed",
-      });
+      await expect(handler(req, res, vi.fn())).rejects.toThrow("Lookup failed");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -383,7 +375,7 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
-    it("a target that is not a live scene on the orphan's instance answers 400", async () => {
+    it("a refused merge target reaches the error handler", async () => {
       mockService.reconcileScene.mockRejectedValue(
         new MergeTargetError("Scene 999 is not a live scene on Stash B")
       );
@@ -398,15 +390,13 @@ describe("Merge Reconciliation Routes", () => {
         user: ADMIN,
       });
       const res = resFor(handler);
-      await handler(req, res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Scene 999 is not a live scene on Stash B",
-      });
+      await expect(handler(req, res, vi.fn())).rejects.toThrow(
+        "Scene 999 is not a live scene on Stash B"
+      );
+      expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("should return 500 on service error", async () => {
+    it("a service failure reaches the error handler", async () => {
       mockService.reconcileScene.mockRejectedValue(
         new Error("Transfer failed")
       );
@@ -421,13 +411,10 @@ describe("Merge Reconciliation Routes", () => {
         user: ADMIN,
       });
       const res = resFor(handler);
-      await handler(req, res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to reconcile scene",
-        message: "Transfer failed",
-      });
+      await expect(handler(req, res, vi.fn())).rejects.toThrow(
+        "Transfer failed"
+      );
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -480,7 +467,7 @@ describe("Merge Reconciliation Routes", () => {
       expect(mockService.discardOrphanedData).not.toHaveBeenCalled();
     });
 
-    it("should return 500 on service error", async () => {
+    it("a service failure reaches the error handler", async () => {
       mockService.discardOrphanedData.mockRejectedValue(
         new Error("Delete failed")
       );
@@ -494,13 +481,8 @@ describe("Merge Reconciliation Routes", () => {
         user: ADMIN,
       });
       const res = resFor(handler);
-      await handler(req, res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to discard orphaned data",
-        message: "Delete failed",
-      });
+      await expect(handler(req, res, vi.fn())).rejects.toThrow("Delete failed");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
@@ -590,20 +572,17 @@ describe("Merge Reconciliation Routes", () => {
       expect(mockService.reconcileScene).not.toHaveBeenCalled();
     });
 
-    it("should return 500 on service error", async () => {
+    it("a service failure reaches the error handler", async () => {
       mockService.findOrphanedScenesWithActivity.mockRejectedValue(
         new Error("Database unavailable")
       );
 
       const handler = await routeHandler("post", "/reconcile-all");
       const res = resFor(handler);
-      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Failed to reconcile all",
-        message: "Database unavailable",
-      });
+      await expect(
+        handler(reqFor(handler, { user: ADMIN }), res, vi.fn())
+      ).rejects.toThrow("Database unavailable");
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });

@@ -43,6 +43,8 @@ vi.mock("../../prisma/singleton.js", () => ({
 
 vi.mock("../../graphql/StashClient.js", () => ({
   StashClient: vi.fn(),
+  describeStashError: (error: unknown) =>
+    error instanceof Error ? error.message : String(error),
 }));
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -117,6 +119,8 @@ describe("setup routes", () => {
     vi.clearAllMocks();
     vi.resetModules();
     const { default: setupRoutes } = await import("../../routes/setup.js");
+    // The same module instance the routes threw their errors from
+    const { errorHandler } = await import("../../middleware/errorHandler.js");
     mockPrisma = vi.mocked(
       (await import("../../prisma/singleton.js")).default,
       true
@@ -149,6 +153,7 @@ describe("setup routes", () => {
 
     ({ baseUrl, close } = await startTestApp((app) => {
       app.use("/api/setup", setupRoutes);
+      app.use(errorHandler);
     }));
   });
 
@@ -271,6 +276,7 @@ describe("setup routes", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
         error: "Could not connect to Stash server",
+        errorType: "VALIDATION_ERROR",
       });
       expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
     });

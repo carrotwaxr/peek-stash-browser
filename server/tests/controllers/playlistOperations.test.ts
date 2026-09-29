@@ -262,6 +262,17 @@ describe("Playlist Controller Operations", () => {
       });
     });
 
+    it("a database failure reaches the error handler", async () => {
+      mockPrisma.playlist.findFirst.mockRejectedValue(new Error("DB down"));
+
+      const req = reqFor(deletePlaylist, { params: { id: "1" }, user: USER });
+      const res = resFor(deletePlaylist);
+
+      await expect(deletePlaylist(req, res)).rejects.toThrow("DB down");
+
+      expect(res.json).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 

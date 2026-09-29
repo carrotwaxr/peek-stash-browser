@@ -138,7 +138,7 @@ describe("Groups Controller", () => {
       expect(body.matches).toHaveLength(2);
     });
 
-    it("returns 500 when query builder throws", async () => {
+    it("a failure reaches the error handler: query builder throws", async () => {
       mockGroupQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = reqFor(findGroups, {
@@ -147,10 +147,9 @@ describe("Groups Controller", () => {
       });
       const res = resFor(findGroups);
 
-      await findGroups(req, res);
+      await expect(findGroups(req, res)).rejects.toThrow("DB error");
 
-      expect(res._getStatus()).toBe(500);
-      expect(res._getErrorBody().error).toBe("Failed to find groups");
+      expect(res.json).not.toHaveBeenCalled();
     });
 
     it("fetches detail counts for single-ID lookup, keeping the builder's tags", async () => {

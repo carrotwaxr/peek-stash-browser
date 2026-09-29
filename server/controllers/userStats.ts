@@ -10,7 +10,6 @@ import type {
   TypedResponse,
   UserStatsResponse,
 } from "../types/api/index.js";
-import { logger } from "../utils/logger.js";
 
 /**
  * Validate sortBy query parameter
@@ -29,30 +28,22 @@ export async function getUserStats(
   req: TypedAuthRequest,
   res: TypedResponse<UserStatsResponse | ApiErrorResponse>
 ) {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
-    // Parse sortBy query parameter
-    const sortByParam = req.query.sortBy;
-    const sortBy: TopListSortBy = isValidSortBy(sortByParam)
-      ? sortByParam
-      : "engagement";
+  // Parse sortBy query parameter
+  const sortByParam = req.query.sortBy;
+  const sortBy: TopListSortBy = isValidSortBy(sortByParam)
+    ? sortByParam
+    : "engagement";
 
-    // Rankings over an hour old are recomputed before the top lists are read
-    await rankingComputeService.ensureFresh(userId, { wait: true });
+  // Rankings over an hour old are recomputed before the top lists are read
+  await rankingComputeService.ensureFresh(userId, { wait: true });
 
-    // Everything counted is on an instance the viewer sees
-    const stats = await userStatsAggregationService.getUserStats(userId, {
-      sortBy,
-      allowedInstanceIds: await getUserAllowedInstanceIds(userId),
-    });
+  // Everything counted is on an instance the viewer sees
+  const stats = await userStatsAggregationService.getUserStats(userId, {
+    sortBy,
+    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+  });
 
-    res.json(stats);
-  } catch (error) {
-    logger.error("Error fetching user stats", {
-      error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    res.status(500).json({ error: "Failed to fetch user stats" });
-  }
+  res.json(stats);
 }

@@ -26,7 +26,17 @@ const ENTITY_KEY_RULE = {
     "build in-memory keys with entityKey/compositeKey (utils/entityRef.ts)",
 };
 
-const RESTRICTED = [WRITER_RULE, ENTITY_KEY_RULE];
+// Error text stays in the log: a body built from a caught error's `message`
+// leaks database messages, file paths and queries. Handlers throw typed
+// errors (middleware/errorHandler.ts) and the central handler answers.
+const ERROR_TEXT_RULE = {
+  selector:
+    'CallExpression[callee.property.name=/^(json|send)$/] MemberExpression[property.name="message"]',
+  message:
+    "do not put error text in a response; throw an AppError (middleware/errorHandler.ts)",
+};
+
+const RESTRICTED = [WRITER_RULE, ENTITY_KEY_RULE, ERROR_TEXT_RULE];
 
 // Handlers and services name their dependencies at the top: an import inside
 // a function hides one from the reader and adds a module lookup to every call
@@ -119,7 +129,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
 
-      // The writer rule and the entity key rule (RESTRICTED, above)
+      // The writer, entity key and error text rules (RESTRICTED, above)
       "no-restricted-syntax": ["error", ...RESTRICTED],
     },
   },
@@ -142,6 +152,13 @@ export default tseslint.config(
     files: ["utils/entityRef.ts"],
     rules: {
       "no-restricted-syntax": restrictedExcept(ENTITY_KEY_RULE),
+    },
+  },
+  // The central handler answers with the text of an AppError
+  {
+    files: ["middleware/errorHandler.ts"],
+    rules: {
+      "no-restricted-syntax": restrictedExcept(ERROR_TEXT_RULE),
     },
   },
   // Tests mock $transaction and spell keys out in their expectations

@@ -61,6 +61,8 @@ vi.mock("../../graphql/StashClient.js", () => ({
       version: { version: "0.27.0" },
     }),
   })),
+  describeStashError: (error: unknown) =>
+    error instanceof Error ? error.message : String(error),
 }));
 
 // Mock StashInstanceManager
@@ -147,6 +149,17 @@ describe("Setup Controller", () => {
       expect(body.setupComplete).toBe(true);
       expect(body.hasUsers).toBe(true);
       expect(body.hasStashInstance).toBe(true);
+    });
+
+    it("a database failure reaches the error handler", async () => {
+      mockPrisma.user.count.mockRejectedValue(new Error("DB down"));
+
+      const res = resFor(getSetupStatus);
+      await expect(getSetupStatus(reqFor(getSetupStatus), res)).rejects.toThrow(
+        "DB down"
+      );
+
+      expect(res.json).not.toHaveBeenCalled();
     });
 
     it("returns setupComplete: false when no users exist", async () => {
@@ -624,6 +637,32 @@ describe("Setup Controller", () => {
       expect(mockSync.fullSync).not.toHaveBeenCalled();
     });
 
+    it("an instance Stash cannot be reached at reaches the error handler as a 400 with the reason", async () => {
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(
+              new Error("Could not reach Stash (ECONNREFUSED)")
+            ),
+          version: vi.fn(),
+        })
+      );
+
+      const res = resFor(createStashInstance);
+      await expect(
+        createStashInstance(reqFor(createStashInstance, { body }), res)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Could not connect to Stash server",
+        details: "Could not reach Stash (ECONNREFUSED)",
+      });
+
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
+    });
+
     it("answers sync: started when no sync runs", async () => {
       mockSync.queueFullSync.mockReturnValue("started");
 
@@ -698,15 +737,17 @@ describe("Setup Controller", () => {
       mockSync.deleteInstance.mockRejectedValue(new SyncBusyError("sync"));
 
       const res = resFor(deleteStashInstance);
-      await deleteStashInstance(
-        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
-        res
-      );
-
-      expect(res.status).toHaveBeenCalledWith(409);
-      expect(res._getErrorBody().error).toBe(
-        "A sync is running. Wait for it to finish or abort it under Server Configuration → Sync status, then delete again."
-      );
+      await expect(
+        deleteStashInstance(
+          reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "A sync is running. Wait for it to finish or abort it under Server Configuration → Sync status, then delete again.",
+      });
+      expect(res.json).not.toHaveBeenCalled();
       expect(mockPrisma.stashInstance.delete).not.toHaveBeenCalled();
       expect(vi.mocked(stashInstanceManager).reload).not.toHaveBeenCalled();
     });
@@ -721,15 +762,16 @@ describe("Setup Controller", () => {
       );
 
       const res = resFor(deleteStashInstance);
-      await deleteStashInstance(
-        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
-        res
-      );
-
-      expect(res.status).toHaveBeenCalledWith(409);
-      expect(res._getErrorBody().error).toBe(
-        "Peek is still removing a deleted instance's cached library. Delete again once it has finished."
-      );
+      await expect(
+        deleteStashInstance(
+          reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "Peek is still removing a deleted instance's cached library. Delete again once it has finished.",
+      });
     });
 
     it("returns 404 when instance does not exist", async () => {
@@ -803,6 +845,45 @@ describe("Setup Controller", () => {
       );
 
       expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("new credentials Stash refuses reach the error handler as a 400 with the reason", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Old Name",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(new Error("Stash answered HTTP 401")),
+          version: vi.fn(),
+        })
+      );
+
+      const res = resFor(updateStashInstance);
+      await expect(
+        updateStashInstance(
+          reqFor(updateStashInstance, {
+            body: { apiKey: "wrong" },
+            params: { id: "inst-a" },
+          }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Could not connect to Stash server with new credentials",
+        details: "Stash answered HTTP 401",
+      });
+
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockPrisma.stashInstance.update).not.toHaveBeenCalled();
     });
 
     it("re-pointing an instance during a sync answers sync: queued", async () => {
