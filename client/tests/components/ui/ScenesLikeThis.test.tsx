@@ -5,7 +5,13 @@
  */
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "@/api";
@@ -26,12 +32,33 @@ vi.mock("@/contexts/ConfigContext", () => ({
 
 // Pagination needs the TV-mode provider; the request count is what matters here
 vi.mock("@/components/ui/Pagination", () => ({
-  default: () => null,
+  default: ({
+    onPageChange,
+    currentPage,
+  }: {
+    onPageChange: (page: number) => void;
+    currentPage: number;
+  }) => (
+    <div>
+      <span>page {currentPage}</span>
+      <button onClick={() => onPageChange(1)}>first page</button>
+      <button onClick={() => onPageChange(3)}>third page</button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/scene-search/SceneGrid", () => ({
-  default: ({ scenes }: { scenes: Array<{ id: string }> }) => (
-    <div data-testid="scene-grid">{scenes.map((s) => s.id).join(",")}</div>
+  default: ({
+    scenes,
+    onHideSuccess,
+  }: {
+    scenes: Array<{ id: string }>;
+    onHideSuccess: (id: string) => void;
+  }) => (
+    <div data-testid="scene-grid">
+      {scenes.map((s) => s.id).join(",")}
+      <button onClick={() => onHideSuccess("s2")}>hide s2</button>
+    </div>
   ),
 }));
 
@@ -88,6 +115,97 @@ describe("ScenesLikeThis", () => {
       await vi.advanceTimersByTimeAsync(LIBRARY_READY_POLL_MS + 50);
     });
     expect(screen.getByTestId("scene-grid")).toHaveTextContent("s2");
+  });
+
+  it("a failed similar scenes request shows the failure text", async () => {
+    mockApiGet.mockRejectedValue(new ApiError("Boom", 500));
+
+    renderUnderOneClient(<ScenesLikeThis sceneId="7" instanceId="a" />);
+
+    expect(
+      await screen.findByText("Failed to load similar scenes")
+    ).toBeInTheDocument();
+  });
+
+  it("a scene hidden from the grid leaves the list", async () => {
+    mockApiGet.mockResolvedValue({
+      scenes: [
+        { id: "s1", instanceId: "a" },
+        { id: "s2", instanceId: "a" },
+      ],
+      count: 2,
+      page: 1,
+      perPage: 12,
+    });
+
+    renderUnderOneClient(<ScenesLikeThis sceneId="7" instanceId="a" />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("scene-grid")).toHaveTextContent("s1,s2")
+    );
+    fireEvent.click(screen.getByText("hide s2"));
+    expect(screen.getByTestId("scene-grid")).toHaveTextContent(/^s1hide/);
+  });
+
+  it("paging moves the tab to that page, and the first page drops the page param", async () => {
+    mockApiGet.mockResolvedValue({
+      scenes: [{ id: "s2", instanceId: "a" }],
+      count: 40,
+      page: 2,
+      perPage: 12,
+    });
+
+    renderUnderOneClient(
+      <ScenesLikeThis sceneId="7" instanceId="a" />,
+      "/scene/7?page=2"
+    );
+
+    await waitFor(() => expect(screen.getAllByText("page 2")).toHaveLength(2));
+    fireEvent.click(screen.getAllByText("third page")[0] as HTMLElement);
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenLastCalledWith(
+        "/library/scenes/7/similar?instanceId=a&page=3"
+      )
+    );
+    await waitFor(() => expect(screen.getAllByText("page 3")).toHaveLength(2));
+    fireEvent.click(screen.getAllByText("first page")[0] as HTMLElement);
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenLastCalledWith(
+        "/library/scenes/7/similar?instanceId=a&page=1"
+      )
+    );
+  });
+
+  it("opening another scene from page 2 starts its similar scenes on page 1", async () => {
+    mockApiGet.mockResolvedValue({
+      scenes: [{ id: "s2", instanceId: "a" }],
+      count: 40,
+      page: 2,
+      perPage: 12,
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const tree = (sceneId: string) => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/scene/7?page=2"]}>
+          <ScenesLikeThis sceneId={sceneId} instanceId="a" />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree("7"));
+    await waitFor(() => expect(screen.getAllByText("page 2")).toHaveLength(2));
+
+    rerender(tree("8"));
+
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenCalledWith(
+        "/library/scenes/8/similar?instanceId=a&page=1"
+      )
+    );
+    expect(mockApiGet).not.toHaveBeenCalledWith(
+      "/library/scenes/8/similar?instanceId=a&page=2"
+    );
   });
 
   it("the tab and the sidebar share one request for page 1", async () => {

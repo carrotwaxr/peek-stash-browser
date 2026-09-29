@@ -178,6 +178,23 @@ describe("useEntityLookup", () => {
     expect(result.current.entity).toBeUndefined();
   });
 
+  it.each([
+    ["an empty matches list", []],
+    ["a match without an instance", [{ id: "7", name: "Jane Doe" }]],
+    ["a non-object match", ["7"]],
+  ])("a 400 with %s gives error, not ambiguous", async (_case, matches) => {
+    const fetchById = vi
+      .fn<FetchById<Entity>>()
+      .mockRejectedValue(new ApiError("Ambiguous lookup", 400, { matches }));
+
+    const { result } = renderHook(() => useEntityLookup(fetchById, "7", null));
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("error");
+    });
+    expect(result.current.matches).toBeUndefined();
+  });
+
   it("a 400 without matches gives error", async () => {
     const refused = new ApiError("Invalid request", 400, {
       error: "Invalid request",
