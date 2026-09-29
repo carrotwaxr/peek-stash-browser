@@ -374,9 +374,12 @@ export interface SyncTypeStats {
 export type SyncStats = Record<keyof SyncFromStashOptions, SyncTypeStats>;
 
 export interface SyncFromStashResponse {
-  success: true;
+  /** False when an instance's import failed; the others still ran */
+  success: boolean;
   message: string;
   stats: SyncStats;
+  /** The ids of the instances whose import failed */
+  failedInstances: string[];
 }
 
 // =============================================================================
