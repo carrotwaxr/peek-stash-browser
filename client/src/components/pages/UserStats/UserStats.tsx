@@ -21,6 +21,7 @@ type TopListSortBy = "engagement" | "oCount" | "playCount";
 /** Matches TopList's internal TopListItem interface for type-safe prop passing */
 interface TopListItem {
   id: string;
+  instanceId: string;
   name?: string;
   title?: string;
   filePath?: string;
@@ -78,8 +79,9 @@ const TopContentInfoContent = () => (
     </p>
     <p className="mb-2">
       Percentile rank shows where each entity falls among all your engaged
-      entities (100 = top, 0 = bottom). Rankings refresh on login and
-      periodically while browsing.
+      entities (100 = top, 0 = bottom). Performer, studio and tag rankings are
+      recalculated at most once an hour; scenes are ranked each time this page
+      loads.
     </p>
     <p className="font-semibold mb-1">Sort Options</p>
     <ul className="space-y-1">
@@ -257,7 +259,6 @@ const UserStats = () => {
                   key={`scenes-${sortBy}`}
                   title="Top Scenes"
                   items={data.topScenes as TopListItem[]}
-                  linkPrefix="/scene"
                   entityType="scene"
                   sortBy={sortBy}
                   onSortChange={setSortBy as (sortBy: string) => void}
@@ -266,7 +267,6 @@ const UserStats = () => {
                   key={`performers-${sortBy}`}
                   title="Top Performers"
                   items={data.topPerformers as TopListItem[]}
-                  linkPrefix="/performer"
                   entityType="performer"
                   sortBy={sortBy}
                   onSortChange={setSortBy as (sortBy: string) => void}
@@ -275,7 +275,6 @@ const UserStats = () => {
                   key={`studios-${sortBy}`}
                   title="Top Studios"
                   items={data.topStudios as TopListItem[]}
-                  linkPrefix="/studio"
                   entityType="studio"
                   sortBy={sortBy}
                   onSortChange={setSortBy as (sortBy: string) => void}
@@ -284,7 +283,6 @@ const UserStats = () => {
                   key={`tags-${sortBy}`}
                   title="Top Tags"
                   items={data.topTags as TopListItem[]}
-                  linkPrefix="/tag"
                   entityType="tag"
                   sortBy={sortBy}
                   onSortChange={setSortBy as (sortBy: string) => void}
@@ -311,13 +309,13 @@ const UserStats = () => {
                   item={
                     data.mostWatchedScene as {
                       id: string;
+                      instanceId: string;
                       name?: string;
                       title?: string;
                       filePath?: string;
                       imageUrl?: string;
                     } | null
                   }
-                  linkPrefix="/scene"
                   entityType="scene"
                   statLabel="plays"
                   statValue={
@@ -333,13 +331,13 @@ const UserStats = () => {
                   item={
                     data.mostViewedImage as {
                       id: string;
+                      instanceId: string;
                       name?: string;
                       title?: string;
                       filePath?: string;
                       imageUrl?: string;
                     } | null
                   }
-                  linkPrefix="/image"
                   entityType="image"
                   statLabel="views"
                   statValue={
@@ -355,13 +353,13 @@ const UserStats = () => {
                   item={
                     data.mostOdScene as {
                       id: string;
+                      instanceId: string;
                       name?: string;
                       title?: string;
                       filePath?: string;
                       imageUrl?: string;
                     } | null
                   }
-                  linkPrefix="/scene"
                   entityType="scene"
                   statLabel="Os"
                   statValue={
@@ -374,13 +372,13 @@ const UserStats = () => {
                   item={
                     data.mostOdPerformer as {
                       id: string;
+                      instanceId: string;
                       name?: string;
                       title?: string;
                       filePath?: string;
                       imageUrl?: string;
                     } | null
                   }
-                  linkPrefix="/performer"
                   entityType="performer"
                   statLabel="Os"
                   statValue={

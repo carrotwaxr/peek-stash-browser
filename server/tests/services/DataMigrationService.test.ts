@@ -70,14 +70,29 @@ const mockGalleryInheritance = vi.mocked(imageGalleryInheritanceService, true);
 const mockImageCounts = vi.mocked(entityImageCountService, true);
 const mockSync = vi.mocked(stashSyncService, true);
 
-/** Every migration before 006, as applied rows */
-const APPLIED_BEFORE_006 = [
+/** Every migration, in order */
+const MIGRATIONS = [
   "001_rebuild_user_stats",
   "002_rebuild_stats_multi_instance",
   "003_recompute_exclusions_restriction_semantics",
   "004_recompute_exclusions_reason_precedence",
   "005_recompute_exclusions_studio_instance",
-].map((name, i) => ({ id: i + 1, name, appliedAt: new Date() }));
+  "006_rebuild_derived_after_sync_semantics",
+  "007_drop_scene_rankings",
+];
+
+/** Every migration but the named ones, as applied rows */
+const appliedAllBut = (...pending: string[]) =>
+  MIGRATIONS.filter((name) => !pending.includes(name)).map((name, i) => ({
+    id: i + 1,
+    name,
+    appliedAt: new Date(),
+  }));
+
+/** Every migration before 006 applied, and 007 */
+const APPLIED_BEFORE_006 = appliedAllBut(
+  "006_rebuild_derived_after_sync_semantics"
+);
 
 describe("DataMigrationService", () => {
   beforeEach(() => {
@@ -87,6 +102,8 @@ describe("DataMigrationService", () => {
       failed: 0,
       errors: [],
     });
+    // Migration 007: no user holds a stored scene ranking
+    mockPrisma.$queryRaw.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -131,6 +148,11 @@ describe("DataMigrationService", () => {
           name: "006_rebuild_derived_after_sync_semantics",
           appliedAt: new Date(),
         },
+        {
+          id: 7,
+          name: "007_drop_scene_rankings",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -164,8 +186,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All six migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(6);
+      // All seven migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(7);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -184,10 +206,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "006_rebuild_derived_after_sync_semantics" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "007_drop_scene_rankings" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 006 pending
+      // 001 already applied, 002 to 007 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -206,8 +231,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 006 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(5);
+      // 001 is skipped; 002 to 007 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(6);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -220,33 +245,9 @@ describe("DataMigrationService", () => {
     });
 
     it("recomputes every user's exclusions in migration 003 (item 13)", async () => {
-      mockPrisma.dataMigration.findMany.mockResolvedValue([
-        {
-          id: 1,
-          name: "001_rebuild_user_stats",
-          appliedAt: new Date(),
-        },
-        {
-          id: 2,
-          name: "002_rebuild_stats_multi_instance",
-          appliedAt: new Date(),
-        },
-        {
-          id: 4,
-          name: "004_recompute_exclusions_reason_precedence",
-          appliedAt: new Date(),
-        },
-        {
-          id: 5,
-          name: "005_recompute_exclusions_studio_instance",
-          appliedAt: new Date(),
-        },
-        {
-          id: 6,
-          name: "006_rebuild_derived_after_sync_semantics",
-          appliedAt: new Date(),
-        },
-      ]);
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("003_recompute_exclusions_restriction_semantics")
+      );
       mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockExclusionService.recomputeAllUsers.mockResolvedValue({
         success: 2,
@@ -265,33 +266,9 @@ describe("DataMigrationService", () => {
     });
 
     it("recomputes every user's exclusions in migration 004 (reason precedence)", async () => {
-      mockPrisma.dataMigration.findMany.mockResolvedValue([
-        {
-          id: 1,
-          name: "001_rebuild_user_stats",
-          appliedAt: new Date(),
-        },
-        {
-          id: 2,
-          name: "002_rebuild_stats_multi_instance",
-          appliedAt: new Date(),
-        },
-        {
-          id: 3,
-          name: "003_recompute_exclusions_restriction_semantics",
-          appliedAt: new Date(),
-        },
-        {
-          id: 5,
-          name: "005_recompute_exclusions_studio_instance",
-          appliedAt: new Date(),
-        },
-        {
-          id: 6,
-          name: "006_rebuild_derived_after_sync_semantics",
-          appliedAt: new Date(),
-        },
-      ]);
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("004_recompute_exclusions_reason_precedence")
+      );
       mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
       const service = await importFresh();
@@ -306,13 +283,7 @@ describe("DataMigrationService", () => {
 
     it("recomputes every user's exclusions in migration 005 (studio instance of galleries and images)", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue(
-        [
-          "001_rebuild_user_stats",
-          "002_rebuild_stats_multi_instance",
-          "003_recompute_exclusions_restriction_semantics",
-          "004_recompute_exclusions_reason_precedence",
-          "006_rebuild_derived_after_sync_semantics",
-        ].map((name, i) => ({ id: i + 1, name, appliedAt: new Date() }))
+        appliedAllBut("005_recompute_exclusions_studio_instance")
       );
       mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
@@ -370,6 +341,42 @@ describe("DataMigrationService", () => {
       );
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
       expect(mockExclusionService.recomputeAllUsers).not.toHaveBeenCalled();
+    });
+
+    it("deletes the stored scene rankings in migration 007, one write unit per user", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("007_drop_scene_rankings")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      mockPrisma.$queryRaw.mockResolvedValue([{ userId: 1 }, { userId: 4 }]);
+      mockPrisma.userEntityRanking.deleteMany.mockResolvedValue({ count: 5 });
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      expect(mockPrisma.userEntityRanking.deleteMany.mock.calls).toEqual([
+        [{ where: { userId: 1, entityType: "scene" } }],
+        [{ where: { userId: 4, entityType: "scene" } }],
+      ]);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
+        data: { name: "007_drop_scene_rankings" },
+      });
+    });
+
+    it("does not mark 007 as applied when a delete throws", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("007_drop_scene_rankings")
+      );
+      mockPrisma.$queryRaw.mockResolvedValue([{ userId: 1 }]);
+      mockPrisma.userEntityRanking.deleteMany.mockRejectedValue(
+        new Error("disk I/O error")
+      );
+
+      const service = await importFresh();
+      await expect(service.runPendingMigrations()).rejects.toThrow(
+        "disk I/O error"
+      );
+      expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
     });
 
     it("does not mark 004 as applied when the recompute throws", async () => {

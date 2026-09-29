@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
@@ -188,6 +189,33 @@ const migrations: Migration[] = [
         });
         throw error;
       }
+    },
+  },
+  // The stats page ranks its top scenes from the watch history when it
+  // loads, so the scene rankings RankingComputeService used to store are
+  // read by nothing. One unit per user: each is bounded by the scenes that
+  // user watched (17k rows delete in about 30 ms at 200k scenes).
+  {
+    name: "007_drop_scene_rankings",
+    description:
+      "Delete the stored scene rankings: the stats page ranks top scenes from the watch history",
+    run: async () => {
+      const users = await prisma.$queryRaw<Array<{ userId: number }>>`
+        SELECT DISTINCT userId FROM UserEntityRanking WHERE entityType = 'scene'
+      `;
+      let rows = 0;
+      for (const { userId } of users) {
+        const { count } = await dbWrite("rankings.dropScenes", () =>
+          prisma.userEntityRanking.deleteMany({
+            where: { userId, entityType: "scene" },
+          })
+        );
+        rows += count;
+      }
+      logger.info("[Migration 007] Dropped the stored scene rankings", {
+        users: users.length,
+        rows,
+      });
     },
   },
 ];

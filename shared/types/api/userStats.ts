@@ -47,6 +47,8 @@ export interface EngagementStats {
  */
 export interface TopScene {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   title: string | null;
   filePath: string | null; // For title fallback (basename)
   imageUrl: string | null;
@@ -62,6 +64,8 @@ export interface TopScene {
  */
 export interface TopPerformer {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   name: string;
   imageUrl: string | null;
   playCount: number;
@@ -76,6 +80,8 @@ export interface TopPerformer {
  */
 export interface TopStudio {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   name: string;
   imageUrl: string | null;
   playCount: number;
@@ -90,6 +96,8 @@ export interface TopStudio {
  */
 export interface TopTag {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   name: string;
   imageUrl: string | null;
   playCount: number;
@@ -107,6 +115,8 @@ export interface TopTag {
  */
 export interface HighlightScene {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   title: string | null;
   filePath: string | null; // For title fallback (basename)
   imageUrl: string | null;
@@ -119,6 +129,8 @@ export interface HighlightScene {
  */
 export interface HighlightImage {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   title: string | null;
   filePath: string | null; // For title fallback (basename)
   imageUrl: string | null;
@@ -130,6 +142,8 @@ export interface HighlightImage {
  */
 export interface HighlightPerformer {
   id: string;
+  /** The Stash instance the entity is on: with `id`, what names it */
+  instanceId: string;
   name: string;
   imageUrl: string | null;
   oCount: number;
