@@ -88,12 +88,7 @@ export const getUserCustomThemes = async (
   res: TypedResponse<GetUserCustomThemesResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const themes = await prisma.customTheme.findMany({
       where: { userId },
@@ -124,13 +119,8 @@ export const getCustomTheme = async (
   res: TypedResponse<GetCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const themeId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(themeId)) {
       res.status(400).json({ error: "Invalid theme ID" });
@@ -166,13 +156,8 @@ export const createCustomTheme = async (
   res: TypedResponse<CreateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const { name, config } = req.body;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     // Validate name
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -232,14 +217,9 @@ export const updateCustomTheme = async (
   res: TypedResponse<UpdateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const themeId = parseInt(req.params.id);
     const { name, config } = req.body;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(themeId)) {
       res.status(400).json({ error: "Invalid theme ID" });
@@ -324,13 +304,8 @@ export const deleteCustomTheme = async (
   res: TypedResponse<DeleteCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const themeId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(themeId)) {
       res.status(400).json({ error: "Invalid theme ID" });
@@ -372,13 +347,8 @@ export const duplicateCustomTheme = async (
   res: TypedResponse<DuplicateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const themeId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(themeId)) {
       res.status(400).json({ error: "Invalid theme ID" });

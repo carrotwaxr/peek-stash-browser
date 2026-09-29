@@ -30,6 +30,7 @@ import type {
 } from "../../types/api/index.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -246,7 +247,7 @@ describe("Ratings Controller", () => {
     mockInstanceManager.getForSync.mockReturnValue(partialRow(mockStash));
   });
 
-  // The handler's own sign-in check: authenticated() does not enforce a user yet
+  // The sign-in check authenticated() runs before the handler, as the route registers it
   describe("sign-in check (via updateSceneRating)", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(updateSceneRating, {
@@ -254,7 +255,7 @@ describe("Ratings Controller", () => {
         user: malformed({}),
       });
       const res = resFor(updateSceneRating);
-      await updateSceneRating(req, res);
+      await authenticated(updateSceneRating)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
       expect(res._getErrorBody().error).toBe("Unauthorized");
     });
@@ -262,7 +263,7 @@ describe("Ratings Controller", () => {
     it("returns 401 when user is missing entirely", async () => {
       const req = reqFor(updateSceneRating, { params: { sceneId: "1" } });
       const res = resFor(updateSceneRating);
-      await updateSceneRating(req, res);
+      await authenticated(updateSceneRating)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
       expect(res._getErrorBody().error).toBe("Unauthorized");
     });

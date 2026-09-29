@@ -30,12 +30,7 @@ export async function getUserStats(
   res: TypedResponse<UserStatsResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
+    const userId = req.user.id;
 
     // Parse sortBy query parameter
     const sortByParam = req.query.sortBy;

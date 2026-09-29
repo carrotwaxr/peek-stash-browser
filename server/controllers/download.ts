@@ -82,11 +82,7 @@ export async function startSceneDownload(
   res: TypedResponse<StartSceneDownloadResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const { sceneId } = req.params;
 
     // Check permission
@@ -139,11 +135,7 @@ export async function startImageDownload(
   res: TypedResponse<StartImageDownloadResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const { imageId } = req.params;
 
     // Check permission
@@ -193,11 +185,7 @@ export async function startPlaylistDownload(
   res: TypedResponse<StartPlaylistDownloadResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.playlistId, 10);
     if (isNaN(playlistId)) {
       return res.status(400).json({ error: "Invalid playlist ID" });
@@ -276,11 +264,7 @@ export async function getUserDownloads(
   res: TypedResponse<GetUserDownloadsResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const downloads = await downloadService.getUserDownloads(userId);
 
     return res.json({
@@ -303,11 +287,7 @@ export async function getDownloadStatus(
   res: TypedResponse<GetDownloadStatusResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
@@ -341,11 +321,7 @@ export async function getDownloadFile(
   res: TypedResponse<ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
@@ -497,11 +473,7 @@ export async function deleteDownload(
   res: TypedResponse<DeleteDownloadResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
@@ -536,11 +508,7 @@ export async function retryDownload(
   res: TypedResponse<RetryDownloadResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const userId = req.user.id;
     const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });

@@ -21,6 +21,7 @@ import {
   getPlaylistAccess,
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import {
   type PlaylistShareWithGroup,
@@ -166,7 +167,7 @@ describe("Playlist Controller Operations", () => {
       const req = reqFor(createPlaylist, { body: { name: "Test" } });
       const res = resFor(createPlaylist);
 
-      await createPlaylist(req, res);
+      await authenticated(createPlaylist)(req, res, vi.fn());
 
       expect(res._getStatus()).toBe(401);
     });

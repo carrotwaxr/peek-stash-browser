@@ -128,12 +128,7 @@ export const getUserSettings = async (
   res: TypedResponse<GetUserSettingsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -213,13 +208,8 @@ export const updateUserSettings = async (
   res: TypedResponse<UpdateUserSettingsResponse | ApiErrorResponse>
 ) => {
   try {
-    const currentUserId = req.user?.id;
-    const currentUserRole = req.user?.role;
-
-    if (!currentUserId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const currentUserId = req.user.id;
+    const currentUserRole = req.user.role;
 
     // Determine target user ID
     // If userId param provided (admin updating another user), use that
@@ -631,12 +621,7 @@ export const changePassword = async (
   res: TypedResponse<ChangePasswordResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { currentPassword, newPassword } = req.body;
 
@@ -702,12 +687,7 @@ export const getRecoveryKey = async (
   res: TypedResponse<GetRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -738,12 +718,7 @@ export const regenerateRecoveryKey = async (
   res: TypedResponse<RegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     // Express 5 leaves req.body undefined when the request has no body
     const { currentPassword } = req.body ?? {};
@@ -793,11 +768,6 @@ export const getAllUsers = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -843,11 +813,6 @@ export const createUser = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const { username, password, role } = req.body;
 
     if (!username || !password) {
@@ -912,11 +877,6 @@ export const deleteUser = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const { userId } = req.params;
     const userIdInt = parseInt(userId, 10);
 
@@ -976,11 +936,6 @@ export const updateUserRole = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const { userId } = req.params;
     const { role } = req.body;
     const userIdInt = parseInt(userId, 10);
@@ -1034,12 +989,7 @@ export const getFilterPresets = async (
   res: TypedResponse<GetFilterPresetsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -1078,12 +1028,7 @@ export const saveFilterPreset = async (
   res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const {
       artifactType,
@@ -1207,12 +1152,7 @@ export const deleteFilterPreset = async (
   res: TypedResponse<DeleteFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { artifactType, presetId } = req.params;
 
@@ -1283,12 +1223,7 @@ export const getDefaultFilterPresets = async (
   res: TypedResponse<GetDefaultFilterPresetsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     // Get user's default presets
     const user = await prisma.user.findUnique({
@@ -1326,12 +1261,7 @@ export const setDefaultFilterPreset = async (
   res: TypedResponse<SetDefaultFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { context, presetId } = req.body;
 
@@ -1421,14 +1351,6 @@ export const syncFromStash = async (
 ) => {
   const startTime = Date.now();
   try {
-    const currentUser = req.user;
-
-    // Only admins can sync
-    if (!currentUser || currentUser.role !== "ADMIN") {
-      res.status(403).json({ error: "Only admins can sync from Stash" });
-      return;
-    }
-
     const targetUserId = parseInt(req.params.userId);
     if (isNaN(targetUserId)) {
       res.status(400).json({ error: "Invalid user ID" });
@@ -1472,21 +1394,6 @@ export const getUserRestrictions = async (
 ) => {
   try {
     const { userId } = req.params;
-    const requestingUser = req.user;
-
-    if (!requestingUser) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    // Only admins can manage restrictions
-    if (requestingUser.role !== "ADMIN") {
-      res
-        .status(403)
-        .json({ error: "Only administrators can manage content restrictions" });
-      return;
-    }
-
     const restrictions = await prisma.userContentRestriction.findMany({
       where: { userId: parseInt(userId) },
     });
@@ -1511,21 +1418,6 @@ export const updateUserRestrictions = async (
   try {
     const { userId } = req.params;
     const { restrictions } = req.body;
-    const requestingUser = req.user;
-
-    if (!requestingUser) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    // Only admins can manage restrictions
-    if (requestingUser.role !== "ADMIN") {
-      res
-        .status(403)
-        .json({ error: "Only administrators can manage content restrictions" });
-      return;
-    }
-
     const targetUserId = parseInt(userId);
     if (isNaN(targetUserId)) {
       res.status(400).json({ error: "Invalid user ID" });
@@ -1657,21 +1549,6 @@ export const deleteUserRestrictions = async (
 ) => {
   try {
     const { userId } = req.params;
-    const requestingUser = req.user;
-
-    if (!requestingUser) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    // Only admins can manage restrictions
-    if (requestingUser.role !== "ADMIN") {
-      res
-        .status(403)
-        .json({ error: "Only administrators can manage content restrictions" });
-      return;
-    }
-
     const targetUserId = parseInt(userId);
 
     await prisma.userContentRestriction.deleteMany({
@@ -1833,12 +1710,7 @@ export const hideEntity = async (
   res: TypedResponse<HideEntityResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const target = validateHideTarget(req.body);
     if (!target.ok) {
@@ -1878,12 +1750,7 @@ export const unhideEntity = async (
   res: TypedResponse<UnhideEntityResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { entityType, entityId } = req.params;
 
@@ -1933,12 +1800,7 @@ export const unhideAllEntities = async (
   res: TypedResponse<UnhideAllEntitiesResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const entityType = hideTypeFilter(req.query.entityType);
     if (entityType === false) {
@@ -1970,12 +1832,7 @@ export const getHiddenEntities = async (
   res: TypedResponse<{ hiddenEntities: unknown[] } | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const entityType = hideTypeFilter(req.query.entityType);
     if (entityType === false) {
@@ -2005,12 +1862,7 @@ export const getHiddenEntityIds = async (
   res: TypedResponse<GetHiddenEntityIdsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
 
@@ -2042,12 +1894,7 @@ export const hideEntities = async (
   res: TypedResponse<HideEntitiesResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { entities } = req.body;
 
@@ -2117,12 +1964,7 @@ export const updateHideConfirmation = async (
   res: TypedResponse<UpdateHideConfirmationResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { hideConfirmationDisabled } = req.body;
 
@@ -2157,11 +1999,6 @@ export const getUserPermissions = async (
   res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
-    if (!req.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
-
     const permissions = await resolveUserPermissions(req.user.id);
 
     if (!permissions) {
@@ -2186,11 +2023,6 @@ export const getAnyUserPermissions = async (
   res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       res.status(400).json({ error: "Invalid user ID" });
@@ -2224,11 +2056,6 @@ export const updateUserPermissionOverrides = async (
   res: TypedResponse<{ success: true; permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       res.status(400).json({ error: "Invalid user ID" });
@@ -2297,11 +2124,6 @@ export const getUserGroupMemberships = async (
   res: TypedResponse<GetUserGroupMembershipsResponse | ApiErrorResponse>
 ) => {
   try {
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       res.status(400).json({ error: "Invalid user ID" });
@@ -2331,11 +2153,6 @@ export const adminResetPassword = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const { userId } = req.params;
     const { newPassword } = req.body;
     const userIdInt = parseInt(userId, 10);
@@ -2387,11 +2204,6 @@ export const adminRegenerateRecoveryKey = async (
 ) => {
   try {
     // Check if user is admin
-    if (req.user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Forbidden: Admin access required" });
-      return;
-    }
-
     const { userId } = req.params;
     const userIdInt = parseInt(userId, 10);
 
@@ -2446,12 +2258,7 @@ export const getUserStashInstances = async (
   >
 ) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
+    const userId = req.user.id;
     // Get user's selected instances
     const userSelections = await prisma.userStashInstance.findMany({
       where: { userId },
@@ -2497,12 +2304,7 @@ export const updateUserStashInstances = async (
   >
 ) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
+    const userId = req.user.id;
     const { instanceIds } = req.body;
     if (!Array.isArray(instanceIds)) {
       res.status(400).json({ error: "instanceIds must be an array" });
@@ -2580,12 +2382,7 @@ export const getSetupStatus = async (
   >
 ) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
+    const userId = req.user.id;
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -2633,12 +2430,7 @@ export const completeSetup = async (
   res: TypedResponse<CompleteSetupResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
+    const userId = req.user.id;
     const { selectedInstanceIds } = req.body;
 
     // Check if multi-instance - require at least one selection

@@ -33,6 +33,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import { logger } from "../../utils/logger.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import {
   malformed,
   reqFor,
@@ -128,16 +129,17 @@ describe("Watch History Controller", () => {
   describe("saveActivity", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(saveActivity);
-      await saveActivity(
+      await authenticated(saveActivity)(
         reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: "User not found" });
+      expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
     });
 
     it("should return 400 if sceneId is missing", async () => {
@@ -344,12 +346,13 @@ describe("Watch History Controller", () => {
   describe("incrementPlayCount", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(incrementPlayCount);
-      await incrementPlayCount(
+      await authenticated(incrementPlayCount)(
         reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);
@@ -523,12 +526,13 @@ describe("Watch History Controller", () => {
   describe("incrementOCounter", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(incrementOCounter);
-      await incrementOCounter(
+      await authenticated(incrementOCounter)(
         reqFor(incrementOCounter, {
           body: { sceneId: "123" },
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);
@@ -655,12 +659,13 @@ describe("Watch History Controller", () => {
 
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(getWatchHistory);
-      await getWatchHistory(
+      await authenticated(getWatchHistory)(
         reqFor(getWatchHistory, {
           params: { sceneId: "123" },
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);
@@ -785,12 +790,13 @@ describe("Watch History Controller", () => {
   describe("getAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(getAllWatchHistory);
-      await getAllWatchHistory(
+      await authenticated(getAllWatchHistory)(
         reqFor(getAllWatchHistory, {
           query: {},
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);
@@ -926,11 +932,12 @@ describe("Watch History Controller", () => {
   describe("clearAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(clearAllWatchHistory);
-      await clearAllWatchHistory(
+      await authenticated(clearAllWatchHistory)(
         reqFor(clearAllWatchHistory, {
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);

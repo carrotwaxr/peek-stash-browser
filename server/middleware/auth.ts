@@ -217,7 +217,7 @@ export const authenticateToken = async (
   next: NextFunction
 ) => {
   const token: unknown =
-    req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
+    req.cookies.token || req.header("Authorization")?.replace("Bearer ", "");
 
   if (!token) {
     res.status(401).json({ error: "Access denied. No token provided." });
@@ -256,7 +256,7 @@ export const authenticateToken = async (
 
   // Check if token needs refresh (older than threshold)
   // Only refresh for cookie-based auth (not Bearer tokens from external clients)
-  if (req.cookies?.token && decoded.iat) {
+  if (req.cookies.token && decoded.iat) {
     const tokenAgeHours = (Date.now() / 1000 - decoded.iat) / 3600;
     if (tokenAgeHours > TOKEN_REFRESH_THRESHOLD_HOURS) {
       // Keep the sign-in time, so refreshing never extends the 30 days
@@ -278,8 +278,9 @@ export const requireAdmin = (
   res: Response,
   next: NextFunction
 ) => {
-  const authReq = req as AuthenticatedRequest;
-  if (!authReq.user || authReq.user.role !== "ADMIN") {
+  // Fails closed: a route that runs it without authenticate first has no user
+  const { user } = req as Partial<AuthenticatedRequest>;
+  if (user?.role !== "ADMIN") {
     res.status(403).json({ error: "Admin access required." });
     return;
   }

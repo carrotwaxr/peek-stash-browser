@@ -15,6 +15,7 @@ import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { downloadRow } from "../helpers/fixtures.js";
@@ -600,11 +601,12 @@ describe("Download Controller", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(getUserDownloads);
 
-      await getUserDownloads(
+      await authenticated(getUserDownloads)(
         reqFor(getUserDownloads, {
           user: undefined,
         }),
-        res
+        res,
+        vi.fn()
       );
 
       expect(res.status).toHaveBeenCalledWith(401);

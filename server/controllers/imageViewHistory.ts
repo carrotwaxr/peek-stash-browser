@@ -25,12 +25,7 @@ export async function incrementImageOCounter(
 ) {
   try {
     const { imageId, instanceId: requestInstanceId } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!imageId) {
       res.status(400).json({ error: "Missing required field: imageId" });
@@ -129,12 +124,7 @@ export async function recordImageView(
 ) {
   try {
     const { imageId, instanceId: requestInstanceId } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!imageId) {
       res.status(400).json({ error: "Missing required field: imageId" });
@@ -221,12 +211,7 @@ export async function getImageViewHistory(
   try {
     const { imageId } = req.params;
     const requestInstanceId = req.query.instanceId;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!imageId) {
       res.status(400).json({ error: "Missing required parameter: imageId" });

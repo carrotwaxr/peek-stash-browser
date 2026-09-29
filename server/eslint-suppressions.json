@@ -1,7 +1,7 @@
 {
   "controllers/carousel.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 9
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -9,41 +9,30 @@
   },
   "controllers/customTheme.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 11
+      "count": 5
     }
   },
   "controllers/download.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 9
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
   "controllers/groups.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 8
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
   "controllers/imageViewHistory.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
-  "controllers/library/scenes.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
   "controllers/playlist.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 13
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -69,15 +58,10 @@
   },
   "controllers/user.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 42
+      "count": 6
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 7
-    }
-  },
-  "controllers/userStats.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
     }
   },
   "controllers/video.ts": {
@@ -89,9 +73,6 @@
     }
   },
   "controllers/watchHistory.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5
     }
@@ -212,9 +193,6 @@
     }
   },
   "middleware/auth.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }

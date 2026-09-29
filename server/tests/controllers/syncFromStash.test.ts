@@ -12,12 +12,18 @@ import type { WatchHistory } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import userRoutes from "../../routes/user.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { IMPORT_PAGE_SIZE } from "../../services/StashImportService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
-import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  runRoute,
+} from "../helpers/controllerTestUtils.js";
 import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -467,9 +473,9 @@ describe("syncFromStash", () => {
         user: USER,
       });
       const res = resFor(syncFromStash);
-      await syncFromStash(req, res);
+      await runRoute(userRoutes, "post", "/:userId/sync-from-stash", req, res);
       expect(res._getStatus()).toBe(403);
-      expect(res._getErrorBody().error).toMatch(/Only admins/);
+      expect(res._getErrorBody().error).toBe("Admin access required.");
     });
 
     it("returns 403 when user is missing", async () => {
@@ -478,7 +484,7 @@ describe("syncFromStash", () => {
         user: malformed({}),
       });
       const res = resFor(syncFromStash);
-      await syncFromStash(req, res);
+      await runRoute(userRoutes, "post", "/:userId/sync-from-stash", req, res);
       expect(res._getStatus()).toBe(403);
     });
 

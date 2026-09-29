@@ -55,12 +55,7 @@ export const getUserPlaylists = async (
   res: TypedResponse<GetUserPlaylistsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const playlists = await prisma.playlist.findMany({
       where: {
@@ -105,12 +100,7 @@ export const getSharedPlaylists = async (
   res: TypedResponse<GetSharedPlaylistsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     // Find playlists shared with groups the user belongs to (excluding own playlists)
     const sharedPlaylists = await prisma.playlist.findMany({
@@ -196,12 +186,7 @@ export const getPlaylist = async (
   req: TypedAuthRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
   res: TypedResponse<GetPlaylistResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user?.id;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
+  const userId = req.user.id;
   // A ValidationError (400) reaches the central error handler
   const request = parsePlaylistItemsRequest(req.query, { userId });
   logDropped("GET /playlists/:id", request.dropped);
@@ -262,12 +247,7 @@ export const createPlaylist = async (
   res: TypedResponse<CreatePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const { name, description, isPublic } = req.body;
 
@@ -307,13 +287,8 @@ export const updatePlaylist = async (
   res: TypedResponse<UpdatePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -373,13 +348,8 @@ export const deletePlaylist = async (
   res: TypedResponse<DeletePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -421,13 +391,8 @@ export const addSceneToPlaylist = async (
   res: TypedResponse<AddSceneToPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -519,14 +484,9 @@ export const removeSceneFromPlaylist = async (
   res: TypedResponse<RemoveSceneFromPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
     const { sceneId } = req.params;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -579,13 +539,8 @@ export const reorderPlaylist = async (
   res: TypedResponse<ReorderPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -656,13 +611,8 @@ export const getPlaylistShares = async (
   res: TypedResponse<GetPlaylistSharesResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -712,13 +662,8 @@ export const updatePlaylistShares = async (
   res: TypedResponse<UpdatePlaylistSharesResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });
@@ -810,13 +755,8 @@ export const duplicatePlaylist = async (
   res: TypedResponse<DuplicatePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const playlistId = parseInt(req.params.id);
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (isNaN(playlistId)) {
       res.status(400).json({ error: "Invalid playlist ID" });

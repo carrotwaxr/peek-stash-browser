@@ -12,6 +12,7 @@ import rankingComputeService from "../../services/RankingComputeService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
 // Mock dependencies BEFORE imports
@@ -84,7 +85,7 @@ describe("UserStats Controller", () => {
       const req = reqFor(getUserStats);
       const res = resFor(getUserStats);
 
-      await getUserStats(req, res);
+      await authenticated(getUserStats)(req, res, vi.fn());
 
       expect(res._getStatus()).toBe(401);
     });
@@ -93,7 +94,7 @@ describe("UserStats Controller", () => {
       const req = reqFor(getUserStats, { user: malformed({}) });
       const res = resFor(getUserStats);
 
-      await getUserStats(req, res);
+      await authenticated(getUserStats)(req, res, vi.fn());
 
       expect(res._getStatus()).toBe(401);
     });

@@ -25,12 +25,19 @@ import {
   updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import userRoutes from "../../routes/user.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import type { UserRestriction } from "../../types/api/index.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
-import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  runRoute,
+} from "../helpers/controllerTestUtils.js";
 import { type UserWithGroups, userRow } from "../helpers/fixtures.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -114,7 +121,7 @@ describe("User Controller", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getUserSettings, { user: malformed({}) });
       const res = resFor(getUserSettings);
-      await getUserSettings(req, res);
+      await authenticated(getUserSettings)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -200,7 +207,7 @@ describe("User Controller", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(updateUserSettings, { user: malformed({}) });
       const res = resFor(updateUserSettings);
-      await updateUserSettings(req, res);
+      await authenticated(updateUserSettings)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -494,7 +501,7 @@ describe("User Controller", () => {
         user: malformed({}),
       });
       const res = resFor(changePassword);
-      await changePassword(req, res);
+      await authenticated(changePassword)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -605,7 +612,7 @@ describe("User Controller", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getRecoveryKey, { user: malformed({}) });
       const res = resFor(getRecoveryKey);
-      await getRecoveryKey(req, res);
+      await authenticated(getRecoveryKey)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -648,7 +655,7 @@ describe("User Controller", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(regenerateRecoveryKey, { user: malformed({}) });
       const res = resFor(regenerateRecoveryKey);
-      await regenerateRecoveryKey(req, res);
+      await authenticated(regenerateRecoveryKey)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -715,7 +722,7 @@ describe("User Controller", () => {
         user: USER,
       });
       const res = resFor(adminResetPassword);
-      await adminResetPassword(req, res);
+      await runRoute(userRoutes, "post", "/:userId/reset-password", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -799,7 +806,13 @@ describe("User Controller", () => {
         user: USER,
       });
       const res = resFor(adminRegenerateRecoveryKey);
-      await adminRegenerateRecoveryKey(req, res);
+      await runRoute(
+        userRoutes,
+        "post",
+        "/:userId/regenerate-recovery-key",
+        req,
+        res
+      );
       expect(res._getStatus()).toBe(403);
     });
 
@@ -837,7 +850,7 @@ describe("User Controller", () => {
     it("returns 403 when non-admin", async () => {
       const req = reqFor(getAllUsers, { user: USER });
       const res = resFor(getAllUsers);
-      await getAllUsers(req, res);
+      await runRoute(userRoutes, "get", "/all", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -877,7 +890,7 @@ describe("User Controller", () => {
         user: USER,
       });
       const res = resFor(createUser);
-      await createUser(req, res);
+      await runRoute(userRoutes, "post", "/create", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -976,7 +989,7 @@ describe("User Controller", () => {
     it("returns 403 when non-admin", async () => {
       const req = reqFor(deleteUser, { params: { userId: "3" }, user: USER });
       const res = resFor(deleteUser);
-      await deleteUser(req, res);
+      await runRoute(userRoutes, "delete", "/:userId", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -1084,7 +1097,7 @@ describe("User Controller", () => {
         user: USER,
       });
       const res = resFor(updateUserRole);
-      await updateUserRole(req, res);
+      await runRoute(userRoutes, "put", "/:userId/role", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -1269,7 +1282,7 @@ describe("User Controller", () => {
         user: USER,
       });
       const res = resFor(updateUserRestrictions);
-      await updateUserRestrictions(req, res);
+      await runRoute(userRoutes, "put", "/:userId/restrictions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 

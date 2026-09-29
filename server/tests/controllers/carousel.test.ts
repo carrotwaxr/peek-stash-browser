@@ -30,6 +30,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import type { NormalizedScene } from "../../types/index.js";
 import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
@@ -116,7 +117,7 @@ describe("Carousel Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(getUserCarousels);
       const res = resFor(getUserCarousels);
-      await getUserCarousels(req, res);
+      await authenticated(getUserCarousels)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -159,7 +160,7 @@ describe("Carousel Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(getCarousel, { params: { id: "1" } });
       const res = resFor(getCarousel);
-      await getCarousel(req, res);
+      await authenticated(getCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -207,7 +208,7 @@ describe("Carousel Controller", () => {
         body: { title: "New", rules: RULES },
       });
       const res = resFor(createCarousel);
-      await createCarousel(req, res);
+      await authenticated(createCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -441,7 +442,7 @@ describe("Carousel Controller", () => {
         params: { id: "1" },
       });
       const res = resFor(updateCarousel);
-      await updateCarousel(req, res);
+      await authenticated(updateCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -552,7 +553,7 @@ describe("Carousel Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(deleteCarousel, { params: { id: "1" } });
       const res = resFor(deleteCarousel);
-      await deleteCarousel(req, res);
+      await authenticated(deleteCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -601,7 +602,7 @@ describe("Carousel Controller", () => {
         body: { rules: RULES },
       });
       const res = resFor(previewCarousel);
-      await previewCarousel(req, res);
+      await authenticated(previewCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -657,7 +658,7 @@ describe("Carousel Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(executeCarouselById, { params: { id: "1" } });
       const res = resFor(executeCarouselById);
-      await executeCarouselById(req, res);
+      await authenticated(executeCarouselById)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 

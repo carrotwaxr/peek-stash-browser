@@ -17,6 +17,7 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -123,9 +124,9 @@ describe("Image View History Controller", () => {
         body: { imageId: "img-1" },
       });
       const res = resFor(incrementImageOCounter);
-      await incrementImageOCounter(req, res);
+      await authenticated(incrementImageOCounter)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
-      expect(res._getBody()).toEqual({ error: "User not found" });
+      expect(res._getBody()).toEqual({ error: "Unauthorized" });
     });
 
     it("returns 400 when imageId is missing", async () => {
@@ -408,9 +409,9 @@ describe("Image View History Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(recordImageView, { body: { imageId: "img-1" } });
       const res = resFor(recordImageView);
-      await recordImageView(req, res);
+      await authenticated(recordImageView)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
-      expect(res._getBody()).toEqual({ error: "User not found" });
+      expect(res._getBody()).toEqual({ error: "Unauthorized" });
     });
 
     it("returns 400 when imageId is missing", async () => {
@@ -526,9 +527,9 @@ describe("Image View History Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(getImageViewHistory, { params: { imageId: "img-1" } });
       const res = resFor(getImageViewHistory);
-      await getImageViewHistory(req, res);
+      await authenticated(getImageViewHistory)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
-      expect(res._getBody()).toEqual({ error: "User not authenticated" });
+      expect(res._getBody()).toEqual({ error: "Unauthorized" });
     });
 
     it("returns 400 when imageId is missing", async () => {
