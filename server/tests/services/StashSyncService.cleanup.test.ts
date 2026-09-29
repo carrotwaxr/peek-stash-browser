@@ -123,7 +123,10 @@ const ids = (from: number, to: number): string[] =>
  */
 function stashHas(type: CleanupType, keepSet: string[], count?: number): void {
   const total = count ?? keepSet.length;
-  const pageOf = (filter: { page?: number | null; per_page?: number | null }) =>
+  const pageOf = (filter: {
+    page?: number | null | undefined;
+    per_page?: number | null | undefined;
+  }) =>
     keepSet.slice(
       ((filter.page ?? 1) - 1) * (filter.per_page ?? 25),
       (filter.page ?? 1) * (filter.per_page ?? 25)

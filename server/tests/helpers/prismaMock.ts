@@ -53,8 +53,10 @@ export type PrismaMock = ReturnType<typeof createPrismaMock>;
  * inferred from where the row goes (for example a mock's `mockResolvedValue`),
  * so unknown columns, wrong value types and bad enum values do not compile.
  */
-export function partialRow<T>(fields: Partial<NoInfer<NonNullable<T>>>): T {
-  return fields as unknown as T;
+export function partialRow<T>(
+  fields: Partial<NoInfer<NonNullable<T>>>
+): NonNullable<T> {
+  return fields as unknown as NonNullable<T>;
 }
 
 /**

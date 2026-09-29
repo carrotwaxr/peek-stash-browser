@@ -123,9 +123,9 @@ export interface SyncResult {
   synced: number;
   deleted: number;
   durationMs: number;
-  error?: string;
+  error?: string | undefined;
   /** The max updated_at timestamp from synced entities (used for next incremental sync) */
-  maxUpdatedAt?: string;
+  maxUpdatedAt?: string | undefined;
 }
 
 type EntityType = SyncEntityType;
@@ -180,14 +180,14 @@ const SYNC_MODE_NAMES: Record<SyncMode, { name: string; title: string }> = {
 /** What one type's page loop fetches besides every entity. */
 interface PaginateOptions {
   /** Only entities updated after this Stash timestamp */
-  since?: string;
+  since?: string | undefined;
   /** Only these ids, fetched a page of ids at a time */
-  ids?: string[];
+  ids?: string[] | undefined;
   /**
    * Collects the ids the pages returned: a type fetched whole, for the
    * completeness check after its cleanup (`fetchMissedIds`)
    */
-  seen?: Set<string>;
+  seen?: Set<string> | undefined;
 }
 
 // Constants for sync configuration
@@ -1098,9 +1098,9 @@ export interface SyncPageQuery {
   /** 0 asks only for Stash's count (the smart sync's change probe) */
   perPage: number;
   /** Only entities updated after this Stash timestamp */
-  since?: string;
+  since?: string | undefined;
   /** Only these ids (a page of them at most) */
-  ids?: string[];
+  ids?: string[] | undefined;
   /** The run's abort signal: it ends the request in flight */
   signal: AbortSignal;
 }
@@ -1116,7 +1116,7 @@ export interface SyncRunContext {
    * `markChanged`): set on a refetch for a known link change, whose rows
    * come back with the same updated_at (`refetchLinkedToDeleted`)
    */
-  markChanged?: boolean;
+  markChanged?: boolean | undefined;
   /**
    * The instances whose full-mode type loop ran to the end in this run (a
    * type that failed counts): `runSync` records their last full pass once
@@ -3113,7 +3113,10 @@ class StashSyncService extends EventEmitter {
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
-    { full, synced }: { full: boolean; synced?: ReadonlySet<string> }
+    {
+      full,
+      synced,
+    }: { full: boolean; synced?: ReadonlySet<string> | undefined }
   ): Promise<void> {
     const firstSyncs = await this.instancesOnFirstSync(synced);
     let recomputed: RecomputeAllResult | null = null;

@@ -156,7 +156,7 @@ describe("the media proxy when Stash fails mid-transfer", () => {
   ): Promise<Response> {
     const res = await fetch(
       `${peekUrl}/api/proxy/stash?path=/scene/${sceneId}/screenshot`,
-      { signal }
+      signal ? { signal } : {}
     );
     // The response has started: its status and length are out
     expect(res.status).toBe(200);

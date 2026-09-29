@@ -190,13 +190,14 @@ function tags(
   updatedAt: (id: number) => string | undefined = () =>
     "2025-12-01T00:00:00-08:00"
 ): Array<SyncEntityOf<"tag">> {
-  return Array.from({ length: to - from + 1 }, (_, i) =>
-    partialRow<SyncEntityOf<"tag">>({
+  return Array.from({ length: to - from + 1 }, (_, i) => {
+    const at = updatedAt(from + i);
+    return partialRow<SyncEntityOf<"tag">>({
       ...TAG_DEFAULTS,
       id: String(from + i),
-      updated_at: updatedAt(from + i),
-    })
-  );
+      ...(at !== undefined ? { updated_at: at } : {}),
+    });
+  });
 }
 
 /**

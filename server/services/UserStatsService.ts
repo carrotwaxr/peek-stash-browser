@@ -45,9 +45,9 @@ interface TagStats {
 
 /** The fields a failure log carries for an error: Prisma code and message. */
 function describeError(error: unknown): {
-  code?: string;
+  code?: string | undefined;
   error: string;
-  stack?: string;
+  stack?: string | undefined;
 } {
   return {
     code:
@@ -315,8 +315,8 @@ class UserStatsService {
         performerId,
         oCounter: Math.max(0, oCountDelta),
         playCount: Math.max(0, playCountDelta),
-        lastPlayedAt,
-        lastOAt,
+        ...(lastPlayedAt !== undefined ? { lastPlayedAt } : {}),
+        ...(lastOAt !== undefined ? { lastOAt } : {}),
       },
       update: {
         oCounter: {

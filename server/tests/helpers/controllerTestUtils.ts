@@ -137,17 +137,17 @@ export type ResBody<H extends Handler> =
  * Middleware tests also set the headers, cookies and peer address it reads.
  */
 export interface ReqParts<H extends Handler> {
-  body?: ReqPart<H, "body"> | Malformed;
-  params?: ReqPart<H, "params"> | Malformed;
-  query?: ReqPart<H, "query"> | Malformed;
-  user?: RequestUser | Malformed;
+  body?: ReqPart<H, "body"> | Malformed | undefined;
+  params?: ReqPart<H, "params"> | Malformed | undefined;
+  query?: ReqPart<H, "query"> | Malformed | undefined;
+  user?: RequestUser | Malformed | undefined;
   /** Read by `req.header()` and `req.get()` case-insensitively, as in Express. */
-  headers?: Record<string, string>;
-  cookies?: Record<string, string>;
+  headers?: Record<string, string> | undefined;
+  cookies?: Record<string, string> | undefined;
   /** `req.socket.remoteAddress`; without it the request has no socket. */
-  remoteAddress?: string;
+  remoteAddress?: string | undefined;
   /** `req.url`, for handlers that read the path they were called on. */
-  url?: string;
+  url?: string | undefined;
 }
 
 /**

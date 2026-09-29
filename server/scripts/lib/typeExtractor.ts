@@ -9,10 +9,10 @@ export interface TypeInfo {
 }
 
 export interface ControllerTypes {
-  requestBody?: TypeInfo;
-  requestParams?: TypeInfo;
-  requestQuery?: TypeInfo;
-  response?: TypeInfo;
+  requestBody?: TypeInfo | undefined;
+  requestParams?: TypeInfo | undefined;
+  requestQuery?: TypeInfo | undefined;
+  response?: TypeInfo | undefined;
 }
 
 /**

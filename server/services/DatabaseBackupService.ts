@@ -90,7 +90,7 @@ export interface PreMigrationBackupOptions {
   /** The database to back up; the server's client by default. */
   client?: PrismaClient;
   /** Where the backup goes; `getBackupDir()` by default. */
-  dir?: string;
+  dir?: string | undefined;
 }
 
 export interface PreMigrationBackupListOptions extends PreMigrationBackupOptions {

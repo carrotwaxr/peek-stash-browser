@@ -12,7 +12,7 @@ interface ApiResponse<T> {
 }
 
 export class TestClient {
-  private token?: string;
+  private token?: string | undefined;
   private baseUrl: string;
 
   constructor(baseUrl: string = TEST_CONFIG.baseUrl) {
@@ -109,7 +109,7 @@ export class TestClient {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: this.getHeaders(options),
-      body: body ? JSON.stringify(body) : undefined,
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
     this.captureToken(response);
 
@@ -129,7 +129,7 @@ export class TestClient {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "PUT",
       headers: this.getHeaders(options),
-      body: body ? JSON.stringify(body) : undefined,
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
     this.captureToken(response);
 

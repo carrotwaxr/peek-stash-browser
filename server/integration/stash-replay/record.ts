@@ -583,7 +583,7 @@ interface Leaf {
   key: string;
   value: string | number;
   /** For an id: the type it is an id of ("scene", "image.files"). */
-  idType?: string;
+  idType?: string | undefined;
   /** A schema constant (enum value, stream label): not checked. */
   exempt: boolean;
   /** A count, rating or activity counter: not a measurement. */

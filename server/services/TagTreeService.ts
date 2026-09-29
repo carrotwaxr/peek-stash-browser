@@ -25,17 +25,17 @@ import { parseJsonArray } from "../utils/sqlHelpers.js";
 
 /** The scope's refs, parsed; a bare ref (no instance) matches every allowed instance */
 export interface TagTreeScopeRefs {
-  readonly performer?: FilterRef;
-  readonly tag?: FilterRef;
-  readonly studio?: FilterRef;
-  readonly group?: FilterRef;
+  readonly performer?: FilterRef | undefined;
+  readonly tag?: FilterRef | undefined;
+  readonly studio?: FilterRef | undefined;
+  readonly group?: FilterRef | undefined;
 }
 
 export interface LoadTagTreeOptions {
   readonly userId: number;
   /** `getUserAllowedInstanceIds`: none means no tags */
   readonly allowedInstanceIds: readonly string[];
-  readonly scope?: TagTreeScopeRefs;
+  readonly scope?: TagTreeScopeRefs | undefined;
 }
 
 type SqlParam = string | number;
