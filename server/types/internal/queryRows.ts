@@ -537,3 +537,36 @@ export interface MinimalEntityQueryRow {
   fileBasename?: string | null;
   folderPath?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// PlaylistQueryService
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw row of the playlist previews (services/PlaylistQueryService.ts): one of
+ * the first four items a user can see in a playlist, with its scene's
+ * compact columns and how many of the playlist's items the user can see.
+ */
+export interface PlaylistPreviewQueryRow {
+  playlistId: number;
+  sceneId: string;
+  /** The join matches it to the scene's instance, so never null */
+  instanceId: string;
+  position: number;
+  title: string | null;
+  filePath: string | null;
+  pathScreenshot: string | null;
+  /** COUNT(*) OVER the playlist's visible items */
+  visibleCount: bigint;
+}
+
+/** Raw row of a page of a playlist's visible items (PlaylistQueryService) */
+export interface PlaylistItemQueryRow {
+  id: number;
+  playlistId: number;
+  sceneId: string;
+  /** The join matches it to the scene's instance, so never null */
+  instanceId: string;
+  position: number;
+  addedAt: Date;
+}

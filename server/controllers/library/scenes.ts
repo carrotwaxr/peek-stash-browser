@@ -1,4 +1,3 @@
-import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
@@ -23,7 +22,6 @@ import type {
 import type { NormalizedScene } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
-import { readHistory } from "../../utils/historyJson.js";
 import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
@@ -34,144 +32,6 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Merge user-specific data into scenes
- *
- * PERFORMANCE: When fetching data for a small number of scenes (< 100),
- * we filter by sceneId to avoid loading entire watch history tables.
- * For larger sets, we load all data and use Map lookups for efficiency.
- */
-export async function mergeScenesWithUserData(
-  scenes: NormalizedScene[],
-  userId: number
-): Promise<NormalizedScene[]> {
-  // Extract scene IDs for targeted queries when dealing with small sets
-  const sceneIds = scenes.map((s) => s.id);
-  const useTargetedQuery = sceneIds.length < 100;
-
-  // Fetch user data in parallel
-  // For small scene sets, filter by sceneId to avoid loading full tables
-  const [
-    watchHistory,
-    sceneRatings,
-    performerRatings,
-    studioRatings,
-    tagRatings,
-  ] = await Promise.all([
-    prisma.watchHistory.findMany({
-      where: useTargetedQuery
-        ? { userId, sceneId: { in: sceneIds } }
-        : { userId },
-    }),
-    prisma.sceneRating.findMany({
-      where: useTargetedQuery
-        ? { userId, sceneId: { in: sceneIds } }
-        : { userId },
-    }),
-    // Performer/studio/tag ratings are kept as full loads since they're
-    // used for nested entity favorites across all scenes
-    prisma.performerRating.findMany({ where: { userId } }),
-    prisma.studioRating.findMany({ where: { userId } }),
-    prisma.tagRating.findMany({ where: { userId } }),
-  ]);
-
-  // Keys carry the instance (entityKey) for multi-instance correctness
-  // Create lookup maps for O(1) access
-  const watchMap = new Map(
-    watchHistory.map((wh) => {
-      const oHistory = readHistory(wh.oHistory);
-      const playHistory = readHistory(wh.playHistory);
-
-      return [
-        entityKey(wh.sceneId, wh.instanceId ?? ""),
-        {
-          o_counter: wh.oCount || 0,
-          play_count: wh.playCount || 0,
-          play_duration: wh.playDuration || 0,
-          resume_time: wh.resumeTime || 0,
-          play_history: playHistory,
-          // The stored ISO strings, which the response has always carried
-          o_history: oHistory,
-          last_played_at:
-            playHistory.length > 0
-              ? (playHistory[playHistory.length - 1] ?? null)
-              : null,
-          last_o_at:
-            oHistory.length > 0
-              ? (oHistory[oHistory.length - 1] ?? null)
-              : null,
-        },
-      ];
-    })
-  );
-
-  const ratingMap = new Map(
-    sceneRatings.map((r) => [
-      entityKey(r.sceneId, r.instanceId ?? ""),
-      {
-        rating: r.rating,
-        rating100: r.rating, // Alias for consistency with Stash API
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  // Create favorite lookup sets for nested entities (composite key: entityId + instanceId)
-  const performerFavorites = new Set(
-    performerRatings
-      .filter((r) => r.favorite)
-      .map((r) => entityKey(r.performerId, r.instanceId ?? ""))
-  );
-  const studioFavorites = new Set(
-    studioRatings
-      .filter((r) => r.favorite)
-      .map((r) => entityKey(r.studioId, r.instanceId ?? ""))
-  );
-  const tagFavorites = new Set(
-    tagRatings
-      .filter((r) => r.favorite)
-      .map((r) => entityKey(r.tagId, r.instanceId ?? ""))
-  );
-
-  // Merge data and update nested entity favorites
-  return scenes.map((scene) => {
-    const sceneKey = entityKey(scene.id, scene.instanceId);
-    const mergedScene = {
-      ...scene,
-      ...watchMap.get(sceneKey),
-      ...ratingMap.get(sceneKey),
-    };
-
-    // Update favorite status for nested performers
-    if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
-      mergedScene.performers = mergedScene.performers.map((p) => ({
-        ...p,
-        favorite: performerFavorites.has(entityKey(p.id, p.instanceId)),
-      }));
-    }
-
-    // Update favorite status for studio
-    if (mergedScene.studio) {
-      mergedScene.studio = {
-        ...mergedScene.studio,
-        favorite: studioFavorites.has(
-          entityKey(mergedScene.studio.id, mergedScene.studio.instanceId ?? "")
-        ),
-      };
-    }
-
-    // Update favorite status for nested tags
-    if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
-      mergedScene.tags = mergedScene.tags.map((t) => ({
-        ...t,
-        favorite: tagFavorites.has(entityKey(t.id, t.instanceId)),
-      }));
-    }
-
-    return mergedScene;
-  });
-}
 
 /**
  * Add streamability information to scenes

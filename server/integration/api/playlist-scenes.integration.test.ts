@@ -5,16 +5,19 @@
  * each (see helpers/accessFixture.ts). SAME has its own screenshot and
  * performer image on each instance. Each viewer hid GLOBAL on one instance
  * only: the owner on B, the recipient (a member of a group the playlist is
- * shared with) on A. The playlist list, the shared list and the playlist
- * page attach to every item the scene from that item's own instance, with
- * proxy paths served from it, and null for the scene the viewer hid; the
- * playlist page also carries the viewer's own rating of each scene.
+ * shared with) on A. The playlist list and the shared list preview the
+ * first four items the viewer can see, each as a compact scene from that
+ * item's own instance with its proxied screenshot, and count only those.
+ * The playlist page attaches to every item the scene from that item's own
+ * instance, with proxy paths served from it, and null for the scene the
+ * viewer hid; it also carries the viewer's own rating of each scene.
  *
  * Characterisation for the proxy URL helper: it passed before the playlist
  * handlers stopped re-running the old `transformScene` over the scene
  * loader's output, which shows that pass changed nothing there. The same
  * for the one playlist scene loader: it passed before the three handlers
- * shared it.
+ * shared it. The previews became compact, and skip what the viewer cannot
+ * see, when they moved to one statement (PlaylistQueryService).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -29,6 +32,7 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
+import { expectRefused } from "../helpers/refused.js";
 import type { TestClient } from "../helpers/testClient.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -54,6 +58,26 @@ interface PlaylistItemBody {
 interface PlaylistBody {
   id: number;
   items: PlaylistItemBody[];
+}
+
+/** A preview on the playlist list and the shared list: a compact scene */
+interface PreviewBody {
+  sceneId: string;
+  instanceId: string;
+  position: number;
+  scene: {
+    id: string;
+    instanceId: string;
+    title: string | null;
+    paths: { screenshot: string | null };
+  };
+}
+
+interface PlaylistSummaryBody {
+  id: number;
+  items: PreviewBody[];
+  _count?: { items: number };
+  sceneCount?: number;
 }
 
 /** What each SAME item must carry, computed from the seeded rows. */
@@ -256,6 +280,39 @@ describe("Playlist scenes (integration)", () => {
     expect(first).not.toBe(second);
   }
 
+  /**
+   * The first four items the viewer can see, compact: every item but the
+   * GLOBAL the viewer hid, each with its own instance's screenshot (SAME's
+   * stored one; GLOBAL has none).
+   */
+  function expectPreviews(items: PreviewBody[], viewer: Viewer): void {
+    const visible = ITEMS.map(
+      ([sceneId, instanceId], position) =>
+        [sceneId, instanceId, position] as const
+    ).filter(
+      ([sceneId, instanceId]) =>
+        !(sceneId === FX_ID.GLOBAL && instanceId === viewer.hidGlobalOn)
+    );
+    expect(items).toEqual(
+      visible.slice(0, 4).map(([sceneId, instanceId, position]) => ({
+        sceneId,
+        instanceId,
+        position,
+        scene: {
+          id: sceneId,
+          instanceId,
+          title: `${instanceId === FX.A ? "A" : "B"}-${sceneId}`,
+          paths: {
+            screenshot:
+              sceneId === FX_ID.SAME
+                ? must(expected.get(instanceId)).screenshot
+                : null,
+          },
+        },
+      }))
+    );
+  }
+
   /** Each shown scene carries the viewer's own rating on its instance. */
   function expectViewerRatings(
     items: PlaylistItemBody[],
@@ -288,31 +345,73 @@ describe("Playlist scenes (integration)", () => {
   });
 
   it("GET /api/playlists", async () => {
-    const res = await owner.client.get<{ playlists: PlaylistBody[] }>(
+    const res = await owner.client.get<{ playlists: PlaylistSummaryBody[] }>(
       "/api/playlists"
     );
     expect(res.status).toBe(200);
     const playlist = must(res.data.playlists.find((p) => p.id === playlistId));
-    expectItemsFromTheirInstance(playlist.items, owner);
+    expectPreviews(playlist.items, owner);
+    // Three of the four items: the owner hid GLOBAL on B
+    expect(playlist._count).toEqual({ items: 3 });
   });
 
   it("GET /api/playlists/shared", async () => {
-    const res = await recipient.client.get<{ playlists: PlaylistBody[] }>(
-      "/api/playlists/shared"
-    );
+    const res = await recipient.client.get<{
+      playlists: PlaylistSummaryBody[];
+    }>("/api/playlists/shared");
     expect(res.status).toBe(200);
     const playlist = must(res.data.playlists.find((p) => p.id === playlistId));
-    expectItemsFromTheirInstance(playlist.items, recipient);
+    expectPreviews(playlist.items, recipient);
+    expect(playlist.sceneCount).toBe(3);
   });
 
   it("GET /api/playlists/:id, for the owner and a recipient", async () => {
     for (const viewer of [owner, recipient]) {
-      const res = await viewer.client.get<{ playlist: PlaylistBody }>(
-        `/api/playlists/${playlistId}`
-      );
+      const res = await viewer.client.get<{
+        playlist: PlaylistBody;
+        totalItems: number;
+      }>(`/api/playlists/${playlistId}`);
       expect(res.status).toBe(200);
       expectItemsFromTheirInstance(res.data.playlist.items, viewer);
       expectViewerRatings(res.data.playlist.items, viewer);
+      expect(res.data.totalItems).toBe(3);
     }
+  });
+
+  it("GET /api/playlists/:id?page=2&per_page=2 pages what the viewer can see", async () => {
+    for (const viewer of [owner, recipient]) {
+      const res = await viewer.client.get<{
+        playlist: PlaylistBody;
+        totalItems: number;
+        page: number;
+        perPage: number;
+      }>(`/api/playlists/${playlistId}?page=2&per_page=2`);
+      expect(res.status).toBe(200);
+      // SAME@A and SAME@B are page 1; the GLOBAL the viewer did not hide is
+      // the only item of page 2
+      const shown = must(
+        ITEMS.find(
+          ([sceneId, instanceId]) =>
+            sceneId === FX_ID.GLOBAL && instanceId !== viewer.hidGlobalOn
+        )
+      );
+      expect(
+        res.data.playlist.items.map((i) => [
+          i.sceneId,
+          i.instanceId,
+          must(i.scene).instanceId,
+        ])
+      ).toEqual([[shown[0], shown[1], shown[1]]]);
+      expect(res.data.totalItems).toBe(3);
+      expect(res.data.page).toBe(2);
+      expect(res.data.perPage).toBe(2);
+    }
+  });
+
+  it("GET /api/playlists/:id refuses an unknown or invalid paging parameter", async () => {
+    const res = await owner.client.get(
+      `/api/playlists/${playlistId}?page=abc&sort=title`
+    );
+    expectRefused(res, ["page", "sort"]);
   });
 });

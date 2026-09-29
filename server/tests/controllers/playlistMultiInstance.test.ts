@@ -1,9 +1,13 @@
 /**
- * Regression tests for playlist scene map multi-instance collision (#393).
+ * The three playlist reads through PlaylistQueryService (items 41.6, 41.7),
+ * with the regression of #393 in mind: a playlist holding two instances'
+ * scenes with the same id shows each item with its own instance's scene.
  *
- * When a playlist contains scenes from multiple Stash instances that share
- * the same numeric ID, the scene map must use composite keys (id + instanceId)
- * to avoid one instance's data overwriting another's.
+ * The service matches items to scenes by (id, instance) and applies the
+ * viewer's exclusions and allowed instances in SQL (its own unit test, and
+ * integration/services/PlaylistQueries.integration.test.ts); here the
+ * handlers pass the viewer and the paging to it, and attach what it returns
+ * to each playlist unchanged.
  */
 import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,53 +16,42 @@ import {
   getSharedPlaylists,
   getUserPlaylists,
 } from "../../controllers/playlist.js";
-// ---------- imports ----------
-
+import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
+import {
+  type PlaylistPreviews,
+  loadPlaylistItems,
+  loadPlaylistPreviews,
+} from "../../services/PlaylistQueryService.js";
+import type {
+  PlaylistItemWithScene,
+  PlaylistPreviewItem,
+} from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
-import type * as instanceUtilsModule from "../../utils/instanceUtils.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
-import { type PlaylistWithItems } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
-type PlaylistWithCountAndItems = Prisma.PlaylistGetPayload<{
-  include: { _count: { select: { items: true } }; items: true };
-}>;
-type SharedPlaylistWithItems = Prisma.PlaylistGetPayload<{
+type SharedPlaylistRow = Prisma.PlaylistGetPayload<{
   include: {
     user: true;
     shares: { include: { group: true } };
-    _count: { select: { items: true } };
-    items: true;
   };
 }>;
-
-// ---------- mocks (must be before imports of modules under test) ----------
 
 vi.mock(
   "../../prisma/singleton.js",
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    getDefaultConfig: vi.fn(() => ({ id: "inst-A" })),
-  },
+vi.mock("../../services/PlaylistQueryService.js", () => ({
+  loadPlaylistPreviews: vi.fn(),
+  loadPlaylistItems: vi.fn(),
 }));
 
-vi.mock("../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getScenesByIdsWithRelations: vi.fn(),
-  },
-}));
-
-vi.mock("../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn((scenes: unknown[]) => Promise.resolve(scenes)),
-  },
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(() => Promise.resolve(["inst-A", "inst-B"])),
 }));
 
 vi.mock("../../services/PlaylistAccessService.js", () => ({
@@ -79,73 +72,59 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-// mergeScenesWithUserData (getPlaylist's user data) passes scenes through
-vi.mock("../../controllers/library/scenes.js", () => ({
-  mergeScenesWithUserData: vi.fn((scenes: unknown[]) =>
-    Promise.resolve(scenes)
-  ),
-}));
-
-vi.mock("../../utils/instanceUtils.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof instanceUtilsModule>();
-  return { ...actual };
-});
-
 const mockPrisma = vi.mocked(prisma, true);
-const mockGetScenes = vi.mocked(stashEntityService.getScenesByIdsWithRelations);
+const mockPreviews = vi.mocked(loadPlaylistPreviews);
+const mockItems = vi.mocked(loadPlaylistItems);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
+const ALLOWED = ["inst-A", "inst-B"];
 
-/** Minimal NormalizedScene stub with the fields the controller reads. */
-function stubScene(
-  id: string,
+function preview(
+  sceneId: string,
   instanceId: string,
+  position: number,
   title: string
-): NormalizedScene {
-  return partialRow<NormalizedScene>({
-    id,
+): PlaylistPreviewItem {
+  return {
+    sceneId,
     instanceId,
-    title,
-    code: null,
-    date: null,
-    details: null,
-    rating100: null,
-    organized: false,
-    urls: [],
-    o_counter: 0,
-    play_count: 0,
-    play_duration: 0,
-    resume_time: 0,
-    play_history: [],
-    o_history: [],
-    last_played_at: null,
-    last_o_at: null,
-    captions: [],
-    created_at: "",
-    updated_at: "",
-    rating: null,
-    favorite: false,
-    tags: [],
-    performers: [],
-    studio: null,
-    groups: [],
-    galleries: [],
-    files: [],
-    paths: {
-      screenshot: null,
-      preview: null,
-      stream: null,
-      sprite: null,
-      vtt: null,
-      chapters_vtt: null,
-      caption: null,
-    },
-    sceneStreams: [],
-  });
+    position,
+    scene: { id: sceneId, instanceId, title, paths: { screenshot: null } },
+  };
 }
 
-describe("Playlist multi-instance scene map (#393)", () => {
+/** Playlist 1's previews: scene 42 on A and on B, 2 of them visible */
+const MIXED: PlaylistPreviews = {
+  items: [
+    preview("42", "inst-A", 0, "Scene from A"),
+    preview("42", "inst-B", 1, "Scene from B"),
+  ],
+  visibleCount: 2,
+};
+
+function item(
+  id: number,
+  sceneId: string,
+  instanceId: string,
+  position: number,
+  scene: NormalizedScene | null
+): PlaylistItemWithScene {
+  return {
+    id,
+    playlistId: 3,
+    sceneId,
+    instanceId,
+    position,
+    addedAt: new Date(),
+    scene,
+  };
+}
+
+const sceneStub = (id: string, instanceId: string, title: string) =>
+  partialRow<NormalizedScene>({ id, instanceId, title });
+
+describe("Playlist reads through PlaylistQueryService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -153,268 +132,144 @@ describe("Playlist multi-instance scene map (#393)", () => {
     vi.resetAllMocks();
   });
 
-  /**
-   * Shared assertion: given two scenes with the same numeric ID but different
-   * instances, each playlist item should resolve to the correct instance's scene.
-   */
-
-  it("getUserPlaylists maps scenes by composite key, not bare ID", async () => {
-    const sceneA = stubScene("42", "inst-A", "Scene from A");
-    const sceneB = stubScene("42", "inst-B", "Scene from B");
-
+  it("getUserPlaylists attaches each playlist's previews and visible count", async () => {
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      partialRow<PlaylistWithCountAndItems>({
-        id: 1,
-        userId: USER.id,
-        name: "Mixed",
-        description: null,
-        isPublic: false,
-        shuffle: false,
-        repeat: "none",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        _count: { items: 2 },
-        items: [
-          {
-            id: 1,
-            playlistId: 1,
-            sceneId: "42",
-            instanceId: "inst-A",
-            position: 0,
-            addedAt: new Date(),
-          },
-          {
-            id: 2,
-            playlistId: 1,
-            sceneId: "42",
-            instanceId: "inst-B",
-            position: 1,
-            addedAt: new Date(),
-          },
-        ],
-      }),
+      partialRow({ id: 1, userId: USER.id, name: "Mixed" }),
+      partialRow({ id: 2, userId: USER.id, name: "Nothing visible" }),
     ]);
-
-    // getScenesByIdsWithRelations is called once per instance group
-    mockGetScenes
-      .mockResolvedValueOnce([sceneA]) // inst-A batch
-      .mockResolvedValueOnce([sceneB]); // inst-B batch
+    mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
 
     const req = reqFor(getUserPlaylists, { user: USER });
     const res = resFor(getUserPlaylists);
     await getUserPlaylists(req, res);
 
-    const body = res._getOkBody();
-    const items = must(must(body.playlists[0]).items);
-    expect(items).toHaveLength(2);
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
-    expect(must(items[1]).scene?.title).toBe("Scene from B");
+    expect(mockPreviews).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistIds: [1, 2],
+    });
+    const [mixed, nothing] = res._getOkBody().playlists;
+    expect(must(mixed).items).toEqual(MIXED.items);
+    expect(must(mixed)._count).toEqual({ items: 2 });
+    expect(must(nothing).items).toEqual([]);
+    expect(must(nothing)._count).toEqual({ items: 0 });
   });
 
-  it("getSharedPlaylists maps scenes by composite key, not bare ID", async () => {
-    const sceneA = stubScene("42", "inst-A", "Scene from A");
-    const sceneB = stubScene("42", "inst-B", "Scene from B");
-
+  it("getSharedPlaylists attaches the viewer's previews and visible count", async () => {
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      partialRow<SharedPlaylistWithItems>({
-        id: 2,
+      partialRow<SharedPlaylistRow>({
+        id: 1,
         userId: 99,
         name: "Shared Mixed",
         description: null,
-        isPublic: false,
-        shuffle: false,
-        repeat: "none",
-        createdAt: new Date(),
-        updatedAt: new Date(),
         user: partialRow({ id: 99, username: "other" }),
         shares: [
           partialRow({
-            sharedAt: new Date(),
+            sharedAt: new Date("2026-01-02T00:00:00Z"),
             group: partialRow({ name: "Group1" }),
           }),
         ],
-        _count: { items: 2 },
-        items: [
-          {
-            id: 10,
-            playlistId: 2,
-            sceneId: "42",
-            instanceId: "inst-A",
-            position: 0,
-            addedAt: new Date(),
-          },
-          {
-            id: 11,
-            playlistId: 2,
-            sceneId: "42",
-            instanceId: "inst-B",
-            position: 1,
-            addedAt: new Date(),
-          },
-        ],
       }),
     ]);
-
-    mockGetScenes
-      .mockResolvedValueOnce([sceneA])
-      .mockResolvedValueOnce([sceneB]);
+    mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
 
     const req = reqFor(getSharedPlaylists, { user: USER });
     const res = resFor(getSharedPlaylists);
     await getSharedPlaylists(req, res);
 
-    const body = res._getOkBody();
-    const items = must(must(body.playlists[0]).items);
-    expect(items).toHaveLength(2);
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
-    expect(must(items[1]).scene?.title).toBe("Scene from B");
+    expect(mockPreviews).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistIds: [1],
+    });
+    const shared = must(res._getOkBody().playlists[0]);
+    expect(shared.items).toEqual(MIXED.items);
+    expect(shared.sceneCount).toBe(2);
+    expect(shared.owner).toEqual({ id: 99, username: "other" });
+    expect(shared.sharedViaGroups).toEqual(["Group1"]);
   });
 
-  it("getPlaylist maps scenes by composite key, not bare ID", async () => {
-    const sceneA = stubScene("42", "inst-A", "Scene from A");
-    const sceneB = stubScene("42", "inst-B", "Scene from B");
-
+  it("getPlaylist without page returns every item the service gives, with totalItems", async () => {
+    const items = [
+      item(20, "42", "inst-A", 0, sceneStub("42", "inst-A", "Scene from A")),
+      item(21, "42", "inst-B", 1, sceneStub("42", "inst-B", "Scene from B")),
+      item(22, "43", "inst-A", 2, null),
+    ];
     mockGetAccess.mockResolvedValueOnce({ level: "owner" });
     mockPrisma.playlist.findUnique.mockResolvedValueOnce(
-      partialRow<PlaylistWithItems>({
-        id: 3,
-        userId: USER.id,
-        name: "Detail Mixed",
-        description: null,
-        isPublic: false,
-        shuffle: false,
-        repeat: "none",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        items: [
-          {
-            id: 20,
-            playlistId: 3,
-            sceneId: "42",
-            instanceId: "inst-A",
-            position: 0,
-            addedAt: new Date(),
-          },
-          {
-            id: 21,
-            playlistId: 3,
-            sceneId: "42",
-            instanceId: "inst-B",
-            position: 1,
-            addedAt: new Date(),
-          },
-        ],
-      })
+      partialRow({ id: 3, userId: USER.id, name: "Detail Mixed" })
     );
-
-    mockGetScenes
-      .mockResolvedValueOnce([sceneA])
-      .mockResolvedValueOnce([sceneB]);
+    mockItems.mockResolvedValueOnce({ items, totalItems: 2 });
 
     const req = reqFor(getPlaylist, { params: { id: "3" }, user: USER });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
 
+    expect(mockItems).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 3,
+      paging: undefined,
+    });
     const body = res._getOkBody();
-    const items = must(body.playlist.items);
-    expect(items).toHaveLength(2);
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
-    expect(must(items[1]).scene?.title).toBe("Scene from B");
-  });
-});
-
-/**
- * An item saved before multi-instance has no instance: its scene is fetched
- * from the default instance (inst-A here), and must be found under that
- * instance too, not under "".
- */
-describe("Playlist item with no instance", () => {
-  const LEGACY_ITEM = {
-    playlistId: 4,
-    sceneId: "42",
-    instanceId: null,
-    position: 0,
-    addedAt: new Date(),
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetScenes.mockResolvedValueOnce([
-      stubScene("42", "inst-A", "Scene from A"),
-    ]);
-  });
-  afterEach(() => {
-    vi.resetAllMocks();
+    expect(body.playlist.items).toEqual(items);
+    expect(body.playlist.name).toBe("Detail Mixed");
+    expect(body.totalItems).toBe(2);
+    expect(body.page).toBeUndefined();
+    expect(body.perPage).toBeUndefined();
+    expect(body.isOwner).toBe(true);
   });
 
-  it("getUserPlaylists attaches the default instance's scene", async () => {
-    mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      partialRow<PlaylistWithCountAndItems>({
-        id: 4,
-        userId: USER.id,
-        name: "Legacy",
-        _count: { items: 1 },
-        items: [{ id: 30, ...LEGACY_ITEM }],
-      }),
-    ]);
-
-    const req = reqFor(getUserPlaylists, { user: USER });
-    const res = resFor(getUserPlaylists);
-    await getUserPlaylists(req, res);
-
-    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
-    const items = must(must(res._getOkBody().playlists[0]).items);
-    expect(must(items[0]).instanceId).toBeNull();
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
-  });
-
-  it("getSharedPlaylists attaches the default instance's scene", async () => {
-    mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      partialRow<SharedPlaylistWithItems>({
-        id: 4,
-        userId: 99,
-        name: "Shared Legacy",
-        description: null,
-        user: partialRow({ id: 99, username: "other" }),
-        shares: [
-          partialRow({
-            sharedAt: new Date(),
-            group: partialRow({ name: "Group1" }),
-          }),
-        ],
-        _count: { items: 1 },
-        items: [{ id: 31, ...LEGACY_ITEM }],
-      }),
-    ]);
-
-    const req = reqFor(getSharedPlaylists, { user: USER });
-    const res = resFor(getSharedPlaylists);
-    await getSharedPlaylists(req, res);
-
-    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
-    const items = must(must(res._getOkBody().playlists[0]).items);
-    expect(must(items[0]).instanceId).toBeNull();
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
-  });
-
-  it("getPlaylist attaches the default instance's scene", async () => {
-    mockGetAccess.mockResolvedValueOnce({ level: "owner" });
+  it("getPlaylist with page and per_page reads that page for the viewer", async () => {
+    mockGetAccess.mockResolvedValueOnce({ level: "shared", groups: ["G"] });
     mockPrisma.playlist.findUnique.mockResolvedValueOnce(
-      partialRow<PlaylistWithItems>({
-        id: 4,
-        userId: USER.id,
-        name: "Legacy",
-        items: [{ id: 32, ...LEGACY_ITEM }],
-      })
+      partialRow({ id: 3, userId: 99, name: "Shared" })
     );
+    mockItems.mockResolvedValueOnce({ items: [], totalItems: 6 });
 
-    const req = reqFor(getPlaylist, { params: { id: "4" }, user: USER });
+    const req = reqFor(getPlaylist, {
+      params: { id: "3" },
+      query: { page: "2", per_page: "500" },
+      user: USER,
+    });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
 
-    expect(mockGetScenes).toHaveBeenCalledWith(["42"], "inst-A");
-    const items = must(res._getOkBody().playlist.items);
-    expect(must(items[0]).instanceId).toBeNull();
-    expect(must(items[0]).scene?.title).toBe("Scene from A");
+    expect(mockItems).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 3,
+      paging: { page: 2, perPage: 100 },
+    });
+    const body = res._getOkBody();
+    expect(body.totalItems).toBe(6);
+    expect(body.page).toBe(2);
+    expect(body.perPage).toBe(100);
+    expect(body.accessLevel).toBe("shared");
+    expect(body.sharedViaGroups).toEqual(["G"]);
+  });
+
+  it("getPlaylist with an invalid page answers 400 through the central handler, before any read", async () => {
+    const req = reqFor(getPlaylist, {
+      params: { id: "3" },
+      query: { page: "abc" },
+      user: USER,
+    });
+    const res = resFor(getPlaylist);
+
+    await expect(getPlaylist(req, res)).rejects.toBeInstanceOf(ValidationError);
+    expect(mockGetAccess).not.toHaveBeenCalled();
+    expect(mockItems).not.toHaveBeenCalled();
+  });
+
+  it("getPlaylist answers 404 without reading items when the viewer has no access", async () => {
+    mockGetAccess.mockResolvedValueOnce({ level: "none" });
+
+    const req = reqFor(getPlaylist, { params: { id: "3" }, user: USER });
+    const res = resFor(getPlaylist);
+    await getPlaylist(req, res);
+
+    expect(res._getStatus()).toBe(404);
+    expect(mockItems).not.toHaveBeenCalled();
   });
 });

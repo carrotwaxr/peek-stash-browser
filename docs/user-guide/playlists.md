@@ -41,6 +41,8 @@ There are two ways to add scenes to your playlists:
 2. Click on any playlist to see its scenes
 3. Scroll through to see all scenes in the playlist
 
+On the Playlists page, each playlist shows thumbnails of the first four scenes you can see, and its video count counts only the scenes you can see. Scenes you hid, scenes restricted for you, scenes removed from Stash and scenes on a Stash server you don't use are left out of both.
+
 ### Editing Playlist Details
 
 1. Open a playlist
@@ -177,6 +179,8 @@ To stop sharing, uncheck all groups and save.
 1. Go to **Playlists** in the navigation
 2. Click the **Shared with Me** tab
 3. Shared playlists show the owner's name and which groups they're shared through
+
+A shared playlist shows you only the scenes your own hidden items and restrictions allow, so its count can be smaller for you than for its owner.
 
 ### What Shared Users Can Do
 

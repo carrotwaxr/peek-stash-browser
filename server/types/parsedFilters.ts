@@ -199,6 +199,19 @@ export interface ParsedRecommendedQuery {
   readonly dropped: readonly DroppedInput[];
 }
 
+/** `GET /api/playlists/:id` */
+export interface ParsedPlaylistItemsQuery {
+  /**
+   * One page of the items the viewer can see: page >= 1, perPage
+   * 1..PLAYLIST_ITEMS_PER_PAGE_MAX (50 when absent). Undefined without
+   * `page` and `per_page`: every item.
+   */
+  readonly paging:
+    | { readonly page: number; readonly perPage: number }
+    | undefined;
+  readonly dropped: readonly DroppedInput[];
+}
+
 /** The lists with a `/minimal` endpoint (the entity pickers) */
 export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
 

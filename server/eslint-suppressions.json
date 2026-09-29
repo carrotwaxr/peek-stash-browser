@@ -38,10 +38,7 @@
   },
   "controllers/library/scenes.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
+      "count": 3
     }
   },
   "controllers/playlist.ts": {

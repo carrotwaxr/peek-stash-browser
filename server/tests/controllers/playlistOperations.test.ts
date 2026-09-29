@@ -52,18 +52,10 @@ vi.mock("../../utils/entityInstanceId.js", () => ({
   getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
 }));
 
-// Mock StashEntityService
-vi.mock("../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getScenesByIdsWithRelations: vi.fn(() => Promise.resolve([])),
-  },
-}));
-
-// Mock EntityExclusionHelper
-vi.mock("../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    filterExcluded: vi.fn((scenes: unknown[]) => Promise.resolve(scenes)),
-  },
+// Mock PlaylistQueryService (the playlist reads, not under test here)
+vi.mock("../../services/PlaylistQueryService.js", () => ({
+  loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
+  loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
 }));
 
 // Mock PermissionService
