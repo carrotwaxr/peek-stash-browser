@@ -380,7 +380,6 @@ The backend uses SQL-based query builders with pre-computed exclusions for effic
 | `StashSyncService.ts` | Syncs data from Stash GraphQL API to local database |
 | `UserHiddenEntityService.ts` | CRUD for user-hidden entities |
 | `ExclusionComputationService.ts` | Computes and maintains `UserExcludedEntity` table |
-| `EntityExclusionHelper.ts` | Helper functions for exclusion logic |
 
 #### Query Builders
 
