@@ -217,6 +217,20 @@ describe("StashEntityService", () => {
       expect(must(result).title).toBe("Test Scene");
     });
 
+    it("a scene with an empty title takes its file name as the title", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
+        ...mockCachedScene,
+        title: "",
+      });
+
+      const result = await stashEntityService.getScene(
+        "scene-1",
+        "test-instance"
+      );
+
+      expect(must(result).title).toBe("scene");
+    });
+
     it("should return null for non-existent scene", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
@@ -383,6 +397,23 @@ describe("StashEntityService", () => {
       expect(must(result).image_count).toBe(50);
       // The default user fields
       expect(must(result).favorite).toBe(false);
+    });
+
+    it("a gallery with an empty title takes its folder name as the title", async () => {
+      mockPrisma.stashGallery.findFirst.mockResolvedValue({
+        ...mockCachedGallery,
+        title: "",
+        fileBasename: null,
+        folderPath: "/pics/holiday",
+      });
+      mockPrisma.imageGallery.count.mockResolvedValue(1);
+
+      const result = await stashEntityService.getGallery(
+        "gallery-1",
+        "test-instance"
+      );
+
+      expect(must(result).title).toBe("holiday");
     });
 
     it("should return null for non-existent gallery", async () => {
@@ -662,6 +693,20 @@ describe("StashEntityService", () => {
       expect(result).not.toBeNull();
       expect(must(result).id).toBe("image-1");
       expect(must(result).instanceId).toBe("test-instance");
+    });
+
+    it("an image with an empty title takes its file name as the title", async () => {
+      mockPrisma.stashImage.findFirst.mockResolvedValue({
+        ...mockCachedImage,
+        title: "",
+      });
+
+      const result = await stashEntityService.getImage(
+        "image-1",
+        "test-instance"
+      );
+
+      expect(must(result).title).toBe("image");
     });
 
     it("getImage returns null for non-existent image", async () => {

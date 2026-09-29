@@ -84,6 +84,57 @@ describe("timelineController", () => {
       );
     });
 
+    it("passes each of the performer, tag, studio and group filters to the service", async () => {
+      vi.mocked(timelineService.getDistribution).mockResolvedValue([]);
+
+      const req = reqFor(getDateDistribution, {
+        params: { entityType: "image" },
+        query: {
+          granularity: "days",
+          performerId: "p1:inst-a",
+          tagId: "t1:inst-a",
+          studioId: "s1:inst-a",
+          groupId: "g1:inst-a",
+        },
+        user: testUser({ id: 1 }),
+      });
+
+      await getDateDistribution(req, resFor(getDateDistribution));
+
+      expect(timelineService.getDistribution).toHaveBeenCalledWith(
+        "image",
+        1,
+        ["inst-a"],
+        "days",
+        {
+          performerId: "p1:inst-a",
+          tagId: "t1:inst-a",
+          studioId: "s1:inst-a",
+          groupId: "g1:inst-a",
+        }
+      );
+    });
+
+    it("a request with only one filter passes only that filter", async () => {
+      vi.mocked(timelineService.getDistribution).mockResolvedValue([]);
+
+      const req = reqFor(getDateDistribution, {
+        params: { entityType: "gallery" },
+        query: { tagId: "t1:inst-a" },
+        user: testUser({ id: 1 }),
+      });
+
+      await getDateDistribution(req, resFor(getDateDistribution));
+
+      expect(timelineService.getDistribution).toHaveBeenCalledWith(
+        "gallery",
+        1,
+        ["inst-a"],
+        "months",
+        { tagId: "t1:inst-a" }
+      );
+    });
+
     it("returns 400 for invalid entity type", async () => {
       const req = reqFor(getDateDistribution, {
         params: { entityType: "invalid" },
