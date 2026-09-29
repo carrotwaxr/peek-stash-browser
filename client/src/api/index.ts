@@ -68,7 +68,7 @@ export {
 
 // Clips
 export { getClips, getClipsForScene, getClipPreviewUrl } from "./clips";
-export type { GetClipsOptions } from "./clips";
+export type { ClipFilterParams, GetClipsOptions } from "./clips";
 
 // Image view history
 export { imageViewHistoryApi } from "./image-view-history";

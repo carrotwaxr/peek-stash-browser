@@ -119,9 +119,8 @@ const Images = () => {
   const consumePendingLightboxIndexRef = useRef<(() => void) | null>(null);
 
   // TanStack Query for images
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"image"> | null>(null);
   const queryClient = useQueryClient();
   const {
     data,
@@ -174,9 +173,12 @@ const Images = () => {
   // Store the consume function in ref for the onDataChange callback
   consumePendingLightboxIndexRef.current = lightbox.consumePendingLightboxIndex;
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"image">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   // Handle image click - open lightbox
   const handleImageClick = useCallback(

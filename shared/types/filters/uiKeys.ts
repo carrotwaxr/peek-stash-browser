@@ -138,7 +138,6 @@ export const TAG_UI_KEYS = [
   { key: "favorite", field: "favorite" },
   { key: "performerIds", field: "performers" },
   { key: "studioId", field: "studios" },
-  { key: "sceneId", field: "scenes" },
   { key: "groupIds", field: "groups" },
   { key: "createdAt", field: "created_at" },
   { key: "updatedAt", field: "updated_at" },
@@ -162,7 +161,6 @@ export const GROUP_UI_KEYS = [
   { key: "date", field: "date" },
   { key: "createdAt", field: "created_at" },
   { key: "updatedAt", field: "updated_at" },
-  { key: "sceneId", field: "scenes" },
   /** Parent collection: the direct sub-collections of these */
   { key: "groupIds", field: "containing_groups" },
 ] as const satisfies UiKeysOf<typeof GROUP_FIELDS>;

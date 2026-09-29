@@ -1,6 +1,30 @@
 /**
  * Sorting and filtering configuration for all entity types
  */
+import {
+  CLIP_PARAMS,
+  type EntityKind,
+  GALLERY_FIELDS,
+  GENDERS,
+  GROUP_FIELDS,
+  type GalleryFilterInput,
+  type GroupFilterInput,
+  IMAGE_FIELDS,
+  type ImageFilterInput,
+  ORIENTATIONS,
+  PERFORMER_FIELDS,
+  type PerformerFilterInput,
+  RESOLUTIONS,
+  type RefModifier,
+  type RefSpec,
+  SCENE_FIELDS,
+  STUDIO_FIELDS,
+  type SceneFilterInput,
+  type StudioFilterInput,
+  TAG_FIELDS,
+  type TagFilterInput,
+} from "@peek/shared-types";
+import type { ClipFilterParams } from "../api/clips";
 import { UNITS, feetInchesToCm, inchesToCm, lbsToKg } from "./unitConversions";
 
 /** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
@@ -242,6 +266,16 @@ const MULTI_MODIFIER_OPTIONS = [
   { value: "INCLUDES", label: "Has ANY of these" },
   { value: "EXCLUDES", label: "Has NONE of these" },
 ];
+
+// A field an entity has one of (its studio): has all of two means nothing
+const SINGLE_MODIFIER_OPTIONS = [
+  { value: "INCLUDES", label: "Has ANY of these" },
+  { value: "EXCLUDES", label: "Has NONE of these" },
+];
+
+// The Clips page's "All clips" choice: the request sends no isGenerated, so
+// every clip lists. Not "": the panel stores "" as no choice (the default).
+const ALL_CLIPS = "all";
 
 // Group/Collection modifier options (simpler - just include/exclude)
 const GROUP_MODIFIER_OPTIONS = [
@@ -971,15 +1005,6 @@ export const TAG_FILTER_OPTIONS = [
     placeholder: "Select studio...",
   },
   {
-    key: "sceneId",
-    label: "Scene",
-    type: "searchable-select",
-    entityType: "scenes",
-    multi: false,
-    defaultValue: "",
-    placeholder: "Select scene...",
-  },
-  {
     key: "groupIds",
     label: "Collections",
     type: "searchable-select",
@@ -1145,15 +1170,6 @@ export const GROUP_FILTER_OPTIONS = [
     defaultOpen: false,
   },
   {
-    key: "sceneId",
-    label: "Scene",
-    type: "searchable-select",
-    entityType: "scenes",
-    multi: false,
-    defaultValue: "",
-    placeholder: "Select scene...",
-  },
-  {
     // The direct sub-collections of these collections; a collection card's
     // sub-collection count opens the list with it (?groupId=)
     key: "groupIds",
@@ -1203,7 +1219,7 @@ export const GALLERY_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select studios...",
-    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierOptions: SINGLE_MODIFIER_OPTIONS,
     modifierKey: "studioIdsModifier",
     defaultModifier: "INCLUDES",
     supportsHierarchy: true,
@@ -1290,7 +1306,7 @@ export const IMAGE_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select studios...",
-    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierOptions: SINGLE_MODIFIER_OPTIONS,
     modifierKey: "studioIdsModifier",
     defaultModifier: "INCLUDES",
     supportsHierarchy: true,
@@ -1415,507 +1431,340 @@ export const CLIP_FILTER_OPTIONS = [
     options: [
       { value: "true", label: "With preview only" },
       { value: "false", label: "Without preview only" },
-      { value: "", label: "All clips" },
+      { value: ALL_CLIPS, label: "All clips" },
     ],
     placeholder: "Filter by preview status",
   },
 ];
 
 /**
- * Helper functions to convert UI filter values to GraphQL filter format
+ * The panel's state to the request's filter. Each builder returns the list's
+ * wire type from the shared contract (`SceneFilterInput`, ...), so what the
+ * panel sends is what the server's parser accepts.
  */
 
-export const buildSceneFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const sceneFilter: Record<string, any> = {};
+/**
+ * The filter panel's state: option keys with their modifier and depth
+ * companions (`tagIdsModifier`, `tagIdsDepth`), and a page's permanent
+ * criteria in the request's own shape (a performer page's `performers`)
+ */
+type FilterState = Readonly<Record<string, unknown>>;
 
-  // ID-based filters - merge permanent filters with UI filters
-  // Performers: Merge permanent + UI filters
-  const performerIds = [];
-  if (filters.performers?.value) {
-    performerIds.push(...filters.performers.value);
-  }
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    performerIds.push(...filters.performerIds);
-  }
-  if (performerIds.length > 0) {
-    sceneFilter.performers = {
-      value: [...new Set(performerIds)], // Remove duplicates
-      modifier:
-        filters.performerIdsModifier ||
-        filters.performers?.modifier ||
-        "INCLUDES",
-    };
-  }
+/** A filter the builders fill in (the wire types' fields are read-only) */
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
-  // Studios: Merge permanent + UI filters
-  // Supports hierarchical filtering via depth parameter
-  const studioIds = [];
-  if (filters.studios?.value) {
-    studioIds.push(...filters.studios.value);
-  }
-  if (filters.studioId && filters.studioId !== "") {
-    studioIds.push(filters.studioId);
-  }
-  if (studioIds.length > 0) {
-    sceneFilter.studios = {
-      value: [...new Set(studioIds)], // Remove duplicates
-      modifier: "INCLUDES",
-    };
-    // Pass through depth for hierarchical filtering
-    // Priority: permanent filters > UI filters
-    if (filters.studios?.depth !== undefined) {
-      sceneFilter.studios.depth = filters.studios.depth;
-    } else if (filters.studioIdDepth !== undefined) {
-      sceneFilter.studios.depth = filters.studioIdDepth;
-    }
-  }
+/** A picker's option: its key and the companions it names */
+type RefControl = Pick<
+  FilterOption,
+  "key" | "modifierKey" | "modifierOptions" | "defaultModifier" | "hierarchyKey"
+>;
 
-  // Tags: Merge permanent + UI filters
-  // Supports hierarchical filtering via depth parameter
-  const tagIds = [];
-  if (filters.tags?.value) {
-    tagIds.push(...filters.tags.value);
-  }
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    tagIds.push(...filters.tagIds);
-  }
-  if (tagIds.length > 0) {
-    sceneFilter.tags = {
-      value: [...new Set(tagIds)], // Remove duplicates
-      modifier:
-        filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
-    };
-    // Pass through depth for hierarchical filtering
-    // Priority: permanent filters > UI filters
-    if (filters.tags?.depth !== undefined) {
-      sceneFilter.tags.depth = filters.tags.depth;
-    } else if (filters.tagIdsDepth !== undefined) {
-      sceneFilter.tags.depth = filters.tagIdsDepth;
-    }
-  }
+/** A list's options by key, for the builders to read each picker's modifier default from */
+const controlsOf = (options: readonly FilterOption[]) => {
+  const byKey = new Map(options.map((option) => [option.key, option]));
+  return (key: string): RefControl => {
+    const control = byKey.get(key);
+    if (!control) throw new Error(`No filter option ${key}`);
+    return control;
+  };
+};
 
-  // Collections/Groups: Merge permanent + UI filters
-  const groupIds = [];
-  if (filters.groups?.value) {
-    groupIds.push(...filters.groups.value);
-  }
-  if (filters.groupIds && filters.groupIds.length > 0) {
-    groupIds.push(...filters.groupIds);
-  }
-  if (groupIds.length > 0) {
-    sceneFilter.groups = {
-      value: [...new Set(groupIds)], // Remove duplicates
-      modifier:
-        filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
-    };
-  }
+/** Sets a field only when the panel gave it a value, so an unset field is absent */
+function put<F, K extends keyof F>(
+  filter: F,
+  key: K,
+  value: F[K] | undefined
+): void {
+  if (value !== undefined) filter[key] = value;
+}
 
-  // Galleries: Merge permanent + UI filters
-  const galleryIds = [];
-  if (filters.galleries?.value) {
-    galleryIds.push(...filters.galleries.value);
-  }
-  if (filters.galleryIds && filters.galleryIds.length > 0) {
-    galleryIds.push(...filters.galleryIds);
-  }
-  if (galleryIds.length > 0) {
-    sceneFilter.galleries = {
-      value: [...new Set(galleryIds)], // Remove duplicates
-      modifier:
-        filters.galleryIdsModifier || filters.galleries?.modifier || "INCLUDES",
-    };
-  }
+/** A checkbox, or a boolean from the URL ("TRUE") */
+const isChecked = (value: unknown): boolean =>
+  value === true || value === "TRUE";
 
-  // Boolean filters
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    sceneFilter.favorite = true;
+const isWholeNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value);
+
+/** A range bound as a whole number (the inputs hold strings), else undefined */
+const wholeBound = (value: unknown): number | undefined => {
+  const parsed =
+    typeof value === "number"
+      ? Math.trunc(value)
+      : typeof value === "string"
+        ? parseInt(value)
+        : NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+/** A range control's bounds, or none */
+const rangeOf = (value: unknown): { min?: unknown; max?: unknown } =>
+  typeof value === "object" && value !== null ? value : {};
+
+type RangeCriterion =
+  | { modifier: "BETWEEN"; value: number; value2: number }
+  | { modifier: "GREATER_THAN" | "LESS_THAN"; value: number };
+
+/**
+ * A number range: both bounds BETWEEN them; one bound GREATER_THAN min - 1 or
+ * LESS_THAN max + 1, so a lone whole bound is inclusive (PR 9 revisits the
+ * semantics); undefined without a bound. `scale` converts the panel's unit
+ * to the stored one (minutes to seconds, Mbps to bits per second).
+ */
+const rangeCriterion = (
+  range: unknown,
+  scale = 1
+): RangeCriterion | undefined => {
+  const { min: rawMin, max: rawMax } = rangeOf(range);
+  const min = wholeBound(rawMin);
+  const max = wholeBound(rawMax);
+  if (min !== undefined && max !== undefined) {
+    return { modifier: "BETWEEN", value: min * scale, value2: max * scale };
   }
-  if (
-    filters.performerFavorite === true ||
-    filters.performerFavorite === "TRUE"
-  ) {
+  if (min !== undefined) {
+    return { modifier: "GREATER_THAN", value: min * scale - 1 };
+  }
+  if (max !== undefined) {
+    return { modifier: "LESS_THAN", value: max * scale + 1 };
+  }
+  return undefined;
+};
+
+type DateRangeCriterion =
+  | { modifier: "BETWEEN"; value: string; value2: string }
+  | { modifier: "GREATER_THAN" | "LESS_THAN"; value: string };
+
+/** A date range control's day, or undefined when unset */
+const day = (value: unknown): string | undefined =>
+  typeof value === "string" && value !== "" ? value : undefined;
+
+/**
+ * A date range control's `{ start, end }`: both BETWEEN them, a start alone
+ * GREATER_THAN it, an end alone LESS_THAN it; undefined when both are unset
+ */
+const dateCriterion = (range: unknown): DateRangeCriterion | undefined => {
+  const { start, end } =
+    typeof range === "object" && range !== null
+      ? (range as { start?: unknown; end?: unknown })
+      : {};
+  const from = day(start);
+  const to = day(end);
+  if (from !== undefined && to !== undefined) {
+    return { modifier: "BETWEEN", value: from, value2: to };
+  }
+  if (from !== undefined) return { modifier: "GREATER_THAN", value: from };
+  if (to !== undefined) return { modifier: "LESS_THAN", value: to };
+  return undefined;
+};
+
+/** A text search: the trimmed text as a substring, or undefined when blank */
+const textCriterion = (
+  value: unknown
+): { value: string; modifier: "INCLUDES" } | undefined => {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text === "" ? undefined : { value: text, modifier: "INCLUDES" };
+};
+
+/** A select of Stash's free-text values (hair colour), compared whole */
+const equalsCriterion = (
+  value: unknown
+): { value: string; modifier: "EQUALS" } | undefined =>
+  typeof value === "string" && value !== ""
+    ? { value, modifier: "EQUALS" }
+    : undefined;
+
+/** A select's value when it is one the field takes */
+const oneOf = <V extends string>(
+  values: readonly V[],
+  value: unknown
+): V | undefined => values.find((candidate) => candidate === value);
+
+/** The ids a picker holds: a multi-select's list or a single select's one id */
+const idList = (value: unknown): string[] =>
+  (Array.isArray(value) ? (value as unknown[]) : [value])
+    .filter(
+      (id): id is string | number =>
+        (typeof id === "string" && id !== "") || typeof id === "number"
+    )
+    .map(String);
+
+/** A page's permanent criterion of a field, in the request's shape */
+interface PermanentRef {
+  value?: unknown;
+  modifier?: unknown;
+  depth?: unknown;
+}
+
+const permanentOf = (value: unknown): PermanentRef =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as PermanentRef)
+    : {};
+
+interface RefCriterion<M extends RefModifier> {
+  value: string[];
+  modifier: M;
+  depth?: number;
+}
+
+/**
+ * One ref field's criterion: the picker's ids merged with a page's permanent
+ * criterion of the same field (a collection page's `groups`). The modifier is
+ * the panel's choice when the picker offers it, else the permanent
+ * criterion's, else the option's `defaultModifier`, else the field's, each
+ * only if the field takes it (a stale Has ALL on a one-studio field falls
+ * back), so every criterion carries the modifier the panel shows. Depth, on
+ * a hierarchical field only: the permanent criterion's, else the panel's.
+ */
+function refCriterion<M extends RefModifier>(
+  spec: RefSpec<EntityKind, M>,
+  state: FilterState,
+  control?: RefControl,
+  permanent?: unknown
+): RefCriterion<M> | undefined {
+  const fixed = permanentOf(permanent);
+  const value = [
+    ...new Set([
+      ...idList(fixed.value),
+      ...idList(control ? state[control.key] : undefined),
+    ]),
+  ];
+  if (value.length === 0) return undefined;
+
+  const takes = (candidate: unknown): candidate is M =>
+    spec.modifiers.some((modifier) => modifier === candidate);
+  const chosen =
+    control?.modifierKey === undefined ? undefined : state[control.modifierKey];
+  const offered = control?.modifierOptions?.some(
+    (choice) => choice.value === chosen
+  );
+  const modifier =
+    [
+      offered ? chosen : undefined,
+      fixed.modifier,
+      control?.defaultModifier,
+    ].find(takes) ?? spec.defaultModifier;
+
+  const depth = spec.hierarchical
+    ? [
+        fixed.depth,
+        control?.hierarchyKey === undefined
+          ? undefined
+          : state[control.hierarchyKey],
+      ].find(isWholeNumber)
+    : undefined;
+  return depth === undefined ? { value, modifier } : { value, modifier, depth };
+}
+
+const SCENE_CONTROLS = controlsOf(SCENE_FILTER_OPTIONS);
+const PERFORMER_CONTROLS = controlsOf(PERFORMER_FILTER_OPTIONS);
+const STUDIO_CONTROLS = controlsOf(STUDIO_FILTER_OPTIONS);
+const TAG_CONTROLS = controlsOf(TAG_FILTER_OPTIONS);
+const GROUP_CONTROLS = controlsOf(GROUP_FILTER_OPTIONS);
+const GALLERY_CONTROLS = controlsOf(GALLERY_FILTER_OPTIONS);
+const IMAGE_CONTROLS = controlsOf(IMAGE_FILTER_OPTIONS);
+const CLIP_CONTROLS = controlsOf(CLIP_FILTER_OPTIONS);
+
+export const buildSceneFilter = (filters: FilterState): SceneFilterInput => {
+  const control = SCENE_CONTROLS;
+  const sceneFilter: Writable<SceneFilterInput> = {};
+
+  // Pickers, merged with a page's permanent criteria (a performer page's
+  // scenes, the folder view's tag, a gallery page's scenes)
+  put(
+    sceneFilter,
+    "performers",
+    refCriterion(
+      SCENE_FIELDS.performers,
+      filters,
+      control("performerIds"),
+      filters.performers
+    )
+  );
+  put(
+    sceneFilter,
+    "studios",
+    refCriterion(
+      SCENE_FIELDS.studios,
+      filters,
+      control("studioId"),
+      filters.studios
+    )
+  );
+  put(
+    sceneFilter,
+    "tags",
+    refCriterion(SCENE_FIELDS.tags, filters, control("tagIds"), filters.tags)
+  );
+  put(
+    sceneFilter,
+    "groups",
+    refCriterion(
+      SCENE_FIELDS.groups,
+      filters,
+      control("groupIds"),
+      filters.groups
+    )
+  );
+  put(
+    sceneFilter,
+    "galleries",
+    refCriterion(SCENE_FIELDS.galleries, filters, undefined, filters.galleries)
+  );
+
+  if (isChecked(filters.favorite)) sceneFilter.favorite = true;
+  if (isChecked(filters.performerFavorite)) {
     sceneFilter.performer_favorite = true;
   }
-  if (filters.studioFavorite === true || filters.studioFavorite === "TRUE") {
-    sceneFilter.studio_favorite = true;
-  }
-  if (filters.tagFavorite === true || filters.tagFavorite === "TRUE") {
-    sceneFilter.tag_favorite = true;
-  }
+  if (isChecked(filters.studioFavorite)) sceneFilter.studio_favorite = true;
+  if (isChecked(filters.tagFavorite)) sceneFilter.tag_favorite = true;
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
-
-  // Resolution filter
-  if (filters.resolution) {
+  const resolution = oneOf(RESOLUTIONS, filters.resolution);
+  if (resolution !== undefined) {
     sceneFilter.resolution = {
-      value: filters.resolution,
-      modifier: filters.resolutionModifier || "EQUALS",
+      value: resolution,
+      modifier:
+        oneOf(SCENE_FIELDS.resolution.modifiers, filters.resolutionModifier) ??
+        "EQUALS",
     };
   }
-
-  // Range filters
-  if (
-    filters.duration?.min !== undefined ||
-    filters.duration?.max !== undefined
-  ) {
-    const hasMin =
-      filters.duration.min !== undefined && filters.duration.min !== "";
-    const hasMax =
-      filters.duration.max !== undefined && filters.duration.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.duration = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.duration.min) * 60,
-        value2: parseInt(filters.duration.max) * 60,
-      };
-    } else if (hasMin) {
-      sceneFilter.duration = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.duration.min) * 60 - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.duration = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.duration.max) * 60 + 1,
-      };
-    }
+  const orientation = oneOf(ORIENTATIONS, filters.orientation);
+  if (orientation !== undefined) {
+    sceneFilter.orientation = { value: [orientation] };
   }
 
-  if (
-    filters.playDuration?.min !== undefined ||
-    filters.playDuration?.max !== undefined
-  ) {
-    const hasMin =
-      filters.playDuration.min !== undefined && filters.playDuration.min !== "";
-    const hasMax =
-      filters.playDuration.max !== undefined && filters.playDuration.max !== "";
+  put(sceneFilter, "rating100", rangeCriterion(filters.rating));
+  put(sceneFilter, "duration", rangeCriterion(filters.duration, 60));
+  put(sceneFilter, "play_duration", rangeCriterion(filters.playDuration, 60));
+  put(sceneFilter, "o_counter", rangeCriterion(filters.oCount));
+  put(sceneFilter, "play_count", rangeCriterion(filters.playCount));
+  put(sceneFilter, "bitrate", rangeCriterion(filters.bitrate, 1_000_000));
+  put(sceneFilter, "framerate", rangeCriterion(filters.framerate));
+  put(sceneFilter, "performer_count", rangeCriterion(filters.performerCount));
+  put(sceneFilter, "performer_age", rangeCriterion(filters.performerAge));
+  put(sceneFilter, "tag_count", rangeCriterion(filters.tagCount));
 
-    if (hasMin && hasMax) {
-      sceneFilter.play_duration = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.playDuration.min) * 60,
-        value2: parseInt(filters.playDuration.max) * 60,
-      };
-    } else if (hasMin) {
-      sceneFilter.play_duration = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.playDuration.min) * 60 - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.play_duration = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.playDuration.max) * 60 + 1,
-      };
-    }
-  }
+  put(sceneFilter, "date", dateCriterion(filters.date));
+  put(sceneFilter, "created_at", dateCriterion(filters.createdAt));
+  put(sceneFilter, "updated_at", dateCriterion(filters.updatedAt));
+  put(sceneFilter, "last_played_at", dateCriterion(filters.lastPlayedAt));
 
-  if (filters.oCount?.min !== undefined || filters.oCount?.max !== undefined) {
-    const hasMin =
-      filters.oCount.min !== undefined && filters.oCount.min !== "";
-    const hasMax =
-      filters.oCount.max !== undefined && filters.oCount.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.o_counter = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.oCount.min),
-        value2: parseInt(filters.oCount.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.o_counter = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.oCount.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.o_counter = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.oCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.playCount?.min !== undefined ||
-    filters.playCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.playCount.min !== undefined && filters.playCount.min !== "";
-    const hasMax =
-      filters.playCount.max !== undefined && filters.playCount.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.play_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.playCount.min),
-        value2: parseInt(filters.playCount.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.play_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.playCount.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.play_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.playCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.bitrate?.min !== undefined ||
-    filters.bitrate?.max !== undefined
-  ) {
-    const hasMin =
-      filters.bitrate.min !== undefined && filters.bitrate.min !== "";
-    const hasMax =
-      filters.bitrate.max !== undefined && filters.bitrate.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.bitrate = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.bitrate.min) * 1000000,
-        value2: parseInt(filters.bitrate.max) * 1000000,
-      };
-    } else if (hasMin) {
-      sceneFilter.bitrate = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.bitrate.min) * 1000000 - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.bitrate = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.bitrate.max) * 1000000 + 1,
-      };
-    }
-  }
-
-  if (
-    filters.framerate?.min !== undefined ||
-    filters.framerate?.max !== undefined
-  ) {
-    const hasMin =
-      filters.framerate.min !== undefined && filters.framerate.min !== "";
-    const hasMax =
-      filters.framerate.max !== undefined && filters.framerate.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.framerate = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.framerate.min),
-        value2: parseInt(filters.framerate.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.framerate = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.framerate.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.framerate = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.framerate.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.performerCount?.min !== undefined ||
-    filters.performerCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.performerCount.min !== undefined &&
-      filters.performerCount.min !== "";
-    const hasMax =
-      filters.performerCount.max !== undefined &&
-      filters.performerCount.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.performer_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.performerCount.min),
-        value2: parseInt(filters.performerCount.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.performer_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.performerCount.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.performer_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.performerCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.performerAge?.min !== undefined ||
-    filters.performerAge?.max !== undefined
-  ) {
-    const hasMin =
-      filters.performerAge.min !== undefined && filters.performerAge.min !== "";
-    const hasMax =
-      filters.performerAge.max !== undefined && filters.performerAge.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.performer_age = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.performerAge.min),
-        value2: parseInt(filters.performerAge.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.performer_age = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.performerAge.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.performer_age = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.performerAge.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.tagCount?.min !== undefined ||
-    filters.tagCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.tagCount.min !== undefined && filters.tagCount.min !== "";
-    const hasMax =
-      filters.tagCount.max !== undefined && filters.tagCount.max !== "";
-
-    if (hasMin && hasMax) {
-      sceneFilter.tag_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.tagCount.min),
-        value2: parseInt(filters.tagCount.max),
-      };
-    } else if (hasMin) {
-      sceneFilter.tag_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.tagCount.min) - 1,
-      };
-    } else if (hasMax) {
-      sceneFilter.tag_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.tagCount.max) + 1,
-      };
-    }
-  }
-
-  // Date-range filters
-  if (filters.date?.start || filters.date?.end) {
-    sceneFilter.date = {};
-    if (filters.date.start) sceneFilter.date.value = filters.date.start;
-    sceneFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.date.end) sceneFilter.date.value2 = filters.date.end;
-  }
-
-  if (filters.createdAt?.start || filters.createdAt?.end) {
-    sceneFilter.created_at = {};
-    if (filters.createdAt.start)
-      sceneFilter.created_at.value = filters.createdAt.start;
-    sceneFilter.created_at.modifier = filters.createdAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.createdAt.end)
-      sceneFilter.created_at.value2 = filters.createdAt.end;
-  }
-
-  if (filters.updatedAt?.start || filters.updatedAt?.end) {
-    sceneFilter.updated_at = {};
-    if (filters.updatedAt.start)
-      sceneFilter.updated_at.value = filters.updatedAt.start;
-    sceneFilter.updated_at.modifier = filters.updatedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.updatedAt.end)
-      sceneFilter.updated_at.value2 = filters.updatedAt.end;
-  }
-
-  if (filters.lastPlayedAt?.start || filters.lastPlayedAt?.end) {
-    sceneFilter.last_played_at = {};
-    if (filters.lastPlayedAt.start)
-      sceneFilter.last_played_at.value = filters.lastPlayedAt.start;
-    sceneFilter.last_played_at.modifier = filters.lastPlayedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.lastPlayedAt.end)
-      sceneFilter.last_played_at.value2 = filters.lastPlayedAt.end;
-  }
-
-  // Text search filters
-  if (filters.title) {
-    sceneFilter.title = {
-      value: filters.title,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.details) {
-    sceneFilter.details = {
-      value: filters.details,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.director) {
-    sceneFilter.director = {
-      value: filters.director,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.videoCodec) {
-    sceneFilter.video_codec = {
-      value: filters.videoCodec,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.audioCodec) {
-    sceneFilter.audio_codec = {
-      value: filters.audioCodec,
-      modifier: "INCLUDES",
-    };
-  }
-
-  // Orientation filter
-  if (filters.orientation) {
-    sceneFilter.orientation = {
-      value: [filters.orientation],
-    };
-  }
+  put(sceneFilter, "title", textCriterion(filters.title));
+  put(sceneFilter, "details", textCriterion(filters.details));
+  put(sceneFilter, "director", textCriterion(filters.director));
+  put(sceneFilter, "video_codec", textCriterion(filters.videoCodec));
+  put(sceneFilter, "audio_codec", textCriterion(filters.audioCodec));
 
   return sceneFilter;
+};
+
+/** A decimal bound (penis length in inches), else undefined */
+const decimalBound = (value: unknown): number | undefined => {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? parseFloat(value)
+        : NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 /**
@@ -1923,67 +1772,53 @@ export const buildSceneFilter = (
  * Height uses feet/inches fields, weight uses lbs, penisLength uses inches.
  */
 const convertFilterUnits = (
-  filters: Record<string, any>,
+  filters: FilterState,
   unitPreference: string
-): Record<string, any> => {
+): FilterState => {
   if (unitPreference !== UNITS.IMPERIAL) return filters;
 
-  const converted = { ...filters };
+  const converted: Record<string, unknown> = { ...filters };
 
-  // Height: convert feet/inches to cm (from imperial-height-range filter type)
-  // The filter stores: { feetMin, inchesMin, feetMax, inchesMax }
-  if (
-    filters.height?.feetMin !== undefined ||
-    filters.height?.inchesMin !== undefined
-  ) {
-    const feet = parseInt(filters.height.feetMin || 0);
-    const inches = parseInt(filters.height.inchesMin || 0);
-    if (feet || inches) {
-      converted.height = {
-        ...converted.height,
-        min: feetInchesToCm(feet, inches),
-      };
-    }
-  }
-  if (
-    filters.height?.feetMax !== undefined ||
-    filters.height?.inchesMax !== undefined
-  ) {
-    const feet = parseInt(filters.height.feetMax || 0);
-    const inches = parseInt(filters.height.inchesMax || 0);
-    if (feet || inches) {
-      converted.height = {
-        ...converted.height,
-        max: feetInchesToCm(feet, inches),
-      };
-    }
+  // Height: the imperial-height-range control stores
+  // { feetMin, inchesMin, feetMax, inchesMax }
+  const height = rangeOf(filters.height) as {
+    feetMin?: unknown;
+    inchesMin?: unknown;
+    feetMax?: unknown;
+    inchesMax?: unknown;
+  };
+  const heightCm: { min?: number; max?: number } = {};
+  const minFeet = wholeBound(height.feetMin) ?? 0;
+  const minInches = wholeBound(height.inchesMin) ?? 0;
+  if (minFeet || minInches) heightCm.min = feetInchesToCm(minFeet, minInches);
+  const maxFeet = wholeBound(height.feetMax) ?? 0;
+  const maxInches = wholeBound(height.inchesMax) ?? 0;
+  if (maxFeet || maxInches) heightCm.max = feetInchesToCm(maxFeet, maxInches);
+  if (heightCm.min !== undefined || heightCm.max !== undefined) {
+    converted.height = { ...rangeOf(filters.height), ...heightCm };
   }
 
-  // Weight: convert lbs to kg
-  if (filters.weight?.min) {
+  // Weight: lbs to kg
+  const weight = rangeOf(filters.weight);
+  const minLbs = wholeBound(weight.min);
+  const maxLbs = wholeBound(weight.max);
+  if (minLbs || maxLbs) {
     converted.weight = {
-      ...converted.weight,
-      min: lbsToKg(parseInt(filters.weight.min)),
-    };
-  }
-  if (filters.weight?.max) {
-    converted.weight = {
-      ...converted.weight,
-      max: lbsToKg(parseInt(filters.weight.max)),
+      ...weight,
+      ...(minLbs ? { min: lbsToKg(minLbs) } : {}),
+      ...(maxLbs ? { max: lbsToKg(maxLbs) } : {}),
     };
   }
 
-  // Penis length: convert inches to cm
-  if (filters.penisLength?.min) {
+  // Penis length: inches (with decimals) to cm
+  const length = rangeOf(filters.penisLength);
+  const minInchesLength = decimalBound(length.min);
+  const maxInchesLength = decimalBound(length.max);
+  if (minInchesLength || maxInchesLength) {
     converted.penisLength = {
-      ...converted.penisLength,
-      min: inchesToCm(parseFloat(filters.penisLength.min)),
-    };
-  }
-  if (filters.penisLength?.max) {
-    converted.penisLength = {
-      ...converted.penisLength,
-      max: inchesToCm(parseFloat(filters.penisLength.max)),
+      ...length,
+      ...(minInchesLength ? { min: inchesToCm(minInchesLength) } : {}),
+      ...(maxInchesLength ? { max: inchesToCm(maxInchesLength) } : {}),
     };
   }
 
@@ -1991,1292 +1826,281 @@ const convertFilterUnits = (
 };
 
 export const buildPerformerFilter = (
-  filters: Record<string, any>,
+  filters: FilterState,
   unitPreference: string = UNITS.METRIC
-): Record<string, any> => {
-  // Convert imperial values to metric before building filter
-  const convertedFilters = convertFilterUnits(filters, unitPreference);
-  const performerFilter: Record<string, any> = {};
+): PerformerFilterInput => {
+  // Imperial values to metric before building the filter
+  const converted = convertFilterUnits(filters, unitPreference);
+  const control = PERFORMER_CONTROLS;
+  const performerFilter: Writable<PerformerFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    performerFilter.favorite = true;
+  if (isChecked(filters.favorite)) performerFilter.favorite = true;
+
+  put(
+    performerFilter,
+    "tags",
+    refCriterion(PERFORMER_FIELDS.tags, filters, control("tagIds"))
+  );
+
+  const gender = oneOf(GENDERS, filters.gender);
+  if (gender !== undefined) {
+    performerFilter.gender = { value: gender, modifier: "EQUALS" };
   }
+  put(performerFilter, "ethnicity", equalsCriterion(filters.ethnicity));
+  put(performerFilter, "hair_color", equalsCriterion(filters.hairColor));
+  put(performerFilter, "eye_color", equalsCriterion(filters.eyeColor));
+  put(performerFilter, "fake_tits", equalsCriterion(filters.fakeTits));
 
-  // Tags filter
-  // Supports hierarchical filtering via depth parameter
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    performerFilter.tags = {
-      value: filters.tagIds.map(String),
-      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.tagIdsDepth !== undefined) {
-      performerFilter.tags.depth = filters.tagIdsDepth;
-    }
-  }
+  put(performerFilter, "rating100", rangeCriterion(filters.rating));
+  put(performerFilter, "age", rangeCriterion(filters.age));
+  put(performerFilter, "birth_year", rangeCriterion(filters.birthYear));
+  put(performerFilter, "death_year", rangeCriterion(filters.deathYear));
+  put(performerFilter, "career_length", rangeCriterion(filters.careerLength));
+  put(performerFilter, "height", rangeCriterion(converted.height));
+  put(performerFilter, "weight", rangeCriterion(converted.weight));
+  put(performerFilter, "penis_length", rangeCriterion(converted.penisLength));
+  put(performerFilter, "o_counter", rangeCriterion(filters.oCounter));
+  put(performerFilter, "play_count", rangeCriterion(filters.playCount));
+  put(performerFilter, "scene_count", rangeCriterion(filters.sceneCount));
 
-  // Select filters with EQUALS modifier
-  if (filters.gender) {
-    performerFilter.gender = {
-      value: filters.gender,
-      modifier: "EQUALS",
-    };
-  }
+  put(performerFilter, "birthdate", dateCriterion(filters.birthdate));
+  put(performerFilter, "death_date", dateCriterion(filters.deathDate));
+  put(performerFilter, "created_at", dateCriterion(filters.createdAt));
+  put(performerFilter, "updated_at", dateCriterion(filters.updatedAt));
 
-  // Rating filter (0-100 scale)
-  // Check for non-empty values before creating filter object
-  const hasRatingMin =
-    filters.rating?.min !== undefined && filters.rating.min !== "";
-  const hasRatingMax =
-    filters.rating?.max !== undefined && filters.rating.max !== "";
-
-  if (hasRatingMin || hasRatingMax) {
-    if (hasRatingMin && hasRatingMax) {
-      performerFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasRatingMin) {
-      performerFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasRatingMax) {
-      performerFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
-
-  if (filters.ethnicity) {
-    performerFilter.ethnicity = {
-      value: filters.ethnicity,
-      modifier: "EQUALS",
-    };
-  }
-
-  if (filters.hairColor) {
-    performerFilter.hair_color = {
-      value: filters.hairColor,
-      modifier: "EQUALS",
-    };
-  }
-
-  if (filters.eyeColor) {
-    performerFilter.eye_color = {
-      value: filters.eyeColor,
-      modifier: "EQUALS",
-    };
-  }
-
-  if (filters.fakeTits) {
-    performerFilter.fake_tits = {
-      value: filters.fakeTits,
-      modifier: "EQUALS",
-    };
-  }
-
-  // Range filters
-  if (filters.age?.min || filters.age?.max) {
-    const hasMin = filters.age.min !== undefined && filters.age.min !== "";
-    const hasMax = filters.age.max !== undefined && filters.age.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.age = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.age.min),
-        value2: parseInt(filters.age.max),
-      };
-    } else if (hasMin) {
-      performerFilter.age = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.age.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.age = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.age.max) + 1,
-      };
-    }
-  }
-
-  if (filters.birthYear?.min || filters.birthYear?.max) {
-    const hasMin =
-      filters.birthYear.min !== undefined && filters.birthYear.min !== "";
-    const hasMax =
-      filters.birthYear.max !== undefined && filters.birthYear.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.birth_year = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.birthYear.min),
-        value2: parseInt(filters.birthYear.max),
-      };
-    } else if (hasMin) {
-      performerFilter.birth_year = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.birthYear.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.birth_year = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.birthYear.max) + 1,
-      };
-    }
-  }
-
-  if (filters.deathYear?.min || filters.deathYear?.max) {
-    const hasMin =
-      filters.deathYear.min !== undefined && filters.deathYear.min !== "";
-    const hasMax =
-      filters.deathYear.max !== undefined && filters.deathYear.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.death_year = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.deathYear.min),
-        value2: parseInt(filters.deathYear.max),
-      };
-    } else if (hasMin) {
-      performerFilter.death_year = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.deathYear.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.death_year = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.deathYear.max) + 1,
-      };
-    }
-  }
-
-  if (filters.careerLength?.min || filters.careerLength?.max) {
-    const hasMin =
-      filters.careerLength.min !== undefined && filters.careerLength.min !== "";
-    const hasMax =
-      filters.careerLength.max !== undefined && filters.careerLength.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.career_length = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.careerLength.min),
-        value2: parseInt(filters.careerLength.max),
-      };
-    } else if (hasMin) {
-      performerFilter.career_length = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.careerLength.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.career_length = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.careerLength.max) + 1,
-      };
-    }
-  }
-
-  // Height, weight, and penisLength use convertedFilters for unit conversion
-  if (convertedFilters.height?.min || convertedFilters.height?.max) {
-    const hasMin =
-      convertedFilters.height.min !== undefined &&
-      convertedFilters.height.min !== "";
-    const hasMax =
-      convertedFilters.height.max !== undefined &&
-      convertedFilters.height.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.height = {
-        modifier: "BETWEEN",
-        value: parseInt(convertedFilters.height.min),
-        value2: parseInt(convertedFilters.height.max),
-      };
-    } else if (hasMin) {
-      performerFilter.height = {
-        modifier: "GREATER_THAN",
-        value: parseInt(convertedFilters.height.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.height = {
-        modifier: "LESS_THAN",
-        value: parseInt(convertedFilters.height.max) + 1,
-      };
-    }
-  }
-
-  if (convertedFilters.weight?.min || convertedFilters.weight?.max) {
-    const hasMin =
-      convertedFilters.weight.min !== undefined &&
-      convertedFilters.weight.min !== "";
-    const hasMax =
-      convertedFilters.weight.max !== undefined &&
-      convertedFilters.weight.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.weight = {
-        modifier: "BETWEEN",
-        value: parseInt(convertedFilters.weight.min),
-        value2: parseInt(convertedFilters.weight.max),
-      };
-    } else if (hasMin) {
-      performerFilter.weight = {
-        modifier: "GREATER_THAN",
-        value: parseInt(convertedFilters.weight.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.weight = {
-        modifier: "LESS_THAN",
-        value: parseInt(convertedFilters.weight.max) + 1,
-      };
-    }
-  }
-
-  if (convertedFilters.penisLength?.min || convertedFilters.penisLength?.max) {
-    const hasMin =
-      convertedFilters.penisLength.min !== undefined &&
-      convertedFilters.penisLength.min !== "";
-    const hasMax =
-      convertedFilters.penisLength.max !== undefined &&
-      convertedFilters.penisLength.max !== "";
-
-    if (hasMin && hasMax) {
-      performerFilter.penis_length = {
-        modifier: "BETWEEN",
-        value: parseInt(convertedFilters.penisLength.min),
-        value2: parseInt(convertedFilters.penisLength.max),
-      };
-    } else if (hasMin) {
-      performerFilter.penis_length = {
-        modifier: "GREATER_THAN",
-        value: parseInt(convertedFilters.penisLength.min) - 1,
-      };
-    } else if (hasMax) {
-      performerFilter.penis_length = {
-        modifier: "LESS_THAN",
-        value: parseInt(convertedFilters.penisLength.max) + 1,
-      };
-    }
-  }
-
-  // Check for non-empty values before creating filter object
-  const hasOCounterMin =
-    filters.oCounter?.min !== undefined && filters.oCounter.min !== "";
-  const hasOCounterMax =
-    filters.oCounter?.max !== undefined && filters.oCounter.max !== "";
-
-  if (hasOCounterMin || hasOCounterMax) {
-    if (hasOCounterMin && hasOCounterMax) {
-      performerFilter.o_counter = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.oCounter.min),
-        value2: parseInt(filters.oCounter.max),
-      };
-    } else if (hasOCounterMin) {
-      performerFilter.o_counter = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.oCounter.min) - 1,
-      };
-    } else if (hasOCounterMax) {
-      performerFilter.o_counter = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.oCounter.max) + 1,
-      };
-    }
-  }
-
-  // Check for non-empty values before creating filter object
-  const hasPlayCountMin =
-    filters.playCount?.min !== undefined && filters.playCount.min !== "";
-  const hasPlayCountMax =
-    filters.playCount?.max !== undefined && filters.playCount.max !== "";
-
-  if (hasPlayCountMin || hasPlayCountMax) {
-    if (hasPlayCountMin && hasPlayCountMax) {
-      performerFilter.play_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.playCount.min),
-        value2: parseInt(filters.playCount.max),
-      };
-    } else if (hasPlayCountMin) {
-      performerFilter.play_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.playCount.min) - 1,
-      };
-    } else if (hasPlayCountMax) {
-      performerFilter.play_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.playCount.max) + 1,
-      };
-    }
-  }
-
-  // Check for non-empty values before creating filter object
-  const hasSceneCountMin =
-    filters.sceneCount?.min !== undefined && filters.sceneCount.min !== "";
-  const hasSceneCountMax =
-    filters.sceneCount?.max !== undefined && filters.sceneCount.max !== "";
-
-  if (hasSceneCountMin || hasSceneCountMax) {
-    if (hasSceneCountMin && hasSceneCountMax) {
-      performerFilter.scene_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.sceneCount.min),
-        value2: parseInt(filters.sceneCount.max),
-      };
-    } else if (hasSceneCountMin) {
-      performerFilter.scene_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.sceneCount.min) - 1,
-      };
-    } else if (hasSceneCountMax) {
-      performerFilter.scene_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.sceneCount.max) + 1,
-      };
-    }
-  }
-
-  // Date-range filters
-  if (filters.birthdate?.start || filters.birthdate?.end) {
-    performerFilter.birthdate = {};
-    if (filters.birthdate.start)
-      performerFilter.birthdate.value = filters.birthdate.start;
-    performerFilter.birthdate.modifier = filters.birthdate.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.birthdate.end)
-      performerFilter.birthdate.value2 = filters.birthdate.end;
-  }
-
-  if (filters.deathDate?.start || filters.deathDate?.end) {
-    performerFilter.death_date = {};
-    if (filters.deathDate.start)
-      performerFilter.death_date.value = filters.deathDate.start;
-    performerFilter.death_date.modifier = filters.deathDate.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.deathDate.end)
-      performerFilter.death_date.value2 = filters.deathDate.end;
-  }
-
-  if (filters.createdAt?.start || filters.createdAt?.end) {
-    performerFilter.created_at = {};
-    if (filters.createdAt.start)
-      performerFilter.created_at.value = filters.createdAt.start;
-    performerFilter.created_at.modifier = filters.createdAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.createdAt.end)
-      performerFilter.created_at.value2 = filters.createdAt.end;
-  }
-
-  if (filters.updatedAt?.start || filters.updatedAt?.end) {
-    performerFilter.updated_at = {};
-    if (filters.updatedAt.start)
-      performerFilter.updated_at.value = filters.updatedAt.start;
-    performerFilter.updated_at.modifier = filters.updatedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.updatedAt.end)
-      performerFilter.updated_at.value2 = filters.updatedAt.end;
-  }
-
-  // Text search filters
-  if (filters.name) {
-    performerFilter.name = {
-      value: filters.name,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.details) {
-    performerFilter.details = {
-      value: filters.details,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.measurements) {
-    performerFilter.measurements = {
-      value: filters.measurements,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.tattoos) {
-    performerFilter.tattoos = {
-      value: filters.tattoos,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.piercings) {
-    performerFilter.piercings = {
-      value: filters.piercings,
-      modifier: "INCLUDES",
-    };
-  }
-
-  // Entity filters
-  if (filters.sceneId) {
-    performerFilter.scene_filter = {
-      id: {
-        value: [filters.sceneId],
-        modifier: "INCLUDES",
-      },
-    };
-  }
-
-  if (filters.groupIds && filters.groupIds.length > 0) {
-    performerFilter.scene_filter = performerFilter.scene_filter || {};
-    performerFilter.scene_filter.groups = {
-      value: filters.groupIds,
-      modifier: "INCLUDES",
-    };
-  }
+  put(performerFilter, "name", textCriterion(filters.name));
+  put(performerFilter, "details", textCriterion(filters.details));
+  put(performerFilter, "measurements", textCriterion(filters.measurements));
+  put(performerFilter, "tattoos", textCriterion(filters.tattoos));
+  put(performerFilter, "piercings", textCriterion(filters.piercings));
 
   return performerFilter;
 };
 
-export const buildStudioFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const studioFilter: Record<string, any> = {};
+export const buildStudioFilter = (filters: FilterState): StudioFilterInput => {
+  const control = STUDIO_CONTROLS;
+  const studioFilter: Writable<StudioFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    studioFilter.favorite = true;
-  }
+  if (isChecked(filters.favorite)) studioFilter.favorite = true;
 
-  // Tags filter
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    studioFilter.tags = {
-      value: filters.tagIds.map(String),
-      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.tagIdsDepth !== undefined) {
-      studioFilter.tags.depth = filters.tagIdsDepth;
-    }
-  }
+  put(
+    studioFilter,
+    "tags",
+    refCriterion(STUDIO_FIELDS.tags, filters, control("tagIds"))
+  );
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
+  put(studioFilter, "rating100", rangeCriterion(filters.rating));
+  put(studioFilter, "scene_count", rangeCriterion(filters.sceneCount));
+  put(studioFilter, "o_counter", rangeCriterion(filters.oCounter));
+  put(studioFilter, "play_count", rangeCriterion(filters.playCount));
 
-    if (hasMin && hasMax) {
-      studioFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      studioFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      studioFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
+  put(studioFilter, "created_at", dateCriterion(filters.createdAt));
+  put(studioFilter, "updated_at", dateCriterion(filters.updatedAt));
 
-  // Range filter
-  if (
-    filters.sceneCount?.min !== undefined ||
-    filters.sceneCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
-    const hasMax =
-      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
-
-    if (hasMin && hasMax) {
-      studioFilter.scene_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.sceneCount.min),
-        value2: parseInt(filters.sceneCount.max),
-      };
-    } else if (hasMin) {
-      studioFilter.scene_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.sceneCount.min) - 1,
-      };
-    } else if (hasMax) {
-      studioFilter.scene_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.sceneCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.oCounter?.min !== undefined ||
-    filters.oCounter?.max !== undefined
-  ) {
-    const hasMin =
-      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
-    const hasMax =
-      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
-
-    if (hasMin && hasMax) {
-      studioFilter.o_counter = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.oCounter.min),
-        value2: parseInt(filters.oCounter.max),
-      };
-    } else if (hasMin) {
-      studioFilter.o_counter = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.oCounter.min) - 1,
-      };
-    } else if (hasMax) {
-      studioFilter.o_counter = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.oCounter.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.playCount?.min !== undefined ||
-    filters.playCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.playCount.min !== undefined && filters.playCount.min !== "";
-    const hasMax =
-      filters.playCount.max !== undefined && filters.playCount.max !== "";
-
-    if (hasMin && hasMax) {
-      studioFilter.play_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.playCount.min),
-        value2: parseInt(filters.playCount.max),
-      };
-    } else if (hasMin) {
-      studioFilter.play_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.playCount.min) - 1,
-      };
-    } else if (hasMax) {
-      studioFilter.play_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.playCount.max) + 1,
-      };
-    }
-  }
-
-  // Date-range filters
-  if (filters.createdAt?.start || filters.createdAt?.end) {
-    studioFilter.created_at = {};
-    if (filters.createdAt.start)
-      studioFilter.created_at.value = filters.createdAt.start;
-    studioFilter.created_at.modifier = filters.createdAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.createdAt.end)
-      studioFilter.created_at.value2 = filters.createdAt.end;
-  }
-
-  if (filters.updatedAt?.start || filters.updatedAt?.end) {
-    studioFilter.updated_at = {};
-    if (filters.updatedAt.start)
-      studioFilter.updated_at.value = filters.updatedAt.start;
-    studioFilter.updated_at.modifier = filters.updatedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.updatedAt.end)
-      studioFilter.updated_at.value2 = filters.updatedAt.end;
-  }
-
-  // Text search filters
-  if (filters.name) {
-    studioFilter.name = {
-      value: filters.name,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.details) {
-    studioFilter.details = {
-      value: filters.details,
-      modifier: "INCLUDES",
-    };
-  }
+  put(studioFilter, "name", textCriterion(filters.name));
+  put(studioFilter, "details", textCriterion(filters.details));
 
   return studioFilter;
 };
 
-export const buildTagFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const tagFilter: Record<string, any> = {};
+export const buildTagFilter = (filters: FilterState): TagFilterInput => {
+  const control = TAG_CONTROLS;
+  const tagFilter: Writable<TagFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    tagFilter.favorite = true;
-  }
+  if (isChecked(filters.favorite)) tagFilter.favorite = true;
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
+  put(tagFilter, "rating100", rangeCriterion(filters.rating));
+  put(tagFilter, "scene_count", rangeCriterion(filters.sceneCount));
+  put(tagFilter, "o_counter", rangeCriterion(filters.oCounter));
+  put(tagFilter, "play_count", rangeCriterion(filters.playCount));
 
-    if (hasMin && hasMax) {
-      tagFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      tagFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      tagFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
+  put(tagFilter, "created_at", dateCriterion(filters.createdAt));
+  put(tagFilter, "updated_at", dateCriterion(filters.updatedAt));
 
-  // Range filter
-  if (
-    filters.sceneCount?.min !== undefined ||
-    filters.sceneCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
-    const hasMax =
-      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
+  put(tagFilter, "name", textCriterion(filters.name));
+  put(tagFilter, "description", textCriterion(filters.description));
 
-    if (hasMin && hasMax) {
-      tagFilter.scene_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.sceneCount.min),
-        value2: parseInt(filters.sceneCount.max),
-      };
-    } else if (hasMin) {
-      tagFilter.scene_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.sceneCount.min) - 1,
-      };
-    } else if (hasMax) {
-      tagFilter.scene_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.sceneCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.oCounter?.min !== undefined ||
-    filters.oCounter?.max !== undefined
-  ) {
-    const hasMin =
-      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
-    const hasMax =
-      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
-
-    if (hasMin && hasMax) {
-      tagFilter.o_counter = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.oCounter.min),
-        value2: parseInt(filters.oCounter.max),
-      };
-    } else if (hasMin) {
-      tagFilter.o_counter = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.oCounter.min) - 1,
-      };
-    } else if (hasMax) {
-      tagFilter.o_counter = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.oCounter.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.playCount?.min !== undefined ||
-    filters.playCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.playCount.min !== undefined && filters.playCount.min !== "";
-    const hasMax =
-      filters.playCount.max !== undefined && filters.playCount.max !== "";
-
-    if (hasMin && hasMax) {
-      tagFilter.play_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.playCount.min),
-        value2: parseInt(filters.playCount.max),
-      };
-    } else if (hasMin) {
-      tagFilter.play_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.playCount.min) - 1,
-      };
-    } else if (hasMax) {
-      tagFilter.play_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.playCount.max) + 1,
-      };
-    }
-  }
-
-  // Date-range filters
-  if (filters.createdAt?.start || filters.createdAt?.end) {
-    tagFilter.created_at = {};
-    if (filters.createdAt.start)
-      tagFilter.created_at.value = filters.createdAt.start;
-    tagFilter.created_at.modifier = filters.createdAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.createdAt.end)
-      tagFilter.created_at.value2 = filters.createdAt.end;
-  }
-
-  if (filters.updatedAt?.start || filters.updatedAt?.end) {
-    tagFilter.updated_at = {};
-    if (filters.updatedAt.start)
-      tagFilter.updated_at.value = filters.updatedAt.start;
-    tagFilter.updated_at.modifier = filters.updatedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.updatedAt.end)
-      tagFilter.updated_at.value2 = filters.updatedAt.end;
-  }
-
-  // Text search filters
-  if (filters.name) {
-    tagFilter.name = {
-      value: filters.name,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.description) {
-    tagFilter.description = {
-      value: filters.description,
-      modifier: "INCLUDES",
-    };
-  }
-
-  // Entity filters
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    tagFilter.performers = {
-      value: filters.performerIds,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.studioId) {
-    tagFilter.studios = {
-      value: [filters.studioId],
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.sceneId) {
-    tagFilter.scenes_filter = {
-      id: {
-        value: [filters.sceneId],
-        modifier: "INCLUDES",
-      },
-    };
-  }
-
-  if (filters.groupIds && filters.groupIds.length > 0) {
-    tagFilter.scenes_filter = tagFilter.scenes_filter || {};
-    tagFilter.scenes_filter.groups = {
-      value: filters.groupIds,
-      modifier: "INCLUDES",
-    };
-  }
+  put(
+    tagFilter,
+    "performers",
+    refCriterion(TAG_FIELDS.performers, filters, control("performerIds"))
+  );
+  put(
+    tagFilter,
+    "studios",
+    refCriterion(TAG_FIELDS.studios, filters, control("studioId"))
+  );
+  // Tags on scenes of these collections, as `scenes_filter.groups`
+  const groups = refCriterion(TAG_FIELDS.groups, filters, control("groupIds"));
+  if (groups) tagFilter.scenes_filter = { groups };
 
   return tagFilter;
 };
 
-export const buildGroupFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const groupFilter: Record<string, any> = {};
+export const buildGroupFilter = (filters: FilterState): GroupFilterInput => {
+  const control = GROUP_CONTROLS;
+  const groupFilter: Writable<GroupFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    groupFilter.favorite = true;
-  }
+  if (isChecked(filters.favorite)) groupFilter.favorite = true;
 
-  // Tags filter
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    groupFilter.tags = {
-      value: filters.tagIds.map(String),
-      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
-    };
-  }
+  put(
+    groupFilter,
+    "tags",
+    refCriterion(GROUP_FIELDS.tags, filters, control("tagIds"))
+  );
+  put(
+    groupFilter,
+    "performers",
+    refCriterion(GROUP_FIELDS.performers, filters, control("performerIds"))
+  );
+  put(
+    groupFilter,
+    "studios",
+    refCriterion(GROUP_FIELDS.studios, filters, control("studioId"))
+  );
+  // Parent collection: the direct sub-collections of these
+  put(
+    groupFilter,
+    "containing_groups",
+    refCriterion(GROUP_FIELDS.containing_groups, filters, control("groupIds"))
+  );
 
-  // Performers filter
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    groupFilter.performers = {
-      value: filters.performerIds.map(String),
-      modifier: filters.performerIdsModifier || "INCLUDES",
-    };
-  }
+  put(groupFilter, "rating100", rangeCriterion(filters.rating));
+  put(groupFilter, "scene_count", rangeCriterion(filters.sceneCount));
+  put(groupFilter, "duration", rangeCriterion(filters.duration, 60));
 
-  // Studios filter
-  if (filters.studioId && filters.studioId !== "") {
-    groupFilter.studios = {
-      value: [String(filters.studioId)],
-      modifier: "INCLUDES",
-    };
-  }
+  put(groupFilter, "date", dateCriterion(filters.date));
+  put(groupFilter, "created_at", dateCriterion(filters.createdAt));
+  put(groupFilter, "updated_at", dateCriterion(filters.updatedAt));
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
-
-    if (hasMin && hasMax) {
-      groupFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      groupFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      groupFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
-
-  // Range filters
-  if (
-    filters.sceneCount?.min !== undefined ||
-    filters.sceneCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
-    const hasMax =
-      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
-
-    if (hasMin && hasMax) {
-      groupFilter.scene_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.sceneCount.min),
-        value2: parseInt(filters.sceneCount.max),
-      };
-    } else if (hasMin) {
-      groupFilter.scene_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.sceneCount.min) - 1,
-      };
-    } else if (hasMax) {
-      groupFilter.scene_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.sceneCount.max) + 1,
-      };
-    }
-  }
-
-  if (
-    filters.duration?.min !== undefined ||
-    filters.duration?.max !== undefined
-  ) {
-    const hasMin =
-      filters.duration.min !== undefined && filters.duration.min !== "";
-    const hasMax =
-      filters.duration.max !== undefined && filters.duration.max !== "";
-
-    if (hasMin && hasMax) {
-      groupFilter.duration = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.duration.min) * 60,
-        value2: parseInt(filters.duration.max) * 60,
-      };
-    } else if (hasMin) {
-      groupFilter.duration = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.duration.min) * 60 - 1,
-      };
-    } else if (hasMax) {
-      groupFilter.duration = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.duration.max) * 60 + 1,
-      };
-    }
-  }
-
-  // Date-range filters
-  if (filters.date?.start || filters.date?.end) {
-    groupFilter.date = {};
-    if (filters.date.start) groupFilter.date.value = filters.date.start;
-    groupFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.date.end) groupFilter.date.value2 = filters.date.end;
-  }
-
-  if (filters.createdAt?.start || filters.createdAt?.end) {
-    groupFilter.created_at = {};
-    if (filters.createdAt.start)
-      groupFilter.created_at.value = filters.createdAt.start;
-    groupFilter.created_at.modifier = filters.createdAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.createdAt.end)
-      groupFilter.created_at.value2 = filters.createdAt.end;
-  }
-
-  if (filters.updatedAt?.start || filters.updatedAt?.end) {
-    groupFilter.updated_at = {};
-    if (filters.updatedAt.start)
-      groupFilter.updated_at.value = filters.updatedAt.start;
-    groupFilter.updated_at.modifier = filters.updatedAt.end
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.updatedAt.end)
-      groupFilter.updated_at.value2 = filters.updatedAt.end;
-  }
-
-  // Text search filters
-  if (filters.name) {
-    groupFilter.name = {
-      value: filters.name,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.synopsis) {
-    groupFilter.synopsis = {
-      value: filters.synopsis,
-      modifier: "INCLUDES",
-    };
-  }
-
-  if (filters.director) {
-    groupFilter.director = {
-      value: filters.director,
-      modifier: "INCLUDES",
-    };
-  }
-
-  // Entity filters
-  if (filters.sceneId) {
-    groupFilter.scene_filter = {
-      id: {
-        value: [filters.sceneId],
-        modifier: "INCLUDES",
-      },
-    };
-  }
-
-  // Parent collection: "id:instanceId" values, kept whole for the server
-  const parentIds: unknown = filters.groupIds;
-  if (Array.isArray(parentIds) && parentIds.length > 0) {
-    groupFilter.containing_groups = {
-      value: parentIds.map(String),
-      modifier: "INCLUDES",
-    };
-  }
+  put(groupFilter, "name", textCriterion(filters.name));
+  put(groupFilter, "synopsis", textCriterion(filters.synopsis));
+  put(groupFilter, "director", textCriterion(filters.director));
 
   return groupFilter;
 };
 
 export const buildGalleryFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const galleryFilter: Record<string, any> = {};
+  filters: FilterState
+): GalleryFilterInput => {
+  const control = GALLERY_CONTROLS;
+  const galleryFilter: Writable<GalleryFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    galleryFilter.favorite = true;
-  }
-
-  // Has favorite image filter
-  if (
-    filters.hasFavoriteImage === true ||
-    filters.hasFavoriteImage === "TRUE"
-  ) {
+  if (isChecked(filters.favorite)) galleryFilter.favorite = true;
+  if (isChecked(filters.hasFavoriteImage)) {
     galleryFilter.hasFavoriteImage = true;
   }
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
+  put(galleryFilter, "rating100", rangeCriterion(filters.rating));
+  put(galleryFilter, "image_count", rangeCriterion(filters.imageCount));
+  put(galleryFilter, "title", textCriterion(filters.title));
 
-    if (hasMin && hasMax) {
-      galleryFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      galleryFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      galleryFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
+  put(
+    galleryFilter,
+    "studios",
+    refCriterion(GALLERY_FIELDS.studios, filters, control("studioIds"))
+  );
+  put(
+    galleryFilter,
+    "performers",
+    refCriterion(GALLERY_FIELDS.performers, filters, control("performerIds"))
+  );
+  // The folder view's tag arrives as a permanent `tags` criterion
+  put(
+    galleryFilter,
+    "tags",
+    refCriterion(GALLERY_FIELDS.tags, filters, control("tagIds"), filters.tags)
+  );
 
-  // Image count filter
-  if (
-    filters.imageCount?.min !== undefined ||
-    filters.imageCount?.max !== undefined
-  ) {
-    const hasMin =
-      filters.imageCount.min !== undefined && filters.imageCount.min !== "";
-    const hasMax =
-      filters.imageCount.max !== undefined && filters.imageCount.max !== "";
-
-    if (hasMin && hasMax) {
-      galleryFilter.image_count = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.imageCount.min),
-        value2: parseInt(filters.imageCount.max),
-      };
-    } else if (hasMin) {
-      galleryFilter.image_count = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.imageCount.min) - 1,
-      };
-    } else if (hasMax) {
-      galleryFilter.image_count = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.imageCount.max) + 1,
-      };
-    }
-  }
-
-  // Text search filter
-  if (filters.title) {
-    galleryFilter.title = {
-      value: filters.title,
-      modifier: "INCLUDES",
-    };
-  }
-
-  // Studio filter
-  // Supports hierarchical filtering via depth parameter
-  if (filters.studioIds && filters.studioIds.length > 0) {
-    galleryFilter.studios = {
-      value: filters.studioIds.map(String),
-      modifier: filters.studioIdsModifier || "INCLUDES",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.studioIdsDepth !== undefined) {
-      galleryFilter.studios.depth = filters.studioIdsDepth;
-    }
-  }
-
-  // Performers filter
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    galleryFilter.performers = {
-      value: filters.performerIds.map(String),
-      modifier: filters.performerIdsModifier || "INCLUDES",
-    };
-  }
-
-  // Tags filter
-  // Supports hierarchical filtering via depth parameter
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    galleryFilter.tags = {
-      value: filters.tagIds.map(String),
-      modifier: filters.tagIdsModifier || "INCLUDES",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.tagIdsDepth !== undefined) {
-      galleryFilter.tags.depth = filters.tagIdsDepth;
-    }
-  }
-
-  // Date-range filters (for timeline view)
-  if (filters.date?.start || filters.date?.end) {
-    galleryFilter.date = {};
-    if (filters.date.start) galleryFilter.date.value = filters.date.start;
-    galleryFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.date.end) galleryFilter.date.value2 = filters.date.end;
-  }
+  // The timeline view's period
+  put(galleryFilter, "date", dateCriterion(filters.date));
 
   return galleryFilter;
 };
 
-export const buildImageFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const imageFilter: Record<string, any> = {};
+export const buildImageFilter = (filters: FilterState): ImageFilterInput => {
+  const control = IMAGE_CONTROLS;
+  const imageFilter: Writable<ImageFilterInput> = {};
 
-  // Boolean filter
-  if (filters.favorite === true || filters.favorite === "TRUE") {
-    imageFilter.favorite = true;
-  }
+  if (isChecked(filters.favorite)) imageFilter.favorite = true;
 
-  // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
+  put(imageFilter, "rating100", rangeCriterion(filters.rating));
+  put(imageFilter, "o_counter", rangeCriterion(filters.oCounter));
 
-    if (hasMin && hasMax) {
-      imageFilter.rating100 = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.rating.min),
-        value2: parseInt(filters.rating.max),
-      };
-    } else if (hasMin) {
-      imageFilter.rating100 = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.rating.min) - 1,
-      };
-    } else if (hasMax) {
-      imageFilter.rating100 = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.rating.max) + 1,
-      };
-    }
-  }
+  // Performers, studios and tags match through the image's galleries too
+  // (the server's gallery-umbrella inheritance)
+  put(
+    imageFilter,
+    "performers",
+    refCriterion(IMAGE_FIELDS.performers, filters, control("performerIds"))
+  );
+  put(
+    imageFilter,
+    "studios",
+    refCriterion(IMAGE_FIELDS.studios, filters, control("studioIds"))
+  );
+  // The folder view's tag arrives as a permanent `tags` criterion
+  put(
+    imageFilter,
+    "tags",
+    refCriterion(IMAGE_FIELDS.tags, filters, control("tagIds"), filters.tags)
+  );
+  put(
+    imageFilter,
+    "galleries",
+    refCriterion(IMAGE_FIELDS.galleries, filters, control("galleryIds"))
+  );
 
-  // Performers filter (with gallery-umbrella inheritance on backend)
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    imageFilter.performers = {
-      value: filters.performerIds.map(String),
-      modifier: filters.performerIdsModifier || "INCLUDES",
-    };
-  }
-
-  // Studios filter (with gallery-umbrella inheritance on backend)
-  // Supports hierarchical filtering via depth parameter
-  if (filters.studioIds && filters.studioIds.length > 0) {
-    imageFilter.studios = {
-      value: filters.studioIds.map(String),
-      modifier: filters.studioIdsModifier || "INCLUDES",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.studioIdsDepth !== undefined) {
-      imageFilter.studios.depth = filters.studioIdsDepth;
-    }
-  }
-
-  // Tags filter (with gallery-umbrella inheritance on backend)
-  // Supports hierarchical filtering via depth parameter
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    imageFilter.tags = {
-      value: filters.tagIds.map(String),
-      modifier: filters.tagIdsModifier || "INCLUDES",
-    };
-    // Pass through depth for hierarchical filtering
-    if (filters.tagIdsDepth !== undefined) {
-      imageFilter.tags.depth = filters.tagIdsDepth;
-    }
-  }
-
-  // Galleries filter
-  if (filters.galleryIds && filters.galleryIds.length > 0) {
-    imageFilter.galleries = {
-      value: filters.galleryIds.map(String),
-      modifier: filters.galleryIdsModifier || "INCLUDES",
-    };
-  }
-
-  // O Counter filter
-  if (
-    filters.oCounter?.min !== undefined ||
-    filters.oCounter?.max !== undefined
-  ) {
-    const hasMin =
-      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
-    const hasMax =
-      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
-
-    if (hasMin && hasMax) {
-      imageFilter.o_counter = {
-        modifier: "BETWEEN",
-        value: parseInt(filters.oCounter.min),
-        value2: parseInt(filters.oCounter.max),
-      };
-    } else if (hasMin) {
-      imageFilter.o_counter = {
-        modifier: "GREATER_THAN",
-        value: parseInt(filters.oCounter.min) - 1,
-      };
-    } else if (hasMax) {
-      imageFilter.o_counter = {
-        modifier: "LESS_THAN",
-        value: parseInt(filters.oCounter.max) + 1,
-      };
-    }
-  }
-
-  // Date-range filters (for timeline view)
-  if (filters.date?.start || filters.date?.end) {
-    imageFilter.date = {};
-    if (filters.date.start) imageFilter.date.value = filters.date.start;
-    imageFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.date.end) imageFilter.date.value2 = filters.date.end;
-  }
+  // The timeline view's period
+  put(imageFilter, "date", dateCriterion(filters.date));
 
   return imageFilter;
 };
 
 /**
- * Build clip filter params for Peek server API
- * Unlike other build*Filter functions that return GraphQL filter objects,
- * this returns params for the Peek REST API's getClips endpoint.
+ * The Clips page's filter parameters for `GET /api/clips` (`getClips` joins
+ * the lists with commas). Each list with a choice of modifier sends it in
+ * `<param>Modifier`. Clips list with a preview unless the panel picks
+ * "Without preview only" (false) or "All clips" (no `isGenerated`).
  */
-export const buildClipFilter = (
-  filters: Record<string, any>
-): Record<string, any> => {
-  const clipParams: Record<string, any> = {};
+export const buildClipFilter = (filters: FilterState): ClipFilterParams => {
+  const control = CLIP_CONTROLS;
+  const clipParams: ClipFilterParams = {};
 
-  // Tag filters
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    clipParams.tagIds = filters.tagIds;
+  const tags = refCriterion(CLIP_PARAMS.tagIds, filters, control("tagIds"));
+  if (tags) {
+    clipParams.tagIds = tags.value;
+    clipParams.tagIdsModifier = tags.modifier;
   }
-
-  // Scene tag filters
-  if (filters.sceneTagIds && filters.sceneTagIds.length > 0) {
-    clipParams.sceneTagIds = filters.sceneTagIds;
+  const sceneTags = refCriterion(
+    CLIP_PARAMS.sceneTagIds,
+    filters,
+    control("sceneTagIds")
+  );
+  if (sceneTags) {
+    clipParams.sceneTagIds = sceneTags.value;
+    clipParams.sceneTagIdsModifier = sceneTags.modifier;
   }
-
-  // Performer filters
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    clipParams.performerIds = filters.performerIds;
+  const performers = refCriterion(
+    CLIP_PARAMS.performerIds,
+    filters,
+    control("performerIds")
+  );
+  if (performers) {
+    clipParams.performerIds = performers.value;
+    clipParams.performerIdsModifier = performers.modifier;
   }
+  const studio = refCriterion(
+    CLIP_PARAMS.studioId,
+    filters,
+    control("studioId")
+  );
+  if (studio) clipParams.studioId = studio.value[0];
 
-  // Studio filter (single value)
-  if (filters.studioId) {
-    clipParams.studioId = filters.studioId;
-  }
-
-  // isGenerated filter
-  if (filters.isGenerated !== undefined && filters.isGenerated !== "") {
-    clipParams.isGenerated =
-      filters.isGenerated === "true" || filters.isGenerated === true;
+  if (filters.isGenerated !== ALL_CLIPS) {
+    clipParams.isGenerated = !(
+      filters.isGenerated === "false" || filters.isGenerated === false
+    );
   }
 
   return clipParams;
@@ -3687,20 +2511,21 @@ export const carouselRulesToFilterState = (
 };
 
 /**
- * Helper to convert API date filter to UI date range format
+ * A stored date criterion as the date range control holds it, `{ start, end }`
+ * (what `dateCriterion` reads back)
  */
 const dateRangeFromApi = (
-  dateFilter: Record<string, any> | null | undefined
-): Record<string, any> => {
-  if (!dateFilter) return {};
-
-  if (dateFilter.modifier === "BETWEEN") {
-    return { min: dateFilter.value, max: dateFilter.value2 };
-  } else if (dateFilter.modifier === "GREATER_THAN") {
-    return { min: dateFilter.value };
-  } else if (dateFilter.modifier === "LESS_THAN") {
-    return { max: dateFilter.value };
-  }
+  dateFilter: unknown
+): { start?: string; end?: string } => {
+  const { modifier, value, value2 } = permanentOf(dateFilter) as {
+    modifier?: unknown;
+    value?: unknown;
+    value2?: unknown;
+  };
+  const start = day(value);
+  if (modifier === "BETWEEN") return { start, end: day(value2) };
+  if (modifier === "GREATER_THAN") return { start };
+  if (modifier === "LESS_THAN") return { end: start };
   return {};
 };
 

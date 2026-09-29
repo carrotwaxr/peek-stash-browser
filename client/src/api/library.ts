@@ -2,17 +2,26 @@
  * Library API — entity search and lookup endpoints.
  */
 import type {
+  EntityKind,
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
+  FindGalleriesRequest,
   FindGroupsMinimalRequest,
   FindGroupsMinimalResponse,
+  FindGroupsRequest,
+  FindImagesRequest,
   FindPerformersMinimalRequest,
   FindPerformersMinimalResponse,
+  FindPerformersRequest,
+  FindScenesRequest,
   FindStudiosMinimalRequest,
   FindStudiosMinimalResponse,
+  FindStudiosRequest,
   FindTagTreeResponse,
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
+  FindTagsRequest,
+  ListRequestInput,
   NormalizedImage,
   TagTreeScope,
 } from "@peek/shared-types";
@@ -21,44 +30,41 @@ import { apiFetch, apiGet, apiPost } from "./client";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface LibrarySearchParams {
-  filter?: Record<string, unknown>;
-  scene_filter?: Record<string, unknown>;
-  performer_filter?: Record<string, unknown>;
-  studio_filter?: Record<string, unknown>;
-  tag_filter?: Record<string, unknown>;
-  gallery_filter?: Record<string, unknown>;
-  group_filter?: Record<string, unknown>;
-  image_filter?: Record<string, unknown>;
-  ids?: string[];
-}
+/**
+ * A list request, as the server's parser takes it (`ListRequestInput<E>`):
+ * paging, sort and search in `filter`, top-level `ids`, and the list's own
+ * `<entity>_filter`. Each list endpoint takes its kind's (`FindScenesRequest`
+ * is `LibrarySearchParams<"scene">`).
+ */
+export type LibrarySearchParams<E extends EntityKind = EntityKind> =
+  ListRequestInput<E>;
 
 // ── Library API ────────────────────────────────────────────────────────
 
 export const libraryApi = {
   // Search endpoints
-  findScenes: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findScenes: (params: FindScenesRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/scenes", {
       method: "POST",
       body: JSON.stringify(params),
       signal,
     }),
 
-  findPerformers: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findPerformers: (params: FindPerformersRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/performers", {
       method: "POST",
       body: JSON.stringify(params),
       signal,
     }),
 
-  findStudios: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findStudios: (params: FindStudiosRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/studios", {
       method: "POST",
       body: JSON.stringify(params),
       signal,
     }),
 
-  findTags: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findTags: (params: FindTagsRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/tags", {
       method: "POST",
       body: JSON.stringify(params),
@@ -76,21 +82,21 @@ export const libraryApi = {
       signal
     ),
 
-  findGalleries: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findGalleries: (params: FindGalleriesRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/galleries", {
       method: "POST",
       body: JSON.stringify(params),
       signal,
     }),
 
-  findGroups: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findGroups: (params: FindGroupsRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/groups", {
       method: "POST",
       body: JSON.stringify(params),
       signal,
     }),
 
-  findImages: (params: LibrarySearchParams = {}, signal?: AbortSignal) =>
+  findImages: (params: FindImagesRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/images", {
       method: "POST",
       body: JSON.stringify(params),
@@ -343,7 +349,14 @@ export const filterHelpers = {
     per_page: perPage,
   }),
 
-  ratingFilter: (minRating: number, modifier = "GREATER_THAN") => ({
+  ratingFilter: (
+    minRating: number,
+    modifier:
+      | "EQUALS"
+      | "NOT_EQUALS"
+      | "GREATER_THAN"
+      | "LESS_THAN" = "GREATER_THAN"
+  ) => ({
     rating100: { modifier, value: minRating },
   }),
 };

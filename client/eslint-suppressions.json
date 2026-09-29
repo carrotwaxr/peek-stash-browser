@@ -91,10 +91,7 @@
   },
   "src/components/clip-search/ClipSearch.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
+      "count": 3
     }
   },
   "src/components/folder/FolderTreeSidebar.tsx": {
@@ -1516,22 +1513,16 @@
   },
   "src/utils/filterConfig.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 32
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 164
+      "count": 4
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 142
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 11
+      "count": 28
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 664
+      "count": 64
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 34
+      "count": 8
     }
   },
   "src/utils/format.ts": {

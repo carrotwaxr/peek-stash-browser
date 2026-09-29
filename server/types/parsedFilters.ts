@@ -152,10 +152,11 @@ export interface ParsedListRequest<E extends EntityKind> {
   readonly dropped: readonly DroppedInput[];
 }
 
-/** `GET /api/clips`: the filter parameters, with `isGenerated` always set (true when absent) */
-export type ParsedClipFilter = ParsedFields<typeof CLIP_PARAMS> & {
-  readonly isGenerated: boolean;
-};
+/**
+ * `GET /api/clips`: the filter parameters. `isGenerated` absent lists every
+ * clip; the Clips page sends true for its default ("With preview only").
+ */
+export type ParsedClipFilter = ParsedFields<typeof CLIP_PARAMS>;
 
 export interface ParsedClipQuery {
   readonly page: number;
@@ -169,12 +170,11 @@ export interface ParsedClipQuery {
 }
 
 /**
- * What the clip builder takes: the parsed clip query, with `isGenerated`
- * optional (absent: every clip, as a scene's clips with ungenerated ones).
+ * What the clip builder takes: the parsed clip query (`isGenerated` absent:
+ * every clip, as the Clips page's All clips and a scene's clips with
+ * ungenerated ones).
  */
-export type ClipListRequest = Omit<ParsedClipQuery, "filter"> & {
-  readonly filter: ParsedFields<typeof CLIP_PARAMS>;
-};
+export type ClipListRequest = ParsedClipQuery;
 
 /** `GET /api/scenes/:id/clips` */
 export interface ParsedSceneClipsQuery {

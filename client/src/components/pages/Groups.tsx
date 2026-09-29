@@ -49,9 +49,8 @@ const Groups = () => {
     getColumnConfig,
   } = useTableColumns("group");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"group"> | null>(null);
   const {
     data,
     isLoading: queryLoading,
@@ -64,9 +63,12 @@ const Groups = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"group">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const findGroups = (data as Record<string, unknown>)?.findGroups as
     | Record<string, unknown>

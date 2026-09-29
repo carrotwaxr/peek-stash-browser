@@ -97,9 +97,8 @@ const SceneSearch = ({
     getColumnConfig,
   } = useTableColumns("scene");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"scene"> | null>(null);
   const queryClient = useQueryClient();
   const {
     data,
@@ -261,9 +260,12 @@ const SceneSearch = ({
     });
   };
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"scene">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const findScenesData = (data as Record<string, unknown>)?.findScenes as
     | Record<string, unknown>

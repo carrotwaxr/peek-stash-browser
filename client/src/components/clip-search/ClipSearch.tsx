@@ -95,53 +95,28 @@ const ClipSearch = ({
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   /**
-   * Handle query changes from SearchControls
-   * Converts the GraphQL-style query to Peek REST API params
+   * Handle query changes from SearchControls: the page's paging, sort and
+   * search, and every parameter the panel built (`buildClipFilter`, the
+   * modifiers included), as `getClips` sends them
    */
   const handleQueryChange = useCallback(
     (query: Record<string, unknown>) => {
       const filter = query.filter as Record<string, unknown> | undefined;
-      const clipFilter = (query.clip_filter || {}) as Record<string, unknown>;
+      // buildClipFilter's parameters (ClipFilterParams, a part of the options)
+      const clipFilter = (query.clip_filter ?? {}) as GetClipsOptions;
+      const direction = (
+        filter?.direction as string | undefined
+      )?.toLowerCase();
 
-      // Build API params
       const params: GetClipsOptions = {
+        ...clipFilter,
         page: (filter?.page as number) || 1,
         perPage: (filter?.per_page as number) || 24,
-        sortBy: (filter?.sort as string) || "stashCreatedAt",
-        sortDir: (filter?.direction as string)?.toLowerCase() || "desc",
+        sortBy: ((filter?.sort as string) ||
+          "stashCreatedAt") as GetClipsOptions["sortBy"],
+        sortDir: direction === "asc" ? "asc" : "desc",
         q: (filter?.q as string) || undefined,
       };
-
-      // Handle isGenerated filter
-      if (clipFilter.isGenerated !== undefined) {
-        params.isGenerated = clipFilter.isGenerated as boolean;
-      }
-
-      // Handle tag IDs filter
-      if (clipFilter.tagIds && (clipFilter.tagIds as string[]).length > 0) {
-        params.tagIds = clipFilter.tagIds as string[];
-      }
-
-      // Handle scene tag IDs filter
-      if (
-        clipFilter.sceneTagIds &&
-        (clipFilter.sceneTagIds as string[]).length > 0
-      ) {
-        params.sceneTagIds = clipFilter.sceneTagIds as string[];
-      }
-
-      // Handle performer IDs filter
-      if (
-        clipFilter.performerIds &&
-        (clipFilter.performerIds as string[]).length > 0
-      ) {
-        params.performerIds = clipFilter.performerIds as string[];
-      }
-
-      // Handle studio ID filter
-      if (clipFilter.studioId) {
-        params.studioId = clipFilter.studioId as string;
-      }
 
       // Merge permanent filters
       if (permanentFilters.sceneId) {

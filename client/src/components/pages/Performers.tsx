@@ -49,9 +49,8 @@ const Performers = () => {
     getColumnConfig,
   } = useTableColumns("performer");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"performer"> | null>(null);
   const {
     data,
     isLoading: queryLoading,
@@ -64,9 +63,12 @@ const Performers = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"performer">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const findPerformers = (data as Record<string, unknown>)?.findPerformers as
     | Record<string, unknown>

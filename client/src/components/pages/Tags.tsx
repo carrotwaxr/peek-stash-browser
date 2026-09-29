@@ -56,9 +56,8 @@ const Tags = () => {
     searchParams.get("view_mode") || "grid"
   );
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"tag"> | null>(null);
   const {
     data,
     isLoading: queryLoading,
@@ -77,9 +76,12 @@ const Tags = () => {
     activeViewMode === "hierarchy"
   );
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"tag">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const findTags = (data as Record<string, unknown>)?.findTags as
     | Record<string, unknown>

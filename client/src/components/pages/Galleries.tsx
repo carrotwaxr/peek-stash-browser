@@ -58,9 +58,8 @@ const Galleries = () => {
     getColumnConfig,
   } = useTableColumns("gallery");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"gallery"> | null>(null);
   const {
     data,
     isLoading: queryLoading,
@@ -114,9 +113,12 @@ const Galleries = () => {
     return filters;
   }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"gallery">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const handleGalleryClick = useCallback(
     (gallery: Record<string, unknown>) => {

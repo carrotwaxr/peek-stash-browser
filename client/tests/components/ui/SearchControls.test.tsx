@@ -8,7 +8,7 @@
  * If a test fails, investigate whether it's a bug in the code or the test.
  */
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -210,6 +210,35 @@ describe("SearchControls", () => {
       await waitFor(() => {
         expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Modifier dropdowns", () => {
+    it("an untouched Performers modifier reads Has ANY, the modifier the request carries", async () => {
+      const user = userEvent.setup();
+      const onQueryChange = vi.fn<(query: Record<string, unknown>) => void>();
+      renderSearchControls(
+        { onQueryChange },
+        { filters: { performerIds: ["7:server-a"] } }
+      );
+
+      await waitFor(() => {
+        expect(onQueryChange).toHaveBeenCalled();
+      });
+      expect(must(onQueryChange.mock.calls[0])[0].scene_filter).toEqual({
+        performers: { value: ["7:server-a"], modifier: "INCLUDES" },
+      });
+
+      await user.click(
+        must(screen.getByText("Filters").closest("button"), "Filters button")
+      );
+      const performers = must(
+        screen.getByText("Performers", { selector: "label" }).parentElement,
+        "the Performers control"
+      );
+      const modifier = within(performers).getAllByRole("combobox")[0];
+      expect(modifier).toHaveValue("INCLUDES");
+      expect(modifier).toHaveDisplayValue("Has ANY of these");
     });
   });
 

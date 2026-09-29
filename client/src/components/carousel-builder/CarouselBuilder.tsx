@@ -200,7 +200,7 @@ const CarouselBuilder = () => {
     // Date range rules
     ["date", "createdAt", "lastPlayedAt"].forEach((key) => {
       const val = filterState[key] as Record<string, unknown> | undefined;
-      if (val?.min || val?.max) {
+      if (val?.start || val?.end) {
         ruleList.push({
           id: generateRuleId(),
           filterKey: key,

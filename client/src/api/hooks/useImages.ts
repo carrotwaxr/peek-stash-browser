@@ -3,7 +3,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useImageList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"image"> | null,
   instanceId?: string
 ) {
   return useQuery({

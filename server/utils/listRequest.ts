@@ -995,7 +995,7 @@ function parseClipRefs(
   return { refs: result.data, modifier, depth: 0 };
 }
 
-/** `GET /api/clips`: query strings coerced, refs as comma lists, `isGenerated` true when absent */
+/** `GET /api/clips`: query strings coerced, refs as comma lists, every clip when `isGenerated` is absent */
 export function parseClipQuery(
   query: unknown,
   options: ParseOptions
@@ -1061,7 +1061,7 @@ export function parseClipQuery(
   const filter: ParsedClipFilter = {
     // The boundary cast: each criterion was validated by its parameter's spec
     ...(criteria as ParsedFields<typeof CLIP_PARAMS>),
-    isGenerated: isGenerated ?? true,
+    ...(isGenerated === undefined ? {} : { isGenerated }),
   };
   return {
     page: clampPage(state.page),

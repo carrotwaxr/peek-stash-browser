@@ -51,6 +51,7 @@ Different filter types support different operators:
 
 - **Entity filters** (Performers, Tags, etc.): includes any of, includes all of, excludes
 - **Numeric filters** (Rating, Duration, etc.): between, greater than, less than
+- **Date filters** (Created Date, Scene Date, Last Played Date): pick a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between. Date rules are saved with the carousel and shown again when you edit it.
 - **Boolean filters** (Favorites): is true / is false
 - **Text filters**: contains
 

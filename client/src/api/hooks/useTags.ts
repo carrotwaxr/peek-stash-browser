@@ -4,7 +4,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useTagList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"tag"> | null,
   instanceId?: string
 ) {
   return useQuery({

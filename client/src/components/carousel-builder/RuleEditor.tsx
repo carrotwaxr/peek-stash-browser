@@ -265,7 +265,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
     case "date-range":
       return (
         <DateRangeInput
-          value={rule.value as { min?: string; max?: string } | undefined}
+          value={rule.value as DateRange | undefined}
           onChange={(val) => onChange({ value: val })}
         />
       );
@@ -340,9 +340,15 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
   );
 };
 
+/** A date rule, as the filter panel's date range holds it (`dateCriterion` reads it) */
+interface DateRange {
+  start?: string;
+  end?: string;
+}
+
 interface DateRangeInputProps {
-  value: { min?: string; max?: string } | undefined;
-  onChange: (value: { min?: string; max?: string }) => void;
+  value: DateRange | undefined;
+  onChange: (value: DateRange) => void;
 }
 
 /**
@@ -351,20 +357,20 @@ interface DateRangeInputProps {
  */
 const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
   const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const min = e.target.value || undefined;
-    onChange({ ...value, min });
+    const start = e.target.value || undefined;
+    onChange({ ...value, start });
   };
 
   const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const max = e.target.value || undefined;
-    onChange({ ...value, max });
+    const end = e.target.value || undefined;
+    onChange({ ...value, end });
   };
 
   return (
     <div className="flex items-center gap-2">
       <input
         type="date"
-        value={value?.min || ""}
+        value={value?.start || ""}
         onChange={handleFromChange}
         className="px-3 py-2 rounded-lg border text-sm"
         style={{
@@ -376,7 +382,7 @@ const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
       <span style={{ color: "var(--text-secondary)" }}>to</span>
       <input
         type="date"
-        value={value?.max || ""}
+        value={value?.end || ""}
         onChange={handleToChange}
         className="px-3 py-2 rounded-lg border text-sm"
         style={{

@@ -60,12 +60,8 @@ import { recordStatements } from "../helpers/statementRecorder.js";
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 // Why each known gap fails, and the task that closes it
-const END_ONLY =
-  "an end-only date range sends BETWEEN with no value, which the parser refuses (B10)";
-const ONE_STUDIO_ALL =
-  "the client offers Has ALL for the one studio an entity has; the contract takes INCLUDES or EXCLUDES (B10)";
 const CLIP_MODIFIER =
-  "buildClipFilter sends no modifier, and the clip builder matches INCLUDES whatever it is (B10, B11)";
+  "the clip builder matches INCLUDES whatever modifier the client sends (B11)";
 const NO_HEIGHT =
   "the resolution clause has no height for 7K or Huge, so it adds nothing (B11)";
 const NO_CLAUSE = "the builder has no clause for the field (B11)";
@@ -73,14 +69,10 @@ const NO_SORT = "the sort map has no expression, so the default sort applies";
 
 /**
  * The cases failing at this commit: `"<list> filter <option>: <sample>"` or
- * `"<list> sort <value>"`, each with why. B10 conforms the client and B11
- * and B12 wire the server; each deletes the entries it closes.
+ * `"<list> sort <value>"`, each with why. B11 and B12 wire the server; each
+ * deletes the entries it closes.
  */
 const KNOWN_GAPS: Readonly<Record<string, string>> = {
-  "scene filter date: end only": END_ONLY,
-  "scene filter createdAt: end only": END_ONLY,
-  "scene filter updatedAt: end only": END_ONLY,
-  "scene filter lastPlayedAt: end only": END_ONLY,
   "scene filter resolution: EQUALS SEVEN_K": NO_HEIGHT,
   "scene filter resolution: EQUALS HUGE": NO_HEIGHT,
   "scene filter resolution: NOT_EQUALS SEVEN_K": NO_HEIGHT,
@@ -93,32 +85,8 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
   "performer filter careerLength: min only": NO_CLAUSE,
   "performer filter careerLength: max only": NO_CLAUSE,
   "performer filter careerLength: min and max": NO_CLAUSE,
-  "performer filter birthdate: end only": END_ONLY,
-  "performer filter deathDate: end only": END_ONLY,
-  "performer filter createdAt: end only": END_ONLY,
-  "performer filter updatedAt: end only": END_ONLY,
-  "studio filter createdAt: end only": END_ONLY,
-  "studio filter updatedAt: end only": END_ONLY,
-  "tag filter createdAt: end only": END_ONLY,
-  "tag filter updatedAt: end only": END_ONLY,
   "group filter synopsis: text": NO_CLAUSE,
   "group filter director: text": NO_CLAUSE,
-  "group filter date: end only": END_ONLY,
-  "group filter createdAt: end only": END_ONLY,
-  "group filter updatedAt: end only": END_ONLY,
-  "group filter sceneId: one id":
-    "sends scene_filter.id, which the group contract does not have; B10 deletes the option",
-  "gallery filter studioIds: INCLUDES_ALL one id": ONE_STUDIO_ALL,
-  "gallery filter studioIds: INCLUDES_ALL two ids": ONE_STUDIO_ALL,
-  "gallery filter studioIds: INCLUDES_ALL one id, with sub-items":
-    ONE_STUDIO_ALL,
-  "gallery filter studioIds: INCLUDES_ALL two ids, with sub-items":
-    ONE_STUDIO_ALL,
-  "image filter studioIds: INCLUDES_ALL one id": ONE_STUDIO_ALL,
-  "image filter studioIds: INCLUDES_ALL two ids": ONE_STUDIO_ALL,
-  "image filter studioIds: INCLUDES_ALL one id, with sub-items": ONE_STUDIO_ALL,
-  "image filter studioIds: INCLUDES_ALL two ids, with sub-items":
-    ONE_STUDIO_ALL,
   "clip filter tagIds: INCLUDES_ALL one id": CLIP_MODIFIER,
   "clip filter tagIds: INCLUDES_ALL two ids": CLIP_MODIFIER,
   "clip filter tagIds: EXCLUDES one id": CLIP_MODIFIER,
@@ -131,8 +99,6 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
   "clip filter performerIds: INCLUDES_ALL two ids": CLIP_MODIFIER,
   "clip filter performerIds: EXCLUDES one id": CLIP_MODIFIER,
   "clip filter performerIds: EXCLUDES two ids": CLIP_MODIFIER,
-  'clip filter isGenerated: "" (All clips)':
-    "All clips sends no isGenerated, which the parser reads as true, so only clips with a preview list (in neither B10's nor B11's text)",
   "scene sort last_o_at": `${NO_SORT} (B12)`,
   "scene sort scene_index": `${NO_SORT} (B12)`,
   "performer sort career_length": `${NO_SORT} (B11)`,

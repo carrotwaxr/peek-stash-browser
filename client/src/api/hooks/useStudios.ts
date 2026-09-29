@@ -3,7 +3,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useStudioList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"studio"> | null,
   instanceId?: string
 ) {
   return useQuery({

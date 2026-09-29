@@ -8,7 +8,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useSceneList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"scene"> | null,
   instanceId?: string
 ) {
   return useQuery({
