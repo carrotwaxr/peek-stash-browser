@@ -5,12 +5,15 @@
  * Every row goes through the exclusion anti-join with the instance,
  * `deletedAt IS NULL` and the user's allowed instances (invariants 3 and 11:
  * none allowed lists nothing). An admin's Content Restrictions editor sends
- * `scope: "allEnabled"`, which lists every enabled instance past its first
- * sync instead: only the instance clause widens, so the admin's own hidden
- * items and deleted entities stay out. The search matches the name and, for
- * performers and tags, their aliases, never a description (lead decision,
- * PR 4). The order is always the name with case folded, and the `LIMIT` is
- * the page size: a picker lists one page.
+ * `scope: "allEnabled"`, which lists every live entity on every enabled
+ * instance past its first sync instead: the instance clause widens and the
+ * exclusion join goes, so an admin can restrict another user from what they
+ * hid for themselves (owner, 2026-09-28). Deleted entities stay out, and
+ * without the scope (filter dropdowns, carousel rules) the admin's own
+ * hidden items apply as everywhere else. The search matches the name and,
+ * for performers and tags, their aliases, never a description (lead
+ * decision, PR 4). The order is always the name with case folded, and the
+ * `LIMIT` is the page size: a picker lists one page.
  *
  * No index serves `%q%`, so a keystroke reads the type's live rows once and
  * sorts the matches in a temp B-tree: a few ms at 9k performers.
@@ -35,7 +38,10 @@ import {
 
 type SqlParam = string | number | boolean;
 
-/** Who asks: their exclusions apply, and only an admin may widen the scope */
+/**
+ * Who asks: their exclusions apply, and only an admin may widen the scope
+ * (every enabled instance, no exclusions)
+ */
 interface MinimalViewer {
   readonly id: number;
   readonly role: string;
@@ -133,15 +139,28 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
   },
 };
 
-/** The statement for one request */
+/**
+ * The statement for one request. `excludedFor` is the user whose exclusions
+ * the anti-join applies; undefined leaves the join out (scope "allEnabled"),
+ * and every other clause and its params stay as they are.
+ */
 function buildQuery(
   config: MinimalConfig,
-  userId: number,
+  excludedFor: number | undefined,
   instanceIds: string[],
   request: ParsedMinimalRequest<MinimalKind>
 ): { sql: string; params: SqlParam[] } {
-  const where: string[] = ["x.deletedAt IS NULL", "e.id IS NULL"];
-  const params: SqlParam[] = [userId, config.entityType];
+  const where: string[] = ["x.deletedAt IS NULL"];
+  const params: SqlParam[] = [];
+
+  let exclusionJoin = "";
+  if (excludedFor !== undefined) {
+    exclusionJoin = `
+LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entityId = x.id
+  AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)`;
+    where.push("e.id IS NULL");
+    params.push(excludedFor, config.entityType);
+  }
 
   const instances = buildInstanceFilterClause(instanceIds, "x.stashInstanceId");
   where.push(instances.sql);
@@ -175,9 +194,7 @@ function buildQuery(
   const extra = config.extraColumns ? `, ${config.extraColumns}` : "";
   return {
     sql: `SELECT x.id, x.stashInstanceId AS instanceId, ${config.name} AS name${extra}
-FROM ${config.table} x
-LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entityId = x.id
-  AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)
+FROM ${config.table} x${exclusionJoin}
 WHERE ${where.join("\n  AND ")}
 ORDER BY name COLLATE NOCASE, x.id, x.stashInstanceId
 LIMIT ?`,
@@ -195,24 +212,38 @@ function displayName(kind: MinimalKind, row: MinimalEntityQueryRow): string {
   );
 }
 
+/** What a picker lists from: its instances, and whose exclusions apply */
+interface PickerReach {
+  readonly instanceIds: string[];
+  readonly excludedFor: number | undefined;
+}
+
 /**
- * The instances a picker lists: the viewer's allowed instances, or with
- * scope "allEnabled" every enabled instance past its first sync. A viewer
- * who is not an admin sending the scope is refused (403) before any read.
+ * What a picker lists from: the viewer's allowed instances less their
+ * exclusions, or with scope "allEnabled" every enabled instance past its
+ * first sync with no exclusions (the admin's Content Restrictions editor).
+ * A viewer who is not an admin sending the scope is refused (403) before
+ * any read.
  */
-async function pickerInstances(
+async function pickerReach(
   viewer: MinimalViewer,
   request: ParsedMinimalRequest<MinimalKind>
-): Promise<string[]> {
+): Promise<PickerReach> {
   if (request.scope === undefined) {
-    return getUserAllowedInstanceIds(viewer.id);
+    return {
+      instanceIds: await getUserAllowedInstanceIds(viewer.id),
+      excludedFor: viewer.id,
+    };
   }
   if (viewer.role !== "ADMIN") {
     throw new ForbiddenError(
       "Only an administrator can list every server's entities"
     );
   }
-  return getEnabledSyncedInstanceIds();
+  return {
+    instanceIds: await getEnabledSyncedInstanceIds(),
+    excludedFor: undefined,
+  };
 }
 
 /** One page of what a picker lists for the viewer, in name order */
@@ -220,11 +251,11 @@ export async function findMinimalEntities(
   viewer: MinimalViewer,
   request: ParsedMinimalRequest<MinimalKind>
 ): Promise<MinimalEntity[]> {
-  const instanceIds = await pickerInstances(viewer, request);
+  const { instanceIds, excludedFor } = await pickerReach(viewer, request);
   if (instanceIds.length === 0) return [];
   const query = buildQuery(
     CONFIGS[request.entity],
-    viewer.id,
+    excludedFor,
     instanceIds,
     request
   );

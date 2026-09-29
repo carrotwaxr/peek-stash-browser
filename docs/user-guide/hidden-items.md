@@ -68,7 +68,7 @@ You can toggle this setting on/off at any time.
 ### For Admin Users
 - Admins can hide content for themselves just like regular users
 - Content Restrictions (INCLUDE/EXCLUDE rules) are bypassed for admins
-- Hidden Items filtering is ALWAYS applied, even for admins
+- Hidden Items filtering is ALWAYS applied, even for admins, with one exception: the Content Restrictions editor lists everything, so an admin can restrict another user from items they hid for themselves
 - This allows admins to maintain full admin access while personalizing their own view
 
 ### Cascading Behavior

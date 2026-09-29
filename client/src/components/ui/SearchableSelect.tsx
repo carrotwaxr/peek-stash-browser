@@ -20,7 +20,8 @@ import Button from "./Button";
  * openings, so the list is always the current user's. The selected values'
  * names are resolved with one minimal request carrying their ids. With
  * `scope`, both kinds of request carry it: the Content Restrictions editor
- * sends "allEnabled" to list every enabled server's entities (admins only).
+ * sends "allEnabled" to list every enabled server's entities, including
+ * what the admin hid for themselves (admins only).
  *
  * @param {Object} props
  * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
@@ -29,7 +30,7 @@ import Button from "./Button";
  * @param {boolean} props.multi - Enable multi-select mode
  * @param {string} props.placeholder - Placeholder text
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
- * @param {"allEnabled"} [props.scope] - Every enabled server, not only the user's own (admins only)
+ * @param {"allEnabled"} [props.scope] - Every enabled server, not only the user's own, hidden items included (admins only)
  */
 
 interface SelectOption {

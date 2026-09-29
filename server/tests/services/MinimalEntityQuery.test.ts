@@ -203,25 +203,61 @@ describe("findMinimalEntities", () => {
     ]);
   });
   describe("scope allEnabled (the Content Restrictions editor)", () => {
-    it("an admin lists every enabled, synced instance in place of their own; exclusions and deletedAt as before", async () => {
+    it("with scope the statement has no exclusion join", async () => {
       mockAllowed.mockResolvedValue(["a"]);
       mockEnabled.mockResolvedValue(["a", "b", "c"]);
 
       await find("tag", { scope: "allEnabled" }, AS_ADMIN);
 
+      // Every enabled, synced instance in place of the admin's own
       expect(mockAllowed).not.toHaveBeenCalled();
       const { sql, params } = statement();
-      expect(sql).toContain(
-        "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entityId = x.id"
-      );
-      expect(sql).toContain(
-        "(e.instanceId = '' OR e.instanceId = x.stashInstanceId)"
-      );
-      expect(sql).toContain("x.deletedAt IS NULL");
-      expect(sql).toContain("e.id IS NULL");
+      expect(sql).not.toContain("UserExcludedEntity");
+      expect(sql).not.toContain("e.id IS NULL");
+      expect(sql).not.toContain("e.instanceId");
+      expect(sql).toContain("FROM StashTag x\nWHERE x.deletedAt IS NULL");
       expect(sql).toContain("x.stashInstanceId IN (?, ?, ?)");
-      expect(params).toEqual([USER, "tag", "a", "b", "c", 50]);
+      expect(params).toEqual(["a", "b", "c", 50]);
       expect(placeholders(sql)).toBe(params.length);
+    });
+
+    it("with scope every other clause stays, its params in order", async () => {
+      mockEnabled.mockResolvedValue(["a", "b"]);
+      const request = {
+        ids: ["12:a", "13"],
+        filter: { q: "50%", per_page: 20 },
+        count_filter: { min_scene_count: 1 },
+      };
+
+      await find("tag", request, AS_ADMIN);
+      const own = statement();
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await find("tag", { ...request, scope: "allEnabled" }, AS_ADMIN);
+      const scoped = statement();
+
+      // The same statement without the join, its two params and e.id IS NULL
+      expect(scoped.sql).toBe(
+        own.sql
+          .replace(
+            "\nLEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entityId = x.id\n  AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)",
+            ""
+          )
+          .replace("\n  AND e.id IS NULL", "")
+      );
+      expect(own.params.slice(0, 2)).toEqual([USER, "tag"]);
+      expect(scoped.params).toEqual(own.params.slice(2));
+      expect(scoped.params).toEqual([
+        "a",
+        "b",
+        "%50\\%%",
+        "%50\\%%",
+        1,
+        "12",
+        "a",
+        "13",
+        20,
+      ]);
+      expect(placeholders(scoped.sql)).toBe(scoped.params.length);
     });
 
     it("sends nothing and lists nothing when no enabled instance has synced", async () => {
