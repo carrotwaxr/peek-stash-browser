@@ -1,19 +1,24 @@
 import type { ComponentProps } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks are registered)
 // ---------------------------------------------------------------------------
 
 import { ApiError } from "@/api/client";
+import { LIBRARY_READY_POLL_MS } from "@/api/hooks/useLibraryReady";
+import { createQueryClient } from "@/api/queryClient";
+import { queryKeys } from "@/api/queryKeys";
 import { useConfig } from "@/contexts/ConfigContext";
 import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "@/contexts/ScenePlayerContext";
 import { getEntityPath } from "@/utils/entityLinks";
+import { jsonResponse, stubApi } from "../helpers/stubApi";
 
 // ---------------------------------------------------------------------------
 // Mocks (must be defined before imports that use them)
@@ -58,7 +63,10 @@ type ProviderProps = Omit<
   "children"
 >;
 
-function createWrapper(props: Partial<ProviderProps> = {}) {
+function createWrapper(
+  props: Partial<ProviderProps> = {},
+  client = createQueryClient()
+) {
   const defaults: ProviderProps = {
     sceneId: "scene-42",
     instanceId: "inst-1",
@@ -71,7 +79,11 @@ function createWrapper(props: Partial<ProviderProps> = {}) {
   const merged: ProviderProps = { ...defaults, ...props };
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <ScenePlayerProvider {...merged}>{children}</ScenePlayerProvider>;
+    return (
+      <QueryClientProvider client={client}>
+        <ScenePlayerProvider {...merged}>{children}</ScenePlayerProvider>
+      </QueryClientProvider>
+    );
   };
 }
 
@@ -81,6 +93,11 @@ function createWrapper(props: Partial<ProviderProps> = {}) {
 
 describe("ScenePlayerContext", () => {
   let replaceState: MockInstance<History["replaceState"]>;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -268,6 +285,36 @@ describe("ScenePlayerContext", () => {
       expect((result.current.sceneError as ApiError).message).toBe(
         "Scene not found"
       );
+    });
+
+    it("the library-initializing 503 keeps loading and loads the scene once the library is ready", async () => {
+      vi.useFakeTimers();
+      stubApi({
+        "/library/ready": () => jsonResponse(200, { ready: true }),
+      });
+      mockPost.mockRejectedValueOnce(
+        new ApiError("Server is initializing", 503, { ready: false })
+      );
+      const client = createQueryClient();
+
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: createWrapper({}, client),
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
+
+      expect(result.current.sceneError).toBeNull();
+      expect(result.current.sceneLoading).toBe(true);
+      expect(client.getQueryData(queryKeys.library.ready())).toEqual({
+        ready: false,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LIBRARY_READY_POLL_MS + 50);
+      });
+      expect(mockPost).toHaveBeenCalledTimes(2);
+      expect(result.current.scene).toEqual(mockScene);
     });
 
     it("retryScene loads the scene again after a failure", async () => {

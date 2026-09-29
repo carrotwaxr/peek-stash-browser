@@ -8,8 +8,14 @@ import {
   useState,
 } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../api";
 import { ApiError } from "../api/client";
+import {
+  isLibraryInitializing,
+  markLibraryNotReady,
+  useLibraryReady,
+} from "../api/hooks/useLibraryReady";
 import { getEntityPath } from "../utils/entityLinks";
 import { useConfig } from "./ConfigContext";
 import {
@@ -64,6 +70,8 @@ export function ScenePlayerProvider({
 }: ScenePlayerProviderProps) {
   const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
   const { hasMultipleInstances } = useConfig();
+  const queryClient = useQueryClient();
+  const { ready } = useLibraryReady();
 
   // Initialize context from props
   useEffect(() => {
@@ -112,6 +120,12 @@ export function ScenePlayerProvider({
           },
         });
       } catch (error) {
+        // The library's first sync is running: stay loading; the re-check
+        // runs the load again once it is ready
+        if (isLibraryInitializing(error)) {
+          markLibraryNotReady(queryClient);
+          return;
+        }
         console.error("Error loading scene:", error);
         dispatch({
           type: "LOAD_SCENE_ERROR",
@@ -119,7 +133,7 @@ export function ScenePlayerProvider({
         });
       }
     },
-    []
+    [queryClient]
   );
 
   // Playlist navigation helpers (kept for convenience)
@@ -173,7 +187,7 @@ export function ScenePlayerProvider({
     const effectiveInstanceId =
       (playlistScene?.instanceId as string | undefined) || instanceId;
 
-    if (effectiveSceneId) {
+    if (effectiveSceneId && ready) {
       void loadScene(effectiveSceneId, effectiveInstanceId);
     }
   }, [
@@ -183,6 +197,7 @@ export function ScenePlayerProvider({
     state.playlist,
     loadScene,
     loadAttempt,
+    ready,
   ]);
 
   // Update URL when navigating playlist (without React Router navigation)

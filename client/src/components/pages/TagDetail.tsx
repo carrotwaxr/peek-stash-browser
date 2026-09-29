@@ -33,6 +33,7 @@ import {
   EntityNotFound,
   FavoriteButton,
   LazyImage,
+  LibraryInitializingBanner,
   LoadingSpinner,
   MediaImage,
   PageHeader,
@@ -181,7 +182,8 @@ const TagDetail = () => {
 
   if (lookup.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LibraryInitializingBanner />
         <LoadingSpinner />
       </div>
     );

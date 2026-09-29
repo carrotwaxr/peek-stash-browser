@@ -1,12 +1,39 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  renderHook as renderHookBare,
+  waitFor,
+} from "@testing-library/react";
 import { actAsync, must } from "@tests/testUtils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
+import { LIBRARY_READY_POLL_MS } from "@/api/hooks/useLibraryReady";
+import { createQueryClient } from "@/api/queryClient";
+import { queryKeys } from "@/api/queryKeys";
 import {
   type EntityMatch,
   type FetchById,
   useEntityLookup,
 } from "@/hooks/useEntityLookup";
+import { jsonResponse, stubApi } from "../helpers/stubApi";
+
+/** Renders under one query client, as the app does */
+function renderHook<T, P = undefined>(
+  callback: (props: P) => T,
+  options: { initialProps?: P; client?: QueryClient } = {}
+) {
+  const client = options.client ?? createQueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return renderHookBare(callback, {
+    wrapper,
+    ...("initialProps" in options
+      ? { initialProps: options.initialProps as P }
+      : {}),
+  });
+}
 
 interface Entity {
   id: string;
@@ -38,6 +65,45 @@ const MATCHES: EntityMatch[] = [
 ];
 
 describe("useEntityLookup", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("the library-initializing 503 is loading, marks the library not ready, and asks again once it is ready", async () => {
+    vi.useFakeTimers();
+    const client = createQueryClient();
+    const ready = stubApi({
+      "/library/ready": () => jsonResponse(200, { ready: true }),
+    });
+    const fetchById = vi
+      .fn<FetchById<Entity>>()
+      .mockRejectedValueOnce(
+        new ApiError("Server is initializing", 503, { ready: false })
+      )
+      .mockResolvedValue({ id: "7", name: "Jane Doe" });
+    const { result } = renderHook(
+      () => useEntityLookup(fetchById, "7", "inst-a"),
+      { client }
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(result.current.status).toBe("loading");
+    expect(client.getQueryData(queryKeys.library.ready())).toEqual({
+      ready: false,
+    });
+    expect(fetchById).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LIBRARY_READY_POLL_MS + 50);
+    });
+    expect(ready).toHaveBeenCalled();
+    expect(fetchById).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe("found");
+  });
+
   it("a found entity gives found with the entity", async () => {
     const fetchById = vi
       .fn<FetchById<Entity>>()

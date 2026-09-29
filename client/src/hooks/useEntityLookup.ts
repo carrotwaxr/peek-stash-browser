@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../api/client";
+import {
+  isLibraryInitializing,
+  markLibraryNotReady,
+  useLibraryReady,
+} from "../api/hooks/useLibraryReady";
 
 /**
  * One entity a single-id lookup matched on one server. The server answers a
@@ -94,6 +100,10 @@ interface Settled<T> {
  * arrives the status is "loading", so a page never shows the previous
  * entity under the new id.
  *
+ * While the library is initializing (the server's 503 `ready: false`) the
+ * status stays "loading": the library is marked not ready, which starts
+ * `useLibraryReady`'s re-check, and the lookup runs again once it is ready.
+ *
  * `fetchById` must keep its identity between renders (a `libraryApi`
  * function, say): a new one starts a new request.
  */
@@ -102,6 +112,8 @@ export function useEntityLookup<T>(
   id: string | undefined,
   instanceId: string | null
 ): EntityLookup<T> {
+  const queryClient = useQueryClient();
+  const { ready } = useLibraryReady();
   const [attempt, setAttempt] = useState(0);
   const [settled, setSettled] = useState<Settled<T> | null>(null);
 
@@ -110,7 +122,8 @@ export function useEntityLookup<T>(
   }, []);
 
   useEffect(() => {
-    if (!id) return undefined;
+    // Wait for the library: the re-check runs the lookup again when it is ready
+    if (!id || !ready) return undefined;
     const controller = new AbortController();
     const settle = (result: Settled<T>["result"]) => {
       // Aborted: the page has moved to another id, or unmounted
@@ -124,16 +137,21 @@ export function useEntityLookup<T>(
         );
       },
       (err: unknown) => {
+        if (isLibraryInitializing(err)) {
+          if (!controller.signal.aborted) markLibraryNotReady(queryClient);
+          return;
+        }
         settle(describeLookupFailure(err));
       }
     );
     return () => {
       controller.abort();
     };
-  }, [fetchById, id, instanceId, attempt]);
+  }, [fetchById, id, instanceId, attempt, ready, queryClient]);
 
   if (!id) return { status: "notFound", retry };
   const current =
+    ready &&
     settled?.id === id &&
     settled.instanceId === instanceId &&
     settled.attempt === attempt
