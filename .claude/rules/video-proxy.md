@@ -3,6 +3,8 @@ paths:
   - "server/controllers/video.ts"
   - "server/controllers/proxy.ts"
   - "server/controllers/download.ts"
+  - "server/services/PlaylistZipService.ts"
+  - "server/services/DownloadService.ts"
   - "server/routes/video.ts"
   - "server/initializers/api.ts"
   - "server/utils/stashUrl*.ts"
@@ -49,3 +51,7 @@ The one exception is `stashUrl`, the View in Stash link on library entities, whi
 - `proxy.ts` caps outbound requests at 6 with a module-level queue. A slot is freed when the transfer's `stream.pipeline` finishes, when the client closes, on a request error and at the timeout. `tests/controllers/proxy.test.ts` fakes `http.get` and `stream.pipeline` (the fake completes at once); a fake that never calls back holds its slot, and the seventh request hangs. `proxy.http.test.ts` runs the real streams against a stand-in Stash.
 - `proxyHttpRequest` streams with `stream.pipeline`, not `pipe`, which neither passes a source error on nor ends its destination. Once Stash's response has started, its status and Content-Length are promised, so a reset, a close or a stall (the timeout) mid-body destroys the response and the browser sees the request fail at once. Before Stash answers, a failure answers 500 and the timeout 504. A browser that leaves is logged at debug; Stash failing or going quiet at warn.
 - `proxy.ts` drops a request whose client has gone (`res.destroyed`) before it takes a slot, and frees the slot instead of forwarding when the client left while queued. A request now waits on the session and access checks before the queue, and a grid of thumbnails is often abandoned mid-wait; forwarding it would fetch a response nobody reads and hold a slot meanwhile. Without the guard (and with `pipe`, which held such a slot until the upstream timeout) a full E2E run left the proxy starved for minutes.
+
+## Downloads
+
+- A playlist zip is read when it is built (start and retry), for the download's `userId` (the requester, never the playlist owner), through `loadPlaylistItems` (`services/PlaylistQueryService.ts`) with that user's allowed instances, so its entries, M3U and NFOs hold only what they may see and the NFO's rating is theirs (`rating` from the scene builder; none writes none). Never read a scene, its relations or `rating100` with Prisma for a file a user receives.
