@@ -4,40 +4,31 @@
  * Bug #424: the carousel tag filter received composite keys
  * ("284:instance-1") and used them as bare tagId values. The parser now
  * hands the builder (id, instance) pairs, and the tag clause matches each
- * as a pair on the SceneTag junction and the inherited list; a bare ref
- * matches its id on every instance. With a depth, INCLUDES_ALL is one
- * clause per selected tag with its own descendants (QUERIES-08).
+ * as a pair on the SceneTag junction and the inherited list, through the
+ * hierarchy expansion (item 34b): a descendant carries the instance it was
+ * found on, a bare ref expands on every allowed instance. With a depth,
+ * INCLUDES_ALL is one clause per selected tag with its own descendants
+ * (QUERIES-08).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
 // Import after mocks
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { QueryContext } from "../../services/query/EntityQueryBuilder.js";
 import type { RefCriterion } from "../../types/parsedFilters.js";
-import { expandTagIds } from "../../utils/hierarchyUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
-// Mock prisma (required by SceneQueryBuilder import)
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn(),
-    stashScene: { count: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-// Mock hierarchyUtils: expandTagIds passes the ids through at depth 0 and
-// adds one child per id ("<id>-child") otherwise
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[], depth: number) =>
-    Promise.resolve(
-      depth === 0 ? ids : [...ids, ...ids.map((id) => `${id}-child`)]
-    )
-  ),
-  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
-}));
+const mockPrisma = vi.mocked(prisma, true);
 
 const CTX: QueryContext = {
   userId: 1,
@@ -49,12 +40,31 @@ const CTX: QueryContext = {
 const ref = (id: string, instanceId = "instance-1") => ({ id, instanceId });
 const bare = (id: string) => ({ id, instanceId: undefined });
 
+/** The slim hierarchy the expansion loads: one child per tag on instance-1, another on instance-2 */
+const tagRow = (id: string, stashInstanceId: string, parent?: string) =>
+  partialRow<Awaited<ReturnType<typeof prisma.stashTag.findMany>>[number]>({
+    id,
+    stashInstanceId,
+    parentIds: parent === undefined ? null : JSON.stringify([parent]),
+  });
+
 const tagClause = (criterion: RefCriterion) =>
   sceneQueryBuilder["tagClause"](criterion, CTX);
+
+/** The bare term of the inline shape, which matches an id on every instance */
+const BARE_TERM = "(st.tagId = ?)";
 
 describe("SceneQueryBuilder tag clause", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.stashTag.findMany.mockResolvedValue([
+      tagRow("284", "instance-1"),
+      tagRow("284-child", "instance-1", "284"),
+      tagRow("313", "instance-1"),
+      tagRow("313-child", "instance-1", "313"),
+      tagRow("284", "instance-2"),
+      tagRow("284-child-2", "instance-2", "284"),
+    ]);
   });
 
   describe("composite key handling", () => {
@@ -76,7 +86,32 @@ describe("SceneQueryBuilder tag clause", () => {
       }
     );
 
-    it("a bare ref binds its id alone, so it matches every instance", async () => {
+    it("INCLUDES with 284:instance-1 and a depth binds 284 and instance-1 as a pair and never a bare 284 alone", async () => {
+      const result = await tagClause({
+        refs: [ref("284")],
+        modifier: "INCLUDES",
+        depth: -1,
+      });
+
+      expect(result.sql).toContain(
+        "(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ? AND st.tagInstanceId = ?)"
+      );
+      expect(result.sql).not.toContain(BARE_TERM);
+      // The direct arm, then the inherited arm, each the tag and its child
+      // on the tag's own instance
+      expect(result.params).toEqual([
+        "284",
+        "instance-1",
+        "284-child",
+        "instance-1",
+        "284",
+        "instance-1",
+        "284-child",
+        "instance-1",
+      ]);
+    });
+
+    it("a bare 284 binds only 284, so it matches every instance", async () => {
       const result = await tagClause({
         refs: [ref("284"), bare("313")],
         modifier: "INCLUDES",
@@ -93,6 +128,48 @@ describe("SceneQueryBuilder tag clause", () => {
         "284",
         "instance-1",
         "313",
+      ]);
+      expect(mockPrisma.stashTag.findMany).not.toHaveBeenCalled();
+    });
+
+    it("a bare 284 with a depth expands on every allowed instance, each descendant on the instance it was found on", async () => {
+      const result = await tagClause({
+        refs: [bare("284")],
+        modifier: "INCLUDES",
+        depth: -1,
+      });
+
+      expect(result.sql).not.toContain(BARE_TERM);
+      expect(result.params.slice(0, 8)).toEqual([
+        "284",
+        "instance-1",
+        "284-child",
+        "instance-1",
+        "284",
+        "instance-2",
+        "284-child-2",
+        "instance-2",
+      ]);
+    });
+
+    it("EXCLUDES with a composite excludes only that instance's tag and its descendants", async () => {
+      const result = await tagClause({
+        refs: [ref("284")],
+        modifier: "EXCLUDES",
+        depth: -1,
+      });
+
+      expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
+      expect(result.sql).not.toContain(BARE_TERM);
+      expect(result.params).toEqual([
+        "284",
+        "instance-1",
+        "284-child",
+        "instance-1",
+        "284",
+        "instance-1",
+        "284-child",
+        "instance-1",
       ]);
     });
   });
@@ -133,55 +210,55 @@ describe("SceneQueryBuilder tag clause", () => {
   });
 
   describe("depth", () => {
-    it("depth 0 expands nothing", async () => {
+    it("depth 0 loads no hierarchy", async () => {
       await tagClause({ refs: [ref("284")], modifier: "INCLUDES", depth: 0 });
 
-      expect(expandTagIds).not.toHaveBeenCalled();
+      expect(mockPrisma.stashTag.findMany).not.toHaveBeenCalled();
     });
 
-    it("a depth adds the descendants as bare refs and keeps the selected refs' instances", async () => {
-      const result = await tagClause({
-        refs: [ref("284")],
-        modifier: "INCLUDES",
-        depth: -1,
+    it("a depth loads the involved instances' live tags once, whatever the number of refs", async () => {
+      await tagClause({
+        refs: [ref("284"), ref("313"), ref("284", "instance-2")],
+        modifier: "INCLUDES_ALL",
+        depth: 1,
       });
 
-      expect(expandTagIds).toHaveBeenCalledWith(["284"], -1);
-      expect(result.sql).toContain(
-        "(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?)"
-      );
-      expect(result.params.slice(0, 3)).toEqual([
-        "284",
-        "instance-1",
-        "284-child",
-      ]);
+      expect(mockPrisma.stashTag.findMany).toHaveBeenCalledTimes(1);
+      const args = mockPrisma.stashTag.findMany.mock.calls[0]?.[0];
+      expect(args?.where).toEqual({
+        stashInstanceId: { in: ["instance-1", "instance-2"] },
+        deletedAt: null,
+      });
     });
 
-    it("INCLUDES_ALL with a depth is one clause per selected tag, each with its own descendants", async () => {
+    it("INCLUDES_ALL with two values emits two AND-ed clauses, each with its own descendants", async () => {
       const result = await tagClause({
         refs: [ref("284"), ref("313")],
         modifier: "INCLUDES_ALL",
         depth: 1,
       });
 
-      expect(expandTagIds).toHaveBeenCalledTimes(2);
-      expect(expandTagIds).toHaveBeenCalledWith(["284"], 1);
-      expect(expandTagIds).toHaveBeenCalledWith(["313"], 1);
-      // Two AND-ed clauses, each matching a tag or its child
+      // Two AND-ed clauses, each matching a tag or its child on instance-1
+      expect(result.sql).toMatch(/^\(.* AND .*\)$/s);
       expect(result.sql.match(/FROM SceneTag st/g)).toHaveLength(2);
+      expect(result.sql).not.toContain(BARE_TERM);
       expect(result.params).toEqual([
         "284",
         "instance-1",
         "284-child",
+        "instance-1",
         "284",
         "instance-1",
         "284-child",
+        "instance-1",
         "313",
         "instance-1",
         "313-child",
+        "instance-1",
         "313",
         "instance-1",
         "313-child",
+        "instance-1",
       ]);
     });
   });

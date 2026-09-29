@@ -33,10 +33,11 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Each tag expands to itself and one descendant, "99"
-vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
-}));
+// Each ref expands to itself and one descendant, "99", on its own instance
+vi.mock(
+  "../../utils/hierarchyUtils.js",
+  () => import("../helpers/hierarchyMock.js")
+);
 
 vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
@@ -250,7 +251,7 @@ describe("PerformerQueryBuilder", () => {
       expect(params).not.toContain("5:inst-a");
     });
 
-    it("tags match PerformerTag pairs, the selected tag on its instance and its descendants on every instance", async () => {
+    it("tags match PerformerTag pairs, the selected tag and its descendants on its instance", async () => {
       await run({
         filter: {
           tags: { refs: [ref("284")], modifier: "INCLUDES", depth: -1 },
@@ -259,9 +260,12 @@ describe("PerformerQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toMatch(
-        /EXISTS \(SELECT 1 FROM PerformerTag (\w+) WHERE \1\.performerId = p\.id AND \1\.performerInstanceId = p\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \?\)\)\)/
+        /EXISTS \(SELECT 1 FROM PerformerTag (\w+) WHERE \1\.performerId = p\.id AND \1\.performerInstanceId = p\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \? AND \1\.tagInstanceId = \?\)\)\)/
       );
-      expect(params).toEqual(arrayContaining(["284", "inst-a", "99"]));
+      expect(params).toEqual(
+        arrayContaining(["284", "inst-a", "99", "inst-a"])
+      );
+      expect(sql).not.toMatch(/\.(tagId|studioId) = \?\)/);
       expect(params).not.toContain("284:inst-a");
     });
 

@@ -22,7 +22,6 @@ import type {
 } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey, pairsJson } from "../utils/entityRef.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
@@ -48,7 +47,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import {
   PERFORMER_REF,
@@ -243,14 +242,8 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandStudioIds
-    );
-    return refClause(GALLERY_STUDIO, refs, criterion.modifier, {
+    return hierarchicalRefClause("studio", GALLERY_STUDIO, criterion, ctx, {
       name: "studios",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 
@@ -259,14 +252,8 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(GALLERY_TAGS, refs, criterion.modifier, {
+    return hierarchicalRefClause("tag", GALLERY_TAGS, criterion, ctx, {
       name: "tags",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

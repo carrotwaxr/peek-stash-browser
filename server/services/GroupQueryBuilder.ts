@@ -22,7 +22,6 @@ import type {
 } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
@@ -48,7 +47,7 @@ import {
   type EntitySpec,
   type QueryContext,
   type SortExpr,
-  expandRefs,
+  hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import { STUDIO_REF, loadRefsByKey } from "./query/nestedRefs.js";
 
@@ -272,14 +271,8 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandStudioIds
-    );
-    return refClause(GROUP_STUDIO, refs, criterion.modifier, {
+    return hierarchicalRefClause("studio", GROUP_STUDIO, criterion, ctx, {
       name: "studios",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 
@@ -288,14 +281,8 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: QueryContext
   ): Promise<FilterClause> {
-    const refs = await expandRefs(
-      criterion.refs,
-      criterion.depth,
-      expandTagIds
-    );
-    return refClause(GROUP_TAGS, refs, criterion.modifier, {
+    return hierarchicalRefClause("tag", GROUP_TAGS, criterion, ctx, {
       name: "tags",
-      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

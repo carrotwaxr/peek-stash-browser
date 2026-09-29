@@ -31,16 +31,25 @@ import type {
   ParsedListRequest,
   RefCriterion,
 } from "../../types/parsedFilters.js";
+import {
+  type HierarchyKind,
+  expandRefs,
+  expandRefsEach,
+} from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import {
+  type ColumnTarget,
   type FilterClause,
+  type JunctionTarget,
   type SqlFragment,
   type SqlParam,
+  allOf,
   combine,
   exclusionJoin,
   idClause,
   instanceClause,
   randomOrder,
+  refClause,
   specificInstanceClause,
 } from "../../utils/sqlClauses.js";
 
@@ -163,28 +172,45 @@ export interface ListResult<Entity> {
 export const DEFAULT_RANDOM_SEED = 12345;
 
 /**
- * The refs with their descendants to `depth` (0: none), for a hierarchical
- * ref filter (tags, studios). Expansion works on bare ids (C9 keeps the
- * instance through it): the selected refs keep their instance, and a
- * descendant matches its id on every instance.
+ * A hierarchical ref filter (tags, studios): the refs with their
+ * descendants to the criterion's depth, matched as (id, instance) pairs
+ * through `refClause`. Every ref keeps its instance through the expansion
+ * (`utils/hierarchyUtils.ts`): a bare ref means every allowed instance.
+ * INCLUDES_ALL is one clause per selected ref, each with its own
+ * descendants, AND-ed: an entity holding any descendant of each chosen
+ * ref matches, not one holding every descendant (QUERIES-08).
  */
-export async function expandRefs(
-  refs: readonly FilterRef[],
-  depth: number,
-  expand: (ids: string[], depth: number) => Promise<string[]>
-): Promise<readonly FilterRef[]> {
-  if (depth === 0) return refs;
-  const own = new Set(refs.map((ref) => ref.id));
-  const expanded = await expand(
-    refs.map((ref) => ref.id),
-    depth
+export async function hierarchicalRefClause(
+  kind: HierarchyKind,
+  target: JunctionTarget | ColumnTarget,
+  criterion: RefCriterion,
+  ctx: QueryContext,
+  opts: { name: string; inheritedJson?: string }
+): Promise<FilterClause> {
+  const options = { ...opts, allowedInstanceIds: ctx.allowedInstanceIds };
+  if (criterion.modifier === "INCLUDES_ALL") {
+    const groups = await expandRefsEach(
+      kind,
+      criterion.refs,
+      criterion.depth,
+      ctx.allowedInstanceIds
+    );
+    return allOf(
+      groups.map((group, i) =>
+        refClause(target, group, "INCLUDES", {
+          ...options,
+          name: `${opts.name}_${i}`,
+        })
+      )
+    );
+  }
+  const refs = await expandRefs(
+    kind,
+    criterion.refs,
+    criterion.depth,
+    ctx.allowedInstanceIds
   );
-  return [
-    ...refs,
-    ...expanded
-      .filter((id) => !own.has(id))
-      .map((id): FilterRef => ({ id, instanceId: undefined })),
-  ];
+  return refClause(target, refs, criterion.modifier, options);
 }
 
 /** A statement's parts, built once for the page and the count */
