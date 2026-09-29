@@ -1,11 +1,10 @@
 /**
  * Utility functions for persisting filter/sort state to URL query parameters
  */
+import { PER_PAGE_MAX } from "@peek/shared-types";
 import { makeCompositeKey, parseCompositeKey } from "./compositeKey";
 import type { FilterOption } from "./filterConfig";
 
-/** The most rows a list page asks for; the server holds `per_page` to it. */
-export const PER_PAGE_MAX = 250;
 const DEFAULT_PER_PAGE = 24;
 
 /**

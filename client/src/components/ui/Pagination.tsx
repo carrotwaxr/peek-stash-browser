@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PER_PAGE_MAX } from "@peek/shared-types";
 import {
   LucideArrowLeft,
   LucideArrowLeftToLine,
@@ -7,7 +8,6 @@ import {
 } from "lucide-react";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 import { useTVMode } from "../../hooks/useTVMode";
-import { PER_PAGE_MAX } from "../../utils/urlParams";
 import Button from "./Button";
 
 interface Props {
