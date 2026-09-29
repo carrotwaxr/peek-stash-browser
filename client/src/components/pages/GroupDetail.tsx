@@ -19,6 +19,7 @@ import {
   Button,
   EntityNotFound,
   FavoriteButton,
+  LibraryInitializingBanner,
   LoadingSpinner,
   PageHeader,
   RatingSlider,
@@ -121,7 +122,8 @@ const GroupDetail = () => {
 
   if (lookup.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LibraryInitializingBanner />
         <LoadingSpinner />
       </div>
     );

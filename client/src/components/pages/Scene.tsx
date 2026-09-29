@@ -20,6 +20,7 @@ import {
   Button,
   EntityNotFound,
   ExternalPlayerButton,
+  LibraryInitializingBanner,
   RecommendedSidebar,
   ScenesLikeThis,
 } from "../ui/index";
@@ -149,6 +150,8 @@ const SceneContent = () => {
       className="min-h-screen"
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
+      <LibraryInitializingBanner className="mx-4 lg:mx-6 xl:mx-8 mt-6" />
+
       {/* Video Player Header */}
       <header className="w-full py-8 px-4 lg:px-6 xl:px-8">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
