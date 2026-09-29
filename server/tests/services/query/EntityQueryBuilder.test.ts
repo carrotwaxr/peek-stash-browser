@@ -685,9 +685,8 @@ describe("EntityQueryBuilder", () => {
         "inst-a",
         "8",
         "inst-a",
-        2,
-        0,
       ]);
+      expect(page.sql).not.toContain("LIMIT");
     });
 
     it("a bare ref matches its id on every allowed instance", async () => {
@@ -701,7 +700,10 @@ describe("EntityQueryBuilder", () => {
       expect(page.sql).toContain(
         "s.stashInstanceId IN (?, ?) AND ((s.id = ?))"
       );
-      expect(page.params.slice(-3)).toEqual(["7", 1, 0]);
+      // The refs bound the result: a bare ref matches one row per allowed
+      // instance, which a LIMIT of refs.length would cut
+      expect(page.sql).not.toContain("LIMIT");
+      expect(page.params.slice(-1)).toEqual(["7"]);
     });
 
     it("runs no query for no refs", async () => {

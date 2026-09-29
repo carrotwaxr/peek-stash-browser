@@ -382,13 +382,13 @@ describe("carousel, recommended and similar requests", () => {
       expect(body.count).toBe(REC_SCENES);
       expect(body.perPage).toBe(250);
       expect(body.scenes).toHaveLength(250);
-      // The page statement binds the clamped page size
-      const pageStatements = recorder.statements.filter(({ sql }) =>
-        sql.includes("LIMIT ? OFFSET ?")
-      );
-      expect(pageStatements).toHaveLength(1);
-      const { params } = must(pageStatements[0], "the page statement");
-      expect(params.slice(-2)).toEqual([250, 0]);
+      // The clamped page is 250 refs; the hydration statement binds them
+      // and carries no LIMIT (a bare ref may match a row per instance)
+      expect(
+        recorder.statements.filter(({ sql }) =>
+          sql.includes("LIMIT ? OFFSET ?")
+        )
+      ).toHaveLength(0);
     });
 
     it("recommended page abc answers 400", async () => {
