@@ -66,17 +66,3 @@ export function assertEntityRef(value: string): InstanceAwareId {
   }
   return value as InstanceAwareId;
 }
-
-/**
- * Coerce a string array to InstanceAwareId[] at API boundaries.
- *
- * This is an explicit trust boundary — the caller acknowledges these
- * values are entity references (potentially composite keys from the client).
- * The runtime behavior is unchanged; composite key parsing already handles
- * both bare and composite formats.
- *
- * Use at route handlers where filter values arrive from the client.
- */
-export function coerceEntityRefs(values: string[]): InstanceAwareId[] {
-  return values as InstanceAwareId[];
-}

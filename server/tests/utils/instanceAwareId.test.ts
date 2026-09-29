@@ -7,7 +7,6 @@
 import {
   type InstanceAwareId,
   assertEntityRef,
-  coerceEntityRefs,
   isEntityRef,
   makeEntityRef,
   parseEntityRef,
@@ -129,24 +128,5 @@ describe("assertEntityRef", () => {
 
   it("accepts keys with empty instanceId (colon present)", () => {
     expect(() => assertEntityRef("82:")).not.toThrow();
-  });
-});
-
-describe("coerceEntityRefs", () => {
-  it("returns the same array as InstanceAwareId[]", () => {
-    const input = ["82:server-1", "83:server-2"];
-    const result = coerceEntityRefs(input);
-    expect(result).toBe(input); // same reference
-  });
-
-  it("works with empty arrays", () => {
-    const result = coerceEntityRefs([]);
-    expect(result).toEqual([]);
-  });
-
-  it("preserves mixed bare and composite keys", () => {
-    const input = ["82:server-1", "83"];
-    const result = coerceEntityRefs(input);
-    expect(result).toEqual(["82:server-1", "83"]);
   });
 });

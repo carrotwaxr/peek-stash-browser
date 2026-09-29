@@ -36,11 +36,6 @@ export const SCENE_GRID_DENSITIES = {
     "card-grid-responsive density-large grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6",
 };
 
-// Keep legacy exports for backwards compatibility during migration
-export const STANDARD_GRID_CONTAINER_CLASSNAMES =
-  STANDARD_GRID_DENSITIES.medium;
-export const SCENE_GRID_CONTAINER_CLASSNAMES = SCENE_GRID_DENSITIES.medium;
-
 /** Helper to get grid classes for a density level */
 export const getGridClasses = (gridType: string, density = "medium") => {
   const densities: Record<string, string> =

@@ -10,7 +10,7 @@
  * - previewCarousel (preview carousel query results)
  * - executeCarouselById (execute saved carousel and return scenes)
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
 import type { UserCarousel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -793,7 +793,7 @@ describe("Carousel Controller", () => {
           rules: {
             ...RULES,
             performers: {
-              value: coerceEntityRefs(["7:inst-a"]),
+              value: ["7:inst-a"] as InstanceAwareId[],
               modifier: CriterionModifier.Includes,
             },
           },

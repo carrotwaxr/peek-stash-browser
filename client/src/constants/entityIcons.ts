@@ -100,29 +100,3 @@ export const getEntityIcon = (entityType: string) => {
     )[entityType] ?? ENTITY_ICONS.scene
   );
 };
-
-/**
- * Get the icon name string for an entity type.
- * @param {string} entityType - The entity type
- * @returns {string} The icon name for ThemedIcon
- */
-export const getEntityIconName = (entityType: string) => {
-  return (
-    (ENTITY_ICON_NAMES as Record<string, string>)[entityType] ||
-    ENTITY_ICON_NAMES.scene
-  );
-};
-
-/**
- * Get the label for an entity type.
- * @param {string} entityType - The entity type
- * @param {boolean} plural - Whether to return plural form
- * @returns {string} The label
- */
-export const getEntityLabel = (entityType: string, plural = false) => {
-  const labels = (
-    ENTITY_LABELS as Record<string, { singular: string; plural: string }>
-  )[entityType];
-  if (!labels) return entityType;
-  return plural ? labels.plural : labels.singular;
-};

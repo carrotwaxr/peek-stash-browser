@@ -410,14 +410,4 @@ export const commonFilters = {
     filter: filterHelpers.textSearch(query, page, perPage),
     performer_filter: {},
   }),
-
-  favoriteStudios: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "scenes_count", "DESC"),
-    studio_filter: { favorite: true },
-  }),
-
-  favoriteTags: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "scenes_count", "DESC"),
-    tag_filter: { favorite: true },
-  }),
 };
