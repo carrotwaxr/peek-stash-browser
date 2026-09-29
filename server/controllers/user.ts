@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
+import { AppError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import {
   getIdsVisibleOnAnyInstance,
@@ -1258,6 +1259,12 @@ export const syncFromStash = async (
     return;
   }
 
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true },
+  });
+  if (!target) throw new NotFoundError("User not found");
+
   const options = importOptionsFrom(req.body.options);
   const instances = stashInstanceManager.getAll();
   if (instances.length === 0) {
@@ -1265,18 +1272,34 @@ export const syncFromStash = async (
     return;
   }
 
-  const stats = await importFromStash(targetUserId, options, instances);
+  const { stats, failedInstances } = await importFromStash(
+    targetUserId,
+    options,
+    instances
+  );
+  if (failedInstances.length === instances.length) {
+    throw new AppError(
+      "Sync from Stash failed for every Stash instance",
+      502,
+      "UPSTREAM_ERROR"
+    );
+  }
 
   logger.info("syncFromStash completed", {
     totalTime: `${Date.now() - startTime}ms`,
     targetUserId,
+    failedInstances,
     ...stats,
   });
 
   res.json({
-    success: true,
-    message: "Successfully synced ratings and favorites from Stash",
+    success: failedInstances.length === 0,
+    message:
+      failedInstances.length === 0
+        ? "Successfully synced ratings and favorites from Stash"
+        : `Synced from Stash, except for ${failedInstances.join(", ")}, which failed`,
     stats,
+    failedInstances,
   });
 };
 
