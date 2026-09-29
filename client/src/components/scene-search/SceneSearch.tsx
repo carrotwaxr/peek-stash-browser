@@ -150,10 +150,15 @@ const SceneSearch = ({
   }, [permanentFilters]);
 
   // Fetch tags for folder view (only when folder view is active)
-  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
-    currentViewMode === "folder",
-    viewFilters
-  );
+  const {
+    tags: folderTags,
+    isLoading: tagsLoading,
+    error: folderTagsError,
+    refetch: refetchFolderTags,
+  } = useFolderViewTags(currentViewMode === "folder", viewFilters);
+  // A failed tree shows its error; the library's first sync counts as loading
+  const folderTagsFailed =
+    !!folderTagsError && !isLibraryInitializing(folderTagsError);
 
   // Track timeline date filter for filtering by selected period
   const [timelineDateFilter, setTimelineDateFilter] = useState<Record<
@@ -438,6 +443,11 @@ const SceneSearch = ({
                 emptyMessage="No scenes found for this time period"
                 gridDensity={gridDensity}
                 filters={viewFilters}
+              />
+            ) : viewMode === "folder" && folderTagsFailed ? (
+              <ErrorMessage
+                error={folderTagsError}
+                onRetry={() => void refetchFolderTags()}
               />
             ) : viewMode === "folder" ? (
               <FolderView

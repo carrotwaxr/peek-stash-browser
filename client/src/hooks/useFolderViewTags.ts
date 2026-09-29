@@ -32,6 +32,9 @@ export function useFolderViewTags(
   isActive: boolean,
   filters: FolderViewFilters | null = null
 ) {
-  const { data, isLoading, error } = useTagTree(scopeOf(filters), isActive);
-  return { tags: data?.tags ?? NO_TAGS, isLoading, error };
+  const { data, isLoading, error, refetch } = useTagTree(
+    scopeOf(filters),
+    isActive
+  );
+  return { tags: data?.tags ?? NO_TAGS, isLoading, error, refetch };
 }
