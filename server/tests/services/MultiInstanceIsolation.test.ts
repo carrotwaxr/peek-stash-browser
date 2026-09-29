@@ -15,7 +15,7 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import type { SceneScoringData } from "../../types/index.js";
 import { entityKey } from "../../utils/entityRef.js";
 import { must } from "../helpers/must.js";
-import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { prismaImpl } from "../helpers/prismaMock.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 // Mock prisma before importing service
@@ -116,9 +116,6 @@ const createEmptyPrefs = (): LightweightEntityPreferences => ({
 describe("Multi-Instance Isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear the singleton's studio name cache, which lives as long as the process
-    stashEntityService["studioNameCache"] = null;
-    stashEntityService["studioNameCachePromise"] = null;
   });
 
   describe("StashEntityService.getPerformer with instanceId", () => {
@@ -180,32 +177,6 @@ describe("Multi-Instance Isolation", () => {
           stashInstanceId: "inst-b",
         },
       });
-    });
-  });
-
-  describe("Studio name map composite keys", () => {
-    it("returns correct names when same studio ID has different names across instances", async () => {
-      mockPrisma.stashStudio.findMany.mockResolvedValue([
-        partialRow({
-          id: "studio1",
-          stashInstanceId: "inst-a",
-          name: "Studio Alpha",
-        }),
-        partialRow({
-          id: "studio1",
-          stashInstanceId: "inst-b",
-          name: "Studio Beta",
-        }),
-      ]);
-
-      const nameMap = await stashEntityService.getStudioNameMap();
-
-      // Composite keys should resolve to different names
-      expect(nameMap.get("studio1\0inst-a")).toBe("Studio Alpha");
-      expect(nameMap.get("studio1\0inst-b")).toBe("Studio Beta");
-
-      // Plain ID lookup returns the first one encountered (backwards compat)
-      expect(nameMap.get("studio1")).toBe("Studio Alpha");
     });
   });
 
