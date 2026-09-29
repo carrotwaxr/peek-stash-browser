@@ -35,6 +35,7 @@ import {
   parseStoredSceneQuery,
 } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 import { addStreamabilityInfo } from "./library/scenes.js";
 
 // Maximum number of custom carousels per user
@@ -140,7 +141,7 @@ export const createCarousel = async (
     data: {
       userId,
       title: title.trim(),
-      icon: icon || "Film",
+      icon: emptyToNull(icon) ?? "Film",
       rules: rules as unknown as Prisma.InputJsonValue,
       // As the parser read them: a contract sort, direction upper-case
       sort: request.sort.field,
