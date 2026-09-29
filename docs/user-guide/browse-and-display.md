@@ -175,6 +175,34 @@ Each entity type (Scene, Performer, Studio, etc.) has independent settings. Conf
 
 ---
 
+## Filters
+
+Click **Filters** in the search toolbar to open the filter panel, set the filters, and click **Apply Filters**.
+
+### Modifier Dropdowns
+
+A filter that picks performers, tags, studios, collections or galleries has a dropdown above it that says how the picks combine:
+
+| Choice | Matches |
+|--------|---------|
+| **Has ANY of these** | Items with at least one of the picks |
+| **Has ALL of these** | Items with every pick |
+| **Has NONE of these** | Items with none of the picks |
+
+- The dropdown always shows the choice the search uses. Until you change it, that is the filter's default: **Has ALL** for tags, **Has ANY** for the others.
+- A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.
+- Ticking **Include sub-tags** or **Include sub-studios** sets the dropdown to **Has ANY**.
+
+### Date Ranges
+
+Set a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between.
+
+### Clips
+
+The Clips page's **Has Preview** filter lists clips **With preview only** until you pick **Without preview only** or **All clips**.
+
+---
+
 ## Filter Presets
 
 Save your current view configuration for quick access later.

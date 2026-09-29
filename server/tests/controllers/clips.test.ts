@@ -78,7 +78,8 @@ describe("Clips Controller", () => {
           page: 1,
           perPage: 24,
           sort: { field: "stashCreatedAt", direction: "DESC", seed: undefined },
-          filter: { isGenerated: true },
+          // No isGenerated: every clip (the Clips page sends true by default)
+          filter: {},
           specificInstanceId: undefined,
         }),
       });

@@ -251,7 +251,10 @@ export const CLIP_PARAMS = {
   performerIds: ref("performer"),
   /** The clip's scene's studio */
   studioId: ref("studio", { single: true, modifiers: ["INCLUDES"] }),
-  /** Clips with a generated preview; true when absent */
+  /**
+   * Clips with (true) or without (false) a generated preview; every clip
+   * when absent. The Clips page sends true for its default.
+   */
   isGenerated: bool(),
 } as const satisfies Record<string, FieldSpec>;
 

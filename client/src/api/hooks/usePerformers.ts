@@ -3,7 +3,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function usePerformerList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"performer"> | null,
   instanceId?: string
 ) {
   return useQuery({

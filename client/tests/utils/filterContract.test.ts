@@ -4,7 +4,15 @@
  * entity with the same modifier and hierarchy companions, every UI key is
  * offered, and every sort is one the server accepts.
  */
-import { LIST_KINDS, type ListKind, SORTS, UI_KEYS } from "@peek/shared-types";
+import {
+  CLIP_PARAMS,
+  FIELDS,
+  type FieldSpec,
+  LIST_KINDS,
+  type ListKind,
+  SORTS,
+  UI_KEYS,
+} from "@peek/shared-types";
 import { describe, expect, it } from "vitest";
 import {
   CLIP_FILTER_OPTIONS,
@@ -67,6 +75,28 @@ describe("client filter options and the shared contract", () => {
       const fromContract = UI_KEYS[kind].map(describeKey).sort();
 
       expect(fromOptions).toEqual(fromContract);
+    }
+  );
+
+  it.each(LIST_KINDS)(
+    "every %s option offers only modifiers its field takes, and defaults to one of them",
+    (kind) => {
+      const fields: Readonly<Record<string, FieldSpec>> =
+        kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+      const refused = FILTER_OPTIONS[kind].flatMap((option) => {
+        const uiKey = UI_KEYS[kind].find((key) => key.key === option.key);
+        const spec = uiKey ? fields[uiKey.field] : undefined;
+        if (!spec || !("modifiers" in spec)) return [];
+        const taken: readonly string[] = spec.modifiers;
+        return [
+          ...(option.modifierOptions ?? []).map((choice) => choice.value),
+          ...(option.defaultModifier ? [option.defaultModifier] : []),
+        ]
+          .filter((modifier) => !taken.includes(modifier))
+          .map((modifier) => `${option.key} ${modifier}`);
+      });
+
+      expect(refused).toEqual([]);
     }
   );
 

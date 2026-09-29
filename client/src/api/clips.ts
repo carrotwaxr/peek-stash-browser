@@ -1,41 +1,68 @@
 /**
  * Clips API endpoints.
  */
+import type { ClipQueryInput, RefModifier } from "@peek/shared-types";
 import { apiGet } from "./client";
 
-export interface GetClipsOptions {
+/**
+ * The Clips page's filter parameters, as `buildClipFilter` builds them: ids
+ * as `"id:instanceId"`, each list with a choice of modifier beside it
+ */
+export interface ClipFilterParams {
+  tagIds?: string[];
+  tagIdsModifier?: RefModifier;
+  sceneTagIds?: string[];
+  sceneTagIdsModifier?: RefModifier;
+  performerIds?: string[];
+  performerIdsModifier?: RefModifier;
+  studioId?: string;
+  /** With (true) or without (false) a generated preview; absent lists every clip */
+  isGenerated?: boolean;
+}
+
+export interface GetClipsOptions extends ClipFilterParams {
   page?: number;
   perPage?: number;
-  sortBy?: string;
-  sortDir?: string;
-  isGenerated?: boolean;
+  sortBy?: ClipQueryInput["sortBy"];
+  sortDir?: ClipQueryInput["sortDir"];
   sceneId?: string;
-  tagIds?: string[];
-  sceneTagIds?: string[];
-  performerIds?: string[];
-  studioId?: string;
   q?: string;
 }
 
+/** `GET /api/clips`, with every parameter as the server's contract names it */
 export async function getClips(options: GetClipsOptions = {}) {
-  const params = new URLSearchParams();
+  const query: { -readonly [K in keyof ClipQueryInput]: ClipQueryInput[K] } =
+    {};
 
-  if (options.page) params.set("page", String(options.page));
-  if (options.perPage) params.set("perPage", String(options.perPage));
-  if (options.sortBy) params.set("sortBy", options.sortBy);
-  if (options.sortDir) params.set("sortDir", options.sortDir);
+  if (options.page) query.page = String(options.page);
+  if (options.perPage) query.perPage = String(options.perPage);
+  if (options.sortBy) query.sortBy = options.sortBy;
+  if (options.sortDir) query.sortDir = options.sortDir;
   if (options.isGenerated !== undefined)
-    params.set("isGenerated", String(options.isGenerated));
-  if (options.sceneId) params.set("sceneId", options.sceneId);
-  if (options.tagIds?.length) params.set("tagIds", options.tagIds.join(","));
-  if (options.sceneTagIds?.length)
-    params.set("sceneTagIds", options.sceneTagIds.join(","));
-  if (options.performerIds?.length)
-    params.set("performerIds", options.performerIds.join(","));
-  if (options.studioId) params.set("studioId", options.studioId);
-  if (options.q) params.set("q", options.q);
+    query.isGenerated = options.isGenerated ? "true" : "false";
+  if (options.sceneId) query.sceneId = options.sceneId;
+  if (options.tagIds?.length) {
+    query.tagIds = options.tagIds.join(",");
+    if (options.tagIdsModifier) query.tagIdsModifier = options.tagIdsModifier;
+  }
+  if (options.sceneTagIds?.length) {
+    query.sceneTagIds = options.sceneTagIds.join(",");
+    if (options.sceneTagIdsModifier)
+      query.sceneTagIdsModifier = options.sceneTagIdsModifier;
+  }
+  if (options.performerIds?.length) {
+    query.performerIds = options.performerIds.join(",");
+    if (options.performerIdsModifier)
+      query.performerIdsModifier = options.performerIdsModifier;
+  }
+  if (options.studioId) query.studioId = options.studioId;
+  if (options.q) query.q = options.q;
 
-  const queryString = params.toString();
+  const queryString = new URLSearchParams(
+    Object.entries(query).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string"
+    )
+  ).toString();
   return apiGet(`/clips${queryString ? `?${queryString}` : ""}`);
 }
 

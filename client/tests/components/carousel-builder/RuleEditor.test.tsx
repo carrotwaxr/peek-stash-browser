@@ -11,6 +11,10 @@ import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "../../../src/api";
 import RuleEditor from "../../../src/components/carousel-builder/RuleEditor";
+import {
+  buildSceneFilter,
+  carouselRulesToFilterState,
+} from "../../../src/utils/filterConfig";
 
 type FindMinimalMock = (
   params: MinimalRequest,
@@ -70,6 +74,55 @@ describe("RuleEditor", () => {
     });
     expect(must(mockFindTagsMinimal.mock.calls[1])[0]).toEqual({
       filter: { per_page: 50 },
+    });
+  });
+
+  it("a Last Played date rule round-trips rules, state, rules", () => {
+    const stored = {
+      last_played_at: {
+        modifier: "BETWEEN",
+        value: "2024-01-01",
+        value2: "2024-06-30",
+      },
+    };
+    const state = carouselRulesToFilterState(stored);
+    const onChange = vi.fn();
+
+    render(
+      <RuleEditor
+        rule={{
+          id: "rule-1",
+          filterKey: "lastPlayedAt",
+          value: state.lastPlayedAt,
+        }}
+        usedFilterKeys={new Set(["lastPlayedAt"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    // The editor shows the stored dates and edits the same shape
+    expect(screen.getByDisplayValue("2024-01-01")).toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue("2024-06-30"), {
+      target: { value: "2024-12-31" },
+    });
+    const edited: unknown = must(onChange.mock.calls[0])[0];
+    expect(edited).toEqual({
+      value: { start: "2024-01-01", end: "2024-12-31" },
+    });
+
+    expect(buildSceneFilter(state)).toEqual(stored);
+    expect(buildSceneFilter({ lastPlayedAt: { end: "2024-06-30" } })).toEqual({
+      last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
+    });
+    expect(
+      buildSceneFilter(
+        carouselRulesToFilterState({
+          last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
+        })
+      )
+    ).toEqual({
+      last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
     });
   });
 });

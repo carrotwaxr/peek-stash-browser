@@ -48,9 +48,8 @@ const Studios = () => {
     getColumnConfig,
   } = useTableColumns("studio");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
-    null
-  );
+  const [queryParams, setQueryParams] =
+    useState<LibrarySearchParams<"studio"> | null>(null);
   const {
     data,
     isLoading: queryLoading,
@@ -63,9 +62,12 @@ const Studios = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
-    setQueryParams(newQuery);
-  }, []);
+  const handleQueryChange = useCallback(
+    (newQuery: LibrarySearchParams<"studio">) => {
+      setQueryParams(newQuery);
+    },
+    []
+  );
 
   const findStudios = (data as Record<string, unknown>)?.findStudios as
     | Record<string, unknown>

@@ -3,7 +3,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useGroupList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"group"> | null,
   instanceId?: string
 ) {
   return useQuery({

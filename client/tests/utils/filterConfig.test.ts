@@ -4,12 +4,34 @@
  * Tests that filter builder functions correctly transform UI filter values
  * into the GraphQL filter format expected by the backend
  */
+import {
+  type EntityKind,
+  FIELDS,
+  type FieldSpec,
+  LIST_KINDS,
+  type ListKind,
+  UI_KEYS,
+} from "@peek/shared-types";
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
+  CLIP_FILTER_OPTIONS,
+  type FilterOption,
+  GALLERY_FILTER_OPTIONS,
+  GROUP_FILTER_OPTIONS,
+  IMAGE_FILTER_OPTIONS,
+  PERFORMER_FILTER_OPTIONS,
+  SCENE_FILTER_OPTIONS,
+  STUDIO_FILTER_OPTIONS,
+  TAG_FILTER_OPTIONS,
+  buildClipFilter,
   buildGalleryFilter,
+  buildGroupFilter,
   buildImageFilter,
   buildPerformerFilter,
   buildSceneFilter,
+  buildStudioFilter,
+  buildTagFilter,
 } from "../../src/utils/filterConfig";
 
 describe("buildSceneFilter", () => {
@@ -174,16 +196,15 @@ describe("buildSceneFilter", () => {
       });
     });
 
-    it("should build galleries filter with INCLUDES modifier", () => {
+    it("sends no galleries for a panel key the scene panel does not have", () => {
+      // Scenes filter by gallery only on a gallery page (the permanent
+      // `galleries` below); the panel has no gallery picker
       const uiFilters = {
         galleryIds: ["1"],
         galleryIdsModifier: "INCLUDES",
       };
       const result = buildSceneFilter(uiFilters);
-      expect(result.galleries).toEqual({
-        value: ["1"],
-        modifier: "INCLUDES",
-      });
+      expect(result.galleries).toBeUndefined();
     });
 
     it("should build galleries filter from permanent filters", () => {
@@ -418,21 +439,29 @@ describe("buildSceneFilter", () => {
 
   describe("Resolution Filter", () => {
     it("should build resolution filter with EQUALS modifier", () => {
-      const uiFilters = { resolution: "1080" };
+      const uiFilters = { resolution: "FULL_HD" };
       const result = buildSceneFilter(uiFilters);
       expect(result.resolution).toEqual({
-        value: "1080",
+        value: "FULL_HD",
         modifier: "EQUALS",
       });
     });
 
-    it("should build resolution filter for 720p", () => {
-      const uiFilters = { resolution: "720" };
+    it("should build resolution filter for 720p with its modifier", () => {
+      const uiFilters = {
+        resolution: "STANDARD_HD",
+        resolutionModifier: "GREATER_THAN",
+      };
       const result = buildSceneFilter(uiFilters);
       expect(result.resolution).toEqual({
-        value: "720",
-        modifier: "EQUALS",
+        value: "STANDARD_HD",
+        modifier: "GREATER_THAN",
       });
+    });
+
+    it("sends no resolution the contract does not name (a stale URL's 1080)", () => {
+      const result = buildSceneFilter({ resolution: "1080" });
+      expect(result.resolution).toBeUndefined();
     });
   });
 
@@ -595,9 +624,10 @@ describe("buildGalleryFilter", () => {
         value2: "2024-12-31",
         modifier: "BETWEEN",
       });
+      // Untouched, the option's default (Has ALL), as the panel shows it
       expect(result.tags).toEqual({
         value: ["1"],
-        modifier: "INCLUDES",
+        modifier: "INCLUDES_ALL",
       });
     });
   });
@@ -961,4 +991,223 @@ describe("buildPerformerFilter", () => {
       expect(result.height).toBeUndefined();
     });
   });
+});
+
+/**
+ * The panel's requests follow the shared contract (item 38): what each
+ * builder sends is what the server's parser accepts, with the modifier the
+ * panel shows. The server walks the same options into SQL
+ * (`server/integration/api/filter-contract.integration.test.ts`).
+ */
+describe("filter requests follow the contract", () => {
+  type Build = (state: Record<string, unknown>) => unknown;
+
+  const LISTS: Record<
+    ListKind,
+    { options: readonly FilterOption[]; build: Build }
+  > = {
+    scene: { options: SCENE_FILTER_OPTIONS, build: buildSceneFilter },
+    performer: {
+      options: PERFORMER_FILTER_OPTIONS,
+      build: (state) => buildPerformerFilter(state),
+    },
+    studio: { options: STUDIO_FILTER_OPTIONS, build: buildStudioFilter },
+    tag: { options: TAG_FILTER_OPTIONS, build: buildTagFilter },
+    group: { options: GROUP_FILTER_OPTIONS, build: buildGroupFilter },
+    gallery: { options: GALLERY_FILTER_OPTIONS, build: buildGalleryFilter },
+    image: { options: IMAGE_FILTER_OPTIONS, build: buildImageFilter },
+    clip: { options: CLIP_FILTER_OPTIONS, build: buildClipFilter },
+  };
+
+  const ENTITY_LISTS = LIST_KINDS.filter(
+    (kind): kind is EntityKind => kind !== "clip"
+  );
+
+  /** Where an entity list's request carries the field a panel key fills */
+  const pathOf = (kind: EntityKind, key: string): readonly string[] => {
+    const uiKey = must(
+      UI_KEYS[kind].find((candidate) => candidate.key === key),
+      `${kind} UI key ${key}`
+    );
+    const fields: Readonly<Record<string, FieldSpec>> = FIELDS[kind];
+    const spec = must(fields[uiKey.field], `${kind} field ${uiKey.field}`);
+    return spec.kind === "ref" && spec.path ? spec.path : [uiKey.field];
+  };
+
+  const readPath = (value: unknown, path: readonly string[]): unknown =>
+    path.reduce<unknown>(
+      (at, part) =>
+        typeof at === "object" && at !== null
+          ? (at as Record<string, unknown>)[part]
+          : undefined,
+      value
+    );
+
+  const optionsOfType = <K extends ListKind>(
+    type: string,
+    kinds: readonly K[]
+  ) =>
+    kinds.flatMap((kind) =>
+      LISTS[kind].options
+        .filter((option) => option.type === type)
+        .map((option) => ({ kind, option }))
+    );
+
+  const DATE_OPTIONS = optionsOfType("date-range", ENTITY_LISTS).map(
+    ({ kind, option }) => ({ kind, key: option.key })
+  );
+
+  it.each(DATE_OPTIONS)(
+    "an end-only $kind $key range sends LESS_THAN end and a start-only one GREATER_THAN start",
+    ({ kind, key }) => {
+      const { build } = LISTS[kind];
+      const path = pathOf(kind, key);
+
+      expect(readPath(build({ [key]: { end: "2024-12-31" } }), path)).toEqual({
+        modifier: "LESS_THAN",
+        value: "2024-12-31",
+      });
+      expect(readPath(build({ [key]: { start: "2020-01-01" } }), path)).toEqual(
+        { modifier: "GREATER_THAN", value: "2020-01-01" }
+      );
+      expect(
+        readPath(
+          build({ [key]: { start: "2020-01-01", end: "2024-12-31" } }),
+          path
+        )
+      ).toEqual({
+        modifier: "BETWEEN",
+        value: "2020-01-01",
+        value2: "2024-12-31",
+      });
+    }
+  );
+
+  const MULTI_SELECTS = optionsOfType("searchable-select", LIST_KINDS).filter(
+    ({ option }) => option.multi === true
+  );
+
+  /** The modifier a multi-select's request carries, and its ids */
+  const sentRef = (
+    kind: ListKind,
+    option: FilterOption,
+    state: Record<string, unknown>
+  ) => {
+    const sent = LISTS[kind].build(state);
+    if (kind === "clip") {
+      return {
+        value: readPath(sent, [option.key]),
+        modifier: readPath(sent, [`${option.key}Modifier`]),
+      };
+    }
+    const criterion = readPath(sent, pathOf(kind, option.key));
+    return {
+      value: readPath(criterion, ["value"]),
+      modifier: readPath(criterion, ["modifier"]),
+    };
+  };
+
+  it.each(MULTI_SELECTS.map(({ kind, option }) => ({ kind, option })))(
+    "every multi-select sends its modifier, which is the defaultModifier when untouched: $kind $option.key",
+    ({ kind, option }) => {
+      const ids = ["10:server-a", "11:server-a"];
+
+      expect(sentRef(kind, option, { [option.key]: ids })).toEqual({
+        value: ids,
+        modifier: option.defaultModifier ?? "INCLUDES",
+      });
+      for (const { value: modifier } of option.modifierOptions ?? []) {
+        expect(
+          sentRef(kind, option, {
+            [option.key]: ids,
+            [must(option.modifierKey, `${option.key} modifierKey`)]: modifier,
+          })
+        ).toEqual({ value: ids, modifier });
+      }
+    }
+  );
+
+  it("clip tag, scene tag and performer filters send their modifiers", () => {
+    expect(
+      buildClipFilter({
+        tagIds: ["1:server-a"],
+        tagIdsModifier: "EXCLUDES",
+        sceneTagIds: ["2:server-a", "3:server-a"],
+        sceneTagIdsModifier: "INCLUDES_ALL",
+        performerIds: ["4:server-a"],
+        performerIdsModifier: "EXCLUDES",
+      })
+    ).toEqual({
+      tagIds: ["1:server-a"],
+      tagIdsModifier: "EXCLUDES",
+      sceneTagIds: ["2:server-a", "3:server-a"],
+      sceneTagIdsModifier: "INCLUDES_ALL",
+      performerIds: ["4:server-a"],
+      performerIdsModifier: "EXCLUDES",
+      isGenerated: true,
+    });
+  });
+
+  it("clips list with a preview until the panel picks otherwise, and All clips sends no isGenerated", () => {
+    const isGenerated = must(
+      CLIP_FILTER_OPTIONS.find((option) => option.key === "isGenerated"),
+      "the clip isGenerated option"
+    );
+    const allClips = must(
+      isGenerated.options?.find((choice) => choice.label === "All clips"),
+      "the All clips choice"
+    );
+
+    expect(buildClipFilter({})).toEqual({ isGenerated: true });
+    expect(buildClipFilter({ isGenerated: "true" })).toEqual({
+      isGenerated: true,
+    });
+    expect(buildClipFilter({ isGenerated: "false" })).toEqual({
+      isGenerated: false,
+    });
+    // The panel stores "" as no choice, so All clips needs a value of its own
+    expect(allClips.value).not.toBe("");
+    expect(buildClipFilter({ isGenerated: allClips.value })).toEqual({});
+  });
+
+  it.each([
+    ["gallery", GALLERY_FILTER_OPTIONS],
+    ["image", IMAGE_FILTER_OPTIONS],
+  ] as const)(
+    "%s studio options offer only Has ANY and Has NONE",
+    (_kind, options) => {
+      const studios = must(
+        options.find((option) => option.key === "studioIds"),
+        "the studioIds option"
+      );
+
+      expect(studios.modifierOptions).toEqual([
+        { value: "INCLUDES", label: "Has ANY of these" },
+        { value: "EXCLUDES", label: "Has NONE of these" },
+      ]);
+    }
+  );
+
+  it("the Scene picker is gone from Tags and Collections, and performers send no scene_filter", () => {
+    const keys = (options: readonly FilterOption[]) =>
+      options.map((option) => option.key);
+
+    expect(keys(TAG_FILTER_OPTIONS)).not.toContain("sceneId");
+    expect(keys(GROUP_FILTER_OPTIONS)).not.toContain("sceneId");
+    expect(
+      buildPerformerFilter({ sceneId: "1:server-a", groupIds: ["2:server-a"] })
+    ).toEqual({});
+  });
+
+  it.each([
+    ["gallery", buildGalleryFilter],
+    ["image", buildImageFilter],
+  ] as const)(
+    "the %s folder view's tag reaches the request, with its sub-tags",
+    (_kind, build) => {
+      const folder = { value: ["5:server-a"], modifier: "INCLUDES", depth: -1 };
+
+      expect(build({ tags: folder }).tags).toEqual(folder);
+    }
+  );
 });

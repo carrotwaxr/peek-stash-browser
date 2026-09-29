@@ -1324,8 +1324,10 @@ const SearchControls = ({
               }
               label={filterProps.label!}
               modifierOptions={modifierOptions}
+              // Untouched, the option's default: the modifier the request carries
               modifierValue={
-                modifierKey ? localFilters[modifierKey] : defaultModifier
+                (modifierKey ? localFilters[modifierKey] : undefined) ??
+                defaultModifier
               }
               onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)

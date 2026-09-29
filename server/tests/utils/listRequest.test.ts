@@ -931,10 +931,23 @@ describe("parseClipQuery", () => {
       direction: "DESC",
       seed: undefined,
     });
-    expect(parsed.filter).toEqual({ isGenerated: true });
+    // No isGenerated: every clip (the Clips page sends true for its default)
+    expect(parsed.filter).toEqual({});
     expect(parsed.q).toBeUndefined();
     expect(parsed.specificInstanceId).toBeUndefined();
     expect(parsed.dropped).toEqual([]);
+  });
+
+  it("isGenerated true or false narrows to clips with or without a preview; absent lists every clip", () => {
+    expect(
+      parseClipQuery({ isGenerated: "true" }, opts("reject")).filter
+    ).toEqual({ isGenerated: true });
+    expect(
+      parseClipQuery({ isGenerated: "false" }, opts("reject")).filter
+    ).toEqual({ isGenerated: false });
+    expect(parseClipQuery({}, opts("reject")).filter.isGenerated).toBe(
+      undefined
+    );
   });
 
   it("sortBy is whitelisted and sortDir is asc or desc", () => {
@@ -1047,13 +1060,13 @@ describe("parseClipQuery", () => {
       { tagIds: "1", tagIdsModifier: "SOMETIMES", isGenerated: "maybe" },
       opts("drop")
     );
-    expect(dropped.filter).toEqual({ isGenerated: true });
+    expect(dropped.filter).toEqual({});
     expect(paths(dropped.dropped)).toEqual(["tagIdsModifier", "isGenerated"]);
   });
 
   it("an empty ref list is omitted; a query that is not an object fails", () => {
     const parsed = parseClipQuery({ tagIds: " , " }, opts("reject"));
-    expect(parsed.filter).toEqual({ isGenerated: true });
+    expect(parsed.filter).toEqual({});
     expect(issuesOf(() => parseClipQuery("x", opts("reject")))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);

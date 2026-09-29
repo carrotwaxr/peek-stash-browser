@@ -210,14 +210,14 @@ describe("buildGalleryFilter", () => {
   });
 
   describe("Tags Filter", () => {
-    it("should build tags filter with INCLUDES modifier (default)", () => {
+    it("should build tags filter with INCLUDES_ALL modifier (the option's default)", () => {
       const uiFilters = {
         tagIds: ["1", "2"],
       };
       const result = buildGalleryFilter(uiFilters);
       expect(result.tags).toEqual({
         value: ["1", "2"],
-        modifier: "INCLUDES",
+        modifier: "INCLUDES_ALL",
       });
     });
 
@@ -252,7 +252,7 @@ describe("buildGalleryFilter", () => {
       const result = buildGalleryFilter(uiFilters);
       expect(result.tags).toEqual({
         value: ["1", "2", "3"],
-        modifier: "INCLUDES",
+        modifier: "INCLUDES_ALL",
       });
     });
 
@@ -294,7 +294,7 @@ describe("buildGalleryFilter", () => {
       });
       expect(result.tags).toEqual({
         value: ["4", "5"],
-        modifier: "INCLUDES",
+        modifier: "INCLUDES_ALL",
       });
     });
 
@@ -305,6 +305,7 @@ describe("buildGalleryFilter", () => {
         imageCount: { min: 100, max: 500 },
         title: "Beach",
         studioIds: ["1", "2"],
+        // A gallery has one studio: a stale Has ALL falls back to Has ANY
         studioIdsModifier: "INCLUDES_ALL",
         performerIds: ["3"],
         performerIdsModifier: "INCLUDES",
@@ -329,7 +330,7 @@ describe("buildGalleryFilter", () => {
       });
       expect(result.studios).toEqual({
         value: ["1", "2"],
-        modifier: "INCLUDES_ALL",
+        modifier: "INCLUDES",
       });
       expect(result.performers).toEqual({
         value: ["3"],

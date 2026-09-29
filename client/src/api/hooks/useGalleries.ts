@@ -3,7 +3,7 @@ import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
 export function useGalleryList(
-  params: LibrarySearchParams | null,
+  params: LibrarySearchParams<"gallery"> | null,
   instanceId?: string
 ) {
   return useQuery({

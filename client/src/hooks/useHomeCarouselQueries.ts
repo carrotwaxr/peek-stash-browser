@@ -48,7 +48,6 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
         scene_filter: {
           studios: {
             value: favoriteStudioIds,
-            excludes: [],
             modifier: "INCLUDES",
             depth: 0,
           },
@@ -79,7 +78,6 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
         scene_filter: {
           tags: {
             value: favoriteTagIds,
-            excludes: [],
             modifier: "INCLUDES",
             depth: 0,
           },
