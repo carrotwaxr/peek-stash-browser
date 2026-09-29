@@ -7,7 +7,8 @@
  * <clause joins> <sort joins> WHERE <live> AND <not excluded> AND <extra
  * base conditions> AND <allowed instances> AND <clauses> ORDER BY <sort>,
  * <tiebreak>, <primary key> LIMIT ? OFFSET ?`, and its count as
- * `SELECT COUNT(*)` over the same WITH, FROM and WHERE. The parameters are bound in the text's order:
+ * `SELECT COUNT(*)` over the same WITH, FROM and WHERE, a clause's count
+ * form (`FilterClause.count`) in its place. The parameters are bound in the text's order:
  * ctes, the select list, one user id per user join, the exclusion's user
  * id, extra joins, clause joins, sort joins, the WHERE, the sort, the page.
  *
@@ -39,12 +40,14 @@ import {
 import { logger } from "../../utils/logger.js";
 import {
   type ColumnTarget,
+  type CombinedClauses,
   type FilterClause,
   type JunctionTarget,
   type SqlFragment,
   type SqlParam,
   allOf,
   combine,
+  countForms,
   exclusionJoin,
   idClause,
   instanceClause,
@@ -184,7 +187,10 @@ export const DEFAULT_RANDOM_SEED = 12345;
  * (`utils/hierarchyUtils.ts`): a bare ref means every allowed instance.
  * INCLUDES_ALL is one clause per selected ref, each with its own
  * descendants, AND-ed: an entity holding any descendant of each chosen
- * ref matches, not one holding every descendant (QUERIES-08).
+ * ref matches, not one holding every descendant (QUERIES-08). With
+ * `sortedByIndex` the clause is the page's shape for it, and its count form
+ * (`FilterClause.count`) the shape for reading every match in no order
+ * (`sortedByIndex: false`, L9); the refs are expanded once for both.
  */
 export async function hierarchicalRefClause(
   kind: HierarchyKind,
@@ -193,7 +199,9 @@ export async function hierarchicalRefClause(
   ctx: QueryContext,
   opts: { name: string; inheritedJson?: string; sortedByIndex?: boolean }
 ): Promise<FilterClause> {
-  const options = { ...opts, allowedInstanceIds: ctx.allowedInstanceIds };
+  const { sortedByIndex, ...rest } = opts;
+  const options = { ...rest, allowedInstanceIds: ctx.allowedInstanceIds };
+  let clauseFor: (sorted: boolean | undefined) => FilterClause;
   if (criterion.modifier === "INCLUDES_ALL") {
     const groups = await expandRefsEach(
       kind,
@@ -201,37 +209,59 @@ export async function hierarchicalRefClause(
       criterion.depth,
       ctx.allowedInstanceIds
     );
-    return allOf(
-      groups.map((group, i) =>
-        refClause(target, group, "INCLUDES", {
-          ...options,
-          name: `${opts.name}_${i}`,
-        })
-      )
+    clauseFor = (sorted) =>
+      allOf(
+        groups.map((group, i) =>
+          refClause(target, group, "INCLUDES", {
+            ...options,
+            ...(sorted === undefined ? {} : { sortedByIndex: sorted }),
+            name: `${opts.name}_${i}`,
+          })
+        )
+      );
+  } else {
+    const refs = await expandRefs(
+      kind,
+      criterion.refs,
+      criterion.depth,
+      ctx.allowedInstanceIds
     );
+    clauseFor = (sorted) =>
+      refClause(target, refs, criterion.modifier, {
+        ...options,
+        ...(sorted === undefined ? {} : { sortedByIndex: sorted }),
+      });
   }
-  const refs = await expandRefs(
-    kind,
-    criterion.refs,
-    criterion.depth,
-    ctx.allowedInstanceIds
-  );
-  return refClause(target, refs, criterion.modifier, options);
+  const page = clauseFor(sortedByIndex);
+  if (sortedByIndex !== true) return page;
+  const count = clauseFor(false);
+  return JSON.stringify(count) === JSON.stringify(page)
+    ? page
+    : { ...page, count };
 }
 
-/** A statement's parts, built once for the page and the count */
-interface Built {
+/** A statement's WITH, FROM and WHERE, with their parameters */
+interface StatementParts {
   /** The WITH block with its trailing newline, or "" */
   readonly with: string;
   readonly withParams: SqlParam[];
-  readonly select: SqlFragment;
   readonly from: string;
   readonly fromParams: SqlParam[];
   readonly where: string;
   readonly whereParams: SqlParam[];
+}
+
+/** A statement's parts, built once for the page and the count */
+interface Built extends StatementParts {
+  readonly select: SqlFragment;
   readonly order: string;
   readonly orderParams: SqlParam[];
   readonly clauseCount: number;
+  /**
+   * The count's parts: the page's, with each clause's count form
+   * (`FilterClause.count`) in its place (L9)
+   */
+  readonly count: StatementParts;
 }
 
 /** A row statement's ORDER BY and page (none: every row), or nothing for a count */
@@ -463,7 +493,6 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
         : []),
       ...(await this.filterClauses(request.filter, request.q, ctx)),
     ];
-    const combined = combine(clauses);
 
     const { field, seed } = request.sort;
     // Defence in depth, as for the key: the parser sends ASC or DESC, and
@@ -484,37 +513,43 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       .filter((term) => term !== undefined)
       .join(", ");
 
-    const from = [
-      `FROM ${spec.table} ${x}`,
-      ...userJoins,
-      ...(spec.joins ?? []),
-      ...(ownExclusions === "" ? [] : [ownExclusions]),
-      ...extraJoins.map((j) => j.sql),
-      ...combined.joins.map((j) => j.sql),
-      ...(sortExpr.joins ?? []).map((j) => j.sql),
-    ].join("\n");
-    const fromParams: SqlParam[] = [
-      ...spec.userJoins.map(() => ctx.userId),
-      ...(ctx.applyExclusions ? [ctx.userId] : []),
-      ...extraJoins.flatMap((j) => j.params),
-      ...combined.joins.flatMap((j) => j.params),
-      ...(sortExpr.joins ?? []).flatMap((j) => j.params),
-    ];
-
-    return {
+    const partsOf = (combined: CombinedClauses): StatementParts => ({
       with:
         combined.ctes.length > 0
           ? `WITH ${combined.ctes.map((c) => c.sql).join(",\n")}\n`
           : "",
       withParams: combined.ctes.flatMap((c) => c.params),
-      select,
-      from,
-      fromParams,
+      from: [
+        `FROM ${spec.table} ${x}`,
+        ...userJoins,
+        ...(spec.joins ?? []),
+        ...(ownExclusions === "" ? [] : [ownExclusions]),
+        ...extraJoins.map((j) => j.sql),
+        ...combined.joins.map((j) => j.sql),
+        ...(sortExpr.joins ?? []).map((j) => j.sql),
+      ].join("\n"),
+      fromParams: [
+        ...spec.userJoins.map(() => ctx.userId),
+        ...(ctx.applyExclusions ? [ctx.userId] : []),
+        ...extraJoins.flatMap((j) => j.params),
+        ...combined.joins.flatMap((j) => j.params),
+        ...(sortExpr.joins ?? []).flatMap((j) => j.params),
+      ],
       where: combined.where,
       whereParams: combined.params,
+    });
+    const page = partsOf(combine(clauses));
+    const count = clauses.some((c) => c.count !== undefined)
+      ? partsOf(combine(countForms(clauses)))
+      : page;
+
+    return {
+      ...page,
+      select,
       order,
       orderParams: sortExpr.params,
       clauseCount: clauses.length,
+      count,
     };
   }
 
@@ -553,15 +588,17 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       paging === undefined
         ? ""
         : `\nORDER BY ${paging.order}${paging.page === undefined ? "" : "\nLIMIT ? OFFSET ?"}`;
-    return `${built.with}${select}\n${built.from}\nWHERE ${built.where}${tail}`;
+    const parts = paging === undefined ? built.count : built;
+    return `${parts.with}${select}\n${parts.from}\nWHERE ${parts.where}${tail}`;
   }
 
   private params(built: Built, paging: Paging | undefined): SqlParam[] {
+    const parts = paging === undefined ? built.count : built;
     return [
-      ...built.withParams,
+      ...parts.withParams,
       ...(paging === undefined ? [] : built.select.params),
-      ...built.fromParams,
-      ...built.whereParams,
+      ...parts.fromParams,
+      ...parts.whereParams,
       ...(paging === undefined ? [] : paging.params),
       ...(paging?.page === undefined
         ? []

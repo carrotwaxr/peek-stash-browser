@@ -386,8 +386,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * (the inheritedTagIds JSON list). With a depth, INCLUDES_ALL is one
    * clause per selected tag, each with its own descendants (QUERIES-08).
    * Under a sort with an index the page walks it and probes each scene's
-   * tags; under one without, the tagged scenes are read from SceneTag's tag
-   * index (`sortedByIndex`, L8).
+   * tags (above 64 refs, against the scenes SceneTag's tag index lists for
+   * the refs); under one without, the tagged scenes are read from
+   * SceneTag's tag index (above 64 refs, the matched set). The count reads
+   * every match in no order, so it takes the second form whatever the sort
+   * (`sortedByIndex`, L8, L9).
    */
   private async tagClause(
     criterion: RefCriterion,

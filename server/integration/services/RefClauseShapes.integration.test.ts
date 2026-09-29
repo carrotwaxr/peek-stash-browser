@@ -287,12 +287,21 @@ describeWithDb("Ref clause shapes", () => {
   it("the large shape materializes the matched set and probes the scene by primary key; the small shape is a correlated subquery", async () => {
     const recorder = recordStatements();
     try {
+      // Under a sort with no index: an indexed sort's page reads the refs
+      // list instead (L9, pinned below)
       await sceneQueryBuilder.execute({
         userId: u,
         allowedInstanceIds: [A],
-        request: request({
-          tags: { refs: childRefs(CHILDREN), modifier: "INCLUDES", depth: 0 },
-        }),
+        request: {
+          ...request({
+            tags: {
+              refs: childRefs(CHILDREN),
+              modifier: "INCLUDES",
+              depth: 0,
+            },
+          }),
+          sort: { field: "rating", direction: "DESC", seed: undefined },
+        },
       });
       await sceneQueryBuilder.execute({
         userId: u,
@@ -386,6 +395,80 @@ describeWithDb("Ref clause shapes", () => {
     expect(created).toContain("CORRELATED SCALAR SUBQUERY");
     expect(created).toContain("sqlite_autoindex_SceneTag_1");
     expect(created).not.toContain("SceneTag_tagId_tagInstanceId_idx");
+  });
+
+  // L9: a count walks no order, so under an indexed sort too it reads the
+  // tagged scenes from SceneTag's tag index as a list, while the page walks
+  // the sort index and probes each scene's tags
+  it("under an indexed sort the count of a small filter reads SceneTag by its tag index as a list, the page probes each scene", async () => {
+    const recorder = recordStatements();
+    try {
+      await sceneQueryBuilder.execute({
+        userId: u,
+        allowedInstanceIds: [A],
+        request: request({
+          tags: { refs: childRefs(3), modifier: "INCLUDES", depth: 0 },
+        }),
+      });
+    } finally {
+      recorder.restore();
+    }
+    const [page, count] = recorder.statements.filter((statement) =>
+      statement.sql.includes("FROM StashScene s")
+    );
+    const plan = async (statement: typeof page) =>
+      (
+        await planner.planOf(must(statement).sql, ...must(statement).params)
+      ).join("\n");
+
+    expect(must(count).sql).toContain("SELECT COUNT(*) AS total");
+    const countPlan = await plan(count);
+    expect(countPlan).toContain(
+      "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
+    );
+    expect(countPlan).toMatch(/LIST SUBQUERY/);
+    expect(countPlan).not.toContain("sqlite_autoindex_SceneTag_1");
+
+    const pagePlan = await plan(page);
+    expect(pagePlan).toContain("CORRELATED SCALAR SUBQUERY");
+    expect(pagePlan).toContain("sqlite_autoindex_SceneTag_1");
+  });
+
+  // L9: above the inline limit an indexed sort's page reads the refs list's
+  // junction rows by the tag index (no matched set is built) and walks the
+  // sort index; its count keeps the matched set
+  it("under an indexed sort a large filter's page reads the refs list by the tag index with no matched set; its count reads the matched set", async () => {
+    const recorder = recordStatements();
+    try {
+      await sceneQueryBuilder.execute({
+        userId: u,
+        allowedInstanceIds: [A],
+        request: request({
+          tags: { refs: childRefs(CHILDREN), modifier: "INCLUDES", depth: 0 },
+        }),
+      });
+    } finally {
+      recorder.restore();
+    }
+    const [page, count] = recorder.statements.filter((statement) =>
+      statement.sql.includes("FROM StashScene s")
+    );
+    const plan = async (statement: typeof page) =>
+      (
+        await planner.planOf(must(statement).sql, ...must(statement).params)
+      ).join("\n");
+
+    const pagePlan = await plan(page);
+    expect(pagePlan).toContain("MATERIALIZE tags_refs");
+    expect(pagePlan).toContain(
+      "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
+    );
+    expect(pagePlan).toMatch(/LIST SUBQUERY/);
+    expect(pagePlan).not.toContain("tags_matched");
+
+    const countPlan = await plan(count);
+    expect(countPlan).toContain("MATERIALIZE tags_matched");
+    expect(countPlan).not.toContain("CORRELATED");
   });
 
   it.each([
