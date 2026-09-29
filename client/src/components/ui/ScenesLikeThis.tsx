@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useSimilarScenes } from "../../api/hooks/useScenes";
 import SceneGrid from "../scene-search/SceneGrid";
 import Pagination from "./Pagination";
@@ -42,11 +43,8 @@ const ScenesLikeThis = ({ sceneId, instanceId, onCountChange }: Props) => {
     setPageScene(sceneId);
   }, [pageScene, sceneId, page, searchParams, setSearchParams]);
 
-  const { data, isPending, isPlaceholderData, isError } = useSimilarScenes(
-    sceneId,
-    instanceId,
-    pageScene === sceneId ? page : 1
-  );
+  const { data, error, isPending, isPlaceholderData, isError } =
+    useSimilarScenes(sceneId, instanceId, pageScene === sceneId ? page : 1);
 
   // Notify parent of count change for tab badge
   useEffect(() => {
@@ -73,12 +71,14 @@ const ScenesLikeThis = ({ sceneId, instanceId, onCountChange }: Props) => {
     setHiddenIds((prev) => new Set(prev).add(hiddenSceneId));
   };
 
-  const loading = isPending || isPlaceholderData;
+  // The library's first sync is running: loading, not failed
+  const initializing = isLibraryInitializing(error);
+  const loading = isPending || isPlaceholderData || initializing;
   const scenes = (data?.scenes ?? []).filter((s) => !hiddenIds.has(s.id));
   const totalCount = data?.count ?? 0;
 
   // Show loading/error states, but don't completely hide if empty
-  if (isError) {
+  if (isError && !initializing) {
     return (
       <div className="text-center py-8" style={{ color: "var(--text-muted)" }}>
         Failed to load similar scenes
