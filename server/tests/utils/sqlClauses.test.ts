@@ -364,6 +364,94 @@ describe("refClause", () => {
     expect(clause.params).toEqual(["1", "inst-a", "2", "1", "inst-a", "2"]);
   });
 
+  describe("a list read whole and sorted (sortedByIndex false, L8)", () => {
+    const SORTED = {
+      ...OPTS,
+      inheritedJson: "inheritedTagIds",
+      sortedByIndex: false,
+    };
+    const TAG_IN =
+      "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE (";
+
+    it("a small INCLUDES reads the junction by its ref columns as a row-value IN, the inherited arm as before", () => {
+      const clause = refClause(
+        SCENE_TAGS,
+        [ref("1"), bare("2")],
+        "INCLUDES",
+        SORTED
+      );
+
+      expect(clause.sql).toBe(
+        `(${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?) OR (je.value = ?)))`
+      );
+      expect(clause.params).toEqual(["1", "inst-a", "2", "1", "inst-a", "2"]);
+      expect(clause.ctes).toBeUndefined();
+    });
+
+    it("without an inherited list it is the row-value IN alone", () => {
+      const clause = refClause(SCENE_TAGS, [ref("1")], "INCLUDES", {
+        ...OPTS,
+        sortedByIndex: false,
+      });
+
+      expect(clause).toEqual({
+        sql: `${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?)))`,
+        params: ["1", "inst-a"],
+      });
+    });
+
+    it("INCLUDES_ALL is one row-value IN per ref, AND-ed", () => {
+      const clause = refClause(
+        SCENE_TAGS,
+        [ref("1"), ref("2")],
+        "INCLUDES_ALL",
+        { ...OPTS, sortedByIndex: false }
+      );
+
+      expect(clause.sql).toBe(
+        `(${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?))) AND ${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?))))`
+      );
+      expect(clause.params).toEqual(["1", "inst-a", "2", "inst-a"]);
+    });
+
+    it("EXCLUDES keeps the correlated NOT EXISTS", () => {
+      expect(refClause(SCENE_TAGS, [ref("1")], "EXCLUDES", SORTED)).toEqual(
+        refClause(SCENE_TAGS, [ref("1")], "EXCLUDES", {
+          ...SORTED,
+          sortedByIndex: true,
+        })
+      );
+    });
+
+    it("above the inline limit it is the matched set, as for an indexed sort", () => {
+      const refs = many(PAIR_INLINE_LIMIT + 1);
+
+      expect(refClause(SCENE_TAGS, refs, "INCLUDES", SORTED)).toEqual(
+        refClause(SCENE_TAGS, refs, "INCLUDES", {
+          ...SORTED,
+          sortedByIndex: true,
+        })
+      );
+    });
+
+    it("an indexed sort (or none said) keeps the correlated EXISTS", () => {
+      const refs = [ref("1")];
+      const walked = refClause(SCENE_TAGS, refs, "INCLUDES", {
+        ...SORTED,
+        sortedByIndex: true,
+      });
+
+      expect(walked.sql).toContain("EXISTS (SELECT 1 FROM SceneTag st WHERE");
+      expect(walked.sql).not.toContain(" IN (SELECT");
+      expect(
+        refClause(SCENE_TAGS, refs, "INCLUDES", {
+          ...OPTS,
+          inheritedJson: "inheritedTagIds",
+        })
+      ).toEqual(walked);
+    });
+  });
+
   it("a column target matches the pairs on the row itself, and EXCLUDES keeps rows with no value", () => {
     const target = {
       kind: "column" as const,

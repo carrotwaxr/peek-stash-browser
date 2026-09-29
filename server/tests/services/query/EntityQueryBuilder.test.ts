@@ -95,8 +95,10 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
 
   protected filterClauses(
     filter: ParsedFilter<"scene">,
-    q: string | undefined
+    q: string | undefined,
+    ctx: QueryContext
   ): Promise<FilterClause[]> {
+    this.lastContext = ctx;
     const clauses: FilterClause[] = [];
     if (filter.title) {
       clauses.push({
@@ -407,6 +409,28 @@ describe("EntityQueryBuilder", () => {
       "ORDER BY s.stashCreatedAt ASC, s.id ASC, s.stashInstanceId ASC"
     );
   });
+
+  // L8: a clause can take the shape that suits the page's order (the scene
+  // tag filter reads SceneTag by its tag index when the sort has no index)
+  it.each([
+    ["created_at", "created_at"],
+    ["scene_index", "scene_index"],
+    ["random", "random"],
+    ["last_o_at", "created_at"],
+  ])(
+    "the clauses' context names the key the page is ordered by (%s: %s)",
+    async (field, sortField) => {
+      await builder.execute({
+        userId: 1,
+        allowedInstanceIds: ["inst-a"],
+        request: request({
+          sort: { field, direction: "DESC", seed: 7 },
+        } as Partial<ParsedListRequest<"scene">>),
+      });
+
+      expect(builder.lastContext?.sortField).toBe(sortField);
+    }
+  );
 
   it("applyExclusions false drops the exclusion join and `e.id IS NULL` only", async () => {
     await builder.execute({

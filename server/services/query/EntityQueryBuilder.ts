@@ -101,6 +101,12 @@ export interface QueryContext {
   readonly allowedInstanceIds: readonly string[];
   /** A detail page's one instance */
   readonly specificInstanceId: string | undefined;
+  /**
+   * The key the page is ordered by: the request's, or the default when the
+   * sort map has no expression for it; "random" for the random sort. A
+   * clause may take the shape that suits it (the scene tag filter, L8).
+   */
+  readonly sortField: string;
 }
 
 export interface EntitySpec {
@@ -185,7 +191,7 @@ export async function hierarchicalRefClause(
   target: JunctionTarget | ColumnTarget,
   criterion: RefCriterion,
   ctx: QueryContext,
-  opts: { name: string; inheritedJson?: string }
+  opts: { name: string; inheritedJson?: string; sortedByIndex?: boolean }
 ): Promise<FilterClause> {
   const options = { ...opts, allowedInstanceIds: ctx.allowedInstanceIds };
   if (criterion.modifier === "INCLUDES_ALL") {
@@ -264,7 +270,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   async execute(options: ListQueryOptions<K>): Promise<ListResult<Entity>> {
     const startTime = Date.now();
     const { request } = options;
-    const ctx = this.context(options, request.specificInstanceId);
+    const ctx = this.context(options, request);
 
     const built = await this.build(ctx, request);
     const { perPage, page } = request;
@@ -319,8 +325,8 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const { refs } = options;
     if (refs.length === 0) return [];
 
-    const ctx = this.context(options, undefined);
     const request = this.emptyRequest(refs.length);
+    const ctx = this.context(options, request);
     const built = await this.build(ctx, request, refs);
     const paging: Paging = {
       order: built.order,
@@ -340,7 +346,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    */
   protected async readAll(options: ListQueryOptions<K>): Promise<Entity[]> {
     const { request } = options;
-    const ctx = this.context(options, request.specificInstanceId);
+    const ctx = this.context(options, request);
     const built = await this.build(ctx, request);
     const rows = await this.pageRows(built, {
       order: built.order,
@@ -366,14 +372,33 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       allowedInstanceIds: readonly string[];
       applyExclusions?: boolean;
     },
-    specificInstanceId: string | undefined
+    request: ListRequests[K]
   ): QueryContext {
     return {
       userId: options.userId,
       applyExclusions: options.applyExclusions ?? true,
       allowedInstanceIds: options.allowedInstanceIds,
-      specificInstanceId,
+      specificInstanceId: request.specificInstanceId,
+      sortField: this.sortKey(request),
     };
+  }
+
+  /**
+   * The key the page is ordered by: "random", a key of the sort map, or the
+   * default sort for a key the map lacks (looked up as own data, never
+   * through the prototype: the parser whitelists the key, this is defence
+   * in depth).
+   */
+  private sortKey(request: ListRequests[K]): string {
+    const { field, direction } = request.sort;
+    if (field === "random") return field;
+    const map = this.sortMap(
+      direction === "ASC" ? "ASC" : "DESC",
+      request.filter
+    );
+    return Object.prototype.hasOwnProperty.call(map, field)
+      ? field
+      : this.spec.defaultSort;
   }
 
   /** A request with no filter, for a by-ref read */

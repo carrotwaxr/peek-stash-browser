@@ -59,12 +59,20 @@ const BUILDER_OPTIONS = {
 const keys = (rows: Array<{ id: string; instanceId: string }>): string[] =>
   rows.map((row) => `${row.id}:${row.instanceId}`).sort();
 
+/** A scene sort: the default walks an index, rating has none (L8: the tag filter's shape follows it) */
+type SceneSort = "created_at" | "rating";
+
 async function scenesBy(
-  filter: Partial<{ tags: RefCriterion; studios: RefCriterion }>
+  filter: Partial<{ tags: RefCriterion; studios: RefCriterion }>,
+  sort: SceneSort = "created_at"
 ): Promise<string[]> {
   const { items } = await sceneQueryBuilder.execute({
     ...BUILDER_OPTIONS,
-    request: parsedListRequest("scene", { perPage: 50, filter }),
+    request: parsedListRequest("scene", {
+      perPage: 50,
+      filter,
+      sort: { field: sort, direction: "DESC", seed: undefined },
+    }),
   });
   return keys(items);
 }
@@ -239,42 +247,45 @@ describeWithDb(
       await removeRows();
     });
 
-    describe("scenes by tag with sub-tags", () => {
-      it("tags [284:xi-a] returns xi-a's scenes under 284 only", async () => {
-        expect(await scenesBy({ tags: includes(`284:${A}`) })).toEqual([
-          `1:${A}`,
-          `2:${A}`,
-        ]);
-      });
+    describe.each<SceneSort>(["created_at", "rating"])(
+      "scenes by tag with sub-tags, sorted by %s",
+      (sort) => {
+        it("tags [284:xi-a] returns xi-a's scenes under 284 only", async () => {
+          expect(await scenesBy({ tags: includes(`284:${A}`) }, sort)).toEqual([
+            `1:${A}`,
+            `2:${A}`,
+          ]);
+        });
 
-      it("tags [284] returns both instances' scenes under their own 284", async () => {
-        expect(await scenesBy({ tags: includes("284") })).toEqual([
-          `1:${A}`,
-          `1:${B}`,
-          `2:${A}`,
-          `2:${B}`,
-        ]);
-      });
+        it("tags [284] returns both instances' scenes under their own 284", async () => {
+          expect(await scenesBy({ tags: includes("284") }, sort)).toEqual([
+            `1:${A}`,
+            `1:${B}`,
+            `2:${A}`,
+            `2:${B}`,
+          ]);
+        });
 
-      it("tags [284:xi-b] returns xi-b's scenes only", async () => {
-        expect(await scenesBy({ tags: includes(`284:${B}`) })).toEqual([
-          `1:${B}`,
-          `2:${B}`,
-        ]);
-      });
+        it("tags [284:xi-b] returns xi-b's scenes only", async () => {
+          expect(await scenesBy({ tags: includes(`284:${B}`) }, sort)).toEqual([
+            `1:${B}`,
+            `2:${B}`,
+          ]);
+        });
 
-      it("has all of [284:xi-a, 290:xi-a] matches a scene holding any descendant of each, not every descendant", async () => {
-        expect(await scenesBy({ tags: all(`284:${A}`, `290:${A}`) })).toEqual([
-          `2:${A}`,
-        ]);
-      });
+        it("has all of [284:xi-a, 290:xi-a] matches a scene holding any descendant of each, not every descendant", async () => {
+          expect(
+            await scenesBy({ tags: all(`284:${A}`, `290:${A}`) }, sort)
+          ).toEqual([`2:${A}`]);
+        });
 
-      it("excludes [284:xi-a] keeps xi-b's scenes and xi-a's scene 3", async () => {
-        expect(
-          await scenesBy({ tags: criterion("EXCLUDES", `284:${A}`) })
-        ).toEqual([`1:${B}`, `2:${B}`, `3:${A}`]);
-      });
-    });
+        it("excludes [284:xi-a] keeps xi-b's scenes and xi-a's scene 3", async () => {
+          expect(
+            await scenesBy({ tags: criterion("EXCLUDES", `284:${A}`) }, sort)
+          ).toEqual([`1:${B}`, `2:${B}`, `3:${A}`]);
+        });
+      }
+    );
 
     describe("studios with sub-studios", () => {
       it("scenes: studios [40:xi-a] returns scene 1:xi-a only", async () => {

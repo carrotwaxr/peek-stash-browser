@@ -92,6 +92,21 @@ const SELECT_COLUMNS = `
     w.playHistory AS userPlayHistory
   `.trim();
 
+/**
+ * The sorts a page reads from an index, the browse indexes (L6): the page
+ * walks the index and stops at the page. The others (the viewer's rating,
+ * plays and O count, random, the file columns) read every match and sort it.
+ */
+const INDEXED_SORTS: ReadonlySet<string> = new Set([
+  "created_at",
+  "updated_at",
+  "date",
+  "title",
+  "duration",
+  "performer_count",
+  "tag_count",
+]);
+
 const SCENE_SPEC: EntitySpec = {
   table: "StashScene",
   alias: "s",
@@ -370,6 +385,9 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * The tag filter: the scene's own tags (SceneTag) and its inherited tags
    * (the inheritedTagIds JSON list). With a depth, INCLUDES_ALL is one
    * clause per selected tag, each with its own descendants (QUERIES-08).
+   * Under a sort with an index the page walks it and probes each scene's
+   * tags; under one without, the tagged scenes are read from SceneTag's tag
+   * index (`sortedByIndex`, L8).
    */
   private async tagClause(
     criterion: RefCriterion,
@@ -378,6 +396,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     return hierarchicalRefClause("tag", SCENE_TAGS, criterion, ctx, {
       name: "tags",
       inheritedJson: "inheritedTagIds",
+      sortedByIndex: INDEXED_SORTS.has(ctx.sortField),
     });
   }
 
