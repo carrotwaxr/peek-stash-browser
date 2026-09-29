@@ -69,10 +69,12 @@ const Tags = () => {
   const isLoading = queryParams === null || queryLoading || initializing;
 
   // The compact tag tree for the hierarchy view, fetched only there
-  const { data: hierarchyData, isLoading: hierarchyLoading } = useTagTree(
-    undefined,
-    activeViewMode === "hierarchy"
-  );
+  const {
+    data: hierarchyData,
+    isLoading: hierarchyLoading,
+    error: hierarchyError,
+    refetch: refetchHierarchy,
+  } = useTagTree(undefined, activeViewMode === "hierarchy");
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams<"tag">) => {
@@ -168,6 +170,14 @@ const Tags = () => {
             }) => {
               // Hierarchy view
               if (viewMode === "hierarchy") {
+                if (hierarchyError && !isLibraryInitializing(hierarchyError)) {
+                  return (
+                    <ErrorMessage
+                      error={hierarchyError}
+                      onRetry={() => void refetchHierarchy()}
+                    />
+                  );
+                }
                 // Show loading if we don't have hierarchy data yet
                 const showLoading = hierarchyLoading || !hierarchyData;
                 return (
