@@ -36,9 +36,10 @@ Write migrations by hand:
      DROP TABLE "_fk_guard";
      ```
 
-3. A migration that changes what sync stores, so the cached rows must be fetched again, says so in its own SQL: `UPDATE "SyncState" SET "lastFullSyncTimestamp" = NULL, "lastIncrementalSyncTimestamp" = NULL WHERE "entityType" IN ('scene', ...);`. Name only the types it affects.
-4. Update `schema.prisma` to match the SQL exactly. Checking the schema: `cd server && npm run db:drift` replays every migration into a shadow database and diffs it against `schema.prisma`; it must print `This is an empty migration.` and exit 0, and CI fails otherwise (the `Schema matches the migrations` step). When it prints SQL, that SQL is what the migration still has to do, or what the schema still has to declare. Prisma writes JSON defaults unquoted in that output (`DEFAULT []`, which SQLite reads as an empty identifier): quote them in the migration.
-5. `cd server && npx prisma generate`, then apply with `npx prisma migrate deploy` against a scratch database. Then `docker compose restart peek-server`: the dev container has its own `node_modules`, and its start regenerates the client and applies the migration.
+3. A migration that drops and recreates an index ends with `ANALYZE "<index>"` for each, before `COMMIT`: dropping an index drops its statistics, and SQLite, lacking them, takes `deletedAt IS NULL` on the new index for a narrow range (the L6 migration without it: the studio tooltips walked every live scene, 5 s a page at 200k scenes).
+4. A migration that changes what sync stores, so the cached rows must be fetched again, says so in its own SQL: `UPDATE "SyncState" SET "lastFullSyncTimestamp" = NULL, "lastIncrementalSyncTimestamp" = NULL WHERE "entityType" IN ('scene', ...);`. Name only the types it affects.
+5. Update `schema.prisma` to match the SQL exactly. Checking the schema: `cd server && npm run db:drift` replays every migration into a shadow database and diffs it against `schema.prisma`; it must print `This is an empty migration.` and exit 0, and CI fails otherwise (the `Schema matches the migrations` step). When it prints SQL, that SQL is what the migration still has to do, or what the schema still has to declare. Prisma writes JSON defaults unquoted in that output (`DEFAULT []`, which SQLite reads as an empty identifier): quote them in the migration.
+6. `cd server && npx prisma generate`, then apply with `npx prisma migrate deploy` against a scratch database. Then `docker compose restart peek-server`: the dev container has its own `node_modules`, and its start regenerates the client and applies the migration.
 
 ## How migrations run
 
