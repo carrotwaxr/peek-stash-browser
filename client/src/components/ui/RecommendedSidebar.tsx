@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useSimilarScenes } from "../../api/hooks/useScenes";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -23,10 +24,15 @@ interface Props {
 const RecommendedSidebar = ({ sceneId, instanceId, maxHeight }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
-  const { data, isPending, isError } = useSimilarScenes(sceneId, instanceId, 1);
+  const { data, error, isPending, isError } = useSimilarScenes(
+    sceneId,
+    instanceId,
+    1
+  );
   // Only take first 12 scenes for sidebar
   const scenes = data?.scenes.slice(0, 12) ?? [];
-  const loading = isPending;
+  // The library's first sync is running: loading, not failed
+  const loading = isPending || isLibraryInitializing(error);
 
   const handleSceneClick = (scene: NormalizedScene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
