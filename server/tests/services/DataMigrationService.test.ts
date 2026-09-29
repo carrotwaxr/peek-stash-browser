@@ -13,8 +13,9 @@ import { imageGalleryInheritanceService } from "../../services/ImageGalleryInher
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -80,6 +81,7 @@ const MIGRATIONS = [
   "006_rebuild_derived_after_sync_semantics",
   "007_drop_scene_rankings",
   "008_delete_orphaned_user_rows",
+  "009_clean_stored_filters",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -107,6 +109,8 @@ describe("DataMigrationService", () => {
     mockPrisma.$queryRaw.mockResolvedValue([]);
     // Migration 008: no row of a deleted user left
     mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+    // Migration 009: no saved preset or carousel
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -161,6 +165,11 @@ describe("DataMigrationService", () => {
           name: "008_delete_orphaned_user_rows",
           appliedAt: new Date(),
         },
+        {
+          id: 9,
+          name: "009_clean_stored_filters",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -194,8 +203,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All eight migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(8);
+      // All nine migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(9);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -220,10 +229,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "008_delete_orphaned_user_rows" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "009_clean_stored_filters" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 008 pending
+      // 001 already applied, 002 to 009 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -242,8 +254,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 008 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(7);
+      // 001 is skipped; 002 to 009 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(8);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -446,6 +458,210 @@ describe("DataMigrationService", () => {
         "disk I/O error"
       );
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
+    });
+
+    describe("migration 009: saved filter presets and carousel rules", () => {
+      /** User 3's image preset: a bare tag and a key the panel lacks */
+      const USER_3_PRESETS = JSON.stringify({
+        image: [
+          {
+            id: "p1",
+            name: "Secret name",
+            filters: { tagIds: ["466"], junk: 1 },
+            sort: "created_at",
+            direction: "ASC",
+          },
+        ],
+      });
+      /** User 5's presets: nothing to clean */
+      const USER_5_PRESETS = JSON.stringify({
+        tag: [{ id: "t", filters: {}, sort: "name", direction: "ASC" }],
+      });
+      /** User 5's carousel: a bare tag */
+      const USER_5_RULES = JSON.stringify({
+        tags: { value: ["284"], modifier: "INCLUDES_ALL" },
+      });
+      /** User 7's carousel: nothing to clean */
+      const USER_7_RULES = JSON.stringify({
+        tags: { value: ["284:default"], modifier: "INCLUDES" },
+      });
+
+      /** Answers the reads by the table each names */
+      function storedRows(presets: string = USER_3_PRESETS) {
+        mockPrisma.$queryRawUnsafe.mockImplementation(
+          prismaImpl((sql: string) => {
+            if (sql.includes('FROM "User"')) {
+              return [
+                { userId: 3, presets },
+                { userId: 5, presets: USER_5_PRESETS },
+              ];
+            }
+            if (sql.includes('FROM "UserCarousel"')) {
+              return [
+                {
+                  id: "c5",
+                  userId: 5,
+                  rules: USER_5_RULES,
+                  sort: "random",
+                  direction: "DESC",
+                },
+                {
+                  id: "c7",
+                  userId: 7,
+                  rules: USER_7_RULES,
+                  sort: "random",
+                  direction: "DESC",
+                },
+              ];
+            }
+            // Every bare tag is on the one instance
+            return sql.includes('"StashTag"')
+              ? [
+                  { id: "466", instanceId: "default" },
+                  { id: "284", instanceId: "default" },
+                ]
+              : [];
+          })
+        );
+      }
+
+      beforeEach(() => {
+        mockPrisma.dataMigration.findMany.mockResolvedValue(
+          appliedAllBut("009_clean_stored_filters")
+        );
+        mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      });
+
+      it("writes one unit per user with a change, each write naming the value it read, and logs each change without values", async () => {
+        storedRows();
+        mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+        const { logger } = await import("../../utils/logger.js");
+
+        const service = await importFresh();
+        await service.runPendingMigrations();
+
+        // Users 3 and 5; user 7 has nothing to change
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+        const writes = mockPrisma.$executeRawUnsafe.mock.calls.map(
+          ([sql, ...params]: [string, ...unknown[]]) => [
+            sql.replace(/\s+/g, " "),
+            ...params,
+          ]
+        );
+        expect(writes).toEqual([
+          [
+            'UPDATE "User" SET "filterPresets" = ? WHERE "id" = ? AND "filterPresets" = ?',
+            JSON.stringify({
+              image: [
+                {
+                  id: "p1",
+                  name: "Secret name",
+                  filters: { tagIds: ["466:default"] },
+                  sort: "created_at",
+                  direction: "ASC",
+                },
+              ],
+            }),
+            3,
+            USER_3_PRESETS,
+          ],
+          [
+            'UPDATE "UserCarousel" SET "rules" = ?, "sort" = ?, "direction" = ? WHERE "id" = ? AND "rules" = ? AND "sort" = ? AND "direction" = ?',
+            JSON.stringify({
+              tags: { value: ["284:default"], modifier: "INCLUDES_ALL" },
+            }),
+            "random",
+            "DESC",
+            "c5",
+            USER_5_RULES,
+            "random",
+            "DESC",
+          ],
+        ]);
+        expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith(
+          { data: { name: "009_clean_stored_filters" } }
+        );
+
+        const lines = vi
+          .mocked(logger.info)
+          .mock.calls.filter(([message]) => message.includes("Migration 009"));
+        expect(lines.map(([message]) => message)).toEqual([
+          "[Migration 009] Cleaned a saved filter preset",
+          "[Migration 009] Cleaned a carousel's rules",
+          "[Migration 009] Cleaned saved filter presets and carousel rules",
+        ]);
+        // Key names and counts: no id, name or other value a user saved
+        const logged = JSON.stringify(lines);
+        for (const value of ["466", "284", "Secret name"]) {
+          expect(logged).not.toContain(value);
+        }
+        expect(lines[2]?.[1]).toEqual({
+          users: 2,
+          presets: 1,
+          carousels: 1,
+          droppedKeys: { "image.junk": 1 },
+          refsRewritten: 2,
+          refsLeftBare: 0,
+          skipped: 0,
+        });
+      });
+
+      it("leaves a row saved again since it was read as its user saved it", async () => {
+        storedRows();
+        mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+        const { logger } = await import("../../utils/logger.js");
+
+        const service = await importFresh();
+        await service.runPendingMigrations();
+
+        expect(logger.info).toHaveBeenCalledWith(
+          "[Migration 009] Left saved filter presets changed since they were read",
+          { userId: 3 }
+        );
+        expect(logger.info).toHaveBeenCalledWith(
+          "[Migration 009] Cleaned saved filter presets and carousel rules",
+          objectContaining({ users: 0, presets: 0, carousels: 0, skipped: 2 })
+        );
+        expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(1);
+      });
+
+      it("leaves stored JSON it cannot read as it is", async () => {
+        storedRows("{not json");
+        mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+        const { logger } = await import("../../utils/logger.js");
+
+        const service = await importFresh();
+        await service.runPendingMigrations();
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[Migration 009] Left a stored value it cannot read",
+          { userId: 3, column: "filterPresets" }
+        );
+        // User 3 is not written; user 5's carousel still is
+        expect(
+          mockPrisma.$executeRawUnsafe.mock.calls.map(
+            ([sql, ...params]: [string, ...unknown[]]) => [
+              /UPDATE "(\w+)"/.exec(sql)?.[1],
+              params[3],
+            ]
+          )
+        ).toEqual([["UserCarousel", "c5"]]);
+      });
+
+      it("does not mark 009 as applied when a write unit fails", async () => {
+        storedRows();
+        mockPrisma.$executeRawUnsafe.mockRejectedValue(
+          new Error("disk I/O error")
+        );
+
+        const service = await importFresh();
+        await expect(service.runPendingMigrations()).rejects.toThrow(
+          "disk I/O error"
+        );
+        // The first user's one unit failed; nothing after it ran
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
+      });
     });
 
     it("does not mark 004 as applied when the recompute throws", async () => {

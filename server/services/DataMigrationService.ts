@@ -1,11 +1,18 @@
 import prisma from "../prisma/singleton.js";
-import { dbWrite } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashSyncService } from "./StashSyncService.js";
+import {
+  type BareRefLookup,
+  type CleanReport,
+  bareRefLookupFor,
+  cleanCarouselRules,
+  cleanFilterPresets,
+} from "./StoredFilterCleaner.js";
 import { userStatsService } from "./UserStatsService.js";
 
 /**
@@ -71,6 +78,257 @@ export async function deleteOrphanedUserRows(
     }
   }
   return deleted;
+}
+
+/** A user's saved presets, as stored */
+interface StoredPresetsRow {
+  userId: number;
+  presets: string;
+}
+
+/** A custom carousel's stored query */
+interface StoredCarouselRow {
+  id: string;
+  userId: number;
+  rules: string;
+  sort: string;
+  direction: string;
+}
+
+/** What migration 009 changed: counts and key names, no values */
+export interface StoredFilterCleanup {
+  /** Users with a preset or carousel written */
+  users: number;
+  presets: number;
+  carousels: number;
+  /** Dropped keys by `<list>.<key>` (`carousel.<key>` for rules) */
+  droppedKeys: Record<string, number>;
+  refsRewritten: number;
+  /** Bare ids no single live entity has, left bare (also in rows left unchanged) */
+  refsLeftBare: number;
+  /** Rows left as stored: unreadable JSON, or saved again since they were read */
+  skipped: number;
+}
+
+const MIGRATION_009 = "[Migration 009]";
+
+/** The report's fields for a log line: key names and counts, no values */
+function reportFields(report: CleanReport) {
+  return {
+    droppedKeys: report.droppedKeys,
+    sortReset: report.sortReset,
+    directionFixed: report.directionFixed,
+    perPageCapped: report.perPageCapped,
+    refsRewritten: report.refsRewritten,
+    refsLeftBare: report.refsLeftBare,
+  };
+}
+
+/** Parsed stored JSON; undefined, with a warning, when it does not parse */
+function parseStored(
+  text: string,
+  what: Record<string, unknown>
+): { value: unknown } | undefined {
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    logger.warn(`${MIGRATION_009} Left a stored value it cannot read`, what);
+    return undefined;
+  }
+}
+
+/** Every stored preset list and carousel of the users in scope, by user */
+async function readStoredFilters(userIds: readonly number[] | undefined) {
+  const inScope = (column: string) =>
+    userIds === undefined
+      ? { sql: "", params: [] }
+      : {
+          sql: `AND ${column} IN (SELECT value FROM json_each(?))`,
+          params: [JSON.stringify(userIds)],
+        };
+  const byUser = inScope("id");
+  const presetRows = await prisma.$queryRawUnsafe<StoredPresetsRow[]>(
+    `SELECT id AS userId, CAST(filterPresets AS TEXT) AS presets FROM "User"
+     WHERE filterPresets IS NOT NULL ${byUser.sql}
+     ORDER BY id`,
+    ...byUser.params
+  );
+  const byOwner = inScope("userId");
+  const carouselRows = await prisma.$queryRawUnsafe<StoredCarouselRow[]>(
+    `SELECT id, userId, CAST(rules AS TEXT) AS rules, sort, direction
+     FROM "UserCarousel"
+     WHERE 1 = 1 ${byOwner.sql}
+     ORDER BY userId, createdAt, id`,
+    ...byOwner.params
+  );
+
+  const presetsByUser = new Map(presetRows.map((row) => [row.userId, row]));
+  const carouselsByUser = new Map<number, StoredCarouselRow[]>();
+  for (const row of carouselRows) {
+    const rows = carouselsByUser.get(row.userId) ?? [];
+    rows.push(row);
+    carouselsByUser.set(row.userId, rows);
+  }
+  const users = [
+    ...new Set([...presetsByUser.keys(), ...carouselsByUser.keys()]),
+  ].sort((a, b) => a - b);
+  return { users, presetsByUser, carouselsByUser };
+}
+
+/**
+ * One user's presets and carousels: cleaned, then written in one unit when
+ * anything changed, each write naming the value it read. Adds to `summary`.
+ */
+async function cleanUserStoredFilters(
+  userId: number,
+  presetRow: StoredPresetsRow | undefined,
+  carouselRows: readonly StoredCarouselRow[],
+  summary: StoredFilterCleanup
+): Promise<void> {
+  const presets = presetRow
+    ? parseStored(presetRow.presets, { userId, column: "filterPresets" })
+    : undefined;
+  if (presetRow && !presets) summary.skipped++;
+  const carousels = carouselRows.flatMap((row) => {
+    const rules = parseStored(row.rules, { userId, carouselId: row.id });
+    if (!rules) summary.skipped++;
+    return rules ? [{ row, rules: rules.value }] : [];
+  });
+
+  const clean = (lookup: BareRefLookup) => ({
+    presets: presets ? cleanFilterPresets(presets.value, lookup) : undefined,
+    carousels: carousels.map(({ row, rules }) => ({
+      row,
+      cleaned: cleanCarouselRules(rules, row.sort, row.direction, lookup),
+    })),
+  });
+  const cleaned = clean(await bareRefLookupFor(clean));
+  for (const { report } of [
+    ...(cleaned.presets?.results ?? []),
+    ...cleaned.carousels.map((carousel) => carousel.cleaned),
+  ]) {
+    summary.refsLeftBare += report.refsLeftBare;
+  }
+
+  const presetWrite =
+    presetRow && cleaned.presets?.changed
+      ? { row: presetRow, presets: cleaned.presets }
+      : undefined;
+  const carouselWrites = cleaned.carousels.filter(
+    (carousel) => carousel.cleaned.changed
+  );
+  const ops = [
+    ...(presetWrite
+      ? [
+          prisma.$executeRawUnsafe(
+            `UPDATE "User" SET "filterPresets" = ?
+             WHERE "id" = ? AND "filterPresets" = ?`,
+            JSON.stringify(presetWrite.presets.value),
+            userId,
+            presetWrite.row.presets
+          ),
+        ]
+      : []),
+    ...carouselWrites.map(({ row, cleaned: carousel }) =>
+      prisma.$executeRawUnsafe(
+        `UPDATE "UserCarousel" SET "rules" = ?, "sort" = ?, "direction" = ?
+         WHERE "id" = ? AND "rules" = ? AND "sort" = ? AND "direction" = ?`,
+        JSON.stringify(carousel.value.rules),
+        carousel.value.sort,
+        carousel.value.direction,
+        row.id,
+        row.rules,
+        row.sort,
+        row.direction
+      )
+    ),
+  ];
+  if (ops.length === 0) return;
+
+  // In the order of `ops`: the presets first, then each carousel
+  const written = (await dbWriteBatch("migration.cleanStoredFilters", ops)).map(
+    (count) => count > 0
+  );
+  const countDropped = (prefix: string, keys: readonly string[]) => {
+    for (const key of keys) {
+      const name = `${prefix}.${key}`;
+      summary.droppedKeys[name] = (summary.droppedKeys[name] ?? 0) + 1;
+    }
+  };
+
+  if (presetWrite && written.shift()) {
+    for (const result of presetWrite.presets.results) {
+      if (!result.changed) continue;
+      summary.presets++;
+      summary.refsRewritten += result.report.refsRewritten;
+      countDropped(result.entity, result.report.droppedKeys);
+      logger.info(`${MIGRATION_009} Cleaned a saved filter preset`, {
+        userId,
+        entity: result.entity,
+        presetId: result.presetId,
+        ...reportFields(result.report),
+      });
+    }
+  } else if (presetWrite) {
+    summary.skipped++;
+    logger.info(
+      `${MIGRATION_009} Left saved filter presets changed since they were read`,
+      { userId }
+    );
+  }
+  for (const { row, cleaned: carousel } of carouselWrites) {
+    if (written.shift()) {
+      summary.carousels++;
+      summary.refsRewritten += carousel.report.refsRewritten;
+      countDropped("carousel", carousel.report.droppedKeys);
+      logger.info(`${MIGRATION_009} Cleaned a carousel's rules`, {
+        userId,
+        carouselId: row.id,
+        ...reportFields(carousel.report),
+      });
+    } else {
+      summary.skipped++;
+      logger.info(
+        `${MIGRATION_009} Left a carousel changed since it was read`,
+        { userId, carouselId: row.id }
+      );
+    }
+  }
+}
+
+/**
+ * Cleans every user's saved filter presets and custom carousels against the
+ * filter contract (migration 009; `StoredFilterCleaner`), or only those of
+ * `userIds`. One write unit per user with anything to change. Each write
+ * names the value it read, so a preset list or carousel saved again since
+ * then is left as its user saved it. Idempotent: a second run writes
+ * nothing.
+ */
+export async function cleanStoredFilters(
+  userIds?: readonly number[]
+): Promise<StoredFilterCleanup> {
+  const { users, presetsByUser, carouselsByUser } =
+    await readStoredFilters(userIds);
+  const summary: StoredFilterCleanup = {
+    users: 0,
+    presets: 0,
+    carousels: 0,
+    droppedKeys: {},
+    refsRewritten: 0,
+    refsLeftBare: 0,
+    skipped: 0,
+  };
+  for (const userId of users) {
+    const before = summary.presets + summary.carousels;
+    await cleanUserStoredFilters(
+      userId,
+      presetsByUser.get(userId),
+      carouselsByUser.get(userId) ?? [],
+      summary
+    );
+    if (summary.presets + summary.carousels > before) summary.users++;
+  }
+  return summary;
 }
 
 /**
@@ -279,6 +537,21 @@ const migrations: Migration[] = [
       logger.info(
         "[Migration 008] Deleted the stats and rankings of deleted users",
         deleted
+      );
+    },
+  },
+  // Filter input the contract does not know is dropped for one release and
+  // refused from the next (item 38), so what users saved is tidied once
+  // while it is still only ignored
+  {
+    name: "009_clean_stored_filters",
+    description:
+      "Clean saved filter presets and custom carousel rules against the filter contract: unknown keys and invalid modifiers removed, unknown sorts reset, per page held to 250, ids saved before multi-instance support tied to their one server",
+    run: async () => {
+      const summary = await cleanStoredFilters();
+      logger.info(
+        `${MIGRATION_009} Cleaned saved filter presets and carousel rules`,
+        { ...summary }
       );
     },
   },

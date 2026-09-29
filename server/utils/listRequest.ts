@@ -314,6 +314,11 @@ function parseSortField<K extends ListKind>(
   return undefined;
 }
 
+/** Whether `raw` is one of the list's sorts or `random_<n>`, as a request's sort is checked */
+export function isListSort(kind: ListKind, raw: unknown): boolean {
+  return parseSortField(kind, raw, "sort", new Problems()) !== undefined;
+}
+
 /** The sort with its defaults filled in: the list's default sort, the daily seed for random */
 function resolveSort<K extends ListKind>(
   kind: K,
