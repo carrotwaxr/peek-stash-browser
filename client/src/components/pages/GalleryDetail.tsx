@@ -24,6 +24,7 @@ import {
   Button,
   EntityNotFound,
   FavoriteButton,
+  LibraryInitializingBanner,
   Lightbox,
   LoadingSpinner,
   PageHeader,
@@ -212,7 +213,8 @@ const GalleryDetail = () => {
 
   if (lookup.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LibraryInitializingBanner />
         <LoadingSpinner />
       </div>
     );

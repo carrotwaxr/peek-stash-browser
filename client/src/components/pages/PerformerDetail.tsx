@@ -26,6 +26,7 @@ import {
   FavoriteButton,
   GenderIcon,
   LazyImage,
+  LibraryInitializingBanner,
   LoadingSpinner,
   PageHeader,
   PaginatedImageGrid,
@@ -146,7 +147,8 @@ const PerformerDetail = () => {
 
   if (lookup.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LibraryInitializingBanner />
         <LoadingSpinner />
       </div>
     );

@@ -28,6 +28,7 @@ import {
   EntityNotFound,
   FavoriteButton,
   LazyImage,
+  LibraryInitializingBanner,
   LoadingSpinner,
   PageHeader,
   PaginatedImageGrid,
@@ -195,7 +196,8 @@ const StudioDetail = () => {
 
   if (lookup.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LibraryInitializingBanner />
         <LoadingSpinner />
       </div>
     );
