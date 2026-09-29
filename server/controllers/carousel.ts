@@ -1,6 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
+import {
+  DEFAULT_CAROUSEL_DIRECTION,
+  DEFAULT_CAROUSEL_SORT,
+} from "../services/StoredFilterCleaner.js";
 import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
@@ -38,10 +42,6 @@ const MAX_CAROUSELS_PER_USER = 15;
 
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
-
-// What a new carousel sorts by when the request names nothing
-const DEFAULT_CAROUSEL_SORT = "random";
-const DEFAULT_CAROUSEL_DIRECTION = "DESC";
 
 /** A new seed each load, so a random carousel varies from visit to visit */
 const perLoadSeed = (userId: number) => userId + Date.now();
