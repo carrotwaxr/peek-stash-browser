@@ -7,6 +7,11 @@ import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { safeFileName, uniqueFileName } from "../utils/contentDisposition.js";
+import {
+  NOTHING_TO_DOWNLOAD,
+  PLAYLIST_NOT_FOUND,
+  ZIP_FAILED,
+} from "../utils/downloadReasons.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { downloadService } from "./DownloadService.js";
@@ -99,17 +104,14 @@ export class PlaylistZipService {
     });
 
     if (!playlist) {
-      await downloadService.markFailed(downloadId, "Playlist not found");
+      await downloadService.markFailed(downloadId, PLAYLIST_NOT_FOUND);
       throw new Error(`Playlist not found: ${download.playlistId}`);
     }
 
     // Only the scenes the requester may see now, each on its own instance
     const scenes = await this.readScenes(download.userId, download.playlistId);
     if (scenes.length === 0) {
-      await downloadService.markFailed(
-        downloadId,
-        "No scenes you can download"
-      );
+      await downloadService.markFailed(downloadId, NOTHING_TO_DOWNLOAD);
       return;
     }
 
@@ -289,7 +291,7 @@ export class PlaylistZipService {
         error: errorMessage,
       });
 
-      await downloadService.markFailed(downloadId, errorMessage);
+      await downloadService.markFailed(downloadId, ZIP_FAILED);
       throw error;
     }
   }

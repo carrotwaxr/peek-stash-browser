@@ -29,6 +29,7 @@ import type {
 } from "../types/api/download.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { attachmentContentDisposition } from "../utils/contentDisposition.js";
+import { userFacingReason } from "../utils/downloadReasons.js";
 import { logger } from "../utils/logger.js";
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
@@ -44,9 +45,13 @@ const MAX_PLAYLIST_SIZE_BYTES =
 
 /**
  * Serialize a download record for JSON response.
- * Converts BigInt fileSize to string since JSON doesn't support BigInt.
+ * Converts BigInt fileSize to string since JSON doesn't support BigInt, and
+ * leaves out the server file path.
  */
-function serializeDownload(download: {
+function serializeDownload({
+  filePath: _filePath,
+  ...download
+}: {
   id: number;
   userId: number;
   type: string;
@@ -64,9 +69,11 @@ function serializeDownload(download: {
   completedAt: Date | null;
   expiresAt: Date | null;
 }) {
+  // The server's file path is never sent, nor a caught error's text
   return {
     ...download,
     fileSize: download.fileSize !== null ? download.fileSize.toString() : null,
+    error: userFacingReason(download.error),
   };
 }
 

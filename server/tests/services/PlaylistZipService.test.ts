@@ -261,6 +261,20 @@ describe("PlaylistZipService.createZip", () => {
     expect(downloadService.markCompleted).not.toHaveBeenCalled();
   });
 
+  it("a failure stores a fixed reason, never the caught text or a path", async () => {
+    arrange("Mix", [item(0, scene("s1", "First"))]);
+    vi.mocked(fetch).mockRejectedValue(
+      new Error("ENOENT: open '/config/downloads/user-3/download-7.zip'")
+    );
+
+    await expect(playlistZipService.createZip(7)).rejects.toThrow();
+
+    expect(downloadService.markFailed).toHaveBeenCalledWith(
+      7,
+      "The zip could not be created"
+    );
+  });
+
   it("the NFO carries the builder's names and the requester's rating", async () => {
     await zip("Mix", [
       scene("s1", "First", {
