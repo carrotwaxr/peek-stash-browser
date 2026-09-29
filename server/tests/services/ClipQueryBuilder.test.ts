@@ -583,7 +583,7 @@ describe("ClipQueryBuilder", () => {
   });
 
   describe("a clip by id", () => {
-    it("matches the id on every allowed instance, with both exclusion joins, one row", async () => {
+    it("matches the id on every allowed instance, with both exclusion joins, no LIMIT", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
@@ -601,7 +601,8 @@ describe("ClipQueryBuilder", () => {
       expect(sql).toContain(
         "WHERE c.deletedAt IS NULL AND e.id IS NULL AND s.deletedAt IS NULL AND es.id IS NULL AND c.stashInstanceId IN (?, ?) AND ((c.id = ?))"
       );
-      expect(params).toEqual([7, 7, "inst-a", "inst-b", "101", 1, 0]);
+      expect(sql).not.toContain("LIMIT");
+      expect(params).toEqual([7, 7, "inst-a", "inst-b", "101"]);
     });
 
     it("returns the row with its tags", async () => {
