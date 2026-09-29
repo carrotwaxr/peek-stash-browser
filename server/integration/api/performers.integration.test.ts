@@ -1,9 +1,10 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
   guestClient,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -32,6 +33,8 @@ describe("Performer API", () => {
     // Select only test instance to avoid ID collisions with other instances
     await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   describe("POST /api/library/performers", () => {
     it("rejects unauthenticated requests", async () => {

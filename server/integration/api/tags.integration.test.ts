@@ -5,6 +5,7 @@ import {
   TestClient,
   adminClient,
   guestClient,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -37,6 +38,8 @@ describe("Tag API", () => {
     // Select only test instance to avoid ID collisions with other instances
     await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   describe("POST /api/library/tags", () => {
     it("rejects unauthenticated requests", async () => {

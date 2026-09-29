@@ -30,7 +30,7 @@ import {
 import type { TestClient } from "../helpers/testClient.js";
 import {
   adminClient,
-  selectAllInstances,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -161,7 +161,7 @@ describe("Hidden items and content restrictions (integration)", () => {
       await adminClient.delete(`/api/user/${hider.id}`);
     }
     await clearAccessFixture();
-    await selectAllInstances();
+    await restoreInstanceSelection();
   }, 60000);
 
   it("refuses to hide a restricted entity and writes nothing", async () => {

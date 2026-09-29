@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
  * Text Search Filters Integration Tests
@@ -244,13 +244,17 @@ describe("Text Search Filters", () => {
     });
 
     it("filters by name EQUALS (exact match)", async () => {
-      // First get a tag to know an exact name
+      // First get a tag to know an exact name, on the test instance: the
+      // second library reuses the test library's ids, so a bare id can match
+      // one on each instance (the ambiguous-lookup 400)
+      const instanceId = await findTestInstanceId();
       const initial = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
         {
-          ids: [TEST_ENTITIES.tagWithEntities],
+          ids: [`${TEST_ENTITIES.tagWithEntities}:${instanceId}`],
         }
       );
+      expect(initial.status).toBe(200);
 
       const tagName = must(
         initial.data.findTags.tags[0],

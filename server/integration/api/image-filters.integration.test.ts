@@ -1,7 +1,11 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
+import {
+  adminClient,
+  restoreInstanceSelection,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 /**
  * Image Filters Integration Tests
@@ -42,6 +46,8 @@ describe("Image Filters", () => {
     // Select only test instance to avoid ID collisions with other instances
     testInstanceId = await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   describe("instance_id", () => {
     it("instance_id narrows the list to one instance", async () => {

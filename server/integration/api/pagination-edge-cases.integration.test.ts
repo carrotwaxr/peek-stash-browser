@@ -11,7 +11,11 @@ import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { createApiUser, hideFor } from "../helpers/accessFixture.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 import type { TestClient } from "../helpers/testClient.js";
-import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
+import {
+  adminClient,
+  restoreInstanceSelection,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 /**
  * Pagination Edge Cases Integration Tests
@@ -136,6 +140,8 @@ describe("Pagination Edge Cases", () => {
     // Select only test instance for consistent pagination counts
     testInstanceId = await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   describe("per_page variations", () => {
     it("handles per_page of 1", async () => {

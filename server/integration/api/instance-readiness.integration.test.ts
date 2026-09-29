@@ -23,7 +23,12 @@ import type { SyncStatusResponse } from "../../types/api/sync.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { createApiUser } from "../helpers/accessFixture.js";
 import { TEST_CONFIG } from "../helpers/config.js";
-import { type TestClient, adminClient } from "../helpers/testClient.js";
+import {
+  type TestClient,
+  adminClient,
+  restoreInstanceSelection,
+  selectAllInstances,
+} from "../helpers/testClient.js";
 import { SECOND_ID_OFFSET } from "../stash-replay/library.js";
 
 const SECOND_URL = process.env.STASH_SECOND_URL;
@@ -155,7 +160,6 @@ async function clearFirstSyncedAt(): Promise<void> {
 describeReplay("an instance on its first sync", () => {
   let primaryId: string;
   let adminCookie: string;
-  let adminSelection: string[] = [];
   let restricted: { id: number; client: TestClient };
   let onlyNew: { id: number; client: TestClient };
   /** The users this file created, deleted again afterwards */
@@ -218,11 +222,7 @@ describeReplay("an instance on its first sync", () => {
       "the primary instance"
     ).id;
     // The admin sees every instance while this file runs
-    const selection = await adminClient.get<{ selectedInstanceIds: string[] }>(
-      "/api/user/stash-instances"
-    );
-    adminSelection = selection.data.selectedInstanceIds;
-    await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
+    await selectAllInstances();
 
     // Added as the admin's form does, before any sync: raw SQL, so the row
     // is written the same way whatever columns the schema has
@@ -295,9 +295,7 @@ describeReplay("an instance on its first sync", () => {
     for (const id of createdUsers) {
       await adminClient.delete(`/api/user/${id}`);
     }
-    await adminClient.put("/api/user/stash-instances", {
-      instanceIds: adminSelection,
-    });
+    await restoreInstanceSelection();
     // Through the server, which reloads its instance list; the purge of the
     // cached library runs after the answer, SyncState last
     await adminClient.delete(`/api/setup/stash-instance/${NEW}`);

@@ -17,9 +17,10 @@ export default defineConfig({
     include: ["**/*.integration.test.ts"],
     exclude: ["node_modules", "dist"],
     globalSetup: "./helpers/globalSetup.ts",
-    // Fails a file that sent Stash a mutation or a request the replay
-    // cannot answer (replay runs only)
-    setupFiles: ["./helpers/replayAudit.ts"],
+    // Fail a file that sent Stash a mutation or a request the replay cannot
+    // answer (replay runs only), or that left the shared admin's state or
+    // the configured instances changed
+    setupFiles: ["./helpers/replayAudit.ts", "./helpers/sharedStateAudit.ts"],
     testTimeout: 30000, // 30s for integration tests
     hookTimeout: 60000, // 60s for setup/teardown hooks
     fileParallelism: false, // Run sequentially

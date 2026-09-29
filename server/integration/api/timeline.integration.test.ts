@@ -5,6 +5,7 @@ import {
   adminClient,
   findTestInstanceId,
   guestClient,
+  restoreInstanceSelection,
   selectAllInstances,
 } from "../helpers/testClient.js";
 
@@ -102,8 +103,6 @@ describe("Timeline API", () => {
     let instanceId: string;
     /** Every configured instance: the test one, and the second if added */
     let instanceIds: string[];
-    /** The admin's instance selection before this block, put back after it */
-    let savedSelection: string[];
 
     /** `id:instanceId` as the query string carries it */
     const pair = (id: string, instance: string): string =>
@@ -130,20 +129,11 @@ describe("Timeline API", () => {
       }>("/api/setup/stash-instances");
       expect(instances.ok).toBe(true);
       instanceIds = instances.data.instances.map((i) => i.id);
-      const selection = await adminClient.get<{
-        selectedInstanceIds: string[];
-      }>("/api/user/stash-instances");
-      expect(selection.ok).toBe(true);
-      savedSelection = selection.data.selectedInstanceIds;
       // Every instance selected, so a bare id means all of them
       await selectAllInstances();
     });
 
-    afterAll(async () => {
-      await adminClient.put("/api/user/stash-instances", {
-        instanceIds: savedSelection,
-      });
-    });
+    afterAll(restoreInstanceSelection);
 
     async function distribution(
       entityType: string,

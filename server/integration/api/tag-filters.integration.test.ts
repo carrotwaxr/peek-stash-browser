@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
  * Tag Filters Integration Tests
@@ -21,6 +21,7 @@ interface FindTagsResponse {
   findTags: {
     tags: Array<{
       id: string;
+      instanceId: string;
       name: string;
       description?: string | null;
       favorite?: boolean;
@@ -421,19 +422,23 @@ describe("Tag Filters", () => {
 
   describe("fetch by ID", () => {
     it("fetches specific tag by ID", async () => {
+      // A detail page names the entity's instance: the second library
+      // reuses the test library's ids, so a bare id can match one on each
+      // instance (the ambiguous-lookup 400)
+      const instanceId = await findTestInstanceId();
       const response = await adminClient.post<FindTagsResponse>(
         "/api/library/tags",
         {
-          ids: [TEST_ENTITIES.tagWithEntities],
+          ids: [`${TEST_ENTITIES.tagWithEntities}:${instanceId}`],
         }
       );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
       expect(response.data.findTags.tags.length).toBe(1);
-      expect(must(response.data.findTags.tags[0]).id).toBe(
-        TEST_ENTITIES.tagWithEntities
-      );
+      const tag = must(response.data.findTags.tags[0]);
+      expect(tag.id).toBe(TEST_ENTITIES.tagWithEntities);
+      expect(tag.instanceId).toBe(instanceId);
     });
   });
 });

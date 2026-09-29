@@ -1,3 +1,4 @@
+import type { GetUserStashInstancesResponse } from "../../types/api/index.js";
 import { TEST_CONFIG } from "./config.js";
 
 interface RequestOptions {
@@ -191,58 +192,106 @@ export async function findTestInstanceId(): Promise<string> {
   return cachedTestInstanceId;
 }
 
+/** The shared admin's selection before this file first changed it */
+let adminSelectionBefore: string[] | undefined;
+
+/** The client's instance selection (an empty list: every enabled instance). */
+export async function readInstanceSelection(
+  client: TestClient = adminClient
+): Promise<string[]> {
+  const response = await client.get<GetUserStashInstancesResponse>(
+    "/api/user/stash-instances"
+  );
+  if (!response.ok) {
+    throw new Error(
+      `GET /api/user/stash-instances answered ${response.status}: ${JSON.stringify(response.data)}`
+    );
+  }
+  return response.data.selectedInstanceIds;
+}
+
+async function putInstanceSelection(
+  client: TestClient,
+  instanceIds: string[]
+): Promise<void> {
+  const response = await client.put("/api/user/stash-instances", {
+    instanceIds,
+  });
+  if (!response.ok) {
+    throw new Error(
+      `PUT /api/user/stash-instances ${JSON.stringify(instanceIds)} answered ${response.status}: ${JSON.stringify(response.data)}`
+    );
+  }
+}
+
 /**
- * Select only the primary test instance for the current user.
- * This ensures tests that query by ID only get results from the test instance,
- * not from other instances (e.g., production) that may have been added.
- *
- * Call this in beforeAll for tests that filter by specific entity IDs.
+ * Sets the client's instance selection (an empty list: every enabled
+ * instance). Every file runs as the one shared admin, so the admin's first
+ * change in a file remembers the selection it found, and the file restores it
+ * with `afterAll(restoreInstanceSelection)`: no file sees a selection another
+ * file left. Users a file creates for itself need no restore.
+ */
+export async function setInstanceSelection(
+  instanceIds: string[],
+  client: TestClient = adminClient
+): Promise<void> {
+  if (client === adminClient && adminSelectionBefore === undefined) {
+    adminSelectionBefore = await readInstanceSelection();
+  }
+  await putInstanceSelection(client, instanceIds);
+}
+
+/**
+ * Puts back the admin's selection from before this file (or this describe)
+ * first changed it; nothing when it did not change it. Pair every
+ * `setInstanceSelection` or `select*` call on the admin with it in the same
+ * describe's `afterAll`. `helpers/sharedStateAudit.ts` fails a file that
+ * leaves the admin's selection changed.
+ */
+export async function restoreInstanceSelection(): Promise<void> {
+  const before = adminSelectionBefore;
+  if (before === undefined) return;
+  adminSelectionBefore = undefined;
+  await putInstanceSelection(adminClient, before);
+}
+
+/**
+ * Select only the primary test instance for the admin, so a bare id matches
+ * only the test instance's entity (the second library reuses the first's
+ * ids). Restore with `afterAll(restoreInstanceSelection)`.
  */
 export async function selectTestInstanceOnly(): Promise<string> {
   const instanceId = await findTestInstanceId();
-
-  // Set user's instance selection to only test instance
-  await adminClient.put("/api/user/stash-instances", {
-    instanceIds: [instanceId],
-  });
-
+  await setInstanceSelection([instanceId]);
   return instanceId;
 }
 
 /**
- * Select only the primary test instance for a specific client (non-admin user).
- * Uses the cached test instance ID from a prior selectTestInstanceOnly() call.
+ * Select only the primary test instance for a user the file created.
  *
  * @param client - The TestClient to set instance selection for
  */
 export async function selectTestInstanceForClient(
   client: TestClient
 ): Promise<string> {
-  // Discover the test instance first if no test has yet
-  const instanceId = cachedTestInstanceId ?? (await selectTestInstanceOnly());
-  await client.put("/api/user/stash-instances", {
-    instanceIds: [instanceId],
-  });
+  const instanceId = await findTestInstanceId();
+  await setInstanceSelection([instanceId], client);
   return instanceId;
 }
 
 /**
- * Reset user instance selection to all instances.
- * Call this in afterAll if you need to restore default behavior.
+ * Select every enabled instance for the admin. Restore with
+ * `afterAll(restoreInstanceSelection)`.
  */
 export async function selectAllInstances(): Promise<void> {
-  await adminClient.put("/api/user/stash-instances", {
-    instanceIds: [],
-  });
+  await setInstanceSelection([]);
 }
 
 /**
- * Reset instance selection for a specific client to all instances.
+ * Select every enabled instance for a user the file created.
  */
 export async function selectAllInstancesForClient(
   client: TestClient
 ): Promise<void> {
-  await client.put("/api/user/stash-instances", {
-    instanceIds: [],
-  });
+  await setInstanceSelection([], client);
 }

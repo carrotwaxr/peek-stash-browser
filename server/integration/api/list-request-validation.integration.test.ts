@@ -29,6 +29,7 @@ import { expectRefused } from "../helpers/refused.js";
 import {
   type TestClient,
   adminClient,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -56,6 +57,8 @@ describe("list request validation", () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
     testInstanceId = await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   it.each([
     "/api/library/scenes",

@@ -1,7 +1,11 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
+import {
+  adminClient,
+  restoreInstanceSelection,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 import { assertBenchmark, measureEndpoint } from "./measureEndpoint.js";
 
 /**
@@ -64,6 +68,8 @@ beforeAll(async () => {
   console.log(`  Gallery ID:   ${discoveredGalleryId}`);
   console.log("");
 });
+
+afterAll(restoreInstanceSelection);
 
 describe("Scene List Benchmarks", () => {
   it("paginated scene list (page 1, 25 per page)", async () => {

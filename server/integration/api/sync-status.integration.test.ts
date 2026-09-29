@@ -10,9 +10,8 @@
  */
 import { cpSync } from "fs";
 import path from "path";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { runPrismaCli } from "../../initializers/migrations.js";
-import prisma from "../../prisma/singleton.js";
 import { arrayContaining } from "../../tests/helpers/matchers.js";
 import { must } from "../../tests/helpers/must.js";
 import type { SyncStatusResponse } from "../../types/api/sync.js";
@@ -38,7 +37,7 @@ const ENTITY_TYPES = [
 
 const PRIMARY_URL = must(process.env.STASH_URL, "STASH_URL");
 const PRIMARY_API_KEY = must(process.env.STASH_API_KEY, "STASH_API_KEY");
-// The second instance globalSetup allows for this run (replay: always)
+// The second instance globalSetup adds for this run (replay: always)
 const SECOND_URL = process.env.STASH_SECOND_URL;
 const SECOND_API_KEY = process.env.STASH_SECOND_API_KEY;
 const RUN_URLS = SECOND_URL ? [PRIMARY_URL, SECOND_URL] : [PRIMARY_URL];
@@ -61,70 +60,10 @@ async function listInstances(): Promise<ConfiguredInstance[]> {
   return res.data.instances;
 }
 
-/** Waits up to `ms` for `done`, polling every half second. */
-async function waitFor(
-  what: string,
-  done: () => Promise<boolean>,
-  ms = 120_000
-): Promise<void> {
-  const deadline = Date.now() + ms;
-  while (!(await done())) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-}
-
-async function syncIdle(): Promise<boolean> {
-  const res = await adminClient.get<{ inProgress: boolean }>(
-    "/api/sync/status"
-  );
-  return res.status === 200 && !res.data.inProgress;
-}
-
 describe("GET /api/sync/status", () => {
-  /** The second instance this file added, which afterAll deletes again. */
-  let added: string | undefined;
-
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
-    if (!SECOND_URL || !SECOND_API_KEY) return;
-    if ((await listInstances()).some((i) => i.url === SECOND_URL)) return;
-
-    // multi-instance.integration.test.ts adds the same instance when it runs
-    // first; without it this file adds it and waits for its first sync
-    await waitFor("the sync to finish", syncIdle);
-    const res = await adminClient.post<{ instance: ConfiguredInstance }>(
-      "/api/setup/stash-instance",
-      {
-        name: "Second Stash (sync status)",
-        url: SECOND_URL,
-        apiKey: SECOND_API_KEY,
-        enabled: true,
-        priority: 2,
-      }
-    );
-    expect(res.status).toBe(201);
-    const id = res.data.instance.id;
-    added = id;
-    await waitFor(
-      "the second instance's first sync",
-      async () =>
-        (await prisma.syncState.count({ where: { stashInstanceId: id } })) ===
-          ENTITY_TYPES.length && (await syncIdle())
-    );
-  }, 180_000);
-
-  afterAll(async () => {
-    if (added === undefined) return;
-    const id = added;
-    await adminClient.delete(`/api/setup/stash-instance/${id}`);
-    // The purge runs after the answer; its last step is SyncState
-    await waitFor(
-      "the second instance's purge",
-      async () =>
-        (await prisma.syncState.count({ where: { stashInstanceId: id } })) === 0
-    );
-  }, 180_000);
+  });
 
   it("GET /api/sync/status lists every configured instance with its eight entity states and no Stash address", async () => {
     // The run's Stash instances are configured
