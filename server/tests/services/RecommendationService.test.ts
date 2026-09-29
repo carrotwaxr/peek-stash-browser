@@ -214,6 +214,52 @@ describe("RecommendationService", () => {
     expect(mockScoring).toHaveBeenCalledTimes(2);
   });
 
+  it("forget drops one user's list: their next page rescores, another user's is kept", async () => {
+    const before = await recommendationService.getRankedRefs(USER, [A]);
+    const other = await recommendationService.getRankedRefs(USER + 1, [A]);
+
+    recommendationService.forget(USER);
+    const after = await recommendationService.getRankedRefs(USER, [A]);
+    const otherAgain = await recommendationService.getRankedRefs(USER + 1, [A]);
+
+    // Same stamp, key and day: only forget can make it rescore
+    expect(after).not.toBe(before);
+    expect(keys(after.refs)).toEqual(keys(before.refs));
+    expect(otherAgain).toBe(other);
+    expect(mockScoring).toHaveBeenCalledTimes(3);
+  });
+
+  it("forget during a computation: the next page rescores rather than reuse it", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockScoring.mockImplementationOnce(async () => {
+      await gate;
+      return [scene("s1", A, ["p1"])];
+    });
+
+    const running = recommendationService.getRankedRefs(USER, [A]);
+    await vi.waitFor(() => {
+      expect(mockScoring).toHaveBeenCalledTimes(1);
+    });
+    recommendationService.forget(USER);
+    release();
+    await running;
+    await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(mockScoring).toHaveBeenCalledTimes(2);
+  });
+
+  it("forget of a user with no list changes nothing", async () => {
+    const kept = await recommendationService.getRankedRefs(USER, [A]);
+
+    recommendationService.forget(USER + 1);
+
+    expect(await recommendationService.getRankedRefs(USER, [A])).toBe(kept);
+    expect(mockScoring).toHaveBeenCalledTimes(1);
+  });
+
   it("a user with no criteria gets no refs and no scoring pass", async () => {
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
 

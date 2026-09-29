@@ -9,6 +9,8 @@ import {
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import { rankingComputeService } from "../services/RankingComputeService.js";
+import { recommendationService } from "../services/RecommendationService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import {
   type EntityType,
@@ -936,10 +938,22 @@ export const deleteUser = async (
       return;
     }
 
-    // Delete user (cascades will handle related data)
-    await prisma.user.delete({
-      where: { id: userIdInt },
-    });
+    // The user's delete cascades to every per-user table but four, which
+    // hold userId with no relation to User (a foreign key would need a
+    // rebuild of each table): their rows go in the same unit. On a
+    // 200k-scene library the heaviest user (42k rows: 18k plays, 6k stats
+    // and rankings, 5k exclusions) held the lock 0.15 to 0.44 s, and 0.46
+    // to 0.56 s with its exclusions raised to 181k, so one unit is enough.
+    const byUser = { where: { userId: userIdInt } };
+    await dbWriteBatch("user.delete", [
+      prisma.userPerformerStats.deleteMany(byUser),
+      prisma.userStudioStats.deleteMany(byUser),
+      prisma.userTagStats.deleteMany(byUser),
+      prisma.userEntityRanking.deleteMany(byUser),
+      prisma.user.delete({ where: { id: userIdInt } }),
+    ]);
+    rankingComputeService.forget(userIdInt);
+    recommendationService.forget(userIdInt);
 
     res.json({ success: true, message: "User deleted successfully" });
   } catch (error) {
