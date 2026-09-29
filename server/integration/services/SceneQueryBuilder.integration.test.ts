@@ -198,8 +198,8 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     expect(ids1).toEqual(ids2);
   });
 
-  it("should fetch scenes by IDs with full relations", async () => {
-    // First get some scene IDs
+  it("should fetch scenes by (id, instance) refs with full relations", async () => {
+    // First get some scene refs
     const initial = await sceneQueryBuilder.execute({
       userId: 1,
       applyExclusions: false,
@@ -210,19 +210,23 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     });
 
     if (initial.scenes.length < 2) {
-      console.log("Skipping getByIds test - not enough scenes");
+      console.log("Skipping getByRefs test - not enough scenes");
       return;
     }
 
-    const idsToFetch = initial.scenes.slice(0, 2).map((s) => s.id);
+    const refsToFetch = initial.scenes
+      .slice(0, 2)
+      .map((s) => ({ id: s.id, instanceId: s.instanceId }));
 
-    const result = await sceneQueryBuilder.getByIds({
+    const result = await sceneQueryBuilder.getByRefs({
       userId: 1,
-      ids: idsToFetch,
+      refs: refsToFetch,
     });
 
     expect(result.scenes).toHaveLength(2);
-    expect(result.scenes.map((s) => s.id).sort()).toEqual(idsToFetch.sort());
+    expect(result.scenes.map((s) => s.id).sort()).toEqual(
+      refsToFetch.map((r) => r.id).sort()
+    );
 
     // Verify relations are populated
     for (const scene of result.scenes) {

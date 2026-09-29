@@ -469,5 +469,4 @@ export interface SceneScoringData {
   performerIds: string[];
   tagIds: string[];
   oCounter: number;
-  date: string | null;
 }

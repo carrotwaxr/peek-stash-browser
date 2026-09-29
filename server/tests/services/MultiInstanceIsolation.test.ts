@@ -4,13 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import {
-  type EntityPreferences,
+  IMPLICIT_PERFORMER_WEIGHT,
+  type LightweightEntityPreferences,
   PERFORMER_FAVORITE_WEIGHT,
   STUDIO_FAVORITE_WEIGHT,
-  scoreSceneByPreferences,
+  TAG_SCENE_FAVORITE_WEIGHT,
+  scoreScoringDataByPreferences,
 } from "../../services/RecommendationScoringService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import type { NormalizedScene } from "../../types/index.js";
+import type { SceneScoringData } from "../../types/index.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -95,7 +98,7 @@ function stashPerformerRow(
   };
 }
 
-const createEmptyPrefs = (): EntityPreferences => ({
+const createEmptyPrefs = (): LightweightEntityPreferences => ({
   favoritePerformers: new Set(),
   highlyRatedPerformers: new Set(),
   favoriteStudios: new Set(),
@@ -210,44 +213,42 @@ describe("Multi-Instance Isolation", () => {
     const INST_A = "inst-a";
     const INST_B = "inst-b";
 
-    const sceneFromA = partialRow<NormalizedScene>({
+    // The same performer, studio and tag ids on both instances
+    const sceneFromA: SceneScoringData = {
       id: "scene1",
-      title: "Scene A",
       instanceId: INST_A,
-      performers: [partialRow({ id: "perf1", name: "Performer 1", tags: [] })],
-      studio: { id: "studio1", name: "Studio 1", tags: [] },
-      tags: [partialRow({ id: "tag1", name: "Tag 1" })],
-    });
+      studioId: "studio1",
+      performerIds: ["12"],
+      tagIds: ["tag1"],
+      oCounter: 0,
+    };
 
-    const sceneFromB = partialRow<NormalizedScene>({
+    const sceneFromB: SceneScoringData = {
       id: "scene2",
-      title: "Scene B",
       instanceId: INST_B,
-      performers: [partialRow({ id: "perf1", name: "Performer 1", tags: [] })], // same performer ID
-      studio: { id: "studio1", name: "Studio 1", tags: [] }, // same studio ID
-      tags: [partialRow({ id: "tag1", name: "Tag 1" })],
-    });
+      studioId: "studio1",
+      performerIds: ["12"],
+      tagIds: ["tag1"],
+      oCounter: 0,
+    };
 
-    it("favorite from instance A does not boost scenes from instance B with same performer ID", () => {
+    it("favoriting performer 12 on A boosts no scene on B", () => {
       const prefs = createEmptyPrefs();
-      // Favorite performer in instance A only
-      prefs.favoritePerformers.add(`perf1\0${INST_A}`);
+      prefs.favoritePerformers.add(entityKey("12", INST_A));
 
-      const scoreA = scoreSceneByPreferences(sceneFromA, prefs);
-      const scoreB = scoreSceneByPreferences(sceneFromB, prefs);
+      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
+      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
 
-      // Scene A should get the performer favorite boost
       expect(scoreA).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
-      // Scene B should NOT get the boost (different instance)
       expect(scoreB).toBe(0);
     });
 
     it("favorite studio from instance A does not boost scenes from instance B", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoriteStudios.add(`studio1\0${INST_A}`);
+      prefs.favoriteStudios.add(entityKey("studio1", INST_A));
 
-      const scoreA = scoreSceneByPreferences(sceneFromA, prefs);
-      const scoreB = scoreSceneByPreferences(sceneFromB, prefs);
+      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
+      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
 
       expect(scoreA).toBe(STUDIO_FAVORITE_WEIGHT);
       expect(scoreB).toBe(0);
@@ -255,15 +256,36 @@ describe("Multi-Instance Isolation", () => {
 
     it("favorites from both instances correctly boost their respective scenes", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add(`perf1\0${INST_A}`);
-      prefs.favoritePerformers.add(`perf1\0${INST_B}`);
+      prefs.favoritePerformers.add(entityKey("12", INST_A));
+      prefs.favoritePerformers.add(entityKey("12", INST_B));
 
-      const scoreA = scoreSceneByPreferences(sceneFromA, prefs);
-      const scoreB = scoreSceneByPreferences(sceneFromB, prefs);
+      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
+      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
 
-      // Both scenes should get the boost
       expect(scoreA).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
       expect(scoreB).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
+    });
+
+    it("derived and implicit weights stay on their instance", () => {
+      const prefs = createEmptyPrefs();
+      // A rated scene on A gave its performer, studio and tag a weight of 1
+      prefs.derivedPerformerWeights.set(entityKey("12", INST_A), 1);
+      prefs.derivedStudioWeights.set(entityKey("studio1", INST_A), 1);
+      prefs.derivedTagWeights.set(entityKey("tag1", INST_A), 1);
+      // Watch history on A ranked performer 12 there
+      prefs.implicitPerformerWeights.set(entityKey("12", INST_A), 1);
+
+      const scoreA = scoreScoringDataByPreferences(sceneFromA, prefs);
+      const scoreB = scoreScoringDataByPreferences(sceneFromB, prefs);
+
+      expect(scoreA).toBeCloseTo(
+        PERFORMER_FAVORITE_WEIGHT +
+          STUDIO_FAVORITE_WEIGHT +
+          TAG_SCENE_FAVORITE_WEIGHT +
+          IMPLICIT_PERFORMER_WEIGHT,
+        6
+      );
+      expect(scoreB).toBe(0);
     });
   });
 

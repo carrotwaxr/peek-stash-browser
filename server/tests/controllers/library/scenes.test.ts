@@ -21,13 +21,10 @@ import {
 import prisma from "../../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../../services/EntityAccessService.js";
 import rankingComputeService from "../../../services/RankingComputeService.js";
-import type * as recommendationScoringModule from "../../../services/RecommendationScoringService.js";
-import {
-  hasAnyCriteria,
-  scoreScoringDataByPreferences,
-} from "../../../services/RecommendationScoringService.js";
+import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
+import { getUserAllowedInstanceIds } from "../../../services/UserInstanceService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
 import { logger } from "../../../utils/logger.js";
 import {
@@ -60,26 +57,19 @@ vi.mock("../../../services/StashEntityService.js", () => ({
     generateSceneStreams: vi.fn().mockReturnValue([]),
     getPlaybackStreams: vi.fn().mockResolvedValue([]),
     getSimilarSceneCandidates: vi.fn().mockResolvedValue([]),
-    getScenesForScoring: vi.fn().mockResolvedValue([]),
-  },
-}));
-
-vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: {
-    getExcludedIds: vi.fn().mockResolvedValue(new Set()),
-    getExclusionData: vi.fn().mockResolvedValue({
-      globalIds: new Set(),
-      scopedKeys: new Set(),
-    }),
-    isExcluded: vi.fn().mockReturnValue(false),
   },
 }));
 
 vi.mock("../../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: {
     execute: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
-    getByIds: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
     getByRefs: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
+  },
+}));
+
+vi.mock("../../../services/RecommendationService.js", () => ({
+  recommendationService: {
+    getRankedRefs: vi.fn(),
   },
 }));
 
@@ -96,38 +86,6 @@ vi.mock("../../../services/RankingComputeService.js", () => ({
     ensureFresh: vi.fn().mockResolvedValue(undefined),
   },
 }));
-
-vi.mock(
-  "../../../services/RecommendationScoringService.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof recommendationScoringModule>();
-    return {
-      diversifyByScoreTier: actual.diversifyByScoreTier,
-      buildDerivedWeightsFromScoringData: vi.fn().mockReturnValue({
-        derivedPerformerWeights: new Map(),
-        derivedStudioWeights: new Map(),
-        derivedTagWeights: new Map(),
-      }),
-      buildImplicitWeightsFromRankings: vi.fn().mockReturnValue({
-        implicitPerformerWeights: new Map(),
-        implicitStudioWeights: new Map(),
-        implicitTagWeights: new Map(),
-      }),
-      scoreScoringDataByPreferences: vi.fn().mockReturnValue(0),
-      countUserCriteria: vi.fn().mockReturnValue({
-        favoritePerformers: 0,
-        ratedPerformers: 0,
-        favoriteStudios: 0,
-        ratedStudios: 0,
-        favoriteTags: 0,
-        ratedTags: 0,
-        ratedScenes: 0,
-        favoriteScenes: 0,
-      }),
-      hasAnyCriteria: vi.fn().mockReturnValue(false),
-    };
-  }
-);
 
 vi.mock("../../../utils/codecDetection.js", () => ({
   isSceneStreamable: vi
@@ -175,10 +133,10 @@ const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
-const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
-const mockScore = vi.mocked(scoreScoringDataByPreferences);
 const mockLogger = vi.mocked(logger, true);
 const mockRankingService = vi.mocked(rankingComputeService, true);
+const mockRecommendationService = vi.mocked(recommendationService, true);
+const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -885,6 +843,27 @@ describe("findSimilarScenes", () => {
 });
 
 describe("getRecommendedScenes", () => {
+  const noCriteria = {
+    favoritedPerformers: 0,
+    ratedPerformers: 0,
+    favoritedStudios: 0,
+    ratedStudios: 0,
+    favoritedTags: 0,
+    ratedTags: 0,
+    favoritedScenes: 0,
+    ratedScenes: 0,
+  };
+  const someCriteria = { ...noCriteria, favoritedPerformers: 1 };
+  const ref = (id: string, instanceId = "default") => ({ id, instanceId });
+
+  beforeEach(() => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [],
+      criteria: noCriteria,
+    });
+    mockAllowedInstances.mockResolvedValue(["default"]);
+  });
+
   it("returns 401 when user is not authenticated", async () => {
     const req = reqFor(getRecommendedScenes, { query: { page: "1" } });
     const res = resFor(getRecommendedScenes);
@@ -892,10 +871,10 @@ describe("getRecommendedScenes", () => {
     await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(401);
+    expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
   });
 
   it("starts a ranking refresh without waiting and reads no ranking time itself", async () => {
-    mockHasAnyCriteria.mockReturnValue(false);
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },
@@ -910,8 +889,6 @@ describe("getRecommendedScenes", () => {
   });
 
   it("returns empty result with message when user has no criteria", async () => {
-    mockHasAnyCriteria.mockReturnValue(false);
-
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },
@@ -923,181 +900,130 @@ describe("getRecommendedScenes", () => {
     expect(res._getStatus()).toBe(200);
     const body = res._getOkBody();
     expect(body.scenes).toEqual([]);
+    expect(body.count).toBe(0);
     expect(body.message).toBe("No recommendations yet");
+    expect(body.criteria).toEqual(noCriteria);
+    expect(mockSceneQueryBuilder.getByRefs).not.toHaveBeenCalled();
   });
 
-  describe("play history", () => {
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const scoringRow = (id: string) => ({
-      id,
-      instanceId: "default",
-      studioId: null,
-      performerIds: [],
-      tagIds: [],
-      oCounter: 0,
-      date: null,
+  it("says so when the user's criteria match no scene", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [],
+      criteria: someCriteria,
     });
-    afterEach(() => {
-      mockHasAnyCriteria.mockReturnValue(false);
-      mockScore.mockReturnValue(0);
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
     });
+    const res = resFor(getRecommendedScenes);
 
-    // Every scene matches the user's criteria with the same base score, so
-    // the watch status alone decides which are recommended
-    const recommend = async (ids: string[]) => {
-      mockHasAnyCriteria.mockReturnValue(true);
-      mockScore.mockReturnValue(10);
-      mockStashEntityService.getScenesForScoring.mockResolvedValueOnce(
-        ids.map(scoringRow)
-      );
-      const req = reqFor(getRecommendedScenes, {
-        user: testUser(),
-        query: { page: "1" },
-      });
-      const res = resFor(getRecommendedScenes);
-      await getRecommendedScenes(req, res);
-      return res;
-    };
-    const requestedIds = () =>
-      must(mockSceneQueryBuilder.getByIds.mock.calls[0])[0].ids;
+    await getRecommendedScenes(req, res);
 
-    it("reads a play history stored as a JSON-encoded string", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        // Played an hour ago: marked down below zero, so left out
-        partialRow({
-          sceneId: "recent",
-          playCount: 1,
-          playHistory: JSON.stringify([
-            new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-          ]),
-        }),
-        // Played a month ago: marked up
-        partialRow({
-          sceneId: "old",
-          playCount: 1,
-          playHistory: JSON.stringify([
-            new Date(Date.now() - 30 * DAY_MS).toISOString(),
-          ]),
-        }),
-      ]);
-
-      const res = await recommend(["recent", "old", "unwatched"]);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().count).toBe(2);
-      expect([...requestedIds()].sort()).toEqual(["old", "unwatched"]);
-    });
-
-    it("reads a malformed play history as an empty list", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        partialRow({
-          sceneId: "malformed",
-          playCount: 1,
-          playHistory: "not json",
-        }),
-      ]);
-
-      const res = await recommend(["malformed", "unwatched"]);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getOkBody().count).toBe(2);
-      expect([...requestedIds()].sort()).toEqual(["malformed", "unwatched"]);
-    });
+    expect(res._getStatus()).toBe(200);
+    const body = res._getOkBody();
+    expect(body.scenes).toEqual([]);
+    expect(body.message).toBe("No matching recommendations found");
+    expect(body.criteria).toEqual(someCriteria);
   });
 
-  describe("score tiers", () => {
-    afterEach(() => {
-      mockHasAnyCriteria.mockReturnValue(false);
-      mockScore.mockReturnValue(0);
+  it("asks for the ranked list of the user's instances", async () => {
+    mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
     });
+    const res = resFor(getRecommendedScenes);
 
-    it("answers 200 when one scene is the only match", async () => {
-      const actual = await vi.importActual<typeof recommendationScoringModule>(
-        "../../../services/RecommendationScoringService.js"
-      );
-      mockScore.mockImplementation(actual.scoreScoringDataByPreferences);
-      mockHasAnyCriteria.mockReturnValue(true);
-      mockPrisma.performerRating.findMany.mockResolvedValue([
-        partialRow({
-          performerId: "p1",
-          instanceId: "default",
-          favorite: true,
-          rating: null,
-        }),
-      ]);
-      // p1 is in one scene only, so one scene scores: the score range is 0
-      mockStashEntityService.getScenesForScoring.mockResolvedValueOnce([
-        {
-          id: "s1",
-          instanceId: "default",
-          studioId: null,
-          performerIds: ["p1"],
-          tagIds: [],
-          oCounter: 0,
-          date: null,
-        },
-        {
-          id: "s2",
-          instanceId: "default",
-          studioId: null,
-          performerIds: ["p2"],
-          tagIds: [],
-          oCounter: 0,
-          date: null,
-        },
-      ]);
-      mockSceneQueryBuilder.getByIds.mockResolvedValueOnce({
-        scenes: [createMockScene({ id: "s1" })],
-        total: 1,
-      });
+    await getRecommendedScenes(req, res);
 
-      const req = reqFor(getRecommendedScenes, {
-        user: testUser(),
-        query: { page: "1" },
-      });
-      const res = resFor(getRecommendedScenes);
-      await getRecommendedScenes(req, res);
+    expect(
+      mockRecommendationService.getRankedRefs
+    ).toHaveBeenCalledExactlyOnceWith(1, ["inst-a", "inst-b"]);
+  });
 
-      expect(res._getStatus()).toBe(200);
-      const body = res._getOkBody();
-      expect(body.count).toBe(1);
-      expect(body.scenes.map((s) => s.id)).toEqual(["s1"]);
+  it("fetches one page by (id, instance) in ranked order and counts the whole list", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [
+        ref("s1", "inst-a"),
+        ref("s2", "inst-b"),
+        ref("s1", "inst-b"),
+        ref("s3", "inst-a"),
+        ref("s4", "inst-a"),
+      ],
+      criteria: someCriteria,
     });
+    // Page 2 of 2: s1@B then s3@A, returned by the builder the other way round
+    const s3 = createMockScene({ id: "s3", instanceId: "inst-a" });
+    const s1b = createMockScene({ id: "s1", instanceId: "inst-b" });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
+      scenes: [s3, s1b],
+      total: 2,
+    });
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "2", per_page: "2" },
+    });
+    const res = resFor(getRecommendedScenes);
+
+    await getRecommendedScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockSceneQueryBuilder.getByRefs).toHaveBeenCalledExactlyOnceWith({
+      userId: 1,
+      refs: [ref("s1", "inst-b"), ref("s3", "inst-a")],
+      allowedInstanceIds: ["default"],
+    });
+    const body = res._getOkBody();
+    expect(body.scenes.map((s) => `${s.id}:${s.instanceId}`)).toEqual([
+      "s1:inst-b",
+      "s3:inst-a",
+    ]);
+    expect(body.count).toBe(5);
+    expect(body.page).toBe(2);
+    expect(body.perPage).toBe(2);
+  });
+
+  it("leaves out a ranked scene the page fetch no longer returns", async () => {
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [ref("s1"), ref("s2")],
+      criteria: someCriteria,
+    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
+      scenes: [createMockScene({ id: "s2", instanceId: "default" })],
+      total: 1,
+    });
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(getRecommendedScenes);
+
+    await getRecommendedScenes(req, res);
+
+    const body = res._getOkBody();
+    expect(body.scenes.map((s) => s.id)).toEqual(["s2"]);
+    expect(body.count).toBe(2);
   });
 
   it("echoes per_page 1000 as 250 and asks for at most 250 scenes", async () => {
-    mockHasAnyCriteria.mockReturnValue(true);
-    mockScore.mockReturnValue(10);
-    mockStashEntityService.getScenesForScoring.mockResolvedValueOnce(
-      Array.from({ length: 300 }, (_, i) => ({
-        id: String(i + 1),
-        instanceId: "default",
-        studioId: null,
-        performerIds: [],
-        tagIds: [],
-        oCounter: 0,
-        date: null,
-      }))
-    );
-
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: Array.from({ length: 300 }, (_, i) => ref(String(i + 1))),
+      criteria: someCriteria,
+    });
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1", per_page: "1000" },
     });
     const res = resFor(getRecommendedScenes);
-    try {
-      await getRecommendedScenes(req, res);
-    } finally {
-      mockHasAnyCriteria.mockReturnValue(false);
-      mockScore.mockReturnValue(0);
-    }
+
+    await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
     const body = res._getOkBody();
     expect(body.perPage).toBe(250);
     expect(body.count).toBe(300);
     expect(
-      must(mockSceneQueryBuilder.getByIds.mock.calls[0])[0].ids
+      must(mockSceneQueryBuilder.getByRefs.mock.calls[0])[0].refs
     ).toHaveLength(250);
   });
 
@@ -1115,13 +1041,15 @@ describe("getRecommendedScenes", () => {
         statusCode: 400,
         issues: [{ path }],
       });
-      expect(mockPrisma.performerRating.findMany).not.toHaveBeenCalled();
+      expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
+      expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
     }
   );
 
   it("returns 500 on unexpected error", async () => {
-    // Force an error by making prisma throw
-    mockPrisma.performerRating.findMany.mockRejectedValue(new Error("DB down"));
+    mockRecommendationService.getRankedRefs.mockRejectedValue(
+      new Error("DB down")
+    );
 
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
