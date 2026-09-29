@@ -76,6 +76,11 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         />
       );
 
+    // The scenes the viewer can see, counted by the server: list rows carry
+    // no scene list
+    const scenesCount =
+      gallery.relation_totals?.scenes ?? gallery.scenes?.length ?? 0;
+
     // Each count opens its list through that page's gallery filter; Scenes,
     // Performers and Tags have none, so those counts open nothing
     const imagesLink = getFilteredListPath(
@@ -117,12 +122,12 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
       },
       {
         type: "SCENES",
-        count: gallery.scenes?.length || 0,
+        count: scenesCount,
         tooltipContent: scenesTooltip,
         // Config says 'nav' for gallery->scenes
         onClick:
           getIndicatorBehavior("gallery", "scenes") === "nav" &&
-          gallery.scenes?.length > 0 &&
+          scenesCount > 0 &&
           scenesLink
             ? () => navigate(scenesLink)
             : undefined,

@@ -33,6 +33,30 @@ export interface SearchableGridProps {
   density?: "small" | "medium" | "large";
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * The panel's query with a detail tab's locked criteria (a tag page's
+ * `performer_filter.tags`) merged into the filter the panel built, so a
+ * filter set in the tab's panel still applies; on the same field the locked
+ * criterion wins.
+ */
+function withLockedFilters(
+  query: Record<string, unknown>,
+  lockedFilters: Record<string, unknown>
+): Record<string, unknown> {
+  const merged = { ...query };
+  for (const [key, locked] of Object.entries(lockedFilters)) {
+    const fromPanel = merged[key];
+    merged[key] =
+      isPlainObject(fromPanel) && isPlainObject(locked)
+        ? { ...fromPanel, ...locked }
+        : locked;
+  }
+  return merged;
+}
+
 export const SearchableGrid = ({
   entityType,
   lockedFilters = {},
@@ -103,11 +127,7 @@ export const SearchableGrid = ({
         return;
       }
 
-      // Merge locked filters into query
-      const mergedQuery = {
-        ...newQuery,
-        ...lockedFilters,
-      };
+      const mergedQuery = withLockedFilters(newQuery, lockedFilters);
 
       // Avoid duplicate queries
       if (lastQuery && deepEqual(mergedQuery, lastQuery)) {

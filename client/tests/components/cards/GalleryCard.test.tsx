@@ -2,6 +2,7 @@ import { createElement } from "react";
 import type * as routerModule from "react-router-dom";
 import type { NormalizedGallery } from "@peek/shared-types";
 import { render } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryCard from "../../../src/components/cards/GalleryCard";
@@ -173,4 +174,37 @@ describe("GalleryCard indicator links", () => {
       expect(renderCard()(type).onClick).toBeUndefined();
     }
   );
+});
+
+describe("GalleryCard scenes count", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("counts the scenes the viewer can see from relation_totals: gallery rows carry no scene list", () => {
+    render(
+      <GalleryCard
+        // A list row as the server sends it: no `scenes` list, which the
+        // type still declares
+        gallery={untrusted({
+          id: "12",
+          instanceId: "inst-a",
+          title: "Beach",
+          image_count: 25,
+          performers: [],
+          tags: [],
+          relation_totals: { scenes: 3 },
+        })}
+      />
+    );
+
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    const scenes = must(
+      props.indicators?.find((each) => each.type === "SCENES"),
+      "the scenes indicator"
+    );
+    expect(scenes.count).toBe(3);
+    // No link: the Scenes page has no gallery filter
+    expect(scenes.onClick).toBeUndefined();
+  });
 });

@@ -197,6 +197,15 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 
 Set a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between.
 
+### Studio and Tag Pages
+
+A studio with sub-studios, or a tag with sub-tags, shows **Include sub-studios** or **Include sub-tags** above its tabs. Tick it to add them on every tab that can take them:
+
+- On a tag page: every tab (Scenes, Galleries, Images, Performers, Studios and Collections).
+- On a studio page: Scenes, Galleries, Images and Collections. The Performers tab lists the performers of this studio's own scenes, so the box is hidden there.
+
+Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag.
+
 ### Clips
 
 The Clips page's **Has Preview** filter lists clips **With preview only** until you pick **Without preview only** or **All clips**.

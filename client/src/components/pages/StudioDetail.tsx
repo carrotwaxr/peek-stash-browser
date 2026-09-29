@@ -1,6 +1,14 @@
 import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { NormalizedImage, TagRef } from "@peek/shared-types";
+import {
+  GALLERY_FIELDS,
+  GROUP_FIELDS,
+  IMAGE_FIELDS,
+  type NormalizedImage,
+  PERFORMER_FIELDS,
+  SCENE_FIELDS,
+  type TagRef,
+} from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -40,6 +48,19 @@ interface StashId {
   endpoint: string;
   stash_id: string;
 }
+
+/**
+ * Whether each tab's studio filter takes sub-studios (a depth) in the
+ * shared contract: a performer's studios come through their scenes and
+ * take none, so Include sub-studios is hidden on the Performers tab
+ */
+const TAB_TAKES_SUB_STUDIOS: Readonly<Record<string, boolean>> = {
+  scenes: SCENE_FIELDS.studios.hierarchical,
+  galleries: GALLERY_FIELDS.studios.hierarchical,
+  images: IMAGE_FIELDS.studios.hierarchical,
+  performers: PERFORMER_FIELDS.studios.hierarchical,
+  groups: GROUP_FIELDS.studios.hierarchical,
+};
 
 const StudioDetail = () => {
   const { studioId } = useParams<{ studioId: string }>();
@@ -104,6 +125,7 @@ const StudioDetail = () => {
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
+  const tabTakesSubStudios = TAB_TAKES_SUB_STUDIOS[activeTab] === true;
 
   // Handler for toggling include sub-studios
   const handleIncludeSubStudiosChange = (checked: boolean) => {
@@ -286,8 +308,8 @@ const StudioDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {/* Include Sub-Studios Toggle - only show if studio has children */}
-          {hasChildren && (
+          {/* Include Sub-Studios Toggle: a studio with children, on a tab that takes them */}
+          {hasChildren && tabTakesSubStudios && (
             <div className="mb-4 flex items-center gap-2">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -395,11 +417,13 @@ const StudioDetail = () => {
 
               {activeTab === "groups" && (
                 <GroupGrid
+                  key={`groups-${includeSubStudios}`}
                   lockedFilters={{
                     group_filter: {
                       studios: {
                         value: [makeCompositeKey(studioId!, instanceId)],
                         modifier: "INCLUDES",
+                        ...(includeSubStudios && { depth: -1 }),
                       },
                     },
                   }}

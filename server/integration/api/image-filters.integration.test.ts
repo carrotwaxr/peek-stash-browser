@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
   restoreInstanceSelection,
+  selectAllInstances,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -25,6 +27,7 @@ interface FindImagesResponse {
   findImages: {
     images: Array<{
       id: string;
+      instanceId?: string;
       title?: string;
       favorite?: boolean;
       rating100?: number | null;
@@ -720,4 +723,142 @@ describe("Image Filters", () => {
       // the image retained its tags rather than having them replaced
     });
   });
+
+  /**
+   * A studio's or tag's Images tab with Include sub-studios or sub-tags on
+   * sends depth -1, and the list adds the descendants on the picked studio's
+   * or tag's own server only. Seeded on both servers under the same ids, as
+   * two Stash servers reuse ids: a studio with a sub-studio, a tag with a
+   * sub-tag, and one image under the sub-studio tagged with the sub-tag.
+   * Every seeded row is deleted before the describe ends.
+   */
+  describe.skipIf(!process.env.STASH_SECOND_URL)(
+    "sub-studios and sub-tags",
+    () => {
+      // Ids no library holds (the parser takes digits only)
+      const PARENT = "913001";
+      const CHILD = "913002";
+      const IMAGE = "913001";
+      let otherInstanceId = "";
+
+      /** The instance-qualified keys of the images one filter lists */
+      async function imageKeys(imageFilter: object): Promise<string[]> {
+        const response = await adminClient.post<FindImagesResponse>(
+          "/api/library/images",
+          { filter: { per_page: 50 }, image_filter: imageFilter }
+        );
+        expect(response.status, "POST /api/library/images").toBe(200);
+        return response.data.findImages.images
+          .map((image) => `${image.id}:${image.instanceId ?? ""}`)
+          .sort();
+      }
+
+      beforeAll(async () => {
+        const instances = await adminClient.get<{
+          instances: Array<{ id: string }>;
+        }>("/api/setup/stash-instances");
+        otherInstanceId = must(
+          instances.data.instances.find(
+            (instance) => instance.id !== testInstanceId
+          ),
+          "the second instance"
+        ).id;
+        await selectAllInstances();
+
+        const both = [testInstanceId, otherInstanceId];
+        await prisma.stashStudio.createMany({
+          data: both.flatMap((stashInstanceId) => [
+            { id: PARENT, stashInstanceId, name: "B13 parent studio" },
+            {
+              id: CHILD,
+              stashInstanceId,
+              name: "B13 sub-studio",
+              parentId: PARENT,
+            },
+          ]),
+        });
+        await prisma.stashTag.createMany({
+          data: both.flatMap((stashInstanceId) => [
+            { id: PARENT, stashInstanceId, name: "B13 parent tag" },
+            {
+              id: CHILD,
+              stashInstanceId,
+              name: "B13 sub-tag",
+              parentIds: JSON.stringify([PARENT]),
+            },
+          ]),
+        });
+        await prisma.stashImage.createMany({
+          data: both.map((stashInstanceId) => ({
+            id: IMAGE,
+            stashInstanceId,
+            title: "B13 image",
+            studioId: CHILD,
+            studioInstanceId: stashInstanceId,
+          })),
+        });
+        await prisma.imageTag.createMany({
+          data: both.map((instanceId) => ({
+            imageId: IMAGE,
+            imageInstanceId: instanceId,
+            tagId: CHILD,
+            tagInstanceId: instanceId,
+          })),
+        });
+      });
+
+      afterAll(async () => {
+        // The image's tags go with it (cascade)
+        await prisma.stashImage.deleteMany({ where: { id: IMAGE } });
+        await prisma.stashTag.deleteMany({
+          where: { id: { in: [PARENT, CHILD] } },
+        });
+        await prisma.stashStudio.deleteMany({
+          where: { id: { in: [CHILD, PARENT] } },
+        });
+        await selectTestInstanceOnly();
+      });
+
+      it("studio with depth -1 lists its sub-studio's images, on its own instance only", async () => {
+        const studios = (depth: number) => ({
+          studios: {
+            value: [`${PARENT}:${testInstanceId}`],
+            modifier: "INCLUDES",
+            depth,
+          },
+        });
+
+        expect(await imageKeys(studios(-1))).toEqual([
+          `${IMAGE}:${testInstanceId}`,
+        ]);
+        // Without sub-studios the parent has no images of its own
+        expect(await imageKeys(studios(0))).toEqual([]);
+      });
+
+      it("tag with depth -1 lists its sub-tag's images, on its own instance only", async () => {
+        const tags = (depth: number) => ({
+          tags: {
+            value: [`${PARENT}:${testInstanceId}`],
+            modifier: "INCLUDES",
+            depth,
+          },
+        });
+
+        expect(await imageKeys(tags(-1))).toEqual([
+          `${IMAGE}:${testInstanceId}`,
+        ]);
+        expect(await imageKeys(tags(0))).toEqual([]);
+      });
+
+      it("a bare studio id with depth -1 lists the sub-studio's images on every instance", async () => {
+        expect(
+          await imageKeys({
+            studios: { value: [PARENT], modifier: "INCLUDES", depth: -1 },
+          })
+        ).toEqual(
+          [`${IMAGE}:${testInstanceId}`, `${IMAGE}:${otherInstanceId}`].sort()
+        );
+      });
+    }
+  );
 });
