@@ -23,7 +23,6 @@
  * - v: no hides
  * - w: hides TIP.P15 on A
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
@@ -55,21 +54,8 @@ async function createUser(username: string): Promise<number> {
   return user.id;
 }
 
-/** The builder options for one entity on instance A. */
-function byIdOnA(userId: number, id: string) {
-  return {
-    userId,
-    filters: { ids: { value: coerceEntityRefs([id]), modifier: "INCLUDES" } },
-    specificInstanceId: FX.A,
-    sort: "name",
-    sortDirection: "ASC" as const,
-    page: 1,
-    perPage: 10,
-  };
-}
-
 /**
- * A ported builder's request parts for one entity on instance A: its bare
+ * A builder's request parts for one entity on instance A: its bare
  * id, the detail page's instance.
  */
 const byIdOnAParts = (id: string) => ({
@@ -83,7 +69,7 @@ const byIdOnAParts = (id: string) => ({
   specificInstanceId: FX.A,
 });
 
-/** A ported builder's options for one entity on instance A */
+/** A builder's options for one entity on instance A */
 const listedOnA = (userId: number) => ({
   userId,
   allowedInstanceIds: [FX.A, FX.B],
@@ -120,9 +106,10 @@ async function performerTags(userId: number) {
 }
 
 async function groupTags(userId: number) {
-  const { groups } = await groupQueryBuilder.execute(
-    byIdOnA(userId, FX_ID.SAME)
-  );
+  const { items: groups } = await groupQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("group", byIdOnAParts(FX_ID.SAME)),
+  });
   expect(groups).toHaveLength(1);
   return ids(groups[0]?.tags);
 }
@@ -394,7 +381,10 @@ async function performerOnA(userId: number, id: string) {
 }
 
 async function groupOnA(userId: number, id: string) {
-  const { groups } = await groupQueryBuilder.execute(byIdOnA(userId, id));
+  const { items: groups } = await groupQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("group", byIdOnAParts(id)),
+  });
   return must(groups[0], `group ${id} on A`);
 }
 
@@ -562,8 +552,13 @@ describeWithDb("Tooltip relations (integration)", () => {
   it("scene, gallery and clip rows take relations from their own instance", async () => {
     await linkSameOnBothInstances();
     const both = [FX.A, FX.B];
+    // The bare id: the same gallery on both instances
     const sameOnBoth = {
-      ids: { value: coerceEntityRefs([FX_ID.SAME]), modifier: "INCLUDES" },
+      ids: {
+        refs: [{ id: FX_ID.SAME, instanceId: undefined }],
+        modifier: "INCLUDES" as const,
+        depth: 0,
+      },
     };
 
     const { items: scenes } = await sceneQueryBuilder.execute({
@@ -594,14 +589,10 @@ describeWithDb("Tooltip relations (integration)", () => {
       expect(scene.studio?.name, scene.instanceId).toBe(name);
     }
 
-    const { galleries } = await galleryQueryBuilder.execute({
+    const { items: galleries } = await galleryQueryBuilder.execute({
       userId: v,
-      filters: sameOnBoth,
       allowedInstanceIds: both,
-      sort: "title",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
+      request: parsedListRequest("gallery", { filter: sameOnBoth }),
     });
     expect(galleries.map((g) => g.instanceId).sort()).toEqual(both);
     for (const gallery of galleries) {

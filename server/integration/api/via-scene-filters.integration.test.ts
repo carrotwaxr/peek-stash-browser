@@ -1,6 +1,4 @@
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
@@ -333,42 +331,39 @@ describeWithDb("Via-scene filters and soft-deleted scenes", () => {
   afterAll(clear);
 
   it("a soft-deleted scene no longer links its group: groups by scene and groups by performer", async () => {
-    const byScene = await groupQueryBuilder.execute({
-      userId: USER_ID,
-      filters: {
+    const groups = async (filter: ParsedFilter<"group">) => {
+      const { items } = await groupQueryBuilder.execute({
+        userId: USER_ID,
+        allowedInstanceIds: [X],
+        request: parsedListRequest("group", { filter }),
+      });
+      return items.map((g) => g.id);
+    };
+
+    expect(
+      await groups({
         scenes: {
-          value: coerceEntityRefs([
-            `${DELETED_SCENE}:${X}`,
-            `${LIVE_SCENE}:${X}`,
-          ]),
-          modifier: CriterionModifier.Includes,
+          refs: [
+            { id: DELETED_SCENE, instanceId: X },
+            { id: LIVE_SCENE, instanceId: X },
+          ],
+          modifier: "INCLUDES",
+          depth: 0,
         },
-      },
-      allowedInstanceIds: [X],
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
-    });
-    expect(byScene.groups.map((g) => g.id)).toEqual([LIVE_GROUP]);
+      })
+    ).toEqual([LIVE_GROUP]);
 
     // The stale performer's only group link runs through the deleted scene;
     // the live scene links it to the live group
-    const byPerformer = await groupQueryBuilder.execute({
-      userId: USER_ID,
-      filters: {
+    expect(
+      await groups({
         performers: {
-          value: coerceEntityRefs([`${STALE_PERFORMER}:${X}`]),
-          modifier: CriterionModifier.Includes,
+          refs: [{ id: STALE_PERFORMER, instanceId: X }],
+          modifier: "INCLUDES",
+          depth: 0,
         },
-      },
-      allowedInstanceIds: [X],
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
-    });
-    expect(byPerformer.groups.map((g) => g.id)).toEqual([LIVE_GROUP]);
+      })
+    ).toEqual([LIVE_GROUP]);
   });
 
   it("a soft-deleted scene no longer links its performer: performers by scene and performers by group", async () => {

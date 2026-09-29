@@ -1,12 +1,12 @@
 /**
  * Unit tests for the base query builder (item 74).
  *
- * A fake subclass with one select parameter, one user join, one clause
- * join and one sort join pins the statement's shape and the order its
- * parameters are bound in: the text order, so a clause's `?` meets its own
- * value. The base owns the instance filter (an empty allowed list matches
- * nothing), the exclusion join, the joined count and the random sort's
- * bound seed.
+ * A fake subclass with one select parameter, one user join, one other
+ * join, one clause join and one sort join pins the statement's shape and
+ * the order its parameters are bound in: the text order, so a clause's `?`
+ * meets its own value. The base owns the instance filter (an empty allowed
+ * list matches nothing), the exclusion join, the joined count and the
+ * random sort's bound seed.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../../prisma/singleton.js";
@@ -50,6 +50,9 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
     alias: "s",
     entityType: "scene",
     userJoins: [{ table: "SceneRating", alias: "r", entityIdCol: "sceneId" }],
+    joins: [
+      "LEFT JOIN Other o ON o.id = s.otherId AND o.stashInstanceId = s.stashInstanceId",
+    ],
     selectColumns: (ctx) => ({
       sql: "s.id, s.stashInstanceId, (SELECT COUNT(*) FROM Sub WHERE Sub.userId = ?) AS n",
       params: [`select:${ctx.userId}`],
@@ -176,6 +179,7 @@ describe("EntityQueryBuilder", () => {
       "SELECT s.id, s.stashInstanceId, (SELECT COUNT(*) FROM Sub WHERE Sub.userId = ?) AS n",
       "FROM StashScene s",
       "LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?",
+      "LEFT JOIN Other o ON o.id = s.otherId AND o.stashInstanceId = s.stashInstanceId",
       "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)",
       "JOIN c ON c.id = s.id AND ? = 1",
       "LEFT JOIN SceneGroup sgi ON sgi.sceneId = s.id AND sgi.groupId = ?",

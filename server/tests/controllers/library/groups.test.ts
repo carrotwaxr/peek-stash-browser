@@ -95,7 +95,7 @@ describe("Groups Controller", () => {
     it("returns groups from query builder on happy path", async () => {
       const groups = [createMockGroup({ id: "g1", name: "TestGroup" })];
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups,
+        items: groups,
         total: 1,
       });
 
@@ -107,6 +107,12 @@ describe("Groups Controller", () => {
 
       await findGroups(req, res);
 
+      // The builder reads the parsed request and the viewer's instances
+      const call = must(mockGroupQueryBuilder.execute.mock.calls[0])[0];
+      expect(call).toMatchObject({
+        allowedInstanceIds: ["default"],
+        request: { page: 1, sort: { field: "name", direction: "ASC" } },
+      });
       expect(res._getStatus()).toBe(200);
       const body = res._getOkBody();
       expect(body.findGroups.count).toBe(1);
@@ -119,7 +125,7 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "101", instanceId: "inst-b" }),
       ];
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups,
+        items: groups,
         total: 2,
       });
 
@@ -156,7 +162,7 @@ describe("Groups Controller", () => {
     it("fetches detail counts and hydrates tags for single-ID lookup", async () => {
       const group = createMockGroup({ id: "101", instanceId: "default" });
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups: [group],
+        items: [group],
         total: 1,
       });
       mockStashEntityService.getGroup.mockResolvedValue({
@@ -183,7 +189,7 @@ describe("Groups Controller", () => {
     it("attaches the user's view of the hierarchy to a single-ID lookup", async () => {
       const group = createMockGroup({ id: "101", instanceId: "inst-a" });
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups: [group],
+        items: [group],
         total: 1,
       });
       mockStashEntityService.getGroup.mockResolvedValue(group);
@@ -218,7 +224,7 @@ describe("Groups Controller", () => {
 
     it("does not look up the hierarchy for a list", async () => {
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups: [createMockGroup({ id: "g1" })],
+        items: [createMockGroup({ id: "g1" })],
         total: 1,
       });
 
@@ -234,7 +240,7 @@ describe("Groups Controller", () => {
     it("adds stashUrl to each group for an admin", async () => {
       const groups = [createMockGroup({ id: "g1" })];
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups,
+        items: groups,
         total: 1,
       });
 
@@ -255,7 +261,7 @@ describe("Groups Controller", () => {
 
     it("does not send stashUrl to a regular user", async () => {
       mockGroupQueryBuilder.execute.mockResolvedValue({
-        groups: [createMockGroup({ id: "g1" }), createMockGroup({ id: "g2" })],
+        items: [createMockGroup({ id: "g1" }), createMockGroup({ id: "g2" })],
         total: 2,
       });
 

@@ -2,13 +2,13 @@
  * The base of the entity query builders (item 74).
  *
  * One list statement for every entity: `WITH <ctes> SELECT <columns> FROM
- * <table> <alias> <user joins> <exclusion join> <clause joins> <sort joins>
- * WHERE <live> AND <not excluded> AND <allowed instances> AND <clauses>
- * ORDER BY <sort>, <tiebreak> LIMIT ? OFFSET ?`, and its count as
- * `SELECT COUNT(*)` over the same WITH, FROM and WHERE. The parameters are
- * bound in the text's order: ctes, the select list, one user id per user
- * join, the exclusion's user id, clause joins, sort joins, the WHERE, the
- * sort, the page.
+ * <table> <alias> <user joins> <other joins> <exclusion join> <clause
+ * joins> <sort joins> WHERE <live> AND <not excluded> AND <allowed
+ * instances> AND <clauses> ORDER BY <sort>, <tiebreak> LIMIT ? OFFSET ?`,
+ * and its count as `SELECT COUNT(*)` over the same WITH, FROM and WHERE.
+ * The parameters are bound in the text's order: ctes, the select list, one
+ * user id per user join, the exclusion's user id, clause joins, sort joins,
+ * the WHERE, the sort, the page.
  *
  * The base owns what every list shares (server-sql.md, "Every list query"):
  * `deletedAt IS NULL`, the exclusion join with the instance, the allowed
@@ -82,6 +82,12 @@ export interface EntitySpec {
   readonly alias: string;
   readonly entityType: ExclusionEntityType;
   readonly userJoins: readonly UserJoin[];
+  /**
+   * Other LEFT JOINs the select list reads (a gallery's cover image), after
+   * the user joins and binding no parameters. Each is on a unique key, so
+   * the joined `COUNT(*)` stays exact.
+   */
+  readonly joins?: readonly string[];
   /** The select list; its params bind before the joins' */
   readonly selectColumns: (ctx: QueryContext) => SqlFragment;
   /** The sort key used when the request's key has no expression */
@@ -359,6 +365,7 @@ export abstract class EntityQueryBuilder<Row, Entity, E extends EntityKind> {
     const from = [
       `FROM ${spec.table} ${x}`,
       ...userJoins,
+      ...(spec.joins ?? []),
       ...(exclusionJoin === "" ? [] : [exclusionJoin]),
       ...combined.joins.map((j) => j.sql),
       ...(sortExpr.joins ?? []).map((j) => j.sql),

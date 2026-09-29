@@ -1,15 +1,29 @@
+/**
+ * Unit tests for GalleryQueryBuilder on the base builder (item 74): the
+ * statements it records for a parsed request. The base owns the instance
+ * filter, the exclusion join, the `ids` pairs, the random sort and the
+ * joined count; this file pins what the gallery adds on top (its rating and
+ * cover image joins, sort map and title tiebreak, filter clauses and
+ * search), that the base's clauses reach its statements, and each row's
+ * count of the scenes the viewer can see.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import type { GalleryQueryRow } from "../../types/internal/queryRows.js";
+import type {
+  FilterRef,
+  ParsedListRequest,
+} from "../../types/parsedFilters.js";
+import { parsedListRequest } from "../helpers/fixtures.js";
+import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 
-// Mock prisma
 vi.mock(
   "../../prisma/singleton.js",
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-// Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: {
     error: vi.fn(),
@@ -20,181 +34,443 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-// Mock hierarchy utils (expandTagIds)
+// Each tag and studio expands to itself and one descendant, "99"
 vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn().mockResolvedValue([]),
+  expandTagIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
+  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve([...ids, "99"])),
 }));
 
-// Mock titleUtils
 vi.mock("../../utils/titleUtils.js", () => ({
   getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
 
+const ALLOWED = ["inst-a", "inst-b"];
+const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
+  id,
+  instanceId,
+});
+const bare = (id: string): FilterRef => ({ id, instanceId: undefined });
+
+/** The displayed title's expression, as the title sort and tiebreak read it */
+const TITLE =
+  "COALESCE(NULLIF(g.title, ''), g.fileBasename, REPLACE(REPLACE(g.folderPath, RTRIM(g.folderPath, REPLACE(g.folderPath, '/', '')), ''), '/', '')) COLLATE NOCASE";
+
+/** Runs one list request for user 1 */
+async function run(
+  overrides: Partial<ParsedListRequest<"gallery">> = {},
+  options: { allowedInstanceIds?: string[]; applyExclusions?: boolean } = {}
+) {
+  const request = parsedListRequest("gallery", overrides);
+  return galleryQueryBuilder.execute({
+    userId: 1,
+    allowedInstanceIds: options.allowedInstanceIds ?? ALLOWED,
+    ...(options.applyExclusions === undefined
+      ? {}
+      : { applyExclusions: options.applyExclusions }),
+    request,
+  });
+}
+
+/** The page statement's SQL and parameters */
+function pageStatement(): { sql: string; params: unknown[] } {
+  const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+  return { sql, params };
+}
+
+/** The count statement's SQL and parameters */
+function countStatement(): { sql: string; params: unknown[] } {
+  const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[1]);
+  return { sql, params };
+}
+
+/** A page row as Prisma's raw query returns it from SQLite */
+function galleryRow(overrides: Partial<GalleryQueryRow> = {}): GalleryQueryRow {
+  return {
+    id: "1",
+    stashInstanceId: "inst-a",
+    title: "",
+    date: "",
+    studioId: null,
+    stashRating100: 80,
+    imageCount: null,
+    coverImageId: "7",
+    details: "Beach day",
+    url: null,
+    code: "",
+    photographer: null,
+    urls: '["https://example.test/g/1"]',
+    folderPath: "/images/Beach",
+    fileBasename: null,
+    coverPath: null,
+    stashCreatedAt: null,
+    stashUpdatedAt: new Date("2026-01-02T03:04:05.000Z"),
+    userRating: 60,
+    userFavorite: null,
+    coverWidth: 0,
+    coverHeight: 1080,
+    ...overrides,
+  };
+}
+
 describe("GalleryQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([]) // page
+      .mockResolvedValueOnce([{ total: 0n }]); // count
     mockPrisma.galleryPerformer.findMany.mockResolvedValue([]);
     mockPrisma.galleryTag.findMany.mockResolvedValue([]);
     mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
     mockPrisma.stashTag.findMany.mockResolvedValue([]);
     mockPrisma.stashStudio.findMany.mockResolvedValue([]);
-    // Default: main query returns empty, count query returns {total: 0}
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([]) // main query
-      .mockResolvedValueOnce([{ total: 0 }]); // count query
   });
 
-  describe("multi-instance support", () => {
-    it("filters to a specific instance when specificInstanceId is provided", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        specificInstanceId: "instance-abc",
-      });
+  describe("the statement", () => {
+    it("joins the viewer's rating on (id, instance) and the cover image, and binds params in text order", async () => {
+      await run({ page: 3, perPage: 10 });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      // Must contain a WHERE clause pinning to the specific instance
-      expect(mainQuerySql).toContain("g.stashInstanceId = ?");
-
-      // The instance ID must be in the params
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
-      expect(mainQueryParams).toContain("instance-abc");
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "LEFT JOIN GalleryRating r ON g.id = r.galleryId AND g.stashInstanceId = r.instanceId AND r.userId = ?"
+      );
+      expect(sql).toContain(
+        "LEFT JOIN StashImage ci ON g.coverImageId = ci.id AND g.stashInstanceId = ci.stashInstanceId"
+      );
+      expect(sql.indexOf("LEFT JOIN StashImage ci")).toBeLessThan(
+        sql.indexOf("LEFT JOIN UserExcludedEntity e")
+      );
+      expect(sql).toContain("entityType = 'gallery'");
+      // Rating and exclusion user ids, the instances, the page
+      expect(params).toEqual([1, 1, "inst-a", "inst-b", 10, 20]);
     });
 
-    it("does not add specific instance filter when specificInstanceId is not provided", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-      });
+    it("filters to the allowed instances, with no NULL arm", async () => {
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      // Should NOT have a bare equality check for stashInstanceId
-      expect(mainQuerySql).not.toContain("g.stashInstanceId = ?");
+      const { sql } = pageStatement();
+      expect(sql).toContain("g.stashInstanceId IN (?, ?)");
+      expect(sql).not.toContain("g.stashInstanceId IS NULL");
     });
 
-    it("filters to allowed instances when allowedInstanceIds is provided", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        allowedInstanceIds: ["inst-a", "inst-b"],
-      });
+    it("an empty allowed list matches nothing", async () => {
+      await run({}, { allowedInstanceIds: [] });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      // Should contain IN clause for allowed instances
-      expect(mainQuerySql).toContain("g.stashInstanceId IN (?, ?)");
-      // Should include NULL fallback
-      expect(mainQuerySql).toContain("g.stashInstanceId IS NULL");
-
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
-      expect(mainQueryParams).toContain("inst-a");
-      expect(mainQueryParams).toContain("inst-b");
+      const { sql } = pageStatement();
+      expect(sql).toContain("1 = 0");
+      expect(sql).not.toContain("g.stashInstanceId IN");
     });
 
-    it("does not add instance filter when allowedInstanceIds is empty", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        allowedInstanceIds: [],
-      });
+    it("a specific instance narrows the list to it", async () => {
+      await run({ specificInstanceId: "instance-abc" });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).not.toContain("g.stashInstanceId IN");
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("g.stashInstanceId = ?");
+      expect(params).toContain("instance-abc");
     });
   });
 
-  describe("exclusion filtering", () => {
-    it("includes exclusion JOIN and WHERE by default", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
+  describe("sort", () => {
+    it("the gallery title tiebreak uses the title expression, and the title sort the id", async () => {
+      await run({
+        sort: { field: "image_count", direction: "DESC", seed: undefined },
+      });
+      await run({
+        sort: { field: "title", direction: "DESC", seed: undefined },
       });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).toContain("UserExcludedEntity");
-      expect(mainQuerySql).toContain("entityType = 'gallery'");
-      expect(mainQuerySql).toContain("e.id IS NULL");
+      const [byCount, byTitle] = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      expect(byCount).toContain(`ORDER BY g.imageCount DESC, ${TITLE} ASC`);
+      expect(byTitle).toContain(`ORDER BY ${TITLE} DESC, g.id DESC`);
     });
 
-    it("skips exclusion JOIN when applyExclusions is false", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        applyExclusions: false,
+    it("the viewer's rating sorts through the rating join, the path by the folder", async () => {
+      await run({
+        sort: { field: "rating100", direction: "ASC", seed: undefined },
+      });
+      await run({
+        sort: { field: "path", direction: "ASC", seed: undefined },
       });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).not.toContain("UserExcludedEntity");
-      expect(mainQuerySql).not.toContain("e.id IS NULL");
+      const [byRating, byPath] = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      expect(byRating).toContain(
+        `ORDER BY COALESCE(r.rating, 0) ASC, ${TITLE} ASC`
+      );
+      expect(byPath).toContain(
+        `ORDER BY g.folderPath COLLATE NOCASE ASC, ${TITLE} ASC`
+      );
     });
-  });
 
-  describe("search query", () => {
-    it("searches across title and details fields", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        searchQuery: "vacation",
+    it("binds a random sort's seed and never interpolates it", async () => {
+      await run({
+        sort: { field: "random", direction: "DESC", seed: 87654321 },
       });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).toContain("LOWER(g.title) LIKE");
-      expect(mainQuerySql).toContain("LOWER(g.details) LIKE");
+      const { sql, params } = pageStatement();
+      expect(sql).not.toContain("87654321");
+      expect(params.filter((p) => p === 87654321)).toHaveLength(3);
     });
   });
 
-  describe("count query", () => {
-    it("the count query with exclusions applied counts rows, not distinct composite ids", async () => {
-      await galleryQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
+  describe("count", () => {
+    it("counts with the joined COUNT(*), with and without the exclusion join", async () => {
+      await run();
+      const withExclusions = countStatement();
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({}, { applyExclusions: false });
+      const without = countStatement();
+
+      for (const { sql } of [withExclusions, without]) {
+        expect(sql).toMatch(/SELECT COUNT\(\*\) AS total/i);
+        expect(sql).not.toMatch(/COUNT\(DISTINCT/);
+        expect(sql).toContain("LEFT JOIN GalleryRating r");
+      }
+      expect(withExclusions.sql).toContain("LEFT JOIN UserExcludedEntity e");
+      expect(withExclusions.params).toEqual([1, 1, "inst-a", "inst-b"]);
+      expect(without.sql).not.toContain("UserExcludedEntity");
+    });
+  });
+
+  describe("filters", () => {
+    it("ids with composite values match pairs, and a bare id every instance", async () => {
+      await run({
+        filter: {
+          ids: { refs: [ref("5"), bare("6")], modifier: "INCLUDES", depth: 0 },
+        },
       });
 
-      // Second call is the count query. The other LEFT JOINs are on unique
-      // keys and e.id IS NULL drops every excluded gallery, so each row left
-      // is one gallery.
-      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "((g.id = ? AND g.stashInstanceId = ?) OR (g.id = ?))"
+      );
+      expect(sql).not.toContain("g.id IN (");
+      expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
+    });
 
-      expect(countQuerySql).toMatch(/SELECT COUNT\(\*\) as total/);
-      expect(countQuerySql).not.toMatch(/COUNT\(DISTINCT/);
-      expect(countQuerySql).toContain("LEFT JOIN UserExcludedEntity e");
+    it("studios match the gallery's studio column, the selected studio on its instance and its descendants on every instance", async () => {
+      await run({
+        filter: {
+          studios: { refs: [ref("41")], modifier: "EXCLUDES", depth: -1 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "(g.studioId IS NULL OR NOT ((g.studioId = ? AND g.stashInstanceId = ?) OR (g.studioId = ?)))"
+      );
+      expect(params).toEqual(arrayContaining(["41", "inst-a", "99"]));
+    });
+
+    it("tags match GalleryTag pairs, the selected tag on its instance and its descendants on every instance", async () => {
+      await run({
+        filter: {
+          tags: { refs: [ref("284")], modifier: "INCLUDES", depth: 1 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toMatch(
+        /EXISTS \(SELECT 1 FROM GalleryTag (\w+) WHERE \1\.galleryId = g\.id AND \1\.galleryInstanceId = g\.stashInstanceId AND \(\(\1\.tagId = \? AND \1\.tagInstanceId = \?\) OR \(\1\.tagId = \?\)\)\)/
+      );
+      expect(params).toEqual(arrayContaining(["284", "inst-a", "99"]));
+    });
+
+    it("performers match GalleryPerformer pairs; INCLUDES_ALL needs every one", async () => {
+      await run({
+        filter: {
+          performers: {
+            refs: [ref("7"), ref("8", "inst-b")],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      const one =
+        "EXISTS \\(SELECT 1 FROM GalleryPerformer (\\w+) WHERE \\1\\.galleryId = g\\.id AND \\1\\.galleryInstanceId = g\\.stashInstanceId AND \\(\\(\\1\\.performerId = \\? AND \\1\\.performerInstanceId = \\?\\)\\)\\)";
+      expect(sql).toMatch(new RegExp(`\\(${one} AND ${one}\\)`));
+      expect(params).toEqual(arrayContaining(["7", "inst-a", "8", "inst-b"]));
+    });
+
+    it("scenes match through SceneGallery with the scene live, as pairs", async () => {
+      await run({
+        filter: {
+          scenes: { refs: [ref("3")], modifier: "INCLUDES", depth: 0 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "EXISTS (SELECT 1 FROM SceneGallery sg JOIN StashScene lsc ON lsc.id = sg.sceneId AND lsc.stashInstanceId = sg.sceneInstanceId WHERE sg.galleryId = g.id AND sg.galleryInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))"
+      );
+      expect(params).toEqual(arrayContaining(["3", "inst-a"]));
+    });
+
+    it("hasFavoriteImage asks for an image the viewer favorited; false is no filter", async () => {
+      await run({ filter: { hasFavoriteImage: true } });
+      const withFilter = pageStatement();
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({ filter: { hasFavoriteImage: false } });
+      const without = pageStatement();
+
+      expect(withFilter.sql).toContain(
+        "JOIN ImageRating ir ON ir.imageId = si.id AND ir.instanceId = si.stashInstanceId AND ir.userId = ?"
+      );
+      expect(withFilter.sql).toContain(
+        "WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId"
+      );
+      // Rating and exclusion user ids, the instances, the favorite's user
+      expect(withFilter.params.slice(0, 5)).toEqual([
+        1,
+        1,
+        "inst-a",
+        "inst-b",
+        1,
+      ]);
+      expect(without.sql).not.toContain("ImageRating");
+    });
+
+    it("the viewer's rating and favorite, the counts and the text and date fields each reach SQL", async () => {
+      await run({
+        filter: {
+          favorite: true,
+          rating100: { modifier: "GREATER_THAN", value: 60 },
+          image_count: { modifier: "BETWEEN", value: 5, value2: 50 },
+          title: { modifier: "INCLUDES", value: "beach" },
+          date: { modifier: "LESS_THAN", value: "2020-01-01" },
+          created_at: { modifier: "GREATER_THAN", value: "2025-01-01" },
+          updated_at: { modifier: "NOT_NULL" },
+        },
+      });
+
+      const { sql } = pageStatement();
+      for (const fragment of [
+        "r.favorite = 1",
+        "COALESCE(r.rating, 0) > ?",
+        "COALESCE(g.imageCount, 0) BETWEEN ? AND ?",
+        "(LOWER(g.title) LIKE LOWER(?))",
+        "g.date < ?",
+        "g.stashCreatedAt > ?",
+        "g.stashUpdatedAt IS NOT NULL",
+      ]) {
+        expect(sql).toContain(fragment);
+      }
+    });
+
+    it("the search matches the title, details and photographer, a % in it matching itself", async () => {
+      await run({ q: "100% Real" });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "(LOWER(g.title) LIKE ? ESCAPE '\\' OR LOWER(g.details) LIKE ? ESCAPE '\\' OR LOWER(g.photographer) LIKE ? ESCAPE '\\')"
+      );
+      expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(3);
+    });
+  });
+
+  describe("rows", () => {
+    it("a row reads as the viewer's gallery: Peek's own rating, absent text as null, the title's fallback", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([galleryRow()])
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([]); // no visible scenes
+
+      const result = await run();
+
+      expect(result).toMatchObject({ total: 1 });
+      const gallery = must(result.items[0]);
+      expect(gallery).toMatchObject({
+        id: "1",
+        instanceId: "inst-a",
+        title: "Untitled Gallery",
+        date: null,
+        code: null,
+        details: "Beach day",
+        url: null,
+        urls: ["https://example.test/g/1"],
+        image_count: 0,
+        folder: { path: "/images/Beach" },
+        cover: null,
+        coverWidth: null,
+        coverHeight: 1080,
+        created_at: null,
+        updated_at: "2026-01-02T03:04:05.000Z",
+        rating: 60,
+        rating100: 60,
+        favorite: false,
+        studio: null,
+        performers: [],
+        tags: [],
+        relation_totals: { scenes: 0 },
+      });
+    });
+  });
+
+  describe("scene totals", () => {
+    it("each row counts its live scenes the viewer can see, on its own instance, in one statement for the page", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          galleryRow({ id: "1", stashInstanceId: "inst-a" }),
+          galleryRow({ id: "1", stashInstanceId: "inst-b" }),
+        ])
+        .mockResolvedValueOnce([{ total: 2n }])
+        .mockResolvedValueOnce([{ pid: "1", pinst: "inst-b", total: 2n }]);
+
+      const result = await run();
+
+      const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[2]);
+      expect(sql).toContain("FROM json_each(?)");
+      expect(sql).toContain(
+        "CROSS JOIN SceneGallery sg ON sg.galleryId = pg.pid AND sg.galleryInstanceId = pg.pinst AND sg.sceneInstanceId = pg.pinst"
+      );
+      expect(sql).toContain(
+        "JOIN StashScene s ON s.id = sg.sceneId AND s.stashInstanceId = sg.sceneInstanceId AND s.deletedAt IS NULL"
+      );
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)"
+      );
+      expect(sql).toContain("WHERE e.id IS NULL");
+      expect(params).toEqual([
+        JSON.stringify([
+          ["1", "inst-a"],
+          ["1", "inst-b"],
+        ]),
+        1,
+      ]);
+      expect(result.items.map((g) => g.relation_totals)).toEqual([
+        { scenes: 0 },
+        { scenes: 2 },
+      ]);
+    });
+
+    it("without exclusions the count leaves out only deleted scenes", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([galleryRow()])
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([]);
+
+      await run({}, { applyExclusions: false });
+
+      const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[2]);
+      expect(sql).toContain("s.deletedAt IS NULL");
+      expect(sql).not.toContain("UserExcludedEntity");
+      expect(params).toEqual([JSON.stringify([["1", "inst-a"]])]);
+    });
+
+    it("an empty page runs no totals statement", async () => {
+      await run();
+
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2);
     });
   });
 });

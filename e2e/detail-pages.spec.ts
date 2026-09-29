@@ -31,6 +31,17 @@ async function openFirstCollection(page: Page): Promise<string> {
   return name;
 }
 
+interface GalleryRow {
+  id: string;
+  instanceId: string;
+  image_count: number;
+  relation_totals?: { scenes?: number };
+}
+
+interface FindGalleriesBody {
+  findGalleries: { galleries: GalleryRow[] };
+}
+
 /** The list page of each entity with a detail page, and its cards' label */
 const ENTITIES = [
   { entity: "performer", list: "/performers", label: "Performer" },
@@ -103,6 +114,40 @@ test.describe("Detail Pages", () => {
 
     const performers = new ListPage(page);
     await expect(performers.cards("Performer").first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test("a gallery with scenes shows its Scenes tab, which lists them", async ({
+    page,
+  }) => {
+    // Gallery rows count the scenes the user can see (relation_totals)
+    const listed = await page.request.post("/api/library/galleries", {
+      data: { filter: { per_page: 250, sort: "title", direction: "ASC" } },
+    });
+    expect(listed.ok(), await listed.text()).toBeTruthy();
+    const rows = ((await listed.json()) as FindGalleriesBody).findGalleries
+      .galleries;
+    const gallery = requireData(
+      rows.find(
+        (row) => row.image_count > 0 && (row.relation_totals?.scenes ?? 0) > 0
+      ),
+      "a gallery with images and scenes"
+    );
+    const sceneCount = gallery.relation_totals?.scenes ?? 0;
+
+    await page.goto(
+      `/gallery/${gallery.id}?instance=${encodeURIComponent(gallery.instanceId)}`
+    );
+    const tab = page.getByRole("button", {
+      name: new RegExp(`^Scenes\\s*${sceneCount}$`),
+    });
+    await expect(tab).toBeVisible({ timeout: 10_000 });
+    await tab.click();
+
+    await expect(page).toHaveURL(/[?&]tab=scenes\b/);
+    const scenes = new ListPage(page);
+    await expect(scenes.cards("Scene").first()).toBeVisible({
       timeout: 10_000,
     });
   });
