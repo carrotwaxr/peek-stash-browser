@@ -577,7 +577,7 @@ describe("ImageQueryBuilder", () => {
       expect(ids(result.items)).toEqual([testImageIds[0]]);
     });
 
-    it("each image names its own instance's studio, as a studio ref", async () => {
+    it("each image names its own instance's studio, as a studio ref (no favorite of Stash's)", async () => {
       const { items } = await run();
       const image = must(items.find((i) => i.id === testImageIds[0]));
 
@@ -586,7 +586,6 @@ describe("ImageQueryBuilder", () => {
         instanceId: A,
         name: "Studio One",
         image_path: null,
-        favorite: false,
         parent_studio: null,
       });
       expect(must(items.find((i) => i.id === testImageIds[1])).studio).toEqual(

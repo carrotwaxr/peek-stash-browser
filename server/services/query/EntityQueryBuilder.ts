@@ -100,7 +100,7 @@ export interface EntitySpec {
   readonly userJoins: readonly UserJoin[];
   /**
    * Other joins the select list reads (a gallery's cover image, a clip's
-   * scene and primary tag), after the user joins and binding no parameters.
+   * scene), after the user joins and binding no parameters.
    * Each is on a unique key, so the joined `COUNT(*)` stays exact; an INNER
    * JOIN drops the rows it does not match from the page and the count alike.
    */

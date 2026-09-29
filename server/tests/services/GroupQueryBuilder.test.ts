@@ -9,7 +9,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { keepVisibleConditions } from "../../services/EntityAccessService.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { loadTooltipRelations } from "../../services/TooltipRelations.js";
 import type { GroupQueryRow } from "../../types/internal/queryRows.js";
@@ -17,11 +16,10 @@ import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
-import { entityKey } from "../../utils/entityRef.js";
+import { entityKey, pairsJson } from "../../utils/entityRef.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -48,16 +46,8 @@ vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
 }));
 
-vi.mock("../../services/EntityAccessService.js", () => ({
-  keepVisibleConditions: vi.fn(
-    (_userId: number, _type: string, conditions: unknown[]) =>
-      Promise.resolve(conditions)
-  ),
-}));
-
 const mockPrisma = vi.mocked(prisma, true);
 const mockTooltips = vi.mocked(loadTooltipRelations);
-const mockKeepVisible = vi.mocked(keepVisibleConditions);
 
 const ALLOWED = ["inst-a", "inst-b"];
 const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
@@ -127,7 +117,6 @@ describe("GroupQueryBuilder", () => {
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // page
       .mockResolvedValueOnce([{ total: 0n }]); // count
-    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
   });
 
   describe("the statement", () => {
@@ -377,7 +366,19 @@ describe("GroupQueryBuilder", () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([groupRow()])
-        .mockResolvedValueOnce([{ total: 1n }]);
+        .mockResolvedValueOnce([{ total: 1n }])
+        // The studio, live and not excluded for the viewer; Stash's own
+        // favorite never reaches the ref
+        .mockResolvedValueOnce([
+          {
+            id: "41",
+            stashInstanceId: "inst-a",
+            name: "Studio",
+            imagePath: null,
+            parentId: null,
+            favorite: true,
+          },
+        ]);
       mockTooltips.mockResolvedValueOnce(
         new Map([
           [
@@ -386,17 +387,6 @@ describe("GroupQueryBuilder", () => {
           ],
         ])
       );
-      mockPrisma.stashStudio.findMany.mockResolvedValueOnce([
-        partialRow({
-          id: "41",
-          stashInstanceId: "inst-a",
-          name: "Studio",
-          imagePath: null,
-          favorite: false,
-          parentId: null,
-        }),
-      ]);
-
       const result = await run();
 
       expect(result).toMatchObject({ total: 1 });
@@ -419,13 +409,40 @@ describe("GroupQueryBuilder", () => {
         rating: null,
         rating100: null,
         favorite: true,
-        studio: { id: "41", instanceId: "inst-a", name: "Studio" },
         relation_totals: { performers: 4 },
       });
+      expect(group.studio).toEqual({
+        id: "41",
+        instanceId: "inst-a",
+        name: "Studio",
+        image_path: null,
+        parent_studio: null,
+      });
       expect(mockTooltips).toHaveBeenCalledWith("group", result.items, 1);
-      expect(mockKeepVisible).toHaveBeenCalledWith(1, "studio", [
-        { id: "41", stashInstanceId: "inst-a" },
+      const [studioSql, ...studioParams] = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[2],
+        "the studio statement"
+      );
+      expect(studioSql).toContain(
+        "CROSS JOIN StashStudio x ON x.id = r.rid AND x.stashInstanceId = r.rinst"
+      );
+      expect(studioSql).toContain("WHERE x.deletedAt IS NULL AND e.id IS NULL");
+      expect(studioParams).toEqual([
+        pairsJson([{ id: "41", instanceId: "inst-a" }]),
+        1,
       ]);
+    });
+
+    it("a studio the viewer cannot see is none, though the row names its id", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([groupRow()])
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([]);
+
+      const { items } = await run();
+
+      expect(must(items[0])).toMatchObject({ studioId: "41", studio: null });
     });
   });
 });

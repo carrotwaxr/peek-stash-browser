@@ -144,8 +144,6 @@ describe("TagCard indicators", () => {
     disambiguation: null,
     gender: null,
     image_path: null,
-    favorite: null,
-    rating100: null,
   });
 
   it("the performers indicator shows relation_totals.performers and its grid says how many more", () => {

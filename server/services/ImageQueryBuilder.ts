@@ -11,31 +11,14 @@
  * Rating and O count are the viewer's own (ImageRating, ImageViewHistory),
  * never Stash's, for filtering, sorting and the row alike (QUERIES-17). Each
  * image's performers, tags, galleries and studio are loaded by its
- * (id, instance), one statement per relation for the page.
+ * (id, instance), one statement per relation for the page, only those the
+ * viewer may see.
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
-import prisma from "../prisma/singleton.js";
-import type {
-  GalleryRef,
-  ImageListItem,
-  PerformerRef,
-  StudioRef,
-  TagRef,
-} from "../types/index.js";
-import type {
-  ImageGalleryQueryRow,
-  ImagePerformerQueryRow,
-  ImageQueryRow,
-  ImageStudioQueryRow,
-  ImageTagQueryRow,
-} from "../types/internal/queryRows.js";
+import type { ImageListItem } from "../types/index.js";
+import type { ImageQueryRow } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
-import {
-  type EntityRef,
-  distinctRefs,
-  entityKey,
-  pairsJson,
-} from "../utils/entityRef.js";
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -61,6 +44,14 @@ import {
   type SortExpr,
   expandRefs,
 } from "./query/EntityQueryBuilder.js";
+import {
+  GALLERY_REF,
+  PERFORMER_REF,
+  STUDIO_REF,
+  TAG_REF,
+  loadNestedRefs,
+  loadRefsByKey,
+} from "./query/nestedRefs.js";
 
 // Column list for SELECT - the StashImage fields the list shows, plus the
 // viewer's rating (r) and views (v)
@@ -127,11 +118,6 @@ function imageJunction(
 const IMAGE_TAGS = imageJunction("ImageTag", "it", "tag");
 const IMAGE_PERFORMERS = imageJunction("ImagePerformer", "ip", "performer");
 const IMAGE_GALLERIES = imageJunction("ImageGallery", "ig", "gallery");
-
-/** The page's images, from the one JSON parameter of [id, instance] pairs */
-const PAGE = `WITH page(pid, pinst) AS (
-  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)
-)`;
 
 /**
  * Builds and executes SQL queries for image filtering
@@ -331,140 +317,40 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * Each image's performers, tags and galleries (live ones), and its
-   * studio, by the image's (id, instance): one statement per relation for
-   * the page, driven from the page's pairs (`json_each(?)` with `CROSS
-   * JOIN`) into each junction's key.
+   * Each image's performers, tags, galleries and studio, only those the
+   * viewer may see (`query/nestedRefs.ts`): one statement per relation for
+   * the page, driven from its (id, instance) pairs into each junction's
+   * key. An image's studio is on the image's own instance.
    */
-  protected async populateRelations(images: ImageListItem[]): Promise<void> {
+  protected async populateRelations(
+    images: ImageListItem[],
+    ctx: QueryContext
+  ): Promise<void> {
     if (images.length === 0) return;
 
-    const page = pairsJson(images);
-    const studioRefs = distinctRefs(
-      images.flatMap((image): EntityRef[] =>
-        image.studioId === null
-          ? []
-          : [{ id: image.studioId, instanceId: image.instanceId }]
-      )
+    const studioRefs = images.flatMap((image): EntityRef[] =>
+      image.studioId === null
+        ? []
+        : [{ id: image.studioId, instanceId: image.instanceId }]
     );
-
     const [performers, tags, galleries, studios] = await Promise.all([
-      prisma.$queryRawUnsafe<ImagePerformerQueryRow[]>(
-        `${PAGE}
-        SELECT pg.pid AS imageId, pg.pinst AS imageInstanceId, p.id, p.stashInstanceId,
-          p.name, p.disambiguation, p.gender, p.favorite, p.rating100, p.imagePath
-        FROM page pg
-        CROSS JOIN ImagePerformer ip ON ip.imageId = pg.pid AND ip.imageInstanceId = pg.pinst
-        JOIN StashPerformer p ON p.id = ip.performerId AND p.stashInstanceId = ip.performerInstanceId
-        WHERE p.deletedAt IS NULL`,
-        page
-      ),
-      prisma.$queryRawUnsafe<ImageTagQueryRow[]>(
-        `${PAGE}
-        SELECT pg.pid AS imageId, pg.pinst AS imageInstanceId, t.id, t.stashInstanceId,
-          t.name, t.favorite, t.imagePath
-        FROM page pg
-        CROSS JOIN ImageTag it ON it.imageId = pg.pid AND it.imageInstanceId = pg.pinst
-        JOIN StashTag t ON t.id = it.tagId AND t.stashInstanceId = it.tagInstanceId
-        WHERE t.deletedAt IS NULL`,
-        page
-      ),
-      prisma.$queryRawUnsafe<ImageGalleryQueryRow[]>(
-        `${PAGE}
-        SELECT pg.pid AS imageId, pg.pinst AS imageInstanceId, g.id, g.stashInstanceId,
-          g.title, g.coverPath
-        FROM page pg
-        CROSS JOIN ImageGallery ig ON ig.imageId = pg.pid AND ig.imageInstanceId = pg.pinst
-        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-        WHERE g.deletedAt IS NULL`,
-        page
-      ),
-      studioRefs.length === 0
-        ? Promise.resolve([])
-        : prisma.$queryRawUnsafe<ImageStudioQueryRow[]>(
-            `WITH refs(sid, sinst) AS (
-              SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)
-            )
-            SELECT s.id, s.stashInstanceId, s.name, s.imagePath, s.favorite, s.parentId
-            FROM refs r
-            CROSS JOIN StashStudio s ON s.id = r.sid AND s.stashInstanceId = r.sinst`,
-            pairsJson(studioRefs)
-          ),
+      loadNestedRefs(PERFORMER_REF, IMAGE_PERFORMERS, images, ctx),
+      loadNestedRefs(TAG_REF, IMAGE_TAGS, images, ctx),
+      loadNestedRefs(GALLERY_REF, IMAGE_GALLERIES, images, ctx),
+      loadRefsByKey(STUDIO_REF, studioRefs, ctx),
     ]);
-
-    const performersByImage = groupByImage(
-      performers,
-      (row): PerformerRef => ({
-        id: row.id,
-        instanceId: row.stashInstanceId,
-        name: row.name,
-        disambiguation: row.disambiguation,
-        gender: row.gender,
-        favorite: row.favorite,
-        rating100: row.rating100,
-        image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
-      })
-    );
-    const tagsByImage = groupByImage(
-      tags,
-      (row): TagRef => ({
-        id: row.id,
-        instanceId: row.stashInstanceId,
-        name: row.name,
-        favorite: row.favorite,
-        image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
-      })
-    );
-    const galleriesByImage = groupByImage(
-      galleries,
-      (row): GalleryRef => ({
-        id: row.id,
-        instanceId: row.stashInstanceId,
-        title: row.title,
-        cover: toProxyUrl(row.coverPath, row.stashInstanceId),
-      })
-    );
-    const studiosByKey = new Map(
-      studios.map((row): [string, StudioRef] => [
-        entityKey(row.id, row.stashInstanceId),
-        {
-          id: row.id,
-          instanceId: row.stashInstanceId,
-          name: row.name,
-          image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
-          favorite: row.favorite,
-          parent_studio: row.parentId === null ? null : { id: row.parentId },
-        },
-      ])
-    );
 
     for (const image of images) {
       const key = entityKey(image.id, image.instanceId);
-      image.performers = performersByImage.get(key) ?? [];
-      image.tags = tagsByImage.get(key) ?? [];
-      image.galleries = galleriesByImage.get(key) ?? [];
+      image.performers = performers.get(key) ?? [];
+      image.tags = tags.get(key) ?? [];
+      image.galleries = galleries.get(key) ?? [];
       image.studio =
         image.studioId === null
           ? null
-          : (studiosByKey.get(entityKey(image.studioId, image.instanceId)) ??
-            null);
+          : (studios.get(entityKey(image.studioId, image.instanceId)) ?? null);
     }
   }
-}
-
-/** A relation's rows as refs, grouped by their image's entityKey */
-function groupByImage<
-  Row extends { imageId: string; imageInstanceId: string },
-  Ref,
->(rows: readonly Row[], toRef: (row: Row) => Ref): Map<string, Ref[]> {
-  const grouped = new Map<string, Ref[]>();
-  for (const row of rows) {
-    const key = entityKey(row.imageId, row.imageInstanceId);
-    const list = grouped.get(key) ?? [];
-    list.push(toRef(row));
-    grouped.set(key, list);
-  }
-  return grouped;
 }
 
 // Export singleton instance

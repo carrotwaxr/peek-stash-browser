@@ -5,15 +5,15 @@
  * A clip shows only while its scene does: the scene is joined on the clip's
  * (sceneId, sceneInstanceId) and must be live, and the viewer's exclusions
  * apply to both, the clip's own rows (its tags cascade to it) through the
- * base's join and the scene's through the spec's second join. A clip has no
- * per-user data, so no user joins. The instance filter, the random sort and
- * the count are the base's.
+ * base's join and the scene's through the spec's second join. Its primary
+ * tag and tag list load with the page's relations, only the tags the viewer
+ * may see. A clip has no per-user data, so no user joins. The instance
+ * filter, the random sort and the count are the base's.
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
-import prisma from "../prisma/singleton.js";
-import type { ClipRow, ClipTagQueryRow } from "../types/internal/queryRows.js";
+import type { ClipRow, ClipTagRefRow } from "../types/internal/queryRows.js";
 import type { ClipListRequest, FilterRef } from "../types/parsedFilters.js";
-import { entityKey, pairsJson } from "../utils/entityRef.js";
+import { entityKey } from "../utils/entityRef.js";
 import {
   type ColumnTarget,
   type FilterClause,
@@ -29,6 +29,11 @@ import {
   type QueryContext,
   type SortExpr,
 } from "./query/EntityQueryBuilder.js";
+import {
+  type NestedEntity,
+  type NestedLink,
+  loadNestedRefs,
+} from "./query/nestedRefs.js";
 
 /** A clip's tag as the row carries it */
 export interface ClipTagRef {
@@ -83,14 +88,11 @@ const SELECT_COLUMNS = `c.id, c.stashInstanceId, c.sceneId, c.sceneInstanceId,
   c.screenshotPath,
   c.isGenerated, c.stashCreatedAt, c.stashUpdatedAt,
   s.title AS sceneTitle, s.pathScreenshot AS scenePathScreenshot,
-  s.studioId AS sceneStudioId,
-  pt.name AS primaryTagName, pt.color AS primaryTagColor`;
+  s.studioId AS sceneStudioId`;
 
 /** The clip's scene, on its (id, instance): a clip without one does not list */
 const SCENE_JOIN =
   "INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId";
-const PRIMARY_TAG_JOIN =
-  "LEFT JOIN StashTag pt ON c.primaryTagId = pt.id AND c.primaryTagInstanceId = pt.stashInstanceId";
 
 /** Clips of a scene: the clip's own scene columns */
 const CLIP_SCENE: ColumnTarget = {
@@ -108,6 +110,23 @@ const PRIMARY_TAG: ColumnTarget = {
   parentAlias: "c",
   idCol: "primaryTagId",
   instanceCol: "primaryTagInstanceId",
+};
+
+/** The primary tag as a nested ref's link: a column of the clip's own row */
+const PRIMARY_TAG_LINK: NestedLink = {
+  table: "StashClip",
+  parentIdCol: "id",
+  parentInstanceCol: "stashInstanceId",
+  refIdCol: "primaryTagId",
+  refInstanceCol: "primaryTagInstanceId",
+};
+
+/** A clip's tag as a nested ref: its name and color */
+const CLIP_TAG_REF: NestedEntity<ClipTagRefRow, ClipTagRef> = {
+  table: "StashTag",
+  entityType: "tag",
+  columns: "x.name, x.color",
+  toRef: (row) => ({ id: row.id, name: row.name, color: row.color }),
 };
 
 /** ... or one of its tag list */
@@ -165,7 +184,7 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     alias: "c",
     entityType: "clip",
     userJoins: [],
-    joins: [SCENE_JOIN, PRIMARY_TAG_JOIN],
+    joins: [SCENE_JOIN],
     // The scene's exclusion rows: a clip hides with its scene
     extraJoins: (ctx) =>
       ctx.applyExclusions
@@ -292,13 +311,8 @@ class ClipQueryBuilder extends EntityQueryBuilder<
       isGenerated: row.isGenerated,
       stashCreatedAt: row.stashCreatedAt,
       stashUpdatedAt: row.stashUpdatedAt,
-      primaryTag: row.primaryTagId
-        ? {
-            id: row.primaryTagId,
-            name: row.primaryTagName ?? "",
-            color: row.primaryTagColor,
-          }
-        : null,
+      // Filled by populateRelations
+      primaryTag: null,
       tags: [],
       scene: {
         id: row.sceneId,
@@ -310,28 +324,26 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The page's tag lists, in one statement driven from its (id, instance) pairs */
-  protected async populateRelations(clips: ClipWithRelations[]): Promise<void> {
+  /**
+   * Each clip's primary tag and tag list, only the tags the viewer may see
+   * (`query/nestedRefs.ts`: a deleted tag, or one held for a pending
+   * recompute, is no chip): one statement each for the page, driven from
+   * its (id, instance) pairs
+   */
+  protected async populateRelations(
+    clips: ClipWithRelations[],
+    ctx: QueryContext
+  ): Promise<void> {
     if (clips.length === 0) return;
 
-    const rows = await prisma.$queryRawUnsafe<ClipTagQueryRow[]>(
-      `WITH page(pid, pinst) AS (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))
-SELECT ct.clipId, ct.clipInstanceId, t.id AS tagId, t.name AS tagName, t.color AS tagColor
-FROM page pg
-CROSS JOIN ClipTag ct ON ct.clipId = pg.pid AND ct.clipInstanceId = pg.pinst
-INNER JOIN StashTag t ON t.id = ct.tagId AND t.stashInstanceId = ct.tagInstanceId`,
-      pairsJson(clips.map((c) => ({ id: c.id, instanceId: c.instanceId })))
-    );
-
-    const byClip = new Map<string, ClipTagRef[]>();
-    for (const row of rows) {
-      const key = entityKey(row.clipId, row.clipInstanceId);
-      const tags = byClip.get(key) ?? [];
-      tags.push({ id: row.tagId, name: row.tagName, color: row.tagColor });
-      byClip.set(key, tags);
-    }
+    const [primaryTags, tags] = await Promise.all([
+      loadNestedRefs(CLIP_TAG_REF, PRIMARY_TAG_LINK, clips, ctx),
+      loadNestedRefs(CLIP_TAG_REF, CLIP_TAGS, clips, ctx),
+    ]);
     for (const clip of clips) {
-      clip.tags = byClip.get(entityKey(clip.id, clip.instanceId)) ?? [];
+      const key = entityKey(clip.id, clip.instanceId);
+      clip.primaryTag = primaryTags.get(key)?.[0] ?? null;
+      clip.tags = tags.get(key) ?? [];
     }
   }
 

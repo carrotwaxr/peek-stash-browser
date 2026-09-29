@@ -21,7 +21,7 @@ import type {
   TooltipTotalRow,
 } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
-import { entityKey, pairsJson } from "../utils/entityRef.js";
+import { type EntityRef, entityKey, pairsJson } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -33,6 +33,7 @@ import {
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
+  exclusionJoin,
   refClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -49,6 +50,13 @@ import {
   type SortExpr,
   expandRefs,
 } from "./query/EntityQueryBuilder.js";
+import {
+  PERFORMER_REF,
+  STUDIO_REF,
+  TAG_REF,
+  loadNestedRefs,
+  loadRefsByKey,
+} from "./query/nestedRefs.js";
 
 // Column list for SELECT - all StashGallery fields plus user data
 const SELECT_COLUMNS = `
@@ -179,7 +187,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     // The viewer's own data
     push(buildFavoriteFilter(filter.favorite));
     if (filter.hasFavoriteImage === true) {
-      push(this.hasFavoriteImageClause(ctx.userId));
+      push(this.hasFavoriteImageClause(ctx));
     }
 
     // Related entities
@@ -263,17 +271,24 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     });
   }
 
-  /** Galleries holding at least one image the viewer favorited */
-  private hasFavoriteImageClause(userId: number): FilterClause {
+  /**
+   * Galleries holding at least one image the viewer favorited and can see:
+   * live and, with the viewer's exclusions applied, not excluded for them
+   */
+  private hasFavoriteImageClause(ctx: QueryContext): FilterClause {
+    const exclusion = ctx.applyExclusions
+      ? exclusionJoin("ie", "image", "si.id", "si.stashInstanceId")
+      : "";
     return {
       sql: `EXISTS (
         SELECT 1 FROM ImageGallery ig
         JOIN StashImage si ON ig.imageId = si.id AND ig.imageInstanceId = si.stashInstanceId
         JOIN ImageRating ir ON ir.imageId = si.id AND ir.instanceId = si.stashInstanceId AND ir.userId = ?
+        ${exclusion}
         WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId
-        AND ir.favorite = 1
+        AND ir.favorite = 1 AND si.deletedAt IS NULL${ctx.applyExclusions ? " AND ie.id IS NULL" : ""}
       )`,
-      params: [userId],
+      params: ctx.applyExclusions ? [ctx.userId, ctx.userId] : [ctx.userId],
     };
   }
 
@@ -350,8 +365,10 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * Populate gallery relations (performers, tags, studio), and each
-   * gallery's count of the scenes the viewer can see
+   * Each gallery's performers, tags and studio, only those the viewer may
+   * see (`query/nestedRefs.ts`), and its count of the scenes the viewer can
+   * see: one statement per relation for the page. A gallery's studio is on
+   * the gallery's own instance.
    */
   protected async populateRelations(
     galleries: NormalizedGallery[],
@@ -359,186 +376,28 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
   ): Promise<void> {
     if (galleries.length === 0) return;
 
-    // Build gallery keys with instanceId for multi-instance support
-    const galleryIds = galleries.map((g) => g.id);
-    const galleryInstanceIds = [...new Set(galleries.map((g) => g.instanceId))];
-
-    // Collect unique (studioId, instanceId) pairs - each gallery's studio comes
-    // from its own instance; a gallery without a studio has none to load
-    const studioKeys = [
-      ...new Map(
-        galleries.flatMap((g) =>
-          g.studio?.id
-            ? [
-                [
-                  entityKey(g.studio.id, g.instanceId),
-                  { id: g.studio.id, instanceId: g.instanceId },
-                ] as const,
-              ]
-            : []
-        )
-      ).values(),
-    ];
-
-    // Batch load all relations in parallel
-    // Filter by both galleryId AND galleryInstanceId for multi-instance correctness
-    const [performerJunctions, tagJunctions] = await Promise.all([
-      prisma.galleryPerformer.findMany({
-        where: {
-          galleryId: { in: galleryIds },
-          galleryInstanceId: { in: galleryInstanceIds },
-        },
-      }),
-      prisma.galleryTag.findMany({
-        where: {
-          galleryId: { in: galleryIds },
-          galleryInstanceId: { in: galleryInstanceIds },
-        },
-      }),
-    ]);
-
-    // Collect unique entity refs from junction tables, by entityKey
-    const performerKeys = [
-      ...new Map(
-        performerJunctions.map((j) => [
-          entityKey(j.performerId, j.performerInstanceId),
-          { id: j.performerId, instanceId: j.performerInstanceId },
-        ])
-      ).values(),
-    ];
-    const tagKeys = [
-      ...new Map(
-        tagJunctions.map((j) => [
-          entityKey(j.tagId, j.tagInstanceId),
-          { id: j.tagId, instanceId: j.tagInstanceId },
-        ])
-      ).values(),
-    ];
-
-    // Build OR conditions for entity queries (need to match on composite keys)
-    const performerOrConditions = performerKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-    const tagOrConditions = tagKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-    const studioOrConditions = studioKeys.map((k) => ({
-      id: k.id,
-      stashInstanceId: k.instanceId,
-    }));
-
-    // Load actual entities (only those that exist) using composite key lookups
+    const studioRefs = galleries.flatMap((gallery): EntityRef[] =>
+      gallery.studio
+        ? [{ id: gallery.studio.id, instanceId: gallery.instanceId }]
+        : []
+    );
     const [performers, tags, studios] = await Promise.all([
-      performerOrConditions.length > 0
-        ? prisma.stashPerformer.findMany({
-            where: { OR: performerOrConditions },
-          })
-        : Promise.resolve([]),
-      tagOrConditions.length > 0
-        ? prisma.stashTag.findMany({
-            where: { OR: tagOrConditions },
-          })
-        : Promise.resolve([]),
-      studioOrConditions.length > 0
-        ? prisma.stashStudio.findMany({
-            where: { OR: studioOrConditions },
-          })
-        : Promise.resolve([]),
+      loadNestedRefs(PERFORMER_REF, GALLERY_PERFORMERS, galleries, ctx),
+      loadNestedRefs(TAG_REF, GALLERY_TAGS, galleries, ctx),
+      loadRefsByKey(STUDIO_REF, studioRefs, ctx),
     ]);
-
-    // Build entity lookup maps by entityKey
-    const performersByKey = new Map<string, PerformerRef>();
-    for (const performer of performers) {
-      const key = entityKey(performer.id, performer.stashInstanceId);
-      performersByKey.set(key, {
-        id: performer.id,
-        instanceId: performer.stashInstanceId,
-        name: performer.name,
-        disambiguation: performer.disambiguation,
-        gender: performer.gender,
-        image_path: toProxyUrl(performer.imagePath, performer.stashInstanceId),
-        favorite: performer.favorite,
-        rating100: performer.rating100,
-      });
-    }
-
-    const tagsByKey = new Map<string, TagRef>();
-    for (const tag of tags) {
-      const key = entityKey(tag.id, tag.stashInstanceId);
-      tagsByKey.set(key, {
-        id: tag.id,
-        instanceId: tag.stashInstanceId,
-        name: tag.name,
-        image_path: toProxyUrl(tag.imagePath, tag.stashInstanceId),
-        favorite: tag.favorite,
-      });
-    }
-
-    const studiosByKey = new Map<string, StudioRef>();
-    for (const studio of studios) {
-      const key = entityKey(studio.id, studio.stashInstanceId);
-      studiosByKey.set(key, {
-        id: studio.id,
-        instanceId: studio.stashInstanceId,
-        name: studio.name,
-        image_path: toProxyUrl(studio.imagePath, studio.stashInstanceId),
-        favorite: studio.favorite,
-        parent_studio: studio.parentId ? { id: studio.parentId } : null,
-      });
-    }
-
-    // Build gallery-to-entities maps using junction tables with composite keys
-    // Keyed by the gallery's entityKey -> entities[]
-    const performersByGallery = new Map<string, PerformerRef[]>();
-    for (const junction of performerJunctions) {
-      const performerKey = entityKey(
-        junction.performerId,
-        junction.performerInstanceId
-      );
-      const performer = performersByKey.get(performerKey);
-      if (!performer) continue; // Skip orphaned junction records
-      const galleryKey = entityKey(
-        junction.galleryId,
-        junction.galleryInstanceId
-      );
-      const list = performersByGallery.get(galleryKey) ?? [];
-      list.push(performer);
-      performersByGallery.set(galleryKey, list);
-    }
-
-    const tagsByGallery = new Map<string, TagRef[]>();
-    for (const junction of tagJunctions) {
-      const tagKey = entityKey(junction.tagId, junction.tagInstanceId);
-      const tag = tagsByKey.get(tagKey);
-      if (!tag) continue; // Skip orphaned junction records
-      const galleryKey = entityKey(
-        junction.galleryId,
-        junction.galleryInstanceId
-      );
-      const list = tagsByGallery.get(galleryKey) ?? [];
-      list.push(tag);
-      tagsByGallery.set(galleryKey, list);
-    }
-
     const sceneTotals = await this.loadSceneTotals(galleries, ctx);
 
-    // Populate galleries using composite keys
     for (const gallery of galleries) {
-      const galleryKey = entityKey(gallery.id, gallery.instanceId);
-      gallery.performers = performersByGallery.get(galleryKey) ?? [];
-      gallery.tags = tagsByGallery.get(galleryKey) ?? [];
-      gallery.relation_totals = { scenes: sceneTotals.get(galleryKey) ?? 0 };
-
-      // Hydrate studio with full data using composite key
-      if (gallery.studio?.id) {
-        const studioKey = entityKey(gallery.studio.id, gallery.instanceId);
-        const fullStudio = studiosByKey.get(studioKey);
-        if (fullStudio) {
-          gallery.studio = fullStudio;
-        }
-      }
+      const key = entityKey(gallery.id, gallery.instanceId);
+      gallery.performers = performers.get(key) ?? [];
+      gallery.tags = tags.get(key) ?? [];
+      gallery.relation_totals = { scenes: sceneTotals.get(key) ?? 0 };
+      // The row's studio id until here; none when the viewer cannot see it
+      gallery.studio = gallery.studio
+        ? (studios.get(entityKey(gallery.studio.id, gallery.instanceId)) ??
+          null)
+        : null;
     }
   }
 

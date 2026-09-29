@@ -149,7 +149,6 @@ describe("PerformerCard indicators", () => {
     instanceId: "inst-a",
     name: `Studio ${i}`,
     image_path: null,
-    favorite: null,
     parent_studio: null,
   });
 

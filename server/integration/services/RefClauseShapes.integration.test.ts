@@ -282,7 +282,11 @@ describeWithDb("Ref clause shapes", () => {
     } finally {
       recorder.restore();
     }
-    const [largeIncludes, , largeExcludes, , small] = recorder.statements;
+    // Each call's page and count (its nested refs load after, from the page)
+    const [largeIncludes, , largeExcludes, , small] =
+      recorder.statements.filter((statement) =>
+        statement.sql.includes("FROM StashScene s")
+      );
     const plan = async (statement: typeof largeIncludes) => {
       const lines = await planner.planOf(
         must(statement).sql,
