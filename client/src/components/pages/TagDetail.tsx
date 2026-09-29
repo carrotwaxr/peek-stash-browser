@@ -1,6 +1,14 @@
 import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { NormalizedImage } from "@peek/shared-types";
+import {
+  GALLERY_FIELDS,
+  GROUP_FIELDS,
+  IMAGE_FIELDS,
+  type NormalizedImage,
+  PERFORMER_FIELDS,
+  SCENE_FIELDS,
+  STUDIO_FIELDS,
+} from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -40,6 +48,19 @@ interface EntityRef {
   image_path?: string;
   [key: string]: unknown;
 }
+
+/**
+ * Whether each tab's tag filter takes sub-tags (a depth) in the shared
+ * contract; Include sub-tags shows on the tabs that do (all of them today)
+ */
+const TAB_TAKES_SUB_TAGS: Readonly<Record<string, boolean>> = {
+  scenes: SCENE_FIELDS.tags.hierarchical,
+  galleries: GALLERY_FIELDS.tags.hierarchical,
+  images: IMAGE_FIELDS.tags.hierarchical,
+  performers: PERFORMER_FIELDS.tags.hierarchical,
+  studios: STUDIO_FIELDS.tags.hierarchical,
+  groups: GROUP_FIELDS.tags.hierarchical,
+};
 
 const TagDetail = () => {
   const { tagId } = useParams<{ tagId: string }>();
@@ -97,6 +118,7 @@ const TagDetail = () => {
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
+  const tabTakesSubTags = TAB_TAKES_SUB_TAGS[activeTab] === true;
 
   // Handler for toggling include sub-tags
   const handleIncludeSubTagsChange = (checked: boolean) => {
@@ -267,8 +289,8 @@ const TagDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {/* Include Sub-Tags Toggle - only show if tag has children */}
-          {hasChildren && (
+          {/* Include Sub-Tags Toggle: a tag with children, on a tab that takes them */}
+          {hasChildren && tabTakesSubTags && (
             <div className="mb-4 flex items-center gap-2">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -358,11 +380,13 @@ const TagDetail = () => {
 
               {activeTab === "performers" && (
                 <PerformerGrid
+                  key={`performers-${includeSubTags}`}
                   lockedFilters={{
                     performer_filter: {
                       tags: {
                         value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
+                        ...(includeSubTags && { depth: -1 }),
                       },
                     },
                   }}
@@ -373,11 +397,13 @@ const TagDetail = () => {
 
               {activeTab === "studios" && (
                 <StudioGrid
+                  key={`studios-${includeSubTags}`}
                   lockedFilters={{
                     studio_filter: {
                       tags: {
                         value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
+                        ...(includeSubTags && { depth: -1 }),
                       },
                     },
                   }}
@@ -388,11 +414,13 @@ const TagDetail = () => {
 
               {activeTab === "groups" && (
                 <GroupGrid
+                  key={`groups-${includeSubTags}`}
                   lockedFilters={{
                     group_filter: {
                       tags: {
                         value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
+                        ...(includeSubTags && { depth: -1 }),
                       },
                     },
                   }}
