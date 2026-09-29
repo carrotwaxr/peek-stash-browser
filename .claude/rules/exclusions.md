@@ -54,3 +54,5 @@ Two instance lists, never swapped: the compute (`doRecomputeForUser`, `addHidden
 - The `LEFT JOIN UserExcludedEntity` in the query builders, `TagTreeService` and `TooltipRelations`, for lists.
 - `entityExclusionHelper.filterExcluded`, for endpoints that read cached entities in memory.
 - `services/EntityAccessService.ts`, for endpoints that act on ids from the request: ratings, history writes, downloads, media and hides. It also checks `deletedAt` and the user's allowed instances (enabled, first sync done, selected: `LIVE_AND_ALLOWED_WHERE`, which mirrors `getUserAllowedInstanceIds`). It needs no role logic, because the compute already settles admins: an admin's rows hold only their own hides and cascades. The Hidden Items list uses its `resolveVisibleApartFromOwnHides`, which ignores only `hidden` rows.
+
+One surface reads no exclusions on purpose: the `/minimal` pickers with `scope: "allEnabled"`, which only an admin may send (the Content Restrictions editor), list every live entity on every enabled, synced instance.
