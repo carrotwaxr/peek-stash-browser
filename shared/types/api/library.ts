@@ -29,9 +29,17 @@ export type WithStashUrl<T> = T & { stashUrl: string | null };
 // =============================================================================
 
 /**
+ * A picker's instances beyond the user's own selection. "allEnabled": every
+ * enabled instance past its first sync, for an admin's Content Restrictions
+ * editor, which restricts another user on any server. Admins only.
+ */
+export type MinimalScope = "allEnabled";
+
+/**
  * POST /api/library/<entities>/minimal: the entity pickers (filter
  * dropdowns, carousel rules, content restrictions). One page in name order,
- * of what the user can see on the instances they use.
+ * of what the user can see on the instances they use (or, with `scope`,
+ * on every enabled instance).
  */
 export interface MinimalRequest {
   /**
@@ -40,6 +48,12 @@ export interface MinimalRequest {
    * MINIMAL_IDS_MAX (100).
    */
   ids?: string[];
+  /**
+   * "allEnabled" lists every enabled instance past its first sync in place
+   * of the user's selection; the user's own hidden items still apply. 403
+   * for anyone but an admin.
+   */
+  scope?: MinimalScope;
   filter?: {
     /** Matched anywhere in the name or an alias, ignoring case */
     q?: string;

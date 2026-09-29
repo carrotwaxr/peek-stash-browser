@@ -193,8 +193,9 @@ export const findStudios = async (
 
 /**
  * One page of studios for an entity picker, in name order: the name matched
- * in SQL, or the ids a picker has selected. A ValidationError (400) reaches
- * the central error handler.
+ * in SQL, or the ids a picker has selected; with scope "allEnabled", on
+ * every enabled server (admins only). A ValidationError (400) or
+ * ForbiddenError (403) reaches the central error handler.
  */
 export const findStudiosMinimal = async (
   req: TypedAuthRequest<FindStudiosMinimalRequest>,
@@ -204,6 +205,6 @@ export const findStudiosMinimal = async (
   const request = parseMinimalRequest("studio", req.body, { userId });
   logDropped("POST /library/studios/minimal", request.dropped);
 
-  const studios = await findMinimalEntities(userId, request);
+  const studios = await findMinimalEntities(req.user, request);
   res.json({ studios });
 };

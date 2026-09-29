@@ -157,7 +157,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
     body: object
   ): Promise<MinimalEntity[]> {
     return findMinimalEntities(
-      userId,
+      { id: userId, role: "USER" },
       parseMinimalRequest(entity, body, { userId, policy: "reject" })
     );
   }
@@ -431,7 +431,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
     const recorder = recordStatements();
     let rows: MinimalEntity[] = [];
     try {
-      rows = await findMinimalEntities(viewer, request);
+      rows = await findMinimalEntities({ id: viewer, role: "USER" }, request);
     } finally {
       recorder.restore();
     }

@@ -171,7 +171,7 @@ describe("findPerformersMinimal", () => {
 
     await findPerformersMinimal(req, res);
 
-    expect(mockFindMinimalEntities).toHaveBeenCalledWith(testUser().id, {
+    expect(mockFindMinimalEntities).toHaveBeenCalledWith(testUser(), {
       entity: "performer",
       q: "al",
       perPage: 20,

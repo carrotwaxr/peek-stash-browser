@@ -1201,6 +1201,29 @@ describe("parseMinimalRequest", () => {
       issuesOf(() => parseMinimalRequest("studio", 1, opts(policy)))
     ).toEqual([{ path: "body", message: "Expected an object" }]);
   });
+
+  it("reads scope allEnabled; no scope is the user's own instances", () => {
+    expect(
+      parseMinimalRequest("tag", { scope: "allEnabled" }, opts("reject")).scope
+    ).toBe("allEnabled");
+    expect(
+      parseMinimalRequest("tag", {}, opts("reject")).scope
+    ).toBeUndefined();
+    expect(
+      parseMinimalRequest("tag", { scope: null }, opts("reject")).scope
+    ).toBeUndefined();
+  });
+
+  it.each(POLICIES)(
+    "any other scope fails in both policies: it names the instances the request looks in (%s)",
+    (policy) => {
+      for (const scope of ["all", "ALLENABLED", "", 1, true, ["allEnabled"]]) {
+        expect(
+          issuesOf(() => parseMinimalRequest("tag", { scope }, opts(policy)))
+        ).toEqual([{ path: "scope", message: 'Expected "allEnabled"' }]);
+      }
+    }
+  );
 });
 
 describe("parseListRequest: an empty value", () => {

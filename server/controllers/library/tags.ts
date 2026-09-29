@@ -179,8 +179,9 @@ export const findTags = async (
 
 /**
  * One page of tags for an entity picker, in name order: the name and aliases
- * matched in SQL, or the ids a picker has selected. A ValidationError (400)
- * reaches the central error handler.
+ * matched in SQL, or the ids a picker has selected; with scope "allEnabled",
+ * on every enabled server (admins only). A ValidationError (400) or
+ * ForbiddenError (403) reaches the central error handler.
  */
 export const findTagsMinimal = async (
   req: TypedAuthRequest<FindTagsMinimalRequest>,
@@ -190,7 +191,7 @@ export const findTagsMinimal = async (
   const request = parseMinimalRequest("tag", req.body, { userId });
   logDropped("POST /library/tags/minimal", request.dropped);
 
-  const tags = await findMinimalEntities(userId, request);
+  const tags = await findMinimalEntities(req.user, request);
   res.json({ tags });
 };
 

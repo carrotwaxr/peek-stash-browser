@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import {
   buildInstanceFilterClause,
+  getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
   getUserInstanceScope,
   getUsersSelecting,
@@ -274,6 +275,35 @@ describe("UserInstanceService", () => {
         select: { id: true },
         orderBy: { id: "asc" },
       });
+    });
+  });
+
+  describe("getEnabledSyncedInstanceIds", () => {
+    it("lists every enabled instance past its first sync, whatever any selection", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-b" }),
+      ]);
+
+      expect(await getEnabledSyncedInstanceIds()).toEqual([
+        "instance-a",
+        "instance-b",
+      ]);
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { enabled: true, firstSyncedAt: { not: null } },
+        select: { id: true },
+      });
+      expect(mockPrisma.userStashInstance.findMany).not.toHaveBeenCalled();
+    });
+
+    it("throws on a database error", async () => {
+      mockPrisma.stashInstance.findMany.mockRejectedValue(
+        new Error("SQLITE_BUSY")
+      );
+
+      await expect(getEnabledSyncedInstanceIds()).rejects.toThrow(
+        "SQLITE_BUSY"
+      );
     });
   });
 

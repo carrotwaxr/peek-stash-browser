@@ -129,8 +129,9 @@ export const findPerformers = async (
 
 /**
  * One page of performers for an entity picker, in name order: the name and
- * aliases matched in SQL, or the ids a picker has selected. A
- * ValidationError (400) reaches the central error handler.
+ * aliases matched in SQL, or the ids a picker has selected; with scope
+ * "allEnabled", on every enabled server (admins only). A ValidationError
+ * (400) or ForbiddenError (403) reaches the central error handler.
  */
 export const findPerformersMinimal = async (
   req: TypedAuthRequest<FindPerformersMinimalRequest>,
@@ -140,6 +141,6 @@ export const findPerformersMinimal = async (
   const request = parseMinimalRequest("performer", req.body, { userId });
   logDropped("POST /library/performers/minimal", request.dropped);
 
-  const performers = await findMinimalEntities(userId, request);
+  const performers = await findMinimalEntities(req.user, request);
   res.json({ performers });
 };
