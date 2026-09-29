@@ -94,7 +94,8 @@ export interface SceneScoringRow {
   id: string;
   stashInstanceId: string;
   studioId: string | null;
-  oCounter: number;
+  /** The viewer's O count: COALESCE over an integer, so a bigint */
+  oCounter: bigint;
   performerIds: string | null;
   tagIds: string | null;
   playCount: number | null;

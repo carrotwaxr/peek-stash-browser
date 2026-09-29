@@ -348,4 +348,26 @@ describe("Recommended scenes (integration)", () => {
     const second = await recommendationService.getRankedRefs(viewer.id, [A, B]);
     expect(second).toBe(first);
   });
+
+  it("an O press rescores: the stamp moves with the viewer's O count", async () => {
+    const viewer = must(users[0], "the first viewer");
+    const where = {
+      userId_instanceId_sceneId: {
+        userId: viewer.id,
+        instanceId: A,
+        sceneId: VISIBLE_A,
+      },
+    };
+    await prisma.watchHistory.upsert({
+      where,
+      create: { userId: viewer.id, instanceId: A, sceneId: VISIBLE_A },
+      update: {},
+    });
+    const before = await recommendationService.getRankedRefs(viewer.id, [A, B]);
+
+    await prisma.watchHistory.update({ where, data: { oCount: 1 } });
+
+    const after = await recommendationService.getRankedRefs(viewer.id, [A, B]);
+    expect(after).not.toBe(before);
+  });
 });
