@@ -18,6 +18,16 @@ describe("StashEntityService.getScenesForScoring", () => {
     vi.clearAllMocks();
   });
 
+  it("reads the viewer's O count, never Stash's counter", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    await stashEntityService.getScenesForScoring(USER, ["inst-a"]);
+
+    const [sql] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("COALESCE(wh.oCount, 0) AS oCounter");
+    expect(sql).not.toContain("s.oCounter");
+  });
+
   it("returns the scoring input with the user's watch data", async () => {
     const lastPlayedAt = new Date("2026-09-01T00:00:00Z");
     const mockRows = [
@@ -25,7 +35,7 @@ describe("StashEntityService.getScenesForScoring", () => {
         id: "scene-1",
         stashInstanceId: "inst-a",
         studioId: "studio-1",
-        oCounter: 5,
+        oCounter: 5n,
         performerIds: "perf-1,perf-2",
         tagIds: "tag-1,tag-2,tag-3",
         playCount: 3,
@@ -35,7 +45,7 @@ describe("StashEntityService.getScenesForScoring", () => {
         id: "scene-2",
         stashInstanceId: "inst-b",
         studioId: null,
-        oCounter: 0,
+        oCounter: 0n,
         performerIds: null,
         tagIds: "tag-1",
         playCount: null,

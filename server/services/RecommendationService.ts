@@ -84,7 +84,7 @@ const STAMP_SQL = `
     (SELECT COUNT(*) || ':' || COALESCE(MAX(updatedAt), '') FROM StudioRating WHERE userId = ?) || '|' ||
     (SELECT COUNT(*) || ':' || COALESCE(MAX(updatedAt), '') FROM TagRating WHERE userId = ?) || '|' ||
     (SELECT COUNT(*) || ':' || COALESCE(MAX(updatedAt), '') FROM SceneRating WHERE userId = ?) AS ratings,
-    (SELECT COUNT(*) || ':' || COALESCE(MAX(lastPlayedAt), '') FROM WatchHistory WHERE userId = ?) AS plays,
+    (SELECT COUNT(*) || ':' || COALESCE(MAX(lastPlayedAt), '') || ':' || COALESCE(SUM(oCount), 0) FROM WatchHistory WHERE userId = ?) AS plays,
     (SELECT COUNT(*) || ':' || COALESCE(MAX(updatedAt), '') FROM UserEntityRanking WHERE userId = ?) AS rankings,
     (SELECT COUNT(*) || ':' || COALESCE(MAX(id), '') FROM UserExcludedEntity WHERE userId = ? AND entityType = 'scene') AS exclusions,
     (SELECT COUNT(*) || ':' || COALESCE(MAX(lastFullSyncActual), '') || ':' || COALESCE(MAX(lastIncrementalSyncActual), '')
