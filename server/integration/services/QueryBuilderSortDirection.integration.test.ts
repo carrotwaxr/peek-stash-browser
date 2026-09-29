@@ -28,6 +28,7 @@ import {
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { parsedClipRequest } from "../../tests/helpers/fixtures.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import { SCENE_DEFAULTS } from "../../tests/helpers/syncRowDefaults.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -106,6 +107,7 @@ describeWithDb("Query builder sort direction (integration)", () => {
     await ENTITY_SYNC.scene.processBatch(
       TITLED_SCENES.map(([id, title, path]) =>
         partialRow<SyncEntityOf<"scene">>({
+          ...SCENE_DEFAULTS,
           id,
           title,
           urls: [],

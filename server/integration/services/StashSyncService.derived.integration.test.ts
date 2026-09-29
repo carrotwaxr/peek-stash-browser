@@ -19,6 +19,7 @@ import {
 } from "../../services/StashSyncService.js";
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import { SCENE_DEFAULTS } from "../../tests/helpers/syncRowDefaults.js";
 import { getSceneFallbackTitle } from "../../utils/titleUtils.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -40,6 +41,7 @@ function sceneRow(
   updatedAt = "2026-01-02T00:00:00Z"
 ): SyncScene {
   return partialRow<SyncScene>({
+    ...SCENE_DEFAULTS,
     id,
     title: fields.title ?? null,
     urls: [],

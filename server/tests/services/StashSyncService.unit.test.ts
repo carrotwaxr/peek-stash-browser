@@ -1608,3 +1608,49 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     }
   });
 });
+
+describe("StashSyncService scene batches", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+  });
+
+  it("a scene with an empty files list syncs with null file fields", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    const scene = {
+      id: "9",
+      title: "No files",
+      urls: [],
+      captions: [],
+      sceneStreams: [],
+      files: [],
+      paths: {},
+      performers: [],
+      tags: [],
+      groups: [],
+      galleries: [],
+    } as unknown as Parameters<
+      typeof ENTITY_SYNC.scene.processBatch
+    >[0][number];
+
+    await ENTITY_SYNC.scene.processBatch([scene], "inst-1", {
+      signal: new AbortController().signal,
+      changes: {} as never,
+      holdUsers: new Map([["inst-1", []]]),
+    });
+
+    const upsert = mockPrisma.$executeRawUnsafe.mock.calls
+      .map(([sql]) => sql)
+      .find((sql) => sql.includes("INSERT INTO StashScene"));
+    expect(upsert).toBeDefined();
+    // title, then code, date, studio, rating and duration all null; then the
+    // file's path, bit rate, frame rate, size and codecs after the urls
+    const nulls = (n: number) => Array(n).fill("NULL").join(",\\s+");
+    expect(upsert).toMatch(
+      new RegExp(
+        `'No files',\\s+${nulls(5)},\\s+0,\\s+NULL,\\s+NULL,\\s+'\\[\\]',\\s+${nulls(8)}`
+      )
+    );
+  });
+});

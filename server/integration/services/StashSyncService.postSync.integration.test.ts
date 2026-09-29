@@ -51,6 +51,15 @@ import { syncScheduler } from "../../services/SyncScheduler.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import {
+  GALLERY_DEFAULTS,
+  GROUP_DEFAULTS,
+  IMAGE_DEFAULTS,
+  PERFORMER_DEFAULTS,
+  SCENE_DEFAULTS,
+  STUDIO_DEFAULTS,
+  TAG_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
 import { logger } from "../../utils/logger.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { createApiUser } from "../helpers/accessFixture.js";
@@ -148,6 +157,7 @@ function library(): Library {
     group: [],
     tag: [
       partialRow<SyncTag>({
+        ...TAG_DEFAULTS,
         id: ID,
         name: "PostSync IT tag",
         stash_ids: [],
@@ -158,6 +168,7 @@ function library(): Library {
     ],
     performer: [
       partialRow<SyncPerformer>({
+        ...PERFORMER_DEFAULTS,
         id: ID,
         name: "PostSync IT performer",
         stash_ids: [],
@@ -168,6 +179,7 @@ function library(): Library {
     ],
     gallery: [
       partialRow<SyncGallery>({
+        ...GALLERY_DEFAULTS,
         id: ID,
         title: "PostSync IT gallery",
         urls: [],
@@ -184,6 +196,7 @@ function library(): Library {
     ],
     scene: [
       partialRow<SyncScene>({
+        ...SCENE_DEFAULTS,
         id: ID,
         title: "PostSync IT scene",
         urls: [],
@@ -214,6 +227,7 @@ function library(): Library {
     ],
     image: [
       partialRow<SyncImage>({
+        ...IMAGE_DEFAULTS,
         id: ID,
         title: "PostSync IT image",
         urls: [],
@@ -780,6 +794,7 @@ function performerRow(
 /** Studio 1 as Stash returns it, by default after an edit on LATER_AT. */
 function studioRow(tagIds: string[], updatedAt = LATER_AT): SyncStudio {
   return partialRow<SyncStudio>({
+    ...STUDIO_DEFAULTS,
     id: ID,
     name: "PostSync IT studio",
     stash_ids: [],
@@ -793,6 +808,7 @@ function studioRow(tagIds: string[], updatedAt = LATER_AT): SyncStudio {
 /** Group 1 as Stash returns it, by default after an edit on LATER_AT. */
 function groupRow(tagIds: string[], updatedAt = LATER_AT): SyncGroup {
   return partialRow<SyncGroup>({
+    ...GROUP_DEFAULTS,
     id: ID,
     name: "PostSync IT group",
     urls: [],

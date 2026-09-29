@@ -1455,7 +1455,7 @@ async function processScenesBatch(
   // Build bulk scene upsert using raw SQL
   const sceneValues = validScenes
     .map((scene) => {
-      const file = scene.files?.[0];
+      const file = scene.files[0];
       const paths = scene.paths;
       // Stash may return extra fields (chapters_vtt, stream) not in the GraphQL query selection
       const pathsExtended = scene.paths as Record<string, unknown>;
@@ -1464,7 +1464,7 @@ async function processScenesBatch(
       // Stash's stream choices, read from its labels. The URLs carry the
       // Stash API key and are never stored.
       const streamOptions = summarizeStashStreams(
-        (scene.sceneStreams ?? []).map((s) => s.label ?? "")
+        scene.sceneStreams.map((s) => s.label ?? "")
       );
 
       return `(
@@ -1479,7 +1479,7 @@ async function processScenesBatch(
     ${scene.organized ? 1 : 0},
     ${escapeSqlNullable(scene.details)},
     ${escapeSqlNullable(scene.director)},
-    ${escapeSqlNullable(JSON.stringify(scene.urls || []))},
+    ${escapeSqlNullable(JSON.stringify(scene.urls))},
     ${escapeSqlNullable(file?.path)},
     ${file?.bit_rate ?? "NULL"},
     ${file?.frame_rate ?? "NULL"},
@@ -1488,13 +1488,13 @@ async function processScenesBatch(
     ${escapeSqlNullable(file?.video_codec)},
     ${escapeSqlNullable(file?.audio_codec)},
     ${file?.size ?? "NULL"},
-    ${escapeSqlNullable(paths?.screenshot)},
-    ${escapeSqlNullable(paths?.preview)},
-    ${escapeSqlNullable(paths?.sprite)},
-    ${escapeSqlNullable(paths?.vtt)},
-    ${escapeSqlNullable(pathsExtended?.chapters_vtt as string | undefined)},
-    ${escapeSqlNullable(pathsExtended?.stream as string | undefined)},
-    ${escapeSqlNullable(paths?.caption)},
+    ${escapeSqlNullable(paths.screenshot)},
+    ${escapeSqlNullable(paths.preview)},
+    ${escapeSqlNullable(paths.sprite)},
+    ${escapeSqlNullable(paths.vtt)},
+    ${escapeSqlNullable(pathsExtended.chapters_vtt as string | undefined)},
+    ${escapeSqlNullable(pathsExtended.stream as string | undefined)},
+    ${escapeSqlNullable(paths.caption)},
     ${escapeSqlNullable(JSON.stringify(scene.captions ?? []))},
     ${streamOptions.direct ? 1 : 0},
     ${streamOptions.mkv ? 1 : 0},
@@ -1578,25 +1578,25 @@ async function processScenesBatch(
       SceneGroup: [] as string[],
       SceneGallery: [] as string[],
     };
-    for (const p of scene.performers || []) {
+    for (const p of scene.performers) {
       if (validateEntityId(p.id)) {
         links.ScenePerformer.push(p.id);
         performerRows.push([scene.id, p.id]);
       }
     }
-    for (const t of scene.tags || []) {
+    for (const t of scene.tags) {
       if (validateEntityId(t.id)) {
         links.SceneTag.push(t.id);
         tagRows.push([scene.id, t.id]);
       }
     }
-    for (const g of scene.groups || []) {
+    for (const g of scene.groups) {
       if (validateEntityId(g.group.id)) {
         links.SceneGroup.push(g.group.id);
         groupRows.push([scene.id, g.group.id, g.scene_index ?? null]);
       }
     }
-    for (const g of scene.galleries || []) {
+    for (const g of scene.galleries) {
       if (validateEntityId(g.id)) {
         links.SceneGallery.push(g.id);
         galleryRows.push([scene.id, g.id]);
@@ -1677,7 +1677,7 @@ async function processPerformersBatch(
     ${performer.favorite ? 1 : 0},
     ${performer.rating100 ?? "NULL"},
     ${escapeSqlNullable(performer.details)},
-    ${escapeSqlNullable(JSON.stringify(performer.alias_list || []))},
+    ${escapeSqlNullable(JSON.stringify(performer.alias_list))},
     ${escapeSqlNullable(performer.country)},
     ${escapeSqlNullable(performer.ethnicity)},
     ${escapeSqlNullable(performer.hair_color)},
@@ -1694,10 +1694,10 @@ async function processPerformersBatch(
     ${escapeSqlNullable(performer.death_date)},
     ${escapeSqlNullable(performer.url)},
     ${escapeSqlNullable(performer.image_path)},
-    ${performer.scene_count ?? 0},
-    ${performer.image_count ?? 0},
-    ${performer.gallery_count ?? 0},
-    ${performer.group_count ?? 0},
+    ${performer.scene_count},
+    ${performer.image_count},
+    ${performer.gallery_count},
+    ${performer.group_count},
     ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
     ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
     datetime('now'),
@@ -1764,9 +1764,9 @@ async function processPerformersBatch(
   const incoming: IncomingEntity[] = [];
   for (const performer of validPerformers) {
     const tagIds: string[] = [];
-    if (performer.tags && performer.tags.length > 0) {
+    if (performer.tags.length > 0) {
       for (const tag of performer.tags) {
-        if (tag?.id && validateEntityId(tag.id)) {
+        if (tag.id && validateEntityId(tag.id)) {
           tagIds.push(tag.id);
           tagRows.push([performer.id, tag.id]);
         }
@@ -1838,11 +1838,11 @@ async function processStudiosBatch(
     ${studio.parent_studio?.id ? `'${escapeSql(studio.parent_studio.id)}'` : "NULL"},
     ${studio.favorite ? 1 : 0},
     ${studio.rating100 ?? "NULL"},
-    ${studio.scene_count ?? 0},
-    ${studio.image_count ?? 0},
-    ${studio.gallery_count ?? 0},
-    ${studio.performer_count ?? 0},
-    ${studio.group_count ?? 0},
+    ${studio.scene_count},
+    ${studio.image_count},
+    ${studio.gallery_count},
+    ${studio.performer_count},
+    ${studio.group_count},
     ${escapeSqlNullable(studio.details)},
     ${escapeSqlNullable(studio.url)},
     ${escapeSqlNullable(studio.image_path)},
@@ -1891,8 +1891,8 @@ async function processStudiosBatch(
   const tagRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
   for (const studio of validStudios) {
-    const tagIds = (studio.tags ?? [])
-      .filter((t: TagRef) => t?.id && validateEntityId(t.id))
+    const tagIds = studio.tags
+      .filter((t: TagRef) => t.id && validateEntityId(t.id))
       .map((t: TagRef) => t.id);
     for (const tagId of tagIds) tagRows.push([studio.id, tagId]);
     incoming.push({
@@ -1940,8 +1940,8 @@ async function processTagsBatch(
 
   const values = validTags
     .map((tag) => {
-      const parentIds = tag.parents?.map((p) => p.id) || [];
-      const aliases = tag.aliases || [];
+      const parentIds = tag.parents.map((p) => p.id);
+      const aliases = tag.aliases;
       // Serialize stash_ids array to JSON for deduplication
       const stashIdsJson =
         tag.stash_ids.length > 0
@@ -1962,13 +1962,13 @@ async function processTagsBatch(
     ${escapeSqlNullable(stashIdsJson)},
     ${escapeSqlNullable(tag.name)},
     ${tag.favorite ? 1 : 0},
-    ${tag.scene_count ?? 0},
-    ${tag.image_count ?? 0},
-    ${tag.gallery_count ?? 0},
-    ${tag.performer_count ?? 0},
-    ${tag.studio_count ?? 0},
-    ${tag.group_count ?? 0},
-    ${tag.scene_marker_count ?? 0},
+    ${tag.scene_count},
+    ${tag.image_count},
+    ${tag.gallery_count},
+    ${tag.performer_count},
+    ${tag.studio_count},
+    ${tag.group_count},
+    ${tag.scene_marker_count},
     ${escapeSqlNullable(tag.description)},
     ${escapeSqlNullable(JSON.stringify(aliases))},
     ${escapeSqlNullable(JSON.stringify(parentIds))},
@@ -2056,7 +2056,7 @@ async function processGroupsBatch(
     .map((group) => {
       // 0 is written as NULL below, as no duration
       const duration = group.duration ?? null;
-      const urls = group.urls || [];
+      const urls = group.urls;
       return `(
     '${escapeSql(group.id)}',
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
@@ -2065,8 +2065,8 @@ async function processGroupsBatch(
     ${group.studio?.id ? `'${escapeSql(group.studio.id)}'` : "NULL"},
     ${group.rating100 ?? "NULL"},
     ${duration ? Math.round(duration) : "NULL"},
-    ${group.scene_count ?? 0},
-    ${group.performer_count ?? 0},
+    ${group.scene_count},
+    ${group.performer_count},
     ${escapeSqlNullable(group.director)},
     ${escapeSqlNullable(group.synopsis)},
     ${escapeSqlNullable(JSON.stringify(urls))},
@@ -2113,8 +2113,8 @@ async function processGroupsBatch(
   const tagRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
   for (const group of validGroups) {
-    const tagIds = (group.tags ?? [])
-      .filter((t: TagRef) => t?.id && validateEntityId(t.id))
+    const tagIds = group.tags
+      .filter((t: TagRef) => t.id && validateEntityId(t.id))
       .map((t: TagRef) => t.id);
     for (const tagId of tagIds) tagRows.push([group.id, tagId]);
     incoming.push({
@@ -2164,7 +2164,7 @@ async function processGalleriesBatch(
     .map((gallery) => {
       const folder = gallery.folder;
       // Get first file's basename for zip gallery title fallback
-      const fileBasename = gallery.files?.[0]?.basename ?? null;
+      const fileBasename = gallery.files[0]?.basename ?? null;
       // Cover image ID for dimension lookup
       const coverImageId = gallery.cover?.id ?? null;
       // A gallery's studio is on the gallery's own Stash, so it takes the
@@ -2178,15 +2178,15 @@ async function processGalleriesBatch(
     ${gallery.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${gallery.rating100 ?? "NULL"},
     ${coverImageId ? `'${escapeSql(coverImageId)}'` : "NULL"},
-    ${gallery.image_count ?? 0},
+    ${gallery.image_count},
     ${escapeSqlNullable(gallery.details)},
-    ${escapeSqlNullable(gallery.urls?.[0])},
+    ${escapeSqlNullable(gallery.urls[0])},
     ${escapeSqlNullable(gallery.code)},
     ${escapeSqlNullable(gallery.photographer)},
-    ${escapeSqlNullable(gallery.urls ? JSON.stringify(gallery.urls) : null)},
+    ${escapeSqlNullable(JSON.stringify(gallery.urls))},
     ${escapeSqlNullable(folder?.path)},
     ${escapeSqlNullable(fileBasename)},
-    ${escapeSqlNullable(gallery.paths?.cover)},
+    ${escapeSqlNullable(gallery.paths.cover)},
     ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
     ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
     datetime('now'),
@@ -2236,7 +2236,7 @@ async function processGalleriesBatch(
   const performerRows: JunctionRow[] = [];
   const tagRows: JunctionRow[] = [];
   for (const gallery of validGalleries) {
-    if (gallery.performers && gallery.performers.length > 0) {
+    if (gallery.performers.length > 0) {
       for (const performer of gallery.performers) {
         if (validateEntityId(performer.id)) {
           linksOf.get(gallery.id)?.GalleryPerformer.push(performer.id);
@@ -2244,9 +2244,9 @@ async function processGalleriesBatch(
         }
       }
     }
-    if (gallery.tags && gallery.tags.length > 0) {
+    if (gallery.tags.length > 0) {
       for (const tag of gallery.tags) {
-        if (tag?.id && validateEntityId(tag.id)) {
+        if (tag.id && validateEntityId(tag.id)) {
           linksOf.get(gallery.id)?.GalleryTag.push(tag.id);
           tagRows.push([gallery.id, tag.id]);
         }
@@ -2304,7 +2304,7 @@ async function processImagesBatch(
   // Build bulk image upsert
   const values = validImages
     .map((image) => {
-      const visualFile = image.files?.[0];
+      const visualFile = image.files[0];
       const paths = image.paths;
       return `(
       '${escapeSql(image.id)}',
@@ -2313,7 +2313,7 @@ async function processImagesBatch(
       ${escapeSqlNullable(image.code)},
       ${escapeSqlNullable(image.details)},
       ${escapeSqlNullable(image.photographer)},
-      ${escapeSqlNullable(image.urls ? JSON.stringify(image.urls) : null)},
+      ${escapeSqlNullable(JSON.stringify(image.urls))},
       ${escapeSqlNullable(image.date)},
       ${image.studio?.id ? `'${escapeSql(image.studio.id)}'` : "NULL"},
       ${image.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
@@ -2324,9 +2324,9 @@ async function processImagesBatch(
       ${visualFile?.width ?? "NULL"},
       ${visualFile?.height ?? "NULL"},
       ${visualFile?.size ?? "NULL"},
-      ${escapeSqlNullable(paths?.thumbnail)},
-      ${escapeSqlNullable(paths?.preview)},
-      ${escapeSqlNullable(paths?.image)},
+      ${escapeSqlNullable(paths.thumbnail)},
+      ${escapeSqlNullable(paths.preview)},
+      ${escapeSqlNullable(paths.image)},
       ${image.created_at ? `'${image.created_at}'` : "NULL"},
       ${image.updated_at ? `'${image.updated_at}'` : "NULL"},
       datetime('now'),
@@ -2379,19 +2379,19 @@ async function processImagesBatch(
       ImageTag: [] as string[],
       ImageGallery: [] as string[],
     };
-    for (const p of image.performers || []) {
+    for (const p of image.performers) {
       if (validateEntityId(p.id)) {
         links.ImagePerformer.push(p.id);
         performerRows.push([image.id, p.id]);
       }
     }
-    for (const t of image.tags || []) {
+    for (const t of image.tags) {
       if (validateEntityId(t.id)) {
         links.ImageTag.push(t.id);
         tagRows.push([image.id, t.id]);
       }
     }
-    for (const g of image.galleries || []) {
+    for (const g of image.galleries) {
       if (validateEntityId(g.id)) {
         links.ImageGallery.push(g.id);
         galleryRows.push([image.id, g.id]);
