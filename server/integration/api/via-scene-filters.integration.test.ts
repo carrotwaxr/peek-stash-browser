@@ -4,7 +4,9 @@ import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
+import type { ParsedFilter } from "../../types/parsedFilters.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -370,59 +372,37 @@ describeWithDb("Via-scene filters and soft-deleted scenes", () => {
   });
 
   it("a soft-deleted scene no longer links its performer: performers by scene and performers by group", async () => {
-    const byScene = await performerQueryBuilder.execute({
-      userId: USER_ID,
-      filters: {
-        scenes: {
-          value: coerceEntityRefs([`${DELETED_SCENE}:${X}`]),
-          modifier: CriterionModifier.Includes,
-        },
-      },
-      allowedInstanceIds: [X],
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
-    });
-    expect(byScene.performers).toEqual([]);
+    const performers = async (filter: ParsedFilter<"performer">) => {
+      const { items } = await performerQueryBuilder.execute({
+        userId: USER_ID,
+        allowedInstanceIds: [X],
+        request: parsedListRequest("performer", { filter }),
+      });
+      return items;
+    };
+    const refs = (...ids: string[]) => ids.map((id) => ({ id, instanceId: X }));
 
-    const byGroup = await performerQueryBuilder.execute({
-      userId: USER_ID,
-      filters: {
-        groups: {
-          value: coerceEntityRefs([
-            `${STALE_GROUP}:${X}`,
-            `${LIVE_GROUP}:${X}`,
-          ]),
-          modifier: CriterionModifier.Includes,
-        },
-      },
-      allowedInstanceIds: [X],
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
+    const byScene = await performers({
+      scenes: { refs: refs(DELETED_SCENE), modifier: "INCLUDES", depth: 0 },
     });
-    expect(byGroup.performers.map((p) => p.id).sort()).toEqual(
+    expect(byScene).toEqual([]);
+
+    const byGroup = await performers({
+      groups: {
+        refs: refs(STALE_GROUP, LIVE_GROUP),
+        modifier: "INCLUDES",
+        depth: 0,
+      },
+    });
+    expect(byGroup.map((p) => p.id).sort()).toEqual(
       [LIVE_PERFORMER, STALE_PERFORMER].sort()
     );
 
     // EXCLUDES the stale group: its only scene is deleted, so it excludes nobody
-    const excluding = await performerQueryBuilder.execute({
-      userId: USER_ID,
-      filters: {
-        groups: {
-          value: coerceEntityRefs([`${STALE_GROUP}:${X}`]),
-          modifier: CriterionModifier.Excludes,
-        },
-      },
-      allowedInstanceIds: [X],
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
+    const excluding = await performers({
+      groups: { refs: refs(STALE_GROUP), modifier: "EXCLUDES", depth: 0 },
     });
-    expect(excluding.performers.map((p) => p.id).sort()).toEqual(
+    expect(excluding.map((p) => p.id).sort()).toEqual(
       [LIVE_PERFORMER, STALE_PERFORMER].sort()
     );
   });

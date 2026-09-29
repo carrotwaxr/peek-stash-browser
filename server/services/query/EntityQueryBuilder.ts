@@ -24,6 +24,7 @@ import type {
 } from "@peek/shared-types/filters/index.js";
 import prisma from "../../prisma/singleton.js";
 import type {
+  FilterRef,
   ParsedFilter,
   ParsedListRequest,
   RefCriterion,
@@ -119,6 +120,31 @@ export interface ListResult<Entity> {
 
 /** The seed of a random sort no request set (the parser always sets one) */
 export const DEFAULT_RANDOM_SEED = 12345;
+
+/**
+ * The refs with their descendants to `depth` (0: none), for a hierarchical
+ * ref filter (tags, studios). Expansion works on bare ids (C9 keeps the
+ * instance through it): the selected refs keep their instance, and a
+ * descendant matches its id on every instance.
+ */
+export async function expandRefs(
+  refs: readonly FilterRef[],
+  depth: number,
+  expand: (ids: string[], depth: number) => Promise<string[]>
+): Promise<readonly FilterRef[]> {
+  if (depth === 0) return refs;
+  const own = new Set(refs.map((ref) => ref.id));
+  const expanded = await expand(
+    refs.map((ref) => ref.id),
+    depth
+  );
+  return [
+    ...refs,
+    ...expanded
+      .filter((id) => !own.has(id))
+      .map((id): FilterRef => ({ id, instanceId: undefined })),
+  ];
+}
 
 /** A statement's parts, built once for the page and the count */
 interface Built {

@@ -20,7 +20,6 @@ import type {
 import type { NormalizedTag } from "../../types/index.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseFilterRef,
@@ -54,20 +53,13 @@ export const findTags = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const { tags, total } = await tagQueryBuilder.execute({
+    const { items: tags, total } = await tagQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("tag", request.filter),
+      allowedInstanceIds,
+      request,
       // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
       // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.
       applyExclusions: true,
-      allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      searchQuery: request.q,
-      randomSeed: request.sort.seed,
     });
 
     // Check for ambiguous results on single-ID lookups

@@ -84,7 +84,7 @@ describe("Studios Controller", () => {
     it("returns studios from query builder on happy path", async () => {
       const studios = [createMockStudio({ id: "s1", name: "TestStudio" })];
       mockStudioQueryBuilder.execute.mockResolvedValue({
-        studios,
+        items: studios,
         total: 1,
       });
 
@@ -96,6 +96,12 @@ describe("Studios Controller", () => {
 
       await findStudios(req, res);
 
+      // The builder reads the parsed request and the viewer's instances
+      const call = must(mockStudioQueryBuilder.execute.mock.calls[0])[0];
+      expect(call).toMatchObject({
+        allowedInstanceIds: ["default"],
+        request: { page: 1, sort: { field: "name", direction: "ASC" } },
+      });
       expect(res._getStatus()).toBe(200);
       const body = res._getOkBody();
       expect(body.findStudios.count).toBe(1);
@@ -104,7 +110,7 @@ describe("Studios Controller", () => {
 
     it("adds stashUrl to each studio for an admin", async () => {
       mockStudioQueryBuilder.execute.mockResolvedValue({
-        studios: [createMockStudio({ id: "s1" })],
+        items: [createMockStudio({ id: "s1" })],
         total: 1,
       });
 
@@ -124,10 +130,7 @@ describe("Studios Controller", () => {
 
     it("does not send stashUrl to a regular user", async () => {
       mockStudioQueryBuilder.execute.mockResolvedValue({
-        studios: [
-          createMockStudio({ id: "s1" }),
-          createMockStudio({ id: "s2" }),
-        ],
+        items: [createMockStudio({ id: "s1" }), createMockStudio({ id: "s2" })],
         total: 2,
       });
 
@@ -151,7 +154,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "101", instanceId: "inst-b" }),
       ];
       mockStudioQueryBuilder.execute.mockResolvedValue({
-        studios,
+        items: studios,
         total: 2,
       });
 
@@ -185,7 +188,7 @@ describe("Studios Controller", () => {
     it("fetches detail counts for single-ID lookup", async () => {
       const studio = createMockStudio({ id: "101", instanceId: "default" });
       mockStudioQueryBuilder.execute.mockResolvedValue({
-        studios: [studio],
+        items: [studio],
         total: 1,
       });
       mockStashEntityService.getStudio.mockResolvedValue({

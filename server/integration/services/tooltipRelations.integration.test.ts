@@ -33,6 +33,7 @@ import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import {
   FX,
@@ -67,27 +68,53 @@ function byIdOnA(userId: number, id: string) {
   };
 }
 
+/**
+ * A ported builder's request parts for one entity on instance A: its bare
+ * id, the detail page's instance.
+ */
+const byIdOnAParts = (id: string) => ({
+  filter: {
+    ids: {
+      refs: [{ id, instanceId: undefined }],
+      modifier: "INCLUDES" as const,
+      depth: 0,
+    },
+  },
+  specificInstanceId: FX.A,
+});
+
+/** A ported builder's options for one entity on instance A */
+const listedOnA = (userId: number) => ({
+  userId,
+  allowedInstanceIds: [FX.A, FX.B],
+});
+
 const ids = (refs: Array<{ id: string }> | undefined) =>
   (refs ?? []).map((r) => r.id).sort();
 
 async function tagPerformers(userId: number) {
-  const { tags } = await tagQueryBuilder.execute(byIdOnA(userId, FX_ID.SAME));
+  const { items: tags } = await tagQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("tag", byIdOnAParts(FX_ID.SAME)),
+  });
   expect(tags).toHaveLength(1);
   return ids(tags[0]?.performers);
 }
 
 async function studioTags(userId: number) {
-  const { studios } = await studioQueryBuilder.execute(
-    byIdOnA(userId, FX_ID.SAME)
-  );
+  const { items: studios } = await studioQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("studio", byIdOnAParts(FX_ID.SAME)),
+  });
   expect(studios).toHaveLength(1);
   return ids(studios[0]?.tags);
 }
 
 async function performerTags(userId: number) {
-  const { performers } = await performerQueryBuilder.execute(
-    byIdOnA(userId, FX_ID.VISIBLE_A)
-  );
+  const { items: performers } = await performerQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("performer", byIdOnAParts(FX_ID.VISIBLE_A)),
+  });
   expect(performers).toHaveLength(1);
   return ids(performers[0]?.tags);
 }
@@ -343,19 +370,26 @@ async function seedCappedFixture(): Promise<void> {
 }
 
 async function studioOnA(userId: number, id: string) {
-  const { studios } = await studioQueryBuilder.execute(byIdOnA(userId, id));
+  const { items: studios } = await studioQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("studio", byIdOnAParts(id)),
+  });
   return must(studios[0], `studio ${id} on A`);
 }
 
 async function tagOnA(userId: number, id: string) {
-  const { tags } = await tagQueryBuilder.execute(byIdOnA(userId, id));
+  const { items: tags } = await tagQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("tag", byIdOnAParts(id)),
+  });
   return must(tags[0], `tag ${id} on A`);
 }
 
 async function performerOnA(userId: number, id: string) {
-  const { performers } = await performerQueryBuilder.execute(
-    byIdOnA(userId, id)
-  );
+  const { items: performers } = await performerQueryBuilder.execute({
+    ...listedOnA(userId),
+    request: parsedListRequest("performer", byIdOnAParts(id)),
+  });
   return must(performers[0], `performer ${id} on A`);
 }
 
@@ -486,13 +520,19 @@ describeWithDb("Tooltip relations (integration)", () => {
   });
 
   it("a page of 100 studios sends one statement per relation", async () => {
-    const { studios } = await studioQueryBuilder.execute({
+    const ctx = {
       userId: v,
+      applyExclusions: true,
+      allowedInstanceIds: [FX.A, FX.B],
       specificInstanceId: FX.A,
-      sort: "name",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 100,
+    };
+    const { items: studios } = await studioQueryBuilder.execute({
+      userId: v,
+      allowedInstanceIds: ctx.allowedInstanceIds,
+      request: parsedListRequest("studio", {
+        perPage: 100,
+        specificInstanceId: FX.A,
+      }),
     });
     expect(studios).toHaveLength(100);
 
@@ -507,7 +547,7 @@ describeWithDb("Tooltip relations (integration)", () => {
       stashGroup: ["findMany"],
     });
     try {
-      await studioQueryBuilder.populateRelations(studios, v);
+      await studioQueryBuilder["populateRelations"](studios, ctx);
     } finally {
       recorder.restore();
     }

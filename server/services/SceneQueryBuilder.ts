@@ -23,7 +23,6 @@ import type {
 import type { SceneQueryRow } from "../types/internal/queryRows.js";
 import type {
   EnumCriterion,
-  FilterRef,
   MultiEnumCriterion,
   ParsedFilter,
   RefCriterion,
@@ -46,13 +45,18 @@ import {
   buildNumericFilter,
   buildTextFilter,
 } from "../utils/sqlFilterBuilders.js";
-import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
+import {
+  emptyToNull,
+  likeContains,
+  parseJsonArray,
+} from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
   type QueryContext,
   type SortExpr,
+  expandRefs,
 } from "./query/EntityQueryBuilder.js";
 
 export type {
@@ -162,30 +166,6 @@ const PERFORMER_AGE = `(
       JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
       WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND p.birthdate IS NOT NULL
     )`;
-
-/**
- * The refs with their descendants to `depth` (0: none). Expansion works on
- * bare ids (C9 keeps the instance through it): the selected refs keep their
- * instance, and a descendant matches its id on every instance, as today.
- */
-async function expandRefs(
-  refs: readonly FilterRef[],
-  depth: number,
-  expand: (ids: string[], depth: number) => Promise<string[]>
-): Promise<readonly FilterRef[]> {
-  if (depth === 0) return refs;
-  const own = new Set(refs.map((ref) => ref.id));
-  const expanded = await expand(
-    refs.map((ref) => ref.id),
-    depth
-  );
-  return [
-    ...refs,
-    ...expanded
-      .filter((id) => !own.has(id))
-      .map((id): FilterRef => ({ id, instanceId: undefined })),
-  ];
-}
 
 /**
  * Builds and executes SQL queries for scene filtering
@@ -443,50 +423,41 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * Build text search filter clause (searches across title, details, path, performers, studio, tags)
-   * Uses LIKE with wildcard for broad text matching
+   * The search across the title, details, path, performers, studio and
+   * tags: `likeContains(q)` with `ESCAPE '\'`, so a `%`, `_` or `\` in the
+   * text matches itself. LOWER() on both sides folds ASCII case only, as
+   * SQLite's LIKE does.
    */
   private buildSearchQueryFilter(searchQuery: string): FilterClause {
     const query = searchQuery.trim();
     if (query === "") return noClause();
-    const likeParam = `%${query}%`;
+    const like = "LIKE LOWER(?) ESCAPE '\\'";
 
-    // Build OR clause that searches across multiple fields including relations via subqueries
-    // Using LOWER() for case-insensitive matching
     const sql = `(
-      LOWER(s.title) LIKE LOWER(?) OR
-      LOWER(s.details) LIKE LOWER(?) OR
-      LOWER(s.filePath) LIKE LOWER(?) OR
+      LOWER(s.title) ${like} OR
+      LOWER(s.details) ${like} OR
+      LOWER(s.filePath) ${like} OR
       EXISTS (
         SELECT 1 FROM ScenePerformer sp
         INNER JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
         WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
-        AND LOWER(p.name) LIKE LOWER(?)
+        AND LOWER(p.name) ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM StashStudio st
         WHERE st.id = s.studioId AND st.stashInstanceId = s.stashInstanceId
-        AND LOWER(st.name) LIKE LOWER(?)
+        AND LOWER(st.name) ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM SceneTag stag
         INNER JOIN StashTag t ON stag.tagId = t.id AND stag.tagInstanceId = t.stashInstanceId
         WHERE stag.sceneId = s.id AND stag.sceneInstanceId = s.stashInstanceId
-        AND LOWER(t.name) LIKE LOWER(?)
+        AND LOWER(t.name) ${like}
       )
     )`;
 
-    return {
-      sql,
-      params: [
-        likeParam,
-        likeParam,
-        likeParam,
-        likeParam,
-        likeParam,
-        likeParam,
-      ],
-    };
+    const pattern = likeContains(query);
+    return { sql, params: Array.from({ length: 6 }, () => pattern) };
   }
 
   /**

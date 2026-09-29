@@ -1,29 +1,113 @@
 /**
- * TagQueryBuilder - SQL-native tag querying
+ * TagQueryBuilder: the tag list in SQL.
  *
- * Builds parameterized SQL queries for tag filtering, sorting, and pagination.
- * Eliminates the need to load all tags into memory.
+ * The tag builder on the base (`query/EntityQueryBuilder.ts`): this file
+ * declares the tag's spec (table, per-user joins, columns, tiebreak), its
+ * filter clauses from the parsed request, its sort map, its row transform
+ * and its relations (with its parents' names). The instance filter, the
+ * exclusion join, the `ids` filter, the random sort and the count are the
+ * base's.
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
-import type { NormalizedTag, PeekTagFilter } from "../types/index.js";
+import type { NormalizedTag } from "../types/index.js";
 import type { TagQueryRow } from "../types/internal/queryRows.js";
+import type {
+  FilterRef,
+  ParsedFilter,
+  RefCriterion,
+} from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
-import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
-import { type ViaSceneSpec, viaSceneClause } from "../utils/sqlClauses.js";
 import {
   type FilterClause,
+  type JunctionTarget,
+  type SqlParam,
+  type ViaSceneSpec,
+  refClause,
+  viaSceneClause,
+} from "../utils/sqlClauses.js";
+import {
   buildDateFilter,
   buildFavoriteFilter,
-  buildJunctionFilter,
   buildNumericFilter,
   buildTextFilter,
-  parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
+import {
+  emptyToNull,
+  likeContains,
+  parseJsonArray,
+} from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
+import {
+  EntityQueryBuilder,
+  type EntitySpec,
+  type QueryContext,
+  type SortExpr,
+  expandRefs,
+} from "./query/EntityQueryBuilder.js";
+
+// Column list for SELECT - all StashTag fields plus user data
+const SELECT_COLUMNS = `
+    t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
+    t.sceneCount, t.imageCount, t.galleryCount, t.performerCount, t.studioCount, t.groupCount, t.sceneMarkerCount,
+    t.sceneCountViaPerformers,
+    t.description, t.aliases, t.parentIds, t.imagePath,
+    t.stashCreatedAt, t.stashUpdatedAt,
+    r.rating AS userRating, r.favorite AS userFavorite,
+    us.oCounter AS userOCounter, us.playCount AS userPlayCount
+  `.trim();
+
+const TAG_SPEC: EntitySpec = {
+  table: "StashTag",
+  alias: "t",
+  entityType: "tag",
+  userJoins: [
+    { table: "TagRating", alias: "r", entityIdCol: "tagId" },
+    { table: "UserTagStats", alias: "us", entityIdCol: "tagId" },
+  ],
+  selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
+  defaultSort: "name",
+  // By name, the id keeps the order stable; by anything else, the name
+  tiebreak: (direction, field) =>
+    field === "name" ? `t.id ${direction}` : "t.name COLLATE NOCASE ASC",
+};
+
+/** The scene count the card shows: the larger of the direct and via-performer counts */
+const SCENE_COUNT =
+  "MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0))";
+
+/** A junction holding the tag and another entity (a performer's tags) */
+const tagJunction = (
+  table: string,
+  alias: string,
+  refIdCol: string,
+  refInstanceCol: string
+): JunctionTarget => ({
+  kind: "junction",
+  table,
+  alias,
+  parentAlias: "t",
+  parentIdCol: "tagId",
+  parentInstanceCol: "tagInstanceId",
+  refIdCol,
+  refInstanceCol,
+});
+/** Tags on one of the performers */
+const PERFORMER_TAGS = tagJunction(
+  "PerformerTag",
+  "pt",
+  "performerId",
+  "performerInstanceId"
+);
+/** Tags on one of the studios */
+const STUDIO_TAGS = tagJunction(
+  "StudioTag",
+  "stt",
+  "studioId",
+  "studioInstanceId"
+);
 
 /** Tags on one of the scenes (the Tags page's scene filter) */
 const TAGS_BY_SCENE: ViaSceneSpec = {
@@ -48,652 +132,185 @@ const TAGS_BY_GROUP: ViaSceneSpec = {
   },
 };
 
-// Query builder options
-export interface TagQueryOptions {
-  userId: number;
-  filters?: PeekTagFilter;
-  applyExclusions?: boolean; // Default true - use pre-computed exclusions
-  sort: string;
-  sortDirection: "ASC" | "DESC";
-  page: number;
-  perPage: number;
-  searchQuery?: string;
-  allowedInstanceIds?: string[];
-  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
-  randomSeed?: number; // Seed for consistent random ordering
-}
-
-// Query result
-export interface TagQueryResult {
-  tags: NormalizedTag[];
-  total: number;
+/**
+ * One parent ref on the tag's `parentIds` JSON list. A tag's parents are on
+ * the tag's own instance, so a ref with an instance matches tags on that
+ * instance only; a bare ref matches the id on every instance.
+ */
+function parentCondition(ref: FilterRef): { sql: string; params: SqlParam[] } {
+  const pattern = `%"${ref.id}"%`;
+  return ref.instanceId === undefined || ref.instanceId === ""
+    ? { sql: "t.parentIds LIKE ?", params: [pattern] }
+    : {
+        sql: "(t.stashInstanceId = ? AND t.parentIds LIKE ?)",
+        params: [ref.instanceId, pattern],
+      };
 }
 
 /**
  * Builds and executes SQL queries for tag filtering
  */
-class TagQueryBuilder {
-  // Column list for SELECT - all StashTag fields plus user data
-  private readonly SELECT_COLUMNS = `
-    t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
-    t.sceneCount, t.imageCount, t.galleryCount, t.performerCount, t.studioCount, t.groupCount, t.sceneMarkerCount,
-    t.sceneCountViaPerformers,
-    t.description, t.aliases, t.parentIds, t.imagePath,
-    t.stashCreatedAt, t.stashUpdatedAt,
-    r.rating AS userRating, r.favorite AS userFavorite,
-    us.oCounter AS userOCounter, us.playCount AS userPlayCount
-  `.trim();
+class TagQueryBuilder extends EntityQueryBuilder<
+  TagQueryRow,
+  NormalizedTag,
+  "tag"
+> {
+  protected readonly spec = TAG_SPEC;
 
-  // Base FROM clause with user data JOINs
-  private buildFromClause(
-    userId: number,
-    applyExclusions: boolean = true
-  ): { sql: string; params: number[] } {
-    const baseJoins = `
-        FROM StashTag t
-        LEFT JOIN TagRating r ON t.id = r.tagId AND t.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN UserTagStats us ON t.id = us.tagId AND t.stashInstanceId = us.instanceId AND us.userId = ?
-    `.trim();
-
-    if (applyExclusions) {
-      return {
-        sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'tag' AND e.entityId = t.id AND (e.instanceId = '' OR e.instanceId = t.stashInstanceId)`,
-        params: [userId, userId, userId],
-      };
-    }
-
-    return {
-      sql: baseJoins,
-      params: [userId, userId],
-    };
-  }
-
-  // Base WHERE clause (always filter deleted, optionally filter excluded)
-  private buildBaseWhere(applyExclusions: boolean = true): FilterClause {
-    if (applyExclusions) {
-      return {
-        sql: "t.deletedAt IS NULL AND e.id IS NULL",
-        params: [],
-      };
-    }
-    return {
-      sql: "t.deletedAt IS NULL",
+  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+    const column = (sql: string): SortExpr => ({
+      sql: `${sql} ${dir}`,
       params: [],
-    };
-  }
-
-  /**
-   * Build instance filter clause for multi-instance support
-   * Includes NULL stashInstanceId for backward compatibility with legacy data
-   */
-  private buildInstanceFilter(
-    allowedInstanceIds: string[] | undefined
-  ): FilterClause {
-    if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
-      return { sql: "", params: [] };
-    }
-    const placeholders = allowedInstanceIds.map(() => "?").join(", ");
+    });
     return {
-      sql: `(t.stashInstanceId IN (${placeholders}) OR t.stashInstanceId IS NULL)`,
-      params: allowedInstanceIds,
+      // Tag metadata, the name case-insensitive
+      name: column("t.name COLLATE NOCASE"),
+      created_at: column("t.stashCreatedAt"),
+      updated_at: column("t.stashUpdatedAt"),
+
+      // Counts
+      scene_count: column(SCENE_COUNT),
+      scenes_count: column(SCENE_COUNT),
+      image_count: column("t.imageCount"),
+      gallery_count: column("t.galleryCount"),
+      performer_count: column("t.performerCount"),
+      studio_count: column("t.studioCount"),
+      group_count: column("t.groupCount"),
+      scene_marker_count: column("t.sceneMarkerCount"),
+
+      // The viewer's rating (TagRating)
+      rating: column("COALESCE(r.rating, 0)"),
+      rating100: column("COALESCE(r.rating, 0)"),
+
+      // The viewer's stats (UserTagStats)
+      o_counter: column("COALESCE(us.oCounter, 0)"),
+      play_count: column("COALESCE(us.playCount, 0)"),
     };
   }
 
-  /**
-   * Build filter for a specific instance ID (for disambiguation on detail pages)
-   * This is different from allowedInstanceIds - it filters to exactly one instance.
-   */
-  private buildSpecificInstanceFilter(
-    instanceId: string | undefined
-  ): FilterClause {
-    if (!instanceId) {
-      return { sql: "", params: [] };
+  /** The tag filter's clauses, one per criterion the request carried */
+  protected async filterClauses(
+    filter: ParsedFilter<"tag">,
+    q: string | undefined,
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    const clauses: FilterClause[] = [];
+    const push = (clause: FilterClause) => clauses.push(clause);
+    const junction = (
+      name: string,
+      target: JunctionTarget,
+      criterion: RefCriterion
+    ) =>
+      refClause(target, criterion.refs, criterion.modifier, {
+        name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      });
+    const via = (spec: ViaSceneSpec, criterion: RefCriterion) =>
+      viaSceneClause(spec, criterion.refs, criterion.modifier);
+
+    if (q !== undefined) push(this.searchClause(q));
+
+    // The viewer's own data
+    push(buildFavoriteFilter(filter.favorite));
+    if (filter.rating100) {
+      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
     }
-    return {
-      sql: `t.stashInstanceId = ?`,
-      params: [instanceId],
-    };
+    if (filter.o_counter) {
+      push(buildNumericFilter(filter.o_counter, "COALESCE(us.oCounter, 0)"));
+    }
+    if (filter.play_count) {
+      push(buildNumericFilter(filter.play_count, "COALESCE(us.playCount, 0)"));
+    }
+
+    // Related entities
+    if (filter.parents) push(await this.parentClause(filter.parents));
+    if (filter.performers) {
+      push(junction("performers", PERFORMER_TAGS, filter.performers));
+    }
+    if (filter.studios) {
+      push(junction("studios", STUDIO_TAGS, filter.studios));
+    }
+    if (filter.scenes) push(via(TAGS_BY_SCENE, filter.scenes));
+    if (filter.groups) push(via(TAGS_BY_GROUP, filter.groups));
+
+    // Counts
+    if (filter.scene_count) {
+      push(buildNumericFilter(filter.scene_count, SCENE_COUNT));
+    }
+
+    // Text
+    if (filter.name) push(buildTextFilter(filter.name, "t.name"));
+    if (filter.description) {
+      push(buildTextFilter(filter.description, "t.description"));
+    }
+
+    // Dates
+    if (filter.created_at) {
+      push(buildDateFilter(filter.created_at, "t.stashCreatedAt"));
+    }
+    if (filter.updated_at) {
+      push(buildDateFilter(filter.updated_at, "t.stashUpdatedAt"));
+    }
+
+    return clauses;
   }
 
   /**
-   * Build ID filter clause
+   * The parents filter on the `parentIds` JSON list, with the parents'
+   * descendants to the depth: INCLUDES any of them, INCLUDES_ALL every one,
+   * EXCLUDES none (a tag with no parents included)
    */
-  private buildIdFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | string[]
-      | undefined
-      | null
-  ): FilterClause {
-    const ids = Array.isArray(filter) ? filter : filter?.value;
-    if (!ids || ids.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const modifier = Array.isArray(filter)
-      ? "INCLUDES"
-      : filter?.modifier || "INCLUDES";
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
+  private async parentClause(criterion: RefCriterion): Promise<FilterClause> {
+    const refs = await expandRefs(
+      criterion.refs,
+      criterion.depth,
+      expandTagIds
+    );
+    const conditions = refs.map(parentCondition);
+    const params = conditions.flatMap((c) => c.params);
+    switch (criterion.modifier) {
       case "INCLUDES":
-        return { sql: `t.id IN (${placeholders})`, params: ids };
+        return {
+          sql: `(${conditions.map((c) => c.sql).join(" OR ")})`,
+          params,
+        };
+      case "INCLUDES_ALL":
+        return {
+          sql: `(${conditions.map((c) => c.sql).join(" AND ")})`,
+          params,
+        };
       case "EXCLUDES":
-        return { sql: `t.id NOT IN (${placeholders})`, params: ids };
-      default:
-        return { sql: `t.id IN (${placeholders})`, params: ids };
+        return {
+          sql: `(t.parentIds IS NULL OR NOT (${conditions.map((c) => c.sql).join(" OR ")}))`,
+          params,
+        };
     }
   }
 
   /**
-   * Build parent filter clause with hierarchy support
+   * The search across the name, description and aliases: `likeContains`
+   * with `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
    */
-  private async buildParentFilterWithHierarchy(
-    filter:
-      | {
-          value?: string[] | null;
-          modifier?: string | null;
-          depth?: number | null;
-        }
-      | undefined
-      | null
-  ): Promise<FilterClause> {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
-    const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map((p) => p.id);
-    const { modifier = "INCLUDES", depth } = filter;
-
-    // Expand IDs if depth is specified and not 0
-    if (depth !== undefined && depth !== null && depth !== 0) {
-      ids = await expandTagIds(ids, depth);
-    }
-
-    // parentIds is stored as JSON array in the database
-    // We need to search within the JSON array
-    switch (modifier) {
-      case "INCLUDES": {
-        // Match tags that have any of the given parents
-        const conditions = ids.map(() => `t.parentIds LIKE ?`).join(" OR ");
-        const params = ids.map((id) => `%"${id}"%`);
-        return { sql: `(${conditions})`, params };
-      }
-
-      case "INCLUDES_ALL": {
-        // Match tags that have ALL of the given parents
-        const conditions = ids.map(() => `t.parentIds LIKE ?`).join(" AND ");
-        const params = ids.map((id) => `%"${id}"%`);
-        return { sql: `(${conditions})`, params };
-      }
-
-      case "EXCLUDES": {
-        // Match tags that don't have any of the given parents
-        const conditions = ids
-          .map(() => `(t.parentIds IS NULL OR t.parentIds NOT LIKE ?)`)
-          .join(" AND ");
-        const params = ids.map((id) => `%"${id}"%`);
-        return { sql: `(${conditions})`, params };
-      }
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build performer filter clause
-   * Tags attached to specific performers
-   */
-  private buildPerformerFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier } = filter;
-    const ids = coerceEntityRefs(value);
-
-    return buildJunctionFilter(
-      ids,
-      "PerformerTag",
-      "tagId",
-      "tagInstanceId",
-      "performerId",
-      "performerInstanceId",
-      "t",
-      modifier || "INCLUDES"
-    );
-  }
-
-  /**
-   * Build studio filter clause
-   * Tags attached to specific studios
-   */
-  private buildStudioFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier } = filter;
-    const ids = coerceEntityRefs(value);
-
-    return buildJunctionFilter(
-      ids,
-      "StudioTag",
-      "tagId",
-      "tagInstanceId",
-      "studioId",
-      "studioInstanceId",
-      "t",
-      modifier || "INCLUDES"
-    );
-  }
-
-  /**
-   * Build scenes_filter: tags on specific scenes (`id`) or on scenes in
-   * specific groups (`groups`)
-   */
-  private buildScenesFilter(
-    filter:
-      | {
-          id?: { value: string[]; modifier?: string };
-          groups?: { value: string[]; modifier?: string };
-        }
-      | undefined
-      | null
-  ): FilterClause {
-    const clauses = [
-      viaSceneClause(
-        TAGS_BY_SCENE,
-        parseCompositeFilterValues(filter?.id?.value ?? []).parsed,
-        filter?.id?.modifier ?? "INCLUDES"
-      ),
-      viaSceneClause(
-        TAGS_BY_GROUP,
-        parseCompositeFilterValues(filter?.groups?.value ?? []).parsed,
-        filter?.groups?.modifier ?? "INCLUDES"
-      ),
-    ].filter((clause) => clause.sql !== "");
-
+  private searchClause(q: string): FilterClause {
+    const pattern = likeContains(q.toLowerCase());
     return {
-      sql: clauses.map((c) => c.sql).join(" AND "),
-      params: clauses.flatMap((c) => c.params),
+      sql: "(LOWER(t.name) LIKE ? ESCAPE '\\' OR LOWER(t.description) LIKE ? ESCAPE '\\' OR LOWER(t.aliases) LIKE ? ESCAPE '\\')",
+      params: [pattern, pattern, pattern],
     };
-  }
-
-  /**
-   * Build search query filter (searches name, description, and aliases)
-   */
-  private buildSearchFilter(searchQuery: string | undefined): FilterClause {
-    if (!searchQuery || searchQuery.trim() === "") {
-      return { sql: "", params: [] };
-    }
-
-    const lowerQuery = `%${searchQuery.toLowerCase()}%`;
-    return {
-      sql: "(LOWER(t.name) LIKE ? OR LOWER(t.description) LIKE ? OR LOWER(t.aliases) LIKE ?)",
-      params: [lowerQuery, lowerQuery, lowerQuery],
-    };
-  }
-
-  /**
-   * Build ORDER BY clause
-   */
-  private buildSortClause(
-    sort: string,
-    direction: "ASC" | "DESC",
-    randomSeed?: number
-  ): string {
-    const dir = direction === "ASC" ? "ASC" : "DESC";
-    const seed = randomSeed || 12345;
-
-    const sortMap: Record<string, string> = {
-      // Tag metadata - use COLLATE NOCASE for case-insensitive sorting
-      name: `t.name COLLATE NOCASE ${dir}`,
-      created_at: `t.stashCreatedAt ${dir}`,
-      updated_at: `t.stashUpdatedAt ${dir}`,
-
-      // Counts - scene_count uses MAX of direct and performer counts to match enhanced value
-      scene_count: `MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0)) ${dir}`,
-      scenes_count: `MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0)) ${dir}`,
-      image_count: `t.imageCount ${dir}`,
-      gallery_count: `t.galleryCount ${dir}`,
-      performer_count: `t.performerCount ${dir}`,
-      studio_count: `t.studioCount ${dir}`,
-      group_count: `t.groupCount ${dir}`,
-      scene_marker_count: `t.sceneMarkerCount ${dir}`,
-
-      // User ratings
-      rating: `COALESCE(r.rating, 0) ${dir}`,
-      rating100: `COALESCE(r.rating, 0) ${dir}`,
-
-      // User stats
-      o_counter: `COALESCE(us.oCounter, 0) ${dir}`,
-      play_count: `COALESCE(us.playCount, 0) ${dir}`,
-
-      // Random - seeded formula matching Stash's algorithm, prevents SQLite integer overflow
-      random: `(((((t.id + ${seed}) % 2147483647) * ((t.id + ${seed}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((t.id + ${seed}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
-    };
-
-    const sortExpr = sortMap[sort] || sortMap["name"];
-
-    // Add secondary sort by name for stable ordering
-    if (sort !== "name") {
-      return `${sortExpr}, t.name COLLATE NOCASE ASC`;
-    }
-    return `${sortExpr}, t.id ${dir}`;
-  }
-
-  async execute(options: TagQueryOptions): Promise<TagQueryResult> {
-    const startTime = Date.now();
-    const {
-      userId,
-      page,
-      perPage,
-      applyExclusions = true,
-      filters,
-      searchQuery,
-      allowedInstanceIds,
-      specificInstanceId,
-      randomSeed,
-    } = options;
-
-    // Build FROM clause with optional exclusion JOIN
-    const fromClause = this.buildFromClause(userId, applyExclusions);
-
-    // Build WHERE clauses
-    const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
-
-    // Instance filter (multi-instance support)
-    const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
-    if (instanceFilter.sql) {
-      whereClauses.push(instanceFilter);
-    }
-
-    // Specific instance filter (for disambiguation on detail pages)
-    if (specificInstanceId) {
-      const specificFilter =
-        this.buildSpecificInstanceFilter(specificInstanceId);
-      if (specificFilter.sql) {
-        whereClauses.push(specificFilter);
-      }
-    }
-
-    // Search query
-    const searchFilter = this.buildSearchFilter(searchQuery);
-    if (searchFilter.sql) {
-      whereClauses.push(searchFilter);
-    }
-
-    // ID filter
-    if (filters?.ids) {
-      const idFilter = this.buildIdFilter(filters.ids);
-      if (idFilter.sql) {
-        whereClauses.push(idFilter);
-      }
-    }
-
-    // User data filters
-    const favoriteFilter = buildFavoriteFilter(filters?.favorite);
-    if (favoriteFilter.sql) {
-      whereClauses.push(favoriteFilter);
-    }
-
-    // Parent filter
-    if (filters?.parents) {
-      const parentFilter = await this.buildParentFilterWithHierarchy(
-        filters.parents
-      );
-      if (parentFilter.sql) {
-        whereClauses.push(parentFilter);
-      }
-    }
-
-    // Performer filter
-    if (filters?.performers) {
-      const performerFilter = this.buildPerformerFilter(filters.performers);
-      if (performerFilter.sql) {
-        whereClauses.push(performerFilter);
-      }
-    }
-
-    // Studio filter
-    if (filters?.studios) {
-      const studioFilter = this.buildStudioFilter(filters.studios);
-      if (studioFilter.sql) {
-        whereClauses.push(studioFilter);
-      }
-    }
-
-    // Scenes filter
-    if (filters?.scenes_filter) {
-      const scenesFilter = this.buildScenesFilter(filters.scenes_filter);
-      if (scenesFilter.sql) {
-        whereClauses.push(scenesFilter);
-      }
-    }
-
-    // Rating filter
-    if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(
-        filters.rating100,
-        "COALESCE(r.rating, 0)"
-      );
-      if (ratingFilter.sql) {
-        whereClauses.push(ratingFilter);
-      }
-    }
-
-    // O counter filter
-    if (filters?.o_counter) {
-      const oCounterFilter = buildNumericFilter(
-        filters.o_counter,
-        "COALESCE(us.oCounter, 0)"
-      );
-      if (oCounterFilter.sql) {
-        whereClauses.push(oCounterFilter);
-      }
-    }
-
-    // Play count filter
-    if (filters?.play_count) {
-      const playCountFilter = buildNumericFilter(
-        filters.play_count,
-        "COALESCE(us.playCount, 0)"
-      );
-      if (playCountFilter.sql) {
-        whereClauses.push(playCountFilter);
-      }
-    }
-
-    // Scene count filter
-    // Use MAX of direct scene count and performer scene count to match the enhanced scene_count returned
-    if (filters?.scene_count) {
-      const sceneCountFilter = buildNumericFilter(
-        filters.scene_count,
-        "MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0))"
-      );
-      if (sceneCountFilter.sql) {
-        whereClauses.push(sceneCountFilter);
-      }
-    }
-
-    // Text filters
-    if (filters?.name) {
-      const nameFilter = buildTextFilter(filters.name, "t.name");
-      if (nameFilter.sql) {
-        whereClauses.push(nameFilter);
-      }
-    }
-
-    if (filters?.description) {
-      const descriptionFilter = buildTextFilter(
-        filters.description,
-        "t.description"
-      );
-      if (descriptionFilter.sql) {
-        whereClauses.push(descriptionFilter);
-      }
-    }
-
-    // Date filters
-    if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(
-        filters.created_at,
-        "t.stashCreatedAt"
-      );
-      if (createdAtFilter.sql) {
-        whereClauses.push(createdAtFilter);
-      }
-    }
-
-    if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(
-        filters.updated_at,
-        "t.stashUpdatedAt"
-      );
-      if (updatedAtFilter.sql) {
-        whereClauses.push(updatedAtFilter);
-      }
-    }
-
-    // Combine WHERE clauses
-    const whereSQL = whereClauses
-      .map((c) => c.sql)
-      .filter(Boolean)
-      .join(" AND ");
-    const whereParams = whereClauses.flatMap((c) => c.params);
-
-    // Build sort clause
-    const sortClause = this.buildSortClause(
-      options.sort,
-      options.sortDirection,
-      randomSeed
-    );
-
-    // Build full query
-    const offset = (page - 1) * perPage;
-    const sql = `
-      SELECT ${this.SELECT_COLUMNS}
-      ${fromClause.sql}
-      WHERE ${whereSQL}
-      ORDER BY ${sortClause}
-      LIMIT ? OFFSET ?
-    `;
-
-    const params = [...fromClause.params, ...whereParams, perPage, offset];
-
-    logger.debug("TagQueryBuilder.execute", {
-      whereClauseCount: whereClauses.length,
-      applyExclusions,
-      sort: options.sort,
-      sortDirection: options.sortDirection,
-      paramCount: params.length,
-    });
-
-    // Execute query
-    const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<TagQueryRow[]>(sql, ...params);
-    const queryMs = Date.now() - queryStart;
-
-    // Count query
-    const countStart = Date.now();
-    let total: number;
-
-    // Check if we have any user-data filters that require the JOINs
-    const hasUserDataFilters =
-      filters?.favorite !== undefined ||
-      filters?.rating100 !== undefined ||
-      filters?.play_count !== undefined ||
-      filters?.o_counter !== undefined;
-
-    if (hasUserDataFilters || applyExclusions) {
-      // COUNT(*) counts each tag once: the other LEFT JOINs in buildFromClause
-      // match at most one row each (a unique key), and the exclusion join,
-      // which can match two (global and per-instance), keeps a tag only when it
-      // matched none (e.id IS NULL).
-      const countSql = `
-        SELECT COUNT(*) as total
-        ${fromClause.sql}
-        WHERE ${whereSQL}
-      `;
-      const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-        countSql,
-        ...countParams
-      );
-      total = Number(countResult[0]?.total ?? 0n);
-    } else {
-      // Fast path: count without JOINs
-      const baseWhereClauses = whereClauses.filter(
-        (c) => !c.sql.includes("r.") && !c.sql.includes("us.")
-      );
-      const baseWhereSQL = baseWhereClauses
-        .map((c) => c.sql)
-        .filter(Boolean)
-        .join(" AND ");
-      const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
-
-      const countSql = `
-        SELECT COUNT(*) as total
-        FROM StashTag t
-        WHERE ${baseWhereSQL || "1=1"}
-      `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-        countSql,
-        ...baseWhereParams
-      );
-      total = Number(countResult[0]?.total || 0);
-    }
-    const countMs = Date.now() - countStart;
-
-    const transformStart = Date.now();
-    const tags = rows.map((row) => this.transformRow(row));
-    const transformMs = Date.now() - transformStart;
-
-    // Populate relations for tooltip data
-    const relationsStart = Date.now();
-    await this.populateRelations(tags, userId);
-    const relationsMs = Date.now() - relationsStart;
-
-    logger.debug("TagQueryBuilder.execute complete", {
-      queryTimeMs: Date.now() - startTime,
-      breakdown: { queryMs, countMs, transformMs, relationsMs },
-      resultCount: tags.length,
-      total,
-    });
-
-    return { tags, total };
   }
 
   /**
    * Transform a raw database row into a NormalizedTag
    */
-  private transformRow(row: TagQueryRow): NormalizedTag {
-    const directSceneCount = row.sceneCount || 0;
-    const performerSceneCount = row.sceneCountViaPerformers || 0;
-    // Use the greater of direct scene count or performer scene count
-    const totalSceneCount = Math.max(directSceneCount, performerSceneCount);
+  protected transformRow(row: TagQueryRow): NormalizedTag {
+    const directSceneCount = row.sceneCount ?? 0;
+    const performerSceneCount = row.sceneCountViaPerformers ?? 0;
 
     const tag = {
       id: row.id,
       instanceId: row.stashInstanceId,
       name: row.name,
-      description: row.description || null,
+      description: emptyToNull(row.description),
       aliases: parseJsonArray(row.aliases),
       parents: parseJsonArray(row.parentIds).map((id: string) => ({
         id,
@@ -703,25 +320,25 @@ class TagQueryBuilder {
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
 
-      // Counts - use enhanced scene count
-      scene_count: totalSceneCount,
+      // Counts: the larger of the direct and via-performer scene counts
+      scene_count: Math.max(directSceneCount, performerSceneCount),
       scene_count_direct: directSceneCount,
       scene_count_via_performers: performerSceneCount,
-      image_count: row.imageCount || 0,
-      gallery_count: row.galleryCount || 0,
-      performer_count: row.performerCount || 0,
-      studio_count: row.studioCount || 0,
-      group_count: row.groupCount || 0,
-      scene_marker_count: row.sceneMarkerCount || 0,
+      image_count: row.imageCount ?? 0,
+      gallery_count: row.galleryCount ?? 0,
+      performer_count: row.performerCount ?? 0,
+      studio_count: row.studioCount ?? 0,
+      group_count: row.groupCount ?? 0,
+      scene_marker_count: row.sceneMarkerCount ?? 0,
 
       // Timestamps
       created_at: row.stashCreatedAt?.toISOString() ?? null,
       updated_at: row.stashUpdatedAt?.toISOString() ?? null,
 
       // User data - Peek user data ONLY
-      rating: row.userRating ?? null,
-      rating100: row.userRating ?? null,
-      favorite: Boolean(row.userFavorite),
+      rating: row.userRating,
+      rating100: row.userRating,
+      favorite: row.userFavorite ?? false,
       o_counter: row.userOCounter ?? 0,
       play_count: row.userPlayCount ?? 0,
 
@@ -737,14 +354,14 @@ class TagQueryBuilder {
    * performers, studios, collections and galleries with how many there are
    * (TooltipRelations), one statement per relation; and its parents' names
    */
-  async populateRelations(
+  protected async populateRelations(
     tags: NormalizedTag[],
-    userId: number
+    ctx: QueryContext
   ): Promise<void> {
     if (tags.length === 0) return;
 
     const [relations] = await Promise.all([
-      loadTooltipRelations("tag", tags, userId),
+      loadTooltipRelations("tag", tags, ctx.userId),
       this.hydrateParentNames(tags),
     ]);
     for (const tag of tags) {
@@ -754,44 +371,29 @@ class TagQueryBuilder {
 
   /** The names of the page's parent tags, on each tag's own instance */
   private async hydrateParentNames(tags: NormalizedTag[]): Promise<void> {
-    const tagInstanceIds = [...new Set(tags.map((t) => t.instanceId))];
-
-    // Collect all parent IDs that need name hydration
-    const parentIds = new Set<string>();
-    for (const tag of tags) {
-      if (tag.parents && Array.isArray(tag.parents)) {
-        for (const parent of tag.parents) {
-          if (parent.id) {
-            parentIds.add(parent.id);
-          }
-        }
-      }
-    }
+    const parentIds = new Set(
+      tags.flatMap((tag) => tag.parents.map((parent) => parent.id))
+    );
     if (parentIds.size === 0) return;
 
-    // Fetch parent tag names - filter by parent instanceIds matching tag instanceIds
-    const parentTagRecords = await prisma.stashTag.findMany({
+    const parentTags = await prisma.stashTag.findMany({
       where: {
-        id: { in: Array.from(parentIds) },
-        stashInstanceId: { in: tagInstanceIds },
+        id: { in: [...parentIds] },
+        stashInstanceId: { in: [...new Set(tags.map((t) => t.instanceId))] },
       },
       select: { id: true, stashInstanceId: true, name: true },
     });
-
-    // Build parent name lookup map (by composite key) and hydrate parent names
-    const parentNameMap = new Map<string, string>();
-    for (const pt of parentTagRecords) {
-      const key = entityKey(pt.id, pt.stashInstanceId);
-      parentNameMap.set(key, pt.name || "Unknown");
-    }
+    const names = new Map(
+      parentTags.map((parent) => [
+        entityKey(parent.id, parent.stashInstanceId),
+        emptyToNull(parent.name) ?? "Unknown",
+      ])
+    );
     for (const tag of tags) {
-      if (tag.parents && Array.isArray(tag.parents)) {
-        const tagInstanceId = tag.instanceId;
-        tag.parents = tag.parents.map((p) => ({
-          id: p.id,
-          name: parentNameMap.get(entityKey(p.id, tagInstanceId)) || "Unknown",
-        }));
-      }
+      tag.parents = tag.parents.map((parent) => ({
+        id: parent.id,
+        name: names.get(entityKey(parent.id, tag.instanceId)) ?? "Unknown",
+      }));
     }
   }
 }

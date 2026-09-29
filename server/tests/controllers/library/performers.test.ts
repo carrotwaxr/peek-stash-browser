@@ -71,7 +71,7 @@ describe("findPerformers", () => {
   it("returns paginated performers from query builder", async () => {
     const performers = [createMockPerformer({ id: "p1", name: "Alice" })];
     vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
-      performers,
+      items: performers,
       total: 1,
     });
 
@@ -83,6 +83,14 @@ describe("findPerformers", () => {
 
     await findPerformers(req, res);
 
+    // The builder reads the parsed request and the viewer's instances
+    const call = must(
+      vi.mocked(performerQueryBuilder).execute.mock.calls[0]
+    )[0];
+    expect(call).toMatchObject({
+      allowedInstanceIds: ["default"],
+      request: { page: 1, perPage: 20, sort: { field: "name" } },
+    });
     expect(res._getStatus()).toBe(200);
     const body = res._getOkBody();
     expect(body.findPerformers.count).toBe(1);
@@ -95,7 +103,7 @@ describe("findPerformers", () => {
 
   it("does not send stashUrl to a regular user", async () => {
     vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
-      performers: [
+      items: [
         createMockPerformer({ id: "p1" }),
         createMockPerformer({ id: "p2" }),
       ],
@@ -122,7 +130,7 @@ describe("findPerformers", () => {
       createMockPerformer({ id: "101", instanceId: "inst2" }),
     ];
     vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
-      performers,
+      items: performers,
       total: 2,
     });
 

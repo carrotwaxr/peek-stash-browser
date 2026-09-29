@@ -17,11 +17,12 @@ import {
   coerceEntityRefs,
 } from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import type { FilterRef, RefCriterion } from "../../types/parsedFilters.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -43,6 +44,23 @@ const OPTIONS = {
 const refs = (...values: string[]): InstanceAwareId[] =>
   coerceEntityRefs(values);
 
+/** "id" or "id:instance" as the request parser hands it over */
+const includes = (...values: string[]): RefCriterion => ({
+  refs: values.map((value): FilterRef => {
+    const [id = "", instanceId] = value.split(":");
+    return { id, instanceId };
+  }),
+  modifier: "INCLUDES",
+  depth: 0,
+});
+
+/** The ported builders' options: no per-user rows, exclusions off */
+const BUILDER_OPTIONS = {
+  userId: 0,
+  applyExclusions: false,
+  allowedInstanceIds: [A, B],
+};
+
 const keys = (rows: Array<{ id: string; instanceId: string }>): string[] =>
   rows.map((row) => `${row.id}:${row.instanceId}`).sort();
 
@@ -55,25 +73,25 @@ async function groupsByScene(...scenes: string[]): Promise<string[]> {
 }
 
 async function performersByGroup(...groups: string[]): Promise<string[]> {
-  const { performers } = await performerQueryBuilder.execute({
-    ...OPTIONS,
-    filters: {
-      groups: { value: refs(...groups), modifier: CriterionModifier.Includes },
-    },
+  const { items } = await performerQueryBuilder.execute({
+    ...BUILDER_OPTIONS,
+    request: parsedListRequest("performer", {
+      perPage: 50,
+      filter: { groups: includes(...groups) },
+    }),
   });
-  return keys(performers);
+  return keys(items);
 }
 
 async function tagsByGroup(...groups: string[]): Promise<string[]> {
-  const { tags } = await tagQueryBuilder.execute({
-    ...OPTIONS,
-    filters: {
-      scenes_filter: {
-        groups: { value: refs(...groups), modifier: "INCLUDES" },
-      },
-    },
+  const { items } = await tagQueryBuilder.execute({
+    ...BUILDER_OPTIONS,
+    request: parsedListRequest("tag", {
+      perPage: 50,
+      filter: { groups: includes(...groups) },
+    }),
   });
-  return keys(tags);
+  return keys(items);
 }
 
 async function seed(): Promise<void> {

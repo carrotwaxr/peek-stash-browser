@@ -280,11 +280,6 @@
       "count": 4
     }
   },
-  "services/PerformerQueryBuilder.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 26
-    }
-  },
   "services/PlaylistZipService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -301,19 +296,6 @@
   "services/StashSyncService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 59
-    }
-  },
-  "services/StudioQueryBuilder.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
-    }
-  },
-  "services/TagQueryBuilder.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 16
     }
   },
   "services/TimelineService.ts": {

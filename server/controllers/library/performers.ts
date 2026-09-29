@@ -12,7 +12,6 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -51,18 +50,11 @@ export const findPerformers = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const { performers, total } = await performerQueryBuilder.execute({
+    const { items: performers, total } = await performerQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("performer", request.filter),
-      applyExclusions,
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      searchQuery: request.q,
-      randomSeed: request.sort.seed,
+      request,
+      applyExclusions,
     });
 
     // Check for ambiguous results on single-ID lookups
