@@ -257,6 +257,23 @@ describe("Custom Theme Controller", () => {
       );
     });
 
+    it.each([
+      ["an array", []],
+      ["a string", "dark"],
+    ])("rejects %s as the config with 400", async (_label, config) => {
+      const req = reqFor(createCustomTheme, {
+        body: malformed({ name: "Test", config }),
+        user: USER,
+      });
+      const res = resFor(createCustomTheme);
+      await createCustomTheme(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual(
+        expect.objectContaining({ error: "Invalid theme configuration" })
+      );
+    });
+
     it("returns 400 for undefined config", async () => {
       const req = reqFor(createCustomTheme, {
         body: malformed({ name: "Test" }),

@@ -62,8 +62,10 @@ describe("By-id reads (integration)", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (reader) {
-      await adminClient.delete(`/api/user/${reader.id}`);
+    // beforeAll may have failed before it set reader
+    const created = reader as typeof reader | undefined;
+    if (created) {
+      await adminClient.delete(`/api/user/${created.id}`);
     }
     await clearAccessFixture();
   }, 60000);

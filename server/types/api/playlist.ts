@@ -156,7 +156,8 @@ export interface UpdatePlaylistParams extends Record<string, string> {
 
 export interface UpdatePlaylistRequest {
   name?: string;
-  description?: string;
+  /** A client may send null to clear the description. */
+  description?: string | null;
   isPublic?: boolean;
   shuffle?: boolean;
   repeat?: string;

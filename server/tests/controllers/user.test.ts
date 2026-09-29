@@ -431,6 +431,20 @@ describe("User Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
+    it.each([
+      ["null", null],
+      ["without arrays", {}],
+    ])("rejects a table column config that is %s", async (_label, config) => {
+      const req = reqFor(updateUserSettings, {
+        body: malformed({ tableColumnDefaults: { scene: config } }),
+        user: USER,
+      });
+      const res = resFor(updateUserSettings);
+      await updateUserSettings(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toMatch(/Invalid table column config/);
+    });
+
     it("rejects landingPagePreference with no pages", async () => {
       const req = reqFor(updateUserSettings, {
         body: { landingPagePreference: { pages: [], randomize: false } },

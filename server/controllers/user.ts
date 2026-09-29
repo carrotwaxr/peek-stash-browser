@@ -377,7 +377,12 @@ export const updateUserSettings = async (
         "image",
       ];
 
-      for (const [entityType, config] of Object.entries(tableColumnDefaults)) {
+      // The body is untrusted: a value may be null or lack either array
+      const submittedDefaults = tableColumnDefaults as Record<
+        string,
+        Partial<TableColumnsConfig> | null | undefined
+      >;
+      for (const [entityType, config] of Object.entries(submittedDefaults)) {
         if (!validEntityTypes.includes(entityType)) {
           res.status(400).json({
             error: `Invalid entity type in table column defaults: ${entityType}`,
@@ -685,7 +690,8 @@ export const regenerateRecoveryKey = async (
   const userId = req.user.id;
 
   // Express 5 leaves req.body undefined when the request has no body
-  const { currentPassword } = req.body ?? {};
+  const { currentPassword } =
+    (req.body as Partial<RegenerateRecoveryKeyBody> | undefined) ?? {};
   if (!currentPassword) {
     res.status(400).json({ error: "Current password is required" });
     return;
@@ -1098,9 +1104,9 @@ export const deleteFilterPreset = async (
     return;
   }
 
-  const currentPresets = (user.filterPresets as FilterPresets) || {};
+  const currentPresets = (user.filterPresets as FilterPresets | null) ?? {};
   const currentDefaults =
-    (user.defaultFilterPresets as DefaultFilterPresets) || {};
+    (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
 
   // Remove preset from the appropriate artifact type array
   currentPresets[artifactType] = (currentPresets[artifactType] ?? []).filter(
@@ -1202,8 +1208,8 @@ export const setDefaultFilterPreset = async (
   }
 
   const currentDefaults =
-    (user.defaultFilterPresets as DefaultFilterPresets) || {};
-  const currentPresets = (user.filterPresets as FilterPresets) || {};
+    (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
+  const currentPresets = (user.filterPresets as FilterPresets | null) ?? {};
 
   // If presetId is provided, validate it exists
   // For scene grid contexts (scene_performer, etc.), validate against "scene" presets

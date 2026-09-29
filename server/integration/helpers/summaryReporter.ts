@@ -46,7 +46,7 @@ function collectTests(task: RunnerTask): {
       result.skipped += childResult.skipped;
       result.failures.push(...childResult.failures);
     }
-  } else if (task.type === "test") {
+  } else {
     const state = task.result?.state;
     if (state === "pass") {
       result.passed++;
@@ -54,7 +54,7 @@ function collectTests(task: RunnerTask): {
       result.failed++;
       const errorMessage = task.result?.errors?.[0]?.message ?? "Unknown error";
       result.failures.push({
-        file: task.file?.name ?? "unknown",
+        file: task.file.name,
         test: task.name,
         error: errorMessage.slice(0, 500),
       });

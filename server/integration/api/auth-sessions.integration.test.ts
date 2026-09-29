@@ -49,7 +49,7 @@ describe("Session end and recovery keys", () => {
 
     // Left over from an interrupted run: find it and give it a known password
     const users = await adminClient.get<{
-      users: Array<{ id: number; username: string }>;
+      users?: Array<{ id: number; username: string }>;
     }>("/api/user/all");
     const existing = users.data.users?.find((u) => u.username === USERNAME);
     if (!existing) {

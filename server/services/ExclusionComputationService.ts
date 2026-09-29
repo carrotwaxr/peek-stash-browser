@@ -1858,7 +1858,7 @@ class ExclusionComputationService {
         userId,
         entityType: "gallery",
         entityId: row.galleryId,
-        instanceId: row.instanceId ?? "",
+        instanceId: row.instanceId,
         reason: "empty",
       });
     }
@@ -1903,7 +1903,7 @@ class ExclusionComputationService {
         userId,
         entityType: "performer",
         entityId: row.performerId,
-        instanceId: row.instanceId ?? "",
+        instanceId: row.instanceId,
         reason: "empty",
       });
     }
@@ -1951,7 +1951,7 @@ class ExclusionComputationService {
         userId,
         entityType: "studio",
         entityId: row.studioId,
-        instanceId: row.instanceId ?? "",
+        instanceId: row.instanceId,
         reason: "empty",
       });
     }
@@ -1989,7 +1989,7 @@ class ExclusionComputationService {
         userId,
         entityType: "group",
         entityId: row.groupId,
-        instanceId: row.instanceId ?? "",
+        instanceId: row.instanceId,
         reason: "empty",
       });
     }
@@ -2068,7 +2068,7 @@ class ExclusionComputationService {
         userId,
         entityType: "tag",
         entityId: row.tagId,
-        instanceId: row.instanceId ?? "",
+        instanceId: row.instanceId,
         reason: "empty",
       });
     }

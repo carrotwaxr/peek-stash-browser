@@ -426,13 +426,12 @@ export function main(
 ): number {
   let check: boolean;
   try {
-    check =
-      parseArgs({
-        args: argv,
-        options: { check: { type: "boolean", default: false } },
-        strict: true,
-        allowPositionals: false,
-      }).values.check ?? false;
+    check = parseArgs({
+      args: argv,
+      options: { check: { type: "boolean", default: false } },
+      strict: true,
+      allowPositionals: false,
+    }).values.check;
   } catch (error) {
     log(
       `fixtures:generate: ${error instanceof Error ? error.message : String(error)}\nUsage: npm run fixtures:generate [-- --check]`,

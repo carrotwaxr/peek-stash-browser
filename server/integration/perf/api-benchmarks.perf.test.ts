@@ -30,35 +30,33 @@ beforeAll(async () => {
 
   // Auto-discover entity IDs from first page of each list
   const [scenes, performers, studios, galleries] = await Promise.all([
-    adminClient.post<{ findScenes: { scenes: Array<{ id: string }> } }>(
+    adminClient.post<{ findScenes?: { scenes?: Array<{ id: string }> } }>(
       "/api/library/scenes",
       { filter: { page: 1, per_page: 1 } }
     ),
-    adminClient.post<{ findPerformers: { performers: Array<{ id: string }> } }>(
-      "/api/library/performers",
-      { filter: { page: 1, per_page: 1 } }
-    ),
-    adminClient.post<{ findStudios: { studios: Array<{ id: string }> } }>(
+    adminClient.post<{
+      findPerformers?: { performers?: Array<{ id: string }> };
+    }>("/api/library/performers", { filter: { page: 1, per_page: 1 } }),
+    adminClient.post<{ findStudios?: { studios?: Array<{ id: string }> } }>(
       "/api/library/studios",
       { filter: { page: 1, per_page: 1 } }
     ),
-    adminClient.post<{ findGalleries: { galleries: Array<{ id: string }> } }>(
+    adminClient.post<{ findGalleries?: { galleries?: Array<{ id: string }> } }>(
       "/api/library/galleries",
       { filter: { page: 1, per_page: 1 } }
     ),
   ]);
 
   discoveredSceneId =
-    scenes.data?.findScenes?.scenes?.[0]?.id ??
-    TEST_ENTITIES.sceneWithRelations;
+    scenes.data.findScenes?.scenes?.[0]?.id ?? TEST_ENTITIES.sceneWithRelations;
   discoveredPerformerId =
-    performers.data?.findPerformers?.performers?.[0]?.id ??
+    performers.data.findPerformers?.performers?.[0]?.id ??
     TEST_ENTITIES.performerWithScenes;
   discoveredStudioId =
-    studios.data?.findStudios?.studios?.[0]?.id ??
+    studios.data.findStudios?.studios?.[0]?.id ??
     TEST_ENTITIES.studioWithScenes;
   discoveredGalleryId =
-    galleries.data?.findGalleries?.galleries?.[0]?.id ??
+    galleries.data.findGalleries?.galleries?.[0]?.id ??
     TEST_ENTITIES.galleryWithImages;
 
   console.log("\n=== API Performance Benchmarks ===");

@@ -345,13 +345,6 @@ export async function getDownloadFile(
     });
   }
 
-  if (
-    download.type !== DownloadType.SCENE &&
-    download.type !== DownloadType.IMAGE
-  ) {
-    return res.status(400).json({ error: "Unknown download type" });
-  }
-
   // Scene and image files are proxied from Stash, so check before any fetch
   if (!permissions?.canDownloadFiles) {
     return res

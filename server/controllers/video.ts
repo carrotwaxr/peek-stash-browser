@@ -162,19 +162,19 @@ function rewriteHlsLine(
   }
 
   if (line.startsWith("#")) {
-    let unparsable = false;
+    const rewrite = { unparsable: false };
     const rewritten = line.replace(
       HLS_URI_ATTRIBUTE,
       (match, separator: string, uri: string) => {
         const proxied = rewriteStashUri(uri, sceneId, instanceId);
         if (proxied === null) {
-          unparsable = true;
+          rewrite.unparsable = true;
           return match;
         }
         return `${separator}URI="${proxied}"`;
       }
     );
-    if (unparsable) {
+    if (rewrite.unparsable) {
       logger.warn(`[PROXY] Dropped an HLS tag: ${redactUrl(line)}`);
       return "";
     }
@@ -553,7 +553,8 @@ export const createExternalPlayerLink = async (
   res: TypedResponse<ExternalPlayerLinkResponse | ApiErrorResponse>
 ) => {
   const { sceneId } = req.params;
-  const instanceId = req.body?.instanceId;
+  const instanceId = (req.body as { instanceId?: unknown } | undefined)
+    ?.instanceId;
 
   if (
     !SCENE_ID_PATTERN.test(sceneId) ||

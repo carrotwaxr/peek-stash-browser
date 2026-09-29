@@ -130,6 +130,25 @@ describe("Playlist Controller Operations", () => {
       );
     });
 
+    it.each([[""], ["   "]])(
+      "stores a blank description (%j) as null",
+      async (description) => {
+        mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 1 }));
+
+        const req = reqFor(createPlaylist, {
+          body: { name: "My Playlist", description },
+          user: USER,
+        });
+        await createPlaylist(req, resFor(createPlaylist));
+
+        expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: objectContaining({ description: null }),
+          })
+        );
+      }
+    );
+
     it("rejects empty name", async () => {
       const req = reqFor(createPlaylist, { body: { name: "" }, user: USER });
       const res = resFor(createPlaylist);
@@ -204,6 +223,31 @@ describe("Playlist Controller Operations", () => {
         })
       );
     });
+
+    it.each([[""], ["   "], [null]])(
+      "clears the description when an update sends %j",
+      async (description) => {
+        mockPrisma.playlist.findFirst.mockResolvedValue(
+          partialRow({ id: 1, userId: 1 })
+        );
+        mockPrisma.playlist.update.mockResolvedValue(
+          partialRow<PlaylistWithItemCount>({ id: 1, _count: { items: 0 } })
+        );
+
+        const req = reqFor(updatePlaylist, {
+          body: { description },
+          params: { id: "1" },
+          user: USER,
+        });
+        await updatePlaylist(req, resFor(updatePlaylist));
+
+        expect(mockPrisma.playlist.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: objectContaining({ description: null }),
+          })
+        );
+      }
+    );
 
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);

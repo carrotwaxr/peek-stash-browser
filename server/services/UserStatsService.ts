@@ -211,7 +211,7 @@ class UserStatsService {
         entityId: string;
         run: () => Promise<void>;
       }[] = [
-        ...(scene.performers ?? []).map((performer) => ({
+        ...scene.performers.map((performer) => ({
           entityType: "performer" as const,
           entityId: performer.id,
           run: () =>
@@ -241,7 +241,7 @@ class UserStatsService {
               },
             ]
           : []),
-        ...(scene.tags ?? []).map((tag) => ({
+        ...scene.tags.map((tag) => ({
           entityType: "tag" as const,
           entityId: tag.id,
           run: () =>
@@ -494,7 +494,7 @@ class UserStatsService {
         const lastOAt = lastOEntry ? new Date(lastOEntry) : null;
 
         // Aggregate performers (using composite key: performerId + instanceId)
-        for (const performer of scene.performers || []) {
+        for (const performer of scene.performers) {
           const statsKey = entityKey(performer.id, whInstanceId);
           const existing = performerStatsMap.get(statsKey) ?? {
             oCounter: 0,
@@ -533,7 +533,7 @@ class UserStatsService {
         }
 
         // Aggregate tags (using composite key: tagId + instanceId)
-        for (const tag of scene.tags || []) {
+        for (const tag of scene.tags) {
           const statsKey = entityKey(tag.id, whInstanceId);
           const existing = tagStatsMap.get(statsKey) ?? {
             oCounter: 0,

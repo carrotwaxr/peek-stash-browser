@@ -1,21 +1,10 @@
 {
   "controllers/carousel.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
-  "controllers/customTheme.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
-    }
-  },
   "controllers/download.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
@@ -25,33 +14,12 @@
       "count": 1
     }
   },
-  "controllers/playlist.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "controllers/proxy.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
   },
-  "controllers/setup.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    }
-  },
-  "controllers/user.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 6
-    }
-  },
   "controllers/video.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
@@ -61,132 +29,14 @@
       "count": 5
     }
   },
-  "integration/api/auth-sessions.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/by-id-access.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/content-restrictions-include-mode.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 6
-    }
-  },
-  "integration/api/content-restrictions.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "integration/api/downloads-access.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "integration/api/hidden-entities-access.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/hidden-entities-bulk.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "integration/api/history-access.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/media-security.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "integration/api/multi-instance.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    }
-  },
-  "integration/api/playlist-sharing.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/ratings-access.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/setup.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/api/tags.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
-  "integration/api/user-settings.integration.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/helpers/summaryReporter.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
-  "integration/helpers/testClient.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/perf/api-benchmarks.perf.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 12
-    }
-  },
-  "integration/stash-replay/generate.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
   "services/DownloadService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
   },
-  "services/EntityAccessService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
-    }
-  },
-  "services/ExclusionComputationService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
-    }
-  },
   "services/StashEntityService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 26
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5
-    }
-  },
-  "services/UserStatsService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    }
-  },
-  "tests/controllers/carousel.test.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
     }
   },
   "utils/codecDetection.ts": {
@@ -207,11 +57,6 @@
   "utils/nfoGenerator.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5
-    }
-  },
-  "utils/proxyAuthTrust.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
     }
   }
 }

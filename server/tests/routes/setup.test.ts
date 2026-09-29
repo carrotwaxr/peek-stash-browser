@@ -211,6 +211,25 @@ describe("setup routes", () => {
     });
   });
 
+  it.each([[null], [{}], [{ configuration: null }]])(
+    "a Stash answer without a configuration (%j) fails the connection test",
+    async (answer) => {
+      MockStashClient.mockImplementation(() =>
+        partialRow({
+          configuration: vi.fn().mockResolvedValue(answer),
+          version: vi.fn(),
+        })
+      );
+      const response = await post("/test-stash-connection", STASH_BODY);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: CONNECTION_TEST_FAILED,
+      });
+    }
+  );
+
   it("once the admin exists, test-stash-connection and create-stash-instance need an admin session", async () => {
     mockPrisma.user.count.mockResolvedValue(1);
 

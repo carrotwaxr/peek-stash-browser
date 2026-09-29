@@ -171,8 +171,11 @@ describe("Downloads access (integration)", () => {
   afterAll(async () => {
     await prisma.userGroup.deleteMany({ where: { name: GROUP_NAME } });
     // Users cascade to their playlists, shares' memberships and Download rows.
-    if (dl) await adminClient.delete(`/api/user/${dl.id}`);
-    if (owner) await adminClient.delete(`/api/user/${owner.id}`);
+    // beforeAll may have failed before it set either user
+    const users = [dl, owner] as (typeof dl | undefined)[];
+    for (const user of users) {
+      if (user) await adminClient.delete(`/api/user/${user.id}`);
+    }
     await clearAccessFixture();
     if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   }, 60000);
