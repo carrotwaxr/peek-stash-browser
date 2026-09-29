@@ -20,7 +20,7 @@ Invariants:
 2. Every request that shows or serves Stash content is authenticated as a Peek user: a session, or on the direct stream a personal signed link.
 3. A user's exclusions (restrictions, hidden items, cascades) apply on every surface that lists, counts, recommends, shows or serves an entity, by-id lookups, downloads and media included.
 4. Only admins set restrictions, and never on admin accounts; users cannot bypass them. Hidden items belong to the user who hid them.
-5. Admins bypass restrictions; everyone's own hidden items apply to them everywhere.
+5. Admins bypass restrictions; everyone's own hidden items apply to them everywhere, except in the admin's Content Restrictions editor, which lists everything so an admin can restrict what they hid.
 6. No user sees another user's data, except shared playlists and admin exclusion counts. Deleting a user deletes all their data.
 7. Everything stored about a Stash entity carries its instance.
 8. Peek never edits Stash metadata. It writes to Stash only through Sync to Stash, which only an admin can switch on for a user.
