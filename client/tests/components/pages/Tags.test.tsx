@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import Tags from "@/components/pages/Tags";
@@ -61,10 +61,24 @@ interface MockListResult {
 const mockUseTagList = vi.fn(
   (): MockListResult => ({ data: null, isLoading: false, error: null })
 );
-const mockUseTagTree = vi.fn((_scope: unknown, _enabled: boolean) => ({
-  data: undefined,
-  isLoading: false,
-}));
+const mockRefetchTree = vi.fn();
+const mockUseTagTree = vi.fn(
+  (
+    _scope: unknown,
+    _enabled: boolean
+  ): {
+    data: unknown;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => void;
+  } => ({
+    data: undefined,
+    isLoading: false,
+    error: null,
+    refetch: mockRefetchTree,
+  })
+);
+let mockViewMode = "grid";
 const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   useTagList: (..._args: unknown[]) => mockUseTagList(),
@@ -103,7 +117,7 @@ vi.mock("@/components/ui/index", () => ({
       <div data-testid="search-controls" data-artifact-type={rest.artifactType}>
         {typeof children === "function"
           ? children({
-              viewMode: "grid",
+              viewMode: mockViewMode,
               gridDensity: "medium",
               sortField: "name",
               sortDirection: "ASC",
@@ -122,9 +136,16 @@ vi.mock("@/components/ui/index", () => ({
       {subtitle ? <span>{subtitle as string}</span> : null}
     </div>
   ),
-  ErrorMessage: ({ error }: Record<string, unknown>) => (
+  ErrorMessage: ({
+    error,
+    onRetry,
+  }: {
+    error?: Error;
+    onRetry?: () => void;
+  }) => (
     <div data-testid="error-message">
-      {(error as Error)?.message || "Error"}
+      {error?.message ?? "Error"}
+      {onRetry ? <button onClick={onRetry}>Retry</button> : null}
     </div>
   ),
   // Shows itself while the library is initializing (its own test covers when)
@@ -148,6 +169,7 @@ vi.mock("@/components/table/index", () => ({
 describe("Tags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockViewMode = "grid";
     mockUseTagList.mockReturnValue({
       data: null,
       isLoading: false,
@@ -176,6 +198,44 @@ describe("Tags", () => {
       render(<Tags />);
       const controls = screen.getByTestId("search-controls");
       expect(controls).toHaveAttribute("data-artifact-type", "tag");
+    });
+  });
+
+  describe("Hierarchy view", () => {
+    beforeEach(() => {
+      mockViewMode = "hierarchy";
+    });
+
+    it("a failed tag-tree request shows the error with Retry, not a spinner", () => {
+      mockUseTagTree.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new ApiError("Tree failed", 500),
+        refetch: mockRefetchTree,
+      });
+
+      render(<Tags />);
+
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Tree failed"
+      );
+      expect(screen.queryByTestId("hierarchy-view")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(mockRefetchTree).toHaveBeenCalled();
+    });
+
+    it("an initializing 503 on the tree keeps the loading view, not the error", () => {
+      mockUseTagTree.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new ApiError("init", 503, { ready: false }),
+        refetch: mockRefetchTree,
+      });
+
+      render(<Tags />);
+
+      expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
+      expect(screen.getByTestId("hierarchy-view")).toBeInTheDocument();
     });
   });
 
