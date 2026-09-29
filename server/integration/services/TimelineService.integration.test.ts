@@ -54,11 +54,13 @@ const ONLY_B: DistributionItem[] = [
 async function bars(
   entityType: TimelineEntityType,
   filters?: TimelineFilters,
-  userId = NO_USER
+  userId = NO_USER,
+  allowed: readonly string[] = [A, B]
 ): Promise<DistributionItem[]> {
   const all = await timelineService.getDistribution(
     entityType,
     userId,
+    allowed,
     "months",
     filters
   );
@@ -206,6 +208,14 @@ describeWithDb("TimelineService across instances (integration)", () => {
     "%s bars count both instances' entity 1 in February",
     async (entityType) => {
       expect(await bars(entityType)).toEqual(BOTH);
+    }
+  );
+
+  it.each(["scene", "gallery", "image"] as const)(
+    "%s bars leave out an instance the viewer does not see",
+    async (entityType) => {
+      expect(await bars(entityType, undefined, NO_USER, [A])).toEqual(ONLY_A);
+      expect(await bars(entityType, undefined, NO_USER, [])).toEqual([]);
     }
   );
 

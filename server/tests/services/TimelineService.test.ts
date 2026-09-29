@@ -49,6 +49,7 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months"
       );
 
@@ -63,9 +64,34 @@ describe("TimelineService", () => {
       expect(params).toContain(1); // userId
     });
 
+    it("limits every entity type to the viewer's allowed instances", () => {
+      const service = new TimelineService();
+      for (const type of ["scene", "gallery", "image"] as const) {
+        const { sql, params } = service.buildDistributionQuery(
+          type,
+          7,
+          ["inst-a"],
+          "months"
+        );
+        expect(sql).toMatch(/\.stashInstanceId IN \(\?\)/);
+        expect(params).toEqual([7, "inst-a"]);
+      }
+    });
+
+    it("matches nothing for an empty allowed list", () => {
+      const service = new TimelineService();
+      const { sql } = service.buildDistributionQuery("scene", 7, [], "months");
+      expect(sql).toContain("1 = 0");
+    });
+
     it("builds SQL for galleries with correct table", () => {
       const service = new TimelineService();
-      const { sql } = service.buildDistributionQuery("gallery", 1, "years");
+      const { sql } = service.buildDistributionQuery(
+        "gallery",
+        1,
+        ["inst-a", "inst-b"],
+        "years"
+      );
 
       expect(sql).toContain("FROM StashGallery");
       expect(sql).toContain("strftime('%Y', g.date)");
@@ -73,7 +99,12 @@ describe("TimelineService", () => {
 
     it("builds SQL for images with correct table", () => {
       const service = new TimelineService();
-      const { sql } = service.buildDistributionQuery("image", 1, "days");
+      const { sql } = service.buildDistributionQuery(
+        "image",
+        1,
+        ["inst-a", "inst-b"],
+        "days"
+      );
 
       expect(sql).toContain("FROM StashImage");
       expect(sql).toContain("strftime('%Y-%m-%d', i.date)");
@@ -95,6 +126,7 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months",
         { performerId: "42:inst-a" }
       );
@@ -102,7 +134,7 @@ describe("TimelineService", () => {
       expect(sql).toContain(
         "sp.performerId = ? AND sp.performerInstanceId = ?"
       );
-      expect(params).toEqual([1, "42", "inst-a"]);
+      expect(params).toEqual([1, "inst-a", "inst-b", "42", "inst-a"]);
       expect(placeholders(sql)).toBe(params.length);
     });
 
@@ -110,13 +142,14 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months",
         { performerId: "42" }
       );
 
       expect(sql).toContain("sp.performerId = ?");
       expect(sql).not.toContain("sp.performerInstanceId = ?");
-      expect(params).toEqual([1, "42"]);
+      expect(params).toEqual([1, "inst-a", "inst-b", "42"]);
       expect(placeholders(sql)).toBe(params.length);
     });
 
@@ -124,12 +157,13 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months",
         { performerId: "42:" }
       );
 
       expect(sql).not.toContain("sp.performerInstanceId = ?");
-      expect(params).toEqual([1, "42"]);
+      expect(params).toEqual([1, "inst-a", "inst-b", "42"]);
     });
 
     it.each([
@@ -161,12 +195,13 @@ describe("TimelineService", () => {
         const { sql, params } = service.buildDistributionQuery(
           entityType,
           1,
+          ["inst-a", "inst-b"],
           "months",
           { [filter]: "7:inst-b" }
         );
 
         expect(sql).toContain(condition);
-        expect(params).toEqual([1, "7", "inst-b"]);
+        expect(params).toEqual([1, "inst-a", "inst-b", "7", "inst-b"]);
         expect(placeholders(sql)).toBe(params.length);
       }
     );
@@ -175,6 +210,7 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months",
         {
           performerId: "1:a",
@@ -184,7 +220,18 @@ describe("TimelineService", () => {
         }
       );
 
-      expect(params).toEqual([1, "1", "a", "2", "3", "a", "4", "a"]);
+      expect(params).toEqual([
+        1,
+        "inst-a",
+        "inst-b",
+        "1",
+        "a",
+        "2",
+        "3",
+        "a",
+        "4",
+        "a",
+      ]);
       expect(placeholders(sql)).toBe(params.length);
     });
 
@@ -192,12 +239,13 @@ describe("TimelineService", () => {
       const { sql, params } = service.buildDistributionQuery(
         "gallery",
         1,
+        ["inst-a", "inst-b"],
         "months",
         { groupId: "4:a" }
       );
 
       expect(sql).not.toContain("groupId");
-      expect(params).toEqual([1]);
+      expect(params).toEqual([1, "inst-a", "inst-b"]);
     });
   });
 
@@ -216,6 +264,7 @@ describe("TimelineService", () => {
       const { sql } = service.buildDistributionQuery(
         "scene",
         1,
+        ["inst-a", "inst-b"],
         "months",
         filters
       );
@@ -224,20 +273,32 @@ describe("TimelineService", () => {
     });
 
     it("counts rows when every junction ref names its instance", () => {
-      const { sql } = service.buildDistributionQuery("scene", 1, "months", {
-        performerId: "42:inst-a",
-        tagId: "9:inst-a",
-        studioId: "3",
-      });
+      const { sql } = service.buildDistributionQuery(
+        "scene",
+        1,
+        ["inst-a", "inst-b"],
+        "months",
+        {
+          performerId: "42:inst-a",
+          tagId: "9:inst-a",
+          studioId: "3",
+        }
+      );
 
       expect(sql).toContain("COUNT(*)");
       expect(sql).not.toContain("DISTINCT");
     });
 
     it("counts distinct (id, instance) pairs when a junction ref is bare", () => {
-      const { sql } = service.buildDistributionQuery("image", 1, "months", {
-        tagId: "9",
-      });
+      const { sql } = service.buildDistributionQuery(
+        "image",
+        1,
+        ["inst-a", "inst-b"],
+        "months",
+        {
+          tagId: "9",
+        }
+      );
 
       expect(sql).toContain("SELECT DISTINCT i.id, i.stashInstanceId");
       expect(sql).toContain("COUNT(*)");
