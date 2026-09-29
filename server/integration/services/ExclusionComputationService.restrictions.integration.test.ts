@@ -966,13 +966,12 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       new Set([`i4@${A}`, `i6@${A}`, `i7@${A}`])
     );
 
-    // The clips list is scoped by its instanceId param, not by the user's
-    // instances, and its rows carry no instance field: ask for A directly.
-    const clips = await userClient.get<{ clips: Array<{ id: string }> }>(
-      `/api/clips?perPage=100&instanceId=${A}`
-    );
+    // The clips list is scoped by the user's instances, like the others
+    const clips = await userClient.get<{
+      clips: Array<{ id: string; instanceId: string }>;
+    }>("/api/clips?perPage=100");
     expect(clips.ok).toBe(true);
-    expect(new Set(clips.data.clips.map((c) => c.id))).toEqual(new Set(["c2"]));
+    expect(new Set(clips.data.clips.map(keyOf))).toEqual(new Set([`c2@${A}`]));
 
     const tags = await userClient.post<{
       findTags: { tags: Array<{ id: string; instanceId: string }> };

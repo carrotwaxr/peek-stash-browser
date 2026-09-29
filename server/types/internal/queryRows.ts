@@ -534,6 +534,15 @@ export interface ClipRow {
   primaryTagColor: string | null;
 }
 
+/** One tag of a clip on the page, from its ClipTag row (ClipQueryBuilder) */
+export interface ClipTagQueryRow {
+  clipId: string;
+  clipInstanceId: string;
+  tagId: string;
+  tagName: string;
+  tagColor: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // MinimalEntityQuery
 // ---------------------------------------------------------------------------

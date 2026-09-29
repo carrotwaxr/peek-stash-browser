@@ -1,33 +1,20 @@
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import type {
-  ClipQueryOptions as QueryBuilderOptions,
+  ClipByIdOptions,
   ClipWithRelations as RawClipWithRelations,
+  SceneClipsOptions,
 } from "./ClipQueryBuilder.js";
 import { clipQueryBuilder } from "./ClipQueryBuilder.js";
-
-export interface ClipQueryOptions {
-  page?: number;
-  perPage?: number;
-  sortBy?: string;
-  sortDir?: "asc" | "desc";
-  isGenerated?: boolean;
-  sceneId?: string;
-  tagIds?: string[];
-  sceneTagIds?: string[];
-  performerIds?: string[];
-  studioId?: string;
-  q?: string;
-  randomSeed?: number; // Seed for consistent random ordering
-  allowedInstanceIds?: string[];
-}
+import type { ListQueryOptions } from "./query/EntityQueryBuilder.js";
 
 /**
- * Clip data returned to the client.
+ * Clip data returned to the client, with its instance and its scene's.
  * Note: Raw Stash URLs (previewPath, screenshotPath, streamPath) are NOT exposed.
  * The client uses proxy endpoints like /api/proxy/clip/:id/preview for media.
  */
 export interface ClipWithRelations {
   id: string;
+  instanceId: string;
   sceneId: string;
   title: string | null;
   seconds: number;
@@ -41,6 +28,7 @@ export interface ClipWithRelations {
   tags: Array<{ id: string; name: string; color: string | null }>;
   scene: {
     id: string;
+    instanceId: string;
     title: string | null;
     pathScreenshot: string | null;
     studioId: string | null;
@@ -58,6 +46,7 @@ export class ClipService {
       screenshotUrl: toProxyUrl(screenshotPath, scene.stashInstanceId),
       scene: {
         id: scene.id,
+        instanceId: scene.stashInstanceId,
         title: scene.title,
         pathScreenshot: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
         studioId: scene.studioId,
@@ -69,38 +58,22 @@ export class ClipService {
    * Get clips for a specific scene
    */
   async getClipsForScene(
-    sceneId: string,
-    userId: number,
-    includeUngenerated = false,
-    allowedInstanceIds?: string[]
+    options: SceneClipsOptions
   ): Promise<ClipWithRelations[]> {
-    const clips = await clipQueryBuilder.getClipsForScene(
-      sceneId,
-      userId,
-      includeUngenerated,
-      allowedInstanceIds
-    );
+    const clips = await clipQueryBuilder.getClipsForScene(options);
     return clips.map((clip) => this.transformClip(clip));
   }
 
   /**
-   * Get clips with filtering and pagination
-   * Uses SQL-native query builder with JOIN-based exclusions to avoid P2029 parameter limit errors
+   * Get clips with filtering and pagination, as the viewer sees the library
    */
   async getClips(
-    userId: number,
-    options: ClipQueryOptions = {}
+    options: ListQueryOptions<"clip">
   ): Promise<{ clips: ClipWithRelations[]; total: number }> {
-    const queryOptions: QueryBuilderOptions = {
-      userId,
-      ...options,
-    };
-
-    const result = await clipQueryBuilder.getClips(queryOptions);
-
+    const { items, total } = await clipQueryBuilder.execute(options);
     return {
-      clips: result.clips.map((clip) => this.transformClip(clip)),
-      total: result.total,
+      clips: items.map((clip) => this.transformClip(clip)),
+      total,
     };
   }
 
@@ -108,10 +81,9 @@ export class ClipService {
    * Get a single clip by ID
    */
   async getClipById(
-    clipId: string,
-    userId: number
+    options: ClipByIdOptions
   ): Promise<ClipWithRelations | null> {
-    const clip = await clipQueryBuilder.getClipById(clipId, userId);
+    const clip = await clipQueryBuilder.getClipById(options);
     if (!clip) return null;
     return this.transformClip(clip);
   }

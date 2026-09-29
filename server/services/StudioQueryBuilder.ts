@@ -17,14 +17,12 @@ import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   type JunctionTarget,
-  refClause,
-} from "../utils/sqlClauses.js";
-import {
   buildDateFilter,
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
-} from "../utils/sqlFilterBuilders.js";
+  refClause,
+} from "../utils/sqlClauses.js";
 import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {

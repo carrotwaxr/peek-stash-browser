@@ -17,6 +17,7 @@ import {
   type SortExpr,
 } from "../../../services/query/EntityQueryBuilder.js";
 import type {
+  ClipListRequest,
   ParsedFilter,
   ParsedListRequest,
 } from "../../../types/parsedFilters.js";
@@ -121,6 +122,89 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
 
 const builder = new FakeBuilder();
 
+/**
+ * A clip-shaped builder: a parent row joined on a unique key, the parent's
+ * own exclusion join with the viewer's id, and the parent's conditions.
+ */
+class NestedBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
+  protected readonly spec: EntitySpec = {
+    table: "StashClip",
+    alias: "c",
+    entityType: "clip",
+    userJoins: [],
+    joins: [
+      "INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId",
+    ],
+    extraJoins: (ctx) =>
+      ctx.applyExclusions
+        ? [
+            {
+              sql: "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityId = c.sceneId",
+              params: [`extra:${ctx.userId}`],
+            },
+          ]
+        : [],
+    extraBaseWhere: (ctx) => [
+      { sql: "s.deletedAt IS NULL", params: [] },
+      ...(ctx.applyExclusions ? [{ sql: "es.id IS NULL", params: [] }] : []),
+    ],
+    selectColumns: () => ({ sql: "c.id, c.stashInstanceId", params: [] }),
+    defaultSort: "stashCreatedAt",
+    tiebreak: (dir) => `c.id ${dir}`,
+  };
+
+  protected sortMap(dir: "ASC" | "DESC"): Record<string, SortExpr> {
+    return {
+      stashCreatedAt: { sql: `c.stashCreatedAt ${dir}`, params: [] },
+      seconds: { sql: `c.seconds ${dir}`, params: [] },
+    };
+  }
+
+  protected filterClauses(
+    filter: ClipListRequest["filter"]
+  ): Promise<FilterClause[]> {
+    return Promise.resolve(
+      filter.isGenerated === undefined
+        ? []
+        : [{ sql: "c.isGenerated = ?", params: [filter.isGenerated ? 1 : 0] }]
+    );
+  }
+
+  protected transformRow(row: FakeRow): FakeEntity {
+    return { id: row.id, instanceId: row.stashInstanceId };
+  }
+
+  protected populateRelations(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /** Every row of the request, no page and no count */
+  all(request: ClipListRequest): Promise<FakeEntity[]> {
+    return this.readAll({
+      userId: 5,
+      allowedInstanceIds: ["inst-a"],
+      request,
+    });
+  }
+}
+
+const nested = new NestedBuilder();
+
+function clipRequest(
+  overrides: Partial<ClipListRequest> = {}
+): ClipListRequest {
+  return {
+    page: 2,
+    perPage: 10,
+    q: undefined,
+    sort: { field: "seconds", direction: "ASC", seed: undefined },
+    filter: {},
+    specificInstanceId: undefined,
+    dropped: [],
+    ...overrides,
+  };
+}
+
 function request(
   overrides: Partial<ParsedListRequest<"scene">> = {}
 ): ParsedListRequest<"scene"> {
@@ -146,11 +230,15 @@ function statements(): { sql: string; params: unknown[] }[] {
 
 /** The character positions of the pieces, which must rise */
 function positions(sql: string, pieces: string[]): number[] {
-  return pieces.map((piece) => {
-    const at = sql.indexOf(piece);
-    expect(at, `${piece} in:\n${sql}`).toBeGreaterThanOrEqual(0);
-    return at;
+  const at = pieces.map((piece) => {
+    const found = sql.indexOf(piece);
+    expect(found, `${piece} in:\n${sql}`).toBeGreaterThanOrEqual(0);
+    return found;
   });
+  expect(at, `the pieces in order in:\n${sql}`).toEqual(
+    [...at].sort((a, b) => a - b)
+  );
+  return at;
 }
 
 describe("EntityQueryBuilder", () => {
@@ -367,6 +455,72 @@ describe("EntityQueryBuilder", () => {
     expect(page.params).toContain("%needle%");
   });
 
+  describe("extra joins and base conditions (a clip's scene)", () => {
+    it("the extra joins follow the exclusion join with their params after its user id, and the extra conditions precede the allowed instances", async () => {
+      await nested.execute({
+        userId: 5,
+        allowedInstanceIds: ["inst-a"],
+        request: clipRequest({ filter: { isGenerated: true } }),
+      });
+
+      const [page, count] = statements();
+      positions(must(page).sql, [
+        "FROM StashClip c",
+        "INNER JOIN StashScene s ON c.sceneId = s.id",
+        "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'clip' AND e.entityId = c.id AND (e.instanceId = '' OR e.instanceId = c.stashInstanceId)",
+        "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityId = c.sceneId",
+        "WHERE c.deletedAt IS NULL AND e.id IS NULL AND s.deletedAt IS NULL AND es.id IS NULL AND c.stashInstanceId IN (?) AND c.isGenerated = ?",
+        "ORDER BY c.seconds ASC, c.id ASC",
+      ]);
+      expect(must(page).params).toEqual([5, "extra:5", "inst-a", 1, 10, 10]);
+      expect(must(count).sql).toContain(
+        "LEFT JOIN UserExcludedEntity es ON es.userId = ?"
+      );
+      expect(must(count).params).toEqual([5, "extra:5", "inst-a", 1]);
+    });
+
+    it("the context reaches them: without exclusions neither exclusion join is left", async () => {
+      await nested.execute({
+        userId: 5,
+        allowedInstanceIds: ["inst-a"],
+        applyExclusions: false,
+        request: clipRequest(),
+      });
+
+      const page = must(statements()[0]);
+      expect(page.sql).not.toContain("UserExcludedEntity");
+      expect(page.sql).toContain(
+        "WHERE c.deletedAt IS NULL AND s.deletedAt IS NULL AND c.stashInstanceId IN (?)"
+      );
+      expect(page.params).toEqual(["inst-a", 10, 10]);
+    });
+  });
+
+  describe("readAll", () => {
+    it("runs one statement in the request's order with no page and no count", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+        { id: "1", stashInstanceId: "inst-a" },
+        { id: "2", stashInstanceId: "inst-a" },
+      ]);
+
+      const items = await nested.all(
+        clipRequest({ specificInstanceId: "inst-a" })
+      );
+
+      expect(items).toEqual([
+        { id: "1", instanceId: "inst-a" },
+        { id: "2", instanceId: "inst-a" },
+      ]);
+      expect(statements()).toHaveLength(1);
+      const page = must(statements()[0]);
+      expect(page.sql).toMatch(/ORDER BY c\.seconds ASC, c\.id ASC$/);
+      expect(page.sql).not.toContain("LIMIT");
+      expect(page.sql).toContain("c.stashInstanceId = ?");
+      expect(page.params).toEqual([5, "extra:5", "inst-a", "inst-a"]);
+    });
+  });
+
   describe("getByRefs", () => {
     it("reads exactly the (id, instance) pairs, with the exclusion join and the allowed instances, and counts nothing", async () => {
       const items = await builder.getByRefs({
@@ -400,6 +554,20 @@ describe("EntityQueryBuilder", () => {
         2,
         0,
       ]);
+    });
+
+    it("a bare ref matches its id on every allowed instance", async () => {
+      await builder.getByRefs({
+        userId: 3,
+        refs: [{ id: "7", instanceId: undefined }],
+        allowedInstanceIds: ["inst-a", "inst-b"],
+      });
+
+      const page = must(statements()[0]);
+      expect(page.sql).toContain(
+        "s.stashInstanceId IN (?, ?) AND ((s.id = ?))"
+      );
+      expect(page.params.slice(-3)).toEqual(["7", 1, 0]);
     });
 
     it("runs no query for no refs", async () => {

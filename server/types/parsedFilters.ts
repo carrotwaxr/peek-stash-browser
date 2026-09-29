@@ -168,6 +168,14 @@ export interface ParsedClipQuery {
   readonly dropped: readonly DroppedInput[];
 }
 
+/**
+ * What the clip builder takes: the parsed clip query, with `isGenerated`
+ * optional (absent: every clip, as a scene's clips with ungenerated ones).
+ */
+export type ClipListRequest = Omit<ParsedClipQuery, "filter"> & {
+  readonly filter: ParsedFields<typeof CLIP_PARAMS>;
+};
+
 /** `GET /api/scenes/:id/clips` */
 export interface ParsedSceneClipsQuery {
   /** The `:id` path parameter, a Stash id */
