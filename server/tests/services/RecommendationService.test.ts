@@ -127,6 +127,7 @@ describe("RecommendationService", () => {
     const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
     expect(sql).toContain("PerformerRating");
     expect(sql).toContain("WatchHistory");
+    expect(sql).toMatch(/SUM\(oCount\)/);
     expect(sql).toContain("UserEntityRanking");
     expect(sql).toContain("UserExcludedEntity");
     expect(sql).toContain("SyncState");

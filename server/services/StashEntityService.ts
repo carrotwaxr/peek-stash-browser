@@ -254,7 +254,7 @@ class StashEntityService {
     );
 
     const sql = `
-      SELECT s.id, s.stashInstanceId, s.studioId, s.oCounter,
+      SELECT s.id, s.stashInstanceId, s.studioId, COALESCE(wh.oCount, 0) AS oCounter,
         (SELECT group_concat(sp.performerId) FROM ScenePerformer sp
           WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId) AS performerIds,
         (SELECT group_concat(st.tagId) FROM SceneTag st
@@ -280,7 +280,7 @@ class StashEntityService {
       studioId: row.studioId,
       performerIds: row.performerIds ? row.performerIds.split(",") : [],
       tagIds: row.tagIds ? row.tagIds.split(",") : [],
-      oCounter: row.oCounter,
+      oCounter: Number(row.oCounter),
       playCount: row.playCount ?? 0,
       lastPlayedAt: row.lastPlayedAt,
     }));
