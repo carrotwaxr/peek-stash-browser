@@ -154,6 +154,30 @@ describe("StashClient", () => {
     expect(received).toHaveLength(0);
   });
 
+  it("a request posts the operation's document and variables and resolves its data", async () => {
+    const received: Received[] = [];
+    const url = await startServer(
+      (res) =>
+        answerJson(res, 200, { data: { version: { version: "v0.27" } } }),
+      received
+    );
+    const client = new StashClient({ url, apiKey: "key" });
+    const found = new StashClient({ url, apiKey: "key" });
+
+    await expect(client.version()).resolves.toEqual({
+      version: { version: "v0.27" },
+    });
+    await found.findTags({ ids: ["7"] });
+
+    const [version, tags] = received.map(
+      (r) => JSON.parse(r.body) as { query: string; variables?: unknown }
+    );
+    expect(version?.query).toContain("query Version");
+    expect(version?.variables).toBeUndefined();
+    expect(tags?.query).toContain("query FindTags");
+    expect(tags?.variables).toEqual({ ids: ["7"] });
+  });
+
   it("sends the ApiKey header and resolves normally", async () => {
     const received: Received[] = [];
     const url = await startServer(

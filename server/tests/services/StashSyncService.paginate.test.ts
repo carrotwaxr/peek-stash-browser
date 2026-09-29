@@ -169,7 +169,7 @@ function request(
   fn: { mock: { calls: unknown[][] } },
   i = 0
 ): { vars: Record<string, unknown>; signal: unknown } {
-  const [vars, , signal] = must(fn.mock.calls[i], `request ${i + 1}`);
+  const [vars, signal] = must(fn.mock.calls[i], `request ${i + 1}`);
   return { vars: isRecord(vars) ? vars : {}, signal };
 }
 

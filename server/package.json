@@ -42,8 +42,8 @@
   "license": "ISC",
   "devDependencies": {
     "@graphql-codegen/cli": "^5.0.7",
+    "@graphql-codegen/typed-document-node": "^5.1.2",
     "@graphql-codegen/typescript": "^4.1.6",
-    "@graphql-codegen/typescript-graphql-request": "^6.4.0",
     "@graphql-codegen/typescript-operations": "^4.6.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/archiver": "^7.0.0",
