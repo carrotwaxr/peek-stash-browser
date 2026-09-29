@@ -6,6 +6,7 @@ const mockUseTagTree = vi.fn((_scope: unknown, _enabled: boolean) => ({
   data: undefined as { tags: Array<{ id: string }> } | undefined,
   isLoading: false,
   error: null,
+  refetch: vi.fn(),
 }));
 vi.mock("@/api/hooks", () => ({
   useTagTree: (scope: unknown, enabled: boolean) =>
@@ -29,6 +30,7 @@ describe("useFolderViewTags", () => {
       data: { tags: [{ id: "5" }] },
       isLoading: false,
       error: null,
+      refetch: vi.fn(),
     });
 
     const { result } = renderHook(() =>
@@ -46,5 +48,31 @@ describe("useFolderViewTags", () => {
     renderHook(() => useFolderViewTags(true, {}));
 
     expect(mockUseTagTree).toHaveBeenLastCalledWith(undefined, true);
+  });
+
+  it("scopes the tree to a tag or group page", () => {
+    renderHook(() => useFolderViewTags(true, { tagId: "4:a", groupId: "9:a" }));
+
+    expect(mockUseTagTree).toHaveBeenLastCalledWith(
+      { tag: "4:a", group: "9:a" },
+      true
+    );
+  });
+
+  it("returns the tree's error and a refetch that reloads the tag tree", () => {
+    const refetch = vi.fn();
+    const error = new Error("Tree failed");
+    mockUseTagTree.mockReturnValueOnce({
+      data: undefined,
+      isLoading: false,
+      error,
+      refetch,
+    } as never);
+
+    const { result } = renderHook(() => useFolderViewTags(true));
+    void result.current.refetch();
+
+    expect(result.current.error).toBe(error);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
