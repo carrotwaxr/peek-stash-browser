@@ -106,6 +106,7 @@ import {
   generateRecoveryKey,
   hashRecoveryKey,
 } from "../utils/recoveryKey.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 import { USER_GROUP_SUMMARY_SELECT } from "./groups.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
@@ -797,7 +798,7 @@ export const createUser = async (
     data: {
       username,
       password: hashedPassword,
-      role: (role || "USER") as "ADMIN" | "USER",
+      role: (emptyToNull(role) ?? "USER") as "ADMIN" | "USER",
       carouselPreferences: getDefaultCarouselPreferences() as never,
     },
     select: {
@@ -1027,11 +1028,11 @@ export const saveFilterPreset = async (
     filters,
     sort,
     direction,
-    viewMode: viewMode || "grid",
-    zoomLevel: zoomLevel || "medium",
-    gridDensity: gridDensity || "comfortable",
-    tableColumns: tableColumns || null,
-    perPage: perPage || null,
+    viewMode: emptyToNull(viewMode) ?? "grid",
+    zoomLevel: emptyToNull(zoomLevel) ?? "medium",
+    gridDensity: emptyToNull(gridDensity) ?? "comfortable",
+    tableColumns: tableColumns ?? null,
+    perPage: perPage ?? null,
     createdAt: new Date().toISOString(),
   };
 
@@ -1043,7 +1044,7 @@ export const saveFilterPreset = async (
 
   // If setAsDefault is true, set this preset as default for the context
   if (setAsDefault) {
-    const defaultContext = context || artifactType;
+    const defaultContext = emptyToNull(context) ?? artifactType;
     currentDefaults[defaultContext] = newPreset.id;
   }
 

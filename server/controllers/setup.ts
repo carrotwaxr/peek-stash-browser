@@ -36,6 +36,7 @@ import type {
   UpdateStashInstanceResponse,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 // Default carousel preferences for new users
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [
@@ -211,7 +212,7 @@ export const testStashConnection = async (
       let versionString: string | undefined;
       try {
         const versionResult = await testStash.version();
-        versionString = versionResult.version.version || undefined;
+        versionString = emptyToNull(versionResult.version.version) ?? undefined;
       } catch (versionError) {
         // Version fetch failed, but connection is still valid
         logger.warn("Failed to fetch Stash version", { error: versionError });
@@ -354,9 +355,9 @@ export const createFirstStashInstance = async (
   // Create Stash instance
   const instance = await prisma.stashInstance.create({
     data: {
-      name: name || "Default",
+      name: emptyToNull(name) ?? "Default",
       url,
-      uiUrl: uiUrl || null,
+      uiUrl: emptyToNull(uiUrl),
       apiKey,
       enabled: true,
       priority: 0,
@@ -536,9 +537,9 @@ export const createStashInstance = async (
   const instance = await prisma.stashInstance.create({
     data: {
       name,
-      description: description || null,
+      description: emptyToNull(description),
       url,
-      uiUrl: uiUrl || null,
+      uiUrl: emptyToNull(uiUrl),
       apiKey,
       enabled,
       priority: instancePriority,
@@ -609,8 +610,8 @@ export const updateStashInstance = async (
 
   // If URL or API key changed, test connection
   if (url || apiKey) {
-    const testUrl = url || existing.url;
-    const testApiKey = apiKey || existing.apiKey;
+    const testUrl = emptyToNull(url) ?? existing.url;
+    const testApiKey = emptyToNull(apiKey) ?? existing.apiKey;
 
     const testStash = new StashClient({ url: testUrl, apiKey: testApiKey });
     try {

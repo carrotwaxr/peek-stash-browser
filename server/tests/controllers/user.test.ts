@@ -963,6 +963,30 @@ describe("User Controller", () => {
       );
     });
 
+    it("creates a USER when role is an empty string", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 5,
+          username: "new",
+          role: "USER",
+          createdAt: new Date(),
+        })
+      );
+      const req = reqFor(createUser, {
+        body: { username: "new", password: "Pass123", role: "" },
+        user: ADMIN,
+      });
+      const res = resFor(createUser);
+      await createUser(req, res);
+      expect(res._getStatus()).toBe(201);
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({ role: "USER" }),
+        })
+      );
+    });
+
     it("creates user with explicit ADMIN role", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue(

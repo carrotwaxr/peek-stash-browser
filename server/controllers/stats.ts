@@ -31,7 +31,7 @@ export const getStats = async (
       cacheStats = {
         isInitialized: isReady,
         isRefreshing: stashSyncService.isSyncing(),
-        lastRefreshed: lastRefreshed?.toISOString() || null,
+        lastRefreshed: lastRefreshed?.toISOString() ?? null,
         counts: {
           scenes: counts.scenes,
           performers: counts.performers,
@@ -69,7 +69,7 @@ export const getStats = async (
     }
 
     // Get database size with fallback
-    const dbPath = process.env.DATABASE_URL?.replace("file:", "") || "";
+    const dbPath = process.env.DATABASE_URL?.replace("file:", "") ?? "";
     let dbSize = 0;
     try {
       if (dbPath) {

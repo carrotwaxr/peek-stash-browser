@@ -20,11 +20,6 @@
       "count": 1
     }
   },
-  "controllers/groups.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "controllers/imageViewHistory.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -46,22 +41,11 @@
   "controllers/setup.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
-    }
-  },
-  "controllers/stats.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
     }
   },
   "controllers/user.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 6
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
     }
   },
   "controllers/video.ts": {
@@ -75,11 +59,6 @@
   "controllers/watchHistory.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5
-    }
-  },
-  "initializers/validate.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
     }
   },
   "integration/api/auth-sessions.integration.test.ts": {
@@ -147,16 +126,6 @@
       "count": 1
     }
   },
-  "integration/api/sort-options.integration.test.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
-    }
-  },
-  "integration/api/tag-filters.integration.test.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
-    }
-  },
   "integration/api/tags.integration.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
@@ -164,11 +133,6 @@
   },
   "integration/api/user-settings.integration.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "integration/helpers/stashTarget.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
@@ -189,26 +153,6 @@
   },
   "integration/stash-replay/generate.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "middleware/auth.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "routes/auth.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
-    }
-  },
-  "scripts/generate-api-docs.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
-  "services/ClipPreviewProber.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
@@ -238,24 +182,11 @@
   "services/UserStatsService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 9
     }
   },
   "tests/controllers/carousel.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
-    }
-  },
-  "tests/helpers/mockDataGenerators.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 66
-    }
-  },
-  "tests/services/ClipPreviewProber.test.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
     }
   },
   "utils/codecDetection.ts": {
@@ -280,21 +211,6 @@
   },
   "utils/proxyAuthTrust.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "utils/recoveryKey.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "utils/serverVersion.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "utils/titleUtils.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   }

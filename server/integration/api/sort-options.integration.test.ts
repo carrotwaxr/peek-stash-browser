@@ -122,7 +122,7 @@ describe("Sort Options", () => {
       expect(response.data.findScenes).toBeDefined();
 
       const titles = response.data.findScenes.scenes
-        .map((s) => s.title?.toLowerCase() || "")
+        .map((s) => s.title?.toLowerCase() ?? "")
         .filter((t) => t);
       for (let i = 1; i < titles.length; i++) {
         expect(must(titles[i]) >= must(titles[i - 1])).toBe(true);
@@ -145,7 +145,7 @@ describe("Sort Options", () => {
       expect(response.data.findScenes).toBeDefined();
 
       const titles = response.data.findScenes.scenes
-        .map((s) => s.title?.toLowerCase() || "")
+        .map((s) => s.title?.toLowerCase() ?? "")
         .filter((t) => t);
       for (let i = 1; i < titles.length; i++) {
         expect(must(titles[i]) <= must(titles[i - 1])).toBe(true);
@@ -276,7 +276,7 @@ describe("Sort Options", () => {
       expect(response.data.findScenes).toBeDefined();
 
       const counts = response.data.findScenes.scenes.map(
-        (s) => s.play_count || 0
+        (s) => s.play_count ?? 0
       );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
@@ -299,7 +299,7 @@ describe("Sort Options", () => {
       expect(response.data.findScenes).toBeDefined();
 
       const counts = response.data.findScenes.scenes.map(
-        (s) => s.o_counter || 0
+        (s) => s.o_counter ?? 0
       );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
@@ -448,7 +448,7 @@ describe("Sort Options", () => {
       expect(response.data.findPerformers).toBeDefined();
 
       const counts = response.data.findPerformers.performers.map(
-        (p) => p.scene_count || 0
+        (p) => p.scene_count ?? 0
       );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
@@ -575,7 +575,7 @@ describe("Sort Options", () => {
       expect(response.data.findStudios).toBeDefined();
 
       const counts = response.data.findStudios.studios.map(
-        (s) => s.scene_count || 0
+        (s) => s.scene_count ?? 0
       );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
@@ -669,7 +669,7 @@ describe("Sort Options", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
 
-      const counts = response.data.findTags.tags.map((t) => t.scene_count || 0);
+      const counts = response.data.findTags.tags.map((t) => t.scene_count ?? 0);
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
       }

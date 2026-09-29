@@ -6,6 +6,7 @@ import { KEY_SEP, entityKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 
@@ -84,8 +85,8 @@ class UserStatsService {
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
-          lastPlayedAt: s.lastPlayedAt?.toISOString() || null,
-          lastOAt: s.lastOAt?.toISOString() || null,
+          lastPlayedAt: s.lastPlayedAt?.toISOString() ?? null,
+          lastOAt: s.lastOAt?.toISOString() ?? null,
         },
       ])
     );
@@ -185,7 +186,7 @@ class UserStatsService {
       // Get scene from cache to find all related entities
       const scene = await stashEntityService.getScene(
         sceneId,
-        instanceId || stashInstanceManager.getDefaultConfig().id
+        emptyToNull(instanceId) ?? stashInstanceManager.getDefaultConfig().id
       );
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
@@ -193,13 +194,13 @@ class UserStatsService {
       }
 
       // Resolve instanceId: use provided value, or look up from DB, or default to ""
-      let resolvedInstanceId = instanceId || "";
+      let resolvedInstanceId = emptyToNull(instanceId) ?? "";
       if (!resolvedInstanceId) {
         const sceneRecord = await prisma.stashScene.findFirst({
           where: { id: sceneId },
           select: { stashInstanceId: true },
         });
-        resolvedInstanceId = sceneRecord?.stashInstanceId || "";
+        resolvedInstanceId = sceneRecord?.stashInstanceId ?? "";
       }
       context.instanceId = resolvedInstanceId;
 
@@ -477,7 +478,7 @@ class UserStatsService {
         if (!scene) continue;
 
         // Get instanceId from the watch history record
-        const whInstanceId = wh.instanceId || "";
+        const whInstanceId = wh.instanceId ?? "";
 
         // Parse O history for timestamps
         const oHistory = readHistory(wh.oHistory);
@@ -558,7 +559,7 @@ class UserStatsService {
             const [performerId, instanceId] = key.split(KEY_SEP);
             return {
               userId,
-              instanceId: instanceId || "",
+              instanceId: instanceId ?? "",
               performerId: performerId ?? "",
               oCounter: stats.oCounter,
               playCount: stats.playCount,
@@ -573,7 +574,7 @@ class UserStatsService {
             const [studioId, instanceId] = key.split(KEY_SEP);
             return {
               userId,
-              instanceId: instanceId || "",
+              instanceId: instanceId ?? "",
               studioId: studioId ?? "",
               oCounter: stats.oCounter,
               playCount: stats.playCount,
@@ -586,7 +587,7 @@ class UserStatsService {
             const [tagId, instanceId] = key.split(KEY_SEP);
             return {
               userId,
-              instanceId: instanceId || "",
+              instanceId: instanceId ?? "",
               tagId: tagId ?? "",
               oCounter: stats.oCounter,
               playCount: stats.playCount,

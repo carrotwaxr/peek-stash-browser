@@ -216,8 +216,12 @@ export const authenticateToken = async (
   res: Response,
   next: NextFunction
 ) => {
+  // An empty token cookie counts as absent: the header is tried next
+  const cookieToken: unknown = req.cookies.token;
   const token: unknown =
-    req.cookies.token || req.header("Authorization")?.replace("Bearer ", "");
+    cookieToken === undefined || cookieToken === null || cookieToken === ""
+      ? req.header("Authorization")?.replace("Bearer ", "")
+      : cookieToken;
 
   if (!token) {
     res.status(401).json({ error: "Access denied. No token provided." });

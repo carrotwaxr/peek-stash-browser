@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import http from "http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
@@ -80,7 +81,7 @@ describe("ClipPreviewProber", () => {
     beforeEach(() => {
       return new Promise<void>((resolve) => {
         server = http.createServer((req, res) => {
-          const url = req.url || "";
+          const url = req.url ?? "";
 
           if (url === "/large-preview") {
             // Large file - definitely generated
@@ -198,6 +199,37 @@ describe("ClipPreviewProber", () => {
         `http://localhost:${port}/404`
       );
       expect(result).toBe(false);
+    });
+  });
+
+  describe("getPreviewSize", () => {
+    it("an empty content-length reads as 0", async () => {
+      // A server that ignores Range and sends an empty Content-Length
+      const request = vi.spyOn(http, "request").mockImplementation(((
+        _options: unknown,
+        callback: unknown
+      ) => {
+        const req = new EventEmitter() as EventEmitter & {
+          end: () => void;
+        };
+        req.end = () => {
+          (callback as (res: unknown) => void)({
+            statusCode: 200,
+            headers: { "content-length": "" },
+            resume: () => undefined,
+          });
+        };
+        return req;
+      }) as unknown as typeof http.request);
+      try {
+        const prober = new ClipPreviewProber({ timeoutMs: 5000 });
+        const size = await prober["getPreviewSize"](
+          "http://localhost:1/preview"
+        );
+        expect(size).toBe(0);
+      } finally {
+        request.mockRestore();
+      }
     });
   });
 });

@@ -128,7 +128,7 @@ function findBasePath(
   const match = apiContent.match(importPattern);
   if (match) {
     const varName = match[1] as string;
-    return mounts.get(varName) || null;
+    return mounts.get(varName) ?? null;
   }
 
   // Fallback: try matching by route file name
@@ -232,9 +232,9 @@ async function main() {
   const groups: DocumentedGroup[] = Array.from(groupedRoutes.entries())
     .map(([basePath, routes]) => ({
       name: formatGroupName(basePath),
-      description: GROUP_CONFIG[basePath]?.description || "",
+      description: GROUP_CONFIG[basePath]?.description ?? "",
       routes,
-      _order: GROUP_CONFIG[basePath]?.order || 999,
+      _order: GROUP_CONFIG[basePath]?.order ?? 999,
     }))
     .sort((a, b) => a._order - b._order)
     .map(({ _order, ...group }) => group);

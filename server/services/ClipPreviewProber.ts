@@ -4,6 +4,7 @@ import https from "https";
 import { URL } from "url";
 import { redactUrl } from "../utils/logRedaction.js";
 import { logger } from "../utils/logger.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 const MIN_PREVIEW_SIZE = 5 * 1024; // 5KB - below this is likely a placeholder
 const PLACEHOLDER_SIZE = 1199; // Exact size of Stash's "Pending Generate" placeholder
@@ -100,7 +101,9 @@ export class ClipPreviewProber {
 
             // For 200 OK (server doesn't support Range), use Content-Length
             if (res.statusCode === 200) {
-              resolve(parseInt(res.headers["content-length"] || "0", 10));
+              resolve(
+                parseInt(emptyToNull(res.headers["content-length"]) ?? "0", 10)
+              );
               return;
             }
 
