@@ -1,5 +1,6 @@
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
+import { type SqlParam, instanceClause } from "../utils/sqlClauses.js";
 
 export type Granularity = "years" | "months" | "weeks" | "days";
 export type TimelineEntityType = "scene" | "gallery" | "image";
@@ -11,7 +12,7 @@ export interface DistributionItem {
 
 interface QueryClause {
   sql: string;
-  params: (string | number)[];
+  params: SqlParam[];
 }
 
 /**
@@ -141,6 +142,7 @@ export class TimelineService {
   buildDistributionQuery(
     entityType: TimelineEntityType,
     userId: number,
+    allowedInstanceIds: readonly string[],
     granularity: Granularity,
     filters?: TimelineFilters
   ): QueryClause {
@@ -148,6 +150,7 @@ export class TimelineService {
     const { alias } = config;
     const format = this.getStrftimeFormat(granularity);
     const dateField = `${alias}.date`;
+    const instances = instanceClause(alias, allowedInstanceIds);
 
     const joins: string[] = [];
     const conditions: string[] = [];
@@ -200,6 +203,7 @@ export class TimelineService {
           ON e.userId = ? AND e.entityType = '${entityType}' AND e.entityId = ${alias}.id AND (e.instanceId = '' OR e.instanceId = ${alias}.stashInstanceId)
         WHERE ${alias}.deletedAt IS NULL
           AND e.id IS NULL
+          AND ${instances.sql}
           AND ${dateField} IS NOT NULL
           AND ${dateField} LIKE '____-__-__'
           ${extraWhere}
@@ -209,18 +213,20 @@ export class TimelineService {
       ORDER BY period ASC
     `.trim();
 
-    return { sql, params: [userId, ...filterParams] };
+    return { sql, params: [userId, ...instances.params, ...filterParams] };
   }
 
   async getDistribution(
     entityType: TimelineEntityType,
     userId: number,
+    allowedInstanceIds: readonly string[],
     granularity: Granularity,
     filters?: TimelineFilters
   ): Promise<DistributionItem[]> {
     const { sql, params } = this.buildDistributionQuery(
       entityType,
       userId,
+      allowedInstanceIds,
       granularity,
       filters
     );
