@@ -126,7 +126,7 @@ describeWithDb("importFromStash (real SQLite)", () => {
   it("imports the same scene id on two instances into two rating rows and two history rows, merged per instance", async () => {
     const options = defaultImportOptions();
     options.scenes.oCounter = true;
-    const stats = await importFromStash(userId, options, [
+    const { stats } = await importFromStash(userId, options, [
       [
         INSTANCE_A,
         stubClient({ rating100: 80, o_counter: 1, o_history: [T_PLUS_2S] }),
@@ -186,7 +186,7 @@ describeWithDb("importFromStash (real SQLite)", () => {
     }
     options.scenes.playCount = true;
 
-    const stats = await importFromStash(userId, options, [
+    const { stats } = await importFromStash(userId, options, [
       [
         INSTANCE_A,
         stubWatched([

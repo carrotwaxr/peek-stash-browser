@@ -8,7 +8,7 @@
  * upserts go in one writer-queue unit. The scene history cases pin the merge
  * of Stash's O and play dates with Peek's.
  */
-import type { WatchHistory } from "@prisma/client";
+import type { User, WatchHistory } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
@@ -457,6 +457,10 @@ describe("syncFromStash", () => {
     mockInstanceManager.getAll.mockReturnValue([
       [INSTANCE, partialRow(mockStashClient)],
     ]);
+    // Default: the target user exists
+    mockPrisma.user.findUnique.mockResolvedValue(
+      partialRow<User>({ id: TARGET_USER_ID })
+    );
     // Default: empty existing records
     for (const t of TYPES) mockPrisma[t.model].findMany.mockResolvedValue([]);
     mockPrisma.watchHistory.findMany.mockResolvedValue([]);
@@ -497,6 +501,21 @@ describe("syncFromStash", () => {
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getErrorBody().error).toMatch(/Invalid user ID/);
+    });
+
+    it("returns 404 for a user that does not exist, and reads no Stash", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(syncFromStash, {
+        params: { userId: "999" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
+
+      await expect(syncFromStash(req, res)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      expect(mockStashClient.findScenes).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("returns 400 when no Stash instances configured", async () => {
@@ -1302,17 +1321,25 @@ describe("syncFromStash", () => {
 
       const res = await run(DEFAULT_OPTIONS);
 
-      // Should still succeed overall: only the failing instance is skipped
-      expect(res._getOkBody().success).toBe(true);
+      // The failing instance is skipped, the others run, and the answer
+      // names the failure instead of reporting success
+      expect(res._getOkBody().success).toBe(false);
+      expect(res._getOkBody().failedInstances).toEqual(["failing-instance"]);
+      expect(res._getOkBody().message).toContain("failing-instance");
       expect(workingStash.findScenes).toHaveBeenCalled();
       expect(res._getOkBody().stats.scenes.created).toBe(1);
     });
 
-    it("still answers 200 when the only instance fails", async () => {
+    it("answers 502 without the error text when every instance fails", async () => {
       mockStashClient.findScenes.mockRejectedValue(new Error("GraphQL Error"));
-      const res = await run(only(SCENE, { rating: true }));
-      // Per-instance errors are caught, so sync still succeeds
-      expect(res._getOkBody().success).toBe(true);
+
+      const error = await run(only(SCENE, { rating: true })).then(
+        () => undefined,
+        (caught: unknown) => caught
+      );
+
+      expect(error).toMatchObject({ statusCode: 502 });
+      expect((error as Error).message).not.toContain("GraphQL");
     });
   });
 
@@ -1356,6 +1383,7 @@ describe("syncFromStash", () => {
       expect(body).toEqual({
         success: true,
         message: stringContaining("Successfully synced"),
+        failedInstances: [],
         stats: {
           scenes: { checked: 0, updated: 0, created: 0 },
           performers: { checked: 0, updated: 0, created: 0 },

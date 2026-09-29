@@ -614,10 +614,16 @@ function emptyStats(): SyncStats {
   return stats as SyncStats;
 }
 
+/** What an import wrote, and the instances whose import failed */
+export interface ImportResult {
+  stats: SyncStats;
+  failedInstances: string[];
+}
+
 /**
  * Imports `userId`'s data from every instance given, one type at a time
- * per instance. An instance whose import fails is logged and skipped; the
- * others still run. After a history import that wrote something, the
+ * per instance. An instance whose import fails is logged, skipped and named
+ * in `failedInstances`; the others still run. After a history import that wrote something, the
  * user's per-entity stats are rebuilt from their history. After an import
  * that wrote anything, the user's rankings and Recommended list are
  * forgotten, so the next stats and Recommended pages compute them again.
@@ -626,8 +632,9 @@ export async function importFromStash(
   userId: number,
   options: SyncFromStashOptions,
   instances: ReadonlyArray<readonly [string, StashClient]>
-): Promise<SyncStats> {
+): Promise<ImportResult> {
   const stats = emptyStats();
+  const failedInstances: string[] = [];
   let historyWrote = false;
   let ratingsWrote = false;
 
@@ -659,6 +666,7 @@ export async function importFromStash(
       }
     } catch (error) {
       // Continue with the other instances
+      failedInstances.push(instanceId);
       logger.error("Error syncing from Stash instance", { instanceId, error });
     }
   }
@@ -682,5 +690,5 @@ export async function importFromStash(
     recommendationService.forget(userId);
   }
 
-  return stats;
+  return { stats, failedInstances };
 }
