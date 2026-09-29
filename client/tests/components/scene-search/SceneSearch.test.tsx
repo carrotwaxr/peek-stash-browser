@@ -1,9 +1,13 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import SceneSearch from "@/components/scene-search/SceneSearch";
+import { useFolderViewTags } from "@/hooks/useFolderViewTags";
+
+// The view the page is on (the URL's `view`, as the controls report it)
+let mockView = "grid";
 
 // Mock react-router-dom
 vi.mock("react-router-dom", async () => {
@@ -11,7 +15,10 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useNavigate: vi.fn(() => vi.fn()),
-    useSearchParams: vi.fn(() => [new URLSearchParams(), vi.fn()]),
+    useSearchParams: vi.fn(() => [
+      new URLSearchParams(mockView === "grid" ? "" : `view=${mockView}`),
+      vi.fn(),
+    ]),
   };
 });
 
@@ -47,7 +54,12 @@ vi.mock("@/hooks/useWallPlayback", () => ({
   })),
 }));
 vi.mock("@/hooks/useFolderViewTags", () => ({
-  useFolderViewTags: vi.fn(() => ({ tags: [], isLoading: false })),
+  useFolderViewTags: vi.fn(() => ({
+    tags: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }));
 vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
@@ -133,7 +145,7 @@ vi.mock("@/components/ui/index", () => ({
       >
         {typeof children === "function"
           ? children({
-              viewMode: "grid",
+              viewMode: mockView,
               gridDensity: "medium",
               zoomLevel: "medium",
               sortField: "o_counter",
@@ -152,9 +164,16 @@ vi.mock("@/components/ui/index", () => ({
   PageHeader: ({ title }: Record<string, unknown>) => (
     <div data-testid="page-header">{title as string}</div>
   ),
-  ErrorMessage: ({ error }: Record<string, unknown>) => (
+  ErrorMessage: ({
+    error,
+    onRetry,
+  }: {
+    error?: Error;
+    onRetry?: () => void;
+  }) => (
     <div data-testid="error-message">
-      {(error as Error)?.message || "Error"}
+      {error?.message ?? "Error"}
+      {onRetry ? <button onClick={onRetry}>Retry</button> : null}
     </div>
   ),
   LibraryInitializingBanner: () => <div data-testid="sync-banner" />,
@@ -213,6 +232,48 @@ describe("SceneSearch", () => {
 
       const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
       expect(props).toMatchObject({ isRefreshing: true });
+    });
+  });
+
+  describe("Folder view", () => {
+    beforeEach(() => {
+      mockView = "folder";
+    });
+    afterEach(() => {
+      mockView = "grid";
+    });
+
+    it("a failed tag-tree load shows the error with Retry, not untagged items", () => {
+      const refetch = vi.fn();
+      vi.mocked(useFolderViewTags).mockReturnValue({
+        tags: [],
+        isLoading: false,
+        error: new ApiError("Tree failed", 500),
+        refetch,
+      });
+
+      render(<SceneSearch title="Scenes" />);
+
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Tree failed"
+      );
+      expect(screen.queryByTestId("folder-view")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    it("an initializing 503 on the tree keeps the folder view loading", () => {
+      vi.mocked(useFolderViewTags).mockReturnValue({
+        tags: [],
+        isLoading: false,
+        error: new ApiError("init", 503, { ready: false }),
+        refetch: vi.fn(),
+      });
+
+      render(<SceneSearch title="Scenes" />);
+
+      expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
+      expect(screen.getByTestId("folder-view")).toBeInTheDocument();
     });
   });
 
