@@ -232,7 +232,7 @@ describe("Studios Controller", () => {
 
       await findStudiosMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
         entity: "studio",
         q: "al",
         perPage: 20,

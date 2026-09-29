@@ -292,7 +292,7 @@ describe("Groups Controller", () => {
 
       await findGroupsMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
         entity: "group",
         q: "al",
         perPage: 20,

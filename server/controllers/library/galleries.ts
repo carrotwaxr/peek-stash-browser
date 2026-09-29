@@ -148,8 +148,9 @@ export const findGalleries = async (
 /**
  * One page of galleries for an entity picker, in name order: the shown name
  * (the title, else the file, else the folder) matched in SQL, or the ids a
- * picker has selected. A ValidationError (400) reaches the central error
- * handler.
+ * picker has selected; with scope "allEnabled", on every enabled server
+ * (admins only). A ValidationError (400) or ForbiddenError (403) reaches the
+ * central error handler.
  */
 export const findGalleriesMinimal = async (
   req: TypedAuthRequest<FindGalleriesMinimalRequest>,
@@ -159,6 +160,6 @@ export const findGalleriesMinimal = async (
   const request = parseMinimalRequest("gallery", req.body, { userId });
   logDropped("POST /library/galleries/minimal", request.dropped);
 
-  const galleries = await findMinimalEntities(userId, request);
+  const galleries = await findMinimalEntities(req.user, request);
   res.json({ galleries });
 };

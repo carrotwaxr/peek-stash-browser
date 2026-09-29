@@ -249,6 +249,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             }
             multi={true}
             placeholder={`Show only these ${lower}...`}
+            scope="allEnabled"
           />
         </div>
 
@@ -270,6 +271,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             }
             multi={true}
             placeholder={`Always hide these ${lower}...`}
+            scope="allEnabled"
           />
         </div>
 

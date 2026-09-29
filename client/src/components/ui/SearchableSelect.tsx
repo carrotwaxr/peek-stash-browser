@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MinimalEntity, MinimalRequest } from "@peek/shared-types";
+import type {
+  MinimalEntity,
+  MinimalRequest,
+  MinimalScope,
+} from "@peek/shared-types";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
@@ -14,7 +18,9 @@ import Button from "./Button";
  * each search aborts the one before it, and a response for a search that is
  * no longer current is dropped. Nothing is kept in the browser between
  * openings, so the list is always the current user's. The selected values'
- * names are resolved with one minimal request carrying their ids.
+ * names are resolved with one minimal request carrying their ids. With
+ * `scope`, both kinds of request carry it: the Content Restrictions editor
+ * sends "allEnabled" to list every enabled server's entities (admins only).
  *
  * @param {Object} props
  * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
@@ -23,6 +29,7 @@ import Button from "./Button";
  * @param {boolean} props.multi - Enable multi-select mode
  * @param {string} props.placeholder - Placeholder text
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
+ * @param {"allEnabled"} [props.scope] - Every enabled server, not only the user's own (admins only)
  */
 
 interface SelectOption {
@@ -76,6 +83,8 @@ interface Props {
     | "performers"
     | "groups"
     | null;
+  /** Sent with every request; only the Content Restrictions editor sets it */
+  scope?: MinimalScope;
 }
 
 const SearchableSelect = ({
@@ -85,6 +94,7 @@ const SearchableSelect = ({
   multi = false,
   placeholder = "Select...",
   countFilterContext = null,
+  scope,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -124,12 +134,19 @@ const SearchableSelect = ({
       }
       const pages = await Promise.all(
         chunks.map((chunk) =>
-          find({ ids: chunk, filter: { per_page: IDS_PER_REQUEST } }, signal)
+          find(
+            {
+              ids: chunk,
+              filter: { per_page: IDS_PER_REQUEST },
+              ...(scope ? { scope } : {}),
+            },
+            signal
+          )
         )
       );
       return pages.flat().map(toOption);
     },
-    [entityType]
+    [entityType, scope]
   );
 
   // Load the selected items' names when the value changes
@@ -211,6 +228,7 @@ const SearchableSelect = ({
           {
             filter: { per_page: PAGE_SIZE, ...(search ? { q: search } : {}) },
             ...(count_filter ? { count_filter } : {}),
+            ...(scope ? { scope } : {}),
           },
           signal
         );
@@ -224,7 +242,7 @@ const SearchableSelect = ({
         setLoading(false);
       }
     },
-    [entityType, getCountFilter]
+    [entityType, getCountFilter, scope]
   );
 
   // Options load only while the dropdown is open: when it opens and after

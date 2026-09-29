@@ -248,7 +248,7 @@ describe("Tags Controller", () => {
 
       await findTagsMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
         entity: "tag",
         q: "al",
         perPage: 20,

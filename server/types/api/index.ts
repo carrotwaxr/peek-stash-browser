@@ -272,6 +272,7 @@ export type {
   WithStashUrl,
   // Entity pickers
   MinimalRequest,
+  MinimalScope,
   MinimalEntity,
   // Scenes
   FindScenesRequest,

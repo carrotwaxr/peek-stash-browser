@@ -4,7 +4,10 @@
  *
  * Every row goes through the exclusion anti-join with the instance,
  * `deletedAt IS NULL` and the user's allowed instances (invariants 3 and 11:
- * none allowed lists nothing). The search matches the name and, for
+ * none allowed lists nothing). An admin's Content Restrictions editor sends
+ * `scope: "allEnabled"`, which lists every enabled instance past its first
+ * sync instead: only the instance clause widens, so the admin's own hidden
+ * items and deleted entities stay out. The search matches the name and, for
  * performers and tags, their aliases, never a description (lead decision,
  * PR 4). The order is always the name with case folded, and the `LIMIT` is
  * the page size: a picker lists one page.
@@ -12,6 +15,7 @@
  * No index serves `%q%`, so a keystroke reads the type's live rows once and
  * sorts the matches in a temp B-tree: a few ms at 9k performers.
  */
+import { ForbiddenError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import type { MinimalCountFilter, MinimalEntity } from "../types/api/index.js";
 import type { MinimalEntityQueryRow } from "../types/internal/queryRows.js";
@@ -25,10 +29,17 @@ import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import {
   buildInstanceFilterClause,
+  getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
 } from "./UserInstanceService.js";
 
 type SqlParam = string | number | boolean;
+
+/** Who asks: their exclusions apply, and only an admin may widen the scope */
+interface MinimalViewer {
+  readonly id: number;
+  readonly role: string;
+}
 
 /** A picker's type: its table, how it is named, searched and counted */
 interface MinimalConfig {
@@ -126,16 +137,13 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
 function buildQuery(
   config: MinimalConfig,
   userId: number,
-  allowedInstanceIds: string[],
+  instanceIds: string[],
   request: ParsedMinimalRequest<MinimalKind>
 ): { sql: string; params: SqlParam[] } {
   const where: string[] = ["x.deletedAt IS NULL", "e.id IS NULL"];
   const params: SqlParam[] = [userId, config.entityType];
 
-  const instances = buildInstanceFilterClause(
-    allowedInstanceIds,
-    "x.stashInstanceId"
-  );
+  const instances = buildInstanceFilterClause(instanceIds, "x.stashInstanceId");
   where.push(instances.sql);
   params.push(...instances.params);
 
@@ -187,17 +195,37 @@ function displayName(kind: MinimalKind, row: MinimalEntityQueryRow): string {
   );
 }
 
-/** One page of what a picker lists for the user, in name order */
+/**
+ * The instances a picker lists: the viewer's allowed instances, or with
+ * scope "allEnabled" every enabled instance past its first sync. A viewer
+ * who is not an admin sending the scope is refused (403) before any read.
+ */
+async function pickerInstances(
+  viewer: MinimalViewer,
+  request: ParsedMinimalRequest<MinimalKind>
+): Promise<string[]> {
+  if (request.scope === undefined) {
+    return getUserAllowedInstanceIds(viewer.id);
+  }
+  if (viewer.role !== "ADMIN") {
+    throw new ForbiddenError(
+      "Only an administrator can list every server's entities"
+    );
+  }
+  return getEnabledSyncedInstanceIds();
+}
+
+/** One page of what a picker lists for the viewer, in name order */
 export async function findMinimalEntities(
-  userId: number,
+  viewer: MinimalViewer,
   request: ParsedMinimalRequest<MinimalKind>
 ): Promise<MinimalEntity[]> {
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-  if (allowedInstanceIds.length === 0) return [];
+  const instanceIds = await pickerInstances(viewer, request);
+  if (instanceIds.length === 0) return [];
   const query = buildQuery(
     CONFIGS[request.entity],
-    userId,
-    allowedInstanceIds,
+    viewer.id,
+    instanceIds,
     request
   );
   const rows = await prisma.$queryRawUnsafe<MinimalEntityQueryRow[]>(

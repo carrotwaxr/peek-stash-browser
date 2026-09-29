@@ -224,7 +224,7 @@ describe("Galleries Controller", () => {
 
       await findGalleriesMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser.id, {
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
         entity: "gallery",
         q: "al",
         perPage: 20,

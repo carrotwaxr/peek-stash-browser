@@ -304,17 +304,18 @@ export async function hideFixtureDefaults(userId: number): Promise<void> {
 }
 
 /**
- * Creates a USER through the admin API (or finds it in GET /api/user/all if
- * it already exists), then logs a new TestClient in as that user.
- * adminClient must already be logged in.
+ * Creates a USER (or an ADMIN) through the admin API (or finds it in
+ * GET /api/user/all if it already exists), then logs a new TestClient in as
+ * that user. adminClient must already be logged in.
  */
 export async function createApiUser(
   username: string,
-  password: string
+  password: string,
+  role: "USER" | "ADMIN" = "USER"
 ): Promise<{ id: number; client: TestClient }> {
   const created = await adminClient.post<{ user?: { id: number } }>(
     "/api/user/create",
-    { username, password, role: "USER" }
+    { username, password, role }
   );
   let id = created.ok ? created.data.user?.id : undefined;
   if (id === undefined) {

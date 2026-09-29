@@ -126,6 +126,22 @@ export async function getUserAllowedInstanceIds(
 }
 
 /**
+ * Every enabled instance past its first sync, whatever any user's selection:
+ * the instances an admin's Content Restrictions editor lists, since an admin
+ * restricts another user on any server (selection is a viewing preference,
+ * not access). Throws on a database error.
+ *
+ * @returns Array of instance IDs
+ */
+export async function getEnabledSyncedInstanceIds(): Promise<string[]> {
+  const instances = await prisma.stashInstance.findMany({
+    where: { enabled: true, firstSyncedAt: { not: null } },
+    select: { id: true },
+  });
+  return instances.map((i) => i.id);
+}
+
+/**
  * Build a SQL filter condition for instance IDs.
  *
  * Returns a WHERE clause fragment and parameter array for filtering by instance.

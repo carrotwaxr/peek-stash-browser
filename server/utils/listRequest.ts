@@ -45,7 +45,11 @@ import {
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import { z } from "zod";
 import { ValidationError } from "../middleware/errorHandler.js";
-import type { ApiErrorIssue, MinimalCountFilter } from "../types/api/index.js";
+import type {
+  ApiErrorIssue,
+  MinimalCountFilter,
+  MinimalScope,
+} from "../types/api/index.js";
 import type {
   DroppedInput,
   EnumCriterion,
@@ -1190,8 +1194,10 @@ const minimalIdList = z
 
 /**
  * `POST /api/library/<entities>/minimal` (the entity pickers): search text,
- * a page size, ids and count minimums; always name order, one page. `ids`
- * names what the request looks up, so a bad one is a 400 in both policies.
+ * a page size, ids, count minimums and a scope; always name order, one page.
+ * `ids` names what the request looks up and `scope` the instances it looks
+ * in, so a bad one is a 400 in both policies. Whether the user may send the
+ * scope is the query's check (findMinimalEntities: admins only).
  */
 export function parseMinimalRequest<E extends MinimalKind>(
   entity: E,
@@ -1206,6 +1212,7 @@ export function parseMinimalRequest<E extends MinimalKind>(
   let perPage: number | undefined;
   let ids: readonly FilterRef[] | undefined;
   let countFilter: MinimalCountFilter | undefined;
+  let scope: MinimalScope | undefined;
 
   const pageHandlers = new Map<string, (raw: unknown, path: string) => void>([
     ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
@@ -1261,6 +1268,17 @@ export function parseMinimalRequest<E extends MinimalKind>(
         walk(raw, path, countHandlers, problems, "Unknown count filter");
       },
     ],
+    [
+      "scope",
+      (raw, path) => {
+        if (raw === undefined || raw === null) return;
+        if (raw === "allEnabled") {
+          scope = raw;
+        } else {
+          problems.add(path, 'Expected "allEnabled"');
+        }
+      },
+    ],
   ]);
 
   walk(input, "", handlers, problems, "Unknown request field");
@@ -1275,6 +1293,7 @@ export function parseMinimalRequest<E extends MinimalKind>(
     ),
     ids,
     countFilter,
-    dropped: problems.finish(policy, ["ids"]),
+    scope,
+    dropped: problems.finish(policy, ["ids", "scope"]),
   };
 }
