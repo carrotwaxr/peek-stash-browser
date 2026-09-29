@@ -1,7 +1,7 @@
 /**
  * The builders on the base (item 74), and the list search of scenes,
- * performers, studios, tags, galleries and groups, against the real test
- * SQLite database.
+ * performers, studios, tags, galleries, groups and images, against the real
+ * test SQLite database.
  *
  * Two made-up instances reuse the same ids, as two Stash servers do:
  * - lq-a: performer, studio, tag, scene, gallery and group 7870001 named
@@ -11,28 +11,36 @@
  * - lq-b: performer, studio, tag, gallery and group 7870001, the performer
  *   and gallery tagged with the tag, the group of the studio; tag 7870010 a
  *   child of 7870001
+ * - image 7870001 on lq-a titled "100% ...", 7870002 "1000 ..."; image
+ *   7870001 on lq-b; each image 7870001 tagged with its instance's tag
  * - gallery 7870001 on lq-a holds scenes 7870003 and 7870004, 7870005 (which
  *   the scene-count user hid), 7870006 (deleted) and, through a link across
  *   instances, 7870003 on lq-b; gallery 7870001 on lq-b holds 7870003 on
  *   lq-b
  *
  * The search binds `likeContains(q)` with `ESCAPE '\'`, so a `%` in it
- * matches only names holding one ("1000 ..." would match an unescaped
- * `%100%%`). A ref with an instance matches that instance only, a bare ref
- * its id on every instance; an empty allowed list matches nothing. A
- * gallery counts the live scenes the viewer can see on its own instance.
+ * matches only names (an image's title) holding one ("1000 ..." would
+ * match an unescaped `%100%%`). A ref with an instance matches that
+ * instance only, a bare ref its id on every instance; an empty allowed list
+ * matches nothing. A gallery counts the live scenes the viewer can see on
+ * its own instance.
  * Every seeded row is deleted before the file ends.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
-import type { FilterRef, RefCriterion } from "../../types/parsedFilters.js";
+import type {
+  FilterRef,
+  ParsedListRequest,
+  RefCriterion,
+} from "../../types/parsedFilters.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -66,6 +74,14 @@ const includes = (...refs: FilterRef[]): RefCriterion => ({
   modifier: "INCLUDES",
   depth: 0,
 });
+
+/** One image page */
+async function images(
+  request: ParsedListRequest<"image">,
+  options: { allowedInstanceIds: string[] } = OPTIONS
+) {
+  return imageQueryBuilder.execute({ ...OPTIONS, ...options, request });
+}
 
 async function seed(): Promise<void> {
   const named = (id: string, instance: string, name: string) => ({
@@ -126,6 +142,21 @@ async function seed(): Promise<void> {
       { ...named(PCT, B, "Group B"), studioId: PCT },
     ],
   });
+  await prisma.stashImage.createMany({
+    data: [
+      { id: PCT, stashInstanceId: A, title: "100% Image" },
+      { id: NO_PCT, stashInstanceId: A, title: "1000 Image" },
+      { id: PCT, stashInstanceId: B, title: "Image B" },
+    ],
+  });
+  await prisma.imageTag.createMany({
+    data: [A, B].map((instance) => ({
+      imageId: PCT,
+      imageInstanceId: instance,
+      tagId: PCT,
+      tagInstanceId: instance,
+    })),
+  });
   await prisma.galleryTag.createMany({
     data: [A, B].map((instance) => ({
       galleryId: PCT,
@@ -167,6 +198,7 @@ async function removeRows(): Promise<void> {
   const where = { stashInstanceId: { in: [A, B] } };
   await prisma.user.deleteMany({ where: { username: SCENE_COUNT_USER } });
   await prisma.stashScene.deleteMany({ where });
+  await prisma.stashImage.deleteMany({ where });
   await prisma.stashGallery.deleteMany({ where });
   await prisma.stashGroup.deleteMany({ where });
   await prisma.stashPerformer.deleteMany({ where });
@@ -234,6 +266,13 @@ describeWithDb(
         });
         expect(keys(items)).toEqual([`${PCT}:${A}`]);
       });
+
+      it("images", async () => {
+        const { items } = await images(
+          parsedListRequest("image", { q: "100%" })
+        );
+        expect(keys(items)).toEqual([`${PCT}:${A}`]);
+      });
     });
 
     describe("an empty allowed list returns no rows and count 0", () => {
@@ -276,6 +315,11 @@ describeWithDb(
           ...none,
           request: parsedListRequest("group"),
         });
+        expect(result).toEqual({ items: [], total: 0 });
+      });
+
+      it("images", async () => {
+        const result = await images(parsedListRequest("image"), none);
         expect(result).toEqual({ items: [], total: 0 });
       });
     });
@@ -379,6 +423,23 @@ describeWithDb(
           `${PCT}:${B}`,
         ]);
       });
+    });
+
+    it("an image's tag on lq-b lists lq-b's image only; the bare id both", async () => {
+      const byTag = async (ref: FilterRef) =>
+        keys(
+          (
+            await images(
+              parsedListRequest("image", { filter: { tags: includes(ref) } })
+            )
+          ).items
+        );
+
+      expect(await byTag({ id: PCT, instanceId: B })).toEqual([`${PCT}:${B}`]);
+      expect(await byTag({ id: PCT, instanceId: undefined })).toEqual([
+        `${PCT}:${A}`,
+        `${PCT}:${B}`,
+      ]);
     });
 
     describe("a gallery's scene count", () => {

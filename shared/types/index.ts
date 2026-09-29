@@ -16,6 +16,7 @@ export type {
   NormalizedGroup,
   NormalizedGallery,
   NormalizedImage,
+  ImageListItem,
   WithInstanceId,
   SceneScoringData,
 } from "./entities.js";

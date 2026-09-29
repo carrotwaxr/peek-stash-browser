@@ -9,9 +9,8 @@
  * and `director`, performer `career_length` (filter and sort, from the free
  * text career field), the performer `measurements` and `weight` sorts, the
  * scene `scene_index` and `last_o_at` sorts, the SEVEN_K and HUGE
- * resolutions, depth on image tags and studios, image `instance_id`, and the
- * clip tag and performer modifiers other than INCLUDES. A new filter or sort
- * starts here.
+ * resolutions, and the clip tag and performer modifiers other than INCLUDES.
+ * A new filter or sort starts here.
  */
 import {
   COMPARISON_MODIFIERS,

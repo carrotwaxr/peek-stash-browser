@@ -1,19 +1,16 @@
 /**
  * Unit Tests for Images Library Controller
  *
- * Tests findImages.
- * Note: transformImageResult is private and tested indirectly through the
- * handler.
+ * Tests findImages: the parsed request reaches the image builder, whose
+ * rows go out as they are, each with its stashUrl.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { findImages } from "../../../controllers/library/images.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
-import {
-  type ImageListRow,
-  imageQueryBuilder,
-} from "../../../services/ImageQueryBuilder.js";
+import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
+import type { ImageListItem } from "../../../types/index.js";
 import {
   malformed,
   reqFor,
@@ -60,10 +57,15 @@ const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 const defaultUser = testUser();
 const adminUser = testUser({ role: "ADMIN" });
 
-/** A row as the query builder's execute returns it, which the controller reads. */
+/** A row as the query builder's execute returns it, which the controller sends. */
 function createQueryBuilderImage(
-  overrides: Partial<ImageListRow> = {}
-): ImageListRow {
+  overrides: Partial<ImageListItem> = {}
+): ImageListItem {
+  const paths = {
+    thumbnail: "/api/proxy/image/img1/thumbnail",
+    preview: "/api/proxy/image/img1/preview",
+    image: "/api/proxy/image/img1/image",
+  };
   return {
     id: "img1",
     stashInstanceId: "default",
@@ -72,26 +74,25 @@ function createQueryBuilderImage(
     code: null,
     details: null,
     photographer: null,
-    urls: null,
+    urls: [],
     date: null,
     studioId: null,
-    stashRating100: null,
-    stashOCounter: 0,
     organized: false,
     filePath: null,
     width: null,
     height: null,
     fileSize: null,
-    pathThumbnail: "/api/proxy/image/img1/thumbnail",
-    pathPreview: "/api/proxy/image/img1/preview",
-    pathImage: "/api/proxy/image/img1/image",
+    paths,
+    pathThumbnail: paths.thumbnail,
+    pathPreview: paths.preview,
+    pathImage: paths.image,
     stashCreatedAt: null,
     stashUpdatedAt: null,
-    userRating: null,
-    userFavorite: null,
-    userViewCount: null,
-    userOCount: null,
-    userLastViewedAt: null,
+    rating100: null,
+    favorite: false,
+    oCounter: 0,
+    viewCount: 0,
+    lastViewedAt: null,
     performers: [],
     tags: [],
     galleries: [],
@@ -99,6 +100,8 @@ function createQueryBuilderImage(
     ...overrides,
   };
 }
+
+const bare = (id: string) => ({ id, instanceId: undefined });
 
 describe("Images Controller", () => {
   beforeEach(() => {
@@ -113,7 +116,7 @@ describe("Images Controller", () => {
     it("returns images from query builder on happy path", async () => {
       const images = [createQueryBuilderImage({ id: "img1" })];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images,
+        items: images,
         total: 1,
       });
 
@@ -125,23 +128,30 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
+      // The builder reads the parsed request and the viewer's instances
+      const call = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(call).toMatchObject({
+        userId: 1,
+        allowedInstanceIds: ["default"],
+        request: { page: 1, sort: { field: "title", direction: "ASC" } },
+      });
       expect(res._getStatus()).toBe(200);
       const body = res._getOkBody();
       expect(body.findImages.count).toBe(1);
       expect(body.findImages.images).toHaveLength(1);
     });
 
-    it("transforms image results with paths object", async () => {
+    it("sends each builder row as it is, with its paths and the viewer's data", async () => {
       const images = [
         createQueryBuilderImage({
           id: "img1",
-          pathThumbnail: "/thumb",
-          pathPreview: "/prev",
-          pathImage: "/full",
+          paths: { thumbnail: "/thumb", preview: "/prev", image: "/full" },
+          rating100: 60,
+          oCounter: 2,
         }),
       ];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images,
+        items: images,
         total: 1,
       });
 
@@ -155,17 +165,17 @@ describe("Images Controller", () => {
 
       const body = res._getOkBody();
       const img = must(body.findImages.images[0]);
-      expect(img.paths).toEqual({
-        thumbnail: "/thumb",
-        preview: "/prev",
-        image: "/full",
+      expect(img).toMatchObject({
+        paths: { thumbnail: "/thumb", preview: "/prev", image: "/full" },
+        rating100: 60,
+        oCounter: 2,
       });
     });
 
     it("adds stashUrl to each image for an admin", async () => {
       const images = [createQueryBuilderImage({ id: "img1" })];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images,
+        items: images,
         total: 1,
       });
 
@@ -186,7 +196,7 @@ describe("Images Controller", () => {
 
     it("does not send stashUrl to a regular user", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [
+        items: [
           createQueryBuilderImage({ id: "img1" }),
           createQueryBuilderImage({ id: "img2" }),
         ],
@@ -209,7 +219,7 @@ describe("Images Controller", () => {
 
     it("passes filter parameters to query builder", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -227,20 +237,21 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      expect(mockImageQueryBuilder.execute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 1,
-          sort: "title",
-          sortDirection: "DESC",
-          page: 2,
-          perPage: 20,
-        })
-      );
+      const { request } = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(request).toMatchObject({
+        page: 2,
+        perPage: 20,
+        sort: { field: "title", direction: "DESC" },
+        filter: {
+          favorite: true,
+          rating100: { modifier: "GREATER_THAN", value: 50 },
+        },
+      });
     });
 
     it("builds filters from image_filter body", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -260,30 +271,33 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
-      expect(callArgs.filters?.performers).toEqual({
-        value: ["11"],
-        modifier: "INCLUDES",
-      });
-      expect(callArgs.filters?.tags).toEqual({
-        value: ["12:inst-a"],
-        modifier: "INCLUDES",
-        depth: -1,
-      });
-      expect(callArgs.filters?.studios).toEqual({
-        value: ["13"],
+      const { filter } = must(mockImageQueryBuilder.execute.mock.calls[0])[0]
+        .request;
+      expect(filter.performers).toEqual({
+        refs: [bare("11")],
         modifier: "INCLUDES",
         depth: 0,
       });
-      expect(callArgs.filters?.galleries).toEqual({
-        value: ["14"],
+      expect(filter.tags).toEqual({
+        refs: [{ id: "12", instanceId: "inst-a" }],
         modifier: "INCLUDES",
+        depth: -1,
+      });
+      expect(filter.studios).toEqual({
+        refs: [bare("13")],
+        modifier: "INCLUDES",
+        depth: 0,
+      });
+      expect(filter.galleries).toEqual({
+        refs: [bare("14")],
+        modifier: "INCLUDES",
+        depth: 0,
       });
     });
 
     it("passes image_filter.instance_id as the specific instance", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -295,17 +309,18 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
-      expect(callArgs.specificInstanceId).toBe("inst-b");
-      expect(callArgs.filters?.ids).toEqual({
-        value: ["201"],
+      const { request } = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(request.specificInstanceId).toBe("inst-b");
+      expect(request.filter.ids).toEqual({
+        refs: [bare("201")],
         modifier: "INCLUDES",
+        depth: 0,
       });
     });
 
     it("answers the ambiguous lookup for one bare id found on two instances", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [
+        items: [
           createQueryBuilderImage({ id: "201", instanceId: "inst-a" }),
           createQueryBuilderImage({ id: "201", instanceId: "inst-b" }),
         ],
@@ -346,7 +361,7 @@ describe("Images Controller", () => {
 
     it("supports top-level ids parameter", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -358,16 +373,17 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
-      expect(callArgs.filters?.ids).toEqual({
-        value: ["201", "202:inst-b"],
+      const { request } = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(request.filter.ids).toEqual({
+        refs: [bare("201"), { id: "202", instanceId: "inst-b" }],
         modifier: "INCLUDES",
+        depth: 0,
       });
     });
 
     it("parses random_<seed> sort field", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -379,14 +395,13 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
-      expect(callArgs.sort).toBe("random");
-      expect(callArgs.randomSeed).toBe(12345);
+      const { request } = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(request.sort).toMatchObject({ field: "random", seed: 12345 });
     });
 
     it("handles bare 'random' sort field", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -398,15 +413,15 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
-      expect(callArgs.randomSeed).toBeDefined();
-      expect(typeof callArgs.randomSeed).toBe("number");
+      const { request } = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
+      expect(request.sort.field).toBe("random");
+      expect(typeof request.sort.seed).toBe("number");
     });
 
     it("admins apply exclusions too", async () => {
       // Their rows hold only their own hides and cascades (item 13)
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 
@@ -424,7 +439,7 @@ describe("Images Controller", () => {
 
     it("non-admins apply exclusions", async () => {
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: [],
+        items: [],
         total: 0,
       });
 

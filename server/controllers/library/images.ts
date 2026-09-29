@@ -7,10 +7,7 @@ import type {
   FindImagesResponse,
   TypedAuthRequest,
   TypedResponse,
-  WithStashUrl,
 } from "../../types/api/index.js";
-import type { NormalizedImage } from "../../types/index.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -18,38 +15,6 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Transform ImageQueryBuilder result to match expected API response format
- */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment -- data transformer between ImageQueryBuilder's internal DB row format and API response; all property accesses on Record<string, any> are inherently unsafe */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- spread of dynamic fields prevents specific return type
-function transformImageResult(image: Record<string, any>): any {
-  return {
-    ...image,
-    // Map user data fields to expected names
-    rating100: image.userRating ?? image.stashRating100 ?? null,
-    favorite: image.userFavorite === 1 || image.userFavorite === true,
-    oCounter: image.userOCount ?? image.stashOCounter ?? 0,
-    viewCount: image.userViewCount ?? 0,
-    lastViewedAt: image.userLastViewedAt ?? null,
-    // Add paths object for frontend compatibility
-    paths: {
-      thumbnail: image.pathThumbnail,
-      preview: image.pathPreview,
-      image: image.pathImage,
-    },
-    // Clean up internal field names
-    userRating: undefined,
-    userFavorite: undefined,
-    userViewCount: undefined,
-    userOCount: undefined,
-    userLastViewedAt: undefined,
-    stashRating100: undefined,
-    stashOCounter: undefined,
-  };
-}
-/* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
 /**
  * Find images endpoint - uses SQL-native ImageQueryBuilder
@@ -77,32 +42,27 @@ export const findImages = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // Execute query. The image builder reads the search text from its filter
+    // The request's instance_id (specificInstanceId) narrows the list to
+    // one instance
     const result = await imageQueryBuilder.execute({
       userId,
-      filters: { ...toLegacyFilter("image", request.filter), q: request.q },
-      applyExclusions,
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      randomSeed: request.sort.seed,
+      request,
+      applyExclusions,
     });
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (lookup && !specificInstanceId && result.images.length > 1) {
+    if (lookup && !specificInstanceId && result.items.length > 1) {
       logger.warn("Ambiguous image lookup", {
         id: lookup.id,
-        matchCount: result.images.length,
-        instances: result.images.map((i) => i.instanceId),
+        matchCount: result.items.length,
+        instances: result.items.map((i) => i.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple images found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: result.images.map((i) => ({
+        matches: result.items.map((i) => ({
           id: i.id,
           title: i.title,
           instanceId: i.instanceId,
@@ -111,10 +71,9 @@ export const findImages = async (
       return;
     }
 
-    // Transform and add stashUrl to each image
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- transformImageResult intentionally returns any (dynamic DB row transformer)
-    const imagesWithStashUrl = result.images.map((image) => ({
-      ...transformImageResult(image),
+    // Add stashUrl to each image
+    const imagesWithStashUrl = result.items.map((image) => ({
+      ...image,
       stashUrl: buildStashEntityUrl(
         "image",
         image.id,
@@ -135,7 +94,7 @@ export const findImages = async (
     res.json({
       findImages: {
         count: result.total,
-        images: imagesWithStashUrl as WithStashUrl<NormalizedImage>[],
+        images: imagesWithStashUrl,
       },
     });
   } catch (error) {

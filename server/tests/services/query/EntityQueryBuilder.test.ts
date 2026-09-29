@@ -270,6 +270,24 @@ describe("EntityQueryBuilder", () => {
     );
   });
 
+  it("a direction other than ASC sorts DESC and never reaches the text", async () => {
+    await builder.execute({
+      userId: 1,
+      allowedInstanceIds: ["inst-a"],
+      request: request({
+        sort: {
+          field: "created_at",
+          direction: "ASC, (SELECT 1)" as never,
+          seed: undefined,
+        },
+      }),
+    });
+
+    const { sql } = must(statements()[0]);
+    expect(sql).toContain("ORDER BY s.stashCreatedAt DESC, s.id DESC");
+    expect(sql).not.toContain("SELECT 1");
+  });
+
   it("a sort the map lacks falls back to the default sort", async () => {
     await builder.execute({
       userId: 1,

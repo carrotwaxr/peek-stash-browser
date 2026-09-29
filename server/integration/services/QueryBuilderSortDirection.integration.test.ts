@@ -2,7 +2,8 @@
  * Integration tests for sort-direction handling in the image and clip query
  * builders (item 3), and for the scene builder's title order (item 67 (c)).
  *
- * Both builders splice the sort direction into ORDER BY. These tests run
+ * Both builders put the sort direction into ORDER BY (the image builder
+ * through the base, which takes ASC or else DESC). These tests run
  * against the real test SQLite database with a hostile direction whose
  * subquery overflows (abs() of the minimum 64-bit integer), so SQLite raises
  * "integer overflow" if the text ever reaches the query.
@@ -153,14 +154,23 @@ describeWithDb("Query builder sort direction (integration)", () => {
   it("image builder ignores a hostile direction", async () => {
     const result = await imageQueryBuilder.execute({
       userId: TEST_USER_ID,
-      sort: "created_at",
-      sortDirection: HOSTILE_DIRECTION as never,
-      page: 1,
-      perPage: 10,
       allowedInstanceIds: [TEST_INSTANCE],
+      request: {
+        page: 1,
+        perPage: 10,
+        q: undefined,
+        sort: {
+          field: "created_at",
+          direction: HOSTILE_DIRECTION as never,
+          seed: undefined,
+        },
+        filter: {},
+        specificInstanceId: undefined,
+        dropped: [],
+      },
     });
 
-    expect(result.images.map((i) => i.id)).toEqual(["3", "2", "1"]);
+    expect(result.items.map((i) => i.id)).toEqual(["3", "2", "1"]);
   });
 
   it("clip builder ignores a hostile direction", async () => {

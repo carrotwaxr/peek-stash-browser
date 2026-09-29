@@ -35,10 +35,36 @@ interface FindImagesResponse {
 }
 
 describe("Image Filters", () => {
+  let testInstanceId = "";
+
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
     // Select only test instance to avoid ID collisions with other instances
-    await selectTestInstanceOnly();
+    testInstanceId = await selectTestInstanceOnly();
+  });
+
+  describe("instance_id", () => {
+    it("instance_id narrows the list to one instance", async () => {
+      const count = async (instanceId?: string) => {
+        const response = await adminClient.post<FindImagesResponse>(
+          "/api/library/images",
+          {
+            filter: { per_page: 1 },
+            ...(instanceId === undefined
+              ? {}
+              : { image_filter: { instance_id: instanceId } }),
+          }
+        );
+        expect(response.ok).toBe(true);
+        return response.data.findImages.count;
+      };
+
+      const all = await count();
+      expect(all).toBeGreaterThan(0);
+      // The test instance holds every image the admin sees; another holds none
+      expect(await count(testInstanceId)).toBe(all);
+      expect(await count("no-such-instance")).toBe(0);
+    });
   });
 
   describe("favorite filter", () => {
