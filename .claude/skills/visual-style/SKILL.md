@@ -211,7 +211,7 @@ The app supports full TV/remote navigation with spatial awareness:
 ```jsx
 <PageLayout>
   <PageHeader />           {/* Title, search, filter controls */}
-  <GridLayout>             {/* Or BaseGrid */}
+  <GridLayout>
     <EntityCard />          {/* Repeated per item */}
   </GridLayout>
   <Pagination />
