@@ -1,7 +1,6 @@
 ---
 paths:
   - "server/services/ExclusionComputationService.ts"
-  - "server/services/EntityExclusionHelper.ts"
   - "server/services/UserHiddenEntityService.ts"
   - "server/services/EntityAccessService.ts"
   - "server/routes/exclusions.ts"
