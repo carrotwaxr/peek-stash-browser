@@ -69,11 +69,11 @@ Four highlight cards showcase your single best-of entries:
 
 ## Refreshing Stats
 
-Rankings are recalculated at most once an hour. When you sign in, open this page or load Recommended and your rankings are more than an hour old, Peek recalculates them: this page waits for the new rankings, while signing in and Recommended carry on and use them next time. The **Refresh** button reloads the page's numbers; it does not force a recalculation.
+Performer, studio and tag rankings are recalculated at most once an hour. When you sign in, open this page or load Recommended and your rankings are more than an hour old, Peek recalculates them: this page waits for the new rankings, while signing in and Recommended carry on and use them next time. Top Scenes are ranked from your watch history each time the page loads. The **Refresh** button reloads the page's numbers; it does not force a recalculation.
 
-Stats update in real-time as you watch scenes and interact with content. Rankings are the only part that recalculates periodically.
+Stats update in real-time as you watch scenes and interact with content. The performer, studio and tag rankings are the only part that recalculates periodically.
 
-Performers, studios, tags and scenes deleted from Stash are left out of the rankings, and deleted scenes no longer count toward how many scenes feature an entity or toward the average scene length.
+Everything on this page counts only what you can see. Items you hid, content restricted for you, anything deleted from Stash and Stash servers you have not selected are left out of the engagement totals, top lists and highlights as soon as they change. When two Stash servers use the same ids, each entry shows and links to the one on its own server. Deleted scenes also no longer count toward how many scenes feature an entity or toward the average scene length.
 
 ## Related
 

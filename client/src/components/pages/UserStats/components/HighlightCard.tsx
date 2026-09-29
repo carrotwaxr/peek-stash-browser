@@ -1,10 +1,14 @@
 // client/src/components/pages/UserStats/components/HighlightCard.tsx
 import { Link } from "react-router-dom";
+import { useConfig } from "../../../../contexts/ConfigContext";
+import { getEntityPath } from "../../../../utils/entityLinks";
 import { getFilenameFromPath } from "../../../../utils/format";
 import { Paper } from "../../../ui/index";
 
 interface HighlightItem {
   id: string;
+  /** With `id`, what names the entity: its page is on this instance */
+  instanceId: string;
   name?: string;
   title?: string;
   filePath?: string;
@@ -16,7 +20,6 @@ type EntityType = "scene" | "image" | "performer";
 interface Props {
   title: string;
   item: HighlightItem | null;
-  linkPrefix: string;
   statLabel: string;
   statValue: number;
   entityType?: EntityType;
@@ -57,11 +60,12 @@ const getFallbackIcon = (entityType: EntityType): string => {
 const HighlightCard = ({
   title,
   item,
-  linkPrefix,
   statLabel,
   statValue,
   entityType = "scene",
 }: Props) => {
+  const { hasMultipleInstances } = useConfig();
+
   if (!item) {
     return null;
   }
@@ -83,7 +87,7 @@ const HighlightCard = ({
         </h3>
       </div>
       <Link
-        to={`${linkPrefix}/${item.id}`}
+        to={getEntityPath(entityType, item, hasMultipleInstances)}
         className="block transition-colors hover:bg-[var(--bg-secondary)]"
       >
         {/* Consistent 16/9 container for all cards - portrait images pillarboxed */}

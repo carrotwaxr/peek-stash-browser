@@ -3,12 +3,13 @@
  *
  * Tests the getUserStats endpoint including auth checks, sortBy validation
  * (with default fallback), waiting for fresh rankings (the freshness rule
- * itself is RankingComputeService.ensureFresh's, tested there), and error
- * handling.
+ * itself is RankingComputeService.ensureFresh's, tested there), the viewer's
+ * allowed instances, and error handling.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserStats } from "../../controllers/userStats.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
@@ -26,12 +27,17 @@ vi.mock("../../services/RankingComputeService.js", () => ({
   },
 }));
 
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn(),
+}));
+
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockStatsService = vi.mocked(userStatsAggregationService);
 const mockRankingService = vi.mocked(rankingComputeService, true);
+const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -68,6 +74,7 @@ describe("UserStats Controller", () => {
 
     mockRankingService.ensureFresh.mockResolvedValue(undefined);
     mockStatsService.getUserStats.mockResolvedValue(SAMPLE_STATS);
+    mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
   });
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -189,6 +196,23 @@ describe("UserStats Controller", () => {
 
       expect(res._getStatus()).toBe(500);
       expect(mockStatsService.getUserStats).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Allowed instances ────────────────────────────────────────────────────
+
+  describe("allowed instances", () => {
+    it("reads the stats over the viewer's allowed instances", async () => {
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
+
+      await getUserStats(req, res);
+
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(1);
+      expect(mockStatsService.getUserStats).toHaveBeenCalledExactlyOnceWith(1, {
+        sortBy: "engagement",
+        allowedInstanceIds: ["inst-a", "inst-b"],
+      });
     });
   });
 

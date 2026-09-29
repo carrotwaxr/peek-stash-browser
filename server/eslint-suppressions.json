@@ -277,11 +277,6 @@
       "count": 1
     }
   },
-  "services/UserStatsAggregationService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
   "services/UserStatsService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4

@@ -1,4 +1,5 @@
 import rankingComputeService from "../services/RankingComputeService.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import {
   type TopListSortBy,
   userStatsAggregationService,
@@ -45,8 +46,10 @@ export async function getUserStats(
     // Rankings over an hour old are recomputed before the top lists are read
     await rankingComputeService.ensureFresh(userId, { wait: true });
 
+    // Everything counted is on an instance the viewer sees
     const stats = await userStatsAggregationService.getUserStats(userId, {
       sortBy,
+      allowedInstanceIds: await getUserAllowedInstanceIds(userId),
     });
 
     res.json(stats);

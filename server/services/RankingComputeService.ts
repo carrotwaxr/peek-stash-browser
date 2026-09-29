@@ -1,7 +1,8 @@
 // server/services/RankingComputeService.ts
 /**
  * Service to compute and store percentile rankings for user engagement stats.
- * Rankings are pre-computed and stored in UserEntityRanking table for fast retrieval.
+ * Performer, studio and tag rankings are pre-computed and stored in the
+ * UserEntityRanking table, for the stats page's top lists and Recommended.
  *
  * Algorithm:
  * 1. Fetch all entities of a type that the user has engaged with
@@ -10,12 +11,18 @@
  * 4. Compute percentile rank within the user's engaged entities
  * 5. Store results in UserEntityRanking table
  *
- * Only live entities count: a soft-deleted performer, studio, tag or scene
- * gets no ranking, and a deleted scene adds nothing to an entity's library
- * presence or watch time, nor to the average scene duration. The user's
- * watch history drives each scene lookup (`WatchHistory w CROSS JOIN
- * StashScene s`): left to itself, SQLite may walk every live scene and probe
- * the history instead (0.12 s against 0.03 s at 200k scenes).
+ * Scenes are not stored: the stats page ranks its top scenes from the
+ * user's watch history when it loads (UserStatsAggregationService, with
+ * these weights and `percentileRank`). They were 92 % of each recompute's
+ * writes for one top-10 list: a user with 17k watched scenes at 200k scenes
+ * held the lock 0.5 s to rewrite them, where the read costs 50 ms.
+ *
+ * Only live entities count: a soft-deleted performer, studio or tag gets no
+ * ranking, and a deleted scene adds nothing to an entity's library presence
+ * or watch time, nor to the average scene duration. The user's watch history
+ * drives each scene lookup (`WatchHistory w CROSS JOIN StashScene s`): left
+ * to itself, SQLite may walk every live scene and probe the history instead
+ * (0.12 s against 0.03 s at 200k scenes).
  *
  * `ensureFresh` is the entry point: each user is recomputed at most once an
  * hour, and callers arriving during a recompute share it.
@@ -24,16 +31,26 @@ import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
-const RANKING_WEIGHTS = {
+/** Engagement score = oCount × 5 + watched time / average scene length + plays */
+export const RANKING_WEIGHTS = {
   oCount: 5,
   duration: 1,
   playCount: 1,
-};
+} as const;
 
 /** How long a user's rankings stay fresh after a recompute starts */
 const FRESH_FOR_MS = 60 * 60 * 1000;
 
-type EntityType = "performer" | "studio" | "tag" | "scene";
+type EntityType = "performer" | "studio" | "tag";
+
+/**
+ * The percentile of the entity at `index` (0 = the most engaged) among
+ * `count`: 100 for the first, 0 for the last (and for one alone). Entities
+ * tied with the one before them take its index.
+ */
+export function percentileRank(index: number, count: number): number {
+  return Math.round((100 * (count - index - 1)) / Math.max(count - 1, 1));
+}
 
 /** One user's last recompute, kept for the life of the process */
 interface Freshness {
@@ -157,13 +174,12 @@ class RankingComputeService {
     // Get average scene duration for normalization
     const avgSceneDuration = await this.getAverageSceneDuration();
 
-    // One type after another: run together, the four reads contend for
-    // the pool's connections and the disk
+    // One type after another: run together, the reads contend for the
+    // pool's connections and the disk
     let rankings = 0;
     rankings += await this.computePerformerRankings(userId, avgSceneDuration);
     rankings += await this.computeStudioRankings(userId, avgSceneDuration);
     rankings += await this.computeTagRankings(userId, avgSceneDuration);
-    rankings += await this.computeSceneRankings(userId, avgSceneDuration);
 
     logger.info("Ranking computation complete", {
       userId,
@@ -173,9 +189,10 @@ class RankingComputeService {
   }
 
   /**
-   * Get average live scene duration for normalizing watch times
+   * The average live scene duration in seconds, which normalizes watch
+   * times (1200 when no scene has one)
    */
-  private async getAverageSceneDuration(): Promise<number> {
+  async getAverageSceneDuration(): Promise<number> {
     const result = await prisma.$queryRaw<
       Array<{ avgDuration: number | null }>
     >`
@@ -246,12 +263,8 @@ class RankingComputeService {
     // Assign percentile ranks (100 = best, 0 = worst)
     const n = scored.length;
     for (let i = 0; i < n; i++) {
-      // Formula: percentile = 100 * (n - rank) / n
-      // Where rank is 1-indexed position (1 = best)
       const item = scored[i] as (typeof scored)[number];
-      item.percentileRank = Math.round(
-        (100 * (n - i - 1)) / Math.max(n - 1, 1)
-      );
+      item.percentileRank = percentileRank(i, n);
     }
 
     // Handle ties: entities with same engagement rate get same percentile
@@ -472,42 +485,6 @@ class RankingComputeService {
 
     const rankings = this.computePercentileRanks(stats, avgSceneDuration);
     await this.upsertRankings(userId, "tag", rankings);
-    return rankings.length;
-  }
-
-  /**
-   * Compute scene rankings
-   * Scenes don't have library presence normalization - just raw engagement scores
-   */
-  private async computeSceneRankings(
-    userId: number,
-    avgSceneDuration: number
-  ): Promise<number> {
-    const stats = await prisma.$queryRaw<RawEntityStats[]>`
-      SELECT
-        w.sceneId as entityId,
-        w.instanceId,
-        w.playCount,
-        w.oCount,
-        w.playDuration,
-        1 as libraryPresence
-      FROM WatchHistory w
-      CROSS JOIN StashScene s
-        ON s.id = w.sceneId
-        AND s.stashInstanceId = w.instanceId
-        AND s.deletedAt IS NULL
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'scene'
-        AND e.entityId = w.sceneId
-        AND (e.instanceId = '' OR e.instanceId = w.instanceId)
-      WHERE w.userId = ${userId}
-        AND e.id IS NULL
-        AND (w.playCount > 0 OR w.oCount > 0 OR w.playDuration > 0)
-    `;
-
-    const rankings = this.computePercentileRanks(stats, avgSceneDuration);
-    await this.upsertRankings(userId, "scene", rankings);
     return rankings.length;
   }
 }

@@ -10,6 +10,9 @@
  *
  * User U has stats rows for all of them, and watch history on A's scenes 1,
  * 4 and 6. Every seeded row is deleted before the file ends.
+ *
+ * Scenes are ranked when the stats page reads them, from the watch history;
+ * only performers, studios and tags are stored.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -183,6 +186,11 @@ async function seed(): Promise<void> {
   });
 }
 
+const statsOf = (userId: number) =>
+  userStatsAggregationService.getUserStats(userId, {
+    allowedInstanceIds: [A, B],
+  });
+
 async function rankingsOf(entityType: string) {
   const rows = await prisma.userEntityRanking.findMany({
     where: { userId: u, entityType },
@@ -205,17 +213,34 @@ describeWithDb("Ranking compute (integration)", () => {
     const performers = await rankingsOf("performer");
     expect([...performers.keys()].sort()).toEqual([`${P}:${A}`, `${P}:${B}`]);
 
-    const stats = await userStatsAggregationService.getUserStats(u);
+    const stats = await statsOf(u);
     expect(stats.topPerformers.map((p) => p.id)).not.toContain(X);
     expect(stats.topPerformers).toHaveLength(2);
   });
 
-  it("soft-deleted studios, tags and scenes get no ranking", async () => {
+  it("the top list names A's performer, not B's same id", async () => {
+    const stats = await statsOf(u);
+
+    // A's P is the more engaged: three plays and an O against B's one play
+    expect(stats.topPerformers.map((p) => [p.name, p.instanceId])).toEqual([
+      ["Rank A performer", A],
+      ["Rank B performer", B],
+    ]);
+  });
+
+  it("soft-deleted studios and tags get no ranking, and no scene ranking is stored", async () => {
     expect([...(await rankingsOf("studio")).keys()]).toEqual([`${S}:${A}`]);
     expect([...(await rankingsOf("tag")).keys()]).toEqual([`${T}:${A}`]);
-    expect([...(await rankingsOf("scene")).keys()].sort()).toEqual([
-      `${SCENE(1)}:${A}`,
-      `${SCENE(6)}:${A}`,
+    expect([...(await rankingsOf("scene")).keys()]).toEqual([]);
+  });
+
+  it("top scenes leave out the soft-deleted scene", async () => {
+    const stats = await statsOf(u);
+
+    // Scene 4 has the most plays and an O, but is deleted
+    expect(stats.topScenes.map((s) => [s.id, s.instanceId])).toEqual([
+      [SCENE(1), A],
+      [SCENE(6), A],
     ]);
   });
 

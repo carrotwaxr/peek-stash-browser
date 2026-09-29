@@ -2,13 +2,23 @@
 /**
  * Aggregates user statistics for the My Stats page.
  *
- * Top lists are read from pre-computed UserEntityRanking table,
- * which is populated by RankingComputeService on login and engagement changes.
+ * Every number and list is the viewer's own and names each entity by its
+ * (id, instance), and counts only what the viewer may see now: live entities
+ * on their allowed instances with no exclusion row on the entity's own
+ * instance. Each statement drives from the viewer's rows (rankings, history,
+ * stats) and looks the entity up by its primary key (`CROSS JOIN`), so its
+ * cost follows the viewer's history, not the library.
  *
- * Rankings use percentile-based scoring:
- * - Raw engagement: (oCount × 5) + (normalizedDuration) + (playCount)
- * - Engagement rate: raw engagement / library presence
- * - Percentile: rank among all entities user has engaged with (100 = top)
+ * - Top performers, studios and tags read the rankings RankingComputeService
+ *   stores (at most an hour old), percentile-based:
+ *   - Raw engagement: (oCount × 5) + (normalizedDuration) + (playCount)
+ *   - Engagement rate: raw engagement / library presence
+ *   - Percentile: rank among all entities user has engaged with (100 = top)
+ * - Top scenes are ranked here, from the watch history, with the same
+ *   weights and percentile (a scene's library presence is 1): 50 ms at 200k
+ *   scenes for a user with 17k watched scenes, where storing them cost each
+ *   recompute 0.5 s of writes.
+ * - Totals and highlights read the history and per-user stats directly.
  */
 import prisma from "../prisma/singleton.js";
 import type {
@@ -24,6 +34,16 @@ import type {
   UserStatsResponse,
 } from "../types/api/index.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
+import {
+  type SqlParam,
+  exclusionJoin,
+  instanceClause,
+} from "../utils/sqlClauses.js";
+import {
+  RANKING_WEIGHTS,
+  percentileRank,
+  rankingComputeService,
+} from "./RankingComputeService.js";
 
 /**
  * Valid sort options for top lists
@@ -35,44 +55,227 @@ export type TopListSortBy = "engagement" | "oCount" | "playCount";
  */
 export interface UserStatsOptions {
   sortBy?: TopListSortBy;
+  /** The viewer's allowed instances (`getUserAllowedInstanceIds`): none counts nothing */
+  allowedInstanceIds: readonly string[];
+}
+
+/** How many entries each top list holds */
+const TOP_LIST_LIMIT = 10;
+
+/** The entity tables a stats row names, with the columns it shows */
+const ENTITY_SOURCES = {
+  scene: {
+    table: "StashScene",
+    columns:
+      "x.title AS title, x.filePath AS filePath, x.pathScreenshot AS imagePath",
+  },
+  image: {
+    table: "StashImage",
+    columns:
+      "x.title AS title, x.filePath AS filePath, x.pathThumbnail AS imagePath",
+  },
+  performer: {
+    table: "StashPerformer",
+    columns: "x.name AS name, x.imagePath AS imagePath",
+  },
+  studio: {
+    table: "StashStudio",
+    columns: "x.name AS name, x.imagePath AS imagePath",
+  },
+  tag: {
+    table: "StashTag",
+    columns: "x.name AS name, x.imagePath AS imagePath",
+  },
+} as const;
+
+type EntitySource = keyof typeof ENTITY_SOURCES;
+
+/** The entity types with stored rankings, each a top list */
+type RankedType = "performer" | "studio" | "tag";
+
+/** The ranking column each sort orders the stored rankings by */
+const RANKING_SORT: Record<TopListSortBy, string> = {
+  engagement: "r.percentileRank",
+  oCount: "r.oCount",
+  playCount: "r.playCount",
+};
+
+/** The column each sort orders the scenes ranked from history by */
+const SCENE_SORT: Record<TopListSortBy, string> = {
+  engagement: "engagement",
+  oCount: "oCount",
+  playCount: "playCount",
+};
+
+/** Where each highlight reads its count, and the entity it names */
+const HIGHLIGHT_SOURCES = {
+  mostWatchedScene: {
+    from: "WatchHistory",
+    idColumn: "sceneId",
+    count: "playCount",
+    entity: "scene",
+  },
+  mostOdScene: {
+    from: "WatchHistory",
+    idColumn: "sceneId",
+    count: "oCount",
+    entity: "scene",
+  },
+  mostViewedImage: {
+    from: "ImageViewHistory",
+    idColumn: "imageId",
+    count: "viewCount",
+    entity: "image",
+  },
+  mostOdPerformer: {
+    from: "UserPerformerStats",
+    idColumn: "performerId",
+    count: "oCounter",
+    entity: "performer",
+  },
+} as const;
+
+type HighlightSource =
+  (typeof HIGHLIGHT_SOURCES)[keyof typeof HIGHLIGHT_SOURCES];
+
+// Raw rows. A plain Int or Float column reads as a number; COUNT, SUM and
+// COALESCE over integers, and window counts, as bigint.
+
+interface NamedRow {
+  id: string;
+  instanceId: string;
+  name: string;
+  imagePath: string | null;
+}
+
+interface TitledRow {
+  id: string;
+  instanceId: string;
+  title: string | null;
+  filePath: string | null;
+  imagePath: string | null;
+}
+
+interface RankedRow extends NamedRow {
+  playCount: number;
+  playDuration: number;
+  oCount: number;
+  percentileRank: number;
+}
+
+interface HistoryRankedSceneRow extends TitledRow {
+  playCount: number;
+  playDuration: number;
+  oCount: number;
+  /** RANK() by engagement: 1 for the most engaged, ties share the first */
+  position: bigint | number;
+  /** How many scenes were ranked */
+  total: bigint | number;
+}
+
+/** A highlight's row: the entity's own columns and the source's count */
+type HighlightRow<Row extends NamedRow | TitledRow> = Row & { count: number };
+
+interface SceneTotalsRow {
+  totalWatchTime: bigint | number;
+  totalPlayCount: bigint | number;
+  totalOCount: bigint | number;
+  uniqueScenesWatched: bigint | number;
+}
+
+interface ImageTotalsRow {
+  totalImagesViewed: bigint | number;
+  imageOCount: bigint | number;
+}
+
+/**
+ * The joins and conditions that keep a per-user row only while its entity
+ * shows to the viewer: the live entity (as `x`) by the row's (id,
+ * instance), no exclusion row (as `e`) for the viewer on that instance, an
+ * allowed instance. The row drives (`CROSS JOIN`), so SQLite looks each
+ * entity up by its primary key. The joins bind `joinParams` where they
+ * stand and the condition `whereParams` where it stands.
+ */
+function visibleEntity(
+  entity: EntitySource,
+  row: { alias: string; idColumn: string },
+  userId: number,
+  allowedInstanceIds: readonly string[]
+) {
+  const id = `${row.alias}.${row.idColumn}`;
+  const instance = `${row.alias}.instanceId`;
+  const instances = instanceClause("x", allowedInstanceIds);
+  return {
+    joins: `CROSS JOIN ${ENTITY_SOURCES[entity].table} x
+        ON x.id = ${id} AND x.stashInstanceId = ${instance} AND x.deletedAt IS NULL
+      ${exclusionJoin("e", entity, id, instance)}`,
+    joinParams: [userId] as SqlParam[],
+    where: `e.id IS NULL AND ${instances.sql}`,
+    whereParams: instances.params,
+  };
 }
 
 class UserStatsAggregationService {
   /**
    * Get all user stats in a single call
-   * Top lists read from pre-computed UserEntityRanking table
    * @param userId - The user ID
-   * @param options - Optional parameters for customization
+   * @param options - The sort, and the viewer's allowed instances
    */
   async getUserStats(
     userId: number,
-    options: UserStatsOptions = {}
+    options: UserStatsOptions
   ): Promise<UserStatsResponse> {
-    const { sortBy = "engagement" } = options;
+    const { sortBy = "engagement", allowedInstanceIds } = options;
 
-    const [
-      library,
-      engagement,
-      topScenes,
-      topPerformers,
-      topStudios,
-      topTags,
-      mostWatchedScene,
-      mostViewedImage,
-      mostOdScene,
-      mostOdPerformer,
-    ] = await Promise.all([
-      this.getLibraryStats(userId),
-      this.getEngagementStats(userId),
-      this.getTopScenes(userId, 10, sortBy),
-      this.getTopPerformers(userId, 10, sortBy),
-      this.getTopStudios(userId, 10, sortBy),
-      this.getTopTags(userId, 10, sortBy),
-      this.getMostWatchedScene(userId),
-      this.getMostViewedImage(userId),
-      this.getMostOdScene(userId),
-      this.getMostOdPerformer(userId),
-    ]);
+    // One statement after another: sent together, they contend for the
+    // pool's connections and the disk (at 200k scenes, for a user with 17k
+    // watched scenes, 0.28 s together against 0.12 s in turn)
+    const library = await this.getLibraryStats(userId);
+    const engagement = await this.getEngagementStats(
+      userId,
+      allowedInstanceIds
+    );
+    const topScenes = await this.getTopScenes(
+      userId,
+      allowedInstanceIds,
+      sortBy
+    );
+    const topPerformers = await this.getTopEntities(
+      "performer",
+      userId,
+      allowedInstanceIds,
+      sortBy
+    );
+    const topStudios = await this.getTopEntities(
+      "studio",
+      userId,
+      allowedInstanceIds,
+      sortBy
+    );
+    const topTags = await this.getTopEntities(
+      "tag",
+      userId,
+      allowedInstanceIds,
+      sortBy
+    );
+    const mostWatchedScene = await this.getSceneHighlight(
+      HIGHLIGHT_SOURCES.mostWatchedScene,
+      userId,
+      allowedInstanceIds
+    );
+    const mostViewedImage = await this.getImageHighlight(
+      userId,
+      allowedInstanceIds
+    );
+    const mostOdScene = await this.getSceneHighlight(
+      HIGHLIGHT_SOURCES.mostOdScene,
+      userId,
+      allowedInstanceIds
+    );
+    const mostOdPerformer = await this.getPerformerHighlight(
+      userId,
+      allowedInstanceIds
+    );
 
     return {
       library,
@@ -111,450 +314,274 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get engagement totals with exclusion filtering
+   * Engagement totals over the scenes and images the viewer may see. Each
+   * history row is one (entity, instance), so a count of rows counts two
+   * servers' same id twice.
    */
-  private async getEngagementStats(userId: number): Promise<EngagementStats> {
-    // Run scene and image engagement queries in parallel (both filtered by exclusions)
-    const [sceneStats, imageStats] = await Promise.all([
-      prisma.$queryRaw<
-        Array<{
-          totalWatchTime: number | null;
-          totalPlayCount: number | null;
-          totalOCount: number | null;
-          uniqueScenesWatched: number | null;
-        }>
-      >`
-        SELECT
-          COALESCE(SUM(w.playDuration), 0) as totalWatchTime,
-          COALESCE(SUM(w.playCount), 0) as totalPlayCount,
-          COALESCE(SUM(w.oCount), 0) as totalOCount,
-          COUNT(DISTINCT w.sceneId) as uniqueScenesWatched
+  private async getEngagementStats(
+    userId: number,
+    allowedInstanceIds: readonly string[]
+  ): Promise<EngagementStats> {
+    const scene = visibleEntity(
+      "scene",
+      { alias: "w", idColumn: "sceneId" },
+      userId,
+      allowedInstanceIds
+    );
+    const image = visibleEntity(
+      "image",
+      { alias: "iv", idColumn: "imageId" },
+      userId,
+      allowedInstanceIds
+    );
+    const scenes = await prisma.$queryRawUnsafe<SceneTotalsRow[]>(
+      `SELECT
+          COALESCE(SUM(w.playDuration), 0) AS totalWatchTime,
+          COALESCE(SUM(w.playCount), 0) AS totalPlayCount,
+          COALESCE(SUM(w.oCount), 0) AS totalOCount,
+          COUNT(*) AS uniqueScenesWatched
         FROM WatchHistory w
-        LEFT JOIN UserExcludedEntity e
-          ON e.userId = ${userId}
-          AND e.entityType = 'scene'
-          AND e.entityId = w.sceneId
-        WHERE w.userId = ${userId}
-          AND e.id IS NULL
-      `,
-      prisma.$queryRaw<
-        Array<{
-          totalImagesViewed: number | null;
-          imageOCount: number | null;
-        }>
-      >`
-        SELECT
-          COUNT(DISTINCT iv.imageId) as totalImagesViewed,
-          COALESCE(SUM(iv.oCount), 0) as imageOCount
+        ${scene.joins}
+        WHERE w.userId = ? AND ${scene.where}`,
+      ...scene.joinParams,
+      userId,
+      ...scene.whereParams
+    );
+    const images = await prisma.$queryRawUnsafe<ImageTotalsRow[]>(
+      `SELECT
+          COUNT(*) AS totalImagesViewed,
+          COALESCE(SUM(iv.oCount), 0) AS imageOCount
         FROM ImageViewHistory iv
-        LEFT JOIN UserExcludedEntity e
-          ON e.userId = ${userId}
-          AND e.entityType = 'image'
-          AND e.entityId = iv.imageId
-        WHERE iv.userId = ${userId}
-          AND e.id IS NULL
-      `,
-    ]);
+        ${image.joins}
+        WHERE iv.userId = ? AND ${image.where}`,
+      ...image.joinParams,
+      userId,
+      ...image.whereParams
+    );
 
-    const scene = sceneStats[0];
-    const image = imageStats[0];
-
+    // One row each: an aggregate without GROUP BY
+    const s = scenes[0];
+    const i = images[0];
     return {
-      totalWatchTime: Number(scene?.totalWatchTime) || 0,
-      totalPlayCount: Number(scene?.totalPlayCount) || 0,
-      totalOCount:
-        (Number(scene?.totalOCount) || 0) + (Number(image?.imageOCount) || 0),
-      totalImagesViewed: Number(image?.totalImagesViewed) || 0,
-      uniqueScenesWatched: Number(scene?.uniqueScenesWatched) || 0,
+      totalWatchTime: Number(s?.totalWatchTime ?? 0),
+      totalPlayCount: Number(s?.totalPlayCount ?? 0),
+      totalOCount: Number(s?.totalOCount ?? 0) + Number(i?.imageOCount ?? 0),
+      totalImagesViewed: Number(i?.totalImagesViewed ?? 0),
+      uniqueScenesWatched: Number(s?.uniqueScenesWatched ?? 0),
     };
   }
 
   /**
-   * Map sortBy option to Prisma orderBy field
+   * A top list of performers, studios or tags from the stored rankings, in
+   * the sort's order: only entities the viewer may see now, whatever they
+   * were when the rankings were computed.
    */
-  private getSortField(
+  private async getTopEntities(
+    entity: RankedType,
+    userId: number,
+    allowedInstanceIds: readonly string[],
     sortBy: TopListSortBy
-  ): "percentileRank" | "oCount" | "playCount" {
-    switch (sortBy) {
-      case "oCount":
-        return "oCount";
-      case "playCount":
-        return "playCount";
-      case "engagement":
-      default:
-        return "percentileRank";
-    }
+  ): Promise<TopPerformer[] | TopStudio[] | TopTag[]> {
+    const visible = visibleEntity(
+      entity,
+      { alias: "r", idColumn: "entityId" },
+      userId,
+      allowedInstanceIds
+    );
+    const rows = await prisma.$queryRawUnsafe<RankedRow[]>(
+      `SELECT r.entityId AS id, r.instanceId AS instanceId,
+        r.playCount AS playCount, r.playDuration AS playDuration,
+        r.oCount AS oCount, r.percentileRank AS percentileRank,
+        ${ENTITY_SOURCES[entity].columns}
+      FROM UserEntityRanking r
+      ${visible.joins}
+      WHERE r.userId = ? AND r.entityType = ? AND ${visible.where}
+      ORDER BY ${RANKING_SORT[sortBy]} DESC, r.entityId, r.instanceId
+      LIMIT ?`,
+      ...visible.joinParams,
+      userId,
+      entity,
+      ...visible.whereParams,
+      TOP_LIST_LIMIT
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      instanceId: row.instanceId,
+      name: row.name,
+      imageUrl: toProxyUrl(row.imagePath, row.instanceId),
+      playCount: row.playCount,
+      playDuration: Math.round(row.playDuration),
+      oCount: row.oCount,
+      score: row.percentileRank,
+    }));
   }
 
   /**
-   * Get top scenes by the specified sort order from pre-computed rankings
+   * Top scenes, ranked from the viewer's watch history as the stored
+   * rankings are (engagement score, percentile among the engaged scenes),
+   * then taken in the sort's order. A window ranks every engaged scene the
+   * viewer may see (one row per watched scene); only the page's 10 read
+   * their titles.
    */
   private async getTopScenes(
     userId: number,
-    limit: number,
-    sortBy: TopListSortBy = "engagement"
+    allowedInstanceIds: readonly string[],
+    sortBy: TopListSortBy
   ): Promise<TopScene[]> {
-    // Query pre-computed rankings
-    const rankings = await prisma.userEntityRanking.findMany({
-      where: { userId, entityType: "scene" },
-      orderBy: { [this.getSortField(sortBy)]: "desc" },
-      take: limit,
-    });
+    const averageDuration =
+      await rankingComputeService.getAverageSceneDuration();
+    const visible = visibleEntity(
+      "scene",
+      { alias: "w", idColumn: "sceneId" },
+      userId,
+      allowedInstanceIds
+    );
+    const sort = SCENE_SORT[sortBy];
+    const rows = await prisma.$queryRawUnsafe<HistoryRankedSceneRow[]>(
+      `WITH engaged AS (
+        SELECT w.sceneId AS id, w.instanceId AS instanceId,
+          w.playCount AS playCount, w.oCount AS oCount,
+          w.playDuration AS playDuration,
+          w.oCount * ? + w.playDuration / ? * ? + w.playCount * ? AS engagement
+        FROM WatchHistory w
+        ${visible.joins}
+        WHERE w.userId = ? AND ${visible.where}
+          AND (w.playCount > 0 OR w.oCount > 0 OR w.playDuration > 0)
+      ),
+      ranked AS (
+        SELECT engaged.*,
+          RANK() OVER (ORDER BY engagement DESC) AS position,
+          COUNT(*) OVER () AS total
+        FROM engaged
+      ),
+      top AS (
+        SELECT * FROM ranked ORDER BY ${sort} DESC, id, instanceId LIMIT ?
+      )
+      SELECT top.id AS id, top.instanceId AS instanceId,
+        top.playCount AS playCount, top.oCount AS oCount,
+        top.playDuration AS playDuration, top.position AS position,
+        top.total AS total, ${ENTITY_SOURCES.scene.columns}
+      FROM top
+      CROSS JOIN StashScene x ON x.id = top.id AND x.stashInstanceId = top.instanceId
+      ORDER BY top.${sort} DESC, top.id, top.instanceId`,
+      RANKING_WEIGHTS.oCount,
+      averageDuration,
+      RANKING_WEIGHTS.duration,
+      RANKING_WEIGHTS.playCount,
+      ...visible.joinParams,
+      userId,
+      ...visible.whereParams,
+      TOP_LIST_LIMIT
+    );
 
-    if (rankings.length === 0) return [];
-
-    // Fetch scene details including stashInstanceId for proxy routing
-    const scenes = await prisma.stashScene.findMany({
-      where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: {
-        id: true,
-        title: true,
-        filePath: true,
-        pathScreenshot: true,
-        stashInstanceId: true,
-      },
-    });
-
-    const sceneMap = new Map(scenes.map((s) => [s.id, s]));
-
-    return rankings.map((r) => {
-      const scene = sceneMap.get(r.entityId);
-      return {
-        id: r.entityId,
-        title: scene?.title ?? null,
-        filePath: scene?.filePath ?? null,
-        imageUrl: scene
-          ? toProxyUrl(scene.pathScreenshot, scene.stashInstanceId)
-          : null,
-        playCount: r.playCount,
-        playDuration: Math.round(r.playDuration),
-        oCount: r.oCount,
-        score: r.percentileRank,
-      };
-    });
+    return rows.map((row) => ({
+      id: row.id,
+      instanceId: row.instanceId,
+      title: row.title,
+      filePath: row.filePath,
+      imageUrl: toProxyUrl(row.imagePath, row.instanceId),
+      playCount: row.playCount,
+      playDuration: Math.round(row.playDuration),
+      oCount: row.oCount,
+      score: percentileRank(Number(row.position) - 1, Number(row.total)),
+    }));
   }
 
   /**
-   * Get top performers by the specified sort order from pre-computed rankings
+   * The viewer's row with the highest count in a highlight's source, for
+   * an entity they may see (ties: the lowest id, then instance)
    */
-  private async getTopPerformers(
+  private async getHighlight<Row extends NamedRow | TitledRow>(
+    source: HighlightSource,
     userId: number,
-    limit: number,
-    sortBy: TopListSortBy = "engagement"
-  ): Promise<TopPerformer[]> {
-    // Query pre-computed rankings
-    const rankings = await prisma.userEntityRanking.findMany({
-      where: { userId, entityType: "performer" },
-      orderBy: { [this.getSortField(sortBy)]: "desc" },
-      take: limit,
-    });
-
-    if (rankings.length === 0) return [];
-
-    // Fetch performer details including stashInstanceId for proxy routing
-    const performers = await prisma.stashPerformer.findMany({
-      where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
-    });
-
-    const performerMap = new Map(performers.map((p) => [p.id, p]));
-
-    return rankings.map((r) => {
-      const performer = performerMap.get(r.entityId);
-      return {
-        id: r.entityId,
-        name: performer?.name ?? "Unknown",
-        imageUrl: performer
-          ? toProxyUrl(performer.imagePath, performer.stashInstanceId)
-          : null,
-        playCount: r.playCount,
-        playDuration: Math.round(r.playDuration),
-        oCount: r.oCount,
-        score: r.percentileRank,
-      };
-    });
+    allowedInstanceIds: readonly string[]
+  ): Promise<HighlightRow<Row> | undefined> {
+    const visible = visibleEntity(
+      source.entity,
+      { alias: "h", idColumn: source.idColumn },
+      userId,
+      allowedInstanceIds
+    );
+    const rows = await prisma.$queryRawUnsafe<HighlightRow<Row>[]>(
+      `SELECT h.${source.idColumn} AS id, h.instanceId AS instanceId,
+        h.${source.count} AS count, ${ENTITY_SOURCES[source.entity].columns}
+      FROM ${source.from} h
+      ${visible.joins}
+      WHERE h.userId = ? AND h.${source.count} > 0 AND ${visible.where}
+      ORDER BY h.${source.count} DESC, h.${source.idColumn}, h.instanceId
+      LIMIT 1`,
+      ...visible.joinParams,
+      userId,
+      ...visible.whereParams
+    );
+    return rows[0];
   }
 
-  /**
-   * Get top studios by the specified sort order from pre-computed rankings
-   */
-  private async getTopStudios(
+  /** The most watched or most O'd scene */
+  private async getSceneHighlight(
+    source:
+      | typeof HIGHLIGHT_SOURCES.mostWatchedScene
+      | typeof HIGHLIGHT_SOURCES.mostOdScene,
     userId: number,
-    limit: number,
-    sortBy: TopListSortBy = "engagement"
-  ): Promise<TopStudio[]> {
-    // Query pre-computed rankings
-    const rankings = await prisma.userEntityRanking.findMany({
-      where: { userId, entityType: "studio" },
-      orderBy: { [this.getSortField(sortBy)]: "desc" },
-      take: limit,
-    });
-
-    if (rankings.length === 0) return [];
-
-    // Fetch studio details including stashInstanceId for proxy routing
-    const studios = await prisma.stashStudio.findMany({
-      where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
-    });
-
-    const studioMap = new Map(studios.map((s) => [s.id, s]));
-
-    return rankings.map((r) => {
-      const studio = studioMap.get(r.entityId);
-      return {
-        id: r.entityId,
-        name: studio?.name ?? "Unknown",
-        imageUrl: studio
-          ? toProxyUrl(studio.imagePath, studio.stashInstanceId)
-          : null,
-        playCount: r.playCount,
-        playDuration: Math.round(r.playDuration),
-        oCount: r.oCount,
-        score: r.percentileRank,
-      };
-    });
-  }
-
-  /**
-   * Get top tags by the specified sort order from pre-computed rankings
-   */
-  private async getTopTags(
-    userId: number,
-    limit: number,
-    sortBy: TopListSortBy = "engagement"
-  ): Promise<TopTag[]> {
-    // Query pre-computed rankings
-    const rankings = await prisma.userEntityRanking.findMany({
-      where: { userId, entityType: "tag" },
-      orderBy: { [this.getSortField(sortBy)]: "desc" },
-      take: limit,
-    });
-
-    if (rankings.length === 0) return [];
-
-    // Fetch tag details including stashInstanceId for proxy routing
-    const tags = await prisma.stashTag.findMany({
-      where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
-    });
-
-    const tagMap = new Map(tags.map((t) => [t.id, t]));
-
-    return rankings.map((r) => {
-      const tag = tagMap.get(r.entityId);
-      return {
-        id: r.entityId,
-        name: tag?.name ?? "Unknown",
-        imageUrl: tag ? toProxyUrl(tag.imagePath, tag.stashInstanceId) : null,
-        playCount: r.playCount,
-        playDuration: Math.round(r.playDuration),
-        oCount: r.oCount,
-        score: r.percentileRank,
-      };
-    });
-  }
-
-  /**
-   * Get most watched scene (by play count, exclusion-aware)
-   */
-  private async getMostWatchedScene(
-    userId: number
+    allowedInstanceIds: readonly string[]
   ): Promise<HighlightScene | null> {
-    const result = await prisma.$queryRaw<
-      Array<{
-        sceneId: string;
-        playCount: number;
-      }>
-    >`
-      SELECT
-        w.sceneId,
-        w.playCount
-      FROM WatchHistory w
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'scene'
-        AND e.entityId = w.sceneId
-      WHERE w.userId = ${userId}
-        AND e.id IS NULL
-        AND w.playCount > 0
-      ORDER BY w.playCount DESC
-      LIMIT 1
-    `;
-
-    if (result.length === 0) return null;
-    const topResult = result[0] as (typeof result)[number];
-
-    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-    const scene = await prisma.stashScene.findFirst({
-      where: { id: topResult.sceneId },
-      select: {
-        id: true,
-        title: true,
-        filePath: true,
-        pathScreenshot: true,
-        stashInstanceId: true,
-      },
-    });
-
-    if (!scene) return null;
-
-    return {
-      id: scene.id,
-      title: scene.title ?? null,
-      filePath: scene.filePath ?? null,
-      imageUrl: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
-      playCount: topResult.playCount,
+    const row = await this.getHighlight<TitledRow>(
+      source,
+      userId,
+      allowedInstanceIds
+    );
+    if (!row) return null;
+    const scene = {
+      id: row.id,
+      instanceId: row.instanceId,
+      title: row.title,
+      filePath: row.filePath,
+      imageUrl: toProxyUrl(row.imagePath, row.instanceId),
     };
+    return source.count === "playCount"
+      ? { ...scene, playCount: row.count }
+      : { ...scene, oCount: row.count };
   }
 
-  /**
-   * Get most viewed image (by view count, exclusion-aware)
-   */
-  private async getMostViewedImage(
-    userId: number
+  /** The most viewed image */
+  private async getImageHighlight(
+    userId: number,
+    allowedInstanceIds: readonly string[]
   ): Promise<HighlightImage | null> {
-    const result = await prisma.$queryRaw<
-      Array<{
-        imageId: string;
-        viewCount: number;
-      }>
-    >`
-      SELECT
-        iv.imageId,
-        iv.viewCount
-      FROM ImageViewHistory iv
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'image'
-        AND e.entityId = iv.imageId
-      WHERE iv.userId = ${userId}
-        AND e.id IS NULL
-        AND iv.viewCount > 0
-      ORDER BY iv.viewCount DESC
-      LIMIT 1
-    `;
-
-    if (result.length === 0) return null;
-    const topResult = result[0] as (typeof result)[number];
-
-    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-    const image = await prisma.stashImage.findFirst({
-      where: { id: topResult.imageId },
-      select: {
-        id: true,
-        title: true,
-        filePath: true,
-        pathThumbnail: true,
-        stashInstanceId: true,
-      },
-    });
-
-    if (!image) return null;
-
+    const row = await this.getHighlight<TitledRow>(
+      HIGHLIGHT_SOURCES.mostViewedImage,
+      userId,
+      allowedInstanceIds
+    );
+    if (!row) return null;
     return {
-      id: image.id,
-      title: image.title ?? null,
-      filePath: image.filePath ?? null,
-      imageUrl: toProxyUrl(image.pathThumbnail, image.stashInstanceId),
-      viewCount: topResult.viewCount,
+      id: row.id,
+      instanceId: row.instanceId,
+      title: row.title,
+      filePath: row.filePath,
+      imageUrl: toProxyUrl(row.imagePath, row.instanceId),
+      viewCount: row.count,
     };
   }
 
-  /**
-   * Get scene with most Os (exclusion-aware)
-   */
-  private async getMostOdScene(userId: number): Promise<HighlightScene | null> {
-    const result = await prisma.$queryRaw<
-      Array<{
-        sceneId: string;
-        oCount: number;
-      }>
-    >`
-      SELECT
-        w.sceneId,
-        w.oCount
-      FROM WatchHistory w
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'scene'
-        AND e.entityId = w.sceneId
-      WHERE w.userId = ${userId}
-        AND e.id IS NULL
-        AND w.oCount > 0
-      ORDER BY w.oCount DESC
-      LIMIT 1
-    `;
-
-    if (result.length === 0) return null;
-    const topResult = result[0] as (typeof result)[number];
-
-    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-    const scene = await prisma.stashScene.findFirst({
-      where: { id: topResult.sceneId },
-      select: {
-        id: true,
-        title: true,
-        filePath: true,
-        pathScreenshot: true,
-        stashInstanceId: true,
-      },
-    });
-
-    if (!scene) return null;
-
-    return {
-      id: scene.id,
-      title: scene.title ?? null,
-      filePath: scene.filePath ?? null,
-      imageUrl: toProxyUrl(scene.pathScreenshot, scene.stashInstanceId),
-      oCount: topResult.oCount,
-    };
-  }
-
-  /**
-   * Get performer with most Os (exclusion-aware)
-   */
-  private async getMostOdPerformer(
-    userId: number
+  /** The performer with the most Os across their scenes */
+  private async getPerformerHighlight(
+    userId: number,
+    allowedInstanceIds: readonly string[]
   ): Promise<HighlightPerformer | null> {
-    const result = await prisma.$queryRaw<
-      Array<{
-        performerId: string;
-        oCounter: number;
-      }>
-    >`
-      SELECT
-        ups.performerId,
-        ups.oCounter
-      FROM UserPerformerStats ups
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'performer'
-        AND e.entityId = ups.performerId
-      WHERE ups.userId = ${userId}
-        AND e.id IS NULL
-        AND ups.oCounter > 0
-      ORDER BY ups.oCounter DESC
-      LIMIT 1
-    `;
-
-    if (result.length === 0) return null;
-    const topResult = result[0] as (typeof result)[number];
-
-    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-    const performer = await prisma.stashPerformer.findFirst({
-      where: { id: topResult.performerId },
-      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
-    });
-
-    if (!performer) return null;
-
+    const row = await this.getHighlight<NamedRow>(
+      HIGHLIGHT_SOURCES.mostOdPerformer,
+      userId,
+      allowedInstanceIds
+    );
+    if (!row) return null;
     return {
-      id: performer.id,
-      name: performer.name ?? "Unknown",
-      imageUrl: toProxyUrl(performer.imagePath, performer.stashInstanceId),
-      oCount: topResult.oCounter,
+      id: row.id,
+      instanceId: row.instanceId,
+      name: row.name,
+      imageUrl: toProxyUrl(row.imagePath, row.instanceId),
+      oCount: row.count,
     };
   }
 }

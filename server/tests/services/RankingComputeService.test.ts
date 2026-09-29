@@ -53,14 +53,12 @@ function setupRankingMocks(opts: {
   performerStats?: unknown[];
   studioStats?: unknown[];
   tagStats?: unknown[];
-  sceneStats?: unknown[];
 }) {
   mockPrisma.$queryRaw
     .mockResolvedValueOnce([{ avgDuration: opts.avgDuration ?? 1200 }])
     .mockResolvedValueOnce(opts.performerStats ?? [])
     .mockResolvedValueOnce(opts.studioStats ?? [])
-    .mockResolvedValueOnce(opts.tagStats ?? [])
-    .mockResolvedValueOnce(opts.sceneStats ?? []);
+    .mockResolvedValueOnce(opts.tagStats ?? []);
 
   const txMock = rankingTx();
 
@@ -313,7 +311,6 @@ describe("RankingComputeService", () => {
         performerStats: [],
         studioStats: [],
         tagStats: [],
-        sceneStats: [],
       });
 
       await rankingComputeService.recomputeAllRankings(1);
@@ -346,7 +343,6 @@ describe("RankingComputeService", () => {
             libraryPresence: 10,
           },
         ],
-        sceneStats: [], // Empty
       });
 
       await rankingComputeService.recomputeAllRankings(1);
@@ -357,18 +353,15 @@ describe("RankingComputeService", () => {
       expect(perfRankings).toHaveLength(1);
       expect(tagRankings).toHaveLength(1);
 
-      // Studio and scene should trigger deleteMany (empty results)
+      // Studio should trigger deleteMany (empty results)
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId: 1, entityType: "studio" } })
-      );
-      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId: 1, entityType: "scene" } })
+        objectContaining({ where: { userId: 1, entityType: "studio" } })
       );
     });
   });
 
   describe("multi-entity-type orchestration", () => {
-    it("computes rankings for all four entity types", async () => {
+    it("computes and stores performer, studio and tag rankings, never scenes", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
           {
@@ -400,30 +393,24 @@ describe("RankingComputeService", () => {
             libraryPresence: 15,
           },
         ],
-        sceneStats: [
-          {
-            entityId: "sc1",
-            instanceId: "i1",
-            playCount: 3,
-            oCount: 1,
-            playDuration: 900,
-            libraryPresence: 1,
-          },
-        ],
       });
 
       await rankingComputeService.recomputeAllRankings(1);
 
-      // All four entity types should be written
+      // The three stored types are written; scenes are ranked when the
+      // stats page reads them, so nothing reads or writes a scene ranking
       const perfRankings = getWrittenRankings(txMock, "performer");
       const studioRankings = getWrittenRankings(txMock, "studio");
       const tagRankings = getWrittenRankings(txMock, "tag");
-      const sceneRankings = getWrittenRankings(txMock, "scene");
 
       expect(perfRankings).toHaveLength(1);
       expect(studioRankings).toHaveLength(1);
       expect(tagRankings).toHaveLength(1);
-      expect(sceneRankings).toHaveLength(1);
+      expect(getWrittenRankings(txMock, "scene")).toEqual([]);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(4);
+      expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalledWith(
+        objectContaining({ where: { userId: 1, entityType: "scene" } })
+      );
     });
   });
 
@@ -446,7 +433,7 @@ describe("RankingComputeService", () => {
 
       await rankingComputeService.recomputeAllRankings(1);
 
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(5);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(4);
       expect(most).toBe(1);
       mockPrisma.$queryRaw.mockReset();
     });
@@ -466,7 +453,6 @@ describe("RankingComputeService", () => {
             libraryPresence: 1,
           },
         ])
-        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -562,8 +548,8 @@ describe("RankingComputeService", () => {
       vi.setSystemTime(now);
     };
 
-    // One recompute is five queries: the average duration and one per type
-    const QUERIES_PER_RECOMPUTE = 5;
+    // One recompute is four queries: the average duration and one per type
+    const QUERIES_PER_RECOMPUTE = 4;
     const recomputes = () =>
       mockPrisma.$queryRaw.mock.calls.length / QUERIES_PER_RECOMPUTE;
 
@@ -609,8 +595,8 @@ describe("RankingComputeService", () => {
 
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(QUERIES_PER_RECOMPUTE);
       expect(mockPrisma.userEntityRanking.findFirst).toHaveBeenCalledTimes(1);
-      // Each of the four types written once
-      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(4);
+      // Each of the three types written once
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(3);
     });
 
     it("a failed recompute is retried on the next call", async () => {
@@ -685,7 +671,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.ensureFresh(106, { wait: true });
 
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(QUERIES_PER_RECOMPUTE);
-      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(4);
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledTimes(3);
     });
 
     it("without wait, a failed recompute is logged and not thrown", async () => {

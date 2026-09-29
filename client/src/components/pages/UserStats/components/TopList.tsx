@@ -1,5 +1,8 @@
 // client/src/components/pages/UserStats/components/TopList.tsx
 import { Link } from "react-router-dom";
+import { useConfig } from "../../../../contexts/ConfigContext";
+import { makeCompositeKey } from "../../../../utils/compositeKey";
+import { getEntityPath } from "../../../../utils/entityLinks";
 import {
   formatDurationHumanReadable,
   getFilenameFromPath,
@@ -11,6 +14,8 @@ type SortBy = "engagement" | "oCount" | "playCount";
 
 interface TopListItem {
   id: string;
+  /** With `id`, what names the entity: its page is on this instance */
+  instanceId: string;
   name?: string;
   title?: string;
   filePath?: string;
@@ -24,7 +29,6 @@ interface TopListItem {
 interface Props {
   title: string;
   items: TopListItem[];
-  linkPrefix: string;
   entityType?: EntityType;
   showImage?: boolean;
   sortBy?: SortBy;
@@ -76,12 +80,13 @@ const LIST_HEIGHT = "360px";
 const TopList = ({
   title,
   items,
-  linkPrefix,
   entityType = "performer",
   showImage = true,
   sortBy = "engagement",
   onSortChange,
 }: Props) => {
+  const { hasMultipleInstances } = useConfig();
+
   if (!items || items.length === 0) {
     return null;
   }
@@ -169,8 +174,8 @@ const TopList = ({
 
           return (
             <Link
-              key={item.id}
-              to={`${linkPrefix}/${item.id}`}
+              key={makeCompositeKey(item.id, item.instanceId)}
+              to={getEntityPath(entityType, item, hasMultipleInstances)}
               className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-[var(--bg-secondary)]"
               style={{ color: "var(--text-primary)" }}
             >
