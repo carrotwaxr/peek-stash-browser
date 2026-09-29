@@ -3,10 +3,11 @@
  * statements it records for a parsed clip request. The base owns the
  * instance filter, the clip's exclusion join, the random sort and the
  * joined count; this file pins what the clip adds on top (its scene join,
- * the scene's exclusion join and `deletedAt`, the primary tag join, the sort
- * map and its tiebreak, the filter clauses and search), that the base's
- * clauses reach its statements, the row transform, the tags loaded for the
- * page, and the scene's clips and the clip by id.
+ * the scene's exclusion join and `deletedAt`, the sort map and its
+ * tiebreak, the filter clauses and search), that the base's clauses reach
+ * its statements, the row transform, the primary tags and tags loaded for
+ * the page (only those the viewer may see), and the scene's clips and the
+ * clip by id.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -100,8 +101,6 @@ function clipRow(overrides: Partial<ClipRow> = {}): ClipRow {
     sceneTitle: "The Scene",
     scenePathScreenshot: "/scene/42/screenshot",
     sceneStudioId: "8",
-    primaryTagName: "Intro",
-    primaryTagColor: "#ff0000",
     ...overrides,
   };
 }
@@ -173,14 +172,13 @@ describe("ClipQueryBuilder", () => {
   });
 
   describe("the statement", () => {
-    it("joins the scene and the primary tag, both exclusion joins with the instance, and binds params in text order", async () => {
+    it("joins the scene and both exclusion joins with the instance, and binds params in text order", async () => {
       await run({ page: 3, perPage: 20 });
 
       const { sql, params } = statement(0);
       positions(sql, [
         "FROM StashClip c",
         "INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId",
-        "LEFT JOIN StashTag pt ON c.primaryTagId = pt.id AND c.primaryTagInstanceId = pt.stashInstanceId",
         "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'clip' AND e.entityId = c.id AND (e.instanceId = '' OR e.instanceId = c.stashInstanceId)",
         "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityType = 'scene' AND es.entityId = c.sceneId AND (es.instanceId = '' OR es.instanceId = c.sceneInstanceId)",
         "WHERE c.deletedAt IS NULL AND e.id IS NULL AND s.deletedAt IS NULL AND es.id IS NULL AND c.stashInstanceId IN (?, ?)",
@@ -188,6 +186,8 @@ describe("ClipQueryBuilder", () => {
         "LIMIT ? OFFSET ?",
       ]);
       expect(sql).not.toContain("IS NULL)");
+      // The primary tag loads with the page's relations, not in the list
+      expect(sql).not.toContain("StashTag");
       expect(params).toEqual([7, 7, "inst-a", "inst-b", 20, 40]);
     });
 
@@ -355,7 +355,7 @@ describe("ClipQueryBuilder", () => {
   });
 
   describe("rows", () => {
-    it("carry the clip's instance, its scene and primary tag, and the tags of their own (id, instance)", async () => {
+    it("carry the clip's instance, its scene, and the primary tag and tags of their own (id, instance)", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([
@@ -365,25 +365,36 @@ describe("ClipQueryBuilder", () => {
             sceneInstanceId: "inst-b",
             primaryTagId: null,
             primaryTagInstanceId: null,
-            primaryTagName: null,
-            primaryTagColor: null,
           }),
         ])
         .mockResolvedValueOnce([{ total: 2n }])
+        // The primary tags, then the tag lists
         .mockResolvedValueOnce([
           {
-            clipId: "101",
-            clipInstanceId: "inst-a",
-            tagId: "9",
-            tagName: "Tag on A",
-            tagColor: null,
+            pid: "101",
+            pinst: "inst-a",
+            id: "5",
+            stashInstanceId: "inst-a",
+            name: "Intro",
+            color: "#ff0000",
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            pid: "101",
+            pinst: "inst-a",
+            id: "9",
+            stashInstanceId: "inst-a",
+            name: "Tag on A",
+            color: null,
           },
           {
-            clipId: "101",
-            clipInstanceId: "inst-b",
-            tagId: "9",
-            tagName: "Tag on B",
-            tagColor: "#00ff00",
+            pid: "101",
+            pinst: "inst-b",
+            id: "9",
+            stashInstanceId: "inst-b",
+            name: "Tag on B",
+            color: "#00ff00",
           },
         ]);
 
@@ -421,17 +432,39 @@ describe("ClipQueryBuilder", () => {
           scene: objectContaining({ stashInstanceId: "inst-b" }),
         }),
       ]);
-      const tags = statement(2);
-      expect(tags.sql).toContain(
-        "FROM page pg\nCROSS JOIN ClipTag ct ON ct.clipId = pg.pid AND ct.clipInstanceId = pg.pinst"
-      );
-      expect(tags.sql).not.toContain("ct.clipId = ? AND");
-      expect(tags.params).toEqual([
-        pairsJson([
-          { id: "101", instanceId: "inst-a" },
-          { id: "101", instanceId: "inst-b" },
-        ]),
+      const page = pairsJson([
+        { id: "101", instanceId: "inst-a" },
+        { id: "101", instanceId: "inst-b" },
       ]);
+      const primary = statement(2);
+      expect(primary.sql).toContain(
+        "FROM page pg\nCROSS JOIN StashClip j ON j.id = pg.pid AND j.stashInstanceId = pg.pinst\nCROSS JOIN StashTag x ON x.id = j.primaryTagId AND x.stashInstanceId = j.primaryTagInstanceId"
+      );
+      const tags = statement(3);
+      expect(tags.sql).toContain(
+        "FROM page pg\nCROSS JOIN ClipTag j ON j.clipId = pg.pid AND j.clipInstanceId = pg.pinst"
+      );
+      for (const { sql, params } of [primary, tags]) {
+        expect(sql).toContain("e.entityType = 'tag'");
+        expect(sql).toContain("WHERE x.deletedAt IS NULL AND e.id IS NULL");
+        expect(params).toEqual([page, 7]);
+      }
+    });
+
+    it("a primary tag the viewer cannot see (deleted, hidden) is none, though the clip keeps its id", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([clipRow()])
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValue([]);
+
+      const { items } = await run();
+
+      expect(must(items[0], "the clip")).toMatchObject({
+        primaryTagId: "5",
+        primaryTag: null,
+        tags: [],
+      });
     });
 
     it("an empty page loads no tags", async () => {
@@ -508,7 +541,8 @@ describe("ClipQueryBuilder", () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([clipRow()])
-        .mockResolvedValueOnce([]);
+        // Its primary tag and its tags
+        .mockResolvedValue([]);
 
       const clip = await clipQueryBuilder.getClipById({
         userId: 7,

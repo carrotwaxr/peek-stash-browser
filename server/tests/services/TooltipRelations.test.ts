@@ -85,6 +85,9 @@ describe("loadTooltipRelations", () => {
         "(e.instanceId = '' OR e.instanceId = x.stashInstanceId)"
       );
       expect(sql).toContain("WHERE e.id IS NULL");
+      // Stash's own favorite and rating are the Stash user's: never read
+      expect(sql).not.toContain("favorite");
+      expect(sql).not.toContain("rating100");
     }
     // Studios and collections come through live scenes only
     expect(statementFor("StashStudio")[0]).toContain("s.deletedAt IS NULL");
@@ -201,7 +204,6 @@ describe("loadTooltipRelations", () => {
         instanceId: "inst-b",
         name: "Studio 9",
         image_path: toProxyUrl("http://stash:9999/studio/9/image", "inst-b"),
-        favorite: true,
         parent_studio: { id: "3" },
       },
       {
@@ -209,7 +211,6 @@ describe("loadTooltipRelations", () => {
         instanceId: "inst-b",
         name: "Studio 8",
         image_path: null,
-        favorite: false,
         parent_studio: null,
       },
     ]);
@@ -236,7 +237,6 @@ describe("loadTooltipRelations", () => {
         instanceId: "inst-a",
         name: "Tag 6",
         image_path: null,
-        favorite: false,
       },
     ]);
     // Own tags are never counted
@@ -259,7 +259,7 @@ describe("loadTooltipRelations", () => {
     expect(onA.performers).toBeUndefined();
   });
 
-  it("a group's performers keep their disambiguation and gender, blanks as null", async () => {
+  it("a group's performers keep their disambiguation and gender, blanks as null, and no favorite or rating100 of Stash's", async () => {
     rowsByTable({
       StashPerformer: [
         {
@@ -290,8 +290,6 @@ describe("loadTooltipRelations", () => {
         disambiguation: null,
         gender: "FEMALE",
         image_path: null,
-        favorite: false,
-        rating100: 80,
       },
     ]);
   });

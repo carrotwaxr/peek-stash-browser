@@ -13,6 +13,11 @@
  */
 
 // ─── Lightweight Relation References ─────────────────────────────────────────
+//
+// A list row's nested entities: what a chip, a card line or a tooltip shows,
+// only those the requesting user may see (live, not excluded). A ref carries
+// no favorite or rating: Stash's own are the Stash user's, and no reader
+// shows one from a ref (the entity's own list row carries the user's).
 
 export interface PerformerRef {
   id: string;
@@ -21,8 +26,6 @@ export interface PerformerRef {
   disambiguation: string | null;
   gender: string | null;
   image_path: string | null;
-  favorite: boolean | null;
-  rating100: number | null;
 }
 
 export interface TagRef {
@@ -30,7 +33,6 @@ export interface TagRef {
   instanceId: string;
   name: string;
   image_path: string | null;
-  favorite: boolean | null;
 }
 
 export interface StudioRef {
@@ -38,7 +40,6 @@ export interface StudioRef {
   instanceId: string;
   name: string;
   image_path: string | null;
-  favorite: boolean | null;
   parent_studio: { id: string } | null;
 }
 
@@ -129,13 +130,11 @@ export interface NormalizedScene {
   captions: unknown[];
 
   // Nested entities (populated by QueryBuilder or transformSceneWithRelations)
-  // Studio may be enriched with favorite/tags by mergeScenesWithUserData or QueryBuilder
   studio: {
     id: string;
     name?: string;
     instanceId?: string;
     image_path?: string | null;
-    favorite?: boolean | null;
     parent_studio?: { id: string } | null;
     tags?: Array<{ id: string; name?: string; image_path?: string | null }>;
   } | null;

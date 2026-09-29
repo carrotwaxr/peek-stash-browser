@@ -14,6 +14,7 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { must } from "../helpers/must.js";
+import { prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -158,15 +159,6 @@ describe("SceneQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashTag.findMany.mockResolvedValue([]);
-    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
-    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
-    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query
@@ -586,6 +578,124 @@ describe("SceneQueryBuilder", () => {
       expect(scene.paths.caption).toBeNull();
       expect(scene.paths.screenshot).toContain("/api/proxy/stash");
     });
+
+    it("each row's nested refs load one statement per relation for the page, and carry no favorite or rating of Stash's", async () => {
+      const parent = { pid: "1", pinst: "inst-a" };
+      const key = (id: string) => ({ id, stashInstanceId: "inst-a" });
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) => {
+          if (sql.includes("FROM StashScene s")) {
+            return sql.startsWith("SELECT COUNT(*)")
+              ? [{ total: 1n }]
+              : [sceneRow({ studioId: "8", inheritedTagIds: '["3"]' })];
+          }
+          const byTable: Partial<Record<string, unknown[]>> = {
+            StashPerformer: [
+              {
+                ...parent,
+                ...key("5"),
+                name: "Performer",
+                disambiguation: "",
+                gender: "FEMALE",
+                imagePath: null,
+                favorite: true,
+                rating100: 90,
+              },
+            ],
+            StashTag: sql.includes("FROM refs r")
+              ? [{ ...key("3"), name: "Inherited", imagePath: null }]
+              : [{ ...parent, ...key("4"), name: "Own", imagePath: null }],
+            StashGroup: [
+              {
+                ...parent,
+                ...key("6"),
+                name: "Collection",
+                frontImagePath: null,
+                backImagePath: null,
+                sceneIndex: 2,
+              },
+            ],
+            StashGallery: [
+              {
+                ...parent,
+                ...key("7"),
+                title: "Gallery",
+                folderPath: null,
+                fileBasename: null,
+                coverPath: null,
+              },
+            ],
+            StashStudio: [
+              {
+                ...key("8"),
+                name: "Studio",
+                imagePath: null,
+                parentId: null,
+                favorite: true,
+                rating100: 80,
+              },
+            ],
+          };
+          return byTable[/CROSS JOIN (Stash\w+) x/.exec(sql)?.[1] ?? ""] ?? [];
+        })
+      );
+
+      const scene = must((await run()).items[0], "the scene");
+
+      const ref = { instanceId: "inst-a", image_path: null };
+      expect(scene.performers).toEqual([
+        {
+          ...ref,
+          id: "5",
+          name: "Performer",
+          disambiguation: null,
+          gender: "FEMALE",
+        },
+      ]);
+      expect(scene.tags).toEqual([{ ...ref, id: "4", name: "Own" }]);
+      expect(scene.inheritedTags).toEqual([
+        { ...ref, id: "3", name: "Inherited" },
+      ]);
+      expect(scene.groups).toEqual([
+        {
+          id: "6",
+          instanceId: "inst-a",
+          name: "Collection",
+          front_image_path: null,
+          back_image_path: null,
+          scene_index: 2,
+        },
+      ]);
+      expect(scene.galleries).toEqual([
+        { id: "7", instanceId: "inst-a", title: "Gallery", cover: null },
+      ]);
+      expect(scene.studio).toEqual({
+        ...ref,
+        id: "8",
+        name: "Studio",
+        parent_studio: null,
+      });
+      // The page, the count, then performers, tags, collections, galleries,
+      // the studio and the inherited tags, each binding the viewer
+      const calls = mockPrisma.$queryRawUnsafe.mock.calls;
+      expect(calls).toHaveLength(8);
+      for (const [sql, ...params] of calls.slice(2)) {
+        expect(sql).toContain("FROM json_each(?)");
+        expect(params[params.length - 1]).toBe(1);
+      }
+    });
+
+    it("a studio or inherited tag the viewer cannot see is left out, though the row names its id", async () => {
+      const scene = await executeRow(
+        sceneRow({ studioId: "8", inheritedTagIds: '["3"]' })
+      );
+
+      expect(scene.studioId).toBe("8");
+      expect(scene.studio).toBeNull();
+      expect(scene.inheritedTagIds).toEqual(["3"]);
+      expect(scene.inheritedTags).toEqual([]);
+    });
   });
 
   describe("user history", () => {
@@ -695,10 +805,6 @@ describe("getByRefs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
   });
 
   it("binds one (id, instance) pair per ref, so B's same id stays out", async () => {

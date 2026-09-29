@@ -12,12 +12,15 @@
  * are listed whole, by name. A studio's performers are only counted: the
  * studio card's performers indicator shows a number and no tooltip.
  *
- * The related entities the user can see, as keepVisibleConditions decides:
+ * The related entities the user can see, as the list rows' nested refs:
  * live (deletedAt IS NULL), with no UserExcludedEntity row for the user
  * (global or on the entity's instance), and on the parent's instance, which
  * the list already held to the user's allowed instances. A path through
  * scenes takes live scenes only, so a performer's card never names a studio
  * or collection it shares only a deleted scene with.
+ *
+ * The refs are the list rows' nested refs (`query/nestedRefs.ts`): names,
+ * images and links, never Stash's own favorite or rating.
  */
 import prisma from "../prisma/singleton.js";
 import type {
@@ -29,12 +32,12 @@ import type {
   TagRef,
 } from "../types/index.js";
 import type {
-  TooltipGalleryRow,
-  TooltipGroupRow,
+  GalleryRefRow,
+  GroupRefRow,
+  PerformerRefRow,
+  StudioRefRow,
+  TagRefRow,
   TooltipListRow,
-  TooltipPerformerRow,
-  TooltipStudioRow,
-  TooltipTagRow,
   TooltipTotalRow,
 } from "../types/internal/queryRows.js";
 import {
@@ -43,9 +46,14 @@ import {
   entityKey,
   pairsJson,
 } from "../utils/entityRef.js";
-import { toProxyUrl } from "../utils/proxyUrl.js";
-import { emptyToNull } from "../utils/sqlHelpers.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import {
+  REF_COLUMNS,
+  galleryRef,
+  groupRef,
+  performerRef,
+  studioRef,
+  tagRef,
+} from "./query/nestedRefs.js";
 
 /** The most related entities of one kind a card lists. */
 export const TOOLTIP_LIMIT = 12;
@@ -66,11 +74,11 @@ export interface TooltipRelations {
 type RelatedType = "performer" | "studio" | "tag" | "group" | "gallery";
 
 interface RelatedRow {
-  performer: TooltipPerformerRow;
-  studio: TooltipStudioRow;
-  tag: TooltipTagRow;
-  group: TooltipGroupRow;
-  gallery: TooltipGalleryRow;
+  performer: PerformerRefRow;
+  studio: StudioRefRow;
+  tag: TagRefRow;
+  group: GroupRefRow;
+  gallery: GalleryRefRow;
 }
 
 interface RelatedRef {
@@ -102,18 +110,8 @@ const RELATED: { [R in RelatedType]: RelatedEntity<R> } = {
     table: "StashPerformer",
     size: "x.sceneCount",
     sortName: "x.name",
-    columns:
-      "x.name, x.disambiguation, x.gender, x.imagePath, x.favorite, x.rating100",
-    toRef: (row) => ({
-      id: row.id,
-      instanceId: row.pinst,
-      name: row.name,
-      disambiguation: emptyToNull(row.disambiguation),
-      gender: emptyToNull(row.gender),
-      image_path: toProxyUrl(row.imagePath, row.pinst),
-      favorite: row.favorite,
-      rating100: row.rating100,
-    }),
+    columns: REF_COLUMNS.performer,
+    toRef: (row) => performerRef(row, row.pinst),
     list: (into) => (into.performers ??= []),
     totalKey: "performers",
   },
@@ -121,15 +119,8 @@ const RELATED: { [R in RelatedType]: RelatedEntity<R> } = {
     table: "StashStudio",
     size: "x.sceneCount",
     sortName: "x.name",
-    columns: "x.name, x.imagePath, x.favorite, x.parentId",
-    toRef: (row) => ({
-      id: row.id,
-      instanceId: row.pinst,
-      name: row.name,
-      image_path: toProxyUrl(row.imagePath, row.pinst),
-      favorite: row.favorite,
-      parent_studio: row.parentId ? { id: row.parentId } : null,
-    }),
+    columns: REF_COLUMNS.studio,
+    toRef: (row) => studioRef(row, row.pinst),
     list: (into) => (into.studios ??= []),
     totalKey: "studios",
   },
@@ -137,14 +128,8 @@ const RELATED: { [R in RelatedType]: RelatedEntity<R> } = {
     table: "StashTag",
     size: "x.sceneCount",
     sortName: "x.name",
-    columns: "x.name, x.imagePath, x.favorite",
-    toRef: (row) => ({
-      id: row.id,
-      instanceId: row.pinst,
-      name: row.name,
-      image_path: toProxyUrl(row.imagePath, row.pinst),
-      favorite: row.favorite,
-    }),
+    columns: REF_COLUMNS.tag,
+    toRef: (row) => tagRef(row, row.pinst),
     list: (into) => (into.tags ??= []),
     totalKey: null,
   },
@@ -152,14 +137,8 @@ const RELATED: { [R in RelatedType]: RelatedEntity<R> } = {
     table: "StashGroup",
     size: "x.sceneCount",
     sortName: "x.name",
-    columns: "x.name, x.frontImagePath, x.backImagePath",
-    toRef: (row) => ({
-      id: row.id,
-      instanceId: row.pinst,
-      name: row.name,
-      front_image_path: toProxyUrl(row.frontImagePath, row.pinst),
-      back_image_path: toProxyUrl(row.backImagePath, row.pinst),
-    }),
+    columns: REF_COLUMNS.group,
+    toRef: (row) => groupRef(row, row.pinst),
     list: (into) => (into.groups ??= []),
     totalKey: "groups",
   },
@@ -168,15 +147,8 @@ const RELATED: { [R in RelatedType]: RelatedEntity<R> } = {
     size: "x.imageCount",
     // The displayed title's fallbacks, near enough to order by
     sortName: "COALESCE(NULLIF(x.title, ''), x.fileBasename, x.folderPath)",
-    columns: "x.title, x.folderPath, x.fileBasename, x.coverPath",
-    toRef: (row) => ({
-      id: row.id,
-      instanceId: row.pinst,
-      title:
-        emptyToNull(row.title) ??
-        getGalleryFallbackTitle(row.folderPath, row.fileBasename),
-      cover: toProxyUrl(row.coverPath, row.pinst),
-    }),
+    columns: REF_COLUMNS.gallery,
+    toRef: (row) => galleryRef(row, row.pinst),
     list: (into) => (into.galleries ??= []),
     totalKey: "galleries",
   },

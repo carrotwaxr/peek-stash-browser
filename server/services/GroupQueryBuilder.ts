@@ -21,7 +21,7 @@ import type {
   GroupRelationQueryRow,
 } from "../types/internal/queryRows.js";
 import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
-import { entityKey } from "../utils/entityRef.js";
+import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -42,7 +42,6 @@ import {
   likeContains,
   parseJsonArray,
 } from "../utils/sqlHelpers.js";
-import { keepVisibleConditions } from "./EntityAccessService.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -51,6 +50,7 @@ import {
   type SortExpr,
   expandRefs,
 } from "./query/EntityQueryBuilder.js";
+import { STUDIO_REF, loadRefsByKey } from "./query/nestedRefs.js";
 
 /** A group's place in the collection hierarchy, as its detail page shows it */
 export interface GroupHierarchy {
@@ -411,7 +411,8 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   /**
    * The card's relations for the whole page: its tags, at most
    * TOOLTIP_LIMIT performers and galleries with how many there are
-   * (TooltipRelations), one statement per relation; and its studio
+   * (TooltipRelations), one statement per relation; and its studio, on the
+   * group's instance, only when the viewer may see it (`query/nestedRefs.ts`)
    */
   protected async populateRelations(
     groups: NormalizedGroup[],
@@ -419,77 +420,22 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   ): Promise<void> {
     if (groups.length === 0) return;
 
-    const [relations] = await Promise.all([
-      loadTooltipRelations("group", groups, ctx.userId),
-      this.hydrateStudios(groups, ctx.userId),
-    ]);
+    const studioRefs = groups.flatMap((group): EntityRef[] =>
+      group.studioId
+        ? [{ id: group.studioId, instanceId: group.instanceId }]
+        : []
+    );
+    const relations = await loadTooltipRelations("group", groups, ctx.userId);
+    const studios = await loadRefsByKey(STUDIO_REF, studioRefs, ctx);
     for (const group of groups) {
       Object.assign(
         group,
         relations.get(entityKey(group.id, group.instanceId))
       );
-    }
-  }
-
-  /**
-   * Each group's studio with its tooltip data (id, name, image_path), on the
-   * group's instance, when the user can see it
-   */
-  private async hydrateStudios(
-    groups: NormalizedGroup[],
-    userId: number
-  ): Promise<void> {
-    const studioConditions = [
-      ...new Map(
-        groups.flatMap((g) =>
-          g.studioId
-            ? [
-                [
-                  entityKey(g.studioId, g.instanceId),
-                  { id: g.studioId, stashInstanceId: g.instanceId },
-                ] as const,
-              ]
-            : []
-        )
-      ).values(),
-    ];
-
-    // Keep only studios this user may see (hidden, restricted, deleted or
-    // on an instance they don't use)
-    const visibleStudioConditions = await keepVisibleConditions(
-      userId,
-      "studio",
-      studioConditions
-    );
-    const studios =
-      visibleStudioConditions.length > 0
-        ? await prisma.stashStudio.findMany({
-            where: { OR: visibleStudioConditions },
-          })
-        : [];
-
-    const studiosByKey = new Map<string, StudioRef>();
-    for (const s of studios) {
-      const key = entityKey(s.id, s.stashInstanceId);
-      studiosByKey.set(key, {
-        id: s.id,
-        instanceId: s.stashInstanceId,
-        name: s.name,
-        image_path: toProxyUrl(s.imagePath, s.stashInstanceId),
-        favorite: s.favorite,
-        parent_studio: s.parentId ? { id: s.parentId } : null,
-      });
-    }
-
-    for (const group of groups) {
-      if (group.studio?.id) {
-        const studioData = studiosByKey.get(
-          entityKey(group.studio.id, group.instanceId)
-        );
-        if (studioData) {
-          group.studio = studioData;
-        }
-      }
+      // The row's studio id until here; none when the viewer cannot see it
+      group.studio = group.studioId
+        ? (studios.get(entityKey(group.studioId, group.instanceId)) ?? null)
+        : null;
     }
   }
 }

@@ -370,44 +370,62 @@ export interface TooltipTotalRow {
   total: bigint;
 }
 
-/** A related performer's columns. */
-export interface TooltipPerformerRow {
+// ---------------------------------------------------------------------------
+// Nested refs (services/query/nestedRefs.ts, TooltipRelations)
+// ---------------------------------------------------------------------------
+
+/**
+ * A nested or related entity's key, as a list row's relation load reads it
+ * (the tooltip loads name the instance `pinst`, the parent's).
+ */
+export interface RefKeyRow {
+  id: string;
+  stashInstanceId: string;
+}
+
+/**
+ * A nested performer's columns. Stash's own `favorite` and `rating100` are
+ * never read: they belong to the Stash user.
+ */
+export interface PerformerRefRow {
   name: string;
   disambiguation: string | null;
   gender: string | null;
   imagePath: string | null;
-  favorite: boolean;
-  rating100: number | null;
 }
 
-/** A related studio's columns. */
-export interface TooltipStudioRow {
+/** A nested studio's columns (no Stash favorite) */
+export interface StudioRefRow {
   name: string;
   imagePath: string | null;
-  favorite: boolean;
   parentId: string | null;
 }
 
-/** A related tag's columns. */
-export interface TooltipTagRow {
+/** A nested tag's columns (no Stash favorite) */
+export interface TagRefRow {
   name: string;
   imagePath: string | null;
-  favorite: boolean;
 }
 
-/** A related group's columns. */
-export interface TooltipGroupRow {
+/** A nested group's columns */
+export interface GroupRefRow {
   name: string;
   frontImagePath: string | null;
   backImagePath: string | null;
 }
 
-/** A related gallery's columns. */
-export interface TooltipGalleryRow {
+/** A nested gallery's columns */
+export interface GalleryRefRow {
   title: string | null;
   folderPath: string | null;
   fileBasename: string | null;
   coverPath: string | null;
+}
+
+/** The parent a nested load's row belongs to, from the page's pairs */
+export interface NestedParentRow {
+  pid: string;
+  pinst: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -453,51 +471,6 @@ export interface ImageQueryRow {
   userLastViewedAt: Date | null;
 }
 
-/** Raw row of ImageQueryBuilder's performer lookup for a page of images. */
-export interface ImagePerformerQueryRow {
-  imageId: string;
-  imageInstanceId: string;
-  id: string;
-  stashInstanceId: string;
-  name: string;
-  disambiguation: string | null;
-  gender: string | null;
-  favorite: boolean;
-  rating100: number | null;
-  imagePath: string | null;
-}
-
-/** Raw row of ImageQueryBuilder's tag lookup for a page of images. */
-export interface ImageTagQueryRow {
-  imageId: string;
-  imageInstanceId: string;
-  id: string;
-  stashInstanceId: string;
-  name: string;
-  favorite: boolean;
-  imagePath: string | null;
-}
-
-/** Raw row of ImageQueryBuilder's gallery lookup for a page of images. */
-export interface ImageGalleryQueryRow {
-  imageId: string;
-  imageInstanceId: string;
-  id: string;
-  stashInstanceId: string;
-  title: string | null;
-  coverPath: string | null;
-}
-
-/** Raw row of ImageQueryBuilder's studio lookup for a page of images. */
-export interface ImageStudioQueryRow {
-  id: string;
-  stashInstanceId: string;
-  name: string;
-  imagePath: string | null;
-  favorite: boolean;
-  parentId: string | null;
-}
-
 // ---------------------------------------------------------------------------
 // ClipQueryBuilder
 // ---------------------------------------------------------------------------
@@ -505,8 +478,9 @@ export interface ImageStudioQueryRow {
 /**
  * Raw row returned by ClipQueryBuilder's SELECT.
  *
- * Base columns from StashClip, the scene's columns from INNER JOIN
- * StashScene (s), and the primary tag's from LEFT JOIN StashTag (pt).
+ * Base columns from StashClip and the scene's columns from INNER JOIN
+ * StashScene (s). The primary tag and the tag list load with the page's
+ * relations, only when the viewer may see them.
  */
 export interface ClipRow {
   // StashClip base columns
@@ -528,19 +502,12 @@ export interface ClipRow {
   sceneTitle: string | null;
   scenePathScreenshot: string | null;
   sceneStudioId: string | null;
-
-  // Primary tag columns from LEFT JOIN StashTag (pt)
-  primaryTagName: string | null;
-  primaryTagColor: string | null;
 }
 
-/** One tag of a clip on the page, from its ClipTag row (ClipQueryBuilder) */
-export interface ClipTagQueryRow {
-  clipId: string;
-  clipInstanceId: string;
-  tagId: string;
-  tagName: string;
-  tagColor: string | null;
+/** A clip's tag's columns (its primary tag or one of its list) */
+export interface ClipTagRefRow {
+  name: string;
+  color: string | null;
 }
 
 // ---------------------------------------------------------------------------

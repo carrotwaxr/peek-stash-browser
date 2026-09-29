@@ -18,6 +18,7 @@ import type {
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { prismaImpl } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -86,6 +87,37 @@ function countStatement(): { sql: string; params: unknown[] } {
 }
 
 /** A page row as Prisma's raw query returns it from SQLite */
+/**
+ * Answers the page with these rows, the count, the scene totals, and each
+ * nested relation by the entity table it reads
+ */
+function answerPage(
+  rows: GalleryQueryRow[],
+  totals: unknown[] = [],
+  nested: Partial<Record<string, unknown[]>> = {}
+): void {
+  mockPrisma.$queryRawUnsafe.mockReset();
+  mockPrisma.$queryRawUnsafe.mockImplementation(
+    prismaImpl((sql: string) => {
+      if (sql.includes("FROM StashGallery g")) {
+        return sql.startsWith("SELECT COUNT(*)")
+          ? [{ total: BigInt(rows.length) }]
+          : rows;
+      }
+      if (sql.includes("SceneGallery sg")) return totals;
+      return nested[/CROSS JOIN (Stash\w+) x/.exec(sql)?.[1] ?? ""] ?? [];
+    })
+  );
+}
+
+/** The statement holding this text, as [sql, ...params] */
+function statementWith(text: string): [string, ...unknown[]] {
+  return must(
+    mockPrisma.$queryRawUnsafe.mock.calls.find(([sql]) => sql.includes(text)),
+    `the statement with ${text}`
+  );
+}
+
 function galleryRow(overrides: Partial<GalleryQueryRow> = {}): GalleryQueryRow {
   return {
     id: "1",
@@ -121,11 +153,6 @@ describe("GalleryQueryBuilder", () => {
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // page
       .mockResolvedValueOnce([{ total: 0n }]); // count
-    mockPrisma.galleryPerformer.findMany.mockResolvedValue([]);
-    mockPrisma.galleryTag.findMany.mockResolvedValue([]);
-    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashTag.findMany.mockResolvedValue([]);
-    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
   });
 
   describe("the statement", () => {
@@ -326,15 +353,36 @@ describe("GalleryQueryBuilder", () => {
       expect(withFilter.sql).toContain(
         "WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId"
       );
-      // Rating and exclusion user ids, the instances, the favorite's user
-      expect(withFilter.params.slice(0, 5)).toEqual([
+      // The image is live and not excluded for the viewer
+      expect(withFilter.sql).toContain(
+        "LEFT JOIN UserExcludedEntity ie ON ie.userId = ? AND ie.entityType = 'image' AND ie.entityId = si.id AND (ie.instanceId = '' OR ie.instanceId = si.stashInstanceId)"
+      );
+      expect(withFilter.sql).toContain(
+        "AND ir.favorite = 1 AND si.deletedAt IS NULL AND ie.id IS NULL"
+      );
+      // Rating and exclusion user ids, the instances, the favorite's and
+      // the image exclusion's user
+      expect(withFilter.params.slice(0, 6)).toEqual([
         1,
         1,
         "inst-a",
         "inst-b",
         1,
+        1,
       ]);
       expect(without.sql).not.toContain("ImageRating");
+    });
+
+    it("hasFavoriteImage without exclusions still asks for a live image", async () => {
+      await run(
+        { filter: { hasFavoriteImage: true } },
+        { applyExclusions: false }
+      );
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("AND ir.favorite = 1 AND si.deletedAt IS NULL\n");
+      expect(sql).not.toContain("UserExcludedEntity ie");
+      expect(params.slice(0, 4)).toEqual([1, "inst-a", "inst-b", 1]);
     });
 
     it("the viewer's rating and favorite, the counts and the text and date fields each reach SQL", async () => {
@@ -377,11 +425,7 @@ describe("GalleryQueryBuilder", () => {
 
   describe("rows", () => {
     it("a row reads as the viewer's gallery: Peek's own rating, absent text as null, the title's fallback", async () => {
-      mockPrisma.$queryRawUnsafe.mockReset();
-      mockPrisma.$queryRawUnsafe
-        .mockResolvedValueOnce([galleryRow()])
-        .mockResolvedValueOnce([{ total: 1n }])
-        .mockResolvedValueOnce([]); // no visible scenes
+      answerPage([galleryRow()]); // no visible scenes, no relations
 
       const result = await run();
 
@@ -416,18 +460,17 @@ describe("GalleryQueryBuilder", () => {
 
   describe("scene totals", () => {
     it("each row counts its live scenes the viewer can see, on its own instance, in one statement for the page", async () => {
-      mockPrisma.$queryRawUnsafe.mockReset();
-      mockPrisma.$queryRawUnsafe
-        .mockResolvedValueOnce([
+      answerPage(
+        [
           galleryRow({ id: "1", stashInstanceId: "inst-a" }),
           galleryRow({ id: "1", stashInstanceId: "inst-b" }),
-        ])
-        .mockResolvedValueOnce([{ total: 2n }])
-        .mockResolvedValueOnce([{ pid: "1", pinst: "inst-b", total: 2n }]);
+        ],
+        [{ pid: "1", pinst: "inst-b", total: 2n }]
+      );
 
       const result = await run();
 
-      const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[2]);
+      const [sql, ...params] = statementWith("SceneGallery sg");
       expect(sql).toContain("FROM json_each(?)");
       expect(sql).toContain(
         "CROSS JOIN SceneGallery sg ON sg.galleryId = pg.pid AND sg.galleryInstanceId = pg.pinst AND sg.sceneInstanceId = pg.pinst"
@@ -453,15 +496,11 @@ describe("GalleryQueryBuilder", () => {
     });
 
     it("without exclusions the count leaves out only deleted scenes", async () => {
-      mockPrisma.$queryRawUnsafe.mockReset();
-      mockPrisma.$queryRawUnsafe
-        .mockResolvedValueOnce([galleryRow()])
-        .mockResolvedValueOnce([{ total: 1n }])
-        .mockResolvedValueOnce([]);
+      answerPage([galleryRow()]);
 
       await run({}, { applyExclusions: false });
 
-      const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[2]);
+      const [sql, ...params] = statementWith("SceneGallery sg");
       expect(sql).toContain("s.deletedAt IS NULL");
       expect(sql).not.toContain("UserExcludedEntity");
       expect(params).toEqual([JSON.stringify([["1", "inst-a"]])]);
@@ -471,6 +510,87 @@ describe("GalleryQueryBuilder", () => {
       await run();
 
       expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("nested refs", () => {
+    it("performers and tags load one statement each for the page, live and not excluded, with no favorite or rating of Stash's", async () => {
+      answerPage([galleryRow({ studioId: "4" })], [], {
+        StashPerformer: [
+          {
+            pid: "1",
+            pinst: "inst-a",
+            id: "2",
+            stashInstanceId: "inst-a",
+            name: "Performer",
+            disambiguation: null,
+            gender: null,
+            imagePath: null,
+            favorite: true,
+            rating100: 90,
+          },
+        ],
+        StashTag: [
+          {
+            pid: "1",
+            pinst: "inst-a",
+            id: "3",
+            stashInstanceId: "inst-a",
+            name: "Tag",
+            imagePath: null,
+            favorite: true,
+          },
+        ],
+        StashStudio: [
+          {
+            id: "4",
+            stashInstanceId: "inst-a",
+            name: "Studio",
+            imagePath: null,
+            parentId: null,
+            favorite: true,
+          },
+        ],
+      });
+
+      const gallery = must((await run()).items[0], "the gallery");
+
+      expect(gallery.performers).toEqual([
+        {
+          id: "2",
+          instanceId: "inst-a",
+          name: "Performer",
+          disambiguation: null,
+          gender: null,
+          image_path: null,
+        },
+      ]);
+      expect(gallery.tags).toEqual([
+        { id: "3", instanceId: "inst-a", name: "Tag", image_path: null },
+      ]);
+      expect(gallery.studio).toEqual({
+        id: "4",
+        instanceId: "inst-a",
+        name: "Studio",
+        image_path: null,
+        parent_studio: null,
+      });
+      for (const junction of ["GalleryPerformer j", "GalleryTag j"]) {
+        const [sql, ...params] = statementWith(junction);
+        expect(sql).toContain("WHERE x.deletedAt IS NULL AND e.id IS NULL");
+        expect(params).toEqual([JSON.stringify([["1", "inst-a"]]), 1]);
+      }
+    });
+
+    it("a studio the viewer cannot see is none, though the row names it", async () => {
+      answerPage([galleryRow({ studioId: "4" })]);
+
+      const gallery = must((await run()).items[0], "the gallery");
+
+      expect(gallery.studio).toBeNull();
+      expect(statementWith("FROM refs r")[0]).toContain(
+        "CROSS JOIN StashStudio x ON x.id = r.rid AND x.stashInstanceId = r.rinst"
+      );
     });
   });
 });
