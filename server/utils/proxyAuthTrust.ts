@@ -80,8 +80,9 @@ export function getProxyAuthTrust(): ProxyAuthTrust {
 
 /** The address that connected to the container's nginx (see the file comment). */
 export function proxyPeerAddress(req: Request): string {
-  // Mock requests in tests may have no socket
-  const socketAddress = req.socket?.remoteAddress ?? "";
+  // A destroyed connection has no socket (and mock requests in tests none)
+  const socket = (req as { socket?: Request["socket"] }).socket;
+  const socketAddress = socket?.remoteAddress ?? "";
   if (isLoopbackAddress(socketAddress)) {
     const realIp = req.header("x-real-ip")?.trim();
     if (realIp && net.isIP(realIp) !== 0) return realIp;

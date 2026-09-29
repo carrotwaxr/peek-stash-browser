@@ -194,8 +194,7 @@ export async function getVisibleEntityKeys(
 
   const unique = new Map<string, EntityRef>();
   for (const ref of refs) {
-    const id = ref.id ?? "";
-    const instanceId = ref.instanceId ?? "";
+    const { id, instanceId } = ref;
     if (!id || !instanceId) continue;
     unique.set(entityKey(id, instanceId), { id, instanceId });
   }
@@ -232,7 +231,7 @@ export async function getIdsVisibleOnAnyInstance(
   ids: ReadonlyArray<string>
 ): Promise<Set<string>> {
   const source = sourceFor(entityType);
-  const unique = [...new Set(ids.map((id) => id ?? ""))].filter(Boolean);
+  const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Set();
 
   const sql = `SELECT DISTINCT x.id AS id
@@ -322,8 +321,7 @@ export async function resolveVisibleApartFromOwnHides(
 
   const unique = new Map<string, EntityRef>();
   for (const ref of refs) {
-    const id = ref.id ?? "";
-    const instanceId = ref.instanceId ?? "";
+    const { id, instanceId } = ref;
     if (!id) continue;
     unique.set(entityKey(id, instanceId), { id, instanceId });
   }

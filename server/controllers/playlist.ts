@@ -44,6 +44,7 @@ import {
   getEntityInstanceIds,
 } from "../utils/entityInstanceId.js";
 import { logDropped, parsePlaylistItemsRequest } from "../utils/listRequest.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
  * Get all playlists for current user, each with the first four items and
@@ -236,7 +237,7 @@ export const createPlaylist = async (
   const playlist = await prisma.playlist.create({
     data: {
       name: name.trim(),
-      description: description?.trim() || null,
+      description: emptyToNull(description?.trim()),
       isPublic: isPublic === true,
       userId,
     },
@@ -288,7 +289,7 @@ export const updatePlaylist = async (
     data: {
       ...(name !== undefined && { name: name.trim() }),
       ...(description !== undefined && {
-        description: description?.trim() || null,
+        description: emptyToNull(description?.trim()),
       }),
       ...(isPublic !== undefined && { isPublic: isPublic === true }),
       ...(shuffle !== undefined && { shuffle: shuffle === true }),

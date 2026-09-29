@@ -25,28 +25,38 @@ const isValidHexColor = (color: string): boolean => {
   return /^#[0-9A-Fa-f]{6}$/.test(color);
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
 /**
- * Validate theme config structure and values
+ * Validate theme config structure and values. The config comes from a request
+ * body, so it is unknown until every part is checked.
  */
-const validateThemeConfig = (config: ThemeConfig): config is ThemeConfig => {
-  if (!config || typeof config !== "object") return false;
+const validateThemeConfig = (config: unknown): config is ThemeConfig => {
+  if (!isRecord(config)) return false;
 
   // Validate mode
-  if (!["dark", "light"].includes(config.mode)) return false;
+  if (
+    typeof config.mode !== "string" ||
+    !["dark", "light"].includes(config.mode)
+  )
+    return false;
 
   // Validate fonts
-  if (!config.fonts || typeof config.fonts !== "object") return false;
+  const { fonts, colors, accents, status } = config;
+  if (!isRecord(fonts)) return false;
   const requiredFonts: (keyof ThemeConfig["fonts"])[] = [
     "brand",
     "heading",
     "body",
     "mono",
   ];
-  if (!requiredFonts.every((f) => typeof config.fonts[f] === "string"))
-    return false;
+  if (!requiredFonts.every((f) => typeof fonts[f] === "string")) return false;
 
   // Validate colors
-  if (!config.colors || typeof config.colors !== "object") return false;
+  if (!isRecord(colors)) return false;
+  const isHex = (value: unknown) =>
+    typeof value === "string" && isValidHexColor(value);
   const requiredColors: (keyof ThemeConfig["colors"])[] = [
     "background",
     "backgroundSecondary",
@@ -54,27 +64,21 @@ const validateThemeConfig = (config: ThemeConfig): config is ThemeConfig => {
     "text",
     "border",
   ];
-  if (!requiredColors.every((c) => isValidHexColor(config.colors[c])))
-    return false;
+  if (!requiredColors.every((c) => isHex(colors[c]))) return false;
 
   // Validate accents
-  if (!config.accents || typeof config.accents !== "object") return false;
-  if (
-    !isValidHexColor(config.accents.primary) ||
-    !isValidHexColor(config.accents.secondary)
-  )
-    return false;
+  if (!isRecord(accents)) return false;
+  if (!isHex(accents.primary) || !isHex(accents.secondary)) return false;
 
   // Validate status colors
-  if (!config.status || typeof config.status !== "object") return false;
+  if (!isRecord(status)) return false;
   const requiredStatus: (keyof ThemeConfig["status"])[] = [
     "success",
     "error",
     "info",
     "warning",
   ];
-  if (!requiredStatus.every((s) => isValidHexColor(config.status[s])))
-    return false;
+  if (!requiredStatus.every((s) => isHex(status[s]))) return false;
 
   return true;
 };

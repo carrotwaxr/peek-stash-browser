@@ -42,8 +42,10 @@ describe("History access (integration)", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (viewer) {
-      await adminClient.delete(`/api/user/${viewer.id}`);
+    // beforeAll may have failed before it set viewer
+    const created = viewer as typeof viewer | undefined;
+    if (created) {
+      await adminClient.delete(`/api/user/${created.id}`);
     }
     await clearAccessFixture();
   }, 60000);

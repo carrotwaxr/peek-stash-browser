@@ -74,17 +74,17 @@ describe("Multi-Instance Support", () => {
       // Select only test instance and count
       await setInstanceSelection([testInstanceId]);
       const testScenesResponse = await adminClient.post<{
-        findScenes: { count: number };
+        findScenes?: { count: number };
       }>("/api/library/scenes", { filter: { per_page: 1 } });
-      testInstanceSceneCount = testScenesResponse.data?.findScenes?.count || 0;
+      testInstanceSceneCount = testScenesResponse.data.findScenes?.count ?? 0;
 
       // Select only production instance and count
       await setInstanceSelection([productionInstanceId]);
       const prodScenesResponse = await adminClient.post<{
-        findScenes: { count: number };
+        findScenes?: { count: number };
       }>("/api/library/scenes", { filter: { per_page: 1 } });
       productionInstanceSceneCount =
-        prodScenesResponse.data?.findScenes?.count || 0;
+        prodScenesResponse.data.findScenes?.count ?? 0;
 
       console.log(
         `[Multi-Instance Tests] Test instance: ${testInstanceSceneCount} scenes`

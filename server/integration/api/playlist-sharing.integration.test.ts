@@ -206,7 +206,7 @@ describe("Playlist Sharing API", () => {
       try {
         // Find user by username and delete
         const usersResponse = await adminClient.get<{
-          users: Array<{ id: number; username: string }>;
+          users?: Array<{ id: number; username: string }>;
         }>("/api/user/all");
         const user = usersResponse.data.users?.find(
           (u) => u.username === username
