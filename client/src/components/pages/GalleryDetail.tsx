@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type React from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { NormalizedImage, TagRef } from "@peek/shared-types";
+import type {
+  NormalizedImage,
+  RelationTotals,
+  TagRef,
+} from "@peek/shared-types";
 import { ArrowLeft, Play } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -66,8 +70,9 @@ const GalleryDetail = () => {
   // Compute tabs with counts for smart default selection
   // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
   const galleryImageCount = totalCount || (gallery?.image_count as number) || 0;
+  // The scenes the user can see, counted by the server (gallery rows carry no scene list)
   const galleryScenesCount =
-    (gallery?.scenes as unknown[] | undefined)?.length || 0;
+    (gallery?.relation_totals as RelationTotals | undefined)?.scenes ?? 0;
   const contentTabs = [
     { id: "images", label: "Images", count: galleryImageCount },
     { id: "scenes", label: "Scenes", count: galleryScenesCount },

@@ -238,7 +238,7 @@
       "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
+      "count": 3
     }
   },
   "src/components/pages/GroupDetail.tsx": {

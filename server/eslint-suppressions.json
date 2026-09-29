@@ -262,16 +262,6 @@
       "count": 5
     }
   },
-  "services/GalleryQueryBuilder.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 13
-    }
-  },
-  "services/GroupQueryBuilder.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 12
-    }
-  },
   "services/ImageQueryBuilder.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1

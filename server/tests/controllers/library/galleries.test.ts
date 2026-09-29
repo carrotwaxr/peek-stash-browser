@@ -78,7 +78,7 @@ describe("Galleries Controller", () => {
     it("returns galleries from query builder on happy path", async () => {
       const galleries = [createMockGallery({ id: "g1", title: "TestGallery" })];
       mockGalleryQueryBuilder.execute.mockResolvedValue({
-        galleries,
+        items: galleries,
         total: 1,
       });
 
@@ -90,6 +90,12 @@ describe("Galleries Controller", () => {
 
       await findGalleries(req, res);
 
+      // The builder reads the parsed request and the viewer's instances
+      const call = must(mockGalleryQueryBuilder.execute.mock.calls[0])[0];
+      expect(call).toMatchObject({
+        allowedInstanceIds: ["default"],
+        request: { page: 1, sort: { field: "title", direction: "ASC" } },
+      });
       expect(res._getStatus()).toBe(200);
       const body = res._getOkBody();
       expect(body.findGalleries.count).toBe(1);
@@ -98,7 +104,7 @@ describe("Galleries Controller", () => {
 
     it("adds stashUrl to each gallery for an admin", async () => {
       mockGalleryQueryBuilder.execute.mockResolvedValue({
-        galleries: [createMockGallery({ id: "g1" })],
+        items: [createMockGallery({ id: "g1" })],
         total: 1,
       });
 
@@ -118,7 +124,7 @@ describe("Galleries Controller", () => {
 
     it("does not send stashUrl to a regular user", async () => {
       mockGalleryQueryBuilder.execute.mockResolvedValue({
-        galleries: [
+        items: [
           createMockGallery({ id: "g1" }),
           createMockGallery({ id: "g2" }),
         ],
@@ -145,7 +151,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "101", instanceId: "inst-b" }),
       ];
       mockGalleryQueryBuilder.execute.mockResolvedValue({
-        galleries,
+        items: galleries,
         total: 2,
       });
 
@@ -182,7 +188,7 @@ describe("Galleries Controller", () => {
         instanceId: "default",
       });
       mockGalleryQueryBuilder.execute.mockResolvedValue({
-        galleries: [gallery],
+        items: [gallery],
         total: 1,
       });
       mockStashEntityService.getGallery.mockResolvedValue({

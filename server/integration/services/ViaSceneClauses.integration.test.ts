@@ -12,10 +12,6 @@
  * matches that id on every instance. Every seeded row is deleted before the
  * file ends.
  */
-import {
-  type InstanceAwareId,
-  coerceEntityRefs,
-} from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
@@ -30,20 +26,6 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const A = "vs-a";
 const B = "vs-b";
 
-/** No user owns per-user rows here, and exclusions are off */
-const OPTIONS = {
-  userId: 0,
-  applyExclusions: false,
-  allowedInstanceIds: [A, B],
-  sort: "name",
-  sortDirection: "ASC" as const,
-  page: 1,
-  perPage: 50,
-};
-
-const refs = (...values: string[]): InstanceAwareId[] =>
-  coerceEntityRefs(values);
-
 /** "id" or "id:instance" as the request parser hands it over */
 const includes = (...values: string[]): RefCriterion => ({
   refs: values.map((value): FilterRef => {
@@ -54,7 +36,7 @@ const includes = (...values: string[]): RefCriterion => ({
   depth: 0,
 });
 
-/** The ported builders' options: no per-user rows, exclusions off */
+/** The builders' options: no user owns per-user rows here, and exclusions are off */
 const BUILDER_OPTIONS = {
   userId: 0,
   applyExclusions: false,
@@ -65,11 +47,14 @@ const keys = (rows: Array<{ id: string; instanceId: string }>): string[] =>
   rows.map((row) => `${row.id}:${row.instanceId}`).sort();
 
 async function groupsByScene(...scenes: string[]): Promise<string[]> {
-  const { groups } = await groupQueryBuilder.execute({
-    ...OPTIONS,
-    filters: { scenes: { value: refs(...scenes), modifier: "INCLUDES" } },
+  const { items } = await groupQueryBuilder.execute({
+    ...BUILDER_OPTIONS,
+    request: parsedListRequest("group", {
+      perPage: 50,
+      filter: { scenes: includes(...scenes) },
+    }),
   });
-  return keys(groups);
+  return keys(items);
 }
 
 async function performersByGroup(...groups: string[]): Promise<string[]> {

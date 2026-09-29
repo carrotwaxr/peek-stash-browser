@@ -13,7 +13,6 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -53,18 +52,11 @@ export const findGroups = async (
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
     // Use SQL-native query builder
-    const { groups, total } = await groupQueryBuilder.execute({
+    const { items: groups, total } = await groupQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("group", request.filter),
-      applyExclusions,
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      searchQuery: request.q,
-      randomSeed: request.sort.seed,
+      request,
+      applyExclusions,
     });
 
     // Check for ambiguous results on single-ID lookups

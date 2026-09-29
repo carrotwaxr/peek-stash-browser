@@ -61,10 +61,11 @@ export interface GalleryRef {
  * How many related entities of each kind the requesting user can see, on the
  * performer, studio, tag and collection list endpoints. A card's list of them
  * holds at most 12 (most shared scenes first, then by name), so a count is
- * this total, and a tooltip says how many more there are.
+ * this total, and a tooltip says how many more there are. The gallery list
+ * counts each gallery's scenes here, with no list.
  */
 export type RelationTotals = Partial<
-  Record<"performers" | "studios" | "groups" | "galleries", number>
+  Record<"performers" | "studios" | "groups" | "galleries" | "scenes", number>
 >;
 
 /**
@@ -386,6 +387,10 @@ export interface NormalizedGallery {
   // User activity fields
   rating: number | null;
   favorite: boolean;
+
+  // Added by GalleryQueryBuilder: how many of its scenes the requesting user
+  // can see (`scenes`)
+  relation_totals?: RelationTotals;
 }
 
 // ─── NormalizedImage ─────────────────────────────────────────────────────────

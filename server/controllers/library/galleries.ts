@@ -12,7 +12,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -52,18 +51,11 @@ export const findGalleries = async (
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
     // Use SQL-native query builder
-    const { galleries, total } = await galleryQueryBuilder.execute({
+    const { items: galleries, total } = await galleryQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("gallery", request.filter),
-      applyExclusions,
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      searchQuery: request.q,
-      randomSeed: request.sort.seed,
+      request,
+      applyExclusions,
     });
 
     // Check for ambiguous results on single-ID lookups
