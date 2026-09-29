@@ -469,6 +469,7 @@ describe("SceneQueryBuilder", () => {
           details: { modifier: "NOT_NULL" },
           video_codec: { modifier: "INCLUDES", value: "h264" },
           audio_codec: { modifier: "EQUALS", value: "aac" },
+          director: { modifier: "INCLUDES", value: "Smith" },
         },
       });
 
@@ -477,8 +478,22 @@ describe("SceneQueryBuilder", () => {
       expect(sql).toContain("(s.details IS NOT NULL AND s.details != '')");
       expect(sql).toContain("LOWER(s.fileVideoCodec) LIKE LOWER(?)");
       expect(sql).toContain("LOWER(s.fileAudioCodec) = LOWER(?)");
+      expect(sql).toContain("(LOWER(s.director) LIKE LOWER(?))");
       expect(params).toContain("%h264%");
       expect(params).toContain("aac");
+      expect(params).toContain("%Smith%");
+    });
+
+    it.each([
+      [true, 1],
+      [false, 0],
+    ])("organized %s matches the boolean column", async (organized, bound) => {
+      await run({ filter: { organized } });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("AND s.organized = ?\nORDER BY");
+      // The viewer's three joins, the allowed instances, the flag, the page
+      expect(params).toEqual([1, 1, 1, ...ALLOWED, bound, 10, 0]);
     });
 
     it("resolution compares the file height; orientation matches any of its values", async () => {
@@ -497,13 +512,19 @@ describe("SceneQueryBuilder", () => {
       );
     });
 
-    it("a resolution with no height yet filters nothing", async () => {
-      await run({
-        filter: { resolution: { modifier: "EQUALS", value: "SEVEN_K" } },
-      });
+    it.each([
+      ["SEVEN_K", 3584],
+      ["HUGE", 6144],
+    ] as const)(
+      "%s compares with Stash's range minimum, %i",
+      async (value, height) => {
+        await run({ filter: { resolution: { modifier: "EQUALS", value } } });
 
-      expect(pageStatement().sql).not.toContain("COALESCE(s.fileHeight, 0)");
-    });
+        const { sql, params } = pageStatement();
+        expect(sql).toContain("COALESCE(s.fileHeight, 0) = ?");
+        expect(params).toContain(height);
+      }
+    );
 
     it("the viewer's favorites, ratings and history filters read the per-user joins", async () => {
       await run({

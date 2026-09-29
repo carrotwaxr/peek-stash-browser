@@ -503,10 +503,11 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     // The primary key last makes the order total: rows equal on every other
     // term (one name twice, one id on two servers, one random value, NULLs)
     // keep one order in every page's statement, so paging never repeats or
-    // skips a row
+    // skips a row. The tiebreak follows the key the page is ordered by, the
+    // default sort's for a key the map lacks.
     const order = [
       sortExpr.sql,
-      spec.tiebreak?.(field),
+      spec.tiebreak?.(ctx.sortField),
       `${x}.id ${direction}`,
       `${x}.stashInstanceId ${direction}`,
     ]

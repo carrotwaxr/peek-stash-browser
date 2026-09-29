@@ -1,6 +1,18 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import { must } from "../../tests/helpers/must.js";
+import type {
+  NumberCriterion,
+  ParsedListRequest,
+} from "../../types/parsedFilters.js";
+import { careerYearsSql } from "../../utils/sqlClauses.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 /**
  * Performer Filters Integration Tests
@@ -15,6 +27,7 @@ import { adminClient } from "../helpers/testClient.js";
  * - play_count filter
  * - scene_count filter
  * - name/aliases text search
+ * - career_length filter and sort, weight and measurements sorts (seeded)
  */
 
 interface FindPerformersResponse {
@@ -589,3 +602,191 @@ describe("Performer Filters", () => {
     });
   });
 });
+
+/**
+ * Career Length is the years between the first and last year of Stash's
+ * free-text career field (`careerYearsSql`, the legacy `parseCareerLength`'s
+ * forms): "YYYY -" and "YYYY - present|current|now" count to the current
+ * year, "YYYY - YYYY" to the end year; "- YYYY" and any other text give no
+ * value. The values are computed from the current year, as SQLite's `now`.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - cl-a: 7892001 "<Y-10> -" (10 years), 7892002 "<Y-16> - <Y-8>" (8),
+ *   7892003 "- <Y-6>" (none), 7892004 "<Y-11>-present" (11), 7892005 with
+ *   no career text
+ * - cl-b: 7892001 "<Y-9> -" (9)
+ * Each carries a weight and measurements for the two sorts. Every seeded row
+ * is deleted before the file ends.
+ */
+describeWithDb(
+  "Performer career length, weight and measurements (seeded)",
+  () => {
+    const A = "cl-a";
+    const B = "cl-b";
+    const Y = new Date().getUTCFullYear();
+
+    const performer = (
+      id: string,
+      instance: string,
+      careerLength: string | null,
+      weightKg: number | null,
+      measurements: string | null
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `CL ${id} ${instance}`,
+      careerLength,
+      weightKg,
+      measurements,
+    });
+
+    async function removeRows(): Promise<void> {
+      await prisma.stashPerformer.deleteMany({
+        where: { stashInstanceId: { in: [A, B] } },
+      });
+    }
+
+    /** The performers a request lists, as "id:instance" keys in its order */
+    async function listed(
+      overrides: Partial<ParsedListRequest<"performer">>
+    ): Promise<string[]> {
+      const { items, total } = await performerQueryBuilder.execute({
+        userId: 0,
+        applyExclusions: false,
+        allowedInstanceIds: [A, B],
+        request: parsedListRequest("performer", { perPage: 50, ...overrides }),
+      });
+      expect(total).toBe(items.length);
+      return items.map((p) => `${p.id}:${p.instanceId}`);
+    }
+
+    const careerFilter = async (criterion: NumberCriterion) =>
+      (await listed({ filter: { career_length: criterion } })).sort();
+
+    const sortedBy = (
+      field: "career_length" | "weight" | "measurements",
+      direction: "ASC" | "DESC"
+    ) => listed({ sort: { field, direction, seed: undefined } });
+
+    beforeAll(async () => {
+      await removeRows();
+      await prisma.stashPerformer.createMany({
+        data: [
+          performer("7892001", A, `${Y - 10} -`, 60, "34b-24-34"),
+          performer("7892002", A, `${Y - 16} - ${Y - 8}`, 80, "36D-26-36"),
+          performer("7892003", A, `- ${Y - 6}`, null, null),
+          performer("7892004", A, `${Y - 11}-present`, 70, "34C-24-34"),
+          performer("7892005", A, null, null, null),
+          performer("7892001", B, `${Y - 9} -`, 65, "30A-20-30"),
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      await removeRows();
+    });
+
+    it(`career_length BETWEEN 8 and 10 matches "${Y - 10} -" and "${Y - 16} - ${Y - 8}", not "- ${Y - 6}" or "${Y - 11}-present"`, async () => {
+      expect(
+        await careerFilter({ modifier: "BETWEEN", value: 8, value2: 10 })
+      ).toEqual(["7892001:cl-a", "7892001:cl-b", "7892002:cl-a"]);
+    });
+
+    it("career_length compares each instance's own text, and a performer without a value never matches", async () => {
+      expect(
+        await careerFilter({ modifier: "GREATER_THAN", value: 9 })
+      ).toEqual(["7892001:cl-a", "7892004:cl-a"]);
+      expect(await careerFilter({ modifier: "LESS_THAN", value: 10 })).toEqual([
+        "7892001:cl-b",
+        "7892002:cl-a",
+      ]);
+      expect(await careerFilter({ modifier: "NOT_EQUALS", value: 10 })).toEqual(
+        ["7892001:cl-b", "7892002:cl-a", "7892004:cl-a"]
+      );
+    });
+
+    it("sort career_length ASC puts unknown last, and DESC too", async () => {
+      const unknown = ["7892003:cl-a", "7892005:cl-a"];
+      const ascending = await sortedBy("career_length", "ASC");
+      expect(ascending.slice(0, 4)).toEqual([
+        "7892002:cl-a",
+        "7892001:cl-b",
+        "7892001:cl-a",
+        "7892004:cl-a",
+      ]);
+      expect(ascending.slice(4).sort()).toEqual(unknown);
+
+      const descending = await sortedBy("career_length", "DESC");
+      expect(descending.slice(0, 4)).toEqual([
+        "7892004:cl-a",
+        "7892001:cl-a",
+        "7892001:cl-b",
+        "7892002:cl-a",
+      ]);
+      expect(descending.slice(4).sort()).toEqual(unknown);
+    });
+
+    it("sorts by weight, heaviest first", async () => {
+      expect((await sortedBy("weight", "DESC")).slice(0, 4)).toEqual([
+        "7892002:cl-a",
+        "7892004:cl-a",
+        "7892001:cl-b",
+        "7892001:cl-a",
+      ]);
+    });
+
+    it("sorts by measurements ignoring case", async () => {
+      const withMeasurements = new Set([
+        "7892001:cl-a",
+        "7892002:cl-a",
+        "7892004:cl-a",
+        "7892001:cl-b",
+      ]);
+      expect(
+        (await sortedBy("measurements", "ASC")).filter((key) =>
+          withMeasurements.has(key)
+        )
+      ).toEqual([
+        "7892001:cl-b",
+        "7892001:cl-a",
+        "7892004:cl-a",
+        "7892002:cl-a",
+      ]);
+    });
+
+    it.each([
+      [`${Y - 5} -`, 5],
+      [`${Y - 5}-`, 5],
+      [`  ${Y - 3} -  `, 3],
+      [`${Y - 5} - present`, 5],
+      [`${Y - 5}-Present`, 5],
+      [`${Y - 5} - current`, 5],
+      [`${Y - 5} - NOW`, 5],
+      [`${Y - 12} - ${Y - 2}`, 10],
+      [`${Y - 12}-${Y - 2}`, 10],
+      [`${Y - 5} - ${Y - 5}`, 0],
+      [`${Y - 12} \u2013 ${Y - 2}`, 10],
+      [`${Y - 12}\u2014`, 12],
+      [`${Y - 2} - ${Y + 1}`, 3],
+      [`- ${Y - 6}`, null],
+      [`${Y - 2} - ${Y - 12}`, null],
+      [`${Y - 2} - ${Y + 2}`, null],
+      [`${Y + 1} -`, null],
+      ["1899 -", null],
+      ["1900 - 1910", null],
+      [`${Y - 12} - ${Y - 2} - ${Y}`, null],
+      [`${Y - 5}`, null],
+      ["5 years", null],
+      ["Performer 100001 career_length", null],
+      ["", null],
+      [null, null],
+    ])("careerYearsSql(%j) is %j", async (text, years) => {
+      const rows = await prisma.$queryRawUnsafe<{ years: bigint | null }[]>(
+        `SELECT ${careerYearsSql("c.v")} AS years FROM (SELECT ? AS v) c`,
+        text
+      );
+      const value = must(rows[0], "the expression's row").years;
+      expect(value === null ? null : Number(value)).toBe(years);
+    });
+  }
+);

@@ -331,6 +331,8 @@ describe("GroupQueryBuilder", () => {
           scene_count: { modifier: "GREATER_THAN", value: 2 },
           duration: { modifier: "LESS_THAN", value: 3600 },
           name: { modifier: "EQUALS", value: "Box Set" },
+          synopsis: { modifier: "INCLUDES", value: "three" },
+          director: { modifier: "NOT_NULL" },
           date: { modifier: "IS_NULL" },
           created_at: { modifier: "EQUALS", value: "2025-01-01" },
           updated_at: {
@@ -348,6 +350,8 @@ describe("GroupQueryBuilder", () => {
         "COALESCE(g.sceneCount, 0) > ?",
         "COALESCE(g.duration, 0) < ?",
         "LOWER(g.name) = LOWER(?)",
+        "(LOWER(g.synopsis) LIKE LOWER(?))",
+        "(g.director IS NOT NULL AND g.director != '')",
         "g.date IS NULL",
         "g.stashCreatedAt",
         "g.stashUpdatedAt BETWEEN ? AND ?",

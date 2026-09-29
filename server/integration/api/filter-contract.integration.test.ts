@@ -60,50 +60,16 @@ import { recordStatements } from "../helpers/statementRecorder.js";
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 // Why each known gap fails, and the task that closes it
-const CLIP_MODIFIER =
-  "the clip builder matches INCLUDES whatever modifier the client sends (B11)";
-const NO_HEIGHT =
-  "the resolution clause has no height for 7K or Huge, so it adds nothing (B11)";
-const NO_CLAUSE = "the builder has no clause for the field (B11)";
 const NO_SORT = "the sort map has no expression, so the default sort applies";
 
 /**
  * The cases failing at this commit: `"<list> filter <option>: <sample>"` or
- * `"<list> sort <value>"`, each with why. B11 and B12 wire the server; each
- * deletes the entries it closes.
+ * `"<list> sort <value>"`, each with why. B12 wires the last two sorts and
+ * deletes their entries.
  */
 const KNOWN_GAPS: Readonly<Record<string, string>> = {
-  "scene filter resolution: EQUALS SEVEN_K": NO_HEIGHT,
-  "scene filter resolution: EQUALS HUGE": NO_HEIGHT,
-  "scene filter resolution: NOT_EQUALS SEVEN_K": NO_HEIGHT,
-  "scene filter resolution: NOT_EQUALS HUGE": NO_HEIGHT,
-  "scene filter resolution: GREATER_THAN SEVEN_K": NO_HEIGHT,
-  "scene filter resolution: GREATER_THAN HUGE": NO_HEIGHT,
-  "scene filter resolution: LESS_THAN SEVEN_K": NO_HEIGHT,
-  "scene filter resolution: LESS_THAN HUGE": NO_HEIGHT,
-  "scene filter director: text": NO_CLAUSE,
-  "performer filter careerLength: min only": NO_CLAUSE,
-  "performer filter careerLength: max only": NO_CLAUSE,
-  "performer filter careerLength: min and max": NO_CLAUSE,
-  "group filter synopsis: text": NO_CLAUSE,
-  "group filter director: text": NO_CLAUSE,
-  "clip filter tagIds: INCLUDES_ALL one id": CLIP_MODIFIER,
-  "clip filter tagIds: INCLUDES_ALL two ids": CLIP_MODIFIER,
-  "clip filter tagIds: EXCLUDES one id": CLIP_MODIFIER,
-  "clip filter tagIds: EXCLUDES two ids": CLIP_MODIFIER,
-  "clip filter sceneTagIds: INCLUDES_ALL one id": CLIP_MODIFIER,
-  "clip filter sceneTagIds: INCLUDES_ALL two ids": CLIP_MODIFIER,
-  "clip filter sceneTagIds: EXCLUDES one id": CLIP_MODIFIER,
-  "clip filter sceneTagIds: EXCLUDES two ids": CLIP_MODIFIER,
-  "clip filter performerIds: INCLUDES_ALL one id": CLIP_MODIFIER,
-  "clip filter performerIds: INCLUDES_ALL two ids": CLIP_MODIFIER,
-  "clip filter performerIds: EXCLUDES one id": CLIP_MODIFIER,
-  "clip filter performerIds: EXCLUDES two ids": CLIP_MODIFIER,
   "scene sort last_o_at": `${NO_SORT} (B12)`,
   "scene sort scene_index": `${NO_SORT} (B12)`,
-  "performer sort career_length": `${NO_SORT} (B11)`,
-  "performer sort measurements": `${NO_SORT} (B11)`,
-  "performer sort weight": `${NO_SORT} (B11)`,
 };
 
 const PER_PAGE = 24;
@@ -347,8 +313,7 @@ function orderBy(statement: Statement): string {
 
 /**
  * An ORDER BY's first term: the sort's own expression. The terms after it
- * (the builder's tiebreak, which follows the requested key, and the primary
- * key) are not the sort's.
+ * (the builder's tiebreak and the primary key) are not the sort's.
  */
 function leadingTerm(order: string): string {
   let depth = 0;

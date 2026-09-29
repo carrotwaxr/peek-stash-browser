@@ -1,7 +1,19 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import type { Resolution } from "@peek/shared-types/filters/index.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import type {
+  EnumCriterion,
+  ParsedFilter,
+  TextCriterion,
+} from "../../types/parsedFilters.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
 import { adminClient } from "../helpers/testClient.js";
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 /**
  * Scene Video Filters Integration Tests
@@ -13,6 +25,7 @@ import { adminClient } from "../helpers/testClient.js";
  * - audio_codec
  * - bitrate
  * - organized
+ * - director (seeded), and the 7K and Huge resolutions (seeded)
  * - Stash's interactive, path and captions filters, which Peek refuses (400)
  */
 
@@ -30,6 +43,7 @@ interface FindScenesResponse {
         bit_rate?: number;
         path?: string;
       }>;
+      organized?: boolean;
       interactive?: boolean;
       interactive_speed?: number | null;
       captions?: Array<{ language_code: string }>;
@@ -317,34 +331,44 @@ describe("Scene Video Filters", () => {
   });
 
   describe("organized filter", () => {
-    it("filters organized scenes", async () => {
+    const listed = async (organized?: boolean) => {
       const response = await adminClient.post<FindScenesResponse>(
         "/api/library/scenes",
         {
           filter: { per_page: 50 },
-          scene_filter: {
-            organized: true,
-          },
+          scene_filter: organized === undefined ? {} : { organized },
         }
       );
-
       expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
+      return response.data.findScenes;
+    };
+
+    it("filters organized scenes", async () => {
+      const { scenes, count } = await listed(true);
+
+      expect(count).toBeGreaterThan(0);
+      expect(scenes.map((scene) => scene.organized)).toEqual(
+        scenes.map(() => true)
+      );
     });
 
     it("filters unorganized scenes", async () => {
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 50 },
-          scene_filter: {
-            organized: false,
-          },
-        }
-      );
+      const { scenes, count } = await listed(false);
 
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
+      expect(count).toBeGreaterThan(0);
+      expect(scenes.map((scene) => scene.organized)).toEqual(
+        scenes.map(() => false)
+      );
+    });
+
+    it("organized and unorganized scenes add up to the whole library", async () => {
+      const [all, organized, unorganized] = await Promise.all([
+        listed(),
+        listed(true),
+        listed(false),
+      ]);
+
+      expect(organized.count + unorganized.count).toBe(all.count);
     });
   });
 
@@ -392,5 +416,124 @@ describe("Scene Video Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
+  });
+});
+
+/**
+ * The scene director filter and the 7K and Huge resolutions, on seeded
+ * scenes. A resolution compares the file's height with the one height each
+ * value names (Stash's range minimums for 7K and Huge: 3584 and 6144; PR 9
+ * moves to ranges).
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do:
+ * - sv-a: 7893001 3584p directed by "Jane Smith", 7893002 6144p by
+ *   "SMITHERS", 7893003 4320p by "Bob Jones", 7893004 2160p with no director
+ * - sv-b: 7893001 1080p directed by "Ann Smith"
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Scene director and 7K / Huge resolutions (seeded)", () => {
+  const A = "sv-a";
+  const B = "sv-b";
+
+  const scene = (
+    id: string,
+    instance: string,
+    fileHeight: number,
+    director: string | null
+  ) => ({
+    id,
+    stashInstanceId: instance,
+    title: `SV ${id} ${instance}`,
+    fileWidth: fileHeight * 2,
+    fileHeight,
+    director,
+  });
+
+  async function removeRows(): Promise<void> {
+    await prisma.stashScene.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+  }
+
+  /** The scenes a filter lists, as sorted "id:instance" keys */
+  async function listed(filter: ParsedFilter<"scene">): Promise<string[]> {
+    const { items, total } = await sceneQueryBuilder.execute({
+      userId: 0,
+      applyExclusions: false,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("scene", { perPage: 50, filter }),
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => `${s.id}:${s.instanceId}`).sort();
+  }
+
+  const resolution = (
+    modifier: EnumCriterion<Resolution>["modifier"],
+    value: Resolution
+  ) => listed({ resolution: { modifier, value } });
+  const director = (criterion: TextCriterion) =>
+    listed({ director: criterion });
+
+  beforeAll(async () => {
+    await removeRows();
+    await prisma.stashScene.createMany({
+      data: [
+        scene("7893001", A, 3584, "Jane Smith"),
+        scene("7893002", A, 6144, "SMITHERS"),
+        scene("7893003", A, 4320, "Bob Jones"),
+        scene("7893004", A, 2160, null),
+        scene("7893001", B, 1080, "Ann Smith"),
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("resolution SEVEN_K EQUALS matches a 3584p scene", async () => {
+    expect(await resolution("EQUALS", "SEVEN_K")).toEqual(["7893001:sv-a"]);
+  });
+
+  it("resolution HUGE EQUALS matches a 6144p scene", async () => {
+    expect(await resolution("EQUALS", "HUGE")).toEqual(["7893002:sv-a"]);
+  });
+
+  it("7K and Huge compare with the other heights", async () => {
+    expect(await resolution("GREATER_THAN", "SEVEN_K")).toEqual([
+      "7893002:sv-a",
+      "7893003:sv-a",
+    ]);
+    expect(await resolution("LESS_THAN", "HUGE")).toEqual([
+      "7893001:sv-a",
+      "7893001:sv-b",
+      "7893003:sv-a",
+      "7893004:sv-a",
+    ]);
+    expect(await resolution("NOT_EQUALS", "SEVEN_K")).toEqual([
+      "7893001:sv-b",
+      "7893002:sv-a",
+      "7893003:sv-a",
+      "7893004:sv-a",
+    ]);
+  });
+
+  it("scene director INCLUDES Smith, ignoring case", async () => {
+    expect(await director({ modifier: "INCLUDES", value: "Smith" })).toEqual([
+      "7893001:sv-a",
+      "7893001:sv-b",
+      "7893002:sv-a",
+    ]);
+  });
+
+  it("scene director EXCLUDES keeps scenes without a director, and EQUALS matches the whole name", async () => {
+    expect(await director({ modifier: "EXCLUDES", value: "smith" })).toEqual([
+      "7893003:sv-a",
+      "7893004:sv-a",
+    ]);
+    expect(await director({ modifier: "EQUALS", value: "jane smith" })).toEqual(
+      ["7893001:sv-a"]
+    );
+    expect(await director({ modifier: "IS_NULL" })).toEqual(["7893004:sv-a"]);
   });
 });

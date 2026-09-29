@@ -21,7 +21,8 @@
  * `NOT IN (subquery)` (78 s: the set is scanned per row).
  *
  * The exclusion join, the instance filters and the per-field clauses
- * (numbers, dates, text, favorites) the builders share live here too.
+ * (numbers, dates, text, career years, favorites) the builders share live
+ * here too.
  */
 import type { RefModifier } from "@peek/shared-types/filters/index.js";
 import type { FilterRef } from "../types/parsedFilters.js";
@@ -668,7 +669,7 @@ export function viaSceneClause(
 }
 
 // =============================================================================
-// PER-FIELD CLAUSES (numbers, dates, text, favorites)
+// PER-FIELD CLAUSES (numbers, dates, text, career years, favorites)
 // =============================================================================
 
 /**
@@ -866,6 +867,42 @@ export function buildTextFilter(
     default:
       return { sql: "", params: [] };
   }
+}
+
+/**
+ * The years a performer's career spans, from Stash's free-text career field,
+ * as an SQL expression over `column`, or NULL. "YYYY -" and
+ * "YYYY - present" (or current, or now, in any case) count to the current
+ * year, "YYYY - YYYY" to the end year; the start is after 1900 and not in
+ * the future, the end not before the start nor after next year; an en or em
+ * dash counts as the hyphen, and spaces around the parts do not matter.
+ * "- YYYY" and any other text give NULL. These are the legacy
+ * `parseCareerLength`'s dated forms (item 38), in SQL so the Career Length
+ * filter and sort run in the list statement; PR 9 revisits the meaning
+ * against Stash's. The current year is SQLite's (`now`, UTC).
+ *
+ * It evaluates per row, as a scalar subquery whose nested FROM computes the
+ * normalised text, its hyphen and its two parts once: written as one inline
+ * expression each part repeats the text's functions, three times as slow
+ * (once over 55k performers through Prisma: 64 ms against 202; a page sorted
+ * by it 110 ms against 257, and 44 ms by name).
+ */
+export function careerYearsSql(column: string): string {
+  const space = "char(32, 9, 10, 13)";
+  const fourDigits = "'[0-9][0-9][0-9][0-9]'";
+  const start = "CAST(career_start AS INTEGER)";
+  const end = "CAST(career_end AS INTEGER)";
+  return [
+    "(SELECT CASE",
+    `WHEN career_start NOT GLOB ${fourDigits} OR ${start} <= 1900 THEN NULL`,
+    `WHEN career_end IN ('', 'present', 'current', 'now') THEN CASE WHEN ${start} <= career_year THEN career_year - ${start} END`,
+    `WHEN career_end GLOB ${fourDigits} AND ${end} >= ${start} AND ${end} <= career_year + 1 THEN ${end} - ${start}`,
+    "END",
+    // No hyphen: substr(x, 1, -1) is '', which no year matches
+    `FROM (SELECT trim(substr(career_text, 1, career_dash - 1), ${space}) AS career_start, trim(substr(career_text, career_dash + 1), ${space}) AS career_end, CAST(strftime('%Y', 'now') AS INTEGER) AS career_year`,
+    `FROM (SELECT career_text, instr(career_text, '-') AS career_dash`,
+    `FROM (SELECT lower(trim(replace(replace(${column}, char(8211), '-'), char(8212), '-'), ${space})) AS career_text))))`,
+  ].join(" ");
 }
 
 /**

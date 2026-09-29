@@ -198,11 +198,7 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /**
-   * The group filter's clauses, one per criterion the request carried.
-   * `synopsis` and `director` are declared in the contract but have no
-   * clause yet (a known gap in `shared/types/filters/fields.ts`).
-   */
+  /** The group filter's clauses, one per criterion the request carried */
   protected async filterClauses(
     filter: ParsedFilter<"group">,
     q: string | undefined,
@@ -250,6 +246,8 @@ class GroupQueryBuilder extends EntityQueryBuilder<
 
     // Text
     if (filter.name) push(buildTextFilter(filter.name, "g.name"));
+    if (filter.synopsis) push(buildTextFilter(filter.synopsis, "g.synopsis"));
+    if (filter.director) push(buildTextFilter(filter.director, "g.director"));
 
     // Dates
     if (filter.date) push(buildDateFilter(filter.date, "g.date"));

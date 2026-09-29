@@ -3,14 +3,10 @@
  * Every list's filter fields and sorts, declared once.
  *
  * A table holds what the list's query builder reads from its
- * `<entity>_filter`, with the modifiers its clause understands. Some fields
- * are declared before their clause exists, so the contract test lists them as
- * known gaps until then: scene `director` and `organized`, group `synopsis`
- * and `director`, performer `career_length` (filter and sort, from the free
- * text career field), the performer `measurements` and `weight` sorts, the
- * scene `scene_index` and `last_o_at` sorts, the SEVEN_K and HUGE
- * resolutions, and the clip tag and performer modifiers other than INCLUDES.
- * A new filter or sort starts here.
+ * `<entity>_filter`, with the modifiers its clause understands. The scene
+ * `scene_index` and `last_o_at` sorts are declared before their expressions
+ * exist, so the contract test lists them as known gaps until then. A new
+ * filter or sort starts here.
  */
 import {
   COMPARISON_MODIFIERS,
