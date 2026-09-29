@@ -37,7 +37,7 @@ import {
   buildSceneStreams,
   inferStashStreamOptions,
 } from "../utils/sceneStreams.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   getGalleryFallbackTitle,
   getImageFallbackTitle,
@@ -1025,7 +1025,7 @@ class StashEntityService {
 
       id: scene.id,
       instanceId: scene.stashInstanceId,
-      title: scene.title || getSceneFallbackTitle(scene.filePath),
+      title: emptyToNull(scene.title) ?? getSceneFallbackTitle(scene.filePath),
       code: scene.code,
       date: scene.date,
       details: scene.details,
@@ -1323,7 +1323,7 @@ class StashEntityService {
     const tags =
       gallery.tags?.map((gt: GalleryTagWithTag) => ({
         id: gt.tagId,
-        name: gt.tag?.name || "Unknown",
+        name: emptyToNull(gt.tag?.name) ?? "Unknown",
         image_path: gt.tag
           ? toProxyUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
           : null,
@@ -1366,7 +1366,7 @@ class StashEntityService {
       id: gallery.id,
       instanceId: gallery.stashInstanceId,
       title:
-        gallery.title ||
+        emptyToNull(gallery.title) ??
         getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
       date: gallery.date,
       studio: gallery.studioId ? { id: gallery.studioId } : null,
@@ -1441,7 +1441,7 @@ class StashEntityService {
       ),
       tags: (ig.gallery.tags ?? []).map((gt: GalleryTagWithTag) => ({
         id: gt.tag?.id ?? gt.tagId,
-        name: gt.tag?.name || "Unknown",
+        name: emptyToNull(gt.tag?.name) ?? "Unknown",
       })),
     }));
 
@@ -1458,7 +1458,7 @@ class StashEntityService {
     return {
       id: image.id,
       instanceId: image.stashInstanceId,
-      title: image.title || getImageFallbackTitle(image.filePath),
+      title: emptyToNull(image.title) ?? getImageFallbackTitle(image.filePath),
       code: image.code,
       details: image.details,
       photographer: image.photographer,

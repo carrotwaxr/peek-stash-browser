@@ -1,9 +1,4 @@
 {
-  "controllers/carousel.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "controllers/download.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -32,11 +27,6 @@
   "services/DownloadService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
-    }
-  },
-  "services/StashEntityService.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
     }
   },
   "utils/codecDetection.ts": {
