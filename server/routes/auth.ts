@@ -41,7 +41,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
   const lockoutStatus = checkAccountLockout(username, clientIp);
   if (lockoutStatus.locked) {
     const retryAfterSeconds = Math.ceil(
-      (lockoutStatus.remainingMs || 0) / 1000
+      (lockoutStatus.remainingMs ?? 0) / 1000
     );
     res.setHeader("Retry-After", retryAfterSeconds.toString());
     res.status(423).json({
@@ -98,7 +98,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
       id: user.id,
       username: user.username,
       role: user.role,
-      landingPagePreference: user.landingPagePreference || {
+      landingPagePreference: user.landingPagePreference ?? {
         pages: ["home"],
         randomize: false,
       },

@@ -1,6 +1,7 @@
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
 import { parseTrustedAddresses } from "../utils/proxyAuthTrust.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
  * Validate startup configuration and log system information.
@@ -28,14 +29,14 @@ export const validateStartup = () => {
   const proxyAuthHeader = process.env.PROXY_AUTH_HEADER;
   const proxyAuthTrustedIps = process.env.PROXY_AUTH_TRUSTED_IPS?.trim();
   logger.info("Environment Configuration", {
-    STASH_URL: process.env.STASH_URL || "NOT SET",
+    STASH_URL: emptyToNull(process.env.STASH_URL) ?? "NOT SET",
     STASH_API_KEY: stashApiKey
       ? `set (${stashApiKey.length} characters)`
       : "NOT SET",
     CONFIG_DIR: getConfigDir(),
-    LOG_LEVEL: process.env.LOG_LEVEL || "INFO",
-    PROXY_AUTH_HEADER: proxyAuthHeader || "NOT SET",
-    PROXY_AUTH_TRUSTED_IPS: proxyAuthTrustedIps || "NOT SET",
+    LOG_LEVEL: emptyToNull(process.env.LOG_LEVEL) ?? "INFO",
+    PROXY_AUTH_HEADER: emptyToNull(proxyAuthHeader) ?? "NOT SET",
+    PROXY_AUTH_TRUSTED_IPS: emptyToNull(proxyAuthTrustedIps) ?? "NOT SET",
   });
 
   // Proxy auth: without a list, any request carrying the header signs in;

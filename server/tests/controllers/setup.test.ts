@@ -623,6 +623,23 @@ describe("Setup Controller", () => {
       );
     });
 
+    it("an empty description and uiUrl are stored as null", async () => {
+      mockSync.queueFullSync.mockReturnValue("started");
+
+      await createStashInstance(
+        reqFor(createStashInstance, {
+          body: { ...body, description: "", uiUrl: "" },
+        }),
+        resFor(createStashInstance)
+      );
+
+      expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({ description: null, uiUrl: null }),
+        })
+      );
+    });
+
     it("createStashInstance during a sync answers 201 with sync: queued", async () => {
       mockSync.queueFullSync.mockReturnValue("queued");
 
@@ -1105,6 +1122,79 @@ describe("Setup Controller", () => {
       );
       expect(again._getOkBody().sync).toBe("none");
       expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+    });
+
+    it("an update with url set and apiKey '' tests the connection with the stored key", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Old Name",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://other:9999/graphql",
+          enabled: true,
+          priority: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockClear();
+
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { url: "http://other:9999/graphql", apiKey: "" },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+
+      expect(StashClient).toHaveBeenCalledWith({
+        url: "http://other:9999/graphql",
+        apiKey: "old-key",
+      });
+    });
+
+    it("an update with apiKey set and url '' tests the connection at the stored url", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Old Name",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          enabled: true,
+          priority: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockClear();
+
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { url: "", apiKey: "new-key" },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+
+      expect(StashClient).toHaveBeenCalledWith({
+        url: "http://stash:9999/graphql",
+        apiKey: "new-key",
+      });
     });
 
     it("returns 404 when instance not found", async () => {

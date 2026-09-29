@@ -27,6 +27,7 @@ import type {
   UpdateUserGroupParams,
   UpdateUserGroupResponse,
 } from "../types/api/groups.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
  * The group fields a member list shows (`UserGroupSummary`): the current
@@ -161,7 +162,7 @@ export const createGroup = async (
   const group = await prisma.userGroup.create({
     data: {
       name: name.trim(),
-      description: description || null,
+      description: emptyToNull(description),
       canShare: canShare === true,
       canDownloadFiles: canDownloadFiles === true,
       canDownloadPlaylists: canDownloadPlaylists === true,

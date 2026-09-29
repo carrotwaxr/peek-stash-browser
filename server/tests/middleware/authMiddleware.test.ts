@@ -276,6 +276,29 @@ describe("Auth Middleware", () => {
       expect(cookieFn).not.toHaveBeenCalled();
     });
 
+    it("an empty token cookie falls through to the Authorization header", async () => {
+      const jwt = await import("jsonwebtoken");
+      const token = jwt.default.sign(
+        {
+          id: MOCK_USER.id,
+          username: MOCK_USER.username,
+          role: MOCK_USER.role,
+        },
+        getJwtSecret(),
+        { expiresIn: "24h" }
+      );
+      const req = createMockReq({
+        cookies: { token: "" },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const { res } = createMockRes();
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
+
+      await authenticateToken(req, res, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+    });
+
     it("refreshes token when cookie-based and older than 1 hour", async () => {
       const jwt = await import("jsonwebtoken");
       const secret = getJwtSecret();

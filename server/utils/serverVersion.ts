@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { emptyToNull } from "./sqlHelpers.js";
 
 /**
  * The server's version and build date (item 84, TCI-18).
@@ -46,4 +47,5 @@ export const getServerVersion = (): string =>
   (cachedVersion ??= findServerVersion());
 
 /** The image's build date (the BUILD_DATE build arg), or null outside a release build */
-export const getBuildDate = (): string | null => process.env.BUILD_DATE || null;
+export const getBuildDate = (): string | null =>
+  emptyToNull(process.env.BUILD_DATE);
