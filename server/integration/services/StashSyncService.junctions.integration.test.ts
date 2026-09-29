@@ -87,6 +87,15 @@ import {
 } from "../../tests/helpers/matchers.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import {
+  GALLERY_DEFAULTS,
+  GROUP_DEFAULTS,
+  IMAGE_DEFAULTS,
+  PERFORMER_DEFAULTS,
+  SCENE_DEFAULTS,
+  STUDIO_DEFAULTS,
+  TAG_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -120,6 +129,7 @@ function studioRow(
   updatedAt = UPDATED_AT
 ): SyncStudio {
   return partialRow<SyncStudio>({
+    ...STUDIO_DEFAULTS,
     id,
     name: `Junctions IT studio ${id}`,
     stash_ids: [],
@@ -137,6 +147,7 @@ function groupRow(
   updatedAt = UPDATED_AT
 ): SyncGroup {
   return partialRow<SyncGroup>({
+    ...GROUP_DEFAULTS,
     id,
     name: `Junctions IT group ${id}`,
     urls: [],
@@ -161,6 +172,7 @@ function sceneRow(
   updatedAt = UPDATED_AT
 ): SyncScene {
   return partialRow<SyncScene>({
+    ...SCENE_DEFAULTS,
     id,
     title: links.title ?? `Junctions IT scene ${id}`,
     urls: [],
@@ -181,6 +193,7 @@ function sceneRow(
 /** A tag as Stash's sync query returns it */
 function tagRow(id: string): SyncTag {
   return partialRow<SyncTag>({
+    ...TAG_DEFAULTS,
     id,
     name: `Junctions IT tag ${id}`,
     stash_ids: [],
@@ -199,6 +212,7 @@ function galleryRow(
   updatedAt = UPDATED_AT
 ): SyncGallery {
   return partialRow<SyncGallery>({
+    ...GALLERY_DEFAULTS,
     id,
     title: `Junctions IT gallery ${id}`,
     urls: [],
@@ -218,6 +232,7 @@ function galleryRow(
 /** A performer as Stash's sync query returns it */
 function performerRow(id: string, tagIds: string[]): SyncPerformer {
   return partialRow<SyncPerformer>({
+    ...PERFORMER_DEFAULTS,
     id,
     name: `Junctions IT performer ${id}`,
     stash_ids: [],
@@ -263,6 +278,7 @@ function imageRow(
   }
 ): SyncImage {
   return partialRow<SyncImage>({
+    ...IMAGE_DEFAULTS,
     id,
     title: `Junctions IT image ${id}`,
     urls: [],

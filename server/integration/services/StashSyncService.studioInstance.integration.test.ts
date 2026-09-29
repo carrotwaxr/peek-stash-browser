@@ -22,6 +22,10 @@ import {
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import {
+  GALLERY_DEFAULTS,
+  IMAGE_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -37,6 +41,7 @@ type SyncImage = SyncEntityOf<"image">;
 
 function stashGallery(id: string, studioId: string | null): SyncGallery {
   return partialRow<SyncGallery>({
+    ...GALLERY_DEFAULTS,
     id,
     title: `Gallery ${id}`,
     urls: [],
@@ -60,6 +65,7 @@ function stashImage(
   galleryId: string
 ): SyncImage {
   return partialRow<SyncImage>({
+    ...IMAGE_DEFAULTS,
     id,
     title: `Image ${id}`,
     urls: [],

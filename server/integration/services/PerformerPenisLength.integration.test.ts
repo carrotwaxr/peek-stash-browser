@@ -37,6 +37,7 @@ import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import { PERFORMER_DEFAULTS } from "../../tests/helpers/syncRowDefaults.js";
 import type { NumberCriterion } from "../../types/parsedFilters.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -92,6 +93,7 @@ function stashPerformer(
   updatedAt: string
 ): SyncPerformer {
   return partialRow<SyncPerformer>({
+    ...PERFORMER_DEFAULTS,
     id,
     name: `PL ${id} ${A}`,
     stash_ids: [],

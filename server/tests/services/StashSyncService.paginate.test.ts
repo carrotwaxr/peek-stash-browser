@@ -28,6 +28,7 @@ import { logger } from "../../utils/logger.js";
 import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
+import { TAG_DEFAULTS } from "../helpers/syncRowDefaults.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -191,6 +192,7 @@ function tags(
 ): Array<SyncEntityOf<"tag">> {
   return Array.from({ length: to - from + 1 }, (_, i) =>
     partialRow<SyncEntityOf<"tag">>({
+      ...TAG_DEFAULTS,
       id: String(from + i),
       updated_at: updatedAt(from + i),
     })

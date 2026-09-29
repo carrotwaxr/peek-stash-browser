@@ -23,6 +23,10 @@ import { userHiddenEntityService } from "../../services/UserHiddenEntityService.
 import { defaultRestrictEmpty } from "../../services/exclusionPolicy.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import {
+  GALLERY_DEFAULTS,
+  IMAGE_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
 
@@ -669,6 +673,7 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     // Synced as sync writes them, not seeded: the batch writers set the
     // studio's instance. Both instances get the same Stash rows.
     const gallery = partialRow<SyncGallery>({
+      ...GALLERY_DEFAULTS,
       id: "g9",
       urls: [],
       organized: false,
@@ -680,6 +685,7 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       tags: [],
     });
     const image = partialRow<SyncImage>({
+      ...IMAGE_DEFAULTS,
       id: "i9",
       urls: [],
       organized: false,

@@ -36,6 +36,14 @@ import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import {
+  GALLERY_DEFAULTS,
+  GROUP_DEFAULTS,
+  IMAGE_DEFAULTS,
+  PERFORMER_DEFAULTS,
+  SCENE_DEFAULTS,
+  TAG_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -70,6 +78,7 @@ type SyncImage = FindImagesQuery["findImages"]["images"][number];
 
 const dates = { created_at: CREATED_AT, updated_at: UPDATED_AT };
 const tag = partialRow<SyncTag>({
+  ...TAG_DEFAULTS,
   id: ID,
   name: "Errors IT tag",
   stash_ids: [],
@@ -78,6 +87,7 @@ const tag = partialRow<SyncTag>({
   ...dates,
 });
 const performer = partialRow<SyncPerformer>({
+  ...PERFORMER_DEFAULTS,
   id: ID,
   name: "Errors IT performer",
   stash_ids: [],
@@ -86,6 +96,7 @@ const performer = partialRow<SyncPerformer>({
   ...dates,
 });
 const group = partialRow<SyncGroup>({
+  ...GROUP_DEFAULTS,
   id: ID,
   name: "Errors IT collection",
   urls: [],
@@ -93,6 +104,7 @@ const group = partialRow<SyncGroup>({
   ...dates,
 });
 const gallery = partialRow<SyncGallery>({
+  ...GALLERY_DEFAULTS,
   id: ID,
   title: "Errors IT gallery",
   urls: [],
@@ -107,6 +119,7 @@ const gallery = partialRow<SyncGallery>({
   ...dates,
 });
 const scene = partialRow<SyncScene>({
+  ...SCENE_DEFAULTS,
   id: ID,
   title: "Errors IT scene",
   urls: [],
@@ -133,6 +146,7 @@ const clip = partialRow<SyncClip>({
   ...dates,
 });
 const image = partialRow<SyncImage>({
+  ...IMAGE_DEFAULTS,
   id: ID,
   title: "Errors IT image",
   urls: [],

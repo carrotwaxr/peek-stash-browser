@@ -235,11 +235,6 @@
       "count": 8
     }
   },
-  "services/StashSyncService.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 59
-    }
-  },
   "services/UserStatsService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
