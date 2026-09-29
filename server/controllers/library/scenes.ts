@@ -70,12 +70,7 @@ export const findScenes = async (
   >
 ) => {
   const requestStart = Date.now();
-  const userId = req.user?.id;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
+  const userId = req.user.id;
   // A ValidationError (400) reaches the central error handler
   const request = parseListRequest("scene", req.body, { userId });
   logDropped("POST /library/scenes", request.dropped);
@@ -174,12 +169,7 @@ export const findSimilarScenes = async (
   res: TypedResponse<FindSimilarScenesResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
-  const userId = req.user?.id;
-  if (!userId) {
-    res.status(401).json({ error: "User not authenticated" });
-    return;
-  }
-
+  const userId = req.user.id;
   // A ValidationError (400) reaches the central error handler
   const request = parseSimilarScenesRequest(req.params.id, req.query, {
     userId,
@@ -271,12 +261,7 @@ export const getRecommendedScenes = async (
   res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
-  const userId = req.user?.id;
-  if (!userId) {
-    res.status(401).json({ error: "User not authenticated" });
-    return;
-  }
-
+  const userId = req.user.id;
   // page >= 1 and per_page 1..250 (24 when absent); a ValidationError (400)
   // reaches the central error handler
   const request = parseRecommendedRequest(req.query, { userId });

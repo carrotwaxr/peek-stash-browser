@@ -40,6 +40,7 @@ import {
   updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import userRoutes from "../../routes/user.js";
 import {
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
@@ -55,7 +56,13 @@ import {
   generateRecoveryKey,
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
-import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  runRoute,
+} from "../helpers/controllerTestUtils.js";
 import {
   type MembershipWithGroup,
   userPermissions,
@@ -190,7 +197,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getFilterPresets, { user: malformed({}) });
       const res = resFor(getFilterPresets);
-      await getFilterPresets(req, res);
+      await authenticated(getFilterPresets)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -238,7 +245,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(saveFilterPreset, { user: malformed({}) });
       const res = resFor(saveFilterPreset);
-      await saveFilterPreset(req, res);
+      await authenticated(saveFilterPreset)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -411,7 +418,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getDefaultFilterPresets, { user: malformed({}) });
       const res = resFor(getDefaultFilterPresets);
-      await getDefaultFilterPresets(req, res);
+      await authenticated(getDefaultFilterPresets)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -506,7 +513,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user missing", async () => {
       const req = reqFor(getUserRestrictions, { params: { userId: "2" } });
       const res = resFor(getUserRestrictions);
-      await getUserRestrictions(req, res);
+      await authenticated(getUserRestrictions)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -516,7 +523,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(getUserRestrictions);
-      await getUserRestrictions(req, res);
+      await runRoute(userRoutes, "get", "/:userId/restrictions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -550,7 +557,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(updateUserRestrictions);
-      await updateUserRestrictions(req, res);
+      await runRoute(userRoutes, "put", "/:userId/restrictions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -656,7 +663,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(deleteUserRestrictions);
-      await deleteUserRestrictions(req, res);
+      await runRoute(userRoutes, "delete", "/:userId/restrictions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -684,7 +691,7 @@ describe("User Controller — Features", () => {
         user: malformed({}),
       });
       const res = resFor(hideEntity);
-      await hideEntity(req, res);
+      await authenticated(hideEntity)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -799,7 +806,7 @@ describe("User Controller — Features", () => {
         user: malformed({}),
       });
       const res = resFor(unhideEntity);
-      await unhideEntity(req, res);
+      await authenticated(unhideEntity)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -828,7 +835,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(unhideAllEntities, { user: malformed({}) });
       const res = resFor(unhideAllEntities);
-      await unhideAllEntities(req, res);
+      await authenticated(unhideAllEntities)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -1149,7 +1156,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user missing", async () => {
       const req = reqFor(getUserPermissions);
       const res = resFor(getUserPermissions);
-      await getUserPermissions(req, res);
+      await authenticated(getUserPermissions)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -1181,7 +1188,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(getAnyUserPermissions);
-      await getAnyUserPermissions(req, res);
+      await runRoute(userRoutes, "get", "/:userId/permissions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -1216,7 +1223,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(updateUserPermissionOverrides);
-      await updateUserPermissionOverrides(req, res);
+      await runRoute(userRoutes, "put", "/:userId/permissions", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -1289,7 +1296,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(getUserGroupMemberships);
-      await getUserGroupMemberships(req, res);
+      await runRoute(userRoutes, "get", "/:userId/groups", req, res);
       expect(res._getStatus()).toBe(403);
     });
 
@@ -1323,7 +1330,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getUserStashInstances, { user: malformed({}) });
       const res = resFor(getUserStashInstances);
-      await getUserStashInstances(req, res);
+      await authenticated(getUserStashInstances)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -1414,7 +1421,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(getSetupStatus, { user: malformed({}) });
       const res = resFor(getSetupStatus);
-      await getSetupStatus(req, res);
+      await authenticated(getSetupStatus)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -1450,7 +1457,7 @@ describe("User Controller — Features", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(completeSetup, { user: malformed({}) });
       const res = resFor(completeSetup);
-      await completeSetup(req, res);
+      await authenticated(completeSetup)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -1524,7 +1531,7 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(syncFromStash);
-      await syncFromStash(req, res);
+      await runRoute(userRoutes, "post", "/:userId/sync-from-stash", req, res);
       expect(res._getStatus()).toBe(403);
     });
 

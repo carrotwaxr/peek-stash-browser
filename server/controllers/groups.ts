@@ -48,10 +48,6 @@ export const getAllGroups = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetAllUserGroupsResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groups = await prisma.userGroup.findMany({
     include: {
       _count: {
@@ -83,10 +79,6 @@ export const getGroup = async (
   req: TypedAuthRequest<never, GetUserGroupParams>,
   res: TypedResponse<GetUserGroupResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
@@ -143,10 +135,6 @@ export const createGroup = async (
   req: TypedAuthRequest<CreateUserGroupBody>,
   res: TypedResponse<CreateUserGroupResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const {
     name,
     description,
@@ -190,10 +178,6 @@ export const updateGroup = async (
   req: TypedAuthRequest<UpdateUserGroupBody, UpdateUserGroupParams>,
   res: TypedResponse<UpdateUserGroupResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
@@ -266,10 +250,6 @@ export const deleteGroup = async (
   req: TypedAuthRequest<never, DeleteUserGroupParams>,
   res: TypedResponse<DeleteUserGroupResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
@@ -297,10 +277,6 @@ export const addMember = async (
   req: TypedAuthRequest<AddMemberBody, AddMemberParams>,
   res: TypedResponse<AddMemberResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
@@ -352,10 +328,6 @@ export const removeMember = async (
   req: TypedAuthRequest<never, RemoveMemberParams>,
   res: TypedResponse<RemoveMemberResponse | ApiErrorResponse>
 ) => {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-
   const groupId = parseInt(req.params.id, 10);
   const userId = parseInt(req.params.userId, 10);
 
@@ -396,10 +368,6 @@ export const getUserGroups = async (
   req: TypedAuthRequest,
   res: TypedResponse<GetCurrentUserGroupsResponse | ApiErrorResponse>
 ) => {
-  if (!req.user?.id) {
-    return res.status(401).json({ error: "User not found" });
-  }
-
   const memberships = await prisma.userGroupMembership.findMany({
     where: { userId: req.user.id },
     include: { group: { select: USER_GROUP_SUMMARY_SELECT } },

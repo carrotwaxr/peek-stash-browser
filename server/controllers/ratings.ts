@@ -31,7 +31,7 @@ import {
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type {
   ApiErrorResponse,
-  TypedRequest,
+  TypedAuthRequest,
   TypedResponse,
   UpdateRatingRequest,
   UpdateRatingResponse,
@@ -213,20 +213,15 @@ function stashInput(
 function ratingHandler<T extends RatingEntityType>(target: RatingTarget<T>) {
   const { type, param, label } = target;
   return async function updateRating(
-    // `user` stays optional here until authenticated() enforces it
-    req: TypedRequest<UpdateRatingRequest, Record<`${T}Id`, string>>,
+    req: TypedAuthRequest<UpdateRatingRequest, Record<`${T}Id`, string>>,
     res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
   ): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user.id;
       const entityId = req.params[param];
       const { instanceId: requestInstanceId, ...change } = req.body;
       const { rating, favorite } = change;
 
-      if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
       if (!entityId) {
         res.status(400).json({ error: `Missing ${param}` });
         return;

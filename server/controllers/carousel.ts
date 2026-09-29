@@ -54,12 +54,7 @@ export const getUserCarousels = async (
   res: TypedResponse<GetUserCarouselsResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+    const userId = req.user.id;
 
     const carousels = await prisma.userCarousel.findMany({
       where: { userId },
@@ -83,13 +78,8 @@ export const getCarousel = async (
   res: TypedResponse<GetCarouselResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const carouselId = req.params.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     const carousel = await prisma.userCarousel.findFirst({
       where: {
@@ -119,12 +109,7 @@ export const createCarousel = async (
   req: TypedAuthRequest<CreateCarouselRequest>,
   res: TypedResponse<CreateCarouselResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user?.id;
-
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  const userId = req.user.id;
 
   const { title, icon, rules, sort, direction } = req.body;
 
@@ -221,13 +206,8 @@ export const updateCarousel = async (
   req: TypedAuthRequest<UpdateCarouselRequest, UpdateCarouselParams>,
   res: TypedResponse<UpdateCarouselResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user?.id;
+  const userId = req.user.id;
   const carouselId = req.params.id;
-
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
 
   const { title, icon, rules, sort, direction } = req.body;
 
@@ -286,13 +266,8 @@ export const deleteCarousel = async (
   res: TypedResponse<DeleteCarouselResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const carouselId = req.params.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     // Check ownership
     const existing = await prisma.userCarousel.findFirst({
@@ -328,12 +303,7 @@ export const previewCarousel = async (
   req: TypedAuthRequest<PreviewCarouselRequest>,
   res: TypedResponse<PreviewCarouselResponse | ApiErrorResponse>
 ) => {
-  const userId = req.user?.id;
-
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  const userId = req.user.id;
 
   const { rules, sort, direction } = req.body;
 
@@ -408,13 +378,8 @@ export const executeCarouselById = async (
   res: TypedResponse<ExecuteCarouselByIdResponse | ApiErrorResponse>
 ) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const carouselId = req.params.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     // Get the carousel
     const carousel = await prisma.userCarousel.findFirst({

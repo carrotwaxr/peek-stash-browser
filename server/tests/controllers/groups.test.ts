@@ -11,10 +11,13 @@ import {
   updateGroup,
 } from "../../controllers/groups.js";
 import prisma from "../../prisma/singleton.js";
+import groupRoutes from "../../routes/groups.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import {
   malformed,
   reqFor,
   resFor,
+  runRoute,
   testUser,
 } from "../helpers/controllerTestUtils.js";
 import { type MembershipWithGroup } from "../helpers/fixtures.js";
@@ -43,7 +46,10 @@ describe("Groups Controller", () => {
   describe("getAllGroups", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(getAllGroups);
-      await getAllGroups(
+      await runRoute(
+        groupRoutes,
+        "get",
+        "/",
         reqFor(getAllGroups, { user: testUser({ id: 1, role: "USER" }) }),
         res
       );
@@ -83,7 +89,10 @@ describe("Groups Controller", () => {
   describe("getGroup", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(getGroup);
-      await getGroup(
+      await runRoute(
+        groupRoutes,
+        "get",
+        "/:id",
         reqFor(getGroup, {
           user: testUser({ id: 1, role: "USER" }),
           params: { id: "1" },
@@ -160,7 +169,10 @@ describe("Groups Controller", () => {
   describe("createGroup", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(createGroup);
-      await createGroup(
+      await runRoute(
+        groupRoutes,
+        "post",
+        "/",
         reqFor(createGroup, {
           user: testUser({ id: 1, role: "USER" }),
           body: { name: "Test" },
@@ -240,7 +252,10 @@ describe("Groups Controller", () => {
   describe("updateGroup", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(updateGroup);
-      await updateGroup(
+      await runRoute(
+        groupRoutes,
+        "put",
+        "/:id",
         reqFor(updateGroup, {
           user: testUser({ id: 1, role: "USER" }),
           params: { id: "1" },
@@ -312,7 +327,10 @@ describe("Groups Controller", () => {
   describe("deleteGroup", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(deleteGroup);
-      await deleteGroup(
+      await runRoute(
+        groupRoutes,
+        "delete",
+        "/:id",
         reqFor(deleteGroup, {
           user: testUser({ id: 1, role: "USER" }),
           params: { id: "1" },
@@ -366,7 +384,10 @@ describe("Groups Controller", () => {
   describe("addMember", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(addMember);
-      await addMember(
+      await runRoute(
+        groupRoutes,
+        "post",
+        "/:id/members",
         reqFor(addMember, {
           user: testUser({ id: 1, role: "USER" }),
           params: { id: "1" },
@@ -462,7 +483,10 @@ describe("Groups Controller", () => {
   describe("removeMember", () => {
     it("should return 403 if user is not admin", async () => {
       const res = resFor(removeMember);
-      await removeMember(
+      await runRoute(
+        groupRoutes,
+        "delete",
+        "/:id/members/:userId",
         reqFor(removeMember, {
           user: testUser({ id: 1, role: "USER" }),
           params: { id: "1", userId: "2" },
@@ -517,10 +541,14 @@ describe("Groups Controller", () => {
   describe("getUserGroups", () => {
     it("should return 401 if user is not authenticated", async () => {
       const res = resFor(getUserGroups);
-      await getUserGroups(reqFor(getUserGroups, { user: undefined }), res);
+      await authenticated(getUserGroups)(
+        reqFor(getUserGroups, { user: undefined }),
+        res,
+        vi.fn()
+      );
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: "User not found" });
+      expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
     });
 
     it("should return user's groups when authenticated", async () => {

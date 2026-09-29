@@ -17,6 +17,7 @@ import {
   updateCustomTheme,
 } from "../../controllers/customTheme.js";
 import prisma from "../../prisma/singleton.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
 
@@ -99,7 +100,7 @@ describe("Custom Theme Controller", () => {
     it("returns 401 when no user", async () => {
       const req = reqFor(getUserCustomThemes);
       const res = resFor(getUserCustomThemes);
-      await getUserCustomThemes(req, res);
+      await authenticated(getUserCustomThemes)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -135,7 +136,7 @@ describe("Custom Theme Controller", () => {
     it("returns 401 when no user", async () => {
       const req = reqFor(getCustomTheme, { params: { id: "1" } });
       const res = resFor(getCustomTheme);
-      await getCustomTheme(req, res);
+      await authenticated(getCustomTheme)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -191,7 +192,7 @@ describe("Custom Theme Controller", () => {
         body: { name: "Test", config: validThemeConfig() },
       });
       const res = resFor(createCustomTheme);
-      await createCustomTheme(req, res);
+      await authenticated(createCustomTheme)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -489,7 +490,7 @@ describe("Custom Theme Controller", () => {
         params: { id: "1" },
       });
       const res = resFor(updateCustomTheme);
-      await updateCustomTheme(req, res);
+      await authenticated(updateCustomTheme)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -684,7 +685,7 @@ describe("Custom Theme Controller", () => {
     it("returns 401 when no user", async () => {
       const req = reqFor(deleteCustomTheme, { params: { id: "1" } });
       const res = resFor(deleteCustomTheme);
-      await deleteCustomTheme(req, res);
+      await authenticated(deleteCustomTheme)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -752,7 +753,7 @@ describe("Custom Theme Controller", () => {
     it("returns 401 when no user", async () => {
       const req = reqFor(duplicateCustomTheme, { params: { id: "1" } });
       const res = resFor(duplicateCustomTheme);
-      await duplicateCustomTheme(req, res);
+      await authenticated(duplicateCustomTheme)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 

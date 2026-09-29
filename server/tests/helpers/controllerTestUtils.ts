@@ -71,6 +71,42 @@ export function findHandler(
   throw new Error(`No ${method.toUpperCase()} ${path} route`);
 }
 
+/**
+ * Runs what `router` registers on the route for `method` and `path`, in
+ * order: its own middleware (`requireAdmin`, say), then the `authenticated()`
+ * handler, each only once the one before called `next()`. The router-wide
+ * `authenticate` is not run: `req.user` is what the test sets, so a missing
+ * user reaches `authenticated()`'s 401 and a USER on an admin route
+ * `requireAdmin`'s 403. Throws when the router has no such route.
+ */
+export async function runRoute(
+  router: Router,
+  method: RouteMethod,
+  path: string,
+  req: Request,
+  res: Response
+): Promise<void> {
+  for (const layer of router.stack) {
+    if (layer.route?.path !== path) continue;
+    const handles = layer.route.stack
+      .filter((l) => l.method === method)
+      .map((l) => l.handle);
+    if (handles.length === 0) continue;
+    for (const handle of handles) {
+      const next = vi.fn<(error?: unknown) => void>();
+      await handle(req, res, next);
+      const [call] = next.mock.calls;
+      if (!call) return;
+      const [error] = call;
+      if (error !== undefined) {
+        throw error instanceof Error ? error : new Error(inspect(error));
+      }
+    }
+    return;
+  }
+  throw new Error(`No ${method.toUpperCase()} ${path} route`);
+}
+
 /** Any Express handler or middleware, whatever its request and response types. */
 type Handler = (req: never, res: never, ...rest: never[]) => unknown;
 

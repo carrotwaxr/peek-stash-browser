@@ -268,7 +268,10 @@ describe("Merge Reconciliation Routes", () => {
         "get",
         "/orphaned-scenes/:ref/matches"
       );
-      const req = reqFor(handler, { params: { ref: "scene-123" } });
+      const req = reqFor(handler, {
+        params: { ref: "scene-123" },
+        user: ADMIN,
+      });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
@@ -286,7 +289,10 @@ describe("Merge Reconciliation Routes", () => {
         "get",
         "/orphaned-scenes/:ref/matches"
       );
-      const req = reqFor(handler, { params: { ref: ORPHAN_REF } });
+      const req = reqFor(handler, {
+        params: { ref: ORPHAN_REF },
+        user: ADMIN,
+      });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
@@ -483,7 +489,10 @@ describe("Merge Reconciliation Routes", () => {
         "post",
         "/orphaned-scenes/:ref/discard"
       );
-      const req = reqFor(handler, { params: { ref: ORPHAN_REF } });
+      const req = reqFor(handler, {
+        params: { ref: ORPHAN_REF },
+        user: ADMIN,
+      });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 

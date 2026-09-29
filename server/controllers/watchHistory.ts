@@ -54,12 +54,7 @@ export async function pingWatchHistory(
       sessionStart,
       seekEvents,
     } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!sceneId || typeof currentTime !== "number") {
       res
@@ -369,12 +364,7 @@ export async function incrementOCounter(
 ) {
   try {
     const { sceneId, instanceId: requestInstanceId } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!sceneId) {
       res.status(400).json({ error: "Missing required field: sceneId" });
@@ -497,15 +487,10 @@ export async function getWatchHistory(
 ) {
   try {
     const { sceneId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user.id;
 
     if (!sceneId) {
       res.status(400).json({ error: "Missing required parameter: sceneId" });
-      return;
-    }
-
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
       return;
     }
 
@@ -561,14 +546,9 @@ export async function getAllWatchHistory(
   res: TypedResponse<GetAllWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const limit = parseInt(req.query.limit as string) || 20;
     const onlyInProgress = req.query.inProgress === "true";
-
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
 
     const where: { userId: number; resumeTime?: { not: null } } = { userId };
 
@@ -607,12 +587,7 @@ export async function clearAllWatchHistory(
   res: TypedResponse<ClearAllWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not authenticated" });
-      return;
-    }
+    const userId = req.user.id;
 
     logger.info("Clearing all watch history and stats", { userId });
 
@@ -677,12 +652,7 @@ export async function saveActivity(
       resumeTime,
       playDuration,
     } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!sceneId) {
       res.status(400).json({ error: "Missing required field: sceneId" });
@@ -800,12 +770,7 @@ export async function incrementPlayCount(
 ) {
   try {
     const { sceneId, instanceId: requestInstanceId } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({ error: "User not found" });
-      return;
-    }
+    const userId = req.user.id;
 
     if (!sceneId) {
       res.status(400).json({ error: "Missing required field: sceneId" });

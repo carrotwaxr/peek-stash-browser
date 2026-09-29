@@ -26,6 +26,7 @@ import { stashEntityService } from "../../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../../services/UserInstanceService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
 import { logger } from "../../../utils/logger.js";
+import { authenticated } from "../../../utils/routeHelpers.js";
 import {
   malformed,
   reqFor,
@@ -214,7 +215,7 @@ describe("findScenes", () => {
     const req = reqFor(findScenes, { body: { filter: {}, scene_filter: {} } });
     const res = resFor(findScenes);
 
-    await findScenes(req, res);
+    await authenticated(findScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
     expect(res._getBody()).toEqual({ error: "Unauthorized" });
@@ -460,7 +461,7 @@ describe("findSimilarScenes", () => {
     });
     const res = resFor(findSimilarScenes);
 
-    await findSimilarScenes(req, res);
+    await authenticated(findSimilarScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
   });
@@ -646,7 +647,7 @@ describe("getRecommendedScenes", () => {
     const req = reqFor(getRecommendedScenes, { query: { page: "1" } });
     const res = resFor(getRecommendedScenes);
 
-    await getRecommendedScenes(req, res);
+    await authenticated(getRecommendedScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
     expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
