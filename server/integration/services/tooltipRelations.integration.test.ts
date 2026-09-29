@@ -543,11 +543,12 @@ describeWithDb("Tooltip relations (integration)", () => {
       recorder.restore();
     }
 
-    // Tags, the performers total, groups and galleries: each one statement
-    // for the whole page, driven from one JSON parameter
+    // Tags, the performers total, groups and galleries, and the children
+    // (none of these studios has a parent to name): each one statement for
+    // the whole page, driven from one JSON parameter
     expect(
       recorder.statements.map(({ sql }) => sql.includes("json_each(?)"))
-    ).toEqual([true, true, true, true]);
+    ).toEqual([true, true, true, true, true]);
   });
 
   it("scene, gallery and clip rows take relations from their own instance", async () => {

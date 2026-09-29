@@ -3,19 +3,27 @@
  * statements it records for a parsed request. The base owns the instance
  * filter, the exclusion join, the `ids` pairs, the random sort and the
  * joined count; this file pins what the studio adds on top (its per-user
- * joins, sort map and tiebreak, filter clauses and search) and that the
- * base's clauses reach its statements.
+ * joins, sort map and tiebreak, filter clauses, search, parent and
+ * children) and that the base's clauses reach its statements.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
+import type * as nestedRefsModule from "../../services/query/nestedRefs.js";
+import {
+  STUDIO_REF,
+  loadNestedRefs,
+  loadRefsByKey,
+} from "../../services/query/nestedRefs.js";
+import type { StudioRef } from "../../types/index.js";
 import type { StudioQueryRow } from "../../types/internal/queryRows.js";
 import type {
   FilterRef,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
-import { arrayContaining } from "../helpers/matchers.js";
+import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 
 vi.mock(
@@ -43,7 +51,29 @@ vi.mock("../../services/TooltipRelations.js", () => ({
   loadTooltipRelations: vi.fn(() => Promise.resolve(new Map())),
 }));
 
+// The parent's and children's loads (their SQL is nestedRefs.test.ts's)
+vi.mock("../../services/query/nestedRefs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof nestedRefsModule>()),
+  loadRefsByKey: vi.fn(() => Promise.resolve(new Map())),
+  loadNestedRefs: vi.fn(() => Promise.resolve(new Map())),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockLoadRefsByKey = vi.mocked(loadRefsByKey);
+const mockLoadNestedRefs = vi.mocked(loadNestedRefs);
+
+/** A studio's ref as nestedRefs builds it */
+const studioRefOf = (
+  id: string,
+  instanceId: string,
+  name: string
+): StudioRef => ({
+  id,
+  instanceId,
+  name,
+  image_path: null,
+  parent_studio: null,
+});
 
 const ALLOWED = ["inst-a", "inst-b"];
 const ref = (id: string, instanceId = "inst-a"): FilterRef => ({
@@ -309,7 +339,6 @@ describe("StudioQueryBuilder", () => {
       expect(studio).toMatchObject({
         id: "1",
         instanceId: "inst-a",
-        parent_studio: { id: "9", name: "" },
         details: null,
         url: null,
         scene_count: 4,
@@ -324,6 +353,88 @@ describe("StudioQueryBuilder", () => {
         tags: [],
         child_studios: [],
       });
+    });
+
+    it("the parent is the visible one on the studio's own instance, or null; children come by name", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          studioRow(),
+          studioRow({ id: "2", parentId: "8" }),
+          studioRow({ id: "1", stashInstanceId: "inst-b", parentId: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 3n }]);
+      // "8" is hidden, deleted or missing: nestedRefs leaves it out
+      mockLoadRefsByKey.mockResolvedValueOnce(
+        new Map([
+          [entityKey("9", "inst-a"), studioRefOf("9", "inst-a", "Network")],
+        ])
+      );
+      mockLoadNestedRefs.mockResolvedValueOnce(
+        new Map([
+          [
+            entityKey("1", "inst-b"),
+            [
+              studioRefOf("12", "inst-b", "zeta"),
+              studioRefOf("11", "inst-b", "Alpha"),
+            ],
+          ],
+        ])
+      );
+
+      const { items } = await run();
+
+      // One load each for the page, with the viewer; the parents on their
+      // studio's instance, the children through the studios' parentId
+      expect(mockLoadRefsByKey).toHaveBeenCalledTimes(1);
+      expect(mockLoadRefsByKey).toHaveBeenCalledWith(
+        STUDIO_REF,
+        [
+          { id: "9", instanceId: "inst-a" },
+          { id: "8", instanceId: "inst-a" },
+        ],
+        objectContaining({ userId: 1, applyExclusions: true })
+      );
+      expect(mockLoadNestedRefs).toHaveBeenCalledTimes(1);
+      expect(mockLoadNestedRefs).toHaveBeenCalledWith(
+        STUDIO_REF,
+        {
+          table: "StashStudio",
+          parentIdCol: "parentId",
+          parentInstanceCol: "stashInstanceId",
+          refIdCol: "id",
+          refInstanceCol: "stashInstanceId",
+        },
+        [
+          objectContaining({ id: "1", instanceId: "inst-a" }),
+          objectContaining({ id: "2", instanceId: "inst-a" }),
+          objectContaining({ id: "1", instanceId: "inst-b" }),
+        ],
+        objectContaining({ userId: 1, applyExclusions: true })
+      );
+
+      const [first, second, onB] = [
+        must(items[0]),
+        must(items[1]),
+        must(items[2]),
+      ];
+      expect(first.parent_studio).toEqual(
+        studioRefOf("9", "inst-a", "Network")
+      );
+      expect(first.child_studios).toEqual([]);
+      expect(second.parent_studio).toBeNull();
+      expect(onB.parent_studio).toBeNull();
+      expect(onB.child_studios).toEqual([
+        studioRefOf("11", "inst-b", "Alpha"),
+        studioRefOf("12", "inst-b", "zeta"),
+      ]);
+    });
+
+    it("an empty page loads no parent or children", async () => {
+      await run();
+
+      expect(mockLoadRefsByKey).not.toHaveBeenCalled();
+      expect(mockLoadNestedRefs).not.toHaveBeenCalled();
     });
   });
 });

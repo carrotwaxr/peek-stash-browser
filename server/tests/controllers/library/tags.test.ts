@@ -29,7 +29,6 @@ import { untrusted } from "../../helpers/untrusted.js";
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getAllTags: vi.fn(),
     getTag: vi.fn(),
   },
 }));
@@ -48,12 +47,6 @@ vi.mock("../../../services/MinimalEntityQuery.js", () => ({
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
-vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  hydrateTagRelationships: vi
-    .fn()
-    .mockImplementation((tags) => Promise.resolve(tags)),
 }));
 
 vi.mock("../../../utils/logger.js", () => ({
@@ -202,7 +195,6 @@ describe("Tags Controller", () => {
         group_count: 1,
         scene_marker_count: 7,
       });
-      mockStashEntityService.getAllTags.mockResolvedValue([tag]);
 
       const req = reqFor(findTags, {
         body: { ids: ["101"], filter: {}, tag_filter: {} },
@@ -217,6 +209,46 @@ describe("Tags Controller", () => {
         "101",
         "default"
       );
+    });
+
+    it("a detail answers the builder's row with the detail counts: the viewer's own fields, parents and children kept", async () => {
+      const parent = {
+        id: "100",
+        instanceId: "inst-b",
+        name: "Places",
+        image_path: null,
+      };
+      const child = { ...parent, id: "102", name: "Beaches" };
+      const tag = createMockTag({
+        id: "101",
+        instanceId: "inst-b",
+        favorite: false,
+        rating: 30,
+        rating100: 30,
+        o_counter: 5,
+        play_count: 6,
+        parents: [parent],
+        children: [child],
+      });
+      mockTagQueryBuilder.execute.mockResolvedValue({ items: [tag], total: 1 });
+      // Stash's own favorite and no rating, with the detail counts
+      mockStashEntityService.getTag.mockResolvedValue({
+        ...createMockTag({ id: "101", instanceId: "inst-b", favorite: true }),
+        scene_count: 42,
+        parents: [{ id: "100" }],
+      });
+
+      const req = reqFor(findTags, {
+        body: { ids: ["101"], tag_filter: { instance_id: "inst-b" } },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
+
+      await findTags(req, res);
+
+      expect(res._getOkBody().findTags.tags).toEqual([
+        { ...tag, scene_count: 42, stashUrl: null },
+      ]);
     });
 
     it("does not skip exclusions when fetching by ids", async () => {

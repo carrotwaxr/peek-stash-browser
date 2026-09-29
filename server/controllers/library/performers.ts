@@ -11,7 +11,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import {
   logDropped,
   parseListRequest,
@@ -77,14 +76,9 @@ export const findPerformers = async (
       return;
     }
 
-    // For single-entity requests (detail pages), hydrate tags
-    let resultPerformers = performers;
-    if (lookup && performers.length === 1) {
-      resultPerformers = await hydrateEntityTags(performers);
-    }
-
-    // Add stashUrl to each performer
-    const performersWithStashUrl = resultPerformers.map((performer) => ({
+    // Add stashUrl to each performer; its tags come with the row, named on
+    // their own instance
+    const performersWithStashUrl = performers.map((performer) => ({
       ...performer,
       stashUrl: buildStashEntityUrl(
         "performer",

@@ -283,21 +283,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Studio Queries", () => {
-    it("should get all studios with default user fields", async () => {
-      const mockCachedStudios = [{ ...mockCachedStudio }];
-
-      mockPrisma.stashStudio.findMany.mockResolvedValue(mockCachedStudios);
-
-      const result = await stashEntityService.getAllStudios();
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("studio-1");
-      expect(must(result[0]).name).toBe("Test Studio");
-      // Check default user fields
-      expect(must(result[0]).favorite).toBe(false);
-      expect(must(result[0]).o_counter).toBe(0);
-    });
-
     it("should get studio by ID", async () => {
       mockPrisma.stashStudio.findFirst.mockResolvedValue({
         ...mockCachedStudio,
@@ -340,21 +325,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Tag Queries", () => {
-    it("should get all tags with default user fields", async () => {
-      const mockCachedTags = [{ ...mockCachedTag }];
-
-      mockPrisma.stashTag.findMany.mockResolvedValue(mockCachedTags);
-
-      const result = await stashEntityService.getAllTags();
-
-      expect(result).toHaveLength(1);
-      expect(must(result[0]).id).toBe("tag-1");
-      expect(must(result[0]).name).toBe("Test Tag");
-      // Check default user fields
-      expect(must(result[0]).favorite).toBe(false);
-      expect(must(result[0]).rating100).toBeNull();
-    });
-
     it("should get tag by ID", async () => {
       mockPrisma.stashTag.findFirst.mockResolvedValue({
         ...mockCachedTag,

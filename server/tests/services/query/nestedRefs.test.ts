@@ -7,8 +7,10 @@ import {
   PERFORMER_REF,
   STUDIO_REF,
   TAG_REF,
+  byName,
   loadNestedRefs,
   loadRefsByKey,
+  loadTagChildren,
 } from "../../../services/query/nestedRefs.js";
 import { entityKey, pairsJson } from "../../../utils/entityRef.js";
 import { toProxyUrl } from "../../../utils/proxyUrl.js";
@@ -202,6 +204,94 @@ describe("nested refs", () => {
         parent_studio: { id: "3" },
       });
     });
+  });
+
+  describe("loadTagChildren", () => {
+    it("sends nothing for an empty page", async () => {
+      const children = await loadTagChildren([], viewer);
+
+      expect(children.size).toBe(0);
+      expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("reads the live tags of the page's instances once, keeps those listing a page tag on its own instance, and leaves out the viewer's exclusion rows", async () => {
+      await loadTagChildren([A, B, A], viewer);
+
+      const [sql, ...params] = statement();
+      expect(sql).toContain("FROM json_each(?)");
+      expect(sql).toContain(
+        "SELECT je.value AS pid, x.stashInstanceId AS pinst, x.id, x.stashInstanceId, x.name, x.imagePath\nFROM StashTag x\nCROSS JOIN json_each(x.parentIds) je"
+      );
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'tag' AND e.entityId = x.id AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)"
+      );
+      expect(sql).toContain("WHERE x.deletedAt IS NULL AND e.id IS NULL");
+      expect(sql).toContain(
+        "AND x.stashInstanceId IN (SELECT pinst FROM page)"
+      );
+      expect(sql).toContain(
+        "AND (je.value, x.stashInstanceId) IN (SELECT pid, pinst FROM page)"
+      );
+      expect(sql).not.toContain("favorite");
+      // The page once, each pair once, then the viewer
+      expect(params).toEqual([pairsJson([A, B]), 7]);
+    });
+
+    it("without the viewer's exclusions, keeps the live tags only", async () => {
+      await loadTagChildren([A], { userId: 7, applyExclusions: false });
+
+      const [sql, ...params] = statement();
+      expect(sql).not.toContain("UserExcludedEntity");
+      expect(sql).toContain("WHERE x.deletedAt IS NULL\n");
+      expect(params).toEqual([pairsJson([A])]);
+    });
+
+    it("rows become tag refs under their parent's entityKey on the child's instance", async () => {
+      answer([
+        {
+          pid: "1",
+          pinst: "inst-b",
+          id: "4",
+          stashInstanceId: "inst-b",
+          name: "Child 4",
+          imagePath: null,
+          favorite: true,
+        },
+        {
+          pid: "1",
+          pinst: "inst-a",
+          id: "2",
+          stashInstanceId: "inst-a",
+          name: "Child 2",
+          imagePath: "http://stash:9999/tag/2/image",
+        },
+      ]);
+
+      const children = await loadTagChildren([A, B], viewer);
+
+      expect(children.get(entityKey(A.id, A.instanceId))).toEqual([
+        {
+          id: "2",
+          instanceId: "inst-a",
+          name: "Child 2",
+          image_path: toProxyUrl("http://stash:9999/tag/2/image", "inst-a"),
+        },
+      ]);
+      expect(children.get(entityKey(B.id, B.instanceId))).toEqual([
+        { id: "4", instanceId: "inst-b", name: "Child 4", image_path: null },
+      ]);
+    });
+  });
+
+  it("byName orders refs by name, case-insensitively, then by id", () => {
+    const refs = [
+      { id: "10", name: "beta" },
+      { id: "3", name: "Alpha" },
+      { id: "9", name: "Beta" },
+      { id: "2", name: "alpha" },
+    ];
+
+    expect(byName(refs).map((ref) => ref.id)).toEqual(["2", "3", "9", "10"]);
   });
 
   it("each ref shape: a tag, a collection and a gallery (its displayed title)", () => {

@@ -12,8 +12,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedStudio } from "../../types/index.js";
-import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import {
   logDropped,
   parseListRequest,
@@ -112,43 +110,9 @@ export const findStudios = async (
       }
     }
 
-    // Hydrate parent/child relationships with names
-    // For single-studio requests (detail pages), we need all studios for accurate parent/child lookup
-    let hydratedStudios: NormalizedStudio[];
-    if (lookup) {
-      // Get all studios for hierarchy lookup, then hydrate
-      const allStudios = await stashEntityService.getAllStudios();
-      const allHydrated = await hydrateStudioRelationships(allStudios);
-      // Filter by both id AND instanceId to handle multi-instance correctly
-      hydratedStudios = allHydrated.filter((s) =>
-        resultStudios.some(
-          (r) => r.id === s.id && r.instanceId === s.instanceId
-        )
-      );
-      // Merge the computed counts back (preserving hydrated parent_studio and child_studios)
-      hydratedStudios = hydratedStudios.map((h) => {
-        // Match by both id AND instanceId
-        const result = resultStudios.find(
-          (r) => r.id === h.id && r.instanceId === h.instanceId
-        );
-        if (!result) return h;
-        return {
-          ...result,
-          ...h,
-          // Override counts from result (which has freshly computed values)
-          scene_count: result.scene_count,
-          image_count: result.image_count,
-          gallery_count: result.gallery_count,
-          performer_count: result.performer_count,
-          group_count: result.group_count,
-        };
-      });
-    } else {
-      hydratedStudios = await hydrateStudioRelationships(resultStudios);
-    }
-
-    // Add stashUrl to each studio
-    const studiosWithStashUrl = hydratedStudios.map((studio) => ({
+    // Add stashUrl to each studio; its parent and children come with the
+    // row, as the viewer may see them
+    const studiosWithStashUrl = resultStudios.map((studio) => ({
       ...studio,
       stashUrl: buildStashEntityUrl(
         "studio",

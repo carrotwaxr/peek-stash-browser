@@ -17,9 +17,7 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import type { NormalizedTag } from "../../types/index.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
-import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import {
   logDropped,
   parseFilterRef,
@@ -117,29 +115,9 @@ export const findTags = async (
       }
     }
 
-    // Hydrate parent/child relationships with names
-    // For single-tag requests (detail pages), we need all tags for accurate parent/child lookup
-    let hydratedTags: NormalizedTag[];
-    if (lookup) {
-      // Get all tags for hierarchy lookup, then hydrate
-      const allTags = await stashEntityService.getAllTags();
-      const allHydrated = await hydrateTagRelationships(allTags);
-      hydratedTags = allHydrated.filter((t) =>
-        resultTags.some((r) => r.id === t.id && r.instanceId === t.instanceId)
-      );
-      // Merge the computed counts back
-      hydratedTags = hydratedTags.map((h) => {
-        const result = resultTags.find(
-          (r) => r.id === h.id && r.instanceId === h.instanceId
-        );
-        return result ? { ...h, ...result } : h;
-      });
-    } else {
-      hydratedTags = await hydrateTagRelationships(resultTags);
-    }
-
-    // Add stashUrl to each tag
-    const tagsWithStashUrl = hydratedTags.map((tag) => ({
+    // Add stashUrl to each tag; its parents and children come with the row,
+    // as the viewer may see them
+    const tagsWithStashUrl = resultTags.map((tag) => ({
       ...tag,
       stashUrl: buildStashEntityUrl("tag", tag.id, tag.instanceId, req.user),
     }));

@@ -6,8 +6,9 @@ import { requireData } from "./support/data";
  * E2E tests for entity detail pages.
  *
  * Each list's first card opens the detail page it links to, whose heading
- * names the entity the card showed. Hermetic runs assert on the replay
- * library; a dev-stack library without the entity skips (requireData).
+ * names the entity the card showed; a tag's and a studio's page link their
+ * parents and children. Hermetic runs assert on the replay library; a
+ * dev-stack library without the entity skips (requireData).
  */
 
 /**
@@ -41,6 +42,33 @@ interface GalleryRow {
 interface FindGalleriesBody {
   findGalleries: { galleries: GalleryRow[] };
 }
+
+/** A tag or studio's parent or child as its row carries it */
+interface HierarchyRef {
+  id: string;
+  instanceId: string;
+  name: string;
+}
+
+interface FindTagsBody {
+  findTags: { tags: Array<HierarchyRef & { parents: HierarchyRef[] }> };
+}
+
+interface FindStudiosBody {
+  findStudios: {
+    studios: Array<HierarchyRef & { parent_studio: HierarchyRef | null }>;
+  };
+}
+
+/** A detail page's path on the entity's own instance */
+const detailPath = (entity: "tag" | "studio", ref: HierarchyRef) =>
+  `/${entity}/${ref.id}?instance=${encodeURIComponent(ref.instanceId)}`;
+
+/** The card under a detail page's heading of that title */
+const cardTitled = (page: Page, title: string) =>
+  page
+    .getByRole("heading", { level: 3, name: title, exact: true })
+    .locator("..");
 
 /** The list page of each entity with a detail page, and its cards' label */
 const ENTITIES = [
@@ -150,6 +178,76 @@ test.describe("Detail Pages", () => {
     await expect(scenes.cards("Scene").first()).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test("a parent tag's page lists its child tags and offers its sub-tags; the child's page names the parent", async ({
+    page,
+  }) => {
+    const listed = await page.request.post("/api/library/tags", {
+      data: { filter: { per_page: 250 } },
+    });
+    expect(listed.ok(), await listed.text()).toBeTruthy();
+    const child = requireData(
+      ((await listed.json()) as FindTagsBody).findTags.tags.find(
+        (tag) => tag.parents.length > 0
+      ),
+      "a tag with a parent"
+    );
+    const parent = requireData(child.parents[0], "the tag's parent");
+
+    await page.goto(detailPath("tag", parent));
+    await expect(
+      cardTitled(page, "Child Tags").getByRole("link", {
+        name: child.name,
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByRole("checkbox", { name: /^Include sub-tags \(\d+\)$/ })
+    ).toBeVisible();
+
+    await page.goto(detailPath("tag", child));
+    await expect(
+      cardTitled(page, "Parent Tags").getByRole("link", {
+        name: parent.name,
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("a child studio's page names its parent; the parent's page lists it and offers its sub-studios", async ({
+    page,
+  }) => {
+    const listed = await page.request.post("/api/library/studios", {
+      data: { filter: { per_page: 250 } },
+    });
+    expect(listed.ok(), await listed.text()).toBeTruthy();
+    const child = requireData(
+      ((await listed.json()) as FindStudiosBody).findStudios.studios.find(
+        (studio) => studio.parent_studio !== null
+      ),
+      "a studio with a parent"
+    );
+    const parent = requireData(child.parent_studio, "the studio's parent");
+
+    await page.goto(detailPath("studio", child));
+    await expect(
+      cardTitled(page, "Parent Studio").getByRole("link", {
+        name: parent.name,
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 10_000 });
+
+    await page.goto(detailPath("studio", parent));
+    await expect(
+      cardTitled(page, "Child Studios").getByRole("link", {
+        name: child.name,
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByRole("checkbox", { name: /^Include sub-studios \(\s*\d+\)$/ })
+    ).toBeVisible();
   });
 
   test("images page loads and shows content or empty state", async ({

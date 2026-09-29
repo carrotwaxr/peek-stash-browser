@@ -12,7 +12,6 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import {
   logDropped,
   parseListRequest,
@@ -101,9 +100,6 @@ export const findGroups = async (
             performer_count: groupWithCounts.performer_count,
           },
         ];
-
-        // Hydrate tags with names
-        paginatedGroups = await hydrateEntityTags(paginatedGroups);
 
         logger.debug("Computed counts for group detail", {
           groupId: existingGroup.id,
