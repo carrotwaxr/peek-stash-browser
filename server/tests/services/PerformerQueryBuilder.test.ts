@@ -188,7 +188,9 @@ describe("PerformerQueryBuilder", () => {
       expect(byCount).toContain(
         "ORDER BY p.sceneCount DESC, p.name COLLATE NOCASE ASC"
       );
-      expect(byName).toContain("ORDER BY p.name COLLATE NOCASE ASC, p.id ASC");
+      expect(byName).toContain(
+        "ORDER BY p.name COLLATE NOCASE ASC, p.id ASC, p.stashInstanceId ASC"
+      );
     });
 
     it("sorts by penis_length", async () => {

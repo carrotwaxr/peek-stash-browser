@@ -6,8 +6,8 @@
  * <table> <alias> <user joins> <other joins> <exclusion join> <extra joins>
  * <clause joins> <sort joins> WHERE <live> AND <not excluded> AND <extra
  * base conditions> AND <allowed instances> AND <clauses> ORDER BY <sort>,
- * <tiebreak> LIMIT ? OFFSET ?`, and its count as `SELECT COUNT(*)` over the
- * same WITH, FROM and WHERE. The parameters are bound in the text's order:
+ * <tiebreak>, <primary key> LIMIT ? OFFSET ?`, and its count as
+ * `SELECT COUNT(*)` over the same WITH, FROM and WHERE. The parameters are bound in the text's order:
  * ctes, the select list, one user id per user join, the exclusion's user
  * id, extra joins, clause joins, sort joins, the WHERE, the sort, the page.
  *
@@ -15,7 +15,8 @@
  * `deletedAt IS NULL`, the exclusion join with the instance, the allowed
  * instances (an empty list matches nothing), a detail page's one instance,
  * the `ids` filter as (id, instance) pairs, the random sort with its seed
- * bound, the joined `COUNT(*)`. A subclass declares its spec (table, alias,
+ * bound, the primary key ending every order, the joined `COUNT(*)`. A
+ * subclass declares its spec (table, alias,
  * user joins, columns, tiebreak), its filter clauses, its sort map, its row
  * transform and its relations.
  */
@@ -120,8 +121,13 @@ export interface EntitySpec {
   readonly selectColumns: (ctx: QueryContext) => SqlFragment;
   /** The sort key used when the request's key has no expression */
   readonly defaultSort: string;
-  /** The stable order after the sort expression (`s.id DESC`) */
-  readonly tiebreak: (direction: SortDirection, field: string) => string;
+  /**
+   * Terms between the sort expression and the primary key, for the sort
+   * keys whose equal values should list by something the viewer sees first
+   * (by name after a count); none when absent or undefined. The base ends
+   * every order with the key.
+   */
+  readonly tiebreak?: (field: string) => string | undefined;
 }
 
 /** One sort key's ORDER BY expression, with the direction in it, and any join it needs */
@@ -414,7 +420,18 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const direction: SortDirection =
       request.sort.direction === "ASC" ? "ASC" : "DESC";
     const sortExpr = this.sortExpr(field, direction, seed, request.filter);
-    const order = `${sortExpr.sql}, ${spec.tiebreak(direction, field)}`;
+    // The primary key last makes the order total: rows equal on every other
+    // term (one name twice, one id on two servers, one random value, NULLs)
+    // keep one order in every page's statement, so paging never repeats or
+    // skips a row
+    const order = [
+      sortExpr.sql,
+      spec.tiebreak?.(field),
+      `${x}.id ${direction}`,
+      `${x}.stashInstanceId ${direction}`,
+    ]
+      .filter((term) => term !== undefined)
+      .join(", ");
 
     const from = [
       `FROM ${spec.table} ${x}`,

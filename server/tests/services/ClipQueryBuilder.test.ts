@@ -123,17 +123,17 @@ describe("ClipQueryBuilder", () => {
       ["sceneTitle", "s.title"],
       ["duration", "(c.endSeconds - c.seconds)"],
     ] as const)(
-      "getClips orders by the chosen column and then by clip id (%s)",
+      "getClips orders by the chosen column and then by the clip's primary key (%s)",
       async (field, column) => {
         await run({ sort: { field, direction: "ASC", seed: undefined } });
         expect(statement(0).sql).toContain(
-          `ORDER BY ${column} ASC, c.id ASC\nLIMIT ? OFFSET ?`
+          `ORDER BY ${column} ASC, c.id ASC, c.stashInstanceId ASC\nLIMIT ? OFFSET ?`
         );
 
         vi.clearAllMocks();
         await run({ sort: { field, direction: "DESC", seed: undefined } });
         expect(statement(0).sql).toContain(
-          `ORDER BY ${column} DESC, c.id DESC\nLIMIT ? OFFSET ?`
+          `ORDER BY ${column} DESC, c.id DESC, c.stashInstanceId DESC\nLIMIT ? OFFSET ?`
         );
       }
     );
@@ -142,18 +142,20 @@ describe("ClipQueryBuilder", () => {
       await run();
 
       expect(statement(0).sql).toContain(
-        "ORDER BY c.stashCreatedAt DESC, c.id DESC"
+        "ORDER BY c.stashCreatedAt DESC, c.id DESC, c.stashInstanceId DESC"
       );
     });
 
-    it("the random sort binds its seed three times and breaks ties by clip id", async () => {
+    it("the random sort binds its seed three times and breaks ties by the clip's primary key", async () => {
       await run({ sort: { field: "random", direction: "ASC", seed: 4242 } });
 
       const { sql, params } = statement(0);
       expect(sql).not.toContain("4242");
       expect(sql.match(/c\.id \+ \?/g)).toHaveLength(3);
       expect(params.filter((p) => p === 4242)).toHaveLength(3);
-      expect(sql).toContain("% 2147483647) ASC, c.id ASC");
+      expect(sql).toContain(
+        "% 2147483647) ASC, c.id ASC, c.stashInstanceId ASC"
+      );
     });
 
     it("a hostile direction sorts DESC and never reaches the text", async () => {
@@ -166,7 +168,9 @@ describe("ClipQueryBuilder", () => {
       });
 
       const { sql } = statement(0);
-      expect(sql).toContain("ORDER BY c.seconds DESC, c.id DESC");
+      expect(sql).toContain(
+        "ORDER BY c.seconds DESC, c.id DESC, c.stashInstanceId DESC"
+      );
       expect(sql).not.toMatch(/select password/i);
     });
   });
@@ -182,7 +186,7 @@ describe("ClipQueryBuilder", () => {
         "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'clip' AND e.entityId = c.id AND (e.instanceId = '' OR e.instanceId = c.stashInstanceId)",
         "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityType = 'scene' AND es.entityId = c.sceneId AND (es.instanceId = '' OR es.instanceId = c.sceneInstanceId)",
         "WHERE c.deletedAt IS NULL AND e.id IS NULL AND s.deletedAt IS NULL AND es.id IS NULL AND c.stashInstanceId IN (?, ?)",
-        "ORDER BY c.stashCreatedAt DESC, c.id DESC",
+        "ORDER BY c.stashCreatedAt DESC, c.id DESC, c.stashInstanceId DESC",
         "LIMIT ? OFFSET ?",
       ]);
       expect(sql).not.toContain("IS NULL)");
@@ -475,7 +479,7 @@ describe("ClipQueryBuilder", () => {
   });
 
   describe("a scene's clips", () => {
-    it("match the scene's (id, instance), generated only, by time then id, every one with no count", async () => {
+    it("match the scene's (id, instance), generated only, by time then the primary key, every one with no count", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
@@ -493,7 +497,9 @@ describe("ClipQueryBuilder", () => {
       expect(sql).toContain(
         "c.stashInstanceId IN (?, ?) AND c.isGenerated = ? AND ((c.sceneId = ? AND c.sceneInstanceId = ?))"
       );
-      expect(sql).toMatch(/ORDER BY c\.seconds ASC, c\.id ASC$/);
+      expect(sql).toMatch(
+        /ORDER BY c\.seconds ASC, c\.id ASC, c\.stashInstanceId ASC$/
+      );
       expect(sql).not.toContain("LIMIT");
       expect(params).toEqual([7, 7, "inst-a", "inst-b", 1, "42", "inst-b"]);
     });

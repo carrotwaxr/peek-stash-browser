@@ -67,9 +67,9 @@ const TAG_SPEC: EntitySpec = {
   ],
   selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
   defaultSort: "name",
-  // By name, the id keeps the order stable; by anything else, the name
-  tiebreak: (direction, field) =>
-    field === "name" ? `t.id ${direction}` : "t.name COLLATE NOCASE ASC",
+  // Equal values list by name, then by the base's key
+  tiebreak: (field) =>
+    field === "name" ? undefined : "t.name COLLATE NOCASE ASC",
 };
 
 /** The scene count the card shows: the larger of the direct and via-performer counts */

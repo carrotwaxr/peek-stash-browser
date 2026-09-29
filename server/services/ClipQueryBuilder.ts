@@ -206,7 +206,6 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     ],
     selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
     defaultSort: "stashCreatedAt",
-    tiebreak: (direction) => `c.id ${direction}`,
   };
 
   protected sortMap(direction: SortDirection): Record<string, SortExpr> {

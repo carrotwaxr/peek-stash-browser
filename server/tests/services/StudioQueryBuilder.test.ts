@@ -171,7 +171,7 @@ describe("StudioQueryBuilder", () => {
         "ORDER BY s.performerCount ASC, s.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
-        "ORDER BY s.name COLLATE NOCASE DESC, s.id DESC"
+        "ORDER BY s.name COLLATE NOCASE DESC, s.id DESC, s.stashInstanceId DESC"
       );
     });
 

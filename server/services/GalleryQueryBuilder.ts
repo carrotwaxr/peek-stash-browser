@@ -89,9 +89,8 @@ const GALLERY_SPEC: EntitySpec = {
   ],
   selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
   defaultSort: "title",
-  // By title, the id keeps the order stable; by anything else, the title
-  tiebreak: (direction, field) =>
-    field === "title" ? `g.id ${direction}` : `${TITLE} ASC`,
+  // Equal values list by title, then by the base's key
+  tiebreak: (field) => (field === "title" ? undefined : `${TITLE} ASC`),
 };
 
 /** A gallery's studio, on the gallery's own row */

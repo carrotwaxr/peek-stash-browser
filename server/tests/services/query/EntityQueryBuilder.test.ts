@@ -8,8 +8,20 @@
  * list matches nothing), the exclusion join, the joined count and the
  * random sort's bound seed.
  */
+import type {
+  EntityKind,
+  SortDirection,
+} from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../../prisma/singleton.js";
+import { clipQueryBuilder } from "../../../services/ClipQueryBuilder.js";
+import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
+import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
+import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
+import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
+import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
+import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
+import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
@@ -22,6 +34,10 @@ import type {
   ParsedListRequest,
 } from "../../../types/parsedFilters.js";
 import type { FilterClause } from "../../../utils/sqlClauses.js";
+import {
+  parsedClipRequest,
+  parsedListRequest,
+} from "../../helpers/fixtures.js";
 import { must } from "../../helpers/must.js";
 
 vi.mock(
@@ -59,7 +75,6 @@ class FakeBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "scene"> {
       params: [`select:${ctx.userId}`],
     }),
     defaultSort: "created_at",
-    tiebreak: (dir) => `s.id ${dir}`,
   };
 
   protected sortMap(dir: "ASC" | "DESC"): Record<string, SortExpr> {
@@ -150,7 +165,6 @@ class NestedBuilder extends EntityQueryBuilder<FakeRow, FakeEntity, "clip"> {
     ],
     selectColumns: () => ({ sql: "c.id, c.stashInstanceId", params: [] }),
     defaultSort: "stashCreatedAt",
-    tiebreak: (dir) => `c.id ${dir}`,
   };
 
   protected sortMap(dir: "ASC" | "DESC"): Record<string, SortExpr> {
@@ -272,7 +286,7 @@ describe("EntityQueryBuilder", () => {
       "JOIN c ON c.id = s.id AND ? = 1",
       "LEFT JOIN SceneGroup sgi ON sgi.sceneId = s.id AND sgi.groupId = ?",
       "WHERE s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?) AND s.title = ?",
-      "ORDER BY COALESCE(sgi.sceneIndex, ?) ASC, s.id ASC",
+      "ORDER BY COALESCE(sgi.sceneIndex, ?) ASC, s.id ASC, s.stashInstanceId ASC",
       "LIMIT ? OFFSET ?",
     ]);
     expect(page.params).toEqual([
@@ -341,10 +355,12 @@ describe("EntityQueryBuilder", () => {
     expect(page.sql).not.toContain("98765432");
     expect(page.sql.match(/s\.id \+ \?/g)).toHaveLength(3);
     expect(page.params.filter((p) => p === 98765432)).toHaveLength(3);
-    expect(page.sql).toContain("% 2147483647) DESC, s.id DESC");
+    expect(page.sql).toContain(
+      "% 2147483647) DESC, s.id DESC, s.stashInstanceId DESC"
+    );
   });
 
-  it("the tiebreak follows the sort expression", async () => {
+  it("the primary key follows the sort expression", async () => {
     await builder.execute({
       userId: 1,
       allowedInstanceIds: ["inst-a"],
@@ -354,7 +370,7 @@ describe("EntityQueryBuilder", () => {
     });
 
     expect(must(statements()[0]).sql).toContain(
-      "ORDER BY s.stashCreatedAt ASC, s.id ASC"
+      "ORDER BY s.stashCreatedAt ASC, s.id ASC, s.stashInstanceId ASC"
     );
   });
 
@@ -372,7 +388,9 @@ describe("EntityQueryBuilder", () => {
     });
 
     const { sql } = must(statements()[0]);
-    expect(sql).toContain("ORDER BY s.stashCreatedAt DESC, s.id DESC");
+    expect(sql).toContain(
+      "ORDER BY s.stashCreatedAt DESC, s.id DESC, s.stashInstanceId DESC"
+    );
     expect(sql).not.toContain("SELECT 1");
   });
 
@@ -386,7 +404,7 @@ describe("EntityQueryBuilder", () => {
     });
 
     expect(must(statements()[0]).sql).toContain(
-      "ORDER BY s.stashCreatedAt ASC, s.id ASC"
+      "ORDER BY s.stashCreatedAt ASC, s.id ASC, s.stashInstanceId ASC"
     );
   });
 
@@ -470,7 +488,7 @@ describe("EntityQueryBuilder", () => {
         "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'clip' AND e.entityId = c.id AND (e.instanceId = '' OR e.instanceId = c.stashInstanceId)",
         "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityId = c.sceneId",
         "WHERE c.deletedAt IS NULL AND e.id IS NULL AND s.deletedAt IS NULL AND es.id IS NULL AND c.stashInstanceId IN (?) AND c.isGenerated = ?",
-        "ORDER BY c.seconds ASC, c.id ASC",
+        "ORDER BY c.seconds ASC, c.id ASC, c.stashInstanceId ASC",
       ]);
       expect(must(page).params).toEqual([5, "extra:5", "inst-a", 1, 10, 10]);
       expect(must(count).sql).toContain(
@@ -514,7 +532,9 @@ describe("EntityQueryBuilder", () => {
       ]);
       expect(statements()).toHaveLength(1);
       const page = must(statements()[0]);
-      expect(page.sql).toMatch(/ORDER BY c\.seconds ASC, c\.id ASC$/);
+      expect(page.sql).toMatch(
+        /ORDER BY c\.seconds ASC, c\.id ASC, c\.stashInstanceId ASC$/
+      );
       expect(page.sql).not.toContain("LIMIT");
       expect(page.sql).toContain("c.stashInstanceId = ?");
       expect(page.params).toEqual([5, "extra:5", "inst-a", "inst-a"]);
@@ -581,6 +601,211 @@ describe("EntityQueryBuilder", () => {
 
       expect(items).toEqual([]);
       expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Rows equal on every other ORDER BY term (one name twice, one id on two
+   * servers, one random value, NULLs) come back in whatever order SQLite
+   * reads them, which can differ between a page's statement and the next
+   * one's: only the primary key last makes the order total, so paging never
+   * repeats or skips a row.
+   */
+  describe("the order ends with the primary key", () => {
+    const options = { userId: 1, allowedInstanceIds: ["inst-a"] };
+    const seed = 7;
+
+    /** A list's sort, as the parser hands it over */
+    function sortOf<E extends EntityKind>(
+      entity: E,
+      field: ParsedListRequest<E>["sort"]["field"],
+      direction: SortDirection
+    ): ParsedListRequest<E> {
+      return parsedListRequest(entity, {
+        sort: { field, direction, seed },
+      });
+    }
+
+    type OrderCase = readonly [
+      label: string,
+      alias: string,
+      run: (direction: SortDirection) => Promise<unknown>,
+    ];
+
+    /** Each builder with sorts that reach each shape of its order */
+    const CASES: OrderCase[] = [
+      ...(
+        [
+          "created_at",
+          "date",
+          "title",
+          "rating",
+          "last_o_at",
+          "random",
+        ] as const
+      ).map(
+        (field): OrderCase => [
+          `scenes by ${field}`,
+          "s",
+          (direction) =>
+            sceneQueryBuilder.execute({
+              ...options,
+              request: sortOf("scene", field, direction),
+            }),
+        ]
+      ),
+      ...(["name", "scene_count", "birthdate", "random"] as const).map(
+        (field): OrderCase => [
+          `performers by ${field}`,
+          "p",
+          (direction) =>
+            performerQueryBuilder.execute({
+              ...options,
+              request: sortOf("performer", field, direction),
+            }),
+        ]
+      ),
+      ...(["name", "scene_count", "random"] as const).map(
+        (field): OrderCase => [
+          `studios by ${field}`,
+          "s",
+          (direction) =>
+            studioQueryBuilder.execute({
+              ...options,
+              request: sortOf("studio", field, direction),
+            }),
+        ]
+      ),
+      ...(["name", "scene_count", "random"] as const).map(
+        (field): OrderCase => [
+          `tags by ${field}`,
+          "t",
+          (direction) =>
+            tagQueryBuilder.execute({
+              ...options,
+              request: sortOf("tag", field, direction),
+            }),
+        ]
+      ),
+      ...(["name", "scene_count", "random"] as const).map(
+        (field): OrderCase => [
+          `groups by ${field}`,
+          "g",
+          (direction) =>
+            groupQueryBuilder.execute({
+              ...options,
+              request: sortOf("group", field, direction),
+            }),
+        ]
+      ),
+      ...(["title", "date", "random"] as const).map(
+        (field): OrderCase => [
+          `galleries by ${field}`,
+          "g",
+          (direction) =>
+            galleryQueryBuilder.execute({
+              ...options,
+              request: sortOf("gallery", field, direction),
+            }),
+        ]
+      ),
+      ...(["created_at", "title", "random"] as const).map(
+        (field): OrderCase => [
+          `images by ${field}`,
+          "i",
+          (direction) =>
+            imageQueryBuilder.execute({
+              ...options,
+              request: sortOf("image", field, direction),
+            }),
+        ]
+      ),
+      ...(["stashCreatedAt", "seconds", "random"] as const).map(
+        (field): OrderCase => [
+          `clips by ${field}`,
+          "c",
+          (direction) =>
+            clipQueryBuilder.execute({
+              ...options,
+              request: parsedClipRequest({
+                sort: { field, direction, seed },
+              }),
+            }),
+        ]
+      ),
+    ];
+
+    /** The page statement's ORDER BY terms, without the page */
+    function order(): string {
+      const { sql } = must(statements()[0]);
+      const at = sql.indexOf("\nORDER BY ");
+      expect(at, sql).toBeGreaterThanOrEqual(0);
+      return sql
+        .slice(at + "\nORDER BY ".length)
+        .replace(/\nLIMIT \? OFFSET \?$/, "");
+    }
+
+    /** Ends with `x.id <dir>, x.stashInstanceId <dir>`, with no other `x.id <dir>` term */
+    function expectKeyLast(
+      alias: string,
+      direction: SortDirection,
+      terms: string
+    ): void {
+      const key = `${alias}.id ${direction}, ${alias}.stashInstanceId ${direction}`;
+      expect(terms.endsWith(`, ${key}`), terms).toBe(true);
+      expect(terms.split(`${alias}.id ${direction}`), terms).toHaveLength(2);
+    }
+
+    beforeEach(() => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    });
+
+    it.each(
+      CASES.flatMap(([label, alias, run]) =>
+        (["ASC", "DESC"] as const).map((direction) => ({
+          label: `${label} ${direction}`,
+          alias,
+          run,
+          direction,
+        }))
+      )
+    )("$label", async ({ alias, run, direction }) => {
+      await run(direction);
+
+      expectKeyLast(alias, direction, order());
+    });
+
+    it("a tiebreak stays between the sort and the key (performers by scene count, then name)", async () => {
+      await performerQueryBuilder.execute({
+        ...options,
+        request: sortOf("performer", "scene_count", "DESC"),
+      });
+
+      expect(order()).toBe(
+        "p.sceneCount DESC, p.name COLLATE NOCASE ASC, p.id DESC, p.stashInstanceId DESC"
+      );
+    });
+
+    it("getByRefs orders by the default sort and the key", async () => {
+      await sceneQueryBuilder.getByRefs({
+        ...options,
+        refs: [{ id: "7", instanceId: undefined }],
+      });
+
+      expect(order()).toBe(
+        "s.stashCreatedAt DESC, s.id DESC, s.stashInstanceId DESC"
+      );
+    });
+
+    it("readAll (a scene's clips) orders by its sort and the key", async () => {
+      await clipQueryBuilder.getClipsForScene({
+        ...options,
+        scene: { id: "7", instanceId: "inst-a" },
+        includeUngenerated: true,
+      });
+
+      expect(order()).toBe("c.seconds ASC, c.id ASC, c.stashInstanceId ASC");
     });
   });
 });

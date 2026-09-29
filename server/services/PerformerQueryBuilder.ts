@@ -69,9 +69,9 @@ const PERFORMER_SPEC: EntitySpec = {
   ],
   selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
   defaultSort: "name",
-  // By name, the id keeps the order stable; by anything else, the name
-  tiebreak: (direction, field) =>
-    field === "name" ? `p.id ${direction}` : "p.name COLLATE NOCASE ASC",
+  // Equal values list by name, then by the base's key
+  tiebreak: (field) =>
+    field === "name" ? undefined : "p.name COLLATE NOCASE ASC",
 };
 
 /** A performer's tags */
