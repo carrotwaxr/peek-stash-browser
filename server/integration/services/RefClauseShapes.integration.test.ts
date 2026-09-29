@@ -6,8 +6,9 @@
  * is matched against, so a subtree of 1,200 tags filters where an OR chain
  * of that size fails to prepare. Two made-up instances reuse the same tag
  * and scene ids, as two Stash servers do; instance A also holds a root tag
- * with CHILDREN child tags, each on one scene of its own. Every seeded row
- * is deleted before the file ends.
+ * with CHILDREN child tags, each on one scene of its own. A tag on both
+ * instances is held by one scene of each directly and one of each through
+ * its inherited list. Every seeded row is deleted before the file ends.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -48,6 +49,10 @@ const SHARED_SCENE = "7859999";
 /** A scene with no title, details or codecs, and one with all of them */
 const BLANK_SCENE = "7859998";
 const TITLED_SCENE = "7859997";
+/** A tag on both instances, held directly by DIRECT_SCENE and inherited by INHERITING_SCENE on each */
+const INHERITED_TAG = "7849997";
+const DIRECT_SCENE = "7859995";
+const INHERITING_SCENE = "7859994";
 
 let u: number;
 let planner: LargeLibraryPlanner;
@@ -112,6 +117,11 @@ async function seed(): Promise<void> {
       })),
       { id: SHARED_TAG, stashInstanceId: A, name: "Refshape shared A" },
       { id: SHARED_TAG, stashInstanceId: B, name: "Refshape shared B" },
+      ...[A, B].map((instance) => ({
+        id: INHERITED_TAG,
+        stashInstanceId: instance,
+        name: `Refshape inherited ${instance}`,
+      })),
     ],
   });
 
@@ -142,6 +152,19 @@ async function seed(): Promise<void> {
         fileAudioCodec: "aac",
         filePath: "/refshape/titled.mp4",
       },
+      ...[A, B].flatMap((instance) => [
+        {
+          id: DIRECT_SCENE,
+          stashInstanceId: instance,
+          title: `Refshape direct ${instance}`,
+        },
+        {
+          id: INHERITING_SCENE,
+          stashInstanceId: instance,
+          title: `Refshape inheriting ${instance}`,
+          inheritedTagIds: JSON.stringify([INHERITED_TAG]),
+        },
+      ]),
     ],
   });
 
@@ -159,6 +182,12 @@ async function seed(): Promise<void> {
         tagId: SHARED_TAG,
         tagInstanceId: instance,
       })),
+      ...[A, B].map((instance) => ({
+        sceneId: DIRECT_SCENE,
+        sceneInstanceId: instance,
+        tagId: INHERITED_TAG,
+        tagInstanceId: instance,
+      })),
     ],
   });
 
@@ -170,8 +199,8 @@ async function seed(): Promise<void> {
 }
 
 /** The scenes on A and B, as the seeded user sees them */
-const SEEDED_ON_A = CHILDREN + 3;
-const SEEDED_ON_B = 1;
+const SEEDED_ON_A = CHILDREN + 5;
+const SEEDED_ON_B = 3;
 
 describeWithDb("Ref clause shapes", () => {
   beforeAll(async () => {
@@ -313,6 +342,90 @@ describeWithDb("Ref clause shapes", () => {
     expect(smallPlan).toContain("CORRELATED SCALAR SUBQUERY");
     expect(smallPlan).not.toContain("MATERIALIZE");
   });
+
+  // L8: a sort with no index reads every match and sorts it, so a small
+  // filter reads the tagged scenes from SceneTag's tag index as a list; an
+  // indexed sort walks its index and probes each scene's tags, stopping at
+  // the page (measured on the 200k and prod copies, see the progress log)
+  it("a small filter under a sort with no index reads SceneTag by its tag index as a list; an indexed sort keeps the correlated probe", async () => {
+    const recorder = recordStatements();
+    try {
+      for (const field of ["rating", "created_at"] as const) {
+        await sceneQueryBuilder.execute({
+          userId: u,
+          allowedInstanceIds: [A],
+          request: {
+            ...request({
+              tags: { refs: childRefs(3), modifier: "INCLUDES", depth: 0 },
+            }),
+            sort: { field, direction: "DESC", seed: undefined },
+          },
+        });
+      }
+    } finally {
+      recorder.restore();
+    }
+    const [ratingPage, ratingCount, createdPage] = recorder.statements.filter(
+      (statement) => statement.sql.includes("FROM StashScene s")
+    );
+    const plan = async (statement: typeof ratingPage) =>
+      (
+        await planner.planOf(must(statement).sql, ...must(statement).params)
+      ).join("\n");
+
+    for (const statement of [ratingPage, ratingCount]) {
+      const lines = await plan(statement);
+      expect(lines).toContain(
+        "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
+      );
+      expect(lines).toMatch(/LIST SUBQUERY/);
+      expect(lines).not.toContain("sqlite_autoindex_SceneTag_1");
+    }
+
+    const created = await plan(createdPage);
+    expect(created).toContain("CORRELATED SCALAR SUBQUERY");
+    expect(created).toContain("sqlite_autoindex_SceneTag_1");
+    expect(created).not.toContain("SceneTag_tagId_tagInstanceId_idx");
+  });
+
+  it.each([
+    ["created_at", "DESC"],
+    ["title", "ASC"],
+    ["rating", "DESC"],
+    ["play_count", "DESC"],
+    ["random", "DESC"],
+  ] as const)(
+    "a small tag filter sorted by %s matches the junction and the inherited list on the ref's instance",
+    async (field, direction) => {
+      const keysOf = async (refs: FilterRef[]) => {
+        const { items, total } = await sceneQueryBuilder.execute({
+          userId: u,
+          allowedInstanceIds: [A, B],
+          request: {
+            ...request({ tags: { refs, modifier: "INCLUDES", depth: 0 } }),
+            sort: {
+              field,
+              direction,
+              seed: field === "random" ? 424242 : undefined,
+            },
+          },
+        });
+        expect(total).toBe(items.length);
+        return items.map((s) => `${s.id}@${s.instanceId}`).sort();
+      };
+      const on = (instance: string) =>
+        [
+          `${DIRECT_SCENE}@${instance}`,
+          `${INHERITING_SCENE}@${instance}`,
+        ].sort();
+
+      expect(await keysOf([ref(INHERITED_TAG)])).toEqual(on(A));
+      expect(await keysOf([ref(INHERITED_TAG, B)])).toEqual(on(B));
+      expect(await keysOf([bare(INHERITED_TAG)])).toEqual(
+        [...on(A), ...on(B)].sort()
+      );
+    }
+  );
 
   it("IS_NULL and NOT_NULL match on title, details and the codecs", async () => {
     const ids = async (filter: ParsedFilter<"scene">) => {

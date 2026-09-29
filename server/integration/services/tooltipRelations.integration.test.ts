@@ -515,6 +515,7 @@ describeWithDb("Tooltip relations (integration)", () => {
       applyExclusions: true,
       allowedInstanceIds: [FX.A, FX.B],
       specificInstanceId: FX.A,
+      sortField: "name",
     };
     const { items: studios } = await studioQueryBuilder.execute({
       userId: v,

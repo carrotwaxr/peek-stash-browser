@@ -35,6 +35,7 @@ const CTX: QueryContext = {
   applyExclusions: true,
   allowedInstanceIds: ["instance-1", "instance-2"],
   specificInstanceId: undefined,
+  sortField: "created_at",
 };
 
 const ref = (id: string, instanceId = "instance-1") => ({ id, instanceId });
@@ -48,8 +49,8 @@ const tagRow = (id: string, stashInstanceId: string, parent?: string) =>
     parentIds: parent === undefined ? null : JSON.stringify([parent]),
   });
 
-const tagClause = (criterion: RefCriterion) =>
-  sceneQueryBuilder["tagClause"](criterion, CTX);
+const tagClause = (criterion: RefCriterion, sortField = "created_at") =>
+  sceneQueryBuilder["tagClause"](criterion, { ...CTX, sortField });
 
 /** The bare term of the inline shape, which matches an id on every instance */
 const BARE_TERM = "(st.tagId = ?)";
@@ -204,6 +205,66 @@ describe("SceneQueryBuilder tag clause", () => {
         modifier: "EXCLUDES",
         depth: 0,
       });
+
+      expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
+    });
+
+    // L8: a sort with an index lets the page walk it and stop at the page,
+    // probing each scene's tags; a sort with none reads every match anyway,
+    // so the matches are read from SceneTag's tag index as a list
+    it.each([
+      "created_at",
+      "updated_at",
+      "date",
+      "title",
+      "duration",
+      "performer_count",
+      "tag_count",
+    ])(
+      "an indexed sort (%s) keeps the correlated EXISTS",
+      async (sortField) => {
+        const result = await tagClause(
+          { refs: [ref("284")], modifier: "INCLUDES", depth: 0 },
+          sortField
+        );
+
+        expect(result.sql).toContain("EXISTS (SELECT 1 FROM SceneTag st WHERE");
+        expect(result.sql).not.toContain("IN (SELECT st.sceneId");
+      }
+    );
+
+    it.each([
+      "rating",
+      "play_count",
+      "o_counter",
+      "last_played_at",
+      "random",
+      "filesize",
+    ])(
+      "a sort with no index (%s) reads SceneTag by its tag index as a list, and the inherited arm as before",
+      async (sortField) => {
+        const result = await tagClause(
+          { refs: [ref("284")], modifier: "INCLUDES", depth: 0 },
+          sortField
+        );
+
+        expect(result.sql).toBe(
+          "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?)))"
+        );
+        expect(result.params).toEqual([
+          "284",
+          "instance-1",
+          "284",
+          "instance-1",
+        ]);
+      }
+    );
+
+    it("a sort with no index keeps the NOT EXISTS for EXCLUDES", async () => {
+      const result = await tagClause(
+        { refs: [ref("284")], modifier: "EXCLUDES", depth: 0 },
+        "rating"
+      );
 
       expect(result.sql).toMatch(/^NOT \(EXISTS \(SELECT 1 FROM SceneTag st/);
     });

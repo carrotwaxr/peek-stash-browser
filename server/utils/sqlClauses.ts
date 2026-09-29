@@ -6,7 +6,9 @@
  * instance, since two Stash servers reuse small ids.
  *
  * A ref set has two shapes. Up to PAIR_INLINE_LIMIT refs are bound inline
- * as OR-ed pairs inside one correlated EXISTS (or on the row itself). Above
+ * as OR-ed pairs inside one correlated EXISTS (or on the row itself; or,
+ * for a junction INCLUDES on a list whose sort has no index, one row-value
+ * IN over the junction's ref index: see junctionInList). Above
  * it the refs travel as one JSON parameter into a materialized CTE, and the
  * matched entities into a second one; the list matches them with a
  * row-value IN on its primary key (INCLUDES) or a single-column key NOT IN
@@ -190,6 +192,16 @@ export interface RefClauseOptions {
   readonly inheritedJson?: string;
   /** Most refs matched inline; Infinity keeps every set inline. Default PAIR_INLINE_LIMIT. */
   readonly inlineLimit?: number;
+  /**
+   * Whether the list's sort reads its order from an index (default true),
+   * for a junction INCLUDES up to the inline limit. With an index the page
+   * walks it and stops at the page, probing each row with the correlated
+   * EXISTS. Without one (a per-user sort, random) every match is read and
+   * sorted anyway, so the matches are read once from the junction's ref
+   * index as a row-value IN (junctionInList). Neither the large shape nor
+   * EXCLUDES changes.
+   */
+  readonly sortedByIndex?: boolean;
 }
 
 /** The inline INCLUDES of a junction target: one EXISTS over all the pairs */
@@ -205,6 +217,41 @@ function junctionIncludes(
     refs
   );
   const direct = `EXISTS (SELECT 1 FROM ${target.table} ${j} WHERE ${j}.${target.parentIdCol} = ${x}.id AND ${j}.${target.parentInstanceCol} = ${x}.stashInstanceId AND (${p.sql}))`;
+  if (inheritedJson === undefined) {
+    return { sql: direct, params: p.params };
+  }
+  const inherited = pairs("je.value", `${x}.stashInstanceId`, refs);
+  return {
+    sql: `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE ${inherited.sql}))`,
+    params: [...p.params, ...inherited.params],
+  };
+}
+
+/**
+ * The inline INCLUDES of a junction target for a list read whole and
+ * sorted: the listed rows named by the junction rows holding the refs, as a
+ * row-value IN that SQLite builds once from the junction's ref index (every
+ * scene holding the tag, by `SceneTag_tagId_tagInstanceId_idx`) and probes
+ * per row, where the correlated EXISTS searches the junction's primary key
+ * per row. At 200k scenes a page by rating filtered on a tag of 46k scenes
+ * takes 255 ms against 358, on a tag of 634 scenes 173 against 332, and
+ * their counts 195 against 233 and 104 against 185 (L8). Under a sort with
+ * an index the EXISTS stays: the page walks the index and stops at the page
+ * (2 ms, where building the list first costs 30). The inherited arm stays a
+ * per-row EXISTS: its list is a JSON column, which no index reads.
+ */
+function junctionInList(
+  target: JunctionTarget,
+  refs: readonly FilterRef[],
+  inheritedJson: string | undefined
+): FilterClause {
+  const { alias: j, parentAlias: x } = target;
+  const p = pairs(
+    `${j}.${target.refIdCol}`,
+    `${j}.${target.refInstanceCol}`,
+    refs
+  );
+  const direct = `(${x}.id, ${x}.stashInstanceId) IN (SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${target.table} ${j} WHERE (${p.sql}))`;
   if (inheritedJson === undefined) {
     return { sql: direct, params: p.params };
   }
@@ -325,6 +372,9 @@ export function refClause(
       : { sql: `(${col} IS NULL OR NOT (${p.sql}))`, params: p.params };
   }
 
+  if (modifier === "INCLUDES" && opts.sortedByIndex === false) {
+    return junctionInList(target, refs, opts.inheritedJson);
+  }
   const includes = junctionIncludes(target, refs, opts.inheritedJson);
   return modifier === "INCLUDES"
     ? includes
