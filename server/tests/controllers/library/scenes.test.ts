@@ -55,8 +55,8 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 
 vi.mock("../../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: {
-    execute: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
-    getByRefs: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
+    execute: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    getByRefs: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -223,7 +223,7 @@ describe("findScenes", () => {
   it("returns scenes from the SQL query builder path", async () => {
     const scene = createMockScene({ id: "s1", title: "Test" });
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [scene],
+      items: [scene],
       total: 1,
     });
 
@@ -243,7 +243,7 @@ describe("findScenes", () => {
 
   it("findScenes logs its timings at DEBUG, not INFO", async () => {
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [createMockScene({ id: "s1" })],
+      items: [createMockScene({ id: "s1" })],
       total: 1,
     });
 
@@ -265,7 +265,7 @@ describe("findScenes", () => {
 
   it("does not send stashUrl to a regular user", async () => {
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
+      items: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
       total: 2,
     });
 
@@ -284,7 +284,7 @@ describe("findScenes", () => {
 
   it("adds stashUrl for an admin", async () => {
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [createMockScene({ id: "s1" })],
+      items: [createMockScene({ id: "s1" })],
       total: 1,
     });
 
@@ -304,7 +304,7 @@ describe("findScenes", () => {
   it("attaches playback streams to a single-id lookup", async () => {
     const scene = createMockScene({ id: "42", instanceId: "inst-a" });
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [scene],
+      items: [scene],
       total: 1,
     });
     const streams = [
@@ -343,7 +343,7 @@ describe("findScenes", () => {
       title: "Scene B",
     });
     mockSceneQueryBuilder.execute.mockResolvedValue({
-      scenes: [s1, s2],
+      items: [s1, s2],
       total: 2,
     });
 
@@ -385,7 +385,7 @@ describe("findScenes", () => {
     it("an unknown key is logged once and the request succeeds", async () => {
       vi.stubEnv("PEEK_FILTER_POLICY", "drop");
       mockSceneQueryBuilder.execute.mockResolvedValue({
-        scenes: [createMockScene({ id: "s1" })],
+        items: [createMockScene({ id: "s1" })],
         total: 1,
       });
       const body = malformed({
@@ -427,7 +427,7 @@ describe("findScenes", () => {
       const { sceneQueryBuilder: freshBuilder } =
         await import("../../../services/SceneQueryBuilder.js");
       vi.mocked(freshBuilder).execute.mockResolvedValue({
-        scenes: [createMockScene({ id: "s1" })],
+        items: [createMockScene({ id: "s1" })],
         total: 1,
       });
 
@@ -450,7 +450,7 @@ describe("findSimilarScenes", () => {
   beforeEach(() => {
     mockResolveInstance.mockResolvedValue("inst-a");
     mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue({ scenes: [], total: 0 });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([]);
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -525,10 +525,7 @@ describe("findSimilarScenes", () => {
       Array.from({ length: 13 }, (_, i) => candidate(`c${i + 1}`, 13 - i))
     );
     const scene13 = createMockScene({ id: "c13", instanceId: "inst-a" });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
-      scenes: [scene13],
-      total: 1,
-    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([scene13]);
 
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
@@ -561,10 +558,7 @@ describe("findSimilarScenes", () => {
     const scene2 = createMockScene({ id: "c2", instanceId: "inst-a" });
     // A same-id scene on another instance is not the one the candidate named
     const other = createMockScene({ id: "c1", instanceId: "inst-b" });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
-      scenes: [scene2, other, scene1], // intentionally out of order
-      total: 3,
-    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([scene2, other, scene1]);
 
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
@@ -739,10 +733,7 @@ describe("getRecommendedScenes", () => {
     // Page 2 of 2: s1@B then s3@A, returned by the builder the other way round
     const s3 = createMockScene({ id: "s3", instanceId: "inst-a" });
     const s1b = createMockScene({ id: "s1", instanceId: "inst-b" });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
-      scenes: [s3, s1b],
-      total: 2,
-    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([s3, s1b]);
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "2", per_page: "2" },
@@ -772,10 +763,9 @@ describe("getRecommendedScenes", () => {
       refs: [ref("s1"), ref("s2")],
       criteria: someCriteria,
     });
-    mockSceneQueryBuilder.getByRefs.mockResolvedValue({
-      scenes: [createMockScene({ id: "s2", instanceId: "default" })],
-      total: 1,
-    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([
+      createMockScene({ id: "s2", instanceId: "default" }),
+    ]);
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },

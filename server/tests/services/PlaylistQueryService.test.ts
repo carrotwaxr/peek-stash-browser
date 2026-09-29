@@ -203,7 +203,7 @@ describe("loadPlaylistPreviews", () => {
 describe("loadPlaylistItems without paging", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetByRefs.mockResolvedValue({ scenes: [], total: 0 });
+    mockGetByRefs.mockResolvedValue([]);
   });
 
   it("every item in position order, each with its own instance's scene; an item on no instance gets none", async () => {
@@ -238,10 +238,10 @@ describe("loadPlaylistItems without paging", () => {
       }),
     ]);
     // In no particular order; 44@a is not visible to the user
-    mockGetByRefs.mockResolvedValue({
-      scenes: [scene("42", "b", "From B"), scene("42", "a", "From A")],
-      total: 2,
-    });
+    mockGetByRefs.mockResolvedValue([
+      scene("42", "b", "From B"),
+      scene("42", "a", "From A"),
+    ]);
 
     const { items, totalItems } = await loadPlaylistItems({
       userId: USER_ID,
@@ -322,7 +322,7 @@ describe("loadPlaylistItems without paging", () => {
 describe("loadPlaylistItems with paging", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetByRefs.mockResolvedValue({ scenes: [], total: 0 });
+    mockGetByRefs.mockResolvedValue([]);
   });
 
   /** Answers the count statement with `total` and the page statement with `rows` */
@@ -339,10 +339,10 @@ describe("loadPlaylistItems with paging", () => {
       itemRow({ id: 6, sceneId: "42", instanceId: "b", position: 5 }),
       itemRow({ id: 7, sceneId: "50", instanceId: "a", position: 6 }),
     ]);
-    mockGetByRefs.mockResolvedValue({
-      scenes: [scene("50", "a", "Fifty"), scene("42", "b", "From B")],
-      total: 2,
-    });
+    mockGetByRefs.mockResolvedValue([
+      scene("50", "a", "Fifty"),
+      scene("42", "b", "From B"),
+    ]);
 
     const { items, totalItems } = await loadPlaylistItems({
       userId: USER_ID,
@@ -393,10 +393,7 @@ describe("loadPlaylistItems with paging", () => {
       itemRow({ id: 1, sceneId: "42", position: 0 }),
       itemRow({ id: 2, sceneId: "43", position: 1 }),
     ]);
-    mockGetByRefs.mockResolvedValue({
-      scenes: [scene("43", "a", "Still here")],
-      total: 1,
-    });
+    mockGetByRefs.mockResolvedValue([scene("43", "a", "Still here")]);
 
     const { items } = await loadPlaylistItems({
       userId: USER_ID,

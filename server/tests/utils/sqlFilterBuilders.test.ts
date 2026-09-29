@@ -445,7 +445,7 @@ describe("buildJunctionFilter", () => {
   const parentAlias = "s";
 
   describe("bare IDs (no instanceId)", () => {
-    it("INCLUDES: generates EXISTS with IN clause", () => {
+    it("INCLUDES: generates EXISTS over the ids as bare pairs", () => {
       const result = buildJunctionFilter(
         coerceEntityRefs(["1", "2"]),
         junctionTable,
@@ -457,11 +457,13 @@ describe("buildJunctionFilter", () => {
         "INCLUDES"
       );
       expect(result.sql).toContain("EXISTS");
-      expect(result.sql).toContain("performerId IN (?, ?)");
+      expect(result.sql).toContain(
+        "((sc.performerId = ?) OR (sc.performerId = ?))"
+      );
       expect(result.params).toEqual(["1", "2"]);
     });
 
-    it("INCLUDES_ALL: generates COUNT(DISTINCT) = N", () => {
+    it("INCLUDES_ALL: generates one EXISTS per id, AND-ed", () => {
       const result = buildJunctionFilter(
         coerceEntityRefs(["1", "2", "3"]),
         junctionTable,
@@ -472,9 +474,11 @@ describe("buildJunctionFilter", () => {
         parentAlias,
         "INCLUDES_ALL"
       );
-      expect(result.sql).toContain("COUNT(DISTINCT");
-      expect(result.sql).toContain("= ?");
-      expect(result.params).toEqual(["1", "2", "3", 3]);
+      expect(
+        result.sql.match(/EXISTS \(SELECT 1 FROM ScenePerformer sc/g)
+      ).toHaveLength(3);
+      expect(result.sql).toMatch(/^\(.* AND .* AND .*\)$/s);
+      expect(result.params).toEqual(["1", "2", "3"]);
     });
 
     it("EXCLUDES: generates NOT EXISTS", () => {
@@ -489,7 +493,7 @@ describe("buildJunctionFilter", () => {
         "EXCLUDES"
       );
       expect(result.sql).toContain("NOT EXISTS");
-      expect(result.sql).toContain("performerId IN (?)");
+      expect(result.sql).toContain("((sc.performerId = ?))");
       expect(result.params).toEqual(["1"]);
     });
 
@@ -527,7 +531,7 @@ describe("buildJunctionFilter", () => {
       expect(result.params).toEqual(["82", "server-1", "5", "server-2"]);
     });
 
-    it("INCLUDES_ALL: generates COUNT(DISTINCT concat) = N", () => {
+    it("INCLUDES_ALL: generates one EXISTS per pair, AND-ed", () => {
       const result = buildJunctionFilter(
         coerceEntityRefs(["82:server-1", "5:server-2"]),
         junctionTable,
@@ -538,9 +542,11 @@ describe("buildJunctionFilter", () => {
         parentAlias,
         "INCLUDES_ALL"
       );
-      expect(result.sql).toContain("COUNT(DISTINCT");
-      expect(result.sql).toContain("|| ':' ||");
-      expect(result.params).toEqual(["82", "server-1", "5", "server-2", 2]);
+      expect(
+        result.sql.match(/EXISTS \(SELECT 1 FROM ScenePerformer sc/g)
+      ).toHaveLength(2);
+      expect(result.sql).not.toContain("COUNT(DISTINCT");
+      expect(result.params).toEqual(["82", "server-1", "5", "server-2"]);
     });
 
     it("EXCLUDES: generates NOT EXISTS with pair conditions", () => {
@@ -601,25 +607,25 @@ describe("buildDirectFilter", () => {
   const instanceCol = "s.stashInstanceId";
 
   describe("bare IDs", () => {
-    it("INCLUDES: generates IN clause", () => {
+    it("INCLUDES: generates the ids as bare pairs", () => {
       const result = buildDirectFilter(
         coerceEntityRefs(["1", "2"]),
         idCol,
         instanceCol,
         "INCLUDES"
       );
-      expect(result.sql).toBe("s.studioId IN (?, ?)");
+      expect(result.sql).toBe("((s.studioId = ?) OR (s.studioId = ?))");
       expect(result.params).toEqual(["1", "2"]);
     });
 
-    it("EXCLUDES: generates NOT IN with NULL check", () => {
+    it("EXCLUDES: negates the pairs and keeps rows with no value", () => {
       const result = buildDirectFilter(
         coerceEntityRefs(["1"]),
         idCol,
         instanceCol,
         "EXCLUDES"
       );
-      expect(result.sql).toBe("(s.studioId IS NULL OR s.studioId NOT IN (?))");
+      expect(result.sql).toBe("(s.studioId IS NULL OR NOT ((s.studioId = ?)))");
       expect(result.params).toEqual(["1"]);
     });
 
@@ -646,7 +652,7 @@ describe("buildDirectFilter", () => {
       expect(result.params).toEqual(["3", "server-1"]);
     });
 
-    it("EXCLUDES: generates NOT pair conditions", () => {
+    it("EXCLUDES: negates the pair conditions and keeps rows with no value", () => {
       const result = buildDirectFilter(
         coerceEntityRefs(["3:server-1"]),
         idCol,
@@ -654,7 +660,7 @@ describe("buildDirectFilter", () => {
         "EXCLUDES"
       );
       expect(result.sql).toBe(
-        "NOT ((s.studioId = ? AND s.stashInstanceId = ?))"
+        "(s.studioId IS NULL OR NOT ((s.studioId = ? AND s.stashInstanceId = ?)))"
       );
       expect(result.params).toEqual(["3", "server-1"]);
     });

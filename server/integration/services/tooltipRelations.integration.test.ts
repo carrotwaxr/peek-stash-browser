@@ -526,14 +526,25 @@ describeWithDb("Tooltip relations (integration)", () => {
       ids: { value: coerceEntityRefs([FX_ID.SAME]), modifier: "INCLUDES" },
     };
 
-    const { scenes } = await sceneQueryBuilder.execute({
+    const { items: scenes } = await sceneQueryBuilder.execute({
       userId: v,
-      filters: sameOnBoth,
       allowedInstanceIds: both,
-      sort: "title",
-      sortDirection: "ASC",
-      page: 1,
-      perPage: 10,
+      request: {
+        page: 1,
+        perPage: 10,
+        q: undefined,
+        sort: { field: "title", direction: "ASC", seed: undefined },
+        // The bare id: the same scene on both instances
+        filter: {
+          ids: {
+            refs: [{ id: FX_ID.SAME, instanceId: undefined }],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+        specificInstanceId: undefined,
+        dropped: [],
+      },
     });
     expect(scenes.map((s) => s.instanceId).sort()).toEqual(both);
     for (const scene of scenes) {

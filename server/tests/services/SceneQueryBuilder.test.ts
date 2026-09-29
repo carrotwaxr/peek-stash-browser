@@ -6,13 +6,13 @@
  * and allowedInstanceIds filtering by inspecting generated SQL.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
-import {
-  buildRefsClause,
-  sceneQueryBuilder,
-} from "../../services/SceneQueryBuilder.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { SceneQueryRow } from "../../types/internal/queryRows.js";
+import type {
+  ParsedFilter,
+  ParsedListRequest,
+} from "../../types/parsedFilters.js";
 import { must } from "../helpers/must.js";
 
 // Mock prisma
@@ -44,6 +44,50 @@ vi.mock("../../utils/titleUtils.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+
+const ALLOWED = ["inst-a", "inst-b"];
+
+/** A parsed scene list request with these parts, the rest at their defaults */
+function request(
+  overrides: Partial<ParsedListRequest<"scene">> = {}
+): ParsedListRequest<"scene"> {
+  return {
+    page: 1,
+    perPage: 10,
+    q: undefined,
+    sort: { field: "created_at", direction: "DESC", seed: undefined },
+    filter: {},
+    specificInstanceId: undefined,
+    dropped: [],
+    ...overrides,
+  };
+}
+
+/** Runs one list request for user 1 on the allowed instances */
+async function run(
+  overrides: Partial<ParsedListRequest<"scene">> = {},
+  options: { allowedInstanceIds?: string[]; applyExclusions?: boolean } = {}
+) {
+  return sceneQueryBuilder.execute({
+    userId: 1,
+    allowedInstanceIds: options.allowedInstanceIds ?? ALLOWED,
+    ...(options.applyExclusions === undefined
+      ? {}
+      : { applyExclusions: options.applyExclusions }),
+    request: request(overrides),
+  });
+}
+
+/** The page statement's SQL and parameters */
+function pageStatement(): { sql: string; params: unknown[] } {
+  const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+  return { sql, params };
+}
+
+/** The count statement's SQL */
+function countSql(): string {
+  return must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
+}
 
 /**
  * A page row as Prisma's raw query returns it from SQLite: BOOLEAN columns
@@ -106,14 +150,8 @@ async function executeRow(row: SceneQueryRow) {
     .mockResolvedValueOnce([{ total: 1 }]) // count query
     .mockResolvedValue([]);
 
-  const result = await sceneQueryBuilder.execute({
-    userId: 1,
-    sort: "created_at",
-    sortDirection: "DESC",
-    page: 1,
-    perPage: 10,
-  });
-  return must(result.scenes[0], "the scene");
+  const result = await run();
+  return must(result.items[0], "the scene");
 }
 
 describe("SceneQueryBuilder", () => {
@@ -137,279 +175,144 @@ describe("SceneQueryBuilder", () => {
 
   describe("multi-instance support", () => {
     it("includes instanceId in Rating and WatchHistory JOINs", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-      });
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // Rating JOIN must match on instanceId
-      expect(mainQuerySql).toContain("s.stashInstanceId = r.instanceId");
+      expect(sql).toContain("s.stashInstanceId = r.instanceId");
       // WatchHistory JOIN must match on instanceId
-      expect(mainQuerySql).toContain("s.stashInstanceId = w.instanceId");
+      expect(sql).toContain("s.stashInstanceId = w.instanceId");
     });
 
-    it("filters to allowed instances when allowedInstanceIds is provided", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        allowedInstanceIds: ["inst-a", "inst-b"],
-      });
+    it("filters to the allowed instances, with no NULL arm", async () => {
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      // Should contain IN clause for allowed instances
-      expect(mainQuerySql).toContain("s.stashInstanceId IN (?, ?)");
-      // Should include NULL fallback for backward compat
-      expect(mainQuerySql).toContain("s.stashInstanceId IS NULL");
-
-      // Params should contain the instance IDs
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
-      expect(mainQueryParams).toContain("inst-a");
-      expect(mainQueryParams).toContain("inst-b");
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("s.stashInstanceId IN (?, ?)");
+      expect(sql).not.toContain("s.stashInstanceId IS NULL");
+      expect(params).toContain("inst-a");
+      expect(params).toContain("inst-b");
     });
 
-    it("does not add instance filter when allowedInstanceIds is empty", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        allowedInstanceIds: [],
-      });
+    it("an empty allowed list matches nothing", async () => {
+      await run({}, { allowedInstanceIds: [] });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      // Should NOT contain the IN clause
-      expect(mainQuerySql).not.toContain("s.stashInstanceId IN");
+      const { sql } = pageStatement();
+      expect(sql).not.toContain("s.stashInstanceId IN");
+      expect(sql).toContain("AND 1 = 0");
     });
 
     it("filters to a specific instance when specificInstanceId is provided", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        specificInstanceId: "instance-abc",
-      });
+      await run({ specificInstanceId: "instance-abc" });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).toContain("s.stashInstanceId = ?");
-
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
-      expect(mainQueryParams).toContain("instance-abc");
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("s.stashInstanceId = ?");
+      expect(params).toContain("instance-abc");
     });
 
     it("does not add specific instance filter when not provided", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-      });
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // Should NOT have a bare equality check
-      expect(mainQuerySql).not.toContain("s.stashInstanceId = ?");
+      expect(sql).not.toContain("s.stashInstanceId = ?");
     });
   });
 
   describe("exclusion filtering", () => {
     it("includes exclusion JOIN and WHERE by default", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-      });
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // Should JOIN UserExcludedEntity
-      expect(mainQuerySql).toContain("UserExcludedEntity");
-      expect(mainQuerySql).toContain("entityType = 'scene'");
+      expect(sql).toContain("UserExcludedEntity");
+      expect(sql).toContain("entityType = 'scene'");
       // Should filter out excluded entities
-      expect(mainQuerySql).toContain("e.id IS NULL");
+      expect(sql).toContain("e.id IS NULL");
     });
 
     it("skips exclusion JOIN when applyExclusions is false", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        applyExclusions: false,
-      });
+      await run({}, { applyExclusions: false });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // Should NOT JOIN UserExcludedEntity
-      expect(mainQuerySql).not.toContain("UserExcludedEntity");
-      expect(mainQuerySql).not.toContain("e.id IS NULL");
+      expect(sql).not.toContain("UserExcludedEntity");
+      expect(sql).not.toContain("e.id IS NULL");
     });
   });
 
   describe("search query", () => {
     it("searches across title, details, path, performers, studio, and tags", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        searchQuery: "test search",
-      });
+      await run({ q: "test search" });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql, params } = pageStatement();
       // Should search across multiple fields
-      expect(mainQuerySql).toContain("LOWER(s.title) LIKE LOWER(?)");
-      expect(mainQuerySql).toContain("LOWER(s.details) LIKE LOWER(?)");
-      expect(mainQuerySql).toContain("LOWER(s.filePath) LIKE LOWER(?)");
+      expect(sql).toContain("LOWER(s.title) LIKE LOWER(?)");
+      expect(sql).toContain("LOWER(s.details) LIKE LOWER(?)");
+      expect(sql).toContain("LOWER(s.filePath) LIKE LOWER(?)");
       // Should have performer subquery
-      expect(mainQuerySql).toContain("StashPerformer");
-      expect(mainQuerySql).toContain("LOWER(p.name) LIKE LOWER(?)");
+      expect(sql).toContain("StashPerformer");
+      expect(sql).toContain("LOWER(p.name) LIKE LOWER(?)");
       // Should have studio subquery
-      expect(mainQuerySql).toContain("StashStudio");
+      expect(sql).toContain("StashStudio");
       // Should have tag subquery
-      expect(mainQuerySql).toContain("StashTag");
+      expect(sql).toContain("StashTag");
 
       // Search param should be wrapped in wildcards
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
-      expect(mainQueryParams).toContain("%test search%");
+      expect(params).toContain("%test search%");
     });
 
-    it("does not add search filter for empty search query", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        searchQuery: "",
-      });
+    it("does not add search filter without a search query", async () => {
+      await run({ q: undefined });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // Should not contain search-specific LIKE patterns on s.filePath
-      expect(mainQuerySql).not.toContain("LOWER(s.filePath) LIKE LOWER(?)");
+      expect(sql).not.toContain("LOWER(s.filePath) LIKE LOWER(?)");
     });
   });
 
   describe("pagination", () => {
     it("passes correct LIMIT and OFFSET for page 1", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 25,
-      });
-
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
+      await run({ page: 1, perPage: 25 });
 
       // Last two params are LIMIT and OFFSET
-      expect(mainQueryParams.slice(-2)).toEqual([25, 0]);
+      expect(pageStatement().params.slice(-2)).toEqual([25, 0]);
     });
 
     it("passes correct OFFSET for page 3", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 3,
-        perPage: 10,
-      });
-
-      const mainQueryParams = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      ).slice(1);
+      await run({ page: 3, perPage: 10 });
 
       // Last two params are LIMIT and OFFSET, (3-1) * 10
-      expect(mainQueryParams.slice(-2)).toEqual([10, 20]);
+      expect(pageStatement().params.slice(-2)).toEqual([10, 20]);
     });
   });
 
   describe("sort", () => {
     it("applies ORDER BY for created_at sort", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-      });
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).toContain("s.stashCreatedAt DESC");
+      expect(pageStatement().sql).toContain("s.stashCreatedAt DESC");
     });
 
     it("sorts by title through the stored titleSort column with id as the tiebreak", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "title",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
+      await run({
+        sort: { field: "title", direction: "ASC", seed: undefined },
       });
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
+      const { sql } = pageStatement();
       // The (deletedAt, titleSort, id) index serves this order as is
-      expect(mainQuerySql).toContain("ORDER BY s.titleSort ASC, s.id ASC");
-      expect(mainQuerySql).not.toContain("COLLATE NOCASE");
+      expect(sql).toContain("ORDER BY s.titleSort ASC, s.id ASC");
+      expect(sql).not.toContain("COLLATE NOCASE");
     });
 
     it("sorts and filters by performer_count and tag_count through the stored columns", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "performer_count",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        filters: {
-          tag_count: {
-            value: 1,
-            value2: 3,
-            modifier: CriterionModifier.Between,
-          },
-        },
+      await run({
+        sort: { field: "performer_count", direction: "DESC", seed: undefined },
+        filter: { tag_count: { value: 1, value2: 3, modifier: "BETWEEN" } },
       });
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "tag_count",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-        filters: {
-          performer_count: {
-            value: 2,
-            modifier: CriterionModifier.GreaterThan,
-          },
-        },
+      await run({
+        sort: { field: "tag_count", direction: "ASC", seed: undefined },
+        filter: { performer_count: { value: 2, modifier: "GREATER_THAN" } },
       });
 
       const statements = mockPrisma.$queryRawUnsafe.mock.calls.map(
@@ -433,74 +336,213 @@ describe("SceneQueryBuilder", () => {
     });
 
     it("includes secondary sort by id for stable ordering", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "date",
-        sortDirection: "ASC",
-        page: 1,
-        perPage: 10,
-      });
-
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+      await run({ sort: { field: "date", direction: "ASC", seed: undefined } });
 
       // ORDER BY should end with secondary id sort
-      expect(mainQuerySql).toContain("s.id ASC");
+      expect(pageStatement().sql).toContain("s.id ASC");
+    });
+
+    it("binds a random sort's seed and never interpolates it", async () => {
+      await run({
+        sort: { field: "random", direction: "DESC", seed: 87654321 },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).not.toContain("87654321");
+      expect(params.filter((p) => p === 87654321)).toHaveLength(3);
     });
   });
 
   describe("count query", () => {
-    it("the count query with exclusions applied counts rows, not distinct composite ids", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-      });
+    it("the count query is the joined COUNT(*), never the unjoined fast path", async () => {
+      await run({}, { applyExclusions: false });
 
       // Second call is the count query. The other LEFT JOINs are on unique
-      // keys and e.id IS NULL drops every excluded scene, so each row left
-      // is one scene.
-      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
-
-      expect(countQuerySql).toMatch(/SELECT COUNT\(\*\) as total/);
-      expect(countQuerySql).not.toMatch(/COUNT\(DISTINCT/);
-      expect(countQuerySql).toContain("LEFT JOIN UserExcludedEntity e");
+      // keys, so each row left is one scene.
+      const sql = countSql();
+      expect(sql).toMatch(/SELECT COUNT\(\*\) AS total/);
+      expect(sql).not.toMatch(/COUNT\(DISTINCT/);
+      expect(sql).toContain("LEFT JOIN SceneRating r");
+      expect(sql).toContain("LEFT JOIN WatchHistory w");
     });
 
-    it("uses fast path COUNT(*) when exclusions are disabled and no user data filters", async () => {
-      await sceneQueryBuilder.execute({
-        userId: 1,
-        sort: "created_at",
-        sortDirection: "DESC",
-        page: 1,
-        perPage: 10,
-        applyExclusions: false,
+    it("counts with the exclusion join when exclusions apply", async () => {
+      await run();
+
+      expect(countSql()).toContain("LEFT JOIN UserExcludedEntity e");
+      expect(countSql()).toContain("e.id IS NULL");
+    });
+  });
+
+  describe("filters", () => {
+    const ref = (id: string, instanceId = "inst-a") => ({ id, instanceId });
+    const bare = (id: string) => ({ id, instanceId: undefined });
+
+    it("ids match (id, instance) pairs, and a bare id every instance", async () => {
+      await run({
+        filter: {
+          ids: {
+            refs: [ref("5"), bare("6")],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
       });
 
-      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ?))"
+      );
+      expect(sql).not.toContain("s.id IN (");
+      expect(params.slice(-5, -2)).toEqual(["5", "inst-a", "6"]);
+    });
 
-      // Fast path: simple COUNT(*) from StashScene only
-      expect(countQuerySql).toContain("COUNT(*)");
-      expect(countQuerySql).not.toContain("COUNT(DISTINCT");
+    it("performers, groups and galleries match pairs through their junctions", async () => {
+      await run({
+        filter: {
+          performers: { refs: [ref("1")], modifier: "INCLUDES", depth: 0 },
+          groups: { refs: [ref("2")], modifier: "EXCLUDES", depth: 0 },
+          galleries: { refs: [ref("3")], modifier: "INCLUDES_ALL", depth: 0 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
+      );
+      expect(sql).toContain(
+        "NOT EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND ((sg.groupId = ? AND sg.groupInstanceId = ?)))"
+      );
+      expect(sql).toContain("sg.galleryId = ? AND sg.galleryInstanceId = ?");
+      expect(params).toContain("1");
+      expect(params).toContain("2");
+      expect(params).toContain("3");
+    });
+
+    it("tags match the junction and the inherited list, each as pairs", async () => {
+      await run({
+        filter: {
+          tags: {
+            refs: [ref("284"), ref("313")],
+            modifier: "INCLUDES",
+            depth: 0,
+          },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ? AND st.tagInstanceId = ?)))"
+      );
+      expect(sql).toContain(
+        "EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?) OR (je.value = ? AND s.stashInstanceId = ?))"
+      );
+      expect(params.filter((p) => p === "284")).toHaveLength(2);
+      expect(params).not.toContain("284:inst-a");
+    });
+
+    it("studios match the scene's own studio column as pairs; EXCLUDES keeps scenes with no studio", async () => {
+      await run({
+        filter: {
+          studios: { refs: [ref("7")], modifier: "EXCLUDES", depth: 0 },
+        },
+      });
+
+      const { sql } = pageStatement();
+      expect(sql).toContain(
+        "(s.studioId IS NULL OR NOT ((s.studioId = ? AND s.stashInstanceId = ?)))"
+      );
+      expect(sql).not.toContain("NOT IN");
+    });
+
+    it("text filters use the shared clause, so IS_NULL and NOT_NULL match", async () => {
+      await run({
+        filter: {
+          title: { modifier: "IS_NULL" },
+          details: { modifier: "NOT_NULL" },
+          video_codec: { modifier: "INCLUDES", value: "h264" },
+          audio_codec: { modifier: "EQUALS", value: "aac" },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("(s.title IS NULL OR s.title = '')");
+      expect(sql).toContain("(s.details IS NOT NULL AND s.details != '')");
+      expect(sql).toContain("LOWER(s.fileVideoCodec) LIKE LOWER(?)");
+      expect(sql).toContain("LOWER(s.fileAudioCodec) = LOWER(?)");
+      expect(params).toContain("%h264%");
+      expect(params).toContain("aac");
+    });
+
+    it("resolution compares the file height; orientation matches any of its values", async () => {
+      await run({
+        filter: {
+          resolution: { modifier: "GREATER_THAN", value: "FULL_HD" },
+          orientation: { modifier: "INCLUDES", values: ["PORTRAIT", "SQUARE"] },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("COALESCE(s.fileHeight, 0) > ?");
+      expect(params).toContain(1080);
+      expect(sql).toContain(
+        "((s.fileWidth < s.fileHeight) OR (s.fileWidth = s.fileHeight AND s.fileWidth > 0))"
+      );
+    });
+
+    it("a resolution with no height yet filters nothing", async () => {
+      await run({
+        filter: { resolution: { modifier: "EQUALS", value: "SEVEN_K" } },
+      });
+
+      expect(pageStatement().sql).not.toContain("COALESCE(s.fileHeight, 0)");
+    });
+
+    it("the viewer's favorites, ratings and history filters read the per-user joins", async () => {
+      await run({
+        filter: {
+          favorite: false,
+          rating100: { modifier: "GREATER_THAN", value: 80 },
+          play_count: { modifier: "EQUALS", value: 0 },
+          o_counter: { modifier: "BETWEEN", value: 2, value2: 5 },
+          last_played_at: { modifier: "IS_NULL" },
+          performer_favorite: true,
+          studio_favorite: true,
+          tag_favorite: true,
+          performer_age: { modifier: "LESS_THAN", value: 30 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("(r.favorite = 0 OR r.favorite IS NULL)");
+      expect(sql).toContain("COALESCE(r.rating, 0) > ?");
+      expect(sql).toContain("COALESCE(w.playCount, 0) = ?");
+      expect(sql).toContain("COALESCE(w.oCount, 0) BETWEEN ? AND ?");
+      expect(sql).toContain("w.lastPlayedAt IS NULL");
+      expect(sql).toContain("PerformerRating pr");
+      expect(sql).toContain("StudioRating sr");
+      expect(sql).toContain("TagRating tr");
+      expect(sql).toContain("julianday(p.birthdate)");
+      // The three favorite clauses bind the viewer
+      expect(params.filter((p) => p === 1)).toHaveLength(6);
+    });
+
+    it("a filter with nothing in it adds no clause", async () => {
+      const filter: ParsedFilter<"scene"> = {};
+      await run({ filter });
+
+      const { sql } = pageStatement();
+      expect(sql).toContain(
+        "WHERE s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?)\nORDER BY"
+      );
     });
   });
 
   describe("stream URLs (PM-02)", () => {
-    const executeOptions = {
-      userId: 1,
-      sort: "created_at",
-      sortDirection: "DESC" as const,
-      page: 1,
-      perPage: 10,
-    };
-
     it("does not select the streams column", async () => {
-      await sceneQueryBuilder.execute(executeOptions);
+      await run();
 
-      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
-
-      expect(mainQuerySql).not.toMatch(/\bs\.streams\b/);
+      expect(pageStatement().sql).not.toMatch(/\bs\.streams\b/);
     });
 
     it("returns no apikey and no Stash host in any row field", async () => {
@@ -639,30 +681,14 @@ describe("SceneQueryBuilder", () => {
   });
 });
 
-describe("buildRefsClause", () => {
-  it("binds one (id, instance) pair per ref", () => {
-    expect(
-      buildRefsClause([
-        { id: "1", instanceId: "inst-a" },
-        { id: "1", instanceId: "inst-b" },
-      ])
-    ).toEqual({
-      sql: "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))",
-      params: ["1", "inst-a", "1", "inst-b"],
-    });
-  });
-
-  it("matches nothing for no refs", () => {
-    expect(buildRefsClause([])).toEqual({ sql: "0", params: [] });
-  });
-});
-
 describe("getByRefs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([]) // main query
-      .mockResolvedValueOnce([{ total: 0 }]); // count query
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
   });
 
   it("binds one (id, instance) pair per ref, so B's same id stays out", async () => {
@@ -675,9 +701,7 @@ describe("getByRefs", () => {
       allowedInstanceIds: ["inst-a", "inst-b"],
     });
 
-    const call = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
-    const sql = call[0];
-    const params = call.slice(1);
+    const { sql, params } = pageStatement();
     expect(sql).toContain(
       "((s.id = ? AND s.stashInstanceId = ?) OR (s.id = ? AND s.stashInstanceId = ?))"
     );
@@ -687,21 +711,27 @@ describe("getByRefs", () => {
     expect(params.slice(at, at + 4)).toEqual(["7", "inst-a", "8", "inst-a"]);
   });
 
-  it("applies the user's exclusions by default", async () => {
+  it("applies the user's exclusions by default and runs no count", async () => {
     await sceneQueryBuilder.getByRefs({
       userId: 1,
       refs: [{ id: "7", instanceId: "inst-a" }],
+      allowedInstanceIds: ["inst-a"],
     });
 
-    const sql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+    const { sql } = pageStatement();
     expect(sql).toContain("LEFT JOIN UserExcludedEntity e");
     expect(sql).toContain("e.id IS NULL");
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
   });
 
   it("runs no query for no refs", async () => {
-    const result = await sceneQueryBuilder.getByRefs({ userId: 1, refs: [] });
+    const result = await sceneQueryBuilder.getByRefs({
+      userId: 1,
+      refs: [],
+      allowedInstanceIds: ["inst-a"],
+    });
 
-    expect(result).toEqual({ scenes: [], total: 0 });
+    expect(result).toEqual([]);
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 });

@@ -195,14 +195,14 @@ describeWithDb("Similar scenes (integration)", () => {
 
   it("an excluded ref is not returned", async () => {
     // The page fetch honours the exclusion too, whatever refs it is given
-    const { scenes } = await sceneQueryBuilder.getByRefs({
+    const scenes = await sceneQueryBuilder.getByRefs({
       userId: u,
       refs: [C_PERF, C_STUDIO, C_TAG].map((id) => ({ id, instanceId: A })),
       allowedInstanceIds: [A, B],
     });
     expect(scenes.map((s) => s.id).sort()).toEqual([C_PERF, C_STUDIO]);
 
-    const { scenes: forV } = await sceneQueryBuilder.getByRefs({
+    const forV = await sceneQueryBuilder.getByRefs({
       userId: v,
       refs: [C_PERF, C_STUDIO, C_TAG].map((id) => ({ id, instanceId: A })),
       allowedInstanceIds: [A, B],
@@ -240,7 +240,7 @@ describeWithDb("Similar scenes (integration)", () => {
     expect(copies).toHaveLength(1);
     expect(copies[0]?.instanceId).toBe(A);
 
-    const { scenes } = await sceneQueryBuilder.getByRefs({
+    const scenes = await sceneQueryBuilder.getByRefs({
       userId: v,
       refs: [{ id: C_PERF, instanceId: A }],
       allowedInstanceIds: [A, B],

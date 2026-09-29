@@ -1,4 +1,9 @@
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CriterionModifier } from "../../graphql/types.js";
+import prisma from "../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
+import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
@@ -30,6 +35,9 @@ interface SceneRow extends Ref {
 interface FindScenesResponse {
   findScenes: { scenes: SceneRow[]; count: number };
 }
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 /** An instance no server has: its composite ids must match nothing */
 const OTHER_INSTANCE = "via-scene-other-instance";
@@ -226,5 +234,196 @@ describe("Via-scene filters with instance-qualified ids", () => {
       );
       expect(ids).toEqual([]);
     });
+  });
+});
+
+/**
+ * A soft-deleted scene links nothing: every via-scene arm requires the scene
+ * to be live. Seeded on a made-up instance and read through the builders
+ * directly, as the admin's selection does not cover it; every row is deleted
+ * before the file ends.
+ */
+describeWithDb("Via-scene filters and soft-deleted scenes", () => {
+  const X = "via-live-it-x";
+  const LIVE_SCENE = "7860001";
+  const DELETED_SCENE = "7860002";
+  /** Linked only through the deleted scene */
+  const STALE_GROUP = "7860101";
+  const STALE_PERFORMER = "7860201";
+  /** Linked through the live scene */
+  const LIVE_GROUP = "7860102";
+  const LIVE_PERFORMER = "7860202";
+  const USER_ID = 999998;
+
+  const clear = async () => {
+    const where = { stashInstanceId: X };
+    await prisma.stashScene.deleteMany({ where });
+    await prisma.stashGroup.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+  };
+
+  beforeAll(async () => {
+    await clear();
+    await prisma.stashGroup.createMany({
+      data: [
+        { id: STALE_GROUP, stashInstanceId: X, name: "Stale group" },
+        { id: LIVE_GROUP, stashInstanceId: X, name: "Live group" },
+      ],
+    });
+    await prisma.stashPerformer.createMany({
+      data: [
+        { id: STALE_PERFORMER, stashInstanceId: X, name: "Stale performer" },
+        { id: LIVE_PERFORMER, stashInstanceId: X, name: "Live performer" },
+      ],
+    });
+    await prisma.stashScene.createMany({
+      data: [
+        { id: LIVE_SCENE, stashInstanceId: X, title: "Live" },
+        {
+          id: DELETED_SCENE,
+          stashInstanceId: X,
+          title: "Deleted",
+          deletedAt: new Date(),
+        },
+      ],
+    });
+    await prisma.sceneGroup.createMany({
+      data: [
+        {
+          sceneId: DELETED_SCENE,
+          sceneInstanceId: X,
+          groupId: STALE_GROUP,
+          groupInstanceId: X,
+        },
+        {
+          sceneId: LIVE_SCENE,
+          sceneInstanceId: X,
+          groupId: LIVE_GROUP,
+          groupInstanceId: X,
+        },
+      ],
+    });
+    await prisma.scenePerformer.createMany({
+      data: [
+        {
+          sceneId: DELETED_SCENE,
+          sceneInstanceId: X,
+          performerId: STALE_PERFORMER,
+          performerInstanceId: X,
+        },
+        {
+          sceneId: LIVE_SCENE,
+          sceneInstanceId: X,
+          performerId: LIVE_PERFORMER,
+          performerInstanceId: X,
+        },
+        // The stale performer also worked on the live scene of the live group
+        {
+          sceneId: LIVE_SCENE,
+          sceneInstanceId: X,
+          performerId: STALE_PERFORMER,
+          performerInstanceId: X,
+        },
+      ],
+    });
+  });
+
+  afterAll(clear);
+
+  it("a soft-deleted scene no longer links its group: groups by scene and groups by performer", async () => {
+    const byScene = await groupQueryBuilder.execute({
+      userId: USER_ID,
+      filters: {
+        scenes: {
+          value: coerceEntityRefs([
+            `${DELETED_SCENE}:${X}`,
+            `${LIVE_SCENE}:${X}`,
+          ]),
+          modifier: CriterionModifier.Includes,
+        },
+      },
+      allowedInstanceIds: [X],
+      sort: "name",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+    });
+    expect(byScene.groups.map((g) => g.id)).toEqual([LIVE_GROUP]);
+
+    // The stale performer's only group link runs through the deleted scene;
+    // the live scene links it to the live group
+    const byPerformer = await groupQueryBuilder.execute({
+      userId: USER_ID,
+      filters: {
+        performers: {
+          value: coerceEntityRefs([`${STALE_PERFORMER}:${X}`]),
+          modifier: CriterionModifier.Includes,
+        },
+      },
+      allowedInstanceIds: [X],
+      sort: "name",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+    });
+    expect(byPerformer.groups.map((g) => g.id)).toEqual([LIVE_GROUP]);
+  });
+
+  it("a soft-deleted scene no longer links its performer: performers by scene and performers by group", async () => {
+    const byScene = await performerQueryBuilder.execute({
+      userId: USER_ID,
+      filters: {
+        scenes: {
+          value: coerceEntityRefs([`${DELETED_SCENE}:${X}`]),
+          modifier: CriterionModifier.Includes,
+        },
+      },
+      allowedInstanceIds: [X],
+      sort: "name",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+    });
+    expect(byScene.performers).toEqual([]);
+
+    const byGroup = await performerQueryBuilder.execute({
+      userId: USER_ID,
+      filters: {
+        groups: {
+          value: coerceEntityRefs([
+            `${STALE_GROUP}:${X}`,
+            `${LIVE_GROUP}:${X}`,
+          ]),
+          modifier: CriterionModifier.Includes,
+        },
+      },
+      allowedInstanceIds: [X],
+      sort: "name",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+    });
+    expect(byGroup.performers.map((p) => p.id).sort()).toEqual(
+      [LIVE_PERFORMER, STALE_PERFORMER].sort()
+    );
+
+    // EXCLUDES the stale group: its only scene is deleted, so it excludes nobody
+    const excluding = await performerQueryBuilder.execute({
+      userId: USER_ID,
+      filters: {
+        groups: {
+          value: coerceEntityRefs([`${STALE_GROUP}:${X}`]),
+          modifier: CriterionModifier.Excludes,
+        },
+      },
+      allowedInstanceIds: [X],
+      sort: "name",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+    });
+    expect(excluding.performers.map((p) => p.id).sort()).toEqual(
+      [LIVE_PERFORMER, STALE_PERFORMER].sort()
+    );
   });
 });

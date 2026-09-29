@@ -290,11 +290,6 @@
       "count": 1
     }
   },
-  "services/SceneQueryBuilder.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
-    }
-  },
   "services/StashEntityService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 30

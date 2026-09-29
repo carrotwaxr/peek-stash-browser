@@ -4,13 +4,15 @@
  * Extracted from QueryBuilder classes to eliminate duplication of filter-building
  * logic for numeric comparisons, date ranges, text matching, and favorites.
  */
+import {
+  REF_MODIFIERS,
+  type RefModifier,
+} from "@peek/shared-types/filters/index.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
+import { type FilterClause, refClause } from "./sqlClauses.js";
 
-export interface FilterClause {
-  sql: string;
-  params: (string | number | boolean)[];
-}
+export type { FilterClause } from "./sqlClauses.js";
 
 /**
  * Parsed composite filter value.
@@ -41,10 +43,29 @@ export function parseCompositeFilterValues(
   return { parsed, hasInstanceIds };
 }
 
+/** The modifiers a ref filter understands; another is no filter */
+function refModifier(modifier: string): RefModifier | undefined {
+  return (REF_MODIFIERS as readonly string[]).includes(modifier)
+    ? (modifier as RefModifier)
+    : undefined;
+}
+
 /**
- * Build a junction table entity filter with instance-aware matching.
- * Generates SQL for INCLUDES, INCLUDES_ALL, or EXCLUDES with optional
- * instanceId constraints when composite keys are provided.
+ * Every set inline, whatever its size: the builders reading these wrappers
+ * take a where fragment only, not the large shape's CTEs and joins. Each
+ * port (C5 to C8) moves onto `refClause` and deletes its wrapper.
+ */
+const LEGACY_REF_OPTIONS = {
+  name: "legacy",
+  allowedInstanceIds: [],
+  inlineLimit: Number.POSITIVE_INFINITY,
+} as const;
+
+/**
+ * Build a junction table entity filter with instance-aware matching: a thin
+ * wrapper over `refClause` (utils/sqlClauses.ts) for the builders not yet
+ * on the base. INCLUDES, INCLUDES_ALL or EXCLUDES over the (id, instance)
+ * pairs; a bare id matches that id on every instance.
  *
  * @param ids - Array of entity references (InstanceAwareId composite keys)
  * @param junctionTable - Junction table name (e.g., "ScenePerformer")
@@ -65,75 +86,31 @@ export function buildJunctionFilter(
   parentAlias: string,
   modifier: string
 ): FilterClause {
-  const { parsed, hasInstanceIds } = parseCompositeFilterValues(ids);
-  const bareIds = parsed.map((p) => p.id);
+  const valid = refModifier(modifier);
+  if (valid === undefined) return { sql: "", params: [] };
   const alias = junctionTable.charAt(0).toLowerCase() + junctionTable.charAt(1);
-  const placeholders = bareIds.map(() => "?").join(", ");
-
-  if (!hasInstanceIds) {
-    // No instance IDs provided — match by entity ID only (backward compat)
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND ${alias}.${entityIdCol} IN (${placeholders}))`,
-          params: bareIds,
-        };
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT ${alias}.${entityIdCol}) FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND ${alias}.${entityIdCol} IN (${placeholders})) = ?`,
-          params: [...bareIds, bareIds.length],
-        };
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND ${alias}.${entityIdCol} IN (${placeholders}))`,
-          params: bareIds,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  // Instance-aware matching: build (entityId = ? AND entityInstanceId = ?) OR ... pairs
-  const pairConditions = parsed.map((p) => {
-    if (p.instanceId) {
-      return `(${alias}.${entityIdCol} = ? AND ${alias}.${entityInstanceCol} = ?)`;
-    }
-    // Bare ID within a mixed set — match any instance
-    return `(${alias}.${entityIdCol} = ?)`;
-  });
-  const pairParams: string[] = [];
-  for (const p of parsed) {
-    pairParams.push(p.id);
-    if (p.instanceId) {
-      pairParams.push(p.instanceId);
-    }
-  }
-  const pairSql = pairConditions.join(" OR ");
-
-  switch (modifier) {
-    case "INCLUDES":
-      return {
-        sql: `EXISTS (SELECT 1 FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND (${pairSql}))`,
-        params: pairParams,
-      };
-    case "INCLUDES_ALL":
-      return {
-        sql: `(SELECT COUNT(DISTINCT ${alias}.${entityIdCol} || ':' || ${alias}.${entityInstanceCol}) FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND (${pairSql})) = ?`,
-        params: [...pairParams, parsed.length],
-      };
-    case "EXCLUDES":
-      return {
-        sql: `NOT EXISTS (SELECT 1 FROM ${junctionTable} ${alias} WHERE ${alias}.${parentIdCol} = ${parentAlias}.id AND ${alias}.${parentInstanceCol} = ${parentAlias}.stashInstanceId AND (${pairSql}))`,
-        params: pairParams,
-      };
-    default:
-      return { sql: "", params: [] };
-  }
+  return refClause(
+    {
+      kind: "junction",
+      table: junctionTable,
+      alias,
+      parentAlias,
+      parentIdCol,
+      parentInstanceCol,
+      refIdCol: entityIdCol,
+      refInstanceCol: entityInstanceCol,
+    },
+    parseCompositeFilterValues(ids).parsed,
+    valid,
+    LEGACY_REF_OPTIONS
+  );
 }
 
 /**
- * Build a direct column entity filter with instance-aware matching.
- * For entities that use a direct FK (e.g., studios) rather than a junction table.
+ * Build a direct column entity filter with instance-aware matching: a thin
+ * wrapper over `refClause` for entities that use a direct FK (e.g., studios)
+ * rather than a junction table. INCLUDES or EXCLUDES over the (id, instance)
+ * pairs; EXCLUDES keeps rows with no value.
  *
  * @param ids - Array of entity references (InstanceAwareId composite keys)
  * @param idColumn - Column for entity ID (e.g., "s.studioId")
@@ -146,49 +123,27 @@ export function buildDirectFilter(
   instanceColumn: string,
   modifier: string
 ): FilterClause {
-  const { parsed, hasInstanceIds } = parseCompositeFilterValues(ids);
-  const bareIds = parsed.map((p) => p.id);
-  const placeholders = bareIds.map(() => "?").join(", ");
-
-  if (!hasInstanceIds) {
-    // No instance IDs — match by entity ID only
-    switch (modifier) {
-      case "INCLUDES":
-        return { sql: `${idColumn} IN (${placeholders})`, params: bareIds };
-      case "EXCLUDES":
-        return {
-          sql: `(${idColumn} IS NULL OR ${idColumn} NOT IN (${placeholders}))`,
-          params: bareIds,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
+  const valid = refModifier(modifier);
+  if (valid === undefined || valid === "INCLUDES_ALL") {
+    return { sql: "", params: [] };
   }
+  // The columns arrive qualified ("s.studioId"): split them for the target
+  const [parentAlias, idCol] = splitColumn(idColumn);
+  const [, instanceCol] = splitColumn(instanceColumn);
+  return refClause(
+    { kind: "column", parentTable: "", parentAlias, idCol, instanceCol },
+    parseCompositeFilterValues(ids).parsed,
+    valid,
+    LEGACY_REF_OPTIONS
+  );
+}
 
-  // Instance-aware: build pair conditions
-  const pairConditions = parsed.map((p) => {
-    if (p.instanceId) {
-      return `(${idColumn} = ? AND ${instanceColumn} = ?)`;
-    }
-    return `(${idColumn} = ?)`;
-  });
-  const pairParams: string[] = [];
-  for (const p of parsed) {
-    pairParams.push(p.id);
-    if (p.instanceId) {
-      pairParams.push(p.instanceId);
-    }
-  }
-  const pairSql = pairConditions.join(" OR ");
-
-  switch (modifier) {
-    case "INCLUDES":
-      return { sql: `(${pairSql})`, params: pairParams };
-    case "EXCLUDES":
-      return { sql: `NOT (${pairSql})`, params: pairParams };
-    default:
-      return { sql: "", params: [] };
-  }
+/** "s.studioId" as ["s", "studioId"]; an unqualified column keeps no alias */
+function splitColumn(column: string): [string, string] {
+  const dot = column.indexOf(".");
+  return dot === -1
+    ? ["", column]
+    : [column.slice(0, dot), column.slice(dot + 1)];
 }
 
 /**

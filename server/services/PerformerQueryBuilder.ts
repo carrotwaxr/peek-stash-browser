@@ -53,8 +53,8 @@ const PERFORMERS_BY_GROUP: ViaSceneSpec = {
 };
 
 /**
- * Performers in a live scene of one of the studios; a scene's studio is on
- * the scene's instance
+ * Performers in a scene of one of the studios; a scene's studio is on the
+ * scene's instance, and viaSceneClause requires the scene to be live
  */
 const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
   ...PERFORMERS_BY_SCENE,
@@ -66,7 +66,6 @@ const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
     refIdCol: "studioId",
     refInstanceCol: "stashInstanceId",
   },
-  where: "sc.deletedAt IS NULL",
 };
 
 // Query builder options
