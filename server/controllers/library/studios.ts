@@ -14,7 +14,6 @@ import type {
 } from "../../types/api/index.js";
 import type { NormalizedStudio } from "../../types/index.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -52,18 +51,11 @@ export const findStudios = async (
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    const { studios, total } = await studioQueryBuilder.execute({
+    const { items: studios, total } = await studioQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("studio", request.filter),
-      applyExclusions,
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      searchQuery: request.q,
-      randomSeed: request.sort.seed,
+      request,
+      applyExclusions,
     });
 
     // Check for ambiguous results on single-ID lookups

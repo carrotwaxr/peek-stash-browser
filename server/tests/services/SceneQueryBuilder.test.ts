@@ -262,6 +262,16 @@ describe("SceneQueryBuilder", () => {
       expect(params).toContain("%test search%");
     });
 
+    it("binds likeContains(q) with ESCAPE, so a % or _ in the search matches itself", async () => {
+      await run({ q: "100%_x" });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("LOWER(s.title) LIKE LOWER(?) ESCAPE '\\'");
+      expect(sql).toContain("LOWER(t.name) LIKE LOWER(?) ESCAPE '\\'");
+      expect(sql).not.toMatch(/LIKE LOWER\(\?\)(?! ESCAPE)/);
+      expect(params.filter((p) => p === "%100\\%\\_x%")).toHaveLength(6);
+    });
+
     it("does not add search filter without a search query", async () => {
       await run({ q: undefined });
 

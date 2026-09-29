@@ -24,10 +24,7 @@ import {
   vi,
 } from "vitest";
 import type { StashClient } from "../../graphql/StashClient.js";
-import {
-  CircumisedEnum,
-  CriterionModifier,
-} from "../../graphql/generated/graphql.js";
+import { CircumisedEnum } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -37,8 +34,10 @@ import {
   stashSyncService,
 } from "../../services/StashSyncService.js";
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
+import type { NumberCriterion } from "../../types/parsedFilters.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -51,10 +50,7 @@ const OPTIONS = {
   userId: 0,
   applyExclusions: false,
   allowedInstanceIds: [A, B],
-  sort: "name",
-  sortDirection: "ASC" as const,
-  page: 1,
-  perPage: 50,
+  request: parsedListRequest("performer", { perPage: 50 }),
 };
 
 type SyncPerformer = SyncEntityOf<"performer">;
@@ -75,16 +71,12 @@ const performer = (
   circumcised,
 });
 
-async function lengthFilter(
-  modifier: CriterionModifier,
-  value: number,
-  value2?: number
-): Promise<string[]> {
-  const { performers } = await performerQueryBuilder.execute({
+async function lengthFilter(criterion: NumberCriterion): Promise<string[]> {
+  const { items } = await performerQueryBuilder.execute({
     ...OPTIONS,
-    filters: { penis_length: { modifier, value, value2 } },
+    request: { ...OPTIONS.request, filter: { penis_length: criterion } },
   });
-  return keys(performers).sort();
+  return keys(items).sort();
 }
 
 async function removeRows(): Promise<void> {
@@ -155,26 +147,27 @@ describeWithDb("Performer penis length (integration)", () => {
     });
 
     it("GREATER_THAN 14 returns 7810001 on A only", async () => {
-      expect(await lengthFilter(CriterionModifier.GreaterThan, 14)).toEqual([
-        `7810001:${A}`,
-      ]);
+      expect(
+        await lengthFilter({ modifier: "GREATER_THAN", value: 14 })
+      ).toEqual([`7810001:${A}`]);
     });
 
     it("BETWEEN 11 and 13 returns 7810002", async () => {
-      expect(await lengthFilter(CriterionModifier.Between, 11, 13)).toEqual([
-        `7810002:${A}`,
-      ]);
+      expect(
+        await lengthFilter({ modifier: "BETWEEN", value: 11, value2: 13 })
+      ).toEqual([`7810002:${A}`]);
     });
 
     it("LESS_THAN 20 leaves out performers with no length", async () => {
-      expect(await lengthFilter(CriterionModifier.LessThan, 20)).toEqual([
+      expect(await lengthFilter({ modifier: "LESS_THAN", value: 20 })).toEqual([
         `7810001:${A}`,
         `7810002:${A}`,
       ]);
     });
 
     it("the list row carries penis_length 15.5 and circumcised CUT", async () => {
-      const { performers } = await performerQueryBuilder.execute(OPTIONS);
+      const { items: performers } =
+        await performerQueryBuilder.execute(OPTIONS);
       const row = must(
         performers.find((p) => p.id === "7810001" && p.instanceId === A)
       );
@@ -184,10 +177,12 @@ describeWithDb("Performer penis length (integration)", () => {
     });
 
     it("sort penis_length DESC lists 7810001 first", async () => {
-      const { performers } = await performerQueryBuilder.execute({
+      const { items: performers } = await performerQueryBuilder.execute({
         ...OPTIONS,
-        sort: "penis_length",
-        sortDirection: "DESC",
+        request: {
+          ...OPTIONS.request,
+          sort: { field: "penis_length", direction: "DESC", seed: undefined },
+        },
       });
 
       // No length last, then by name

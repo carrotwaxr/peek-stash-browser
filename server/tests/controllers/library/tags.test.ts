@@ -91,7 +91,7 @@ describe("Tags Controller", () => {
   describe("findTags", () => {
     it("returns tags from query builder on happy path", async () => {
       const tags = [createMockTag({ id: "t1", name: "TestTag" })];
-      mockTagQueryBuilder.execute.mockResolvedValue({ tags, total: 1 });
+      mockTagQueryBuilder.execute.mockResolvedValue({ items: tags, total: 1 });
 
       const req = reqFor(findTags, {
         body: { filter: {}, tag_filter: {} },
@@ -101,6 +101,12 @@ describe("Tags Controller", () => {
 
       await findTags(req, res);
 
+      // The builder reads the parsed request and the viewer's instances
+      const call = must(mockTagQueryBuilder.execute.mock.calls[0])[0];
+      expect(call).toMatchObject({
+        allowedInstanceIds: ["default"],
+        request: { page: 1, sort: { field: "name", direction: "ASC" } },
+      });
       expect(res._getStatus()).toBe(200);
       const body = res._getOkBody();
       expect(body.findTags.count).toBe(1);
@@ -109,7 +115,7 @@ describe("Tags Controller", () => {
 
     it("adds stashUrl to each tag for an admin", async () => {
       mockTagQueryBuilder.execute.mockResolvedValue({
-        tags: [createMockTag({ id: "t1" })],
+        items: [createMockTag({ id: "t1" })],
         total: 1,
       });
 
@@ -129,7 +135,7 @@ describe("Tags Controller", () => {
 
     it("does not send stashUrl to a regular user", async () => {
       mockTagQueryBuilder.execute.mockResolvedValue({
-        tags: [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })],
+        items: [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })],
         total: 2,
       });
 
@@ -151,7 +157,7 @@ describe("Tags Controller", () => {
         createMockTag({ id: "101", instanceId: "inst-a" }),
         createMockTag({ id: "101", instanceId: "inst-b" }),
       ];
-      mockTagQueryBuilder.execute.mockResolvedValue({ tags, total: 2 });
+      mockTagQueryBuilder.execute.mockResolvedValue({ items: tags, total: 2 });
 
       const req = reqFor(findTags, {
         body: { ids: ["101"], filter: {}, tag_filter: {} },
@@ -183,7 +189,7 @@ describe("Tags Controller", () => {
     it("fetches detail counts for single-ID lookup", async () => {
       const tag = createMockTag({ id: "101", instanceId: "default" });
       mockTagQueryBuilder.execute.mockResolvedValue({
-        tags: [tag],
+        items: [tag],
         total: 1,
       });
       mockStashEntityService.getTag.mockResolvedValue({
@@ -214,7 +220,7 @@ describe("Tags Controller", () => {
     });
 
     it("does not skip exclusions when fetching by ids", async () => {
-      mockTagQueryBuilder.execute.mockResolvedValue({ tags: [], total: 0 });
+      mockTagQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
 
       const req = reqFor(findTags, {
         body: { ids: ["101"], tag_filter: {} },

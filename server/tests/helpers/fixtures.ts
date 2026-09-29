@@ -8,8 +8,13 @@
  * query's `select`, or a model only one file mocks, use `partialRow` from
  * `prismaMock.ts` instead.
  */
+import {
+  DEFAULT_SORT,
+  type EntityKind,
+} from "@peek/shared-types/filters/index.js";
 import type { Download, Prisma, StashInstance, User } from "@prisma/client";
 import type { UserPermissions } from "../../services/PermissionService.js";
+import type { ParsedListRequest } from "../../types/parsedFilters.js";
 
 /** A user with their groups, as `groupMemberships: { include: { group: true } }` returns it. */
 export type UserWithGroups = Prisma.UserGetPayload<{
@@ -130,6 +135,32 @@ export function userPermissions(
       canDownloadFiles: "default",
       canDownloadPlaylists: "default",
     },
+    ...overrides,
+  };
+}
+
+/**
+ * A parsed list request for one entity, as the request parser hands it to
+ * the query builders: page 1 of 10 in the entity's default sort, no filter,
+ * no search. Pass only the parts a test changes.
+ */
+export function parsedListRequest<E extends EntityKind>(
+  entity: E,
+  overrides: Partial<ParsedListRequest<E>> = {}
+): ParsedListRequest<E> {
+  // DEFAULT_SORT holds a member of each entity's sort list
+  const sort = DEFAULT_SORT[entity] as {
+    field: ParsedListRequest<E>["sort"]["field"];
+    direction: "ASC" | "DESC";
+  };
+  return {
+    page: 1,
+    perPage: 10,
+    q: undefined,
+    sort: { field: sort.field, direction: sort.direction, seed: undefined },
+    filter: {},
+    specificInstanceId: undefined,
+    dropped: [],
     ...overrides,
   };
 }
