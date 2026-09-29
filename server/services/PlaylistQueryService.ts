@@ -205,10 +205,10 @@ async function loadItemScenes(
 
   // In turn: the reads share the pooled connection's cache
   for (let start = 0; start < refs.length; start += REFS_PER_READ) {
-    const { scenes: found } = await sceneQueryBuilder.getByRefs({
+    const found = await sceneQueryBuilder.getByRefs({
       userId,
       refs: refs.slice(start, start + REFS_PER_READ),
-      allowedInstanceIds: [...allowedInstanceIds],
+      allowedInstanceIds,
     });
     for (const scene of found) {
       scenes.set(entityKey(scene.id, scene.instanceId), scene);

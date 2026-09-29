@@ -179,14 +179,19 @@ describeWithDb("Query builder sort direction (integration)", () => {
     async (direction) => {
       const result = await sceneQueryBuilder.execute({
         userId: TEST_USER_ID,
-        sort: "title",
-        sortDirection: direction,
-        page: 1,
-        perPage: 50,
         allowedInstanceIds: [TEST_INSTANCE],
+        request: {
+          page: 1,
+          perPage: 50,
+          q: undefined,
+          sort: { field: "title", direction, seed: undefined },
+          filter: {},
+          specificInstanceId: undefined,
+          dropped: [],
+        },
       });
 
-      const shown = result.scenes.map((s) => ({ id: s.id, title: s.title }));
+      const shown = result.items.map((s) => ({ id: s.id, title: s.title }));
       // NULL (no title, no file) first ascending, as SQLite orders it
       const ascending = [...shown].sort(
         (a, b) =>

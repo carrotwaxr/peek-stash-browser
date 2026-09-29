@@ -384,7 +384,7 @@ The backend uses SQL-based query builders with pre-computed exclusions for effic
 
 #### Query Builders
 
-Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs:
+Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs. They extend one base, `services/query/EntityQueryBuilder.ts`, which builds the list and count statements from an entity spec (table, per-user joins, columns, tiebreak) and owns what every list shares: the `deletedAt` filter, the exclusion join with the instance, the allowed-instances filter (an empty list matches nothing), the `ids` filter as (id, instance) pairs, the random sort with its seed bound, and the joined `COUNT(*)`. The clause helpers in `utils/sqlClauses.ts` (`refClause`, `idClause`, `viaSceneClause`, `instanceClause`, `randomOrder`, `combine`) match every ref as an (id, instance) pair, inline up to `PAIR_INLINE_LIMIT` refs and through a materialized set above it. `SceneQueryBuilder` is on the base; the others follow in the next tasks.
 
 | Query Builder | Entity |
 |---------------|--------|
@@ -411,13 +411,13 @@ Each entity type has a dedicated query builder that handles filtering, sorting, 
 Library controllers use query builders for efficient SQL-based filtering:
 
 ```typescript
-// Query with exclusion JOIN — filtering, pagination, and count in one query
-const result = await sceneQueryBuilder
-  .forUser(userId)
-  .withFilters(filters)
-  .withSort(sort)
-  .paginate(offset, limit)
-  .execute();
+// The parsed request (utils/listRequest.ts) goes straight to the builder:
+// filtering, sorting, pagination and the count run in SQL
+const result = await sceneQueryBuilder.execute({
+  userId,
+  allowedInstanceIds,
+  request, // ParsedListRequest<"scene">
+});
 
 // Returns { items: Scene[], total: number }
 // Already filtered by user exclusions, already paginated

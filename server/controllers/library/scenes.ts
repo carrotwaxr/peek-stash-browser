@@ -22,7 +22,6 @@ import type {
 import type { NormalizedScene } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
-import { toLegacyFilter } from "../../utils/legacyFilter.js";
 import {
   logDropped,
   parseListRequest,
@@ -82,7 +81,7 @@ export const findScenes = async (
   logDropped("POST /library/scenes", request.dropped);
 
   try {
-    const { page, perPage, specificInstanceId } = request;
+    const { specificInstanceId } = request;
     // A detail page asks for its scene by id
     const lookup = singleIdRef(request.filter.ids);
 
@@ -92,29 +91,22 @@ export const findScenes = async (
     // Execute query (applyExclusions defaults to true)
     const result = await sceneQueryBuilder.execute({
       userId,
-      filters: toLegacyFilter("scene", request.filter),
       allowedInstanceIds,
-      specificInstanceId,
-      sort: request.sort.field,
-      sortDirection: request.sort.direction,
-      page,
-      perPage,
-      randomSeed: request.sort.seed,
-      searchQuery: request.q,
+      request,
     });
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (lookup && !specificInstanceId && result.scenes.length > 1) {
+    if (lookup && !specificInstanceId && result.items.length > 1) {
       logger.warn("Ambiguous scene lookup", {
         id: lookup.id,
-        matchCount: result.scenes.length,
-        instances: result.scenes.map((s) => s.instanceId),
+        matchCount: result.items.length,
+        instances: result.items.map((s) => s.instanceId),
       });
       res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple scenes found with ID ${lookup.id}. Specify instance_id parameter.`,
-        matches: result.scenes.map((s) => ({
+        matches: result.items.map((s) => ({
           id: s.id,
           title: s.title,
           instanceId: s.instanceId,
@@ -124,7 +116,7 @@ export const findScenes = async (
     }
 
     // Add streamability info
-    let scenes = addStreamabilityInfo(result.scenes, req.user);
+    let scenes = addStreamabilityInfo(result.items, req.user);
 
     // The Scene page loads one scene by id: only then build its stream
     // list. Lists keep sceneStreams empty.
@@ -227,7 +219,7 @@ export const findSimilarScenes = async (
     }
 
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
-    const { scenes } = await sceneQueryBuilder.getByRefs({
+    const scenes = await sceneQueryBuilder.getByRefs({
       userId,
       refs: pageRefs,
       allowedInstanceIds,
@@ -330,7 +322,7 @@ export const getRecommendedScenes = async (
     const startIndex = (page - 1) * perPage;
     const pageRefs = refs.slice(startIndex, startIndex + perPage);
 
-    const { scenes } = await sceneQueryBuilder.getByRefs({
+    const scenes = await sceneQueryBuilder.getByRefs({
       userId,
       refs: pageRefs,
       allowedInstanceIds,

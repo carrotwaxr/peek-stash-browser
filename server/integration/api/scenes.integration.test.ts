@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import {
   adminClient,
   guestClient,
@@ -13,6 +14,7 @@ interface FindScenesResponse {
   findScenes: {
     scenes: Array<{
       id: string;
+      instanceId?: string;
       title?: string;
       organized?: boolean;
       created_at?: string | null;
@@ -75,6 +77,43 @@ describe("Scene API", () => {
       expect(scene.id).toBe(TEST_ENTITIES.sceneWithRelations);
       expect(scene.title).toBeDefined();
       // Note: performers/tags may or may not be included depending on API design
+    });
+
+    it("ids with `id:instanceId` values returns those scenes", async () => {
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: [
+            `${TEST_ENTITIES.sceneWithRelations}:${testInstanceId}`,
+            `${TEST_ENTITIES.sceneInGroup}:${testInstanceId}`,
+          ],
+        }
+      );
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes.count).toBe(2);
+      expect(response.data.findScenes.scenes.map((s) => s.id).sort()).toEqual(
+        [TEST_ENTITIES.sceneWithRelations, TEST_ENTITIES.sceneInGroup].sort()
+      );
+    });
+
+    it("an id on another instance matches nothing", async () => {
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { ids: [`${TEST_ENTITIES.sceneWithRelations}:no-such-instance`] }
+      );
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes.count).toBe(0);
+      expect(response.data.findScenes.scenes).toEqual([]);
+    });
+
+    it("a random sort with a seed that contains SQL characters is rejected by validation, not interpolated", async () => {
+      const response = await adminClient.post("/api/library/scenes", {
+        filter: { sort: "random_12345;DROP TABLE StashScene", per_page: 1 },
+      });
+
+      expectRefused(response, ["filter.sort"]);
     });
 
     it("filters scenes by performer", async () => {

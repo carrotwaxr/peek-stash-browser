@@ -25,7 +25,6 @@ import type {
 } from "../types/api/index.js";
 import type { NormalizedScene } from "../types/index.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
-import { toLegacyFilter } from "../utils/legacyFilter.js";
 import {
   logDropped,
   parseCarouselRequest,
@@ -386,17 +385,11 @@ export async function executeCarouselQuery(
 
   const result = await sceneQueryBuilder.execute({
     userId,
-    filters: toLegacyFilter("scene", query.filter),
     allowedInstanceIds,
-    specificInstanceId: query.specificInstanceId,
-    sort: query.sort.field,
-    sortDirection: query.sort.direction,
-    page: query.page,
-    perPage: query.perPage,
-    randomSeed: query.sort.seed,
+    request: query,
   });
 
-  const scenes = addStreamabilityInfo(result.scenes, viewer);
+  const scenes = addStreamabilityInfo(result.items, viewer);
 
   logger.debug("executeCarouselQuery complete (SQL path)", {
     totalTimeMs: Date.now() - startTime,

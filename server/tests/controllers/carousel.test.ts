@@ -28,6 +28,7 @@ import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
@@ -614,7 +615,7 @@ describe("Carousel Controller", () => {
     it("returns scenes from executeCarouselQuery on success", async () => {
       const scenes = [SAMPLE_SCENE, { ...SAMPLE_SCENE, id: "scene-2" }];
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes,
+        items: scenes,
         total: scenes.length,
       });
       mockAddStreamability.mockReturnValue(withStashUrl(scenes));
@@ -677,7 +678,7 @@ describe("Carousel Controller", () => {
       const scenes = [SAMPLE_SCENE];
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes,
+        items: scenes,
         total: scenes.length,
       });
       mockAddStreamability.mockReturnValue(withStashUrl(scenes));
@@ -716,7 +717,7 @@ describe("Carousel Controller", () => {
     it("runs the carousel query through SceneQueryBuilder", async () => {
       const scenes = [SAMPLE_SCENE];
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes,
+        items: scenes,
         total: scenes.length,
       });
       mockAddStreamability.mockReturnValue(withStashUrl(scenes));
@@ -741,7 +742,7 @@ describe("Carousel Controller", () => {
         { ...SAMPLE_SCENE, streamable: true, stashUrl: null },
       ];
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes: rawScenes,
+        items: rawScenes,
         total: rawScenes.length,
       });
       mockAddStreamability.mockReturnValue(streamableScenes);
@@ -764,7 +765,7 @@ describe("Carousel Controller", () => {
       const scenes = [SAMPLE_SCENE];
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes,
+        items: scenes,
         total: scenes.length,
       });
       mockAddStreamability.mockReturnValue(withStashUrl(scenes));
@@ -780,7 +781,7 @@ describe("Carousel Controller", () => {
     });
 
     it("lists only the user's instances, with the parsed filter and sort", async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
       mockAddStreamability.mockReturnValue([]);
       mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
 
@@ -806,20 +807,24 @@ describe("Carousel Controller", () => {
         expect.objectContaining({
           userId: 1,
           allowedInstanceIds: ["inst-a", "inst-b"],
-          filters: {
-            rating100: { value: 80, modifier: "GREATER_THAN" },
-            performers: { value: ["7:inst-a"], modifier: "INCLUDES" },
-          },
-          sort: "title",
-          sortDirection: "ASC",
-          page: 1,
-          randomSeed: undefined,
+          request: objectContaining<ParsedListRequest<"scene">>({
+            filter: {
+              rating100: { value: 80, modifier: "GREATER_THAN" },
+              performers: {
+                refs: [{ id: "7", instanceId: "inst-a" }],
+                modifier: "INCLUDES",
+                depth: 0,
+              },
+            },
+            sort: { field: "title", direction: "ASC", seed: undefined },
+            page: 1,
+          }),
         })
       );
     });
 
     it("a random carousel gets a new seed each load", async () => {
-      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
       mockAddStreamability.mockReturnValue([]);
       const before = Date.now();
 
@@ -830,10 +835,10 @@ describe("Carousel Controller", () => {
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
-      const options = must(mockQueryBuilder.execute.mock.calls[0])[0];
-      expect(options.sort).toBe("random");
-      expect(options.sortDirection).toBe("DESC");
-      expect(options.randomSeed).toBeGreaterThanOrEqual(1 + before);
+      const { sort } = must(mockQueryBuilder.execute.mock.calls[0])[0].request;
+      expect(sort.field).toBe("random");
+      expect(sort.direction).toBe("DESC");
+      expect(sort.seed).toBeGreaterThanOrEqual(1 + before);
     });
 
     it("a stored carousel's unknown rule key and sort are left out, not refused", async () => {
@@ -843,7 +848,7 @@ describe("Carousel Controller", () => {
         sort: "constructor",
         direction: "DESC",
       });
-      mockQueryBuilder.execute.mockResolvedValue({ scenes: [], total: 0 });
+      mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
       mockAddStreamability.mockReturnValue([]);
 
       const req = reqFor(executeCarouselById, {
@@ -856,11 +861,12 @@ describe("Carousel Controller", () => {
       expect(res._getStatus()).toBe(200);
       expect(mockQueryBuilder.execute).toHaveBeenCalledWith(
         expect.objectContaining({
-          filters: { favorite: true },
           allowedInstanceIds: ["inst-a"],
-          sort: "created_at",
-          sortDirection: "DESC",
-          perPage: 12,
+          request: objectContaining<ParsedListRequest<"scene">>({
+            filter: { favorite: true },
+            sort: { field: "created_at", direction: "DESC", seed: undefined },
+            perPage: 12,
+          }),
         })
       );
     });
@@ -882,7 +888,7 @@ describe("Carousel Controller", () => {
     it("passes CAROUSEL_SCENE_LIMIT (12) as perPage to query builder", async () => {
       const scenes = [SAMPLE_SCENE];
       mockQueryBuilder.execute.mockResolvedValue({
-        scenes,
+        items: scenes,
         total: scenes.length,
       });
       mockAddStreamability.mockReturnValue(withStashUrl(scenes));
@@ -900,7 +906,9 @@ describe("Carousel Controller", () => {
 
       expect(mockQueryBuilder.execute).toHaveBeenCalledWith(
         expect.objectContaining({
-          perPage: 12,
+          request: objectContaining<ParsedListRequest<"scene">>({
+            perPage: 12,
+          }),
         })
       );
     });

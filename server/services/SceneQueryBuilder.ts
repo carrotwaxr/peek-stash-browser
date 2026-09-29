@@ -1,91 +1,68 @@
 /**
- * SceneQueryBuilder - SQL-native scene querying
+ * SceneQueryBuilder: the scene list in SQL.
  *
- * Builds parameterized SQL queries for scene filtering, sorting, and pagination.
- * Eliminates the need to load all scenes into memory.
+ * The scene builder on the base (`query/EntityQueryBuilder.ts`): this file
+ * declares the scene's spec (table, per-user joins, columns, tiebreak), its
+ * filter clauses from the parsed request, its sort map, its row transform
+ * and its relations. The instance filter, the exclusion join, the `ids`
+ * filter, the random sort and the count are the base's.
  */
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import type {
+  Resolution,
+  SortDirection,
+} from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
 import type {
   GalleryRef,
   GroupRef,
   NormalizedScene,
-  PeekSceneFilter,
   PerformerRef,
   StudioRef,
   TagRef,
 } from "../types/index.js";
 import type { SceneQueryRow } from "../types/internal/queryRows.js";
-import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import type {
+  EnumCriterion,
+  FilterRef,
+  MultiEnumCriterion,
+  ParsedFilter,
+  RefCriterion,
+} from "../types/parsedFilters.js";
+import { entityKey } from "../utils/entityRef.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { readHistory } from "../utils/historyJson.js";
-import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
+  type ColumnTarget,
   type FilterClause,
+  type JunctionTarget,
+  allOf,
+  noClause,
+  refClause,
+} from "../utils/sqlClauses.js";
+import {
   buildDateFilter,
   buildFavoriteFilter,
-  buildJunctionFilter,
   buildNumericFilter,
-  parseCompositeFilterValues,
+  buildTextFilter,
 } from "../utils/sqlFilterBuilders.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import {
+  EntityQueryBuilder,
+  type EntitySpec,
+  type QueryContext,
+  type SortExpr,
+} from "./query/EntityQueryBuilder.js";
 
-// Query builder options
-export interface SceneQueryOptions {
-  userId: number;
-  filters?: PeekSceneFilter;
-  applyExclusions?: boolean; // Default true - use pre-computed exclusions
-  allowedInstanceIds?: string[]; // Multi-instance filtering - array of instances the user can access
-  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
-  sort: string;
-  sortDirection: "ASC" | "DESC";
-  page: number;
-  perPage: number;
-  randomSeed?: number;
-  searchQuery?: string; // Text search query - searches title, details, path, performer names, studio name, tag names
-  refs?: readonly EntityRef[]; // Only these (id, instance) scenes, on top of the other clauses
-}
+export type {
+  ByRefsOptions,
+  ListQueryOptions,
+  ListResult,
+} from "./query/EntityQueryBuilder.js";
 
-// Query result
-export interface SceneQueryResult {
-  scenes: NormalizedScene[];
-  total: number;
-}
-
-// Query by (id, instance) refs
-export interface SceneByRefsOptions {
-  userId: number;
-  refs: readonly EntityRef[];
-  allowedInstanceIds?: string[]; // Multi-instance filtering
-}
-
-/**
- * The clause matching exactly these (id, instance) scenes, one bound pair
- * per ref: `(s.id = ? AND s.stashInstanceId = ?) OR ...`, which SQLite runs
- * as a MULTI-INDEX OR over the primary key. No refs matches nothing. C4
- * folds this into the base builder's idClause.
- */
-export function buildRefsClause(
-  refs: readonly EntityRef[],
-  alias: string = "s"
-): FilterClause {
-  if (refs.length === 0) {
-    return { sql: "0", params: [] };
-  }
-  return {
-    sql: `(${refs.map(() => `(${alias}.id = ? AND ${alias}.stashInstanceId = ?)`).join(" OR ")})`,
-    params: refs.flatMap((ref) => [ref.id, ref.instanceId]),
-  };
-}
-
-/**
- * Builds and executes SQL queries for scene filtering
- */
-class SceneQueryBuilder {
-  // Column list for SELECT - all StashScene fields plus user data
-  private readonly SELECT_COLUMNS = `
+// Column list for SELECT - all StashScene fields plus user data
+const SELECT_COLUMNS = `
     s.id, s.stashInstanceId, s.title, s.code, s.date, s.studioId, s.rating100 AS stashRating100,
     s.duration, s.organized, s.details, s.director, s.urls, s.filePath, s.fileBitRate,
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
@@ -101,364 +78,377 @@ class SceneQueryBuilder {
     w.playHistory AS userPlayHistory
   `.trim();
 
-  // Base FROM clause with user data JOINs
-  private buildFromClause(
-    userId: number,
-    applyExclusions: boolean = true
-  ): { sql: string; params: number[] } {
-    const baseJoins = `
-        FROM StashScene s
-        LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN WatchHistory w ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND w.userId = ?
-    `.trim();
+const SCENE_SPEC: EntitySpec = {
+  table: "StashScene",
+  alias: "s",
+  entityType: "scene",
+  userJoins: [
+    { table: "SceneRating", alias: "r", entityIdCol: "sceneId" },
+    { table: "WatchHistory", alias: "w", entityIdCol: "sceneId" },
+  ],
+  selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
+  defaultSort: "created_at",
+  tiebreak: (direction) => `s.id ${direction}`,
+};
 
-    if (applyExclusions) {
-      return {
-        sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)`,
-        params: [userId, userId, userId],
-      };
-    }
+/** A scene's junction to another entity, for the ref filters */
+const junction = (
+  table: string,
+  alias: string,
+  refIdCol: string,
+  refInstanceCol: string
+): JunctionTarget => ({
+  kind: "junction",
+  table,
+  alias,
+  parentAlias: "s",
+  parentIdCol: "sceneId",
+  parentInstanceCol: "sceneInstanceId",
+  refIdCol,
+  refInstanceCol,
+});
+const SCENE_PERFORMERS = junction(
+  "ScenePerformer",
+  "sp",
+  "performerId",
+  "performerInstanceId"
+);
+const SCENE_TAGS = junction("SceneTag", "st", "tagId", "tagInstanceId");
+const SCENE_GROUPS = junction("SceneGroup", "sg", "groupId", "groupInstanceId");
+const SCENE_GALLERIES = junction(
+  "SceneGallery",
+  "sg",
+  "galleryId",
+  "galleryInstanceId"
+);
+/** A scene's studio is a column of its own row, on the scene's instance */
+const SCENE_STUDIO: ColumnTarget = {
+  kind: "column",
+  parentTable: "StashScene",
+  parentAlias: "s",
+  idCol: "studioId",
+  instanceCol: "stashInstanceId",
+};
 
-    return {
-      sql: baseJoins,
-      params: [userId, userId],
-    };
-  }
+/**
+ * The pixel height each resolution names; SEVEN_K and HUGE have none yet
+ * (B11), so they filter nothing.
+ */
+const RESOLUTION_HEIGHTS: Partial<Record<Resolution, number>> = {
+  VERY_LOW: 144,
+  LOW: 240,
+  R360P: 360,
+  STANDARD: 480,
+  WEB_HD: 540,
+  STANDARD_HD: 720,
+  FULL_HD: 1080,
+  QUAD_HD: 1440,
+  VR_HD: 1920,
+  FOUR_K: 2160,
+  FIVE_K: 2880,
+  SIX_K: 3240,
+  EIGHT_K: 4320,
+};
 
-  // Base WHERE clause (always filter deleted, optionally filter excluded)
-  private buildBaseWhere(applyExclusions: boolean = true): FilterClause {
-    if (applyExclusions) {
-      return {
-        sql: "s.deletedAt IS NULL AND e.id IS NULL",
-        params: [],
-      };
-    }
-    return {
-      sql: "s.deletedAt IS NULL",
+/**
+ * The oldest performer's age on the scene's date (today's, without a date):
+ * (scene date - birthdate) in years, as SQLite computes it
+ */
+const PERFORMER_AGE = `(
+      SELECT MAX(
+        CAST((julianday(COALESCE(s.date, date('now'))) - julianday(p.birthdate)) / 365.25 AS INTEGER)
+      )
+      FROM ScenePerformer sp
+      JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
+      WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND p.birthdate IS NOT NULL
+    )`;
+
+/**
+ * The refs with their descendants to `depth` (0: none). Expansion works on
+ * bare ids (C9 keeps the instance through it): the selected refs keep their
+ * instance, and a descendant matches its id on every instance, as today.
+ */
+async function expandRefs(
+  refs: readonly FilterRef[],
+  depth: number,
+  expand: (ids: string[], depth: number) => Promise<string[]>
+): Promise<readonly FilterRef[]> {
+  if (depth === 0) return refs;
+  const own = new Set(refs.map((ref) => ref.id));
+  const expanded = await expand(
+    refs.map((ref) => ref.id),
+    depth
+  );
+  return [
+    ...refs,
+    ...expanded
+      .filter((id) => !own.has(id))
+      .map((id): FilterRef => ({ id, instanceId: undefined })),
+  ];
+}
+
+/**
+ * Builds and executes SQL queries for scene filtering
+ */
+class SceneQueryBuilder extends EntityQueryBuilder<
+  SceneQueryRow,
+  NormalizedScene,
+  "scene"
+> {
+  protected readonly spec = SCENE_SPEC;
+
+  /**
+   * The sort expressions. title, performer_count and tag_count read the
+   * columns sync stores (SCENE_DERIVED_COLUMNS_SQL in StashSyncService):
+   * titleSort is the displayed title with ASCII lower-cased, so its BINARY
+   * order is the case-insensitive title order. Each has a (deletedAt,
+   * column, id) index, which serves the order with its id tiebreak as is.
+   * last_o_at and scene_index have no expression yet (B12) and fall back to
+   * the default sort.
+   */
+  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+    const column = (sql: string): SortExpr => ({
+      sql: `${sql} ${dir}`,
       params: [],
-    };
-  }
-
-  /**
-   * Build instance filter clause for multi-instance support
-   * Filters scenes to only those from allowed Stash instances
-   */
-  private buildInstanceFilter(
-    allowedInstanceIds: string[] | undefined
-  ): FilterClause {
-    if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
-      // No instance filter - return all scenes
-      return { sql: "", params: [] };
-    }
-
-    const placeholders = allowedInstanceIds.map(() => "?").join(", ");
+    });
     return {
-      sql: `(s.stashInstanceId IN (${placeholders}) OR s.stashInstanceId IS NULL)`,
-      params: allowedInstanceIds,
+      // Scene metadata
+      created_at: column("s.stashCreatedAt"),
+      updated_at: column("s.stashUpdatedAt"),
+      date: column("s.date"),
+      title: column("s.titleSort"),
+      duration: column("s.duration"),
+      filesize: column("s.fileSize"),
+      bitrate: column("s.fileBitRate"),
+      framerate: column("s.fileFrameRate"),
+      path: column("s.filePath"),
+      performer_count: column("s.performerCount"),
+      tag_count: column("s.tagCount"),
+
+      // The viewer's rating (SceneRating)
+      rating: column("COALESCE(r.rating, 0)"),
+      user_rating: column("COALESCE(r.rating, 0)"),
+
+      // The viewer's history (WatchHistory)
+      last_played_at: column("w.lastPlayedAt"),
+      play_count: column("COALESCE(w.playCount, 0)"),
+      play_duration: column("COALESCE(w.playDuration, 0)"),
+      o_counter: column("COALESCE(w.oCount, 0)"),
+      resume_time: column("COALESCE(w.resumeTime, 0)"),
     };
   }
 
   /**
-   * Build filter for a specific instance ID (for disambiguation on detail pages)
-   * This is different from allowedInstanceIds - it filters to exactly one instance.
+   * The scene filter's clauses, one per criterion the request carried.
+   * `director` and `organized` are declared in the contract but have no
+   * clause yet (B11).
    */
-  private buildSpecificInstanceFilter(
-    instanceId: string | undefined
-  ): FilterClause {
-    if (!instanceId) {
-      return { sql: "", params: [] };
-    }
-    return {
-      sql: `s.stashInstanceId = ?`,
-      params: [instanceId],
-    };
-  }
+  protected async filterClauses(
+    filter: ParsedFilter<"scene">,
+    q: string | undefined,
+    ctx: QueryContext
+  ): Promise<FilterClause[]> {
+    const { userId, allowedInstanceIds } = ctx;
+    const refs = (
+      name: string,
+      target: JunctionTarget,
+      criterion: RefCriterion
+    ) =>
+      refClause(target, criterion.refs, criterion.modifier, {
+        name,
+        allowedInstanceIds,
+      });
 
-  /**
-   * Build performer filter clause
-   * Supports INCLUDES, INCLUDES_ALL, EXCLUDES modifiers
-   * Handles composite "id:instanceId" values for multi-instance filtering
-   */
-  private buildPerformerFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = coerceEntityRefs(filter.value);
-    const modifier = filter.modifier || "INCLUDES";
-
-    return buildJunctionFilter(
-      ids,
-      "ScenePerformer",
-      "sceneId",
-      "sceneInstanceId",
-      "performerId",
-      "performerInstanceId",
-      "s",
-      modifier
-    );
-  }
-
-  /**
-   * Build group filter clause
-   * Handles composite "id:instanceId" values for multi-instance filtering
-   */
-  private buildGroupFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = coerceEntityRefs(filter.value);
-    const modifier = filter.modifier || "INCLUDES";
-
-    return buildJunctionFilter(
-      ids,
-      "SceneGroup",
-      "sceneId",
-      "sceneInstanceId",
-      "groupId",
-      "groupInstanceId",
-      "s",
-      modifier
-    );
-  }
-
-  /**
-   * Build galleries filter clause
-   * Handles composite "id:instanceId" values for multi-instance filtering
-   */
-  private buildGalleriesFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = coerceEntityRefs(filter.value);
-    const modifier = filter.modifier || "INCLUDES";
-
-    return buildJunctionFilter(
-      ids,
-      "SceneGallery",
-      "sceneId",
-      "sceneInstanceId",
-      "galleryId",
-      "galleryInstanceId",
-      "s",
-      modifier
-    );
-  }
-
-  /**
-   * Build ID filter clause (for specific scene IDs)
-   */
-  private buildIdFilter(
-    filter:
-      | { value?: string[] | null; modifier?: string | null }
-      | string[]
-      | undefined
-      | null
-  ): FilterClause {
-    // Handle both array and object formats
-    const ids = Array.isArray(filter) ? filter : filter?.value;
-    if (!ids || ids.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const modifier = Array.isArray(filter)
-      ? "INCLUDES"
-      : filter?.modifier || "INCLUDES";
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return { sql: `s.id IN (${placeholders})`, params: ids };
-      case "EXCLUDES":
-        return { sql: `s.id NOT IN (${placeholders})`, params: ids };
-      default:
-        return { sql: `s.id IN (${placeholders})`, params: ids };
-    }
-  }
-
-  /**
-   * Build resolution filter clause
-   */
-  private buildResolutionFilter(
-    filter:
-      | { value?: string | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    // Resolution values map enum names to pixel heights
-    const resolutionMap: Record<string, number> = {
-      // Lowercase with 'p' suffix (e.g., "720p")
-      "144p": 144,
-      "240p": 240,
-      "360p": 360,
-      "480p": 480,
-      "540p": 540,
-      "720p": 720,
-      "1080p": 1080,
-      "1440p": 1440,
-      "4k": 2160,
-      "5k": 2880,
-      "6k": 3240,
-      "8k": 4320,
-      // Stash enum values (e.g., "STANDARD_HD")
-      very_low: 144,
-      low: 240,
-      r360p: 360,
-      standard: 480,
-      web_hd: 540,
-      standard_hd: 720,
-      full_hd: 1080,
-      quad_hd: 1440,
-      vr_hd: 1920,
-      four_k: 2160,
-      five_k: 2880,
-      six_k: 3240,
-      eight_k: 4320,
+    const clauses: FilterClause[] = [];
+    const push = (clause: FilterClause | undefined) => {
+      if (clause !== undefined) clauses.push(clause);
     };
 
-    const height = resolutionMap[filter.value.toLowerCase()];
-    if (!height) {
-      return { sql: "", params: [] };
+    // Metadata
+    if (filter.duration) {
+      push(buildNumericFilter(filter.duration, "COALESCE(s.duration, 0)"));
+    }
+    if (filter.resolution) push(this.resolutionClause(filter.resolution));
+
+    // Related entities
+    if (filter.performers) {
+      push(refs("performers", SCENE_PERFORMERS, filter.performers));
+    }
+    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
+    if (filter.studios) push(await this.studioClause(filter.studios, ctx));
+    if (filter.groups) push(refs("groups", SCENE_GROUPS, filter.groups));
+    if (filter.galleries) {
+      push(refs("galleries", SCENE_GALLERIES, filter.galleries));
     }
 
-    const { modifier = "EQUALS" } = filter;
+    // The viewer's own data
+    push(buildFavoriteFilter(filter.favorite));
+    if (filter.rating100) {
+      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
+    }
+    if (filter.play_count) {
+      push(buildNumericFilter(filter.play_count, "COALESCE(w.playCount, 0)"));
+    }
+    if (filter.o_counter) {
+      push(buildNumericFilter(filter.o_counter, "COALESCE(w.oCount, 0)"));
+    }
+
+    // Text
+    if (filter.title) push(buildTextFilter(filter.title, "s.title"));
+    if (filter.details) push(buildTextFilter(filter.details, "s.details"));
+
+    // Dates
+    if (filter.date) push(buildDateFilter(filter.date, "s.date"));
+    if (filter.created_at) {
+      push(buildDateFilter(filter.created_at, "s.stashCreatedAt"));
+    }
+    if (filter.updated_at) {
+      push(buildDateFilter(filter.updated_at, "s.stashUpdatedAt"));
+    }
+    if (filter.last_played_at) {
+      push(buildDateFilter(filter.last_played_at, "w.lastPlayedAt"));
+    }
+
+    // Numbers
+    if (filter.bitrate) {
+      push(buildNumericFilter(filter.bitrate, "COALESCE(s.fileBitRate, 0)"));
+    }
+    if (filter.framerate) {
+      push(
+        buildNumericFilter(filter.framerate, "COALESCE(s.fileFrameRate, 0)")
+      );
+    }
+    if (filter.play_duration) {
+      push(
+        buildNumericFilter(filter.play_duration, "COALESCE(w.playDuration, 0)")
+      );
+    }
+
+    // Counts, stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's
+    // ScenePerformer and SceneTag rows
+    if (filter.performer_count) {
+      push(buildNumericFilter(filter.performer_count, "s.performerCount"));
+    }
+    if (filter.tag_count) {
+      push(buildNumericFilter(filter.tag_count, "s.tagCount"));
+    }
+    if (filter.performer_age) {
+      push(buildNumericFilter(filter.performer_age, PERFORMER_AGE));
+    }
+
+    // Enums
+    if (filter.orientation) push(this.orientationClause(filter.orientation));
+    if (filter.video_codec) {
+      push(buildTextFilter(filter.video_codec, "s.fileVideoCodec"));
+    }
+    if (filter.audio_codec) {
+      push(buildTextFilter(filter.audio_codec, "s.fileAudioCodec"));
+    }
+
+    // The viewer's favorite entities
+    if (filter.performer_favorite === true) {
+      push(this.buildPerformerFavoriteFilter(userId));
+    }
+    if (filter.studio_favorite === true) {
+      push(this.buildStudioFavoriteFilter(userId));
+    }
+    if (filter.tag_favorite === true) {
+      push(this.buildTagFavoriteFilter(userId));
+    }
+
+    // Text search across title, details, path, performers, studio, tags
+    if (q !== undefined) push(this.buildSearchQueryFilter(q));
+
+    return clauses;
+  }
+
+  /**
+   * The tag filter: the scene's own tags (SceneTag) and its inherited tags
+   * (the inheritedTagIds JSON list). With a depth, INCLUDES_ALL is one
+   * clause per selected tag, each with its own descendants (QUERIES-08).
+   */
+  private async tagClause(
+    criterion: RefCriterion,
+    ctx: QueryContext
+  ): Promise<FilterClause> {
+    const opts = {
+      name: "tags",
+      allowedInstanceIds: ctx.allowedInstanceIds,
+      inheritedJson: "inheritedTagIds",
+    };
+    if (criterion.depth !== 0 && criterion.modifier === "INCLUDES_ALL") {
+      const groups = await Promise.all(
+        criterion.refs.map((ref) =>
+          expandRefs([ref], criterion.depth, expandTagIds)
+        )
+      );
+      return allOf(
+        groups.map((group, i) =>
+          refClause(SCENE_TAGS, group, "INCLUDES", {
+            ...opts,
+            name: `tags_${i}`,
+          })
+        )
+      );
+    }
+    const refs = await expandRefs(
+      criterion.refs,
+      criterion.depth,
+      expandTagIds
+    );
+    return refClause(SCENE_TAGS, refs, criterion.modifier, opts);
+  }
+
+  /** The studio filter, with the studios' descendants to the depth */
+  private async studioClause(
+    criterion: RefCriterion,
+    ctx: QueryContext
+  ): Promise<FilterClause> {
+    const refs = await expandRefs(
+      criterion.refs,
+      criterion.depth,
+      expandStudioIds
+    );
+    return refClause(SCENE_STUDIO, refs, criterion.modifier, {
+      name: "studios",
+      allowedInstanceIds: ctx.allowedInstanceIds,
+    });
+  }
+
+  private resolutionClause(criterion: EnumCriterion<Resolution>): FilterClause {
+    const height = RESOLUTION_HEIGHTS[criterion.value];
+    if (height === undefined) return noClause();
     const col = "COALESCE(s.fileHeight, 0)";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [height] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [height] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [height] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [height] };
-      case null:
-      default:
-        return { sql: `${col} >= ?`, params: [height] };
-    }
+    const operator = {
+      EQUALS: "=",
+      NOT_EQUALS: "!=",
+      GREATER_THAN: ">",
+      LESS_THAN: "<",
+    }[criterion.modifier];
+    return { sql: `${col} ${operator} ?`, params: [height] };
   }
 
-  /**
-   * Build title filter clause (text search)
-   */
-  private buildTitleFilter(
-    filter:
-      | { value?: string | null; modifier?: string | null }
-      | undefined
-      | null
+  private orientationClause(
+    criterion: MultiEnumCriterion<"LANDSCAPE" | "PORTRAIT" | "SQUARE">
   ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier = "INCLUDES" } = filter;
-
-    switch (modifier) {
-      case "INCLUDES":
-        return { sql: "LOWER(s.title) LIKE LOWER(?)", params: [`%${value}%`] };
-      case "EXCLUDES":
-        return {
-          sql: "(s.title IS NULL OR LOWER(s.title) NOT LIKE LOWER(?))",
-          params: [`%${value}%`],
-        };
-      case "EQUALS":
-        return { sql: "LOWER(s.title) = LOWER(?)", params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: "(s.title IS NULL OR LOWER(s.title) != LOWER(?))",
-          params: [value],
-        };
-      case "IS_NULL":
-        return { sql: "(s.title IS NULL OR s.title = '')", params: [] };
-      case "NOT_NULL":
-        return { sql: "(s.title IS NOT NULL AND s.title != '')", params: [] };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build details filter clause (text search)
-   */
-  private buildDetailsFilter(
-    filter:
-      | { value?: string | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier = "INCLUDES" } = filter;
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: "LOWER(s.details) LIKE LOWER(?)",
-          params: [`%${value}%`],
-        };
-      case "EXCLUDES":
-        return {
-          sql: "(s.details IS NULL OR LOWER(s.details) NOT LIKE LOWER(?))",
-          params: [`%${value}%`],
-        };
-      case "EQUALS":
-        return { sql: "LOWER(s.details) = LOWER(?)", params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: "(s.details IS NULL OR LOWER(s.details) != LOWER(?))",
-          params: [value],
-        };
-      case "IS_NULL":
-        return { sql: "(s.details IS NULL OR s.details = '')", params: [] };
-      case "NOT_NULL":
-        return {
-          sql: "(s.details IS NOT NULL AND s.details != '')",
-          params: [],
-        };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
+    const conditions = criterion.values.map(
+      (orientation) =>
+        ({
+          LANDSCAPE: "(s.fileWidth > s.fileHeight)",
+          PORTRAIT: "(s.fileWidth < s.fileHeight)",
+          SQUARE: "(s.fileWidth = s.fileHeight AND s.fileWidth > 0)",
+        })[orientation]
+    );
+    return { sql: `(${conditions.join(" OR ")})`, params: [] };
   }
 
   /**
    * Build text search filter clause (searches across title, details, path, performers, studio, tags)
    * Uses LIKE with wildcard for broad text matching
    */
-  private buildSearchQueryFilter(
-    searchQuery: string | undefined
-  ): FilterClause {
-    if (!searchQuery || searchQuery.trim() === "") {
-      return { sql: "", params: [] };
-    }
-
+  private buildSearchQueryFilter(searchQuery: string): FilterClause {
     const query = searchQuery.trim();
+    if (query === "") return noClause();
     const likeParam = `%${query}%`;
 
     // Build OR clause that searches across multiple fields including relations via subqueries
@@ -497,226 +487,6 @@ class SceneQueryBuilder {
         likeParam,
       ],
     };
-  }
-
-  /**
-   * Build orientation filter clause
-   */
-  private buildOrientationFilter(
-    filter: { value?: string[] | null } | undefined | null
-  ): FilterClause {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const orientations = filter.value.map((o) => o.toUpperCase());
-    const conditions: string[] = [];
-
-    for (const orientation of orientations) {
-      switch (orientation) {
-        case "LANDSCAPE":
-          conditions.push("(s.fileWidth > s.fileHeight)");
-          break;
-        case "PORTRAIT":
-          conditions.push("(s.fileWidth < s.fileHeight)");
-          break;
-        case "SQUARE":
-          conditions.push("(s.fileWidth = s.fileHeight AND s.fileWidth > 0)");
-          break;
-      }
-    }
-
-    if (conditions.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    return { sql: `(${conditions.join(" OR ")})`, params: [] };
-  }
-
-  /**
-   * Build video codec filter clause
-   */
-  private buildVideoCodecFilter(
-    filter:
-      | { value?: string | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier = "INCLUDES" } = filter;
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: "LOWER(s.fileVideoCodec) LIKE LOWER(?)",
-          params: [`%${value}%`],
-        };
-      case "EXCLUDES":
-        return {
-          sql: "(s.fileVideoCodec IS NULL OR LOWER(s.fileVideoCodec) NOT LIKE LOWER(?))",
-          params: [`%${value}%`],
-        };
-      case "EQUALS":
-        return { sql: "LOWER(s.fileVideoCodec) = LOWER(?)", params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: "(s.fileVideoCodec IS NULL OR LOWER(s.fileVideoCodec) != LOWER(?))",
-          params: [value],
-        };
-      case "IS_NULL":
-        return {
-          sql: "(s.fileVideoCodec IS NULL OR s.fileVideoCodec = '')",
-          params: [],
-        };
-      case "NOT_NULL":
-        return {
-          sql: "(s.fileVideoCodec IS NOT NULL AND s.fileVideoCodec != '')",
-          params: [],
-        };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build audio codec filter clause
-   */
-  private buildAudioCodecFilter(
-    filter:
-      | { value?: string | null; modifier?: string | null }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier = "INCLUDES" } = filter;
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: "LOWER(s.fileAudioCodec) LIKE LOWER(?)",
-          params: [`%${value}%`],
-        };
-      case "EXCLUDES":
-        return {
-          sql: "(s.fileAudioCodec IS NULL OR LOWER(s.fileAudioCodec) NOT LIKE LOWER(?))",
-          params: [`%${value}%`],
-        };
-      case "EQUALS":
-        return { sql: "LOWER(s.fileAudioCodec) = LOWER(?)", params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: "(s.fileAudioCodec IS NULL OR LOWER(s.fileAudioCodec) != LOWER(?))",
-          params: [value],
-        };
-      case "IS_NULL":
-        return {
-          sql: "(s.fileAudioCodec IS NULL OR s.fileAudioCodec = '')",
-          params: [],
-        };
-      case "NOT_NULL":
-        return {
-          sql: "(s.fileAudioCodec IS NOT NULL AND s.fileAudioCodec != '')",
-          params: [],
-        };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build performer count filter clause
-   */
-  private buildPerformerCountFilter(
-    filter:
-      | {
-          value?: number | null;
-          value2?: number | null;
-          modifier?: string | null;
-        }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "EQUALS" } = filter;
-    // Stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's ScenePerformer rows
-    const column = "s.performerCount";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${column} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${column} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${column} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${column} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return {
-            sql: `${column} BETWEEN ? AND ?`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${column} >= ?`, params: [value] };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build tag count filter clause
-   */
-  private buildTagCountFilter(
-    filter:
-      | {
-          value?: number | null;
-          value2?: number | null;
-          modifier?: string | null;
-        }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "EQUALS" } = filter;
-    // Stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's SceneTag rows
-    const column = "s.tagCount";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${column} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${column} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${column} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${column} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return {
-            sql: `${column} BETWEEN ? AND ?`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${column} >= ?`, params: [value] };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
   }
 
   /**
@@ -764,659 +534,9 @@ class SceneQueryBuilder {
   }
 
   /**
-   * Build performer age filter clause
-   * Filters by performer age at time of scene date
-   */
-  private buildPerformerAgeFilter(
-    filter:
-      | {
-          value?: number | null;
-          value2?: number | null;
-          modifier?: string | null;
-        }
-      | undefined
-      | null
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "EQUALS" } = filter;
-    // Calculate age: (scene_date - birthdate) in years
-    // SQLite: (julianday(scene_date) - julianday(birthdate)) / 365.25
-    const ageSubquery = `(
-      SELECT MAX(
-        CAST((julianday(COALESCE(s.date, date('now'))) - julianday(p.birthdate)) / 365.25 AS INTEGER)
-      )
-      FROM ScenePerformer sp
-      JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
-      WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND p.birthdate IS NOT NULL
-    )`;
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${ageSubquery} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${ageSubquery} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${ageSubquery} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${ageSubquery} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return {
-            sql: `${ageSubquery} BETWEEN ? AND ?`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${ageSubquery} >= ?`, params: [value] };
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build studio filter with hierarchy support
-   */
-  private async buildStudioFilterWithHierarchy(
-    filter:
-      | {
-          value?: string[] | null;
-          modifier?: string | null;
-          depth?: number | null;
-        }
-      | undefined
-      | null
-  ): Promise<FilterClause> {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
-    // but StashScene.studioId stores bare IDs
-    const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map((p) => p.id);
-    const { modifier = "INCLUDES", depth } = filter;
-
-    // Expand IDs if depth is specified and not 0
-    if (depth !== undefined && depth !== null && depth !== 0) {
-      ids = await expandStudioIds(ids, depth);
-    }
-
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `s.studioId IN (${placeholders})`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `(s.studioId IS NULL OR s.studioId NOT IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build tag filter with hierarchy support
-   * Searches both direct scene tags (SceneTag) and inherited tags (inheritedTagIds JSON)
-   */
-  private async buildTagFilterWithHierarchy(
-    filter:
-      | {
-          value?: string[] | null;
-          modifier?: string | null;
-          depth?: number | null;
-        }
-      | undefined
-      | null
-  ): Promise<FilterClause> {
-    if (!filter || !filter.value || filter.value.length === 0) {
-      return { sql: "", params: [] };
-    }
-
-    // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
-    // but SceneTag.tagId and inheritedTagIds store bare IDs
-    const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map((p) => p.id);
-    const { modifier = "INCLUDES", depth } = filter;
-
-    // Expand IDs if depth is specified and not 0
-    if (depth !== undefined && depth !== null && depth !== 0) {
-      ids = await expandTagIds(ids, depth);
-    }
-
-    const placeholders = ids.map(() => "?").join(", ");
-
-    // Build inherited tag check using json_each to search the JSON array
-    // inheritedTagIds is stored as JSON string like '["284","313"]'
-    // IMPORTANT: Also verify the tag exists in the scene's instance to prevent cross-instance pollution
-    // Different instances can have different tags with the same ID
-    const inheritedTagCheck = ids
-      .map(
-        () =>
-          `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL))`
-      )
-      .join(" OR ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        // Match if tag is in direct tags OR in inherited tags
-        return {
-          sql: `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) OR (${inheritedTagCheck}))`,
-          params: [...ids, ...ids],
-        };
-
-      case "INCLUDES_ALL": {
-        // Match if ALL tags are present (in direct tags OR inherited tags)
-        // For each tag, check if it's in SceneTag OR in inheritedTagIds (with instance validation)
-        const allTagChecks = ids
-          .map(
-            () =>
-              `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL)))`
-          )
-          .join(" AND ");
-        // Flatten params: for each id, we need it twice (once for SceneTag, once for json_each)
-        const allTagParams = ids.flatMap((id) => [id, id]);
-        return {
-          sql: `(${allTagChecks})`,
-          params: allTagParams,
-        };
-      }
-
-      case "EXCLUDES":
-        // Exclude if tag is in direct tags OR in inherited tags
-        return {
-          sql: `(NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) AND NOT (${inheritedTagCheck}))`,
-          params: [...ids, ...ids],
-        };
-
-      case null:
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build ORDER BY clause
-   */
-  private buildSortClause(
-    sort: string,
-    direction: "ASC" | "DESC",
-    randomSeed?: number
-  ): string {
-    const dir = direction === "ASC" ? "ASC" : "DESC";
-
-    // Map sort field names to SQL expressions. title, performer_count and
-    // tag_count read the columns sync stores (SCENE_DERIVED_COLUMNS_SQL in
-    // StashSyncService): titleSort is the displayed title with ASCII
-    // lower-cased, so its BINARY order is the case-insensitive title order.
-    // Each has a (deletedAt, column, id) index, which serves the order with
-    // its id tiebreak as is.
-    const sortMap: Record<string, string> = {
-      // Scene metadata
-      created_at: `s.stashCreatedAt ${dir}`,
-      updated_at: `s.stashUpdatedAt ${dir}`,
-      date: `s.date ${dir}`,
-      title: `s.titleSort ${dir}`,
-      duration: `s.duration ${dir}`,
-      filesize: `s.fileSize ${dir}`,
-      bitrate: `s.fileBitRate ${dir}`,
-      framerate: `s.fileFrameRate ${dir}`,
-      path: `s.filePath ${dir}`,
-      performer_count: `s.performerCount ${dir}`,
-      tag_count: `s.tagCount ${dir}`,
-
-      // User ratings (from SceneRating table)
-      rating: `COALESCE(r.rating, 0) ${dir}`,
-
-      // User data - prefer user values
-      last_played_at: `w.lastPlayedAt ${dir}`,
-      play_count: `COALESCE(w.playCount, 0) ${dir}`,
-      play_duration: `COALESCE(w.playDuration, 0) ${dir}`,
-      o_counter: `COALESCE(w.oCount, 0) ${dir}`,
-      // last_o_at: SQL sort not supported - lastOAt column doesn't exist in WatchHistory
-      // The last O timestamp is derived from oHistory JSON and can only be sorted in JS
-      user_rating: `COALESCE(r.rating, 0) ${dir}`,
-      resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
-
-      // Random with deterministic seed for stable pagination
-      // Uses Stash's formula with modulo at each step to prevent SQLite integer overflow
-      // Without intermediate modulo, large seeds cause overflow to float which breaks ordering
-      random: `(((((s.id + ${randomSeed || 12345}) % 2147483647) * ((s.id + ${randomSeed || 12345}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((s.id + ${randomSeed || 12345}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
-    };
-
-    const sortExpr = sortMap[sort] || sortMap["created_at"];
-
-    // Add secondary sort by id for stable ordering
-    return `${sortExpr}, s.id ${dir}`;
-  }
-
-  async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
-    const startTime = Date.now();
-    const {
-      userId,
-      page,
-      perPage,
-      applyExclusions = true,
-      allowedInstanceIds,
-      specificInstanceId,
-      filters,
-      refs,
-    } = options;
-
-    // Build FROM clause with optional exclusion JOIN
-    const fromClause = this.buildFromClause(userId, applyExclusions);
-
-    // Build WHERE clauses
-    const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
-
-    // Instance filter (multi-instance support)
-    const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
-    if (instanceFilter.sql) {
-      whereClauses.push(instanceFilter);
-    }
-
-    // Specific instance filter (for disambiguation on detail pages)
-    if (specificInstanceId) {
-      const specificFilter =
-        this.buildSpecificInstanceFilter(specificInstanceId);
-      if (specificFilter.sql) {
-        whereClauses.push(specificFilter);
-      }
-    }
-
-    // Exactly these (id, instance) scenes
-    if (refs) {
-      whereClauses.push(buildRefsClause(refs));
-    }
-
-    // ID filter
-    if (filters?.ids) {
-      const idFilter = this.buildIdFilter(filters.ids);
-      if (idFilter.sql) {
-        whereClauses.push(idFilter);
-      }
-    }
-
-    // Metadata filters
-    if (filters?.duration) {
-      const durationFilter = buildNumericFilter(
-        filters.duration,
-        "COALESCE(s.duration, 0)"
-      );
-      if (durationFilter.sql) {
-        whereClauses.push(durationFilter);
-      }
-    }
-
-    if (filters?.resolution) {
-      const resolutionFilter = this.buildResolutionFilter(filters.resolution);
-      if (resolutionFilter.sql) {
-        whereClauses.push(resolutionFilter);
-      }
-    }
-
-    // Add entity filters
-    if (filters?.performers) {
-      const performerFilter = this.buildPerformerFilter(filters.performers);
-      if (performerFilter.sql) {
-        whereClauses.push(performerFilter);
-      }
-    }
-
-    if (filters?.tags) {
-      // Use hierarchy-aware filter that supports depth parameter
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
-      if (tagFilter.sql) {
-        whereClauses.push(tagFilter);
-      }
-    }
-
-    if (filters?.studios) {
-      // Use hierarchy-aware filter that supports depth parameter
-      const studioFilter = await this.buildStudioFilterWithHierarchy(
-        filters.studios
-      );
-      if (studioFilter.sql) {
-        whereClauses.push(studioFilter);
-      }
-    }
-
-    if (filters?.groups) {
-      const groupFilter = this.buildGroupFilter(filters.groups);
-      if (groupFilter.sql) {
-        whereClauses.push(groupFilter);
-      }
-    }
-
-    if (filters?.galleries) {
-      const galleriesFilter = this.buildGalleriesFilter(filters.galleries);
-      if (galleriesFilter.sql) {
-        whereClauses.push(galleriesFilter);
-      }
-    }
-
-    // User data filters
-    const favoriteFilter = buildFavoriteFilter(filters?.favorite);
-    if (favoriteFilter.sql) {
-      whereClauses.push(favoriteFilter);
-    }
-
-    if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(
-        filters.rating100,
-        "COALESCE(r.rating, 0)"
-      );
-      if (ratingFilter.sql) {
-        whereClauses.push(ratingFilter);
-      }
-    }
-
-    if (filters?.play_count) {
-      const playCountFilter = buildNumericFilter(
-        filters.play_count,
-        "COALESCE(w.playCount, 0)"
-      );
-      if (playCountFilter.sql) {
-        whereClauses.push(playCountFilter);
-      }
-    }
-
-    if (filters?.o_counter) {
-      const oCounterFilter = buildNumericFilter(
-        filters.o_counter,
-        "COALESCE(w.oCount, 0)"
-      );
-      if (oCounterFilter.sql) {
-        whereClauses.push(oCounterFilter);
-      }
-    }
-
-    // Text filters
-    if (filters?.title) {
-      const titleFilter = this.buildTitleFilter(filters.title);
-      if (titleFilter.sql) {
-        whereClauses.push(titleFilter);
-      }
-    }
-
-    if (filters?.details) {
-      const detailsFilter = this.buildDetailsFilter(filters.details);
-      if (detailsFilter.sql) {
-        whereClauses.push(detailsFilter);
-      }
-    }
-
-    // Date filters
-    if (filters?.date) {
-      const dateFilter = buildDateFilter(filters.date, "s.date");
-      if (dateFilter.sql) {
-        whereClauses.push(dateFilter);
-      }
-    }
-
-    if (filters?.created_at) {
-      const createdFilter = buildDateFilter(
-        filters.created_at,
-        "s.stashCreatedAt"
-      );
-      if (createdFilter.sql) {
-        whereClauses.push(createdFilter);
-      }
-    }
-
-    if (filters?.updated_at) {
-      const updatedFilter = buildDateFilter(
-        filters.updated_at,
-        "s.stashUpdatedAt"
-      );
-      if (updatedFilter.sql) {
-        whereClauses.push(updatedFilter);
-      }
-    }
-
-    if (filters?.last_played_at) {
-      const lastPlayedFilter = buildDateFilter(
-        filters.last_played_at,
-        "w.lastPlayedAt"
-      );
-      if (lastPlayedFilter.sql) {
-        whereClauses.push(lastPlayedFilter);
-      }
-    }
-
-    // Numeric filters
-    if (filters?.bitrate) {
-      const bitrateFilter = buildNumericFilter(
-        filters.bitrate,
-        "COALESCE(s.fileBitRate, 0)"
-      );
-      if (bitrateFilter.sql) {
-        whereClauses.push(bitrateFilter);
-      }
-    }
-
-    if (filters?.framerate) {
-      const framerateFilter = buildNumericFilter(
-        filters.framerate,
-        "COALESCE(s.fileFrameRate, 0)"
-      );
-      if (framerateFilter.sql) {
-        whereClauses.push(framerateFilter);
-      }
-    }
-
-    if (filters?.play_duration) {
-      const playDurationFilter = buildNumericFilter(
-        filters.play_duration,
-        "COALESCE(w.playDuration, 0)"
-      );
-      if (playDurationFilter.sql) {
-        whereClauses.push(playDurationFilter);
-      }
-    }
-
-    // Count filters
-    if (filters?.performer_count) {
-      const performerCountFilter = this.buildPerformerCountFilter(
-        filters.performer_count
-      );
-      if (performerCountFilter.sql) {
-        whereClauses.push(performerCountFilter);
-      }
-    }
-
-    if (filters?.tag_count) {
-      const tagCountFilter = this.buildTagCountFilter(filters.tag_count);
-      if (tagCountFilter.sql) {
-        whereClauses.push(tagCountFilter);
-      }
-    }
-
-    if (filters?.performer_age) {
-      const performerAgeFilter = this.buildPerformerAgeFilter(
-        filters.performer_age
-      );
-      if (performerAgeFilter.sql) {
-        whereClauses.push(performerAgeFilter);
-      }
-    }
-
-    // Enum/select filters
-    if (filters?.orientation) {
-      const orientationFilter = this.buildOrientationFilter(
-        filters.orientation
-      );
-      if (orientationFilter.sql) {
-        whereClauses.push(orientationFilter);
-      }
-    }
-
-    if (filters?.video_codec) {
-      const videoCodecFilter = this.buildVideoCodecFilter(filters.video_codec);
-      if (videoCodecFilter.sql) {
-        whereClauses.push(videoCodecFilter);
-      }
-    }
-
-    if (filters?.audio_codec) {
-      const audioCodecFilter = this.buildAudioCodecFilter(filters.audio_codec);
-      if (audioCodecFilter.sql) {
-        whereClauses.push(audioCodecFilter);
-      }
-    }
-
-    // Favorite entity filters
-    if (filters?.performer_favorite === true) {
-      whereClauses.push(this.buildPerformerFavoriteFilter(userId));
-    }
-
-    if (filters?.studio_favorite === true) {
-      whereClauses.push(this.buildStudioFavoriteFilter(userId));
-    }
-
-    if (filters?.tag_favorite === true) {
-      whereClauses.push(this.buildTagFavoriteFilter(userId));
-    }
-
-    // Text search query (searches across title, details, path, performers, studio, tags)
-    if (options.searchQuery) {
-      const searchFilter = this.buildSearchQueryFilter(options.searchQuery);
-      if (searchFilter.sql) {
-        whereClauses.push(searchFilter);
-      }
-    }
-
-    // Combine WHERE clauses
-    const whereSQL = whereClauses
-      .map((c) => c.sql)
-      .filter(Boolean)
-      .join(" AND ");
-    const whereParams = whereClauses.flatMap((c) => c.params);
-
-    // Build sort clause
-    const sortClause = this.buildSortClause(
-      options.sort,
-      options.sortDirection,
-      options.randomSeed
-    );
-
-    // Build full query
-    const offset = (page - 1) * perPage;
-    const sql = `
-      SELECT ${this.SELECT_COLUMNS}
-      ${fromClause.sql}
-      WHERE ${whereSQL}
-      ORDER BY ${sortClause}
-      LIMIT ? OFFSET ?
-    `;
-
-    const params = [...fromClause.params, ...whereParams, perPage, offset];
-
-    logger.debug("SceneQueryBuilder.execute", {
-      whereClauseCount: whereClauses.length,
-      applyExclusions,
-      sort: options.sort,
-      sortDirection: options.sortDirection,
-      paramCount: params.length,
-    });
-
-    // Execute query
-    const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<SceneQueryRow[]>(sql, ...params);
-    const queryMs = Date.now() - queryStart;
-
-    // Count query - use simplified count without JOINs when possible
-    // The JOINs are only needed for user data filtering or exclusions, not for basic count
-    const countStart = Date.now();
-    let total: number;
-
-    // Check if we have any user-data filters that require the JOINs
-    const hasUserDataFilters =
-      filters?.favorite !== undefined ||
-      filters?.rating100 !== undefined ||
-      filters?.play_count !== undefined ||
-      filters?.o_counter !== undefined ||
-      filters?.last_played_at !== undefined ||
-      filters?.play_duration !== undefined ||
-      filters?.performer_favorite === true ||
-      filters?.studio_favorite === true ||
-      filters?.tag_favorite === true;
-
-    // Need full JOINs if user data filters OR exclusions are applied
-    if (hasUserDataFilters || applyExclusions) {
-      // COUNT(*) counts each scene once: the other LEFT JOINs in
-      // buildFromClause match at most one row each (a unique key), and the
-      // exclusion join, which can match two (global and per-instance), keeps a
-      // scene only when it matched none (e.id IS NULL).
-      const countSql = `
-        SELECT COUNT(*) as total
-        ${fromClause.sql}
-        WHERE ${whereSQL}
-      `;
-      const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-        countSql,
-        ...countParams
-      );
-      total = Number(countResult[0]?.total ?? 0n);
-    } else {
-      // Fast path: count without JOINs (no user data filters and no exclusions)
-      // Build WHERE clause without user data conditions
-      const baseWhereClauses = whereClauses.filter(
-        (c) => !c.sql.includes("r.") && !c.sql.includes("w.")
-      );
-      const baseWhereSQL = baseWhereClauses
-        .map((c) => c.sql)
-        .filter(Boolean)
-        .join(" AND ");
-      const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
-
-      const countSql = `
-        SELECT COUNT(*) as total
-        FROM StashScene s
-        WHERE ${baseWhereSQL || "1=1"}
-      `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-        countSql,
-        ...baseWhereParams
-      );
-      total = Number(countResult[0]?.total ?? 0n);
-    }
-    const countMs = Date.now() - countStart;
-
-    const transformStart = Date.now();
-    const scenes = rows.map((row) => this.transformRow(row));
-    const transformMs = Date.now() - transformStart;
-
-    // Populate relations
-    const relationsStart = Date.now();
-    await this.populateRelations(scenes);
-    const relationsMs = Date.now() - relationsStart;
-
-    logger.debug("SceneQueryBuilder.execute complete", {
-      queryTimeMs: Date.now() - startTime,
-      breakdown: { queryMs, countMs, transformMs, relationsMs },
-      resultCount: scenes.length,
-      total,
-    });
-
-    return { scenes, total };
-  }
-
-  /**
    * Transform a raw database row into a NormalizedScene
    */
-  private transformRow(row: SceneQueryRow): NormalizedScene {
+  protected transformRow(row: SceneQueryRow): NormalizedScene {
     // Parse JSON fields
     const oHistory = readHistory(row.userOHistory);
     const playHistory = readHistory(row.userPlayHistory);
@@ -1527,7 +647,7 @@ class SceneQueryBuilder {
    * Multi-instance aware: keys every map by entityKey (id and instance) to
    * correctly associate relations when same IDs exist across different instances.
    */
-  async populateRelations(scenes: NormalizedScene[]): Promise<void> {
+  protected async populateRelations(scenes: NormalizedScene[]): Promise<void> {
     if (scenes.length === 0) return;
 
     // Build scene keys with instanceId for multi-instance support
@@ -1901,30 +1021,6 @@ class SceneQueryBuilder {
       // Cover as simple string URL for consistency
       cover: coverUrl,
     };
-  }
-
-  /**
-   * The scenes named by (id, instance) refs, with the user's exclusions
-   * and allowed instances applied as on every list (invariant 3), in no
-   * particular order: the caller reorders by entityKey. At most one page of
-   * refs at a time, since each binds two parameters.
-   */
-  async getByRefs(options: SceneByRefsOptions): Promise<SceneQueryResult> {
-    const { userId, refs, allowedInstanceIds } = options;
-
-    if (refs.length === 0) {
-      return { scenes: [], total: 0 };
-    }
-
-    return this.execute({
-      userId,
-      refs,
-      allowedInstanceIds,
-      sort: "created_at",
-      sortDirection: "DESC",
-      page: 1,
-      perPage: refs.length,
-    });
   }
 }
 

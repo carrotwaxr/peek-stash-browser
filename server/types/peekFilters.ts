@@ -37,7 +37,6 @@ export type PeekSceneFilter = BaseSceneFilterType & {
   groups?: EntityRefFilter;
   galleries?: EntityRefFilter;
   favorite?: boolean;
-  last_o_at?: { value?: string; value2?: string; modifier?: string };
   studio_favorite?: boolean;
   tag_favorite?: boolean;
   performer_favorite?: boolean;
