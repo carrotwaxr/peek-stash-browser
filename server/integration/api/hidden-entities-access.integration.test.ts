@@ -157,8 +157,10 @@ describe("Hidden items and content restrictions (integration)", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (hider) {
-      await adminClient.delete(`/api/user/${hider.id}`);
+    // beforeAll may have failed before it set hider
+    const created = hider as typeof hider | undefined;
+    if (created) {
+      await adminClient.delete(`/api/user/${created.id}`);
     }
     await clearAccessFixture();
     await restoreInstanceSelection();

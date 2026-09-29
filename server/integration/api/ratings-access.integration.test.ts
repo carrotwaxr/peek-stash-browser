@@ -71,8 +71,10 @@ describe("Ratings access (integration)", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (rater) {
-      await adminClient.delete(`/api/user/${rater.id}`);
+    // beforeAll may have failed before it set rater
+    const created = rater as typeof rater | undefined;
+    if (created) {
+      await adminClient.delete(`/api/user/${created.id}`);
     }
     await clearAccessFixture();
   }, 60000);

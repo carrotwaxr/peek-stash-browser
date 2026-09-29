@@ -47,7 +47,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
       success: boolean;
-      user: { id: number; username: string };
+      user?: { id: number; username: string };
     }>("/api/user/create", {
       username: "include_mode_test_user",
       password: "test_password_123",
@@ -59,7 +59,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     } else {
       // User might already exist from previous test run - fetch them
       const usersResponse = await adminClient.get<{
-        users: Array<{ id: number; username: string }>;
+        users?: Array<{ id: number; username: string }>;
       }>("/api/user/all");
 
       const existingUser = usersResponse.data.users?.find(
@@ -87,13 +87,10 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       }
     );
 
-    if (
-      !tagsResponse.ok ||
-      !tagsResponse.data.findTags?.tags ||
-      tagsResponse.data.findTags.tags.length < 3
-    ) {
+    const foundTags = tagsResponse.ok ? tagsResponse.data.findTags.tags : [];
+    if (foundTags.length < 3) {
       throw new Error(
-        `Need at least 3 tags in database for this test. Found: ${tagsResponse.data.findTags?.tags?.length || 0}`
+        `Need at least 3 tags in database for this test. Found: ${foundTags.length}`
       );
     }
 

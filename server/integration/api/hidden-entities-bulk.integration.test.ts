@@ -13,7 +13,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     // Create a test user for bulk hide testing
     const createResponse = await adminClient.post<{
       success: boolean;
-      user: { id: number; username: string };
+      user?: { id: number; username: string };
     }>("/api/user/create", {
       username: "bulk_hide_test_user",
       password: "test_password_123",
@@ -25,7 +25,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     } else {
       // User might already exist from previous test run - fetch them
       const usersResponse = await adminClient.get<{
-        users: Array<{ id: number; username: string }>;
+        users?: Array<{ id: number; username: string }>;
       }>("/api/user/all");
 
       const existingUser = usersResponse.data.users?.find(

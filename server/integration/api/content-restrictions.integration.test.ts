@@ -22,7 +22,7 @@ describe("Content Restrictions Integration Tests", () => {
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
       success: boolean;
-      user: { id: number; username: string };
+      user?: { id: number; username: string };
     }>("/api/user/create", {
       username: "restriction_test_user",
       password: "test_password_123",
@@ -34,7 +34,7 @@ describe("Content Restrictions Integration Tests", () => {
     } else {
       // User might already exist from previous test run - fetch them
       const usersResponse = await adminClient.get<{
-        users: Array<{ id: number; username: string }>;
+        users?: Array<{ id: number; username: string }>;
       }>("/api/user/all");
 
       const existingUser = usersResponse.data.users?.find(

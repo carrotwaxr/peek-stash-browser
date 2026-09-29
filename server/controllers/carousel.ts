@@ -97,7 +97,9 @@ export const createCarousel = async (
 ) => {
   const userId = req.user.id;
 
-  const { title, icon, rules, sort, direction } = req.body;
+  // The body is unvalidated: any field may be missing
+  const { title, icon, rules, sort, direction } =
+    req.body as Partial<CreateCarouselRequest>;
 
   if (!rules || typeof rules !== "object") {
     res.status(400).json({ error: "Rules are required" });
@@ -188,7 +190,9 @@ export const updateCarousel = async (
   const userId = req.user.id;
   const carouselId = req.params.id;
 
-  const { title, icon, rules, sort, direction } = req.body;
+  // The body is unvalidated: any field may be missing
+  const { title, icon, rules, sort, direction } =
+    req.body as Partial<CreateCarouselRequest>;
 
   // The parts sent, against the scene contract; a ValidationError (400)
   // reaches the central error handler
@@ -270,7 +274,8 @@ export const previewCarousel = async (
 ) => {
   const userId = req.user.id;
 
-  const { rules, sort, direction } = req.body;
+  const { rules, sort, direction } =
+    req.body as Partial<PreviewCarouselRequest>;
 
   if (!rules || typeof rules !== "object") {
     res.status(400).json({ error: "Rules are required" });

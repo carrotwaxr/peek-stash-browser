@@ -138,7 +138,7 @@ describe("Tag API", () => {
       // Create a fresh test user with no restrictions
       const createResponse = await adminClient.post<{
         success: boolean;
-        user: { id: number; username: string };
+        user?: { id: number; username: string };
       }>("/api/user/create", {
         username: "folder_view_test_user",
         password: "test_password_123",
@@ -150,7 +150,7 @@ describe("Tag API", () => {
       } else {
         // User might already exist from previous test run - fetch them
         const usersResponse = await adminClient.get<{
-          users: Array<{ id: number; username: string }>;
+          users?: Array<{ id: number; username: string }>;
         }>("/api/user/all");
 
         const existingUser = usersResponse.data.users?.find(
@@ -173,7 +173,7 @@ describe("Tag API", () => {
       // Set the test user to only see the test instance (same as admin)
       // This ensures apples-to-apples comparison of tag counts
       const instancesResponse = await adminClient.get<{
-        instances: Array<{ id: string; priority: number }>;
+        instances?: Array<{ id: string; priority: number }>;
       }>("/api/setup/stash-instances");
       if (instancesResponse.ok && instancesResponse.data.instances?.length) {
         const testInstance = instancesResponse.data.instances.reduce((a, b) =>

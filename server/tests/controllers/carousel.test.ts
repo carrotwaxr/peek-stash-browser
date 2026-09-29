@@ -138,7 +138,7 @@ describe("Carousel Controller", () => {
         })
       );
       const body = res._getOkBody();
-      expect(Array.isArray(body.carousels || body)).toBe(true);
+      expect(Array.isArray(body.carousels)).toBe(true);
     });
 
     it("a failure reaches the error handler: unexpected error", async () => {
@@ -633,7 +633,7 @@ describe("Carousel Controller", () => {
       await previewCarousel(req, res);
 
       const body = res._getOkBody();
-      expect(body.scenes || body).toBeDefined();
+      expect(body.scenes).toBeDefined();
     });
 
     it("a failure reaches the error handler: unexpected error", async () => {
@@ -692,7 +692,7 @@ describe("Carousel Controller", () => {
       await executeCarouselById(req, res);
 
       const body = res._getOkBody();
-      expect(body.scenes || body.carousel).toBeDefined();
+      expect(body.scenes).toBeDefined();
     });
 
     it("a failure reaches the error handler: unexpected error", async () => {

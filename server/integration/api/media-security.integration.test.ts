@@ -87,7 +87,7 @@ describe("media security", () => {
     // A fresh media_it_user; a leftover from an interrupted run is replaced
     // because its password may have been reset at the end of that run
     const users = await adminClient.get<{
-      users: Array<{ id: number; username: string }>;
+      users?: Array<{ id: number; username: string }>;
     }>("/api/user/all");
     const leftover = users.data.users?.find(
       (u) => u.username === MEDIA_USER.username
@@ -97,7 +97,7 @@ describe("media security", () => {
     }
     const created = await adminClient.post<{
       success: boolean;
-      user: { id: number; username: string };
+      user?: { id: number; username: string };
     }>("/api/user/create", { ...MEDIA_USER, role: "USER" });
     if (!created.ok || !created.data.user) {
       throw new Error(`Failed to create ${MEDIA_USER.username}`);

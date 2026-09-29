@@ -158,6 +158,13 @@ export const createFirstAdmin = async (
 export const CONNECTION_TEST_FAILED =
   "Could not connect to Stash. Check that the URL ends in /graphql, that Stash is running and reachable from the Peek server, and that the API key is correct.";
 
+/** A Stash answer is only trusted once it carries a configuration. */
+const hasConfiguration = (result: unknown): boolean =>
+  typeof result === "object" &&
+  result !== null &&
+  "configuration" in result &&
+  Boolean(result.configuration);
+
 /**
  * Test connection to a Stash server
  * POST /api/setup/test-stash-connection
@@ -193,10 +200,10 @@ export const testStashConnection = async (
 
   logger.info("Testing Stash connection", {
     url,
-    urlLength: url?.length,
+    urlLength: url.length,
     hostname: parsedUrl.hostname,
     port: parsedUrl.port,
-    apiKeyLength: apiKey?.length,
+    apiKeyLength: apiKey.length,
   });
 
   // Try to connect to Stash
@@ -207,7 +214,7 @@ export const testStashConnection = async (
   try {
     const result = await testStash.configuration();
 
-    if (result && result.configuration) {
+    if (hasConfiguration(result)) {
       // Also fetch the version
       let versionString: string | undefined;
       try {

@@ -177,7 +177,7 @@ export async function findTestInstanceId(): Promise<string> {
 
   // Get all instances
   const instancesResponse = await adminClient.get<{
-    instances: Array<{ id: string; name: string; priority: number }>;
+    instances?: Array<{ id: string; name: string; priority: number }>;
   }>("/api/setup/stash-instances");
 
   if (!instancesResponse.ok || !instancesResponse.data.instances?.length) {

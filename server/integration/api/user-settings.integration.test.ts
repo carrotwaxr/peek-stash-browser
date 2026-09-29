@@ -10,7 +10,8 @@ interface UserSettings {
     carouselPreferences: unknown[];
     navPreferences: unknown[];
     tableColumnDefaults: Record<string, unknown>;
-    cardDisplaySettings: Record<string, CardDisplayEntitySettings>;
+    /** The API answers null when nothing is stored */
+    cardDisplaySettings: Record<string, CardDisplayEntitySettings> | null;
   };
 }
 
@@ -79,7 +80,7 @@ describe("User Settings API - cardDisplaySettings", () => {
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
       expect(response.data.settings.cardDisplaySettings).toBeDefined();
-      expect(response.data.settings.cardDisplaySettings.scene).toEqual(
+      expect(response.data.settings.cardDisplaySettings?.scene).toEqual(
         newSettings.cardDisplaySettings.scene
       );
     });
@@ -112,10 +113,10 @@ describe("User Settings API - cardDisplaySettings", () => {
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
-      expect(response.data.settings.cardDisplaySettings.scene).toEqual(
+      expect(response.data.settings.cardDisplaySettings?.scene).toEqual(
         newSettings.cardDisplaySettings.scene
       );
-      expect(response.data.settings.cardDisplaySettings.performer).toEqual(
+      expect(response.data.settings.cardDisplaySettings?.performer).toEqual(
         newSettings.cardDisplaySettings.performer
       );
     });
@@ -178,11 +179,11 @@ describe("User Settings API - cardDisplaySettings", () => {
 
       expect(response.ok).toBe(true);
       // Scene settings should be preserved (sent by client)
-      expect(response.data.settings.cardDisplaySettings.scene).toEqual(
+      expect(response.data.settings.cardDisplaySettings?.scene).toEqual(
         updatedSettings.cardDisplaySettings.scene
       );
       // Performer settings should be updated
-      expect(response.data.settings.cardDisplaySettings.performer).toEqual(
+      expect(response.data.settings.cardDisplaySettings?.performer).toEqual(
         updatedSettings.cardDisplaySettings.performer
       );
     });
