@@ -331,6 +331,24 @@ function resolveSort<K extends ListKind>(
   return { field: resolved, direction: direction ?? fallback.direction, seed };
 }
 
+/**
+ * Scene Number is a scene's number in one collection, so the sort needs an
+ * including `groups` criterion to name it. Without one the sort is a problem
+ * at the sort's path (a 400 in reject mode) and the list keeps its default.
+ */
+function requireCollectionForSceneIndex(
+  field: SortField<"scene"> | undefined,
+  criteria: ParsedFieldsResult["criteria"],
+  path: string,
+  problems: Problems
+): SortField<"scene"> | undefined {
+  if (field?.field !== "scene_index") return field;
+  const groups = criteria.groups as RefCriterion | undefined;
+  if (groups !== undefined && groups.modifier !== "EXCLUDES") return field;
+  problems.add(path, "Scene Number needs a collection filter");
+  return undefined;
+}
+
 function parseInstanceId(
   raw: unknown,
   path: string,
@@ -791,6 +809,14 @@ export function parseListRequest<E extends EntityKind>(
 
   walk(input, "", handlers, problems, "Unknown request field");
   mergeIds(fields.criteria, ids, filterKey, problems);
+  if (entity === "scene") {
+    sortField = requireCollectionForSceneIndex(
+      sortField as SortField<"scene"> | undefined,
+      fields.criteria,
+      "filter.sort",
+      problems
+    ) as typeof sortField;
+  }
 
   return {
     page: clampPage(state.page),
@@ -839,11 +865,17 @@ function parseCarouselParts(
   direction: unknown,
   problems: Problems
 ): CarouselParts {
+  const fields = rules
+    ? parseFields(SCENE_FIELDS, rules, "rules", problems)
+    : { criteria: {}, specificInstanceId: undefined };
   return {
-    fields: rules
-      ? parseFields(SCENE_FIELDS, rules, "rules", problems)
-      : { criteria: {}, specificInstanceId: undefined },
-    sortField: parseSortField("scene", sort, "sort", problems),
+    fields,
+    sortField: requireCollectionForSceneIndex(
+      parseSortField("scene", sort, "sort", problems),
+      fields.criteria,
+      "sort",
+      problems
+    ),
     direction: parseDirection(direction, "direction", problems),
   };
 }

@@ -224,10 +224,17 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * order is the case-insensitive title order. Each has a (deletedAt,
    * column, id, stashInstanceId) index, which serves the whole order with
    * the base's key (created_at, updated_at, date and duration too, DESC).
-   * last_o_at and scene_index have no expression yet (B12) and fall back to
-   * the default sort.
+   * last_o_at is the viewer's latest O time (the newest string of
+   * WatchHistory.oHistory, stored as ISO text), scenes with none last in
+   * either direction; it scans the viewer's history rows, like o_counter.
+   * scene_index is the scene's number in the collection the request filters
+   * by, and has an expression only with one (INCLUDES or INCLUDES_ALL):
+   * without it the key falls back to the default sort.
    */
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    filter: ParsedFilter<"scene">
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -256,6 +263,52 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       play_duration: column("COALESCE(w.playDuration, 0)"),
       o_counter: column("COALESCE(w.oCount, 0)"),
       resume_time: column("COALESCE(w.resumeTime, 0)"),
+      last_o_at: {
+        sql: `(SELECT MAX(j.value) FROM json_each(w.oHistory) j) IS NULL, (SELECT MAX(j.value) FROM json_each(w.oHistory) j) ${dir}`,
+        params: [],
+      },
+      ...this.sceneIndexSort(dir, filter),
+    };
+  }
+
+  /**
+   * Scene Number: the number of the scene in the filter's first collection,
+   * scenes without one last. One ref joins the sort's group as an INNER JOIN
+   * (the filter already keeps only its scenes, so the count is unchanged);
+   * several refs LEFT JOIN the first, which no scene matches twice
+   * (SceneGroup's key is scene and group, and the join names the scene's
+   * instance). A bare ref matches that id on the scene's own instance.
+   */
+  private sceneIndexSort(
+    dir: SortDirection,
+    filter: ParsedFilter<"scene">
+  ): Record<string, SortExpr> {
+    const criterion = filter.groups;
+    const first = criterion?.refs[0];
+    if (
+      criterion === undefined ||
+      first === undefined ||
+      criterion.modifier === "EXCLUDES"
+    ) {
+      return {};
+    }
+    const inner = criterion.refs.length === 1;
+    const instance =
+      first.instanceId === undefined ? "" : " AND sgi.groupInstanceId = ?";
+    return {
+      scene_index: {
+        sql: `sgi.sceneIndex IS NULL, sgi.sceneIndex ${dir}`,
+        params: [],
+        joins: [
+          {
+            sql: `${inner ? "JOIN" : "LEFT JOIN"} SceneGroup sgi ON sgi.sceneId = s.id AND sgi.sceneInstanceId = s.stashInstanceId AND sgi.groupId = ?${instance}`,
+            params: [
+              first.id,
+              ...(first.instanceId === undefined ? [] : [first.instanceId]),
+            ],
+          },
+        ],
+      },
     };
   }
 

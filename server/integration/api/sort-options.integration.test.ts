@@ -1,5 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
+import type { ParsedFilter, RefCriterion } from "../../types/parsedFilters.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -914,5 +918,165 @@ describe("Sort Options", () => {
       expect(response.data.findPerformers).toBeDefined();
       expect(response.data.findPerformers.performers.length).toBeGreaterThan(0);
     });
+  });
+});
+
+/**
+ * Scene Number and Last O At, on rows seeded under two made-up instances that
+ * reuse the same ids (the replay library has no group with indexes and no O
+ * times): so-a holds group 1 with scenes 1, 2, 3 at indexes 3, 1, 2 and scene
+ * 4 outside it; so-b holds a same-id group 1 with scenes 1 and 2 at indexes 1
+ * and 2, which must not interleave with so-a's. The viewer's O times are on
+ * so-a's scenes 1 (two, the latest 2024-03-01), 2 (one, 2024-05-01) and 3
+ * (a count and no times); scene 4 has none. Every seeded row is deleted.
+ */
+describe("Scene Number and Last O At sorts", () => {
+  const A = "so-a";
+  const B = "so-b";
+  const USERNAME = "sort-seeded-user";
+  let userId = 0;
+
+  const collection = (...ids: string[]): RefCriterion => ({
+    refs: ids.map((id) => ({ id, instanceId: A })),
+    modifier: "INCLUDES",
+    depth: 0,
+  });
+
+  const list = async (
+    field: "scene_index" | "last_o_at",
+    direction: "ASC" | "DESC",
+    filter: ParsedFilter<"scene">
+  ) => {
+    const { items } = await sceneQueryBuilder.execute({
+      userId,
+      applyExclusions: false,
+      allowedInstanceIds: [A, B],
+      request: parsedListRequest("scene", {
+        perPage: 50,
+        sort: { field, direction, seed: undefined },
+        filter,
+      }),
+    });
+    return items.map((scene) => `${scene.id}:${scene.instanceId}`);
+  };
+
+  beforeAll(async () => {
+    const user = await prisma.user.create({
+      data: { username: USERNAME, password: "not-a-real-hash", role: "USER" },
+    });
+    userId = user.id;
+    await prisma.stashScene.createMany({
+      data: [
+        ...["1", "2", "3", "4"].map((id) => ({ id, stashInstanceId: A })),
+        ...["1", "2"].map((id) => ({ id, stashInstanceId: B })),
+      ],
+    });
+    await prisma.stashGroup.createMany({
+      data: [A, B].map((stashInstanceId) => ({
+        id: "1",
+        stashInstanceId,
+        name: `Sort ${stashInstanceId}`,
+      })),
+    });
+    const member = (sceneId: string, instance: string, sceneIndex: number) => ({
+      sceneId,
+      sceneInstanceId: instance,
+      groupId: "1",
+      groupInstanceId: instance,
+      sceneIndex,
+    });
+    await prisma.sceneGroup.createMany({
+      data: [
+        member("1", A, 3),
+        member("2", A, 1),
+        member("3", A, 2),
+        member("1", B, 1),
+        member("2", B, 2),
+      ],
+    });
+    const history = (sceneId: string, oCount: number, oHistory: string[]) => ({
+      userId,
+      instanceId: A,
+      sceneId,
+      oCount,
+      oHistory,
+    });
+    await prisma.watchHistory.createMany({
+      data: [
+        history("1", 2, [
+          "2024-01-01T00:00:00.000Z",
+          "2024-03-01T00:00:00.000Z",
+        ]),
+        history("2", 1, ["2024-05-01T00:00:00.000Z"]),
+        history("3", 4, []),
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.watchHistory.deleteMany({ where: { userId } });
+    await prisma.user.deleteMany({ where: { username: USERNAME } });
+    await prisma.sceneGroup.deleteMany({
+      where: { sceneInstanceId: { in: [A, B] } },
+    });
+    await prisma.stashGroup.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.stashScene.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+  });
+
+  it("a collection of three scenes with indexes 3, 1, 2 lists 1, 2, 3; the same ids in a same-id group on the second instance do not interleave", async () => {
+    const filter = { groups: collection("1") };
+    expect(await list("scene_index", "ASC", filter)).toEqual([
+      "2:so-a",
+      "3:so-a",
+      "1:so-a",
+    ]);
+    expect(await list("scene_index", "DESC", filter)).toEqual([
+      "1:so-a",
+      "3:so-a",
+      "2:so-a",
+    ]);
+  });
+
+  it("scene_index over two collections orders by the first", async () => {
+    const filter = { groups: collection("1", "9") };
+    expect(await list("scene_index", "ASC", filter)).toEqual([
+      "2:so-a",
+      "3:so-a",
+      "1:so-a",
+    ]);
+  });
+
+  it("scene_index without a collection filter answers 400", async () => {
+    const response = await adminClient.post("/api/library/scenes", {
+      filter: { per_page: 5, sort: "scene_index", direction: "ASC" },
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it("last_o_at DESC orders by the latest O time and puts scenes without one last", async () => {
+    const filter = {
+      ids: {
+        refs: ["1", "2", "3", "4"].map((id) => ({ id, instanceId: A })),
+        modifier: "INCLUDES" as const,
+        depth: 0,
+      },
+    };
+    expect(await list("last_o_at", "DESC", filter)).toEqual([
+      "2:so-a",
+      "1:so-a",
+      "4:so-a",
+      "3:so-a",
+    ]);
+    // The scenes without a time keep the key's order in the direction
+    expect(await list("last_o_at", "ASC", filter)).toEqual([
+      "1:so-a",
+      "2:so-a",
+      "3:so-a",
+      "4:so-a",
+    ]);
   });
 });
