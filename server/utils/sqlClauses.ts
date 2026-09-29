@@ -795,6 +795,85 @@ export function buildDateFilter(
   }
 }
 
+const DAY_MS = 86_400_000;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A date criterion's bound as epoch milliseconds, `[start, end)`: a
+ * `YYYY-MM-DD` value spans its UTC day, an ISO date-time is the instant.
+ */
+function epochSpan(value: string): { start: number; end: number } | undefined {
+  const start = Date.parse(value);
+  if (Number.isNaN(start)) return undefined;
+  return { start, end: start + (DATE_ONLY.test(value) ? DAY_MS : 1) };
+}
+
+/**
+ * The date filter for a column Prisma wrote as a `DateTime`, which SQLite
+ * holds as integer epoch milliseconds (`WatchHistory.lastPlayedAt`):
+ * `buildDateFilter` compares text, and an integer sorts before any text. The
+ * criterion's dates bind as milliseconds; a date-only value stands for its
+ * whole UTC day, so BETWEEN includes its last day and EQUALS is the day.
+ */
+export function buildEpochDateFilter(
+  filter:
+    | {
+        value?: string | null;
+        value2?: string | null;
+        modifier?: string | null;
+      }
+    | undefined
+    | null,
+  column: string
+): FilterClause {
+  if (!filter) return { sql: "", params: [] };
+  const { value, value2, modifier = "GREATER_THAN" } = filter;
+
+  if (modifier === "IS_NULL") return { sql: `${column} IS NULL`, params: [] };
+  if (modifier === "NOT_NULL") {
+    return { sql: `${column} IS NOT NULL`, params: [] };
+  }
+  const first = value ? epochSpan(value) : undefined;
+  if (!first) return { sql: "", params: [] };
+  const last = value2 ? epochSpan(value2) : undefined;
+
+  switch (modifier) {
+    case "EQUALS":
+      return {
+        sql: `(${column} >= ? AND ${column} < ?)`,
+        params: [first.start, first.end],
+      };
+    case "NOT_EQUALS":
+      return {
+        sql: `(${column} IS NULL OR ${column} < ? OR ${column} >= ?)`,
+        params: [first.start, first.end],
+      };
+    case "GREATER_THAN":
+      return { sql: `${column} > ?`, params: [first.start] };
+    case "LESS_THAN":
+      return { sql: `${column} < ?`, params: [first.start] };
+    case "BETWEEN":
+      if (last) {
+        return {
+          sql: `(${column} >= ? AND ${column} < ?)`,
+          params: [first.start, last.end],
+        };
+      }
+      return { sql: `${column} >= ?`, params: [first.start] };
+    case "NOT_BETWEEN":
+      if (last) {
+        return {
+          sql: `(${column} IS NULL OR ${column} < ? OR ${column} >= ?)`,
+          params: [first.start, last.end],
+        };
+      }
+      return { sql: `${column} < ?`, params: [first.start] };
+    case null:
+    default:
+      return { sql: "", params: [] };
+  }
+}
+
 /**
  * Build a text comparison filter clause.
  * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, IS_NULL, NOT_NULL.
