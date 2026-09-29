@@ -3,14 +3,17 @@
  * content on every enabled Stash server, whichever servers they browse.
  *
  * `scope: "allEnabled"` on `POST /library/<entities>/minimal` lists every
- * enabled instance past its first sync in place of the admin's own
- * selection. Only the instances widen: the admin's own hidden items and
- * deleted entities stay out, and a USER sending the scope gets 403.
+ * live entity on every enabled instance past its first sync, in place of
+ * the admin's own selection, and what the admin hid for themselves with it
+ * (task L4, owner 2026-09-28: an admin may restrict another user from what
+ * they hid). Deleted entities stay out, the admin's hides still apply
+ * without the scope, and a USER sending the scope gets 403.
  *
  * On the access fixture (helpers/accessFixture.ts: A and B enabled and
  * synced, OFF disabled), which has SAME on A and B for each of the five
  * types, and the tags HIDDEN_A and VISIBLE_A on A. Added here: SAME on OFF
- * for each type. The admin selects A only and hides the tag HIDDEN_A@A.
+ * for each type, and the tag DELETED on A, soft-deleted. The admin selects
+ * A only and hides the tag HIDDEN_A@A.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -72,6 +75,16 @@ describe("Picker scope allEnabled (integration)", () => {
       data: { ...onOff, title: `OFF-${FX_ID.SAME}` },
     });
 
+    // A tag sync soft-deleted
+    await prisma.stashTag.create({
+      data: {
+        id: FX_ID.DELETED,
+        stashInstanceId: FX.A,
+        name: `A-${FX_ID.DELETED}`,
+        deletedAt: new Date(),
+      },
+    });
+
     scopeAdmin = await createApiUser(
       "access_it_scope_admin",
       "access_it_pass_1",
@@ -90,7 +103,7 @@ describe("Picker scope allEnabled (integration)", () => {
   }, 60000);
 
   it("an admin who selected only instance A picks B's tags in the restrictions editor with scope allEnabled", async () => {
-    // The tags on A and B, less the admin's own hide; nothing on OFF
+    // The live tags on A and B, the admin's own hide included; nothing on OFF
     const tags = await pick(scopeAdmin.client, "tags", {
       filter: { q: "-7700" },
       scope: "allEnabled",
@@ -98,6 +111,7 @@ describe("Picker scope allEnabled (integration)", () => {
     expect(tags.status).toBe(200);
     expect(refs(tags.data.tags)).toEqual([
       ref(FX_ID.SAME, FX.A),
+      ref(FX_ID.HIDDEN_A, FX.A),
       ref(FX_ID.VISIBLE_A, FX.A),
       ref(FX_ID.SAME, FX.B),
     ]);
@@ -124,6 +138,68 @@ describe("Picker scope allEnabled (integration)", () => {
         ref(FX_ID.SAME, FX.B),
       ]);
     }
+  });
+
+  it("an admin who hid a tag picks it in the restrictions editor with scope allEnabled", async () => {
+    // The hide is in UserExcludedEntity, as every other surface reads it
+    const excluded = await prisma.userExcludedEntity.findUnique({
+      where: {
+        userId_entityType_entityId_instanceId: {
+          userId: scopeAdmin.id,
+          entityType: "tag",
+          entityId: FX_ID.HIDDEN_A,
+          instanceId: FX.A,
+        },
+      },
+    });
+    expect(excluded?.reason).toBe("hidden");
+
+    const search = await pick(scopeAdmin.client, "tags", {
+      filter: { q: FX_ID.HIDDEN_A },
+      scope: "allEnabled",
+    });
+    expect(search.status).toBe(200);
+    expect(refs(search.data.tags)).toEqual([ref(FX_ID.HIDDEN_A, FX.A)]);
+
+    // A stored restriction on the hidden tag resolves to its name
+    const chip = await pick(scopeAdmin.client, "tags", {
+      ids: [ref(FX_ID.HIDDEN_A, FX.A)],
+      scope: "allEnabled",
+    });
+    expect(chip.status).toBe(200);
+    expect(chip.data.tags).toEqual([
+      { id: FX_ID.HIDDEN_A, instanceId: FX.A, name: `A-${FX_ID.HIDDEN_A}` },
+    ]);
+  });
+
+  it("without scope, the admin's hidden tag stays out of the picker", async () => {
+    const search = await pick(scopeAdmin.client, "tags", {
+      filter: { q: FX_ID.HIDDEN_A },
+    });
+    expect(search.status).toBe(200);
+    expect(refs(search.data.tags)).toEqual([]);
+
+    const chip = await pick(scopeAdmin.client, "tags", {
+      ids: [ref(FX_ID.HIDDEN_A, FX.A)],
+    });
+    expect(chip.status).toBe(200);
+    expect(chip.data.tags).toEqual([]);
+  });
+
+  it("with scope allEnabled, a deleted tag stays out", async () => {
+    const search = await pick(scopeAdmin.client, "tags", {
+      filter: { q: FX_ID.DELETED },
+      scope: "allEnabled",
+    });
+    expect(search.status).toBe(200);
+    expect(refs(search.data.tags)).toEqual([]);
+
+    const chip = await pick(scopeAdmin.client, "tags", {
+      ids: [ref(FX_ID.DELETED, FX.A)],
+      scope: "allEnabled",
+    });
+    expect(chip.status).toBe(200);
+    expect(chip.data.tags).toEqual([]);
   });
 
   it("with scope allEnabled, an instance on its first sync stays out", async () => {

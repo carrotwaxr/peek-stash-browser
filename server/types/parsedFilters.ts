@@ -216,9 +216,10 @@ export interface ParsedMinimalRequest<E extends MinimalKind> {
   /** Only the keys sent, each a non-negative integer; OR semantics */
   readonly countFilter: MinimalCountFilter | undefined;
   /**
-   * "allEnabled": every enabled, synced instance in place of the user's
-   * selection (an admin's Content Restrictions editor); undefined for the
-   * user's own instances. Whether the user may send it is the query's check.
+   * "allEnabled": every live entity on every enabled, synced instance, in
+   * place of the user's selection and without the user's exclusions (an
+   * admin's Content Restrictions editor); undefined for what the user sees.
+   * Whether the user may send it is the query's check.
    */
   readonly scope: MinimalScope | undefined;
   readonly dropped: readonly DroppedInput[];

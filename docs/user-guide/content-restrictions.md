@@ -103,7 +103,7 @@ Create appropriate groups/tags in Stash:
 2. Click **Edit** on the target user (a user account, not an admin)
 3. Click **Manage Restrictions**
 4. For each entity type you want to restrict:
-   - Search and select items for **Show only** and/or **Always hide**
+   - Search and select items for **Show only** and/or **Always hide**. The lists offer everything on every enabled Stash server, including items you have hidden for yourself
    - Check or uncheck **Also hide items with no ...** (see below)
 5. Click **Save Restrictions**
 
