@@ -5,12 +5,16 @@
  */
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "@/api";
+import { ApiError } from "@/api/client";
+import { LIBRARY_READY_POLL_MS } from "@/api/hooks/useLibraryReady";
+import { createQueryClient } from "@/api/queryClient";
 import RecommendedSidebar from "@/components/ui/RecommendedSidebar";
 import ScenesLikeThis from "@/components/ui/ScenesLikeThis";
+import { jsonResponse, stubApi } from "../../helpers/stubApi";
 
 vi.mock("@/api", () => ({
   apiGet: vi.fn(),
@@ -50,6 +54,40 @@ describe("ScenesLikeThis", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApiGet.mockResolvedValue(EMPTY);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("while the library initializes the tab and the sidebar wait, then show the scenes", async () => {
+    vi.useFakeTimers();
+    stubApi({ "/library/ready": () => jsonResponse(200, { ready: true }) });
+    mockApiGet.mockRejectedValueOnce(
+      new ApiError("Server is initializing", 503, { ready: false })
+    );
+    mockApiGet.mockResolvedValue({
+      scenes: [{ id: "s2", instanceId: "a" }],
+      count: 1,
+      page: 1,
+      perPage: 12,
+    });
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MemoryRouter initialEntries={["/scene/7"]}>
+          <ScenesLikeThis sceneId="7" instanceId="a" />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.queryByText("Failed to load similar scenes")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LIBRARY_READY_POLL_MS + 50);
+    });
+    expect(screen.getByTestId("scene-grid")).toHaveTextContent("s2");
   });
 
   it("the tab and the sidebar share one request for page 1", async () => {

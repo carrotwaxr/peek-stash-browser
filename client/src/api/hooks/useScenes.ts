@@ -6,6 +6,7 @@ import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "..";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
+import { useLibraryReady } from "./useLibraryReady";
 
 export function useSceneList(
   params: LibrarySearchParams<"scene"> | null,
@@ -77,13 +78,16 @@ export function useSimilarScenes(
   instanceId: string,
   page: number
 ) {
+  // Mounts the library re-check, so a scene opened during the first sync
+  // loads its similar scenes once the library is ready
+  const { ready } = useLibraryReady();
   return useQuery({
     queryKey: queryKeys.scenes.similar(instanceId, sceneId, page),
     queryFn: () =>
       apiGet<SimilarScenesResponse>(
         `/library/scenes/${sceneId}/similar?instanceId=${encodeURIComponent(instanceId)}&page=${page}`
       ),
-    enabled: !!sceneId && !!instanceId,
+    enabled: !!sceneId && !!instanceId && ready,
     // Keep the current page on screen while the next one loads
     placeholderData: keepPreviousData,
   });
