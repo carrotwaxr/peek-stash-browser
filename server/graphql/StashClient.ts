@@ -2,14 +2,100 @@
  * StashClient - Internal GraphQL client for Stash API
  *
  * Replaces the external stashapp-api package with an internal implementation.
- * Uses graphql-request and generated SDK from codegen.
+ * Uses graphql-request and the typed documents from codegen.
  *
  * Every request is bounded: it fails after `requestTimeoutMs`, and a client
  * from `withSignal(signal)` also ends its requests in flight when the signal
  * aborts, so a Stash that never answers cannot hold a sync forever.
  */
-import { ClientError, GraphQLClient } from "graphql-request";
-import { type SdkFunctionWrapper, getSdk } from "./generated/graphql.js";
+import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
+import { ClientError, GraphQLClient, type Variables } from "graphql-request";
+import {
+  ConfigurationDocument,
+  type ConfigurationQueryVariables,
+  FindGalleriesDocument,
+  type FindGalleriesQueryVariables,
+  FindGalleryDocument,
+  FindGalleryIDsDocument,
+  type FindGalleryIDsQueryVariables,
+  type FindGalleryQueryVariables,
+  FindGroupDocument,
+  FindGroupIDsDocument,
+  type FindGroupIDsQueryVariables,
+  type FindGroupQueryVariables,
+  FindGroupRelationsDocument,
+  type FindGroupRelationsQueryVariables,
+  FindGroupsDocument,
+  type FindGroupsQueryVariables,
+  FindImageIDsDocument,
+  type FindImageIDsQueryVariables,
+  FindImagesDocument,
+  type FindImagesQueryVariables,
+  FindPerformerIDsDocument,
+  type FindPerformerIDsQueryVariables,
+  FindPerformersDocument,
+  type FindPerformersQueryVariables,
+  FindSceneIDsDocument,
+  type FindSceneIDsQueryVariables,
+  FindSceneMarkersDocument,
+  type FindSceneMarkersQueryVariables,
+  FindScenesCompactDocument,
+  type FindScenesCompactQueryVariables,
+  FindScenesDocument,
+  type FindScenesQueryVariables,
+  FindStudioIDsDocument,
+  type FindStudioIDsQueryVariables,
+  FindStudiosDocument,
+  type FindStudiosQueryVariables,
+  FindTagIDsDocument,
+  type FindTagIDsQueryVariables,
+  FindTagsDocument,
+  type FindTagsQueryVariables,
+  GalleryUpdateDocument,
+  type GalleryUpdateMutationVariables,
+  GroupUpdateDocument,
+  type GroupUpdateMutationVariables,
+  ImageUpdateDocument,
+  type ImageUpdateMutationVariables,
+  MetadataScanDocument,
+  type MetadataScanMutationVariables,
+  PerformerDestroyDocument,
+  type PerformerDestroyMutationVariables,
+  PerformerUpdateDocument,
+  type PerformerUpdateMutationVariables,
+  PerformersDestroyDocument,
+  type PerformersDestroyMutationVariables,
+  SceneAddPlayDocument,
+  type SceneAddPlayMutationVariables,
+  SceneDecrementODocument,
+  type SceneDecrementOMutationVariables,
+  SceneDestroyDocument,
+  type SceneDestroyMutationVariables,
+  SceneIncrementODocument,
+  type SceneIncrementOMutationVariables,
+  SceneSaveActivityDocument,
+  type SceneSaveActivityMutationVariables,
+  SceneUpdateDocument,
+  type SceneUpdateMutationVariables,
+  ScenesUpdateDocument,
+  type ScenesUpdateMutationVariables,
+  StudioDestroyDocument,
+  type StudioDestroyMutationVariables,
+  StudioUpdateDocument,
+  type StudioUpdateMutationVariables,
+  StudiosDestroyDocument,
+  type StudiosDestroyMutationVariables,
+  TagCreateDocument,
+  type TagCreateMutationVariables,
+  TagDestroyDocument,
+  type TagDestroyMutationVariables,
+  TagUpdateDocument,
+  type TagUpdateMutationVariables,
+  TagsDestroyDocument,
+  type TagsDestroyMutationVariables,
+  VersionDocument,
+  type VersionQueryVariables,
+} from "./generated/graphql.js";
 
 /**
  * How long one Stash request may take. Generous against the largest sync
@@ -132,7 +218,8 @@ function isTimeout(error: unknown): boolean {
  */
 export class StashClient {
   private client: GraphQLClient;
-  private sdk: ReturnType<typeof getSdk>;
+  private readonly timeoutMs: number;
+  private readonly scopeSignal: AbortSignal | undefined;
 
   /**
    * `scopeSignal`, which `withSignal` sets, ends every request of this client
@@ -143,6 +230,8 @@ export class StashClient {
     scopeSignal?: AbortSignal
   ) {
     const timeoutMs = config.requestTimeoutMs ?? STASH_REQUEST_TIMEOUT_MS;
+    this.timeoutMs = timeoutMs;
+    this.scopeSignal = scopeSignal;
     this.client = new GraphQLClient(config.url, {
       headers: { ApiKey: config.apiKey },
       fetch: (input: RequestInfo | URL, init?: RequestInit) => {
@@ -152,18 +241,6 @@ export class StashClient {
         return fetch(input, { ...init, signal: AbortSignal.any(signals) });
       },
     });
-    const wrapper: SdkFunctionWrapper = async (action, operationName) => {
-      try {
-        return await action();
-      } catch (error) {
-        if (scopeSignal?.aborted) throw new Error(ABORTED_MESSAGE);
-        if (isTimeout(error)) {
-          throw new StashRequestTimeoutError(operationName, timeoutMs);
-        }
-        throw error;
-      }
-    };
-    this.sdk = getSdk(this.client, wrapper);
   }
 
   /**
@@ -175,136 +252,202 @@ export class StashClient {
     return new StashClient(this.config, signal);
   }
 
+  /**
+   * Sends one typed operation. A timeout rejects with
+   * StashRequestTimeoutError naming `operationName`, and a request cut short
+   * by the scope signal rejects with Error("Sync aborted").
+   */
+  private async run<TResult, TVars extends Variables>(
+    document: TypedDocumentNode<TResult, TVars>,
+    operationName: string,
+    variables?: TVars,
+    signal?: AbortSignal
+  ): Promise<TResult> {
+    try {
+      return await this.client.request<TResult>({
+        document,
+        ...(variables && { variables }),
+        ...(signal && { signal }),
+      });
+    } catch (error) {
+      if (this.scopeSignal?.aborted) throw new Error(ABORTED_MESSAGE);
+      if (isTimeout(error)) {
+        throw new StashRequestTimeoutError(operationName, this.timeoutMs);
+      }
+      throw error;
+    }
+  }
+
   // Find operations
   findPerformers = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindPerformers"]>
-  ) => this.sdk.FindPerformers(...args);
-  findStudios = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindStudios"]>
-  ) => this.sdk.FindStudios(...args);
-  findScenes = (...args: Parameters<ReturnType<typeof getSdk>["FindScenes"]>) =>
-    this.sdk.FindScenes(...args);
+    variables?: FindPerformersQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindPerformersDocument, "FindPerformers", variables, signal);
+  findStudios = (variables?: FindStudiosQueryVariables, signal?: AbortSignal) =>
+    this.run(FindStudiosDocument, "FindStudios", variables, signal);
+  findScenes = (variables?: FindScenesQueryVariables, signal?: AbortSignal) =>
+    this.run(FindScenesDocument, "FindScenes", variables, signal);
   findScenesCompact = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindScenesCompact"]>
-  ) => this.sdk.FindScenesCompact(...args);
-  findTags = (...args: Parameters<ReturnType<typeof getSdk>["FindTags"]>) =>
-    this.sdk.FindTags(...args);
-  findGroups = (...args: Parameters<ReturnType<typeof getSdk>["FindGroups"]>) =>
-    this.sdk.FindGroups(...args);
-  findGroup = (...args: Parameters<ReturnType<typeof getSdk>["FindGroup"]>) =>
-    this.sdk.FindGroup(...args);
+    variables?: FindScenesCompactQueryVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(FindScenesCompactDocument, "FindScenesCompact", variables, signal);
+  findTags = (variables?: FindTagsQueryVariables, signal?: AbortSignal) =>
+    this.run(FindTagsDocument, "FindTags", variables, signal);
+  findGroups = (variables?: FindGroupsQueryVariables, signal?: AbortSignal) =>
+    this.run(FindGroupsDocument, "FindGroups", variables, signal);
+  findGroup = (variables: FindGroupQueryVariables, signal?: AbortSignal) =>
+    this.run(FindGroupDocument, "FindGroup", variables, signal);
   /** Every group's sub-groups in Stash's order: the collection hierarchy */
   findGroupRelations = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindGroupRelations"]>
-  ) => this.sdk.FindGroupRelations(...args);
+    variables?: FindGroupRelationsQueryVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(
+      FindGroupRelationsDocument,
+      "FindGroupRelations",
+      variables,
+      signal
+    );
   findGalleries = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindGalleries"]>
-  ) => this.sdk.FindGalleries(...args);
-  findGallery = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindGallery"]>
-  ) => this.sdk.FindGallery(...args);
-  findImages = (...args: Parameters<ReturnType<typeof getSdk>["FindImages"]>) =>
-    this.sdk.FindImages(...args);
+    variables?: FindGalleriesQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindGalleriesDocument, "FindGalleries", variables, signal);
+  findGallery = (variables: FindGalleryQueryVariables, signal?: AbortSignal) =>
+    this.run(FindGalleryDocument, "FindGallery", variables, signal);
+  findImages = (variables?: FindImagesQueryVariables, signal?: AbortSignal) =>
+    this.run(FindImagesDocument, "FindImages", variables, signal);
   findSceneMarkers = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindSceneMarkers"]>
-  ) => this.sdk.FindSceneMarkers(...args);
+    variables?: FindSceneMarkersQueryVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(FindSceneMarkersDocument, "FindSceneMarkers", variables, signal);
 
   // ID-only find operations (for cleanup/deletion detection)
   findSceneIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindSceneIDs"]>
-  ) => this.sdk.FindSceneIDs(...args);
+    variables?: FindSceneIDsQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindSceneIDsDocument, "FindSceneIDs", variables, signal);
   findPerformerIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindPerformerIDs"]>
-  ) => this.sdk.FindPerformerIDs(...args);
+    variables?: FindPerformerIDsQueryVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(FindPerformerIDsDocument, "FindPerformerIDs", variables, signal);
   findStudioIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindStudioIDs"]>
-  ) => this.sdk.FindStudioIDs(...args);
-  findTagIDs = (...args: Parameters<ReturnType<typeof getSdk>["FindTagIDs"]>) =>
-    this.sdk.FindTagIDs(...args);
+    variables?: FindStudioIDsQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindStudioIDsDocument, "FindStudioIDs", variables, signal);
+  findTagIDs = (variables?: FindTagIDsQueryVariables, signal?: AbortSignal) =>
+    this.run(FindTagIDsDocument, "FindTagIDs", variables, signal);
   findGroupIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindGroupIDs"]>
-  ) => this.sdk.FindGroupIDs(...args);
+    variables?: FindGroupIDsQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindGroupIDsDocument, "FindGroupIDs", variables, signal);
   findGalleryIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindGalleryIDs"]>
-  ) => this.sdk.FindGalleryIDs(...args);
+    variables?: FindGalleryIDsQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindGalleryIDsDocument, "FindGalleryIDs", variables, signal);
   findImageIDs = (
-    ...args: Parameters<ReturnType<typeof getSdk>["FindImageIDs"]>
-  ) => this.sdk.FindImageIDs(...args);
+    variables?: FindImageIDsQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(FindImageIDsDocument, "FindImageIDs", variables, signal);
 
   // Update operations
   sceneUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["sceneUpdate"]>
-  ) => this.sdk.sceneUpdate(...args);
+    variables: SceneUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(SceneUpdateDocument, "SceneUpdate", variables, signal);
   scenesUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["scenesUpdate"]>
-  ) => this.sdk.scenesUpdate(...args);
+    variables: ScenesUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(ScenesUpdateDocument, "ScenesUpdate", variables, signal);
   performerUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["performerUpdate"]>
-  ) => this.sdk.performerUpdate(...args);
+    variables: PerformerUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(PerformerUpdateDocument, "PerformerUpdate", variables, signal);
   studioUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["studioUpdate"]>
-  ) => this.sdk.studioUpdate(...args);
+    variables: StudioUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(StudioUpdateDocument, "StudioUpdate", variables, signal);
   galleryUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["galleryUpdate"]>
-  ) => this.sdk.galleryUpdate(...args);
+    variables: GalleryUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(GalleryUpdateDocument, "GalleryUpdate", variables, signal);
   groupUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["groupUpdate"]>
-  ) => this.sdk.groupUpdate(...args);
+    variables: GroupUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(GroupUpdateDocument, "GroupUpdate", variables, signal);
   imageUpdate = (
-    ...args: Parameters<ReturnType<typeof getSdk>["imageUpdate"]>
-  ) => this.sdk.imageUpdate(...args);
-  tagCreate = (...args: Parameters<ReturnType<typeof getSdk>["tagCreate"]>) =>
-    this.sdk.tagCreate(...args);
-  tagUpdate = (...args: Parameters<ReturnType<typeof getSdk>["tagUpdate"]>) =>
-    this.sdk.tagUpdate(...args);
+    variables: ImageUpdateMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(ImageUpdateDocument, "ImageUpdate", variables, signal);
+  tagCreate = (variables: TagCreateMutationVariables, signal?: AbortSignal) =>
+    this.run(TagCreateDocument, "TagCreate", variables, signal);
+  tagUpdate = (variables: TagUpdateMutationVariables, signal?: AbortSignal) =>
+    this.run(TagUpdateDocument, "TagUpdate", variables, signal);
 
   // Destroy operations
   performerDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["performerDestroy"]>
-  ) => this.sdk.performerDestroy(...args);
+    variables: PerformerDestroyMutationVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(PerformerDestroyDocument, "PerformerDestroy", variables, signal);
   performersDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["performersDestroy"]>
-  ) => this.sdk.performersDestroy(...args);
-  tagDestroy = (...args: Parameters<ReturnType<typeof getSdk>["tagDestroy"]>) =>
-    this.sdk.tagDestroy(...args);
+    variables: PerformersDestroyMutationVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(PerformersDestroyDocument, "PerformersDestroy", variables, signal);
+  tagDestroy = (variables: TagDestroyMutationVariables, signal?: AbortSignal) =>
+    this.run(TagDestroyDocument, "TagDestroy", variables, signal);
   tagsDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["tagsDestroy"]>
-  ) => this.sdk.tagsDestroy(...args);
+    variables: TagsDestroyMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(TagsDestroyDocument, "TagsDestroy", variables, signal);
   studioDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["studioDestroy"]>
-  ) => this.sdk.studioDestroy(...args);
+    variables: StudioDestroyMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(StudioDestroyDocument, "StudioDestroy", variables, signal);
   studiosDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["studiosDestroy"]>
-  ) => this.sdk.studiosDestroy(...args);
+    variables: StudiosDestroyMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(StudiosDestroyDocument, "StudiosDestroy", variables, signal);
   sceneDestroy = (
-    ...args: Parameters<ReturnType<typeof getSdk>["sceneDestroy"]>
-  ) => this.sdk.sceneDestroy(...args);
+    variables: SceneDestroyMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(SceneDestroyDocument, "SceneDestroy", variables, signal);
 
   // Activity operations
   sceneIncrementO = (
-    ...args: Parameters<ReturnType<typeof getSdk>["sceneIncrementO"]>
-  ) => this.sdk.sceneIncrementO(...args);
+    variables: SceneIncrementOMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(SceneIncrementODocument, "SceneIncrementO", variables, signal);
   sceneDecrementO = (
-    ...args: Parameters<ReturnType<typeof getSdk>["SceneDecrementO"]>
-  ) => this.sdk.SceneDecrementO(...args);
+    variables: SceneDecrementOMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(SceneDecrementODocument, "SceneDecrementO", variables, signal);
   sceneSaveActivity = (
-    ...args: Parameters<ReturnType<typeof getSdk>["SceneSaveActivity"]>
-  ) => this.sdk.SceneSaveActivity(...args);
+    variables: SceneSaveActivityMutationVariables,
+    signal?: AbortSignal
+  ) =>
+    this.run(SceneSaveActivityDocument, "SceneSaveActivity", variables, signal);
   sceneAddPlay = (
-    ...args: Parameters<ReturnType<typeof getSdk>["SceneAddPlay"]>
-  ) => this.sdk.SceneAddPlay(...args);
+    variables: SceneAddPlayMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(SceneAddPlayDocument, "SceneAddPlay", variables, signal);
 
   // Configuration
   configuration = (
-    ...args: Parameters<ReturnType<typeof getSdk>["Configuration"]>
-  ) => this.sdk.Configuration(...args);
+    variables?: ConfigurationQueryVariables,
+    signal?: AbortSignal
+  ) => this.run(ConfigurationDocument, "Configuration", variables, signal);
 
   // Version info
-  version = (...args: Parameters<ReturnType<typeof getSdk>["Version"]>) =>
-    this.sdk.Version(...args);
+  version = (variables?: VersionQueryVariables, signal?: AbortSignal) =>
+    this.run(VersionDocument, "Version", variables, signal);
 
   // Metadata operations
   metadataScan = (
-    ...args: Parameters<ReturnType<typeof getSdk>["metadataScan"]>
-  ) => this.sdk.metadataScan(...args);
+    variables: MetadataScanMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(MetadataScanDocument, "MetadataScan", variables, signal);
 }

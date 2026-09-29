@@ -5,7 +5,7 @@ generates:
     plugins:
       - typescript
       - typescript-operations
-      - typescript-graphql-request
+      - typed-document-node
     config:
       # Use string for ID scalars (Stash uses string IDs)
       scalars:
@@ -20,5 +20,7 @@ generates:
         Upload: File
       # Generate lean types
       skipTypename: true
+      # An explicit undefined means "omitted" where GraphQL has an optional input
+      inputMaybeValue: "T | null | undefined"
       # Use type imports
       useTypeImports: true

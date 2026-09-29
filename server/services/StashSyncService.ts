@@ -1023,7 +1023,6 @@ const GALLERY_MEMBER_ID_FETCHERS: Record<
   scene: async (stash, galleries, filter, signal) => {
     const { findScenes } = await stash.findSceneIDs(
       { filter, scene_filter: { galleries } },
-      undefined,
       signal
     );
     return { ids: findScenes.scenes.map((s) => s.id), count: findScenes.count };
@@ -1031,7 +1030,6 @@ const GALLERY_MEMBER_ID_FETCHERS: Record<
   image: async (stash, galleries, filter, signal) => {
     const { findImages } = await stash.findImageIDs(
       { filter, image_filter: { galleries } },
-      undefined,
       signal
     );
     return { ids: findImages.images.map((i) => i.id), count: findImages.count };
@@ -1228,7 +1226,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           tag_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findTags.tags, count: findTags.count };
@@ -1245,7 +1242,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           studio_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findStudios.studios, count: findStudios.count };
@@ -1264,7 +1260,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           performer_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findPerformers.performers, count: findPerformers.count };
@@ -1283,7 +1278,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           group_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findGroups.groups, count: findGroups.count };
@@ -1303,7 +1297,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           gallery_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findGalleries.galleries, count: findGalleries.count };
@@ -1324,7 +1317,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           scene_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findScenes.scenes, count: findScenes.count };
@@ -1347,7 +1339,6 @@ export const ENTITY_SYNC: {
           ids: q.ids,
           scene_marker_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return {
@@ -1370,7 +1361,6 @@ export const ENTITY_SYNC: {
           image_ids: q.ids?.map((id) => Number(id)),
           image_filter: updatedSince(q.since),
         },
-        undefined,
         q.signal
       );
       return { items: findImages.images, count: findImages.count };
@@ -4038,7 +4028,6 @@ class StashSyncService extends EventEmitter {
     const stash = this.getStashClient(stashInstanceId);
     const { findGroups } = await stash.findGroupRelations(
       { filter: { per_page: -1 } },
-      undefined,
       run.signal
     );
     throwIfAborted(run.signal);
