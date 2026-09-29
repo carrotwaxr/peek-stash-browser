@@ -687,30 +687,6 @@ describe("StashEntityService", () => {
     });
   });
 
-  describe("Studio Name Cache", () => {
-    beforeEach(() => {
-      // Clear the singleton's cache, which lives as long as the process
-      stashEntityService["studioNameCache"] = null;
-      stashEntityService["studioNameCachePromise"] = null;
-      vi.clearAllMocks();
-      // Re-set default mock after clearAllMocks
-      mockPrisma.stashStudio.findMany.mockResolvedValue([]);
-    });
-
-    it("getStudioNameMap caches results across calls", async () => {
-      mockPrisma.stashStudio.findMany.mockResolvedValue([
-        partialRow({ id: "s1", stashInstanceId: "inst-a", name: "Studio A" }),
-      ]);
-
-      const map1 = await stashEntityService.getStudioNameMap();
-      const map2 = await stashEntityService.getStudioNameMap();
-
-      // Should only query DB once (second call uses cache)
-      expect(prisma.stashStudio.findMany).toHaveBeenCalledTimes(1);
-      expect(map1).toBe(map2); // Same reference
-    });
-  });
-
   describe("generateSceneStreams", () => {
     const avi = {
       filePath: "/v/a.avi",

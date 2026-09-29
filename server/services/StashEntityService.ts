@@ -28,7 +28,7 @@ import type {
   SceneStream,
 } from "../types/index.js";
 import type { SceneScoringRow } from "../types/internal/queryRows.js";
-import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -37,6 +37,7 @@ import {
   buildSceneStreams,
   inferStashStreamOptions,
 } from "../utils/sceneStreams.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   getGalleryFallbackTitle,
   getImageFallbackTitle,
@@ -45,6 +46,12 @@ import {
 import type { ScoringScene } from "./RecommendationScoringService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { buildInstanceFilterClause } from "./UserInstanceService.js";
+import {
+  galleryRef,
+  groupRef,
+  performerRef,
+  tagRef,
+} from "./query/nestedRefs.js";
 
 /** One "Scenes like this" candidate: a scene on the seed's instance. */
 export interface SimilarSceneCandidate {
@@ -83,42 +90,9 @@ interface SceneWithRelations extends StashScene {
   galleries?: SceneGalleryWithGallery[];
 }
 
-/** Performer tag junction entry with included tag */
-interface PerformerTagWithTag {
-  tagId: string;
-  tag?: StashTag | null;
-}
-
-/** Performer input for transformPerformer - Prisma result with optional tag relation and optional computed counts */
-type PerformerInput = StashPerformer & {
-  tags?: PerformerTagWithTag[];
-};
-
-/** Studio tag junction entry with included tag */
-interface StudioTagWithTag {
-  tagId: string;
-  tag?: StashTag | null;
-}
-
-/** Studio input for transformStudio - Prisma result with optional tag relation and optional computed counts */
-type StudioInput = StashStudio & {
-  tags?: StudioTagWithTag[];
-};
-
 /** Tag input for transformTag - Prisma result with optional computed counts */
 type TagInput = StashTag & {
   sceneMarkerCount?: number;
-};
-
-/** Group tag junction entry with included tag */
-interface GroupTagWithTag {
-  tagId: string;
-  tag?: StashTag | null;
-}
-
-/** Group input for transformGroup - Prisma result with optional tag relation and optional computed counts */
-type GroupInput = StashGroup & {
-  tags?: GroupTagWithTag[];
 };
 
 /** Gallery performer junction entry */
@@ -258,14 +232,6 @@ const DEFAULT_GROUP_USER_FIELDS = {
 };
 
 class StashEntityService {
-  // In-memory cache for studio name lookups (cleared on cache invalidation)
-  private studioNameCache: Map<string, string> | null = null;
-  private studioNameCachePromise: Promise<Map<string, string>> | null = null;
-
-  // In-memory cache for tag name lookups (for inherited tag hydration)
-  private tagNameCache: Map<string, string> | null = null;
-  private tagNameCachePromise: Promise<Map<string, string>> | null = null;
-
   // ==================== Scene Queries ====================
 
   /**
@@ -440,12 +406,7 @@ class StashEntityService {
     const scene = this.transformSceneWithRelations(cached);
 
     // Hydrate studio names and inherited tags
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames([scene], studioNames);
-    this.hydrateInheritedTags([scene], tagNames);
+    await this.hydrateNames([scene], instanceId);
 
     return scene;
   }
@@ -478,12 +439,7 @@ class StashEntityService {
     const scenes = cached.map((c) => this.transformSceneWithRelations(c));
 
     // Hydrate studio names and inherited tags
-    const [studioNames, tagNames] = await Promise.all([
-      this.getStudioNameMap(),
-      this.getTagNameMap(),
-    ]);
-    this.hydrateStudioNames(scenes, studioNames);
-    this.hydrateInheritedTags(scenes, tagNames);
+    await this.hydrateNames(scenes, instanceId);
 
     return scenes;
   }
@@ -568,81 +524,6 @@ class StashEntityService {
   }
 
   // ==================== Studio Queries ====================
-
-  /**
-   * Get a lightweight Map of studio ID -> name for hydrating browse scenes.
-   * Uses in-memory caching to avoid repeated DB queries.
-   * This is a workaround until StashScene has a proper studio relation.
-   */
-  async getStudioNameMap(): Promise<Map<string, string>> {
-    // Return cached result if available
-    if (this.studioNameCache) {
-      return this.studioNameCache;
-    }
-
-    // If already loading, wait for that promise
-    if (this.studioNameCachePromise) {
-      return this.studioNameCachePromise;
-    }
-
-    // Build the cache with composite keys (id + instanceId) to prevent cross-instance collisions
-    this.studioNameCachePromise = (async () => {
-      const studios = await prisma.stashStudio.findMany({
-        where: { deletedAt: null },
-        select: { id: true, stashInstanceId: true, name: true },
-      });
-      const map = new Map<string, string>();
-      for (const s of studios) {
-        if (s.name) {
-          map.set(entityKey(s.id, s.stashInstanceId), s.name);
-          // Also set by ID only (for backwards compat when instanceId unavailable)
-          if (!map.has(s.id)) map.set(s.id, s.name);
-        }
-      }
-      this.studioNameCache = map;
-      this.studioNameCachePromise = null;
-      return map;
-    })();
-
-    return this.studioNameCachePromise;
-  }
-
-  /**
-   * Get a lightweight Map of tag ID -> name for hydrating inherited tags.
-   * Uses in-memory caching to avoid repeated DB queries.
-   */
-  async getTagNameMap(): Promise<Map<string, string>> {
-    // Return cached result if available
-    if (this.tagNameCache) {
-      return this.tagNameCache;
-    }
-
-    // If already loading, wait for that promise
-    if (this.tagNameCachePromise) {
-      return this.tagNameCachePromise;
-    }
-
-    // Build the cache with composite keys (id + instanceId) to prevent cross-instance collisions
-    this.tagNameCachePromise = (async () => {
-      const tags = await prisma.stashTag.findMany({
-        where: { deletedAt: null },
-        select: { id: true, stashInstanceId: true, name: true },
-      });
-      const map = new Map<string, string>();
-      for (const t of tags || []) {
-        if (t.name) {
-          map.set(entityKey(t.id, t.stashInstanceId), t.name);
-          // Also set by ID only (for backwards compat when instanceId unavailable)
-          if (!map.has(t.id)) map.set(t.id, t.name);
-        }
-      }
-      this.tagNameCache = map;
-      this.tagNameCachePromise = null;
-      return map;
-    })();
-
-    return this.tagNameCachePromise;
-  }
 
   /**
    * Get studio by ID with computed counts
@@ -1148,11 +1029,10 @@ class StashEntityService {
       code: scene.code,
       date: scene.date,
       details: scene.details,
-      rating100: scene.rating100,
       organized: scene.organized,
 
       // URLs
-      urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
+      urls: parseJsonArray(scene.urls),
 
       // File metadata
       files: scene.filePath
@@ -1198,17 +1078,9 @@ class StashEntityService {
       ),
 
       // Caption metadata for multi-language subtitle support
-      captions: scene.captions
-        ? (JSON.parse(scene.captions) as {
-            language_code: string;
-            caption_type: string;
-          }[])
-        : [],
-
-      // Stash counters (override defaults)
-      o_counter: scene.oCounter ?? 0,
-      play_count: scene.playCount ?? 0,
-      play_duration: scene.playDuration ?? 0,
+      captions: parseJsonArray<{ language_code: string; caption_type: string }>(
+        scene.captions
+      ),
 
       // Timestamps
       created_at: scene.stashCreatedAt?.toISOString() ?? null,
@@ -1222,58 +1094,61 @@ class StashEntityService {
       galleries: [],
 
       // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds
-        ? (JSON.parse(scene.inheritedTagIds) as string[])
-        : [],
+      inheritedTagIds: parseJsonArray(scene.inheritedTagIds),
     };
   }
 
   /**
-   * Hydrate studio names on an array of scenes using a pre-fetched name map.
-   * Mutates scenes in-place for performance.
-   * This is a workaround until StashScene has a proper studio relation in Prisma.
+   * Names the scenes' studios and inherited tags, read for this request from
+   * the ids the scenes hold (one instance), so a rename in Stash shows on the
+   * next read. Mutates the scenes in place.
    */
-  private hydrateStudioNames(
+  private async hydrateNames(
     scenes: NormalizedScene[],
-    studioNames: Map<string, string>
-  ): void {
+    instanceId: string
+  ): Promise<void> {
+    const studioIds = new Set<string>();
+    const tagIds = new Set<string>();
     for (const scene of scenes) {
-      if (scene.studio?.id) {
-        const sceneInstanceId = scene.instanceId || "";
-        // Try composite key first, fall back to ID-only
-        const name =
-          studioNames.get(entityKey(scene.studio.id, sceneInstanceId)) ??
-          studioNames.get(scene.studio.id);
-        if (name) {
-          (scene.studio as { id: string; name?: string }).name = name;
-        }
-      }
+      if (scene.studio?.id) studioIds.add(scene.studio.id);
+      for (const tagId of scene.inheritedTagIds ?? []) tagIds.add(tagId);
     }
-  }
+    const [studios, tags] = await Promise.all([
+      studioIds.size === 0
+        ? []
+        : prisma.stashStudio.findMany({
+            where: {
+              id: { in: [...studioIds] },
+              stashInstanceId: instanceId,
+              deletedAt: null,
+            },
+            select: { id: true, name: true },
+          }),
+      tagIds.size === 0
+        ? []
+        : prisma.stashTag.findMany({
+            where: {
+              id: { in: [...tagIds] },
+              stashInstanceId: instanceId,
+              deletedAt: null,
+            },
+            select: { id: true, name: true },
+          }),
+    ]);
+    const studioNames = new Map(studios.map((r) => [r.id, r.name]));
+    const tagNames = new Map(tags.map((r) => [r.id, r.name]));
 
-  /**
-   * Hydrate inherited tag names on an array of scenes using a pre-fetched name map.
-   * Mutates scenes in-place for performance.
-   */
-  private hydrateInheritedTags(
-    scenes: NormalizedScene[],
-    tagNames: Map<string, string>
-  ): void {
     for (const scene of scenes) {
-      const inheritedTagIds = scene.inheritedTagIds;
-      if (
-        inheritedTagIds &&
-        Array.isArray(inheritedTagIds) &&
-        inheritedTagIds.length > 0
-      ) {
-        const sceneInstanceId = scene.instanceId || "";
-        scene.inheritedTags = inheritedTagIds.map((tagId: string) => ({
+      const name = scene.studio ? studioNames.get(scene.studio.id) : undefined;
+      if (scene.studio && name) {
+        (scene.studio as { id: string; name?: string }).name = name;
+      }
+      const inheritedTagIds = scene.inheritedTagIds ?? [];
+      if (inheritedTagIds.length > 0) {
+        scene.inheritedTags = inheritedTagIds.map((tagId) => ({
           id: tagId,
-          // Try composite key first, fall back to ID-only
-          name:
-            tagNames.get(entityKey(tagId, sceneInstanceId)) ??
-            tagNames.get(tagId) ??
-            "Unknown",
+          instanceId,
+          name: tagNames.get(tagId) ?? "Unknown",
         }));
       }
     }
@@ -1284,39 +1159,46 @@ class StashEntityService {
   ): NormalizedScene {
     const base = this.transformScene(scene);
 
-    // Add nested entities
+    // Nested entities take the list rows' ref shapes: Stash's favorite and
+    // rating belong to the Stash user, never to the viewer
     if (scene.performers) {
       base.performers = scene.performers.map(
         (sp: ScenePerformerWithPerformer) =>
-          this.transformPerformer(sp.performer)
+          performerRef(sp.performer, sp.performer.stashInstanceId)
       );
     }
     if (scene.tags) {
       base.tags = scene.tags.map((st: SceneTagWithTag) =>
-        this.transformTag(st.tag)
+        tagRef(st.tag, st.tag.stashInstanceId)
       );
     }
     if (scene.groups) {
       base.groups = scene.groups.map((sg: SceneGroupWithGroup) => ({
-        ...this.transformGroup(sg.group),
+        ...groupRef(sg.group, sg.group.stashInstanceId),
         scene_index: sg.sceneIndex,
       }));
     }
     if (scene.galleries) {
       base.galleries = scene.galleries.map((sg: SceneGalleryWithGallery) =>
-        this.transformGallery(sg.gallery)
+        galleryRef(sg.gallery, sg.gallery.stashInstanceId)
       );
     }
 
     // Hydrate inherited tags with full tag objects
     if (scene.inheritedTagIds) {
-      const inheritedTagIds = JSON.parse(scene.inheritedTagIds) as string[];
+      const inheritedTagIds = parseJsonArray(scene.inheritedTagIds);
       if (inheritedTagIds.length > 0) {
         // Look up tags in the tags array we already have, or create minimal stub
         base.inheritedTags = inheritedTagIds.map((tagId: string) => {
           // Find in existing tags or create minimal stub
           const existingTag = base.tags?.find((t) => t.id === tagId);
-          return existingTag ?? { id: tagId, name: "Unknown" };
+          return (
+            existingTag ?? {
+              id: tagId,
+              instanceId: scene.stashInstanceId,
+              name: "Unknown",
+            }
+          );
         });
       }
     }
@@ -1324,16 +1206,7 @@ class StashEntityService {
     return base;
   }
 
-  private transformPerformer(performer: PerformerInput): NormalizedPerformer {
-    // Extract tags from junction table relation (if included) or empty array
-    const tags =
-      performer.tags?.map((pt: PerformerTagWithTag) => ({
-        id: pt.tagId,
-        name: pt.tag?.name || "Unknown",
-        image_path: pt.tag?.imagePath
-          ? toProxyUrl(pt.tag.imagePath, pt.tag.stashInstanceId)
-          : null,
-      })) ?? [];
+  private transformPerformer(performer: StashPerformer): NormalizedPerformer {
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -1349,9 +1222,7 @@ class StashEntityService {
       gallery_count: performer.galleryCount ?? 0,
       group_count: performer.groupCount ?? 0,
       details: performer.details,
-      alias_list: performer.aliasList
-        ? (JSON.parse(performer.aliasList) as string[])
-        : [],
+      alias_list: parseJsonArray(performer.aliasList),
       country: performer.country,
       ethnicity: performer.ethnicity,
       hair_color: performer.hairColor,
@@ -1365,24 +1236,17 @@ class StashEntityService {
       career_length: performer.careerLength,
       death_date: performer.deathDate,
       url: performer.url,
-      // Tags from junction table relation - will be hydrated with names in controller
-      tags,
+      // No caller includes the tags relation
+      tags: [],
+      penis_length: performer.penisLength,
+      circumcised: performer.circumcised,
       image_path: toProxyUrl(performer.imagePath, performer.stashInstanceId),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 
-  private transformStudio(studio: StudioInput): NormalizedStudio {
-    // Extract tags from junction table relation (if included) or empty array
-    const tags =
-      studio.tags?.map((st: StudioTagWithTag) => ({
-        id: st.tagId,
-        name: st.tag?.name || "Unknown",
-        image_path: st.tag?.imagePath
-          ? toProxyUrl(st.tag.imagePath, st.tag.stashInstanceId)
-          : null,
-      })) ?? [];
+  private transformStudio(studio: StashStudio): NormalizedStudio {
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -1398,8 +1262,7 @@ class StashEntityService {
       group_count: studio.groupCount ?? 0,
       details: studio.details,
       url: studio.url,
-      // Tags from junction table relation - will be hydrated with names in controller
-      tags,
+      tags: [],
       image_path: toProxyUrl(studio.imagePath, studio.stashInstanceId),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
@@ -1422,26 +1285,15 @@ class StashEntityService {
       scene_marker_count: tag.sceneMarkerCount ?? 0,
       scene_count_via_performers: tag.sceneCountViaPerformers ?? 0,
       description: tag.description,
-      aliases: tag.aliases ? (JSON.parse(tag.aliases) as string[]) : [],
-      parents: tag.parentIds
-        ? (JSON.parse(tag.parentIds) as string[]).map((id: string) => ({ id }))
-        : [],
+      aliases: parseJsonArray(tag.aliases),
+      parents: parseJsonArray(tag.parentIds).map((id) => ({ id })),
       image_path: toProxyUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 
-  private transformGroup(group: GroupInput): NormalizedGroup {
-    // Extract tags from junction table relation (if included) or empty array
-    const tags =
-      group.tags?.map((gt: GroupTagWithTag) => ({
-        id: gt.tagId,
-        name: gt.tag?.name || "Unknown",
-        image_path: gt.tag?.imagePath
-          ? toProxyUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
-          : null,
-      })) ?? [];
+  private transformGroup(group: StashGroup): NormalizedGroup {
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
@@ -1455,9 +1307,8 @@ class StashEntityService {
       performer_count: group.performerCount ?? 0,
       director: group.director,
       synopsis: group.synopsis,
-      urls: group.urls ? (JSON.parse(group.urls) as string[]) : [],
-      // Tags from junction table relation - will be hydrated with names in controller
-      tags,
+      urls: parseJsonArray(group.urls),
+      tags: [],
       front_image_path: toProxyUrl(group.frontImagePath, group.stashInstanceId),
       back_image_path: toProxyUrl(group.backImagePath, group.stashInstanceId),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
@@ -1567,7 +1418,7 @@ class StashEntityService {
       date: ig.gallery.date,
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
-      urls: ig.gallery.urls ? (JSON.parse(ig.gallery.urls) as string[]) : [],
+      urls: parseJsonArray(ig.gallery.urls),
       cover: toProxyUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
@@ -1611,7 +1462,7 @@ class StashEntityService {
       code: image.code,
       details: image.details,
       photographer: image.photographer,
-      urls: image.urls ? (JSON.parse(image.urls) as string[]) : [],
+      urls: parseJsonArray(image.urls),
       date: image.date,
       studio,
       studioId: image.studioId,

@@ -666,7 +666,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       sceneStreams: [],
 
       // Caption metadata for multi-language subtitle support
-      captions: row.captions ? (JSON.parse(row.captions) as unknown[]) : [],
+      captions: parseJsonArray<unknown>(row.captions),
 
       // Relations - populated separately after query
       studio: null as StudioRef | null,
