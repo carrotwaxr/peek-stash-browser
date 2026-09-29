@@ -262,14 +262,6 @@
       "count": 5
     }
   },
-  "services/ImageQueryBuilder.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
-    }
-  },
   "services/PlaylistZipService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1

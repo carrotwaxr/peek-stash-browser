@@ -19,7 +19,6 @@ import {
   makeEntityRef,
 } from "@peek/shared-types/instanceAwareId.js";
 import type { ClipQueryOptions } from "../services/ClipService.js";
-import type { ImageFilter } from "../services/ImageQueryBuilder.js";
 import type {
   PeekGalleryFilter,
   PeekGroupFilter,
@@ -44,7 +43,8 @@ export interface LegacyFilters {
   tag: PeekTagFilter;
   group: PeekGroupFilter;
   gallery: PeekGalleryFilter;
-  image: ImageFilter;
+  /** No builder reads it: the image builder takes the parsed filter (C7) */
+  image: Record<string, unknown>;
 }
 
 /** A ref as the wire spells it: "id" when bare, else "id:instanceId" */

@@ -458,6 +458,55 @@ export interface NormalizedImage {
   lastViewedAt?: string | null;
 }
 
+/**
+ * An image as the image list returns it (POST /api/library/images): its
+ * columns, its media as proxy URLs, the requesting user's rating, favorite,
+ * O count and views (never Stash's), and its performers, tags, galleries
+ * and studio on its own instance.
+ */
+export interface ImageListItem {
+  id: string;
+  instanceId: string;
+  /** The same as instanceId */
+  stashInstanceId: string;
+  /** The title, else the file name without its extension */
+  title: string | null;
+  code: string | null;
+  details: string | null;
+  photographer: string | null;
+  urls: string[];
+  date: string | null;
+  studioId: string | null;
+  organized: boolean;
+  filePath: string | null;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  paths: {
+    thumbnail: string | null;
+    preview: string | null;
+    image: string | null;
+  };
+  /** The same as paths.thumbnail, paths.preview and paths.image */
+  pathThumbnail: string | null;
+  pathPreview: string | null;
+  pathImage: string | null;
+  stashCreatedAt: string | null;
+  stashUpdatedAt: string | null;
+
+  // The requesting user's own data
+  rating100: number | null;
+  favorite: boolean;
+  oCounter: number;
+  viewCount: number;
+  lastViewedAt: string | null;
+
+  performers: PerformerRef[];
+  tags: TagRef[];
+  galleries: GalleryRef[];
+  studio: StudioRef | null;
+}
+
 // ─── Utility Types ───────────────────────────────────────────────────────────
 
 /** Entity with instanceId, for nested entities within scenes/galleries */

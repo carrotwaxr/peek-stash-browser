@@ -418,7 +418,8 @@ export interface TooltipGalleryRow {
  * Raw row returned by ImageQueryBuilder's SELECT.
  *
  * Base columns from StashImage, plus user data from LEFT JOINs on
- * ImageRating (r) and ImageViewHistory (v).
+ * ImageRating (r) and ImageViewHistory (v). Stash's own rating and O count
+ * are not selected: the list reads the viewer's.
  */
 export interface ImageQueryRow {
   // StashImage base columns
@@ -431,8 +432,6 @@ export interface ImageQueryRow {
   urls: string | null; // JSON-encoded string[]
   date: string | null;
   studioId: string | null;
-  stashRating100: number | null;
-  stashOCounter: number;
   organized: boolean;
   filePath: string | null;
   width: number | null;
@@ -457,6 +456,7 @@ export interface ImageQueryRow {
 /** Raw row of ImageQueryBuilder's performer lookup for a page of images. */
 export interface ImagePerformerQueryRow {
   imageId: string;
+  imageInstanceId: string;
   id: string;
   stashInstanceId: string;
   name: string;
@@ -470,6 +470,7 @@ export interface ImagePerformerQueryRow {
 /** Raw row of ImageQueryBuilder's tag lookup for a page of images. */
 export interface ImageTagQueryRow {
   imageId: string;
+  imageInstanceId: string;
   id: string;
   stashInstanceId: string;
   name: string;
@@ -480,10 +481,21 @@ export interface ImageTagQueryRow {
 /** Raw row of ImageQueryBuilder's gallery lookup for a page of images. */
 export interface ImageGalleryQueryRow {
   imageId: string;
+  imageInstanceId: string;
   id: string;
   stashInstanceId: string;
   title: string | null;
   coverPath: string | null;
+}
+
+/** Raw row of ImageQueryBuilder's studio lookup for a page of images. */
+export interface ImageStudioQueryRow {
+  id: string;
+  stashInstanceId: string;
+  name: string;
+  imagePath: string | null;
+  favorite: boolean;
+  parentId: string | null;
 }
 
 // ---------------------------------------------------------------------------

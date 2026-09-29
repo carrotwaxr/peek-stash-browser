@@ -20,6 +20,7 @@ export type {
   NormalizedGallery,
   NormalizedGroup,
   NormalizedImage,
+  ImageListItem,
   SceneScoringData,
   WithInstanceId,
   PerformerRef,

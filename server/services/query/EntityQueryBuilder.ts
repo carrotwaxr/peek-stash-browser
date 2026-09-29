@@ -358,7 +358,11 @@ export abstract class EntityQueryBuilder<Row, Entity, E extends EntityKind> {
     ];
     const combined = combine(clauses);
 
-    const { field, direction, seed } = request.sort;
+    const { field, seed } = request.sort;
+    // Defence in depth, as for the key: the parser sends ASC or DESC, and
+    // anything else never reaches ORDER BY (item 3)
+    const direction: SortDirection =
+      request.sort.direction === "ASC" ? "ASC" : "DESC";
     const sortExpr = this.sortExpr(field, direction, seed, request.filter);
     const order = `${sortExpr.sql}, ${spec.tiebreak(direction, field)}`;
 

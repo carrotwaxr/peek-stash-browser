@@ -7,9 +7,9 @@
  * declares it; every row of a list response carries `stashUrl`.
  */
 import type {
+  ImageListItem,
   NormalizedGallery,
   NormalizedGroup,
-  NormalizedImage,
   NormalizedPerformer,
   NormalizedScene,
   NormalizedStudio,
@@ -338,6 +338,6 @@ export type FindImagesRequest = ListRequestInput<"image">;
 export interface FindImagesResponse {
   findImages: {
     count: number;
-    images: WithStashUrl<NormalizedImage>[];
+    images: WithStashUrl<ImageListItem>[];
   };
 }

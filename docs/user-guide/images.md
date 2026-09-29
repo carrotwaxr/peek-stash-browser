@@ -73,7 +73,7 @@ Rate images directly in the lightbox:
     - **0**: Clear rating
 - **F key**: Toggle favorite
 
-Your ratings and favorites are saved to Peek (separate from Stash ratings).
+Your ratings and favorites are saved to Peek (separate from Stash ratings). Filtering and sorting images by rating or O count use your own ratings and O counts: an image you have not rated counts as unrated, whatever its rating in Stash.
 
 ### O Counter
 
