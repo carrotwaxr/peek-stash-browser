@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { findGroups } from "../../controllers/library/groups.js";
 import { findPerformers } from "../../controllers/library/performers.js";
 import { findStudios } from "../../controllers/library/studios.js";
@@ -16,7 +16,11 @@ import {
   type RecordedStatement,
   recordStatements,
 } from "../helpers/statementRecorder.js";
-import { adminClient } from "../helpers/testClient.js";
+import {
+  adminClient,
+  restoreInstanceSelection,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 /**
  * Tag Parent Name Hydration Integration Tests
@@ -115,7 +119,12 @@ const studiosRequest = (body: object) =>
 describe("Tag Parent Name Hydration", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    // The second library reuses the test library's ids: only the test
+    // instance, so a bare id names one tag or studio
+    await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   it("the tag detail request runs no full-table tag load", async () => {
     const listResponse = await adminClient.post<FindTagsResponse>(

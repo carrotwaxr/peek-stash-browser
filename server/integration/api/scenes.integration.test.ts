@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
@@ -6,6 +6,7 @@ import { expectRefused } from "../helpers/refused.js";
 import {
   adminClient,
   guestClient,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -35,6 +36,8 @@ describe("Scene API", () => {
     // Select only test instance to avoid ID collisions with other instances
     testInstanceId = await selectTestInstanceOnly();
   });
+
+  afterAll(restoreInstanceSelection);
 
   describe("POST /api/library/scenes", () => {
     it("rejects unauthenticated requests", async () => {

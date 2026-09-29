@@ -19,7 +19,7 @@ import { TEST_CONFIG } from "../helpers/config.js";
 import {
   TestClient,
   adminClient,
-  selectAllInstances,
+  restoreInstanceSelection,
   selectTestInstanceForClient,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
@@ -114,7 +114,7 @@ describe("media security", () => {
   }, 30_000);
 
   afterAll(async () => {
-    await selectAllInstances();
+    await restoreInstanceSelection();
     if (mediaUserId) {
       await adminClient.delete(`/api/user/${mediaUserId}`);
     }

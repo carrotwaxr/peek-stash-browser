@@ -28,8 +28,8 @@ import {
 import { recordStatements } from "../helpers/statementRecorder.js";
 import {
   adminClient,
+  restoreInstanceSelection,
   selectAllInstances,
-  selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -549,9 +549,7 @@ describeWithDb("Ref clause shapes", () => {
       await selectAllInstances();
     });
 
-    afterAll(async () => {
-      await selectTestInstanceOnly();
-    });
+    afterAll(restoreInstanceSelection);
 
     it.each([900, 1000])(
       "an ids filter of %i refs answers 200 with the right rows",

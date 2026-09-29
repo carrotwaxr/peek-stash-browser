@@ -45,6 +45,7 @@ import { recordStatements } from "../helpers/statementRecorder.js";
 import {
   type TestClient,
   adminClient,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -417,6 +418,8 @@ describe("carousel, recommended and similar requests", () => {
     beforeAll(async () => {
       testInstanceId = await selectTestInstanceOnly();
     });
+
+    afterAll(restoreInstanceSelection);
 
     const similarPath = (query: string) =>
       `/api/library/scenes/${TEST_ENTITIES.sceneWithRelations}/similar?${query}`;

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
@@ -22,6 +23,7 @@ import {
   resolveStashTarget,
   stashHost,
 } from "./stashTarget.js";
+import { adminClient } from "./testClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -292,6 +294,28 @@ export async function setup() {
     }
   }
 
+  // Every file sees the same instances, and starts with the admin seeing all
+  // of them: the second library (the replay's; in a live run, the Stash
+  // ALLOW_PROD_STASH allows) is added here rather than by whichever file
+  // needs it first, and the admin's selection is cleared (a live run's
+  // test.db keeps what an older run left). sharedStateAudit.ts fails a file
+  // that leaves either changed.
+  try {
+    if (second) await addSecondInstance(prisma, second, stashSyncService);
+    const cleared = await adminClient.put("/api/user/stash-instances", {
+      instanceIds: [],
+    });
+    if (!cleared.ok) {
+      throw new Error(
+        `Clearing the admin's instance selection answered ${cleared.status}`
+      );
+    }
+  } catch (error) {
+    const { syncScheduler } = await import("../../services/SyncScheduler.js");
+    syncScheduler.stop();
+    await abort(error instanceof Error ? error : new Error(String(error)));
+  }
+
   console.log("[Integration Tests] Global setup complete");
 
   // Return teardown function for Vitest
@@ -392,3 +416,54 @@ async function waitForServer(maxAttempts = 30, delayMs = 500): Promise<void> {
 }
 
 export default setup;
+
+/**
+ * Adds the run's second Stash as the admin's form does, unless the database
+ * has it already, and waits for its first sync: the instance shows once its
+ * exclusions are computed (`firstSyncedAt`).
+ */
+async function addSecondInstance(
+  prisma: PrismaClient,
+  second: StashEndpoint,
+  sync: { isSyncing(): boolean }
+): Promise<void> {
+  const existing = await prisma.stashInstance.findFirst({
+    where: { url: second.url },
+    select: { id: true },
+  });
+  let id = existing?.id;
+  if (id === undefined) {
+    console.log("[Integration Tests] Adding the second Stash instance...");
+    const added = await adminClient.post<{ instance: { id: string } }>(
+      "/api/setup/stash-instance",
+      {
+        name: "Second Stash (Read-Only)",
+        description: "Second Stash - for multi-instance testing only",
+        url: second.url,
+        apiKey: second.apiKey,
+        enabled: true,
+        priority: 2,
+      }
+    );
+    if (added.status !== 201) {
+      throw new Error(
+        `Adding the second Stash instance answered ${added.status}: ${JSON.stringify(added.data)}`
+      );
+    }
+    id = added.data.instance.id;
+  }
+  const deadline = Date.now() + 120_000;
+  for (;;) {
+    const row = await prisma.stashInstance.findUnique({
+      where: { id },
+      select: { firstSyncedAt: true },
+    });
+    if (row?.firstSyncedAt && !sync.isSyncing()) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        "The second Stash instance's first sync did not finish within 120 s"
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}

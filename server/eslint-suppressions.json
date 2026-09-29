@@ -113,12 +113,12 @@
   },
   "integration/api/content-restrictions-include-mode.integration.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
+      "count": 6
     }
   },
   "integration/api/content-restrictions.integration.test.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     }
   },
   "integration/api/downloads-access.integration.test.ts": {

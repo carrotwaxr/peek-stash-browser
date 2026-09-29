@@ -2,9 +2,10 @@
  * Multi-Instance Integration Tests
  *
  * Tests for multi-Stash-instance support. The primary instance is the run's
- * Stash. The filtering tests need a second instance, STASH_SECOND_URL and
- * STASH_SECOND_API_KEY, which globalSetup sets only when the run allows one
- * (ALLOW_PROD_STASH=1 in the shell); without it they are skipped.
+ * Stash. The filtering tests need a second instance, STASH_SECOND_URL, which
+ * globalSetup adds before any file when the run has one (a replay run always;
+ * a live run with ALLOW_PROD_STASH=1 in the shell); without it they are
+ * skipped.
  *
  * These tests verify:
  * - Admin instance management endpoints
@@ -17,13 +18,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { objectContaining } from "../../tests/helpers/matchers.js";
 import { must } from "../../tests/helpers/must.js";
-import type { SyncStatusResponse } from "../../types/api/sync.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import {
+  adminClient,
+  guestClient,
+  restoreInstanceSelection,
+  selectAllInstances,
+  setInstanceSelection,
+} from "../helpers/testClient.js";
 
-// The second instance globalSetup allows for this run, if any
+// The second instance globalSetup adds for this run, if any
 const SECOND_STASH_URL = process.env.STASH_SECOND_URL;
-const SECOND_STASH_API_KEY = process.env.STASH_SECOND_API_KEY;
 
 interface StashInstance {
   id: string;
@@ -57,97 +62,29 @@ describe("Multi-Instance Support", () => {
     // Find test instance (should be first/primary)
     testInstanceId = must(instancesResponse.data.instances[0]).id;
 
-    // Check if the second instance already exists
-    const existingSecond = SECOND_STASH_URL
-      ? instancesResponse.data.instances.find((i) => i.url === SECOND_STASH_URL)
-      : undefined;
+    // Global setup adds the run's second instance, when it has one
+    if (SECOND_STASH_URL) {
+      productionInstanceId = must(
+        instancesResponse.data.instances.find(
+          (i) => i.url === SECOND_STASH_URL
+        ),
+        "the second instance global setup adds"
+      ).id;
 
-    if (existingSecond) {
-      productionInstanceId = existingSecond.id;
-      console.log("[Multi-Instance Tests] Second instance already configured");
-    } else if (SECOND_STASH_URL && SECOND_STASH_API_KEY) {
-      // Add the second Stash (READ ONLY - we just sync from it)
-      console.log("[Multi-Instance Tests] Adding the second Stash instance...");
-
-      const addResponse = await adminClient.post<{
-        success: boolean;
-        instance: StashInstance;
-      }>("/api/setup/stash-instance", {
-        name: "Second Stash (Read-Only)",
-        description: "Second Stash - for multi-instance testing only",
-        url: SECOND_STASH_URL,
-        apiKey: SECOND_STASH_API_KEY,
-        enabled: true,
-        priority: 2, // Lower priority than test instance
-      });
-
-      if (addResponse.ok) {
-        productionInstanceId = addResponse.data.instance.id;
-        console.log(
-          "[Multi-Instance Tests] Second instance added, waiting for sync..."
-        );
-
-        // Earlier files may have limited the admin to the test instance;
-        // count every instance while waiting
-        await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
-
-        // Wait for its first sync to finish (poll for up to 2 minutes): the
-        // instance shows once its exclusions are computed (firstSyncedAt)
-        const maxWait = 120000;
-        const startTime = Date.now();
-        let syncComplete = false;
-        const secondId = productionInstanceId;
-
-        while (Date.now() - startTime < maxWait && !syncComplete) {
-          await new Promise((r) => setTimeout(r, 1000));
-
-          const status =
-            await adminClient.get<SyncStatusResponse>("/api/sync/status");
-          syncComplete =
-            status.ok &&
-            status.data.instances.some(
-              (i) => i.instanceId === secondId && i.firstSyncedAt !== null
-            );
-        }
-
-        if (!syncComplete) {
-          console.log(
-            "[Multi-Instance Tests] Warning: Sync may not be complete"
-          );
-        }
-      } else {
-        console.log(
-          "[Multi-Instance Tests] Could not add the second instance:",
-          addResponse.data
-        );
-      }
-    }
-
-    // Get scene counts for each instance if we have multiple
-    if (productionInstanceId) {
       // Select only test instance and count
-      await adminClient.put("/api/user/stash-instances", {
-        instanceIds: [testInstanceId],
-      });
+      await setInstanceSelection([testInstanceId]);
       const testScenesResponse = await adminClient.post<{
         findScenes: { count: number };
       }>("/api/library/scenes", { filter: { per_page: 1 } });
       testInstanceSceneCount = testScenesResponse.data?.findScenes?.count || 0;
 
       // Select only production instance and count
-      await adminClient.put("/api/user/stash-instances", {
-        instanceIds: [productionInstanceId],
-      });
+      await setInstanceSelection([productionInstanceId]);
       const prodScenesResponse = await adminClient.post<{
         findScenes: { count: number };
       }>("/api/library/scenes", { filter: { per_page: 1 } });
       productionInstanceSceneCount =
         prodScenesResponse.data?.findScenes?.count || 0;
-
-      // Reset to all instances
-      await adminClient.put("/api/user/stash-instances", {
-        instanceIds: [],
-      });
 
       console.log(
         `[Multi-Instance Tests] Test instance: ${testInstanceSceneCount} scenes`
@@ -156,17 +93,12 @@ describe("Multi-Instance Support", () => {
         `[Multi-Instance Tests] Production instance: ${productionInstanceSceneCount} scenes`
       );
     }
-    // Room for the two-minute sync wait above
-  }, 180_000);
-
-  afterAll(async () => {
-    // Restore user instance selection to test-only (so subsequent tests aren't affected)
-    // Other tests expect to query only the test instance for consistent results
-    await adminClient.put("/api/user/stash-instances", {
-      instanceIds: [testInstanceId],
-    });
-    // Note: We don't remove the production instance - it's useful to keep for future test runs
+    // Every instance while this file runs
+    await selectAllInstances();
   });
+
+  // Puts back the selection the admin had before this file
+  afterAll(restoreInstanceSelection);
 
   describe("Admin Instance Management", () => {
     it("admin can list all Stash instances", async () => {

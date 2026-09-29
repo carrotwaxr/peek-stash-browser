@@ -22,6 +22,7 @@ import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
   adminClient,
+  restoreInstanceSelection,
   selectAllInstancesForClient,
   selectTestInstanceForClient,
   selectTestInstanceOnly,
@@ -123,6 +124,7 @@ describe("Collection hierarchy (integration)", () => {
     for (const user of [hider, restricted]) {
       if (user) await adminClient.delete(`/api/user/${user.id}`);
     }
+    await restoreInstanceSelection();
   });
 
   it.skipIf(!REPLAY)(

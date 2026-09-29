@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -24,8 +24,23 @@ interface CardDisplayEntitySettings {
 }
 
 describe("User Settings API - cardDisplaySettings", () => {
+  /** The shared admin's card settings before this file, put back after it */
+  let savedCardDisplaySettings:
+    | UserSettings["settings"]["cardDisplaySettings"]
+    | null = null;
+
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    const current = await adminClient.get<UserSettings>("/api/user/settings");
+    expect(current.ok).toBe(true);
+    savedCardDisplaySettings = current.data.settings.cardDisplaySettings;
+  });
+
+  afterAll(async () => {
+    const restored = await adminClient.put("/api/user/settings", {
+      cardDisplaySettings: savedCardDisplaySettings,
+    });
+    expect(restored.ok).toBe(true);
   });
 
   describe("GET /api/user/settings", () => {

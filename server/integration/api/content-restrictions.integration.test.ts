@@ -3,8 +3,7 @@ import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
   adminClient,
-  selectAllInstances,
-  selectAllInstancesForClient,
+  restoreInstanceSelection,
   selectTestInstanceForClient,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
@@ -57,11 +56,7 @@ describe("Content Restrictions Integration Tests", () => {
   });
 
   afterAll(async () => {
-    // Restore instance selections
-    await selectAllInstances();
-    if (testUserClient) {
-      await selectAllInstancesForClient(testUserClient);
-    }
+    await restoreInstanceSelection();
     // Clean up: delete the test user
     if (testUserId) {
       await adminClient.delete(`/api/user/${testUserId}`);

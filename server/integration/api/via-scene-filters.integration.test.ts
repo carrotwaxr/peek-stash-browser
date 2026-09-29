@@ -8,7 +8,7 @@ import type { ParsedFilter } from "../../types/parsedFilters.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
-  selectAllInstances,
+  restoreInstanceSelection,
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
@@ -207,9 +207,7 @@ describe("Via-scene filters with instance-qualified ids", () => {
     };
   });
 
-  afterAll(async () => {
-    await selectAllInstances();
-  });
+  afterAll(restoreInstanceSelection);
 
   describe.each(CASES)("$name", ({ list, filter, by, lists }) => {
     it("lists the entity for an instance-qualified id", async () => {

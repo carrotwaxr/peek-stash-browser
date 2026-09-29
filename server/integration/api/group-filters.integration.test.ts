@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { expectRefused } from "../helpers/refused.js";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
  * Group Filters Integration Tests
@@ -23,6 +23,7 @@ interface FindGroupsResponse {
   findGroups: {
     groups: Array<{
       id: string;
+      instanceId: string;
       name: string;
       favorite?: boolean;
       rating100?: number | null;
@@ -490,18 +491,22 @@ describe("Group Filters", () => {
 
   describe("group by ID", () => {
     it("returns group by ID with details", async () => {
+      // A detail page names the entity's instance: the second library
+      // reuses the test library's ids, so a bare id can match one on each
+      // instance (the ambiguous-lookup 400)
+      const instanceId = await findTestInstanceId();
       const response = await adminClient.post<FindGroupsResponse>(
         "/api/library/groups",
         {
-          ids: [TEST_ENTITIES.groupWithScenes],
+          ids: [`${TEST_ENTITIES.groupWithScenes}:${instanceId}`],
         }
       );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups.groups).toHaveLength(1);
-      expect(must(response.data.findGroups.groups[0]).id).toBe(
-        TEST_ENTITIES.groupWithScenes
-      );
+      const group = must(response.data.findGroups.groups[0]);
+      expect(group.id).toBe(TEST_ENTITIES.groupWithScenes);
+      expect(group.instanceId).toBe(instanceId);
     });
   });
 });
