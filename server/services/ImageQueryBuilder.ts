@@ -3,10 +3,10 @@
  *
  * The image builder on the base (`query/EntityQueryBuilder.ts`): this file
  * declares the image's spec (table, the viewer's rating and view joins,
- * columns, the id tiebreak), its filter clauses from the parsed request, its
- * sort map, its row transform and its relations. The instance filters, the
- * exclusion join, the `ids` filter, the random sort and the count are the
- * base's.
+ * columns), its filter clauses from the parsed request, its sort map, its
+ * row transform and its relations. The instance filters, the exclusion join,
+ * the `ids` filter, the random sort, the primary key ending every order and
+ * the count are the base's.
  *
  * Rating and O count are the viewer's own (ImageRating, ImageViewHistory),
  * never Stash's, for filtering, sorting and the row alike (QUERIES-17). Each
@@ -85,7 +85,6 @@ const IMAGE_SPEC: EntitySpec = {
   ],
   selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
   defaultSort: "created_at",
-  tiebreak: (direction) => `i.id ${direction}`,
 };
 
 /** An image's studio, on the image's own row */

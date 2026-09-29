@@ -1,6 +1,6 @@
 /**
- * The junction tables' indexes against the migrated database (item 67 (b),
- * DB-04).
+ * The junction tables' and the list sorts' indexes against the migrated
+ * database (item 67 (b), DB-04; L6).
  *
  * Each junction's primary key starts with its parent's two columns (a
  * SceneTag's is sceneId, sceneInstanceId, tagId, tagInstanceId), so SQLite's
@@ -8,14 +8,27 @@
  * on those two columns is never needed and costs every sync write one more
  * B-tree. The index on the other side, which the tag, performer, gallery and
  * group filters drive from, stays.
+ *
+ * Every list order ends with the primary key, `x.id <dir>,
+ * x.stashInstanceId <dir>` (L6), and each browse index covers the whole
+ * order: deletedAt, the sort column, then the key in the sort's direction.
+ * Prisma's SQLite (built with STAT4) used none of the shorter ones, and one
+ * serving only the sort column was dropped once the order had three terms,
+ * so a page of a large library scanned and sorted every live row.
  */
+import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
+import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import {
   type LargeLibraryPlanner,
   largeLibraryPlanner,
 } from "../helpers/largeLibraryPlanner.js";
+import { recordStatements } from "../helpers/statementRecorder.js";
 
 /** Each junction with the prefix of its two sides' columns */
 const JUNCTIONS = [
@@ -108,6 +121,142 @@ describe("junction table indexes", () => {
       expect(plan, table).toContain(
         `${table}_${child}Id_${child}InstanceId_idx`
       );
+    }
+  });
+});
+
+/** Each browse index, its table and its key columns with their direction */
+const BROWSE_INDEXES = [
+  ["StashScene_browse_idx", "StashScene", "stashCreatedAt", "DESC"],
+  ["StashScene_browse_updated_idx", "StashScene", "stashUpdatedAt", "DESC"],
+  ["StashScene_browse_date_idx", "StashScene", "date", "DESC"],
+  ["StashScene_browse_duration_idx", "StashScene", "duration", "DESC"],
+  ["StashScene_browse_titleSort_idx", "StashScene", "titleSort", "ASC"],
+  [
+    "StashScene_browse_performerCount_idx",
+    "StashScene",
+    "performerCount",
+    "ASC",
+  ],
+  ["StashScene_browse_tagCount_idx", "StashScene", "tagCount", "ASC"],
+  ["StashImage_browse_idx", "StashImage", "stashCreatedAt", "DESC"],
+] as const;
+
+/** The scene sorts on an index, each with the index serving it */
+const SCENE_SORTS: ReadonlyArray<
+  readonly [ParsedListRequest<"scene">["sort"]["field"], string]
+> = [
+  ["created_at", "StashScene_browse_idx"],
+  ["updated_at", "StashScene_browse_updated_idx"],
+  ["date", "StashScene_browse_date_idx"],
+  ["duration", "StashScene_browse_duration_idx"],
+  ["title", "StashScene_browse_titleSort_idx"],
+  ["performer_count", "StashScene_browse_performerCount_idx"],
+  ["tag_count", "StashScene_browse_tagCount_idx"],
+];
+
+/** One allowed instance, and two (the instance term is then no constant) */
+const INSTANCE_SETS = [["plan-a"], ["plan-a", "plan-b"]];
+
+describe("browse indexes", () => {
+  beforeAll(async () => {
+    planner = await largeLibraryPlanner();
+  });
+
+  afterAll(async () => {
+    await planner.close();
+  });
+
+  /** The page statement a builder call sends, with its parameters */
+  async function pageStatement(
+    run: () => Promise<unknown>
+  ): Promise<{ sql: string; params: readonly unknown[] }> {
+    const recorder = recordStatements();
+    try {
+      await run();
+    } finally {
+      recorder.restore();
+    }
+    return must(
+      recorder.statements.find(({ sql }) => sql.includes("\nORDER BY ")),
+      "the page statement"
+    );
+  }
+
+  it("each ends with the list's primary key, in its sort's direction", async () => {
+    for (const [name, table, column, direction] of BROWSE_INDEXES) {
+      const keys = await prisma.$queryRawUnsafe<
+        { name: string; desc: bigint }[]
+      >(
+        `SELECT name, "desc" FROM pragma_index_xinfo(?) WHERE key = 1 ORDER BY seqno`,
+        name
+      );
+      const tables = await prisma.$queryRawUnsafe<{ tbl_name: string }[]>(
+        "SELECT tbl_name FROM sqlite_master WHERE type = 'index' AND name = ?",
+        name
+      );
+
+      expect(must(tables[0], name).tbl_name, name).toBe(table);
+      expect(
+        keys.map((key) => `${key.name} ${key.desc === 1n ? "DESC" : "ASC"}`),
+        name
+      ).toEqual([
+        "deletedAt ASC",
+        `${column} ${direction}`,
+        `id ${direction}`,
+        `stashInstanceId ${direction}`,
+      ]);
+    }
+  });
+
+  it("a scene page sorted on an indexed column reads its rows off the index, with no sort", async () => {
+    for (const [field, index] of SCENE_SORTS) {
+      for (const direction of [
+        "ASC",
+        "DESC",
+      ] as const satisfies readonly SortDirection[]) {
+        for (const allowedInstanceIds of INSTANCE_SETS) {
+          const { sql, params } = await pageStatement(() =>
+            sceneQueryBuilder.execute({
+              userId: 1,
+              allowedInstanceIds,
+              request: parsedListRequest("scene", {
+                page: 100,
+                sort: { field, direction, seed: undefined },
+              }),
+            })
+          );
+          const plan = (await planner.planOf(sql, ...params)).join("\n");
+          const label = `${field} ${direction} on ${allowedInstanceIds.length}`;
+
+          expect(plan, label).toContain(`USING INDEX ${index} `);
+          expect(plan, label).not.toContain("TEMP B-TREE");
+        }
+      }
+    }
+  });
+
+  it("an image page by creation date reads its rows off the index, with no sort", async () => {
+    for (const direction of [
+      "ASC",
+      "DESC",
+    ] as const satisfies readonly SortDirection[]) {
+      for (const allowedInstanceIds of INSTANCE_SETS) {
+        const { sql, params } = await pageStatement(() =>
+          imageQueryBuilder.execute({
+            userId: 1,
+            allowedInstanceIds,
+            request: parsedListRequest("image", {
+              sort: { field: "created_at", direction, seed: undefined },
+            }),
+          })
+        );
+        const plan = (await planner.planOf(sql, ...params)).join("\n");
+        const label = `${direction} on ${allowedInstanceIds.length}`;
+
+        expect(plan, label).toContain("USING INDEX StashImage_browse_idx ");
+        expect(plan, label).not.toContain("TEMP B-TREE");
+      }
     }
   });
 });

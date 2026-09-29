@@ -173,7 +173,9 @@ describe("TagQueryBuilder", () => {
       expect(byCount).toContain(
         "ORDER BY MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0)) DESC, t.name COLLATE NOCASE ASC"
       );
-      expect(byName).toContain("ORDER BY t.name COLLATE NOCASE ASC, t.id ASC");
+      expect(byName).toContain(
+        "ORDER BY t.name COLLATE NOCASE ASC, t.id ASC, t.stashInstanceId ASC"
+      );
     });
 
     it("binds a random sort's seed and never interpolates it", async () => {

@@ -739,14 +739,16 @@ model StashScene {
   @@index([oCounter])
   @@index([playCount])
   @@index([phash])
-  // Compound indexes for efficient browse queries (deletedAt filter + sort)
-  @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashScene_browse_idx")
-  @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "StashScene_browse_updated_idx")
-  @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
-  @@index([deletedAt, titleSort, id], map: "StashScene_browse_titleSort_idx")
-  @@index([deletedAt, performerCount, id], map: "StashScene_browse_performerCount_idx")
-  @@index([deletedAt, tagCount, id], map: "StashScene_browse_tagCount_idx")
-  @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
+  // The list's sorts on an index: the deletedAt filter, the sort column,
+  // then the primary key every list order ends with, in the sort's
+  // direction, so the index serves the whole ORDER BY
+  @@index([deletedAt, stashCreatedAt(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashScene_browse_idx")
+  @@index([deletedAt, stashUpdatedAt(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashScene_browse_updated_idx")
+  @@index([deletedAt, date(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashScene_browse_date_idx")
+  @@index([deletedAt, titleSort, id, stashInstanceId], map: "StashScene_browse_titleSort_idx")
+  @@index([deletedAt, performerCount, id, stashInstanceId], map: "StashScene_browse_performerCount_idx")
+  @@index([deletedAt, tagCount, id, stashInstanceId], map: "StashScene_browse_tagCount_idx")
+  @@index([deletedAt, duration(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashScene_browse_duration_idx")
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
@@ -1063,7 +1065,7 @@ model StashImage {
   @@index([stashUpdatedAt])
   @@index([deletedAt])
   @@index([title])
-  @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashImage_browse_idx")
+  @@index([deletedAt, stashCreatedAt(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashImage_browse_idx")
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }

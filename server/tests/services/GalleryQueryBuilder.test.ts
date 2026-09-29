@@ -212,7 +212,9 @@ describe("GalleryQueryBuilder", () => {
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
       expect(byCount).toContain(`ORDER BY g.imageCount DESC, ${TITLE} ASC`);
-      expect(byTitle).toContain(`ORDER BY ${TITLE} DESC, g.id DESC`);
+      expect(byTitle).toContain(
+        `ORDER BY ${TITLE} DESC, g.id DESC, g.stashInstanceId DESC`
+      );
     });
 
     it("the viewer's rating sorts through the rating join, the path by the folder", async () => {

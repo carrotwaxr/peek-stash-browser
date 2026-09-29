@@ -101,9 +101,9 @@ const GROUP_SPEC: EntitySpec = {
     };
   },
   defaultSort: "name",
-  // By name, the id keeps the order stable; by anything else, the name
-  tiebreak: (direction, field) =>
-    field === "name" ? `g.id ${direction}` : "g.name COLLATE NOCASE ASC",
+  // Equal values list by name, then by the base's key
+  tiebreak: (field) =>
+    field === "name" ? undefined : "g.name COLLATE NOCASE ASC",
 };
 
 /** A group's studio, on the group's own row */

@@ -192,7 +192,9 @@ describe("GroupQueryBuilder", () => {
       expect(byCount).toContain(
         "ORDER BY g.sceneCount DESC, g.name COLLATE NOCASE ASC"
       );
-      expect(byName).toContain("ORDER BY g.name COLLATE NOCASE ASC, g.id ASC");
+      expect(byName).toContain(
+        "ORDER BY g.name COLLATE NOCASE ASC, g.id ASC, g.stashInstanceId ASC"
+      );
     });
 
     it("the viewer's rating sorts through the rating join", async () => {

@@ -2,10 +2,11 @@
  * SceneQueryBuilder: the scene list in SQL.
  *
  * The scene builder on the base (`query/EntityQueryBuilder.ts`): this file
- * declares the scene's spec (table, per-user joins, columns, tiebreak), its
- * filter clauses from the parsed request, its sort map, its row transform
- * and its relations. The instance filter, the exclusion join, the `ids`
- * filter, the random sort and the count are the base's.
+ * declares the scene's spec (table, per-user joins, columns), its filter
+ * clauses from the parsed request, its sort map, its row transform and its
+ * relations. The instance filter, the exclusion join, the `ids` filter, the
+ * random sort, the primary key ending every order and the count are the
+ * base's.
  */
 import type {
   Resolution,
@@ -103,7 +104,6 @@ const SCENE_SPEC: EntitySpec = {
   ],
   selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
   defaultSort: "created_at",
-  tiebreak: (direction) => `s.id ${direction}`,
 };
 
 /** A scene's junction to another entity, for the ref filters */
@@ -207,7 +207,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * columns sync stores (SCENE_DERIVED_COLUMNS_SQL in StashSyncService):
    * titleSort is the displayed title with ASCII lower-cased, so its BINARY
    * order is the case-insensitive title order. Each has a (deletedAt,
-   * column, id) index, which serves the order with its id tiebreak as is.
+   * column, id, stashInstanceId) index, which serves the whole order with
+   * the base's key (created_at, updated_at, date and duration too, DESC).
    * last_o_at and scene_index have no expression yet (B12) and fall back to
    * the default sort.
    */

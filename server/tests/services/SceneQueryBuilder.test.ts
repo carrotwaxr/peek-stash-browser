@@ -296,14 +296,16 @@ describe("SceneQueryBuilder", () => {
       expect(pageStatement().sql).toContain("s.stashCreatedAt DESC");
     });
 
-    it("sorts by title through the stored titleSort column with id as the tiebreak", async () => {
+    it("sorts by title through the stored titleSort column, then the primary key", async () => {
       await run({
         sort: { field: "title", direction: "ASC", seed: undefined },
       });
 
       const { sql } = pageStatement();
-      // The (deletedAt, titleSort, id) index serves this order as is
-      expect(sql).toContain("ORDER BY s.titleSort ASC, s.id ASC");
+      // The (deletedAt, titleSort, id, stashInstanceId) index serves this order
+      expect(sql).toContain(
+        "ORDER BY s.titleSort ASC, s.id ASC, s.stashInstanceId ASC"
+      );
       expect(sql).not.toContain("COLLATE NOCASE");
     });
 
@@ -324,10 +326,12 @@ describe("SceneQueryBuilder", () => {
         sql.includes("ORDER BY")
       );
       expect(byPerformers).toContain(
-        "ORDER BY s.performerCount DESC, s.id DESC"
+        "ORDER BY s.performerCount DESC, s.id DESC, s.stashInstanceId DESC"
       );
       expect(byPerformers).toContain("s.tagCount BETWEEN ? AND ?");
-      expect(byTags).toContain("ORDER BY s.tagCount ASC, s.id ASC");
+      expect(byTags).toContain(
+        "ORDER BY s.tagCount ASC, s.id ASC, s.stashInstanceId ASC"
+      );
       expect(byTags).toContain("s.performerCount > ?");
       // No correlated count of the junction rows, in the lists or the counts
       expect(
@@ -337,11 +341,12 @@ describe("SceneQueryBuilder", () => {
       ).toEqual([]);
     });
 
-    it("includes secondary sort by id for stable ordering", async () => {
+    it("ends the order with the primary key for stable paging", async () => {
       await run({ sort: { field: "date", direction: "ASC", seed: undefined } });
 
-      // ORDER BY should end with secondary id sort
-      expect(pageStatement().sql).toContain("s.id ASC");
+      expect(pageStatement().sql).toContain(
+        "ORDER BY s.date ASC, s.id ASC, s.stashInstanceId ASC\nLIMIT ? OFFSET ?"
+      );
     });
 
     it("binds a random sort's seed and never interpolates it", async () => {
