@@ -361,7 +361,9 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const paging: Paging = {
       order: built.order,
       params: built.orderParams,
-      page: { perPage: refs.length, offset: 0 },
+      // No LIMIT: the refs bound the result, and a bare ref matches one row
+      // per allowed instance, so refs.length would cut a wanted row
+      page: undefined,
     };
     const rows = await this.pageRows(built, paging);
     const items = rows.map((row) => this.transformRow(row));
