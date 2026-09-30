@@ -33,6 +33,7 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { linkCountService } from "../../services/LinkCountService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { must } from "../../tests/helpers/must.js";
+import type { FindTagTreeResponse } from "../../types/api/index.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
@@ -553,6 +554,88 @@ describeWithDb("UserExcludedContentCount (integration)", () => {
     const pairs = await cardsAndTabs(restricted);
     expect(pairs.length).toBeGreaterThan(10);
     expect(pairs.filter(([, shown, listed]) => shown !== listed)).toEqual([]);
+  }, 60_000);
+
+  it("a restricted user's folder badge equals the folder's list count", async () => {
+    /** The user's tag tree on A, whole or scoped, by tag id */
+    const treeOf = async (scope?: Record<string, string>) => {
+      const response = await restricted.post<FindTagTreeResponse>(
+        "/api/library/tags/tree",
+        scope ? { scope } : {}
+      );
+      expect(response.status, JSON.stringify(response.data)).toBe(200);
+      return new Map(
+        response.data.tags
+          .filter((t) => t.instanceId === A)
+          .map((t) => [t.id, t])
+      );
+    };
+    const folder = (id: string) => ({
+      value: [`${id}:${A}`],
+      modifier: "INCLUDES",
+      depth: 0,
+    });
+    const mismatches: Array<[string, number, number]> = [];
+    const compare = (label: string, badge: number, listed: number) => {
+      if (badge !== listed) mismatches.push([label, badge, listed]);
+    };
+
+    // The library's folders: each type's own count, the folder at depth 0
+    const whole = await treeOf();
+    for (const id of SEED_IDS.tag) {
+      const row = whole.get(id);
+      for (const [column, kind] of [
+        ["scene_count", "scene"],
+        ["gallery_count", "gallery"],
+        ["image_count", "image"],
+      ] as const) {
+        const { count } = await list(restricted, kind, { tags: folder(id) });
+        compare(`tag ${id} ${column}`, row?.[column] ?? 0, count);
+      }
+    }
+
+    // A performer's Scenes tab: the folder and the performer
+    for (const performer of ["1", "2"]) {
+      const scoped = await treeOf({ performer: `${performer}:${A}` });
+      for (const id of SEED_IDS.tag) {
+        const { count } = await list(restricted, "scene", {
+          performers: { value: [`${performer}:${A}`], modifier: "INCLUDES" },
+          tags: folder(id),
+        });
+        compare(
+          `performer ${performer}, folder ${id}`,
+          scoped.get(id)?.scene_count ?? 0,
+          count
+        );
+      }
+    }
+    // Performer 2's scene 4 inherits tag 1: the folder counts it
+    const ofPerformer2 = await treeOf({ performer: `2:${A}` });
+    expect(ofPerformer2.get("1")?.scene_count).toBe(2);
+
+    // A tag's Scenes tab: the folder AND the page's tag, both at depth 0
+    for (const page of ["1", "2"]) {
+      const scoped = await treeOf({ tag: `${page}:${A}` });
+      for (const id of SEED_IDS.tag) {
+        const { count } = await list(restricted, "scene", {
+          tags: {
+            value: [...new Set([`${page}:${A}`, `${id}:${A}`])],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        });
+        compare(
+          `tag page ${page}, folder ${id}`,
+          scoped.get(id)?.scene_count ?? 0,
+          count
+        );
+      }
+    }
+    // Tag 1's page holds scene 4 by inheritance, which carries tag 2
+    const ofTag1 = await treeOf({ tag: `1:${A}` });
+    expect(ofTag1.get("2")?.scene_count).toBe(1);
+
+    expect(mismatches).toEqual([]);
   }, 60_000);
 
   it("sorting performers by scene count orders by the visible number, and a scene_count filter reads it", async () => {

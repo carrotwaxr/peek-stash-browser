@@ -88,10 +88,14 @@ export interface UseListUrlStateOptions {
   lockedFields?: readonly string[];
   /**
    * Permanent filters a view adds from its own state (the timeline's period
-   * as `date`, the open folder as `tags`): merged over `permanentFilters`,
-   * and their fields locked like `lockedFields`
+   * as `date`, the open folder as `tags`), given the page's own
+   * (`permanentFilters`): merged over them, and their fields locked like
+   * `lockedFields`
    */
-  viewFilters?: (view: ListView) => Record<string, unknown>;
+  viewFilters?: (
+    view: ListView,
+    pageFilters: Record<string, unknown>
+  ) => Record<string, unknown>;
 }
 
 /** The view and where in it the list is: what a view's own filters follow */
@@ -222,8 +226,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
 
   // The view's own filters join the page's, and lock their fields too
   const viewOwn = useMemo(
-    () => (viewFilters ? viewFilters(view) : NO_FILTERS),
-    [viewFilters, view]
+    () => (viewFilters ? viewFilters(view, pagePermanentFilters) : NO_FILTERS),
+    [viewFilters, view, pagePermanentFilters]
   );
   const permanentFilters = useMemo(
     () =>

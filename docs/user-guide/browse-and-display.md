@@ -71,11 +71,13 @@ Navigate content through your tag hierarchy as folders.
 
 - Tags displayed as folders based on parent/child relationships
 - Breadcrumb navigation shows your current path
-- Item count badges on each folder
+- Item count badges on each folder: how many items of the page's type (scenes, galleries or images) carry that tag directly, counting only what you can see
+- A folder shows while it or a tag below it has items of the page's type, so a Galleries folder view hides tags that are only on scenes
 - Click into nested tags like browsing directories
 - Three density levels: Small, Medium, Large
 - Available for: Scenes, Galleries, Images
 - On a performer, tag, studio or collection page, the folders are the tags on that page's scenes and their parent tags
+- On a tag's Scenes tab, a folder lists the scenes that carry both the folder's tag and the page's tag. The folder view is not offered there while **Include sub-tags** is on
 - With several Stash servers, each server's tags are separate folders, even when two share a name or number
 - A tag whose parent tags are all hidden from you shows at the top level
 
@@ -83,8 +85,9 @@ Navigate content through your tag hierarchy as folders.
 
 - Click folder to navigate into that tag
 - Use breadcrumbs to navigate back up
-- Root level shows top-level parent tags
-- Content displays when you reach a leaf tag or click to view items
+- The root level lists the top-level folders only, no items
+- Opening a folder lists its sub-folders first, then the items that carry the folder's tag directly, paged like any list ("12 galleries in this folder"). An item tagged with the folder and with one of its sub-folders shows in both
+- Items with no tags have no folder yet
 
 ### Tag Hierarchy View
 

@@ -68,6 +68,8 @@ export interface ListEmbed {
   subtitle?: string;
   /** Where a card's page says the user came from */
   fromPageTitle?: string;
+  /** The folder view is offered (true unless set false) */
+  folderView?: boolean;
 }
 
 /** The detail page a timeline or folder view sits on: its counts and folders are that page's */
@@ -158,9 +160,17 @@ const EntityListPage = ({
     entityType,
     embed?.defaultSort ?? config.defaultSort
   );
+  const withoutFolder = embed?.folderView === false;
+  const viewModes = useMemo(
+    () =>
+      withoutFolder
+        ? config.viewModes.filter((mode) => mode.id !== "folder")
+        : config.viewModes,
+    [config.viewModes, withoutFolder]
+  );
   const viewModeIds = useMemo(
-    () => config.viewModes.map((mode) => mode.id),
-    [config.viewModes]
+    () => viewModes.map((mode) => mode.id),
+    [viewModes]
   );
   const sortOptions = useCallback(
     (filters: Record<string, unknown>) => sortOptionsFor(entityType, filters),
@@ -176,7 +186,7 @@ const EntityListPage = ({
     defaults,
     permanentFilters: pagePermanentFilters,
     lockedFields,
-    viewFilters: config.viewFilters ?? timelineAndFolderFilters,
+    viewFilters: timelineAndFolderFilters,
   });
   const {
     ready,
@@ -211,10 +221,13 @@ const EntityListPage = ({
   // chosen (the latest, once the timeline loads)
   const awaitingPeriod =
     viewMode === "timeline" && periodDateRange(timelinePeriod) === null;
+  // The folder view's root lists folders only: no page is asked for
+  const folderRoot = viewMode === "folder" && folderPath.length === 0;
+  const listed = paged && !folderRoot;
 
   const request = useMemo(() => {
     const query =
-      paged && !awaitingPeriod
+      listed && !awaitingPeriod
         ? buildListQuery(
             entityType,
             { ready, filters, sort, page, perPage, q },
@@ -227,7 +240,7 @@ const EntityListPage = ({
       ? source.toRequest(query, permanentFilters)
       : query;
   }, [
-    paged,
+    listed,
     awaitingPeriod,
     source,
     entityType,
@@ -250,7 +263,7 @@ const EntityListPage = ({
   // with rows stays on screen, dimmed
   const isLoading =
     isPending || initializing || (isPlaceholderData && items.length === 0);
-  const totalPages = paged ? Math.ceil(count / perPage) : 0;
+  const totalPages = listed ? Math.ceil(count / perPage) : 0;
 
   // The page's own handlers and parts (the Images lightbox, a scene's queue)
   const usePage = config.usePage ?? useNoExtras;
@@ -370,15 +383,19 @@ const EntityListPage = ({
           />
         );
       }
+      if (!config.folder) return null;
       return (
         <FolderView
-          items={isLoading ? [] : items}
+          items={isLoading || folderRoot ? [] : items}
+          itemCount={count}
           tags={folderTags}
+          countField={config.folder.countField}
+          entityLabel={config.folder.label}
           path={folderPath}
           onPathChange={listState.setFolderPath}
           gridDensity={gridDensity}
-          loading={isLoading || tagsLoading || folderTagsInitializing}
-          emptyMessage={config.emptyMessage}
+          loading={tagsLoading || folderTagsInitializing}
+          itemsLoading={!folderRoot && isLoading}
           renderItem={renderKeyedCard}
         />
       );
@@ -435,10 +452,10 @@ const EntityListPage = ({
           listState={listState}
           isRefreshing={isPlaceholderData}
           totalPages={totalPages}
-          totalCount={paged ? count : 0}
+          totalCount={listed ? count : 0}
           permanentFilters={permanentFilters}
           permanentFiltersMetadata={embed?.permanentFiltersMetadata}
-          viewModes={config.viewModes}
+          viewModes={viewModes}
           contextSettings={
             config.wallPlaybackSetting && viewMode === "wall"
               ? WALL_VIEW_SETTINGS

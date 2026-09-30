@@ -5,7 +5,13 @@
  * API is mocked; the controls, pagination, timeline and folder views are the
  * real ones, the scene card a stub.
  */
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { must, renderListPage } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
@@ -343,6 +349,74 @@ describe("SceneSearch", () => {
         { performer: "1:a" },
         expect.anything()
       );
+    });
+
+    /** A tag page's Scenes tab, with Include sub-tags on or off */
+    const TagScenes = ({ includeSubTags }: { includeSubTags: boolean }) => (
+      <SceneSearch
+        context="scene_tag"
+        permanentFilters={{
+          tags: {
+            value: ["9:a"],
+            modifier: "INCLUDES",
+            ...(includeSubTags && { depth: -1 }),
+          },
+        }}
+        folderView={!includeSubTags}
+      />
+    );
+
+    it("on a tag page a folder lists the scenes with the folder's tag and the page's", async () => {
+      api.findTagTree.mockResolvedValue({
+        tags: [
+          {
+            id: "5",
+            instanceId: "a",
+            name: "Five",
+            parents: [],
+            scene_count: 2,
+          },
+        ],
+      });
+      renderListPage(<TagScenes includeSubTags={false} />, {
+        initialEntries: ["/tag/9?tab=scenes&view=folder&folderPath=5:a"],
+      });
+
+      await waitFor(() =>
+        expect(lastSent().scene_filter?.tags).toEqual({
+          value: ["9:a", "5:a"],
+          modifier: "INCLUDES_ALL",
+          depth: 0,
+        })
+      );
+      expect(api.findTagTree).toHaveBeenCalledWith(
+        { tag: "9:a" },
+        expect.anything()
+      );
+    });
+
+    it("on a tag page with Include sub-tags on, no folder view is offered", async () => {
+      renderListPage(<TagScenes includeSubTags />, {
+        initialEntries: ["/tag/9?tab=scenes&view=folder&folderPath=5:a"],
+      });
+
+      await waitFor(() => expect(api.findScenes).toHaveBeenCalled());
+      // The address's folder view opens the grid, and the menu has none
+      fireEvent.click(
+        screen.getByRole("button", { name: "View mode: Grid view" })
+      );
+      expect(
+        within(screen.getByRole("listbox", { name: "View modes" }))
+          .getAllByRole("option")
+          .map((option) => option.getAttribute("aria-label"))
+      ).not.toContain("Folder view");
+      expect(api.findTagTree).not.toHaveBeenCalled();
+      // The page's own tag with its sub-tags, no folder
+      expect(lastSent().scene_filter?.tags).toEqual({
+        value: ["9:a"],
+        modifier: "INCLUDES",
+        depth: -1,
+      });
     });
   });
 

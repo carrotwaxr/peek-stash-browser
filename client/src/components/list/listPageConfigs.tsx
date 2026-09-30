@@ -11,7 +11,8 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "@peek/shared-types";
-import type { ListUrlState, ListView } from "../../hooks/useListUrlState";
+import type { ListUrlState } from "../../hooks/useListUrlState";
+import type { FolderCountField } from "../../utils/buildFolderTree";
 import {
   GalleryCard,
   GroupCard,
@@ -138,10 +139,13 @@ export interface ListPageConfig {
   /** The wall's cog offers the wall's preview playback (video walls) */
   wallPlaybackSetting?: boolean;
   /**
-   * The filters the timeline's period and the open folder add
-   * (`timelineAndFolderFilters` unless named)
+   * The folder view's counts: the tag tree's count of this page's type (the
+   * folders' badges) and what it counts; a page with a folder view names it
    */
-  viewFilters?: (view: ListView) => Record<string, unknown>;
+  folder?: {
+    countField: FolderCountField;
+    label: { one: string; many: string };
+  };
   extraViews?: Partial<Record<ViewModeId, ExtraView>>;
   /** "No performers found" */
   emptyMessage: string;
@@ -247,6 +251,10 @@ export const GALLERY_LIST: ListPageConfig = {
     />
   ),
   skeleton: { aspect: "portrait", heightRem: 5 },
+  folder: {
+    countField: "gallery_count",
+    label: { one: "gallery", many: "galleries" },
+  },
   emptyMessage: "No galleries found",
   usePage: useGalleryListPage,
 };
@@ -275,6 +283,10 @@ export const IMAGE_LIST: ListPageConfig = {
     />
   ),
   skeleton: { aspect: "landscape", heightRem: 4 },
+  folder: {
+    countField: "image_count",
+    label: { one: "image", many: "images" },
+  },
   emptyMessage: "No images found",
   usePage: useImageListPage,
 };

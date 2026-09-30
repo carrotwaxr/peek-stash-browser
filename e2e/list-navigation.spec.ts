@@ -1,4 +1,4 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, type Response, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
 import { requireData } from "./support/data";
 import { runPrefix } from "./support/names";
@@ -40,6 +40,7 @@ interface TreeTagJson {
   instanceId: string;
   name: string;
   parents: { id: string }[];
+  gallery_count?: number;
   performers?: unknown;
 }
 
@@ -200,6 +201,103 @@ test.describe("List navigation", () => {
       (url) =>
         url.searchParams.get("folderPath") === `${root.id}:${root.instanceId}`
     );
+  });
+
+  test("opening a gallery folder shows its own galleries under its sub-folders, paged over the galleries only", async ({
+    page,
+  }) => {
+    // The root lists folders only: no gallery page is asked for
+    const galleryRequests: string[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/library/galleries") {
+        galleryRequests.push(request.postData() ?? "");
+      }
+    });
+    const tags = await treeTags(page, () =>
+      page.goto("/galleries?view=folder&per_page=1")
+    );
+    const byKey = new Map(tags.map((t) => [`${t.id}:${t.instanceId}`, t]));
+    const count = (t: TreeTagJson) => t.gallery_count ?? 0;
+    // The tag with the most galleries of its own, opened from its root (the
+    // replay's tags are on one gallery each: the unit tests page over more)
+    const target = requireData(
+      [...tags].sort((a, b) => count(b) - count(a)).find((t) => count(t) >= 1),
+      "a tag on a gallery"
+    );
+    const path: TreeTagJson[] = [target];
+    for (
+      let parent = target.parents[0];
+      parent !== undefined && path.length < 20;
+      parent = path[0]?.parents[0]
+    ) {
+      const tag = byKey.get(`${parent.id}:${target.instanceId}`);
+      if (!tag) break;
+      path.unshift(tag);
+    }
+
+    const folders = page.locator("button:has(h3)");
+    await expect(folders.first()).toBeVisible({ timeout: 15_000 });
+    expect(galleryRequests).toEqual([]);
+
+    // Open each folder down to the target
+    let listed: Promise<Response> | null = null;
+    for (const tag of path) {
+      listed = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === "/api/library/galleries" &&
+          (r.request().postData() ?? "").includes(
+            `"${tag.id}:${tag.instanceId}"`
+          )
+      );
+      await folders
+        .filter({
+          has: page.getByRole("heading", { name: tag.name, exact: true }),
+        })
+        .first()
+        .click();
+    }
+    const response = await requireData(listed, "the target folder's request");
+    const body = response.request().postDataJSON() as {
+      gallery_filter?: { tags?: unknown };
+    };
+    // The folder's own galleries: its tag at depth 0, not its sub-tags'
+    expect(body.gallery_filter?.tags).toEqual({
+      value: [`${target.id}:${target.instanceId}`],
+      modifier: "INCLUDES",
+      depth: 0,
+    });
+    const answer = (await response.json()) as {
+      findGalleries: { count: number };
+    };
+    // The folder's badge was its list's total
+    expect(answer.findGalleries.count).toBe(count(target));
+
+    // One gallery a page, paged over the folder's galleries only
+    const list = new ListPage(page);
+    await expect(list.cards("Gallery")).toHaveCount(1, { timeout: 15_000 });
+    await expect(
+      page.getByText(
+        `${count(target)} ${count(target) === 1 ? "gallery" : "galleries"} in this folder`
+      )
+    ).toBeVisible();
+    await expect(
+      page.getByText(`Showing 1-1 of ${count(target)} records`).first()
+    ).toBeVisible();
+
+    // Sub-folders with galleries sit above the galleries
+    const children = tags.filter(
+      (t) =>
+        t.instanceId === target.instanceId &&
+        t.parents.some((p) => p.id === target.id) &&
+        count(t) > 0
+    );
+    for (const child of children) {
+      await expect(
+        folders.filter({
+          has: page.getByRole("heading", { name: child.name, exact: true }),
+        })
+      ).toBeVisible();
+    }
   });
 
   // The other list pages have no empty state yet (LG-13): their empty-results
