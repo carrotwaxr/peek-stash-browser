@@ -391,6 +391,26 @@ export interface GetUserRestrictionsParams extends Record<string, string> {
   userId: string;
 }
 
+/** One stored restriction list, parsed for the editor */
+export interface StoredRestriction {
+  id: number;
+  entityType: string;
+  mode: string;
+  /**
+   * The list's entries (`"id:instanceId"`, or a bare id from older saves);
+   * null when the stored list is not a JSON array of strings. A Show-only
+   * list can be `[]`: its server was deleted, and it still hides that type.
+   */
+  entityIds: string[] | null;
+  /** True when the stored list cannot be read; the editor offers to clear it */
+  unreadable: boolean;
+  restrictEmpty: boolean;
+}
+
+export interface GetUserRestrictionsResponse {
+  restrictions: StoredRestriction[];
+}
+
 /** PUT /api/users/:userId/restrictions */
 export interface UpdateUserRestrictionsBody {
   restrictions: UserRestriction[];

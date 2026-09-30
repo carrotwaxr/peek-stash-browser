@@ -90,6 +90,81 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.ok).toBe(false);
         expect(response.status).toBe(403);
       });
+
+      it("GET answers a stored list that cannot be read as unreadable, and the others parsed", async () => {
+        // Stored as older code or a hand edit could leave them; the save
+        // path cannot write these, so they go in directly
+        const stored = [
+          ["tags", "INCLUDE", JSON.stringify(["5:inst-a", "6"])],
+          ["tags", "EXCLUDE", "[]"],
+          ["studios", "EXCLUDE", "not json"],
+          ["groups", "EXCLUDE", JSON.stringify({ id: "1:inst-a" })],
+          ["galleries", "EXCLUDE", JSON.stringify([3])],
+        ] as const;
+        await prisma.userContentRestriction.createMany({
+          data: stored.map(([entityType, mode, entityIds]) => ({
+            userId: testUserId,
+            entityType,
+            mode,
+            entityIds,
+            restrictEmpty: entityType === "tags",
+          })),
+        });
+        try {
+          const response = await adminClient.get<{
+            restrictions: Array<{
+              entityType: string;
+              mode: string;
+              entityIds: string[] | null;
+              unreadable: boolean;
+              restrictEmpty: boolean;
+            }>;
+          }>(`/api/user/${testUserId}/restrictions`);
+
+          expect(response.status).toBe(200);
+          const byList = Object.fromEntries(
+            response.data.restrictions.map((r) => [
+              `${r.entityType}/${r.mode}`,
+              {
+                entityIds: r.entityIds,
+                unreadable: r.unreadable,
+                restrictEmpty: r.restrictEmpty,
+              },
+            ])
+          );
+          expect(byList).toEqual({
+            "tags/INCLUDE": {
+              entityIds: ["5:inst-a", "6"],
+              unreadable: false,
+              restrictEmpty: true,
+            },
+            "tags/EXCLUDE": {
+              entityIds: [],
+              unreadable: false,
+              restrictEmpty: true,
+            },
+            "studios/EXCLUDE": {
+              entityIds: null,
+              unreadable: true,
+              restrictEmpty: false,
+            },
+            "groups/EXCLUDE": {
+              entityIds: null,
+              unreadable: true,
+              restrictEmpty: false,
+            },
+            "galleries/EXCLUDE": {
+              entityIds: null,
+              unreadable: true,
+              restrictEmpty: false,
+            },
+          });
+        } finally {
+          await prisma.userContentRestriction.deleteMany({
+            where: { userId: testUserId },
+          });
+        }
+      });
     });
 
     describe("PUT /api/user/:userId/restrictions", () => {

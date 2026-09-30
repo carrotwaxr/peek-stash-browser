@@ -1,3 +1,4 @@
+import type { GetUserRestrictionsResponse } from "@peek/shared-types/api/user.js";
 import { ENTITY_KINDS } from "@peek/shared-types/filters/index.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import bcrypt from "bcryptjs";
@@ -1309,22 +1310,52 @@ function isRestrictableEntityType(
 }
 
 /**
- * Get content restrictions for a user (Admin only)
+ * A stored list's entries, or null when it is not a JSON array of strings.
+ * The editor reads null as unreadable rather than empty: saved back as
+ * empty, a lost Show-only list would show the user everything.
+ */
+function parseStoredRestrictionIds(entityIds: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(entityIds);
+  } catch {
+    return null;
+  }
+  return Array.isArray(parsed) &&
+    parsed.every((id): id is string => typeof id === "string")
+    ? parsed
+    : null;
+}
+
+/**
+ * Get content restrictions for a user (Admin only), each list parsed
  */
 export const getUserRestrictions = async (
   req: TypedAuthRequest<never, GetUserRestrictionsParams>,
-  res: TypedResponse<{ restrictions: unknown[] } | ApiErrorResponse>
+  res: TypedResponse<GetUserRestrictionsResponse | ApiErrorResponse>
 ) => {
   const targetUserId = parseInt(req.params.userId);
   if (isNaN(targetUserId)) {
     res.status(400).json({ error: "Invalid user ID" });
     return;
   }
-  const restrictions = await prisma.userContentRestriction.findMany({
+  const rows = await prisma.userContentRestriction.findMany({
     where: { userId: targetUserId },
+    select: {
+      id: true,
+      entityType: true,
+      mode: true,
+      entityIds: true,
+      restrictEmpty: true,
+    },
   });
 
-  res.json({ restrictions });
+  res.json({
+    restrictions: rows.map((row) => {
+      const entityIds = parseStoredRestrictionIds(row.entityIds);
+      return { ...row, entityIds, unreadable: entityIds === null };
+    }),
+  });
 };
 
 /**

@@ -4850,6 +4850,29 @@ class StashSyncService extends EventEmitter {
         if (instance?.enabled === true) {
           await assertAnotherEnabledInstance(tx, instanceId);
         }
+        // The instance's entries leave every restriction list. An emptied
+        // Always-hide list goes; an emptied Show-only list stays `[]` and
+        // keeps hiding its type until an admin edits it (owner, 2026-09-29).
+        // A list that is not a JSON array is left for the editor to clear
+        // (CASE, so json_each never reads malformed text). No
+        // recompute: the entries matched nothing once the instance went.
+        await tx.$executeRaw`
+          UPDATE UserContentRestriction
+          SET entityIds = (
+            SELECT json_group_array(value) FROM json_each(entityIds)
+            WHERE NOT (instr(value, ':') > 0
+              AND substr(value, instr(value, ':') + 1) = ${instanceId})
+          )
+          WHERE CASE WHEN json_valid(entityIds)
+            THEN json_type(entityIds) = 'array' AND EXISTS (
+              SELECT 1 FROM json_each(entityIds)
+              WHERE instr(value, ':') > 0
+                AND substr(value, instr(value, ':') + 1) = ${instanceId}
+            )
+            ELSE 0 END`;
+        await tx.$executeRaw`
+          DELETE FROM UserContentRestriction
+          WHERE mode = 'EXCLUDE' AND entityIds = '[]'`;
         await tx.stashInstance.delete({ where: { id: instanceId } });
         await tx.syncState.deleteMany({
           where: { stashInstanceId: instanceId },

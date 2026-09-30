@@ -10,23 +10,34 @@
  * - saves one row per non-empty list with the type's box value on both
  * - notes ids that are in both lists (Always hide wins)
  * - never saves over a load that failed (CS-11): Save stays off and the
- *   banner offers Retry
+ *   banner offers Retry; a list the server could not read also offers a
+ *   confirmed Clear all restrictions
+ * - a Show-only list emptied by a server's deletion warns, and Save waits
+ *   until the admin adds items or removes it
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../src/api";
 import ContentRestrictionsModal from "../../../src/components/settings/ContentRestrictionsModal";
 
-const { mockApiGet, mockApiPut } = vi.hoisted(() => ({
+const { mockApiGet, mockApiPut, mockApiDelete } = vi.hoisted(() => ({
   mockApiGet: vi.fn(),
   mockApiPut: vi.fn(),
+  mockApiDelete: vi.fn(),
 }));
 
-// The two calls are stubbed; the rest (ApiError, getErrorMessage) is real
+// The three calls are stubbed; the rest (ApiError, getErrorMessage) is real
 vi.mock("../../../src/api", async (importOriginal) => ({
   ...(await importOriginal<typeof api>()),
   apiGet: mockApiGet,
   apiPut: mockApiPut,
+  apiDelete: mockApiDelete,
 }));
 
 // A <select multiple> stands in for SearchableSelect: named by its
@@ -102,11 +113,14 @@ async function renderLoaded(
   restrictions: Array<{
     entityType: string;
     mode: string;
-    entityIds: string;
+    entityIds: string[] | null;
+    unreadable?: boolean;
     restrictEmpty: boolean;
   }> = []
 ) {
-  mockApiGet.mockResolvedValue({ restrictions });
+  mockApiGet.mockResolvedValue({
+    restrictions: restrictions.map((r) => ({ unreadable: false, ...r })),
+  });
   const onClose = vi.fn();
   const onSave = vi.fn();
   render(
@@ -127,13 +141,13 @@ describe("ContentRestrictionsModal", () => {
       {
         entityType: "tags",
         mode: "INCLUDE",
-        entityIds: JSON.stringify(["1:A"]),
+        entityIds: ["1:A"],
         restrictEmpty: false,
       },
       {
         entityType: "tags",
         mode: "EXCLUDE",
-        entityIds: JSON.stringify(["2:A"]),
+        entityIds: ["2:A"],
         restrictEmpty: false,
       },
     ]);
@@ -211,7 +225,7 @@ describe("ContentRestrictionsModal", () => {
       {
         entityType: "studios",
         mode: "EXCLUDE",
-        entityIds: JSON.stringify(["3:A"]),
+        entityIds: ["3:A"],
         restrictEmpty: true,
       },
     ]);
@@ -264,19 +278,19 @@ describe("ContentRestrictionsModal", () => {
       {
         entityType: "performers",
         mode: "INCLUDE",
-        entityIds: JSON.stringify(["1:A"]),
+        entityIds: ["1:A"],
         restrictEmpty: true,
       },
       {
         entityType: "tags",
         mode: "SOMETIMES",
-        entityIds: JSON.stringify(["1:A"]),
+        entityIds: ["1:A"],
         restrictEmpty: true,
       },
       {
         entityType: "groups",
         mode: "EXCLUDE",
-        entityIds: JSON.stringify([3]),
+        entityIds: ["3"],
         restrictEmpty: true,
       },
     ]);
@@ -289,7 +303,7 @@ describe("ContentRestrictionsModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save Restrictions" }));
 
-    // Only the readable row is saved back, with its ids as strings
+    // Only the known row is saved back
     await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
     expect(mockApiPut).toHaveBeenCalledWith("/user/1/restrictions", {
       restrictions: [
@@ -322,7 +336,7 @@ describe("ContentRestrictionsModal", () => {
           {
             entityType: "tags",
             mode: "INCLUDE",
-            entityIds: JSON.stringify(["1:A"]),
+            entityIds: ["1:A"],
             restrictEmpty: true,
           },
         ],
@@ -354,43 +368,170 @@ describe("ContentRestrictionsModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["is not JSON", "not json"],
-    ["is not a list", JSON.stringify({ id: "1:A" })],
-  ])(
-    "a stored list that %s fails the load instead of reading as empty",
-    async (_what, entityIds) => {
-      mockApiGet.mockResolvedValue({
+  it("an unreadable list offers Clear all restrictions, which calls DELETE after the admin confirms", async () => {
+    mockApiGet
+      .mockResolvedValueOnce({
         restrictions: [
           {
             entityType: "tags",
             mode: "INCLUDE",
-            entityIds: JSON.stringify(["1:A"]),
+            entityIds: ["1:A"],
+            unreadable: false,
             restrictEmpty: true,
           },
           {
             entityType: "studios",
             mode: "EXCLUDE",
-            entityIds,
+            entityIds: null,
+            unreadable: true,
             restrictEmpty: false,
           },
         ],
-      });
-      render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
+      })
+      .mockResolvedValueOnce({ restrictions: [] });
+    mockApiDelete.mockResolvedValue({ success: true });
+    const onClose = vi.fn();
+    render(<ContentRestrictionsModal user={user} onClose={onClose} />);
 
-      expect(
-        await screen.findByText(
-          "The stored Studios Always hide list could not be read."
-        )
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Save Restrictions" })
-      ).toBeDisabled();
-      expect(
-        screen.queryByRole("listbox", { name: "Show only these tags..." })
-      ).not.toBeInTheDocument();
-    }
-  );
+    // Editing stays blocked: no lists, Save off
+    expect(
+      await screen.findByText(
+        "The stored Studios Always hide list could not be read."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save Restrictions" })
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("listbox", { name: "Show only these tags..." })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+
+    // Asks first; cancelling deletes nothing
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear all restrictions" })
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent(
+      /restricted then sees everything on their servers except what they hid/
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(mockApiDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear all restrictions" })
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Clear all restrictions",
+      })
+    );
+
+    await waitFor(() =>
+      expect(mockApiDelete).toHaveBeenCalledWith("/user/1/restrictions")
+    );
+    // The editor reloads, now empty and editable
+    await waitFor(() => expect(selected(showOnly("tags"))).toEqual([]));
+    expect(mockApiGet).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByRole("button", { name: "Save Restrictions" })
+    ).toBeEnabled();
+    expect(mockApiPut).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("a failed Clear all restrictions keeps the editor blocked and shows the error", async () => {
+    mockApiGet.mockResolvedValue({
+      restrictions: [
+        {
+          entityType: "groups",
+          mode: "INCLUDE",
+          entityIds: null,
+          unreadable: true,
+          restrictEmpty: true,
+        },
+      ],
+    });
+    render(<ContentRestrictionsModal user={user} onClose={vi.fn()} />);
+    mockApiDelete.mockRejectedValue(new Error("Database busy"));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Clear all restrictions" })
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Clear all restrictions",
+      })
+    );
+
+    expect(await screen.findByText("Database busy")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The stored Collections Show only list could not be read."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save Restrictions" })
+    ).toBeDisabled();
+  });
+
+  it("an emptied Show-only list shows its warning and Save waits until the admin adds items or removes the list", async () => {
+    await renderLoaded([
+      {
+        entityType: "tags",
+        mode: "INCLUDE",
+        entityIds: [],
+        restrictEmpty: true,
+      },
+      {
+        entityType: "studios",
+        mode: "INCLUDE",
+        entityIds: [],
+        restrictEmpty: true,
+      },
+    ]);
+    const save = screen.getByRole("button", { name: "Save Restrictions" });
+
+    expect(
+      screen.getByText(
+        "Show only: nothing (every item was on a deleted server). This user sees no tags until you choose items or remove this list."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/This user sees no studios until you choose items/)
+    ).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    // Tags: the admin chooses items
+    pick(showOnly("tags"), ["1:A"]);
+    expect(
+      screen.queryByText(/This user sees no tags/)
+    ).not.toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    // Studios: the admin removes the list
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove the studios Show-only list" })
+    );
+    expect(
+      screen.queryByText(/This user sees no studios/)
+    ).not.toBeInTheDocument();
+    expect(save).toBeEnabled();
+
+    fireEvent.click(save);
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
+    expect(mockApiPut).toHaveBeenCalledWith("/user/1/restrictions", {
+      restrictions: [
+        {
+          entityType: "tags",
+          mode: "INCLUDE",
+          entityIds: ["1:A"],
+          restrictEmpty: true,
+        },
+      ],
+    });
+  });
 
   it("shows a generic load error when the failure has no message", async () => {
     mockApiGet.mockRejectedValue(new Error(""));

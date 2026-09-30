@@ -462,6 +462,66 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
     expect(await prisma.playlist.count({ where: { userId } })).toBe(2);
   });
 
+  it("deleting an instance removes its entries from restriction lists; an emptied Always-hide list goes, an emptied Show-only list stays empty", async () => {
+    vi.spyOn(exclusionComputationService, "recomputeForUser").mockResolvedValue(
+      undefined
+    );
+    // A's entries, B's, a bare id and an instance whose name starts with A's
+    const stored = [
+      ["tags", "EXCLUDE", [`1:${A}`, `1:${B}`, "7", `2:${A}x`]],
+      ["tags", "INCLUDE", [`1:${B}`]],
+      ["studios", "EXCLUDE", [`1:${A}`, `2:${A}`]],
+      ["groups", "INCLUDE", [`1:${A}`]],
+    ] as const;
+    await prisma.userContentRestriction.createMany({
+      data: [
+        ...stored.map(([entityType, mode, ids]) => ({
+          userId,
+          entityType,
+          mode,
+          entityIds: JSON.stringify(ids),
+          restrictEmpty: true,
+        })),
+        // Lists that cannot be read stay as they are, for the editor to offer
+        // clearing them
+        {
+          userId,
+          entityType: "galleries",
+          mode: "EXCLUDE",
+          entityIds: `not json 1:${A}`,
+          restrictEmpty: false,
+        },
+        {
+          userId,
+          entityType: "galleries",
+          mode: "INCLUDE",
+          entityIds: JSON.stringify({ id: `1:${A}` }),
+          restrictEmpty: false,
+        },
+      ],
+    });
+
+    const { purged } = await stashSyncService.deleteInstance(A);
+    await purged;
+
+    const rows = await prisma.userContentRestriction.findMany({
+      where: { userId },
+      select: { entityType: true, mode: true, entityIds: true },
+    });
+    expect(
+      Object.fromEntries(
+        rows.map((r) => [`${r.entityType}/${r.mode}`, r.entityIds])
+      )
+    ).toEqual({
+      "tags/EXCLUDE": JSON.stringify([`1:${B}`, "7", `2:${A}x`]),
+      "tags/INCLUDE": JSON.stringify([`1:${B}`]),
+      // Emptied Show-only: stays, and keeps hiding every collection
+      "groups/INCLUDE": "[]",
+      "galleries/EXCLUDE": `not json 1:${A}`,
+      "galleries/INCLUDE": JSON.stringify({ id: `1:${A}` }),
+    });
+  });
+
   it("refuses while a sync runs and deletes nothing", async () => {
     stashSyncService["activeJob"] = "sync";
     try {

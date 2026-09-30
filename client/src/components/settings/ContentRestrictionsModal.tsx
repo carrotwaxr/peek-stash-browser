@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut, getErrorMessage } from "../../api";
-import { Button, ErrorMessage, Paper, SearchableSelect } from "../ui/index";
+import type {
+  GetUserRestrictionsResponse,
+  StoredRestriction,
+} from "@peek/shared-types";
+import { apiDelete, apiGet, apiPut, getErrorMessage } from "../../api";
+import {
+  Button,
+  ConfirmDialog,
+  ErrorMessage,
+  Paper,
+  SearchableSelect,
+} from "../ui/index";
 
 interface UserData {
   id: number;
@@ -25,13 +35,12 @@ interface TypeState {
   restrictEmpty: boolean;
   /** True once a stored row or the admin has set the box; otherwise it follows the Show-only list. */
   restrictEmptyTouched: boolean;
-}
-
-interface StoredRestriction {
-  entityType: EntityType;
-  mode: RestrictionMode;
-  entityIds: string;
-  restrictEmpty: boolean;
+  /**
+   * A stored Show-only list with no items (every item was on a deleted
+   * server): it still hides the whole type, so Save waits until the admin
+   * adds items or removes the list.
+   */
+  includeEmptied: boolean;
 }
 
 const emptyTypeState = (): TypeState => ({
@@ -39,6 +48,7 @@ const emptyTypeState = (): TypeState => ({
   exclude: [],
   restrictEmpty: false,
   restrictEmptyTouched: false,
+  includeEmptied: false,
 });
 
 const emptyState = (): Record<EntityType, TypeState> => ({
@@ -63,24 +73,31 @@ const DESCRIPTIONS: Record<EntityType, string> = {
   galleries: "Restrict access to specific gallery content.",
 };
 
+function isEntityType(value: string): value is EntityType {
+  return (ENTITY_TYPES as string[]).includes(value);
+}
+
+/** Thrown for a stored list the server could not read */
+class UnreadableRestrictionError extends Error {}
+
 /**
- * A stored row's ids. A list that cannot be read throws: read as empty, a
- * save would delete it, and a lost Show-only list shows the user everything.
+ * A stored row's ids. A list the server could not read throws: read as
+ * empty, a save would delete it, and a lost Show-only list shows the user
+ * everything.
  */
-function parseStoredIds(row: StoredRestriction): string[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(row.entityIds);
-  } catch {
-    parsed = undefined;
-  }
-  if (!Array.isArray(parsed)) {
+function storedIds(row: StoredRestriction, entityType: EntityType): string[] {
+  if (row.unreadable || row.entityIds === null) {
     const list = row.mode === "INCLUDE" ? "Show only" : "Always hide";
-    throw new Error(
-      `The stored ${LABELS[row.entityType]} ${list} list could not be read.`
+    throw new UnreadableRestrictionError(
+      `The stored ${LABELS[entityType]} ${list} list could not be read.`
     );
   }
-  return parsed.map(String);
+  return row.entityIds;
+}
+
+/** A type whose stored Show-only list was emptied and still has no items */
+function blocksSave(state: TypeState): boolean {
+  return state.includeEmptied && state.include.length === 0;
 }
 
 /** The box value the compute will see: the stored or hand-set value, else on with a Show-only list. */
@@ -103,6 +120,11 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   // and Save is off, since saving replaces every stored row (CS-11)
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // Set when a stored list could not be read: the admin may clear them all
+  const [unreadable, setUnreadable] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [restrictions, setRestrictions] =
@@ -114,17 +136,19 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
       try {
         setLoading(true);
         setLoadError(null);
-        const data = await apiGet<{ restrictions: StoredRestriction[] }>(
+        setUnreadable(false);
+        const data = await apiGet<Partial<GetUserRestrictionsResponse>>(
           `/user/${user.id}/restrictions`
         );
         const next = emptyState();
-        for (const row of data.restrictions || []) {
+        for (const row of data.restrictions ?? []) {
+          if (!isEntityType(row.entityType)) continue;
           const state = next[row.entityType];
-          if (!state) continue;
           if (row.mode === "INCLUDE") {
-            state.include = parseStoredIds(row);
+            state.include = storedIds(row, row.entityType);
+            state.includeEmptied = state.include.length === 0;
           } else if (row.mode === "EXCLUDE") {
-            state.exclude = parseStoredIds(row);
+            state.exclude = storedIds(row, row.entityType);
           } else {
             continue;
           }
@@ -134,7 +158,9 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
         }
         if (!cancelled) setRestrictions(next);
       } catch (err) {
-        if (!cancelled) setLoadError(getErrorMessage(err));
+        if (cancelled) return;
+        setLoadError(getErrorMessage(err));
+        setUnreadable(err instanceof UnreadableRestrictionError);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -146,6 +172,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   }, [user.id, loadAttempt]);
 
   const loaded = !loading && loadError === null;
+  const saveBlocked = ENTITY_TYPES.some((t) => blocksSave(restrictions[t]));
 
   const setList = (
     entityType: EntityType,
@@ -169,8 +196,30 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
     }));
   };
 
+  const removeEmptiedInclude = (entityType: EntityType) => {
+    setRestrictions((prev) => ({
+      ...prev,
+      [entityType]: { ...prev[entityType], includeEmptied: false },
+    }));
+  };
+
+  /** Deletes every stored list (the unreadable one too), then reloads */
+  const handleClearAll = async () => {
+    setConfirmingClear(false);
+    try {
+      setClearing(true);
+      setClearError(null);
+      await apiDelete(`/user/${user.id}/restrictions`);
+      setLoadAttempt((n) => n + 1);
+    } catch (err) {
+      setClearError(getErrorMessage(err, "Failed to clear restrictions"));
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const handleSave = async () => {
-    if (!loaded) return;
+    if (!loaded || saveBlocked) return;
     try {
       setSaving(true);
       setSaveError(null);
@@ -267,6 +316,29 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             placeholder={`Show only these ${lower}...`}
             scope="allEnabled"
           />
+          {blocksSave(state) && (
+            <div
+              className="mt-2 p-2 rounded text-xs flex items-start justify-between gap-2"
+              style={{
+                backgroundColor: "var(--status-warning-bg)",
+                border: "1px solid var(--status-warning-border)",
+                color: "var(--status-warning)",
+              }}
+            >
+              <p>
+                Show only: nothing (every item was on a deleted server). This
+                user sees no {lower} until you choose items or remove this list.
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-label={`Remove the ${lower} Show-only list`}
+                onClick={() => removeEmptiedInclude(entityType)}
+              >
+                Remove list
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="mb-3">
@@ -437,6 +509,34 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
                   Nothing can be saved until {user.username}&apos;s restrictions
                   load.
                 </p>
+                {unreadable && (
+                  <div className="space-y-2">
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      A stored list that cannot be read cannot be edited. Clear
+                      all of {user.username}&apos;s restrictions to start again.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      loading={clearing}
+                      disabled={clearing}
+                      onClick={() => setConfirmingClear(true)}
+                    >
+                      Clear all restrictions
+                    </Button>
+                    {clearError && (
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--status-error)" }}
+                      >
+                        {clearError}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -491,7 +591,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={() => void handleSave()}
-                disabled={saving || !loaded}
+                disabled={saving || !loaded || saveBlocked}
                 variant="primary"
                 fullWidth
                 loading={saving}
@@ -505,6 +605,14 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
           </div>
         </Paper.Body>
       </Paper>
+      <ConfirmDialog
+        isOpen={confirmingClear}
+        title="Clear all restrictions?"
+        message={`Every Show-only and Always-hide list of ${user.username} is deleted, the unreadable one too. ${user.username} then sees everything on their servers except what they hid, until you set new restrictions.`}
+        confirmText="Clear all restrictions"
+        onConfirm={() => void handleClearAll()}
+        onClose={() => setConfirmingClear(false)}
+      />
     </div>
   );
 };

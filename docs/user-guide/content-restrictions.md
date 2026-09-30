@@ -127,6 +127,13 @@ The box is disabled until a list has an item. When you add the first item it tak
 
 Images use their own tags here: an image in a tagged gallery still counts as having no tags of its own.
 
+### When a Stash server is deleted
+
+Deleting a Stash server removes its items from every user's Show-only and Always-hide lists; items on other servers stay listed.
+
+- An **Always-hide** list left with no items is removed: it no longer hid anything
+- A **Show-only** list left with no items stays, and the user keeps seeing none of that type. Removing it on its own would suddenly show the user everything of that type. The editor then shows: "Show only: nothing (every item was on a deleted server). This user sees no ... until you choose items or remove this list". **Save Restrictions** stays off until you choose new items for the list or click **Remove list**
+
 ---
 
 ## How Cascading Works
@@ -244,6 +251,10 @@ After setting restrictions:
 
 - Review Show-only lists: content needs at least one listed item, and the "no ..." box hides content with none
 - Check for overlapping Always-hide rules (child tags and studios are covered too)
+
+### The editor says a stored list could not be read
+
+A saved list that Peek cannot read (damaged by hand editing, say) blocks the editor, so a save cannot silently replace it. Click **Retry** to load again. If the message stays, click **Clear all restrictions** and confirm: every list of that user is deleted, the unreadable one included, and the editor opens empty so you can set them again. Until you do, the user sees everything except what they hid themselves.
 
 ### Admin accounts cannot be restricted
 
