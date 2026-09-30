@@ -7,8 +7,8 @@ import {
   LucideSquare,
 } from "lucide-react";
 import { getGridClasses } from "../../constants/grids";
-import { useGridColumns } from "../../hooks/useGridColumns";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
+import { useRenderedColumns } from "../../hooks/useRenderedColumns";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import {
   AddToPlaylistButton,
@@ -59,7 +59,7 @@ const SceneGrid = ({
   enableKeyboard = true, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: Props) => {
   const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("scenes");
+  const columns = useRenderedColumns(gridRef);
   const gridClasses = getGridClasses("scene", density);
 
   // Selection state (always enabled, no mode toggle)

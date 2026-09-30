@@ -1,12 +1,13 @@
-import type { ComponentProps, ReactNode } from "react";
-import type * as routerModule from "react-router-dom";
+import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks
 import SceneCard from "../../../src/components/ui/SceneCard";
 import type SceneCardPreview from "../../../src/components/ui/SceneCardPreview";
+import SceneCarousel from "../../../src/components/ui/SceneCarousel";
 
 type PreviewProps = ComponentProps<typeof SceneCardPreview>;
 
@@ -43,24 +44,6 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   }),
 }));
 
-// Mock react-router-dom's useNavigate to avoid requiring router context
-vi.mock("react-router-dom", async (importOriginal) => {
-  const actual = await importOriginal<typeof routerModule>();
-  return {
-    ...actual,
-    useNavigate: () => vi.fn(),
-  };
-});
-
-// Mock BaseCard so we only render the image content slot (where SceneCardPreview is mounted)
-vi.mock("../../../src/components/ui/BaseCard", () => ({
-  default: ({
-    renderImageContent,
-  }: {
-    renderImageContent?: () => ReactNode;
-  }) => <div data-testid="base-card">{renderImageContent?.()}</div>,
-}));
-
 // Mock SceneCardPreview to capture props passed from SceneCard
 vi.mock("../../../src/components/ui/SceneCardPreview", () => ({
   default: (props: PreviewProps) => {
@@ -93,39 +76,88 @@ describe("SceneCard (TV Mode) preview activation wiring", () => {
     vi.clearAllMocks();
   });
 
-  it("disables hover and activates preview when highlighted in TV mode", () => {
+  /** The preview's props from its last render */
+  const lastPreviewProps = () =>
+    must(previewSpy.mock.lastCall, "the preview's props")[0];
+
+  it("in TV mode a card that has no focus does not preview, and hover is off", () => {
     mockUseTVMode.mockReturnValue({ isTVMode: true });
 
-    render(<SceneCard scene={scene} tvPreviewActive={true} tabIndex={0} />);
+    render(
+      <MemoryRouter>
+        <SceneCard scene={scene} hideRatingControls />
+      </MemoryRouter>
+    );
 
-    expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0];
-
-    expect(props.disableHover).toBe(true);
-    expect(props.active).toBe(true);
+    expect(lastPreviewProps().disableHover).toBe(true);
+    expect(lastPreviewProps().active).toBe(false);
   });
 
-  it("disables hover and does not activate preview when not highlighted in TV mode", () => {
+  it("in TV mode a focused card plays its preview; blur stops it", () => {
     mockUseTVMode.mockReturnValue({ isTVMode: true });
 
-    render(<SceneCard scene={scene} tvPreviewActive={false} tabIndex={-1} />);
+    render(
+      <MemoryRouter>
+        <SceneCard scene={scene} hideRatingControls />
+      </MemoryRouter>
+    );
+    const card = screen.getByLabelText("Scene");
 
-    expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0];
+    fireEvent.focus(card);
+    expect(lastPreviewProps().active).toBe(true);
 
-    expect(props.disableHover).toBe(true);
-    expect(props.active).toBe(false);
+    fireEvent.blur(card);
+    expect(lastPreviewProps().active).toBe(false);
+  });
+
+  it("in TV mode a focused card inside a carousel plays its preview; blur stops it", () => {
+    mockUseTVMode.mockReturnValue({ isTVMode: true });
+
+    render(
+      <MemoryRouter>
+        <SceneCarousel title="Recent" scenes={[scene]} />
+      </MemoryRouter>
+    );
+    const card = screen.getByLabelText("Scene");
+
+    fireEvent.focus(card);
+    expect(lastPreviewProps().active).toBe(true);
+
+    fireEvent.blur(card);
+    expect(lastPreviewProps().active).toBe(false);
+  });
+
+  it("focus moving between the card's own controls keeps the preview playing", () => {
+    mockUseTVMode.mockReturnValue({ isTVMode: true });
+
+    render(
+      <MemoryRouter>
+        <SceneCard scene={scene} hideRatingControls />
+      </MemoryRouter>
+    );
+    const card = screen.getByLabelText("Scene");
+    const inner = must(
+      card.querySelector("a, button"),
+      "a control in the card"
+    );
+
+    fireEvent.focus(card);
+    fireEvent.blur(card, { relatedTarget: inner });
+
+    expect(lastPreviewProps().active).toBe(true);
   });
 
   it("does not disable hover and does not force activation in non-TV mode", () => {
     mockUseTVMode.mockReturnValue({ isTVMode: false });
 
-    render(<SceneCard scene={scene} tvPreviewActive={true} tabIndex={0} />);
+    render(
+      <MemoryRouter>
+        <SceneCard scene={scene} hideRatingControls />
+      </MemoryRouter>
+    );
+    fireEvent.focus(screen.getByLabelText("Scene"));
 
-    expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0];
-
-    expect(props.disableHover).toBe(false);
-    expect(props.active).toBeUndefined();
+    expect(lastPreviewProps().disableHover).toBe(false);
+    expect(lastPreviewProps().active).toBeUndefined();
   });
 });
