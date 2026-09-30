@@ -620,6 +620,38 @@ describeWithDb("LinkCountService (integration)", () => {
     expect(Object.values(again).every((n) => n === 0)).toBe(true);
   });
 
+  it("the data migration's whole-library rebuild never overwrites a count written after it read", async () => {
+    // A sync commits performer 1's newer count between the rebuild's reads
+    // and its write (migrations run while syncs do)
+    const readCounts = linkCountService["readCounts"];
+    let raced = false;
+    linkCountService["readCounts"] = async (...args) => {
+      const counts = await readCounts.apply(linkCountService, args);
+      if (!raced) {
+        raced = true;
+        await prisma.stashPerformer.update({
+          where: { id_stashInstanceId: { id: "1", stashInstanceId: A } },
+          data: { sceneCount: 7 },
+        });
+      }
+      return counts;
+    };
+    try {
+      await linkCountService.rebuildLinkCounts("all", {
+        onlyIfUnchanged: true,
+      });
+    } finally {
+      linkCountService["readCounts"] = readCounts;
+    }
+
+    expect(raced).toBe(true);
+    expect((await performer("1")).sceneCount).toBe(7);
+    // The rows nothing wrote meanwhile get their counts
+    expect((await performer("2")).sceneCount).toBe(2);
+    expect((await performer("1", B)).sceneCount).toBe(1);
+    expect((await performer("1")).galleryCount).toBe(1);
+  });
+
   it("the stored links of deleted or changed rows name what they count toward", async () => {
     const linked = await linkCountService.linkedThrough({
       scenes: refs("3"),

@@ -568,7 +568,11 @@ const migrations: Migration[] = [
       "Count every performer's, studio's, tag's, collection's and gallery's links from the synced library, so each card shows what the page behind it lists",
     run: async () => {
       const startTime = Date.now();
-      const written = await linkCountService.rebuildLinkCounts("all");
+      // Compare-and-set: a sync that commits between this rebuild's reads
+      // and its writes has stored a newer count, which stands
+      const written = await linkCountService.rebuildLinkCounts("all", {
+        onlyIfUnchanged: true,
+      });
       logger.info("[Migration 010] Rebuilt the link counts", {
         durationMs: Date.now() - startTime,
         written,
