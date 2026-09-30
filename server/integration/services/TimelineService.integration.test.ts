@@ -23,6 +23,7 @@ import {
   type TimelineFilters,
   timelineService,
 } from "../../services/TimelineService.js";
+import type { FilterRef } from "../../types/parsedFilters.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -49,6 +50,11 @@ const ONLY_B: DistributionItem[] = [
   { period: "1901-02", count: 1 },
   { period: "1901-03", count: 1 },
 ];
+
+/** A parsed filter value, as the controller hands it over */
+function ref(id: string, instanceId?: string): FilterRef {
+  return { id, instanceId };
+}
 
 /** The seeded bars: the months of 1901 */
 async function bars(
@@ -212,24 +218,31 @@ describeWithDb("TimelineService across instances (integration)", () => {
   );
 
   it.each(["scene", "gallery", "image"] as const)(
-    "%s bars leave out an instance the viewer does not see",
+    "%s: an entity on an instance outside the allowed list adds no bar",
     async (entityType) => {
       expect(await bars(entityType, undefined, NO_USER, [A])).toEqual(ONLY_A);
+      expect(await bars(entityType, undefined, NO_USER, [B])).toEqual(ONLY_B);
+    }
+  );
+
+  it.each(["scene", "gallery", "image"] as const)(
+    "%s: an empty allowed list gives no bars",
+    async (entityType) => {
       expect(await bars(entityType, undefined, NO_USER, [])).toEqual([]);
     }
   );
 
   describe.each(FILTERS)("%s bars by %s", (entityType, filter) => {
     it("1:tl-a counts tl-a's entity only", async () => {
-      expect(await bars(entityType, { [filter]: `1:${A}` })).toEqual(ONLY_A);
+      expect(await bars(entityType, { [filter]: ref("1", A) })).toEqual(ONLY_A);
     });
 
     it("1:tl-b counts tl-b's two entities", async () => {
-      expect(await bars(entityType, { [filter]: `1:${B}` })).toEqual(ONLY_B);
+      expect(await bars(entityType, { [filter]: ref("1", B) })).toEqual(ONLY_B);
     });
 
     it("a bare 1 counts every instance's entities", async () => {
-      expect(await bars(entityType, { [filter]: "1" })).toEqual(BOTH);
+      expect(await bars(entityType, { [filter]: ref("1") })).toEqual(BOTH);
     });
   });
 
@@ -261,8 +274,10 @@ describeWithDb("TimelineService across instances (integration)", () => {
     });
 
     it("the exclusion applies with a bare ref and with a pair", async () => {
-      expect(await bars("scene", { performerId: "1" }, userId)).toEqual(ONLY_B);
-      expect(await bars("scene", { performerId: `1:${A}` }, userId)).toEqual(
+      expect(await bars("scene", { performerId: ref("1") }, userId)).toEqual(
+        ONLY_B
+      );
+      expect(await bars("scene", { performerId: ref("1", A) }, userId)).toEqual(
         []
       );
     });
