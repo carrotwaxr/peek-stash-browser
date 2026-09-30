@@ -53,8 +53,9 @@ describe("ContentRestrictionsModal pickers", () => {
         {
           entityType: "tags",
           mode: "INCLUDE",
-          entityIds: JSON.stringify(["5:other-server"]),
+          entityIds: ["5:other-server"],
           restrictEmpty: true,
+          unreadable: false,
         },
       ],
     });
