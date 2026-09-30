@@ -264,6 +264,74 @@ describe("dbWrite", () => {
     expect(mockPrisma.$transaction).toHaveBeenCalledWith(ops);
   });
 
+  it("afterCommit runs before the next unit starts", async () => {
+    const order: string[] = [];
+    const ops = [mockPrisma.watchHistory.deleteMany({ where: { userId: 1 } })];
+    mockPrisma.$transaction.mockImplementation((arg: unknown) =>
+      typeof arg === "function"
+        ? Promise.resolve((arg as (tx: unknown) => unknown)(mockPrisma))
+        : Promise.resolve([{ count: 3 }])
+    );
+
+    const batch = dbWriteBatch("history.clear", ops, {
+      afterCommit: (result) => {
+        order.push(`batch:${result[0]?.count}`);
+      },
+    });
+    const transaction = dbWriteTransaction(
+      "syncFromStash.history",
+      () => Promise.resolve(2),
+      {
+        afterCommit: (written) => {
+          order.push(`transaction:${written}`);
+        },
+      }
+    );
+    const next = dbWrite("rankings", () => {
+      order.push("next");
+      return Promise.resolve();
+    });
+    await Promise.all([batch, transaction, next]);
+
+    expect(order).toEqual(["batch:3", "transaction:2", "next"]);
+    // Only the transaction's own options reach Prisma
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      DB_WRITE_TX
+    );
+  });
+
+  it("afterCommit does not run when the transaction fails", async () => {
+    useFakeClock();
+    const afterCommit = vi.fn();
+    const ops = [mockPrisma.watchHistory.deleteMany({ where: { userId: 1 } })];
+    const failure = new Error("constraint failed");
+    mockPrisma.$transaction.mockRejectedValueOnce(failure);
+
+    await expect(
+      dbWriteBatch("history.clear", ops, { afterCommit })
+    ).rejects.toBe(failure);
+    mockPrisma.$transaction.mockRejectedValueOnce(failure);
+    await expect(
+      dbWriteTransaction("history.o", () => Promise.resolve(1), {
+        afterCommit,
+      })
+    ).rejects.toBe(failure);
+    expect(afterCommit).not.toHaveBeenCalled();
+
+    // A busy attempt commits nothing: only the attempt that committed runs it
+    mockPrisma.$transaction
+      .mockRejectedValueOnce(busy())
+      .mockResolvedValueOnce([{ count: 1 }]);
+    const retried = dbWriteBatch("history.clear", ops, { afterCommit });
+    await flush();
+    expect(afterCommit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(DB_WRITE_RETRY_PAUSE_MS);
+    await expect(retried).resolves.toEqual([{ count: 1 }]);
+    expect(afterCommit).toHaveBeenCalledTimes(1);
+    expect(afterCommit).toHaveBeenCalledWith([{ count: 1 }]);
+  });
+
   it("dbWriteBatchIf asks when the unit starts, and writes nothing once unwanted", async () => {
     const ops = [mockPrisma.sceneRating.deleteMany({ where: { userId: 1 } })];
     mockPrisma.$transaction.mockResolvedValue([{ count: 1 }]);

@@ -1186,7 +1186,7 @@ describe("syncFromStash", () => {
   // ─── Rankings and Recommended ───
 
   describe("rankings and the Recommended list", () => {
-    it("calls forget for the imported user once, after the stats rebuild: rankings and the Recommended list", async () => {
+    it("forgets the imported user's rankings and Recommended list inside each unit that wrote, and again after the stats rebuild", async () => {
       const stash2 = stashStub();
       mockStashClient.findScenes.mockResolvedValue(
         page(SCENE, [scene("1", { o_counter: 1, o_history: [T] })])
@@ -1200,17 +1200,28 @@ describe("syncFromStash", () => {
       ]);
       await run(only(SCENE, { oCounter: true }));
 
-      expect(mockRankings.forget).toHaveBeenCalledTimes(1);
-      expect(mockRankings.forget).toHaveBeenCalledWith(TARGET_USER_ID);
-      expect(mockRecommendations.forget).toHaveBeenCalledTimes(1);
-      expect(mockRecommendations.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      // One history unit per instance, then the rebuild
+      expect(mockRankings.forget).toHaveBeenCalledTimes(3);
+      expect(mockRecommendations.forget).toHaveBeenCalledTimes(3);
+      const everyCall = [
+        ...mockRankings.forget.mock.calls,
+        ...mockRecommendations.forget.mock.calls,
+      ];
+      expect(everyCall).toEqual(Array(6).fill([TARGET_USER_ID]));
+      // Inside each unit: after its transaction, before the next one starts
+      const [firstUnit, secondUnit] = mockPrisma.$transaction.mock
+        .invocationCallOrder as [number, number];
+      const [inFirst, inSecond, last] = mockRankings.forget.mock
+        .invocationCallOrder as [number, number, number];
+      expect(inFirst).toBeGreaterThan(firstUnit);
+      expect(inFirst).toBeLessThan(secondUnit);
+      expect(inSecond).toBeGreaterThan(secondUnit);
       // The rankings are computed from the rebuilt stats
       const rebuilt = must(
         mockStats.rebuildAllStatsForUser.mock.invocationCallOrder[0]
       );
-      expect(
-        must(mockRankings.forget.mock.invocationCallOrder[0])
-      ).toBeGreaterThan(rebuilt);
+      expect(inSecond).toBeLessThan(rebuilt);
+      expect(last).toBeGreaterThan(rebuilt);
     });
 
     it("forgets the user's rankings and Recommended list after an import that wrote only ratings", async () => {
@@ -1219,8 +1230,17 @@ describe("syncFromStash", () => {
       );
       await run(only(SCENE, { rating: true }));
 
+      // Inside the ratings unit, and no rebuild to wait for
+      expect(mockRankings.forget).toHaveBeenCalledTimes(1);
       expect(mockRankings.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      expect(mockRecommendations.forget).toHaveBeenCalledTimes(1);
       expect(mockRecommendations.forget).toHaveBeenCalledWith(TARGET_USER_ID);
+      expect(mockStats.rebuildAllStatsForUser).not.toHaveBeenCalled();
+      expect(
+        must(mockRankings.forget.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(
+        must(mockPrisma.$transaction.mock.invocationCallOrder[0])
+      );
     });
 
     it("forgets nothing after an import that wrote nothing", async () => {

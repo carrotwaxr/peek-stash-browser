@@ -590,18 +590,27 @@ export async function clearAllWatchHistory(
     studioStatsResult,
     tagStatsResult,
     rankingsResult,
-  ] = await dbWriteBatch("history.clear", [
-    prisma.watchHistory.deleteMany({ where: { userId } }),
-    prisma.userPerformerStats.deleteMany({ where: { userId } }),
-    prisma.userStudioStats.deleteMany({ where: { userId } }),
-    prisma.userTagStats.deleteMany({ where: { userId } }),
-    prisma.userEntityRanking.deleteMany({ where: { userId } }),
-  ]);
-  // After the unit: the next stats page recomputes the rankings at once
-  // rather than within the hour, and a recompute still running from
-  // before stops without marking the user fresh. Recommended rescores.
-  rankingComputeService.forget(userId);
-  recommendationService.forget(userId);
+  ] = await dbWriteBatch(
+    "history.clear",
+    [
+      prisma.watchHistory.deleteMany({ where: { userId } }),
+      prisma.userPerformerStats.deleteMany({ where: { userId } }),
+      prisma.userStudioStats.deleteMany({ where: { userId } }),
+      prisma.userTagStats.deleteMany({ where: { userId } }),
+      prisma.userEntityRanking.deleteMany({ where: { userId } }),
+    ],
+    {
+      // Inside the unit, once it commits: the next stats page recomputes
+      // the rankings at once rather than within the hour, and a recompute
+      // still running from before, its write queued behind this unit
+      // included, stops without writing or marking the user fresh.
+      // Recommended rescores.
+      afterCommit: () => {
+        rankingComputeService.forget(userId);
+        recommendationService.forget(userId);
+      },
+    }
+  );
 
   logger.info("Watch history and stats cleared", {
     userId,
