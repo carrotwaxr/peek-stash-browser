@@ -443,6 +443,54 @@ describe("useListUrlState", () => {
     });
   });
 
+  describe("fields the page fixes", () => {
+    it("a preset's tagIds is ignored where tags are locked", () => {
+      const list = renderList(
+        "/performer/1?tab=galleries",
+        { ...GALLERY_OPTIONS, lockedFields: ["tags"] },
+        {
+          context: "gallery",
+          preset: preset({
+            filters: {
+              tagIds: ["9:abc"],
+              tagIdsModifier: "EXCLUDES",
+              tagIdsDepth: -1,
+              favorite: true,
+            },
+          }),
+        }
+      );
+      expect(list.state.filters).toEqual({ favorite: true });
+    });
+
+    it("the URL's filter on a locked field is ignored, companions included", () => {
+      const list = renderList(
+        "/performer/1?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
+        { ...SCENE_OPTIONS, lockedFields: ["performers"] }
+      );
+      expect(list.state.filters).toEqual({ favorite: true });
+    });
+
+    it("locks nothing that is not named", () => {
+      const list = renderList("/scenes?performerIds=9:abc&tagIds=4:abc", {
+        ...SCENE_OPTIONS,
+        lockedFields: ["tags"],
+      });
+      expect(Object.keys(list.state.filters)).toEqual(["performerIds"]);
+    });
+
+    it("a write drops the locked field's stale keys from the URL", async () => {
+      const list = renderList(
+        "/scenes?performerIds=9:abc&performerIdsModifier=EXCLUDES&favorite=true",
+        { ...SCENE_OPTIONS, lockedFields: ["performers"] }
+      );
+      await actAsync(() => list.state.removeFilter("favorite"));
+      expect(list.params().has("performerIds")).toBe(false);
+      expect(list.params().has("performerIdsModifier")).toBe(false);
+      expect(list.params().has("favorite")).toBe(false);
+    });
+  });
+
   describe("view mode in the URL", () => {
     it("reads it and leaves it in the URL", () => {
       const list = renderList("/galleries?view=folder", GALLERY_OPTIONS);

@@ -209,7 +209,7 @@ A studio with sub-studios, or a tag with sub-tags, shows **Include sub-studios**
 - On a tag page: every tab (Scenes, Galleries, Images, Performers, Studios and Collections).
 - On a studio page: Scenes, Galleries, Images and Collections. The Performers tab lists the performers of this studio's own scenes, so the box is hidden there.
 
-Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag.
+Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag. The page's own studio or tag is not offered as a filter on its tabs (nor a performer's or collection's own on theirs), so the panel cannot turn the list inside out. Inside a folder, the Tags filter is hidden for the same reason, and in the timeline the date filter is.
 
 ### Clips
 

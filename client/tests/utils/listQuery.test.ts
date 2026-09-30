@@ -1,11 +1,14 @@
 import { DEFAULT_SORT } from "@peek/shared-types";
 import { describe, expect, it } from "vitest";
-import { buildSceneFilter } from "@/utils/filterConfig";
+import { SCENE_FILTER_OPTIONS, buildSceneFilter } from "@/utils/filterConfig";
 import {
   type ListQueryState,
   buildListQuery,
   listKeyOf,
   listKeyWithoutPageOf,
+  lockedFieldsOf,
+  withoutLockedFilters,
+  withoutLockedOptions,
 } from "@/utils/listQuery";
 
 const state = (overrides: Partial<ListQueryState> = {}): ListQueryState => ({
@@ -93,5 +96,48 @@ describe("buildListQuery", () => {
     expect(listKeyOf(one)).not.toBe(listKeyOf(two));
     expect(listKeyWithoutPageOf(one)).toBe(listKeyWithoutPageOf(two));
     expect(listKeyOf(null)).toBe("");
+  });
+});
+
+describe("locked fields", () => {
+  it("lockedFieldsOf reads the top level keys and the entity's own filter", () => {
+    expect(
+      lockedFieldsOf("scene", { tags: {}, date: {}, sceneId: "3" })
+    ).toEqual(["date", "sceneId", "tags"]);
+    expect(
+      lockedFieldsOf("performer", { performer_filter: { tags: {} } })
+    ).toEqual(["performer_filter", "tags"]);
+    expect(lockedFieldsOf("scene", {})).toEqual([]);
+  });
+
+  it("withoutLockedFilters drops a locked field's keys with their companions", () => {
+    const filters = {
+      tagIds: ["1:a"],
+      tagIdsModifier: "EXCLUDES",
+      tagIdsDepth: -1,
+      favorite: true,
+    };
+    expect(withoutLockedFilters("scene", filters, ["tags"])).toEqual({
+      favorite: true,
+    });
+    expect(withoutLockedFilters("scene", filters, [])).toBe(filters);
+    expect(withoutLockedFilters("scene", filters, ["performers"])).toBe(
+      filters
+    );
+  });
+
+  it("withoutLockedOptions drops the option, and a section left empty", () => {
+    const options = withoutLockedOptions("scene", SCENE_FILTER_OPTIONS, [
+      "date",
+    ]);
+    expect(options.some((option) => option.key === "date")).toBe(false);
+    expect(options.some((option) => option.key === "createdAt")).toBe(true);
+    const headers = options.filter(
+      (option) => option.type === "section-header"
+    );
+    for (const header of headers) {
+      const next = options[options.indexOf(header) + 1];
+      expect(next && next.type !== "section-header").toBe(true);
+    }
   });
 });

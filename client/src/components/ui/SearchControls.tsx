@@ -31,7 +31,9 @@ import {
 import {
   type ListQuery,
   buildListQuery,
+  lockedFieldsOf,
   sortOptionsFor,
+  withoutLockedOptions,
 } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
@@ -97,6 +99,7 @@ interface SearchControlsProps {
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
+const NO_LOCKS: readonly string[] = [];
 
 /** A filter value that filters: not empty, and an object with a value set */
 const isActiveFilter = (value: unknown) =>
@@ -159,6 +162,22 @@ function useFilterOptions(artifactType: string): FilterOption[] {
 }
 
 /**
+ * The contract fields the page fixes, from its permanent filters (a detail
+ * tab's locked filters name them inside the entity's own filter): the panel
+ * does not offer them and the URL's and presets' filters on them are dropped.
+ * Equal sets are one array.
+ */
+function useLockedFields(
+  artifactType: string,
+  permanentFilters: Record<string, unknown>
+): readonly string[] {
+  const key = lockedFieldsOf(artifactType as ListEntity, permanentFilters).join(
+    ","
+  );
+  return useMemo(() => (key === "" ? NO_LOCKS : key.split(",")), [key]);
+}
+
+/**
  * A page that does not pass `listState` yet: the controls derive the list
  * state from the URL themselves and keep the old outward contract, through
  * effects over derived values only, so the page's copies follow Back too.
@@ -178,6 +197,7 @@ const SearchControlsOnUrl = (props: SearchControlsProps) => {
   } = props;
   const entity = artifactType as ListEntity;
   const filterOptions = useFilterOptions(artifactType);
+  const lockedFields = useLockedFields(artifactType, permanentFilters);
   const { unitPreference } = useUnitPreference();
 
   // Entity defaults, the user's card display settings folded in
@@ -224,6 +244,7 @@ const SearchControlsOnUrl = (props: SearchControlsProps) => {
     viewModes: viewModeIds,
     defaults,
     permanentFilters,
+    lockedFields,
   });
 
   const { ready, filters, sort, page, perPage, q, viewMode } = listState;
@@ -312,7 +333,18 @@ const SearchControlsView = ({
   const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
 
   const { isTVMode } = useTVMode();
-  const filterOptions = useFilterOptions(artifactType);
+  const lockedFields = useLockedFields(artifactType, permanentFilters);
+  // The panel and the chips offer only what the page leaves free
+  const allFilterOptions = useFilterOptions(artifactType);
+  const filterOptions = useMemo(
+    () =>
+      withoutLockedOptions(
+        artifactType as ListEntity,
+        allFilterOptions,
+        lockedFields
+      ),
+    [artifactType, allFilterOptions, lockedFields]
+  );
 
   const {
     filters,

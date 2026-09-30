@@ -362,6 +362,112 @@ describe("SearchControls", () => {
     });
   });
 
+  describe("Fields the page fixes", () => {
+    const openPanel = async () => {
+      const user = userEvent.setup();
+      await user.click(
+        must(screen.getByText("Filters").closest("button"), "Filters button")
+      );
+    };
+    const offers = (label: string) =>
+      screen.queryByText(label, { selector: "label" }) !== null;
+
+    it("on a performer's Scenes tab the panel offers no Performers picker", async () => {
+      const list = renderSearchControls(
+        {
+          context: "scene_performer",
+          permanentFilters: {
+            performers: { value: ["1:abc"], modifier: "INCLUDES" },
+          },
+        },
+        { url: "/performer/1" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await openPanel();
+
+      expect(offers("Performers")).toBe(false);
+      expect(offers("Tags")).toBe(true);
+    });
+
+    it("a performerIds param in that URL does not reach the request", async () => {
+      const list = renderSearchControls(
+        {
+          context: "scene_performer",
+          permanentFilters: {
+            performers: { value: ["1:abc"], modifier: "INCLUDES" },
+          },
+        },
+        {
+          url: "/performer/1?performerIds=9:abc&performerIdsModifier=EXCLUDES",
+        }
+      );
+
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        performers: { value: ["1:abc"], modifier: "INCLUDES" },
+      });
+    });
+
+    it("on a tag's Performers tab the panel offers no Tags picker", async () => {
+      // SearchableGrid hands its locked filters over as they are: the
+      // entity's own filter holds the fixed fields
+      const list = renderSearchControls(
+        {
+          artifactType: "performer",
+          context: "performer_tag",
+          permanentFilters: {
+            performer_filter: {
+              tags: { value: ["5:abc"], modifier: "INCLUDES" },
+            },
+          },
+        },
+        { url: "/tag/5?tab=performers" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await openPanel();
+
+      expect(offers("Tags")).toBe(false);
+      expect(offers("Gender")).toBe(true);
+    });
+
+    it("in the timeline view the panel offers no Date filter", async () => {
+      const list = renderSearchControls(
+        {
+          permanentFilters: {
+            date: { start: "2024-01-01", end: "2024-01-31" },
+          },
+        },
+        { url: "/scenes?view=timeline" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await openPanel();
+      // The date filters sit in a collapsed section
+      await userEvent.click(screen.getByText("Date Ranges"));
+
+      expect(offers("Created Date")).toBe(true);
+      expect(offers("Scene Date")).toBe(false);
+    });
+
+    it("inside a folder the panel offers no Tags picker", async () => {
+      const list = renderSearchControls(
+        {
+          permanentFilters: {
+            tags: { value: ["5:abc"], modifier: "INCLUDES", depth: 0 },
+          },
+        },
+        { url: "/scenes?view=folder" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await openPanel();
+
+      expect(offers("Tags")).toBe(false);
+      expect(offers("Performers")).toBe(true);
+    });
+  });
+
   describe("Filter Application", () => {
     it("Apply resets the page to 1", async () => {
       const user = userEvent.setup();
