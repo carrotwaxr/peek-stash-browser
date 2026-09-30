@@ -1176,7 +1176,8 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     const commit = sqls.indexOf("COMMIT", begin);
     expect(commit).toBeGreaterThan(begin);
     const unit = sqls.slice(begin + 1, commit);
-    expect(unit).toHaveLength(4);
+    // The rows, the exclusions, then the excluded counts per entity (B13b)
+    expect(unit).toHaveLength(6);
     expect(unit[0]).toBe("DELETE FROM UserContentRestriction WHERE userId = ?");
     expect(unit[1]).toMatch(
       /^INSERT INTO UserContentRestriction \(userId, entityType, mode, entityIds, restrictEmpty, createdAt, updatedAt\) SELECT /
@@ -1185,6 +1186,12 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       /^DELETE FROM UserExcludedEntity WHERE userId = \?/
     );
     expect(unit[3]).toMatch(/^INSERT OR IGNORE INTO UserExcludedEntity /);
+    expect(unit[4]).toBe(
+      "DELETE FROM UserExcludedContentCount WHERE userId = ?"
+    );
+    expect(unit[5]).toMatch(
+      /^INSERT INTO UserExcludedContentCount \(.*\) SELECT \?, .* FROM _peek_counts$/
+    );
     expect(sqls).not.toContain("ROLLBACK");
     // Nothing touches either table outside the unit
     const outside = [...sqls.slice(0, begin), ...sqls.slice(commit + 1)];

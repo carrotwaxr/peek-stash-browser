@@ -138,7 +138,11 @@ describe("GroupQueryBuilder", () => {
       );
       expect(sql).toContain("entityType = 'group' AND e.entityId = g.id");
       // Sub-group exclusion, rating and exclusion user ids, the instances, the page
-      expect(params).toEqual([1, 1, 1, "inst-a", "inst-b", 10, 20]);
+      // The viewer's excluded links per collection, for the counts (B13b)
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'group' AND d.entityId = g.id AND d.instanceId = g.stashInstanceId"
+      );
+      expect(params).toEqual([1, 1, 1, 1, "inst-a", "inst-b", 10, 20]);
     });
 
     it("without exclusions the sub-group count leaves out only deleted sub-groups and binds no user id", async () => {
@@ -190,7 +194,7 @@ describe("GroupQueryBuilder", () => {
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
       expect(byCount).toContain(
-        "ORDER BY g.sceneCount DESC, g.name COLLATE NOCASE ASC"
+        "ORDER BY MAX(g.sceneCount - COALESCE(d.scenes, 0), 0) DESC, g.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
         "ORDER BY g.name COLLATE NOCASE ASC, g.id ASC, g.stashInstanceId ASC"
@@ -233,8 +237,12 @@ describe("GroupQueryBuilder", () => {
         expect(sql).toContain("LEFT JOIN GroupRating r");
       }
       expect(withExclusions.sql).toContain("LEFT JOIN UserExcludedEntity e");
-      expect(withExclusions.params).toEqual([1, 1, "inst-a", "inst-b"]);
+      expect(withExclusions.sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d"
+      );
+      expect(withExclusions.params).toEqual([1, 1, 1, "inst-a", "inst-b"]);
       expect(without.sql).not.toContain("UserExcludedEntity");
+      expect(without.sql).not.toContain("UserExcludedContentCount");
     });
   });
 
@@ -347,7 +355,7 @@ describe("GroupQueryBuilder", () => {
       for (const fragment of [
         "(r.favorite = 0 OR r.favorite IS NULL)",
         "COALESCE(r.rating, 0) BETWEEN ? AND ?",
-        "COALESCE(g.sceneCount, 0) > ?",
+        "MAX(g.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
         "COALESCE(g.duration, 0) < ?",
         "LOWER(g.name) = LOWER(?)",
         "(LOWER(g.synopsis) LIKE LOWER(?))",

@@ -897,7 +897,7 @@ describe("EntityQueryBuilder", () => {
       });
 
       expect(order()).toBe(
-        "p.sceneCount DESC, p.name COLLATE NOCASE ASC, p.id DESC, p.stashInstanceId DESC"
+        "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) DESC, p.name COLLATE NOCASE ASC, p.id DESC, p.stashInstanceId DESC"
       );
     });
 

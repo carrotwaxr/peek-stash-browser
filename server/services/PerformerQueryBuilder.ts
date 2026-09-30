@@ -43,11 +43,18 @@ import {
   type SortExpr,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
+import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 
-// Column list for SELECT - all StashPerformer fields plus user data
-const SELECT_COLUMNS = `
+// Column list for SELECT - all StashPerformer fields plus user data; the
+// counts as the viewer sees them (query/excludedCounts.ts)
+const selectColumns = (ctx: QueryContext) =>
+  `
     p.id, p.stashInstanceId, p.name, p.disambiguation, p.gender, p.birthdate, p.favorite AS stashFavorite,
-    p.rating100 AS stashRating100, p.sceneCount, p.imageCount, p.galleryCount, p.groupCount,
+    p.rating100 AS stashRating100,
+    ${visibleCount(ctx, "p.sceneCount", "scenes")} AS sceneCount,
+    ${visibleCount(ctx, "p.imageCount", "images")} AS imageCount,
+    ${visibleCount(ctx, "p.galleryCount", "galleries")} AS galleryCount,
+    ${visibleCount(ctx, "p.groupCount", "groups")} AS groupCount,
     p.details, p.aliasList, p.country, p.ethnicity, p.hairColor, p.eyeColor,
     p.heightCm, p.weightKg, p.measurements, p.fakeTits, p.penisLength, p.circumcised,
     p.tattoos, p.piercings,
@@ -66,7 +73,9 @@ const PERFORMER_SPEC: EntitySpec = {
     { table: "PerformerRating", alias: "r", entityIdCol: "performerId" },
     { table: "UserPerformerStats", alias: "s", entityIdCol: "performerId" },
   ],
-  selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
+  // The viewer's excluded links per performer, for the counts
+  extraJoins: (ctx) => excludedCountsJoin(ctx, "performer", "p"),
+  selectColumns: (ctx) => ({ sql: selectColumns(ctx), params: [] }),
   defaultSort: "name",
   // Equal values list by name, then by the base's key
   tiebreak: (field) =>
@@ -206,7 +215,11 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
    * The sort expressions. career_length lists performers without a value
    * last in both directions.
    */
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    _filter: ParsedFilter<"performer">,
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -223,12 +236,12 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       penis_length: column("p.penisLength"),
       career_length: { sql: `${CAREER_YEARS} ${dir} NULLS LAST`, params: [] },
 
-      // Counts
-      scene_count: column("p.sceneCount"),
-      scenes_count: column("p.sceneCount"),
-      image_count: column("p.imageCount"),
-      gallery_count: column("p.galleryCount"),
-      group_count: column("p.groupCount"),
+      // Counts, as the viewer sees them
+      scene_count: column(visibleCount(ctx, "p.sceneCount", "scenes")),
+      scenes_count: column(visibleCount(ctx, "p.sceneCount", "scenes")),
+      image_count: column(visibleCount(ctx, "p.imageCount", "images")),
+      gallery_count: column(visibleCount(ctx, "p.galleryCount", "galleries")),
+      group_count: column(visibleCount(ctx, "p.groupCount", "groups")),
 
       // The viewer's rating (PerformerRating)
       rating: column("COALESCE(r.rating, 0)"),
@@ -273,9 +286,14 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     if (filter.scenes) push(via(PERFORMERS_BY_SCENE, filter.scenes));
     if (filter.groups) push(via(PERFORMERS_BY_GROUP, filter.groups));
 
-    // Counts
+    // Counts, as the viewer sees them
     if (filter.scene_count) {
-      push(buildNumericFilter(filter.scene_count, "COALESCE(p.sceneCount, 0)"));
+      push(
+        buildNumericFilter(
+          filter.scene_count,
+          visibleCount(ctx, "p.sceneCount", "scenes")
+        )
+      );
     }
 
     // Text; the name also matches the aliases
@@ -413,10 +431,10 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
 
       // Counts
-      scene_count: row.sceneCount ?? 0,
-      image_count: row.imageCount ?? 0,
-      gallery_count: row.galleryCount ?? 0,
-      group_count: row.groupCount ?? 0,
+      scene_count: Number(row.sceneCount ?? 0),
+      image_count: Number(row.imageCount ?? 0),
+      gallery_count: Number(row.galleryCount ?? 0),
+      group_count: Number(row.groupCount ?? 0),
 
       // Timestamps
       created_at: row.stashCreatedAt?.toISOString() ?? null,

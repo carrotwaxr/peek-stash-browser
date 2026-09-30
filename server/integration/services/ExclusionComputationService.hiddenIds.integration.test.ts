@@ -50,6 +50,8 @@ const BULK_SCENE_IDS = Array.from({ length: 250 }, (_, i) => String(1000 + i));
 
 const EXCLUSION_INSERT = /^INSERT OR IGNORE INTO UserExcludedEntity /;
 const HIDDEN_INSERT = /^INSERT OR IGNORE INTO UserHiddenEntity /;
+/** The hide's increment of the viewer's excluded links per entity (B13b) */
+const COUNT_INCREMENT = /^INSERT INTO UserExcludedContentCount /;
 
 /**
  * Record the statements the compute connection runs until `restore()`, and
@@ -240,14 +242,17 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
       ])
     );
     // One INSERT OR IGNORE ... SELECT from the TEMP result, not one upsert
-    // per row
-    const writes = exec.mock.calls
-      .map(([sql]) => sql)
-      .filter((sql) => /UserExcludedEntity/.test(sql));
+    // per row; the excluded-count increment in the same unit
+    const sqls = exec.mock.calls.map(([sql]) => sql);
+    const writes = sqls.filter((sql) => /INTO UserExcludedEntity/.test(sql));
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatch(
       /^INSERT OR IGNORE INTO UserExcludedEntity \(.*\) SELECT .* FROM _peek_result$/
     );
+    const begin = sqls.lastIndexOf("BEGIN IMMEDIATE");
+    const unit = sqls.slice(begin, sqls.indexOf("COMMIT", begin) + 1);
+    expect(unit.filter((sql) => COUNT_INCREMENT.test(sql))).toHaveLength(1);
+    expect(unit[unit.length - 1]).toBe("COMMIT");
   }, 60000);
   it("a hide whose exclusion write fails leaves no hidden row and no exclusion", async () => {
     const recorder = await recordCompute(EXCLUSION_INSERT);
@@ -325,10 +330,12 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
       failCount: 0,
     });
     const sqls = recorder.sqls();
-    // One read snapshot, one merge statement, one hidden-rows statement
+    // One read snapshot, one merge statement, one hidden-rows statement,
+    // one excluded-count increment
     expect(sqls.filter((sql) => sql === "BEGIN")).toHaveLength(1);
     expect(sqls.filter((sql) => EXCLUSION_INSERT.test(sql))).toHaveLength(1);
     expect(sqls.filter((sql) => HIDDEN_INSERT.test(sql))).toHaveLength(1);
+    expect(sqls.filter((sql) => COUNT_INCREMENT.test(sql))).toHaveLength(1);
     expect(sqls.filter((sql) => sql === "BEGIN IMMEDIATE")).toHaveLength(1);
 
     expect(await prisma.userHiddenEntity.count({ where: { userId } })).toBe(
@@ -405,9 +412,12 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
             ? ["exclusions"]
             : HIDDEN_INSERT.test(sql)
               ? ["hidden"]
-              : []
+              : COUNT_INCREMENT.test(sql)
+                ? ["counts"]
+                : []
       );
-    // The snapshot's own COMMIT comes first; then three units
+    // The snapshot's own COMMIT comes first; then three units, the hidden
+    // rows and the excluded-count increment in the last
     expect(writes.slice(writes.indexOf("BEGIN IMMEDIATE"))).toEqual([
       "BEGIN IMMEDIATE",
       "exclusions",
@@ -418,6 +428,7 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
       "BEGIN IMMEDIATE",
       "exclusions",
       "hidden",
+      "counts",
       "COMMIT",
     ]);
 

@@ -4998,6 +4998,10 @@ class StashSyncService extends EventEmitter {
         await tx.imageViewHistory.deleteMany({ where: own });
         await tx.playlistItem.deleteMany({ where: own });
         await tx.userHiddenEntity.deleteMany({ where: own });
+        // The users' excluded links per entity of the instance (B13b); a
+        // small table, read by its primary key, so a delete by instance
+        // scans it
+        await tx.userExcludedContentCount.deleteMany({ where: own });
         await tx.download.deleteMany({ where: own });
         await tx.mergeRecord.deleteMany({
           where: {

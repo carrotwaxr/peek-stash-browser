@@ -147,7 +147,7 @@ async function seedFixture(): Promise<void> {
       {
         ...tag(T.ROOT, A, "Root"),
         sceneCount: 10,
-        sceneCountViaPerformers: 12,
+        sceneCountAll: 12,
         imageCount: 3,
         galleryCount: 2,
         performerCount: 4,
@@ -156,7 +156,7 @@ async function seedFixture(): Promise<void> {
         stashUpdatedAt: new Date("2024-02-03T04:05:06.000Z"),
       },
       tag(T.CHILD, A, "Child", [T.ROOT]),
-      { ...tag(T.GRAND, A, "Grand", [T.CHILD]), sceneCount: 2 },
+      { ...tag(T.GRAND, A, "Grand", [T.CHILD]), sceneCountAll: 2 },
       tag(T.OTHER, A, "Other"),
       tag(T.MULTI, A, "Multi", [T.ROOT, T.OTHER]),
       tag(T.ABOVE_HIDDEN, A, "Above Hidden"),
@@ -365,7 +365,8 @@ describeWithDb("Tag tree (integration)", () => {
       name: "Root",
       image_path: `/api/proxy/stash?path=${encodeURIComponent("/tag/7740001/image")}&instanceId=${A}`,
       parents: [],
-      // The greater of its own scenes and its performers' scenes, as the list
+      // The card's count: its scenes tagged directly or inheriting it, as
+      // the list, minus the ones the user cannot see (none here)
       scene_count: 12,
       image_count: 3,
       gallery_count: 2,

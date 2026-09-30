@@ -78,7 +78,8 @@ model User {
   groupMemberships UserGroupMembership[]
 
   // Pre-computed exclusions cache
-  excludedEntities UserExcludedEntity[]
+  excludedEntities      UserExcludedEntity[]
+  excludedContentCounts UserExcludedContentCount[]
 
   // Per-user play statistics and rankings
   performerStats UserPerformerStats[]
@@ -578,6 +579,26 @@ model UserExcludedEntity {
   @@index([userId, entityType])
   @@index([entityType, entityId])
   @@index([userId, entityType, reason]) // For groupBy stats queries
+}
+
+/// The viewer's excluded links per entity (B13b): a card's count is the
+/// live column minus the matching column here. Only entities with a
+/// nonzero column have a row; a user with no exclusions has none.
+model UserExcludedContentCount {
+  userId     Int
+  entityType String // performer, studio, tag, group, gallery
+  entityId   String
+  instanceId String
+  scenes     Int    @default(0)
+  images     Int    @default(0)
+  galleries  Int    @default(0)
+  groups     Int    @default(0)
+  performers Int    @default(0)
+  studios    Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entityType, entityId, instanceId])
 }
 
 // Track which data migrations have been applied

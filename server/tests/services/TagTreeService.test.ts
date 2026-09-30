@@ -23,8 +23,7 @@ function row(fields: Partial<TagTreeQueryRow>): TagTreeQueryRow {
     name: "Tag",
     imagePath: null,
     parentIds: null,
-    sceneCount: 0,
-    sceneCountViaPerformers: 0,
+    sceneCountAll: 0,
     imageCount: 0,
     galleryCount: 0,
     performerCount: 0,
@@ -75,7 +74,14 @@ describe("loadTagTree", () => {
     expect(sql).toContain(
       "us.userId = ? AND us.instanceId = t.stashInstanceId"
     );
-    expect(params).toEqual([7, 7, 7, "a", "b"]);
+    // The viewer's excluded links per tag: the counts are the card's (B13b)
+    expect(sql).toContain(
+      "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'tag' AND d.entityId = t.id AND d.instanceId = t.stashInstanceId"
+    );
+    expect(sql).toContain(
+      "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) AS sceneCountAll"
+    );
+    expect(params).toEqual([7, 7, 7, 7, "a", "b"]);
     expect(placeholders(sql)).toBe(params.length);
   });
 
@@ -172,8 +178,7 @@ describe("loadTagTree", () => {
         stashInstanceId: "a",
         name: "Five",
         imagePath: "http://stash:9999/tag/5/image",
-        sceneCount: 4,
-        sceneCountViaPerformers: 9,
+        sceneCountAll: 9,
         imageCount: 3,
         galleryCount: 2,
         performerCount: 1,
@@ -208,13 +213,13 @@ describe("loadTagTree", () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([
       row({
         id: "5",
-        sceneCount: 40,
+        sceneCountAll: 40,
         imageCount: 3,
         galleryCount: 2,
         performerCount: 1,
         scopeSceneCount: 2n,
       }),
-      row({ id: "6", sceneCount: 10, scopeSceneCount: 0n }),
+      row({ id: "6", sceneCountAll: 10, scopeSceneCount: 0n }),
     ]);
 
     const tags = await loadTagTree({

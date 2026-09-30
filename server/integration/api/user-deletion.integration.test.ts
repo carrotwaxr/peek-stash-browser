@@ -138,6 +138,10 @@ function seeders(
           reason: "hidden",
         },
       }),
+    UserExcludedContentCount: () =>
+      prisma.userExcludedContentCount.create({
+        data: { ...entity, entityType: "performer", entityId: "1", scenes: 1 },
+      }),
     UserGroupMembership: () =>
       prisma.userGroupMembership.create({ data: { userId, groupId } }),
     UserHiddenEntity: () =>

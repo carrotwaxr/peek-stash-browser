@@ -112,6 +112,11 @@ export interface SceneScoringRow {
  * Base columns from StashPerformer, plus user data from LEFT JOINs on
  * PerformerRating (r) and UserPerformerStats (s).
  */
+/**
+ * A count column the viewer sees is an expression (the live column minus
+ * the viewer's excluded links, query/excludedCounts.ts), which Prisma
+ * returns as bigint; the plain column, without exclusions, as number.
+ */
 export interface PerformerQueryRow {
   // StashPerformer base columns
   id: string;
@@ -122,10 +127,10 @@ export interface PerformerQueryRow {
   birthdate: string | null;
   stashFavorite: boolean;
   stashRating100: number | null;
-  sceneCount: number | null;
-  imageCount: number | null;
-  galleryCount: number | null;
-  groupCount: number | null;
+  sceneCount: number | bigint | null;
+  imageCount: number | bigint | null;
+  galleryCount: number | bigint | null;
+  groupCount: number | bigint | null;
   details: string | null;
   aliasList: string | null; // JSON-encoded string[]
   country: string | null;
@@ -176,11 +181,11 @@ export interface StudioQueryRow {
   parentId: string | null;
   stashFavorite: boolean;
   stashRating100: number | null;
-  sceneCount: number | null;
-  imageCount: number | null;
-  galleryCount: number | null;
-  performerCount: number | null;
-  groupCount: number | null;
+  sceneCount: number | bigint | null;
+  imageCount: number | bigint | null;
+  galleryCount: number | bigint | null;
+  performerCount: number | bigint | null;
+  groupCount: number | bigint | null;
   details: string | null;
   url: string | null;
   imagePath: string | null;
@@ -213,15 +218,15 @@ export interface TagQueryRow {
   name: string;
   stashFavorite: boolean;
   sceneCount: number | null;
-  imageCount: number | null;
-  galleryCount: number | null;
-  performerCount: number | null;
-  studioCount: number | null;
-  groupCount: number | null;
+  imageCount: number | bigint | null;
+  galleryCount: number | bigint | null;
+  performerCount: number | bigint | null;
+  studioCount: number | bigint | null;
+  groupCount: number | bigint | null;
   sceneMarkerCount: number | null;
   sceneCountViaPerformers: number | null;
   /** Live scenes tagged directly or inheriting the tag, each once */
-  sceneCountAll: number;
+  sceneCountAll: number | bigint;
   description: string | null;
   aliases: string | null; // JSON-encoded string[]
   parentIds: string | null; // JSON-encoded string[]
@@ -245,11 +250,11 @@ export interface TagTreeQueryRow {
   name: string;
   imagePath: string | null;
   parentIds: string | null; // JSON-encoded string[]
-  sceneCount: number;
-  sceneCountViaPerformers: number;
-  imageCount: number;
-  galleryCount: number;
-  performerCount: number;
+  /** The card's counts as the user sees them (query/excludedCounts.ts) */
+  sceneCountAll: number | bigint;
+  imageCount: number | bigint;
+  galleryCount: number | bigint;
+  performerCount: number | bigint;
   stashCreatedAt: Date | null;
   stashUpdatedAt: Date | null;
   // LEFT JOIN TagRating (r) and UserTagStats (us)
@@ -279,7 +284,7 @@ export interface GalleryQueryRow {
   date: string | null;
   studioId: string | null;
   stashRating100: number | null;
-  imageCount: number | null;
+  imageCount: number | bigint | null;
   coverImageId: string | null;
   details: string | null;
   url: string | null;
@@ -320,8 +325,8 @@ export interface GroupQueryRow {
   studioId: string | null;
   stashRating100: number | null;
   duration: number | null;
-  sceneCount: number | null;
-  performerCount: number | null;
+  sceneCount: number | bigint | null;
+  performerCount: number | bigint | null;
   director: string | null;
   synopsis: string | null;
   urls: string | null; // JSON-encoded string[]

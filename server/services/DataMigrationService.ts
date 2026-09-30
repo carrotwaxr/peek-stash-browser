@@ -575,6 +575,17 @@ const migrations: Migration[] = [
       });
     },
   },
+  // Each user's recompute now stores their excluded links per entity
+  // (UserExcludedContentCount, migration 20260930000300), which the cards
+  // subtract from the link counts: every user is recomputed once so the
+  // table exists for all of them. The same pass rewrites, per instance,
+  // any exclusion rows still stored for every instance ('') from before
+  // the per-instance compute.
+  recomputeExclusionsMigration(
+    "011_recompute_exclusions_content_counts",
+    "Recompute every user's exclusions so each card's count leaves out what the user cannot see (UserExcludedContentCount), and rewrite any exclusion rows still stored for every instance per instance",
+    "the per-user card counts"
+  ),
 ];
 
 class DataMigrationService {
