@@ -374,15 +374,11 @@ All or nothing: a target without `instanceId`, or with an unknown one, answers 4
 
 **Authentication:** Required
 
+**Query:** `entityType` (optional: `scene`, `performer`, `studio`, `tag`, `group`, `gallery` or `image`), `page` (default 1), `per_page` (1 to 100, default 50). Anything else answers 400.
+
+**Response:** `{ items, total, counts }`. `items` is the page's hidden rows, newest first; each has `entityType`, `entityId`, `instanceId` (as stored: `""` for a legacy hide of every instance), `hiddenAt`, `restricted` and `summary`. `summary` is `{ id, instanceId, name, imageUrl }` when the user could see the entity without their own hides, read from the instance it shows from, with `imageUrl` a proxy URL naming that instance; otherwise it is `null` and `restricted` is `true`. `total` counts the rows of the requested type (every type when none), and `counts` the rows of each type whatever was requested.
+
 **Controller:** `getHiddenEntities` in `../controllers/user.ts`
-
----
-
-### GET /api/user/hidden-entities/ids
-
-**Authentication:** Required
-
-**Controller:** `getHiddenEntityIds` in `../controllers/user.ts`
 
 ---
 

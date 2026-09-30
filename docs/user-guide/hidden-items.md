@@ -44,11 +44,13 @@ A bulk hide is all or nothing: either every selected item is hidden, or, if some
 2. Scroll to the "Hidden Items" section
 3. Click **View Hidden Items**
 
+The page lists your hidden items newest first, 50 to a page, each with its thumbnail and name. The tabs show how many items of each type you have hidden; a type you have hidden nothing of has no tab. An item you can no longer see for another reason (a content restriction, or it was removed from the library) shows as its type with "Details unavailable", and you can still restore it.
+
 ### Restoring Hidden Items
 
 From the Hidden Items page:
 - Click **Restore** on individual items to unhide them. Restore finishes once the item shows again in your lists, so it can take a moment on a large library
-- Click **Restore All** to restore all hidden items at once
+- Click **Restore All** to restore all hidden items at once, or every hidden item of the open tab's type
 - Use the tabs to filter by entity type (Scenes, Performers, Studios, etc.)
 
 ### Don't Ask Again

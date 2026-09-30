@@ -66,7 +66,7 @@ import type {
   GetDefaultFilterPresetsResponse,
   GetFilterPresetsResponse,
   GetHiddenEntitiesQuery,
-  GetHiddenEntityIdsResponse,
+  GetHiddenEntitiesResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsParams,
   GetUserPermissionsParams,
@@ -1722,13 +1722,31 @@ export const unhideAllEntities = async (
   });
 };
 
+const HIDDEN_PER_PAGE_DEFAULT = 50;
+const HIDDEN_PER_PAGE_MAX = 100;
+
+/** A positive integer query value, its default when absent, or null */
+function positiveIntParam(
+  value: string | string[] | undefined,
+  fallback: number
+): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const n = Number(value);
+  return n >= 1 && Number.isSafeInteger(n) ? n : null;
+}
+
 /**
- * Get all hidden entities for the current user
- * Optionally filter by entity type
+ * One page of the current user's hidden items, newest first, with the
+ * number of each type. `entityType` narrows the page (not the counts);
+ * `per_page` is 1 to 100, default 50. Outside the library-ready gate on
+ * purpose: a user whose servers are all on their first sync can still
+ * restore items. The allowed instances apply in the summary's visibility
+ * check (resolveVisibleApartFromOwnHides).
  */
 export const getHiddenEntities = async (
   req: TypedAuthRequest<never, Record<string, string>, GetHiddenEntitiesQuery>,
-  res: TypedResponse<{ hiddenEntities: unknown[] } | ApiErrorResponse>
+  res: TypedResponse<GetHiddenEntitiesResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
 
@@ -1737,38 +1755,26 @@ export const getHiddenEntities = async (
     res.status(400).json({ error: "Invalid entity type" });
     return;
   }
+  const page = positiveIntParam(req.query.page, 1);
+  if (page === null) {
+    res.status(400).json({ error: "page must be a positive integer" });
+    return;
+  }
+  const perPage = positiveIntParam(req.query.per_page, HIDDEN_PER_PAGE_DEFAULT);
+  if (perPage === null || perPage > HIDDEN_PER_PAGE_MAX) {
+    res.status(400).json({
+      error: `per_page must be an integer from 1 to ${HIDDEN_PER_PAGE_MAX}`,
+    });
+    return;
+  }
 
-  const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
-    userId,
-    entityType
+  res.json(
+    await userHiddenEntityService.getHiddenEntities(userId, {
+      entityType,
+      page,
+      perPage,
+    })
   );
-
-  res.json({ hiddenEntities });
-};
-
-/**
- * Get hidden entity IDs organized by type (for filtering)
- */
-export const getHiddenEntityIds = async (
-  req: TypedAuthRequest,
-  res: TypedResponse<GetHiddenEntityIdsResponse | ApiErrorResponse>
-) => {
-  const userId = req.user.id;
-
-  const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
-
-  // Convert Sets to arrays for JSON serialization
-  const result = {
-    scenes: Array.from(hiddenIds.scenes),
-    performers: Array.from(hiddenIds.performers),
-    studios: Array.from(hiddenIds.studios),
-    tags: Array.from(hiddenIds.tags),
-    groups: Array.from(hiddenIds.groups),
-    galleries: Array.from(hiddenIds.galleries),
-    images: Array.from(hiddenIds.images),
-  };
-
-  res.json({ hiddenIds: result });
 };
 
 /**

@@ -1,15 +1,16 @@
+import type { UserHiddenEntity } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { resolveVisibleApartFromOwnHides } from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import {
   HIDEABLE_ENTITY_TYPES,
   isHideableEntityType,
   userHiddenEntityService,
 } from "../../services/UserHiddenEntityService.js";
-import type { EntityType } from "../../services/UserHiddenEntityService.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
@@ -31,22 +32,8 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
-// Mock StashEntityService
-vi.mock("../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getScene: vi.fn(),
-    getPerformer: vi.fn(),
-    getStudio: vi.fn(),
-    getTag: vi.fn(),
-    getGroup: vi.fn(),
-    getGallery: vi.fn(),
-    getImage: vi.fn(),
-  },
-}));
-
 const mockPrisma = vi.mocked(prisma, true);
 const mockExclusion = vi.mocked(exclusionComputationService);
-const mockEntity = vi.mocked(stashEntityService);
 const mockResolveVisible = vi.mocked(resolveVisibleApartFromOwnHides);
 
 /** Every ref visible: on its own instance, or "shown-instance" for "". */
@@ -101,8 +88,6 @@ describe("HIDEABLE_ENTITY_TYPES", () => {
 describe("UserHiddenEntityService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear internal cache between tests
-    userHiddenEntityService.clearAllCache();
   });
 
   // ─── hideEntity ───────────────────────────────────────────────────
@@ -126,20 +111,6 @@ describe("UserHiddenEntityService", () => {
       expect(mockExclusion.addHiddenEntities).toHaveBeenCalledWith(5, [
         { entityType: "tag", entityId: "3", instanceId: "" },
       ]);
-    });
-
-    it("invalidates the cached hidden IDs for the user", async () => {
-      // Prime the cache
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
-
-      // hideEntity should invalidate cache
-      await userHiddenEntityService.hideEntity(1, "scene", "1", "");
-
-      // Next call should hit DB again
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
     });
 
     it("rejects when the write fails", async () => {
@@ -169,18 +140,6 @@ describe("UserHiddenEntityService", () => {
         4,
         targets
       );
-    });
-
-    it("invalidates the cached hidden IDs for the user", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-      await userHiddenEntityService.getHiddenEntityIds(4);
-
-      await userHiddenEntityService.hideEntities(4, [
-        { entityType: "scene", entityId: "1", instanceId: "inst" },
-      ]);
-
-      await userHiddenEntityService.getHiddenEntityIds(4);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -265,25 +224,6 @@ describe("UserHiddenEntityService", () => {
         userHiddenEntityService.unhideEntity(3, "tag", "8", "inst-c")
       ).rejects.toThrow("recompute failed");
     });
-
-    it("invalidates the cached hidden IDs for the user", async () => {
-      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
-
-      // Prime the cache
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({ entityType: "scene", entityId: "1" }),
-      ]);
-      await userHiddenEntityService.getHiddenEntityIds(3);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
-
-      // unhideEntity should invalidate cache
-      await userHiddenEntityService.unhideEntity(3, "scene", "1", "");
-
-      // Next call should hit DB again
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-      await userHiddenEntityService.getHiddenEntityIds(3);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
-    });
   });
 
   // ─── unhideAll ────────────────────────────────────────────────────
@@ -326,127 +266,115 @@ describe("UserHiddenEntityService", () => {
 
       expect(mockExclusion.recomputeForUser).not.toHaveBeenCalled();
     });
-
-    it("invalidates cache even when count is 0", async () => {
-      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-      // Prime cache
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-      await userHiddenEntityService.getHiddenEntityIds(4);
-
-      await userHiddenEntityService.unhideAll(4);
-
-      // Cache should be invalidated
-      await userHiddenEntityService.getHiddenEntityIds(4);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
-    });
   });
 
   // ─── getHiddenEntities ────────────────────────────────────────────
 
   describe("getHiddenEntities", () => {
-    const mockHiddenRecords = [
-      {
-        id: 1,
+    const PAGE = { entityType: undefined, page: 1, perPage: 50 };
+
+    const hidden = (
+      id: number,
+      entityType: string,
+      entityId: string,
+      instanceId: string
+    ) =>
+      partialRow<UserHiddenEntity>({
+        id,
         userId: 1,
-        entityType: "scene",
-        entityId: "10",
-        instanceId: "inst-a",
-        hiddenAt: new Date("2026-01-01"),
-      },
-      {
-        id: 2,
-        userId: 1,
+        entityType,
+        entityId,
+        instanceId,
+        hiddenAt: new Date(Date.UTC(2026, 0, id)),
+      });
+
+    /** The summary statement's rows for the refs it was given */
+    function summaryRowsFor(
+      rows: (refs: Array<[string, string]>) => Array<Record<string, unknown>>
+    ) {
+      mockPrisma.$queryRawUnsafe.mockImplementation((_sql, ...params) => {
+        const refs = JSON.parse(String(params[0])) as Array<[string, string]>;
+        return Promise.resolve(rows(refs)) as never;
+      });
+    }
+
+    function groups(counts: Record<string, number>) {
+      mockPrisma.userHiddenEntity.groupBy.mockResolvedValue(
+        Object.entries(counts).map(([entityType, n]) => ({
+          entityType,
+          _count: { _all: n },
+        })) as never
+      );
+    }
+
+    beforeEach(() => {
+      groups({});
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    });
+
+    it("counts the hideable types in one groupBy and pages the rows newest first", async () => {
+      groups({ scene: 120, performer: 3 });
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, {
+        entityType: undefined,
+        page: 3,
+        perPage: 50,
+      });
+
+      expect(mockPrisma.userHiddenEntity.groupBy).toHaveBeenCalledWith({
+        by: ["entityType"],
+        where: { userId: 1, entityType: { in: SEVEN_TYPES } },
+        _count: { _all: true },
+      });
+      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
+        where: { userId: 1, entityType: { in: SEVEN_TYPES } },
+        orderBy: [{ hiddenAt: "desc" }, { id: "desc" }],
+        skip: 100,
+        take: 50,
+      });
+      expect(result.total).toBe(123);
+      expect(result.counts).toEqual({
+        scene: 120,
+        performer: 3,
+        studio: 0,
+        tag: 0,
+        group: 0,
+        gallery: 0,
+        image: 0,
+      });
+    });
+
+    it("a type narrows the page and the total, not the counts", async () => {
+      groups({ scene: 120, performer: 3 });
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, {
         entityType: "performer",
-        entityId: "20",
-        instanceId: "",
-        hiddenAt: new Date("2026-01-02"),
-      },
-      {
-        id: 3,
-        userId: 1,
-        entityType: "tag",
-        entityId: "30",
-        instanceId: "inst-b",
-        hiddenAt: new Date("2026-01-03"),
-      },
-    ];
-
-    it("fetches hidden entities ordered by hiddenAt descending", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
-        orderBy: { hiddenAt: "desc" },
+        page: 1,
+        perPage: 2,
       });
-    });
 
-    it("filters by entityType when provided", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      await userHiddenEntityService.getHiddenEntities(1, "scene");
-
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
-        where: { userId: 1, entityType: "scene" },
-        orderBy: { hiddenAt: "desc" },
-      });
-    });
-
-    it("enriches each visible row from the instance the access check resolved", async () => {
-      everyRefVisible();
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue(mockHiddenRecords);
-      mockEntity.getScene.mockResolvedValue(
-        partialRow({
-          id: "10",
-          title: "Scene 10",
+      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith(
+        objectContaining({
+          where: { userId: 1, entityType: "performer" },
+          skip: 0,
+          take: 2,
         })
       );
-      mockEntity.getPerformer.mockResolvedValue(
-        partialRow({
-          id: "20",
-          name: "Performer 20",
-        })
-      );
-      mockEntity.getTag.mockResolvedValue(
-        partialRow({
-          id: "30",
-          name: "Tag 30",
-        })
-      );
-
-      const result = await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(mockEntity.getScene).toHaveBeenCalledWith("10", "inst-a");
-      // A hide stored for every instance shows the instance that was resolved
-      expect(mockEntity.getPerformer).toHaveBeenCalledWith(
-        "20",
-        "shown-instance"
-      );
-      expect(mockEntity.getTag).toHaveBeenCalledWith("30", "inst-b");
-      expect(result).toHaveLength(3);
-      expect(result[0]).toMatchObject({
-        entityId: "10",
-        restricted: false,
-        entity: { id: "10", title: "Scene 10" },
-      });
+      expect(result.total).toBe(3);
+      expect(result.counts.scene).toBe(120);
     });
 
     it("checks visibility once per entity type with each row's stored instance", async () => {
       everyRefVisible();
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        ...mockHiddenRecords,
-        partialRow({
-          id: 4,
-          entityType: "scene",
-          entityId: "11",
-          instanceId: "",
-          hiddenAt: new Date("2026-01-04"),
-        }),
+        hidden(1, "scene", "10", "inst-a"),
+        hidden(2, "performer", "20", ""),
+        hidden(3, "tag", "30", "inst-b"),
+        hidden(4, "scene", "11", ""),
       ]);
 
-      await userHiddenEntityService.getHiddenEntities(7);
+      await userHiddenEntityService.getHiddenEntities(7, PAGE);
 
       expect(mockResolveVisible).toHaveBeenCalledTimes(3);
       expect(mockResolveVisible).toHaveBeenCalledWith(7, "scene", [
@@ -461,177 +389,190 @@ describe("UserHiddenEntityService", () => {
       ]);
     });
 
-    it("returns a row the user may not see as restricted, without its entity", async () => {
-      mockResolveVisible.mockResolvedValue(
-        new Map([[entityKey("10", "i"), "i"]])
-      );
+    it("reads each type's summaries in one statement, by the instance each row shows from", async () => {
+      everyRefVisible();
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          entityType: "scene",
-          entityId: "10",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-01"),
-        }),
-        partialRow({
-          id: 2,
-          entityType: "scene",
-          entityId: "99",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-02"),
-        }),
+        hidden(1, "scene", "10", "inst-a"),
+        hidden(2, "scene", "11", ""),
+        hidden(3, "performer", "20", "inst-a"),
       ]);
-      mockEntity.getScene.mockResolvedValue(
-        partialRow({
-          id: "10",
-          title: "Visible",
-        })
+
+      await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      const calls = mockPrisma.$queryRawUnsafe.mock.calls;
+      expect(calls).toHaveLength(2);
+      const sceneCall: readonly unknown[] = must(calls[0]);
+      const [sceneSql, sceneRefs] = sceneCall;
+      expect(sceneSql).toContain("FROM page pg");
+      expect(sceneSql).toContain(
+        "CROSS JOIN StashScene x ON x.id = pg.pid AND x.stashInstanceId = pg.pinst"
+      );
+      expect(JSON.parse(String(sceneRefs))).toEqual([
+        ["10", "inst-a"],
+        ["11", "shown-instance"],
+      ]);
+      expect(must(calls[1])[0]).toContain("CROSS JOIN StashPerformer x");
+    });
+
+    it("names each entity and builds its thumbnail on its own instance", async () => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, "scene", "10", ""),
+        hidden(2, "scene", "11", "inst-a"),
+      ]);
+      summaryRowsFor((refs) =>
+        refs.map(([id, instanceId]) => ({
+          id,
+          instanceId,
+          name: id === "10" ? "Scene Ten" : "",
+          fallbackA: "/videos/eleven.mp4",
+          fallbackB: null,
+          imagePath:
+            id === "10" ? "/scene/10/screenshot" : "/api/proxy/stash?path=x",
+        }))
       );
 
-      const result = await userHiddenEntityService.getHiddenEntities(1);
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
 
-      expect(mockEntity.getScene).toHaveBeenCalledTimes(1);
-      expect(mockEntity.getScene).toHaveBeenCalledWith("10", "i");
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         {
           id: 1,
           entityType: "scene",
           entityId: "10",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-01"),
+          instanceId: "",
+          hiddenAt: new Date(Date.UTC(2026, 0, 1)).toISOString(),
           restricted: false,
-          entity: { id: "10", title: "Visible" },
+          summary: {
+            id: "10",
+            instanceId: "shown-instance",
+            name: "Scene Ten",
+            imageUrl: `/api/proxy/stash?path=${encodeURIComponent("/scene/10/screenshot")}&instanceId=shown-instance`,
+          },
         },
         {
-          id: 2,
-          entityType: "scene",
-          entityId: "99",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-02"),
-          restricted: true,
-          entity: null,
-        },
-      ]);
-    });
-
-    it("keeps a row whose entity left the cache, as restricted", async () => {
-      everyRefVisible();
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({
-          id: 2,
-          entityType: "scene",
-          entityId: "99",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        }),
-      ]);
-      mockEntity.getScene.mockResolvedValue(null);
-
-      const result = await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        entityId: "99",
-        restricted: true,
-        entity: null,
-      });
-    });
-
-    it("calls the correct StashEntityService method per entity type", async () => {
-      everyRefVisible();
-      const allTypes = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ].map((entityType, i) => ({
-        id: i + 1,
-        userId: 1,
-        entityType,
-        entityId: String(i + 1),
-        instanceId: "i",
-        hiddenAt: new Date(),
-      }));
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue(allTypes);
-      mockEntity.getScene.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getPerformer.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getStudio.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getTag.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getGroup.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getGallery.mockResolvedValue(partialRow({ id: "x" }));
-      mockEntity.getImage.mockResolvedValue(partialRow({ id: "x" }));
-
-      const result = await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(mockEntity.getScene).toHaveBeenCalledWith("1", "i");
-      expect(mockEntity.getPerformer).toHaveBeenCalledWith("2", "i");
-      expect(mockEntity.getStudio).toHaveBeenCalledWith("3", "i");
-      expect(mockEntity.getTag).toHaveBeenCalledWith("4", "i");
-      expect(mockEntity.getGroup).toHaveBeenCalledWith("5", "i");
-      expect(mockEntity.getGallery).toHaveBeenCalledWith("6", "i");
-      expect(mockEntity.getImage).toHaveBeenCalledWith("7", "i");
-      expect(result).toHaveLength(7);
-      expect(result.every((r) => !r.restricted)).toBe(true);
-    });
-
-    it("returns a stored row of a type no one can hide as restricted, without checking it", async () => {
-      everyRefVisible();
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          entityType: "clip",
-          entityId: "5",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-01"),
-        }),
-      ]);
-
-      const result = await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(mockResolveVisible).not.toHaveBeenCalled();
-      expect(result).toEqual([
-        {
-          id: 1,
-          entityType: "clip",
-          entityId: "5",
-          instanceId: "i",
-          hiddenAt: new Date("2026-01-01"),
-          restricted: true,
-          entity: null,
-        },
-      ]);
-    });
-
-    it("returns instanceId as stored", async () => {
-      everyRefVisible();
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          entityType: "scene",
-          entityId: "10",
-          instanceId: "inst-x",
-          hiddenAt: new Date(),
-        }),
-        partialRow({
           id: 2,
           entityType: "scene",
           entityId: "11",
-          instanceId: "",
-          hiddenAt: new Date(),
-        }),
+          instanceId: "inst-a",
+          hiddenAt: new Date(Date.UTC(2026, 0, 2)).toISOString(),
+          restricted: false,
+          // An empty title falls back to the file name; a proxy URL is kept
+          summary: {
+            id: "11",
+            instanceId: "inst-a",
+            name: "eleven",
+            imageUrl: "/api/proxy/stash?path=x",
+          },
+        },
       ]);
-      mockEntity.getScene.mockResolvedValue(
-        partialRow({
-          id: "10",
-        })
+    });
+
+    it.each([
+      ["scene", "StashScene", "x.pathScreenshot"],
+      ["performer", "StashPerformer", "x.imagePath"],
+      ["studio", "StashStudio", "x.imagePath"],
+      ["tag", "StashTag", "x.imagePath"],
+      ["group", "StashGroup", "x.frontImagePath"],
+      ["gallery", "StashGallery", "x.coverPath"],
+      ["image", "StashImage", "x.pathThumbnail"],
+    ])("a %s's summary reads %s and its %s", async (type, table, image) => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, type, "1", "i"),
+      ]);
+
+      await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      const sql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
+      expect(sql).toContain(`CROSS JOIN ${table} x`);
+      expect(sql).toContain(`${image} AS imagePath`);
+      expect(sql).toContain("x.deletedAt IS NULL");
+    });
+
+    it("falls back to a gallery's folder name and an image's file name", async () => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, "gallery", "1", "i"),
+        hidden(2, "image", "2", "i"),
+      ]);
+      summaryRowsFor((refs) =>
+        refs.map(([id, instanceId]) => ({
+          id,
+          instanceId,
+          name: null,
+          fallbackA: id === "1" ? "/photos/Summer Trip" : "/photos/pic.jpg",
+          fallbackB: null,
+          imagePath: null,
+        }))
       );
 
-      const result = await userHiddenEntityService.getHiddenEntities(1);
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
 
-      expect(result.map((r) => r.instanceId)).toEqual(["inst-x", ""]);
+      expect(result.items.map((i) => i.summary?.name)).toEqual([
+        "Summer Trip",
+        "pic",
+      ]);
+      expect(result.items.map((i) => i.summary?.imageUrl)).toEqual([
+        null,
+        null,
+      ]);
+    });
+
+    it("returns a row the user may not see as restricted, with no summary and no summary read", async () => {
+      mockResolveVisible.mockResolvedValue(new Map());
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, "scene", "99", "i"),
+      ]);
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+      expect(result.items).toEqual([
+        {
+          id: 1,
+          entityType: "scene",
+          entityId: "99",
+          instanceId: "i",
+          hiddenAt: new Date(Date.UTC(2026, 0, 1)).toISOString(),
+          restricted: true,
+          summary: null,
+        },
+      ]);
+    });
+
+    it("keeps a row whose entity left the cache after the check, as restricted", async () => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, "scene", "99", "i"),
+      ]);
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      expect(result.items).toEqual([
+        objectContaining({ entityId: "99", restricted: true, summary: null }),
+      ]);
+    });
+
+    it("leaves out a stored row of a type no one can hide, without checking it", async () => {
+      everyRefVisible();
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        hidden(1, "clip", "5", "i"),
+      ]);
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      expect(mockResolveVisible).not.toHaveBeenCalled();
+      expect(result.items).toEqual([]);
+    });
+
+    it("counts no row of a type no one can hide", async () => {
+      groups({ scene: 2, clip: 4 });
+
+      const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
+
+      expect(result.total).toBe(2);
+      expect(result.counts).not.toHaveProperty("clip");
     });
   });
 
@@ -679,198 +620,6 @@ describe("UserHiddenEntityService", () => {
         userHiddenEntityService.findAlreadyHidden(1, [])
       ).resolves.toEqual([]);
       expect(mockPrisma.userHiddenEntity.findMany).not.toHaveBeenCalled();
-    });
-  });
-
-  // ─── getHiddenEntityIds ───────────────────────────────────────────
-
-  describe("getHiddenEntityIds", () => {
-    it("returns Sets organized by entity type", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({ entityType: "scene", entityId: "1" }),
-        partialRow({ entityType: "scene", entityId: "2" }),
-        partialRow({ entityType: "performer", entityId: "10" }),
-        partialRow({ entityType: "tag", entityId: "5" }),
-        partialRow({ entityType: "studio", entityId: "3" }),
-        partialRow({ entityType: "group", entityId: "7" }),
-        partialRow({ entityType: "gallery", entityId: "11" }),
-        partialRow({ entityType: "image", entityId: "15" }),
-      ]);
-
-      const result = await userHiddenEntityService.getHiddenEntityIds(1);
-
-      expect(result.scenes).toEqual(new Set(["1", "2"]));
-      expect(result.performers).toEqual(new Set(["10"]));
-      expect(result.tags).toEqual(new Set(["5"]));
-      expect(result.studios).toEqual(new Set(["3"]));
-      expect(result.groups).toEqual(new Set(["7"]));
-      expect(result.galleries).toEqual(new Set(["11"]));
-      expect(result.images).toEqual(new Set(["15"]));
-    });
-
-    it("returns empty Sets when user has no hidden entities", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      const result = await userHiddenEntityService.getHiddenEntityIds(1);
-
-      expect(result.scenes.size).toBe(0);
-      expect(result.performers.size).toBe(0);
-      expect(result.studios.size).toBe(0);
-      expect(result.tags.size).toBe(0);
-      expect(result.groups.size).toBe(0);
-      expect(result.galleries.size).toBe(0);
-      expect(result.images.size).toBe(0);
-    });
-
-    it("queries only userId and entityType+entityId columns", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      await userHiddenEntityService.getHiddenEntityIds(7);
-
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
-        where: { userId: 7 },
-        select: { entityType: true, entityId: true },
-      });
-    });
-
-    it("caches results and serves from cache on second call", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({ entityType: "scene", entityId: "1" }),
-      ]);
-
-      const result1 = await userHiddenEntityService.getHiddenEntityIds(1);
-      const result2 = await userHiddenEntityService.getHiddenEntityIds(1);
-
-      // Only one DB call — second served from cache
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
-      expect(result1).toBe(result2); // Same reference
-    });
-
-    it("maintains separate caches per user", async () => {
-      mockPrisma.userHiddenEntity.findMany
-        .mockResolvedValueOnce([
-          partialRow({ entityType: "scene", entityId: "1" }),
-        ])
-        .mockResolvedValueOnce([
-          partialRow({ entityType: "performer", entityId: "2" }),
-        ]);
-
-      const user1 = await userHiddenEntityService.getHiddenEntityIds(1);
-      const user2 = await userHiddenEntityService.getHiddenEntityIds(2);
-
-      expect(user1.scenes).toEqual(new Set(["1"]));
-      expect(user1.performers.size).toBe(0);
-      expect(user2.scenes.size).toBe(0);
-      expect(user2.performers).toEqual(new Set(["2"]));
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  // ─── isEntityHidden ───────────────────────────────────────────────
-
-  describe("isEntityHidden", () => {
-    beforeEach(() => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        partialRow({ entityType: "scene", entityId: "10" }),
-        partialRow({ entityType: "performer", entityId: "20" }),
-        partialRow({ entityType: "studio", entityId: "30" }),
-        partialRow({ entityType: "tag", entityId: "40" }),
-        partialRow({ entityType: "group", entityId: "50" }),
-        partialRow({ entityType: "gallery", entityId: "60" }),
-        partialRow({ entityType: "image", entityId: "70" }),
-      ]);
-    });
-
-    it("returns true for a hidden scene", async () => {
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "scene", "10")
-      ).toBe(true);
-    });
-
-    it("returns false for a non-hidden scene", async () => {
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "scene", "999")
-      ).toBe(false);
-    });
-
-    it("checks the correct Set for each entity type", async () => {
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "performer", "20")
-      ).toBe(true);
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "studio", "30")
-      ).toBe(true);
-      expect(await userHiddenEntityService.isEntityHidden(1, "tag", "40")).toBe(
-        true
-      );
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "group", "50")
-      ).toBe(true);
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "gallery", "60")
-      ).toBe(true);
-      expect(
-        await userHiddenEntityService.isEntityHidden(1, "image", "70")
-      ).toBe(true);
-    });
-
-    it("returns false for an unknown entity type", async () => {
-      expect(
-        await userHiddenEntityService.isEntityHidden(
-          1,
-          "unknown" as EntityType,
-          "1"
-        )
-      ).toBe(false);
-    });
-
-    it("leverages the cache (single DB call for multiple checks)", async () => {
-      await userHiddenEntityService.isEntityHidden(1, "scene", "10");
-      await userHiddenEntityService.isEntityHidden(1, "performer", "20");
-      await userHiddenEntityService.isEntityHidden(1, "tag", "40");
-
-      // All checks should use the same cached data
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  // ─── clearCache / clearAllCache ───────────────────────────────────
-
-  describe("clearCache", () => {
-    it("invalidates cache for a specific user", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      // Prime caches for two users
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      await userHiddenEntityService.getHiddenEntityIds(2);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
-
-      // Clear only user 1
-      userHiddenEntityService.clearCache(1);
-
-      // User 1 hits DB again, user 2 still cached
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      await userHiddenEntityService.getHiddenEntityIds(2);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(3); // only 1 new call
-    });
-  });
-
-  describe("clearAllCache", () => {
-    it("invalidates cache for all users", async () => {
-      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-
-      // Prime caches for two users
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      await userHiddenEntityService.getHiddenEntityIds(2);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
-
-      // Clear all
-      userHiddenEntityService.clearAllCache();
-
-      // Both users should hit DB again
-      await userHiddenEntityService.getHiddenEntityIds(1);
-      await userHiddenEntityService.getHiddenEntityIds(2);
-      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(4);
     });
   });
 });

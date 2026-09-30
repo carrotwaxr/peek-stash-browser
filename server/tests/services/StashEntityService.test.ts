@@ -5,10 +5,8 @@
  */
 // Import mocked module
 import type {
-  Prisma,
   StashGallery,
   StashGroup,
-  StashPerformer,
   StashScene,
   StashStudio,
   StashTag,
@@ -93,38 +91,6 @@ const mockCachedScene = partialRow<StashScene>({
   pathStream: null,
   pathCaption: null,
   captions: null,
-  stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
-  stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
-  syncedAt: new Date(),
-  deletedAt: null,
-});
-
-const mockCachedPerformer = partialRow<StashPerformer>({
-  id: "performer-1",
-  name: "Test Performer",
-  disambiguation: null,
-  gender: "FEMALE",
-  birthdate: "1990-01-01",
-  ethnicity: null,
-  country: null,
-  eyeColor: null,
-  hairColor: null,
-  heightCm: null,
-  weightKg: null,
-  measurements: null,
-  fakeTits: null,
-  tattoos: null,
-  piercings: null,
-  careerLength: null,
-  details: null,
-  deathDate: null,
-  rating100: null,
-  favorite: false,
-  imagePath: null,
-  sceneCount: 0,
-  imageCount: 0,
-  galleryCount: 0,
-  groupCount: 0,
   stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
@@ -252,41 +218,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Performer Queries", () => {
-    it("should get performer by ID", async () => {
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue({
-        ...mockCachedPerformer,
-      });
-      // Mock junction table counts for getPerformer
-      mockPrisma.scenePerformer.count.mockResolvedValue(10);
-      mockPrisma.imagePerformer.count.mockResolvedValue(5);
-      mockPrisma.galleryPerformer.count.mockResolvedValue(3);
-      // Mock raw query for group count
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 2 }]);
-
-      const result = await stashEntityService.getPerformer(
-        "performer-1",
-        "test-instance"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("performer-1");
-      expect(must(result).scene_count).toBe(10);
-      // The default user fields
-      expect(must(result).favorite).toBe(false);
-      expect(must(result).o_counter).toBe(0);
-    });
-
-    it("should return null for non-existent performer", async () => {
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getPerformer(
-        "non-existent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("should get performer count", async () => {
       mockPrisma.stashPerformer.count.mockResolvedValue(500);
 
@@ -651,75 +582,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Image Queries", () => {
-    const mockCachedImage = partialRow<
-      Prisma.StashImageGetPayload<{
-        include: { performers: true; tags: true; galleries: true };
-      }>
-    >({
-      id: "image-1",
-      stashInstanceId: "test-instance",
-      title: "Test Image",
-      code: null,
-      date: null,
-      details: null,
-      studioId: null,
-      rating100: null,
-      organized: false,
-      oCounter: 0,
-      filePath: "/path/to/image.jpg",
-      width: 1920,
-      height: 1080,
-      fileSize: BigInt(500000),
-      pathThumbnail: null,
-      pathPreview: null,
-      pathImage: null,
-      stashCreatedAt: new Date("2024-01-01"),
-      stashUpdatedAt: new Date("2024-01-02"),
-      syncedAt: new Date(),
-      deletedAt: null,
-      performers: [],
-      tags: [],
-      galleries: [],
-    });
-
-    it("getImage returns transformed image with relations", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(mockCachedImage);
-
-      const result = await stashEntityService.getImage(
-        "image-1",
-        "test-instance"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("image-1");
-      expect(must(result).instanceId).toBe("test-instance");
-    });
-
-    it("an image with an empty title takes its file name as the title", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        ...mockCachedImage,
-        title: "",
-      });
-
-      const result = await stashEntityService.getImage(
-        "image-1",
-        "test-instance"
-      );
-
-      expect(must(result).title).toBe("image");
-    });
-
-    it("getImage returns null for non-existent image", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getImage(
-        "nonexistent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("getImageCount returns count of non-deleted images", async () => {
       mockPrisma.stashImage.count.mockResolvedValue(42);
 

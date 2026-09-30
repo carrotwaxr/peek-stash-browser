@@ -54,7 +54,18 @@ interface HiddenItem {
   entityId: string;
   instanceId: string;
   restricted?: boolean;
-  entity: { title?: string | null; name?: string | null } | null;
+  summary: {
+    id: string;
+    instanceId: string;
+    name: string | null;
+    imageUrl: string | null;
+  } | null;
+}
+
+interface HiddenPage {
+  items: HiddenItem[];
+  total: number;
+  counts: Record<string, number>;
 }
 
 describe("Hidden items and content restrictions (integration)", () => {
@@ -66,13 +77,17 @@ describe("Hidden items and content restrictions (integration)", () => {
   let visibleScene: { id: string; title: string };
   let otherVisibleScene: { id: string; title: string };
 
-  async function list(entityType?: string): Promise<HiddenItem[]> {
-    const query = entityType ? `?entityType=${entityType}` : "";
-    const response = await hider.client.get<{ hiddenEntities: HiddenItem[] }>(
+  async function listPage(query = ""): Promise<HiddenPage> {
+    const response = await hider.client.get<HiddenPage>(
       `/api/user/hidden-entities${query}`
     );
     expect(response.status).toBe(200);
-    return response.data.hiddenEntities;
+    return response.data;
+  }
+
+  async function list(entityType?: string): Promise<HiddenItem[]> {
+    return (await listPage(entityType ? `?entityType=${entityType}` : ""))
+      .items;
   }
 
   function hiddenRowCount(): Promise<number> {
@@ -148,6 +163,7 @@ describe("Hidden items and content restrictions (integration)", () => {
         stashInstanceId: testInstanceId,
         deletedAt: null,
         title: { not: null },
+        pathScreenshot: { not: null },
       },
       select: { id: true, title: true },
       orderBy: { id: "asc" },
@@ -318,7 +334,7 @@ describe("Hidden items and content restrictions (integration)", () => {
       entityId: visibleScene.id,
       restricted: false,
     });
-    expect(must(items[0]).entity?.title).toBe(visibleScene.title);
+    expect(must(items[0]).summary?.name).toBe(visibleScene.title);
   });
 
   it("a bulk hide with one restricted target writes nothing and names it", async () => {
@@ -361,7 +377,7 @@ describe("Hidden items and content restrictions (integration)", () => {
     }
     expect(await hiddenRowCount()).toBe(2);
 
-    const titles = (await list("scene")).map((i) => i.entity?.title).sort();
+    const titles = (await list("scene")).map((i) => i.summary?.name).sort();
     expect(titles).toEqual(
       [visibleScene.title, otherVisibleScene.title].sort()
     );
@@ -409,7 +425,7 @@ describe("Hidden items and content restrictions (integration)", () => {
           entityId: i.entityId,
           instanceId: i.instanceId,
           restricted: i.restricted,
-          entity: i.entity,
+          summary: i.summary,
         }))
         .sort((a, b) => a.entityType.localeCompare(b.entityType))
     ).toEqual([
@@ -418,14 +434,14 @@ describe("Hidden items and content restrictions (integration)", () => {
         entityId: restrictedScene.id,
         instanceId: testInstanceId,
         restricted: true,
-        entity: null,
+        summary: null,
       },
       {
         entityType: "tag",
         entityId: restrictedTagId,
         instanceId: testInstanceId,
         restricted: true,
-        entity: null,
+        summary: null,
       },
     ]);
     const text = JSON.stringify(items);
@@ -456,7 +472,141 @@ describe("Hidden items and content restrictions (integration)", () => {
       instanceId: "",
       restricted: false,
     });
-    expect(must(items[0]).entity?.title).toBe(`B-${FX_ID.SAME}`);
+    expect(must(items[0]).summary?.name).toBe(`B-${FX_ID.SAME}`);
     expect(JSON.stringify(items)).not.toContain(`A-${FX_ID.SAME}`);
+  });
+
+  it("the list pages by 50 and counts each type", async () => {
+    // Rows for entities that need not exist: they list as restricted
+    await prisma.userHiddenEntity.createMany({
+      data: [
+        ...Array.from({ length: 120 }, (_, i) => ({
+          userId: hider.id,
+          entityType: "scene",
+          entityId: `hidden-page-${i}`,
+          instanceId: testInstanceId,
+          hiddenAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
+        })),
+        ...Array.from({ length: 3 }, (_, i) => ({
+          userId: hider.id,
+          entityType: "performer",
+          entityId: `hidden-page-${i}`,
+          instanceId: testInstanceId,
+          hiddenAt: new Date(Date.UTC(2025, 0, 1, 0, 0, i)),
+        })),
+      ],
+    });
+
+    const first = await listPage();
+    expect(first.items).toHaveLength(50);
+    expect(first.total).toBe(123);
+    expect(first.counts).toEqual({
+      scene: 120,
+      performer: 3,
+      studio: 0,
+      tag: 0,
+      group: 0,
+      gallery: 0,
+      image: 0,
+    });
+    // Newest first
+    expect(must(first.items[0]).entityId).toBe("hidden-page-119");
+
+    const last = await listPage("?page=3");
+    expect(last.items.map((i) => i.entityType)).toEqual([
+      ...Array.from({ length: 20 }, () => "scene"),
+      "performer",
+      "performer",
+      "performer",
+    ]);
+
+    const performers = await listPage("?entityType=performer&per_page=2");
+    expect(performers.items).toHaveLength(2);
+    expect(performers.total).toBe(3);
+    expect(performers.counts.scene).toBe(120);
+  });
+
+  it("answers 400 for a page size outside 1 to 100 or a bad page", async () => {
+    for (const query of [
+      "?per_page=0",
+      "?per_page=101",
+      "?per_page=ten",
+      "?page=0",
+      "?page=1.5",
+      "?page=1&page=2",
+    ]) {
+      const response = await hider.client.get(
+        `/api/user/hidden-entities${query}`
+      );
+      expect(response.status, query).toBe(400);
+    }
+  });
+
+  it("each row's summary names the entity on the instance it shows from, with a thumbnail URL that names that instance", async () => {
+    const hide = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: testInstanceId,
+    });
+    expect(hide.status).toBe(200);
+    // Gallery SAME is restricted on A and visible on B; B's copy gets a cover
+    await prisma.stashGallery.update({
+      where: {
+        id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.B },
+      },
+      data: { coverPath: "/gallery/same/cover" },
+    });
+    try {
+      await hideFor(hider.id, "gallery", FX_ID.SAME, "");
+      await exclusionComputationService.recomputeForUser(hider.id);
+
+      const items = await list();
+      const scene = must(items.find((i) => i.entityType === "scene"));
+      expect(scene.summary).toMatchObject({
+        id: visibleScene.id,
+        instanceId: testInstanceId,
+        name: visibleScene.title,
+      });
+      const sceneUrl = new URL(
+        must(scene.summary?.imageUrl, "scene thumbnail"),
+        "http://peek"
+      );
+      expect(sceneUrl.pathname).toBe("/api/proxy/stash");
+      expect(sceneUrl.searchParams.get("instanceId")).toBe(testInstanceId);
+
+      const gallery = must(items.find((i) => i.entityType === "gallery"));
+      expect(gallery.instanceId).toBe("");
+      expect(gallery.summary).toEqual({
+        id: FX_ID.SAME,
+        instanceId: FX.B,
+        name: `B-${FX_ID.SAME}`,
+        imageUrl: `/api/proxy/stash?path=${encodeURIComponent("/gallery/same/cover")}&instanceId=${encodeURIComponent(FX.B)}`,
+      });
+    } finally {
+      await prisma.stashGallery.update({
+        where: {
+          id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.B },
+        },
+        data: { coverPath: null },
+      });
+    }
+  });
+
+  it("a hidden row of a type that cannot be hidden is left out", async () => {
+    await hideFor(hider.id, "scene", visibleScene.id, testInstanceId);
+    await prisma.userHiddenEntity.create({
+      data: {
+        userId: hider.id,
+        entityType: "clip",
+        entityId: "1",
+        instanceId: testInstanceId,
+      },
+    });
+
+    const page = await listPage();
+    expect(page.items.map((i) => i.entityType)).toEqual(["scene"]);
+    expect(page.total).toBe(1);
+    expect(page.counts).not.toHaveProperty("clip");
+    expect(Object.values(page.counts).reduce((a, b) => a + b, 0)).toBe(1);
   });
 });
