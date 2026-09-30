@@ -25,6 +25,7 @@ import {
   SCENE_FILTER_OPTIONS,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
+import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import { buildSearchParams } from "../../utils/urlParams";
 import {
   AddToPlaylistButton,
@@ -164,19 +165,12 @@ const Home = () => {
         state: {
           scene,
           fromPageTitle: "Home",
-          playlist: {
+          playlist: buildPlaybackQueue({
             id: "virtual-carousel",
             name: carouselTitle,
-            shuffle: false,
-            repeat: "none",
-            scenes: scenes.map((s, idx) => ({
-              sceneId: s.id,
-              instanceId: s.instanceId,
-              scene: s,
-              position: idx,
-            })),
+            scenes,
             currentIndex: currentIndex >= 0 ? currentIndex : 0,
-          },
+          }),
         },
       });
       return true; // Prevent fallback navigation in SceneCard

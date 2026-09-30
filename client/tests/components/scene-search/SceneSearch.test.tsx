@@ -9,12 +9,14 @@ import { useFolderViewTags } from "@/hooks/useFolderViewTags";
 // The view the page is on (the URL's `view`, as the controls report it)
 let mockView = "grid";
 
+const mockNavigate = vi.fn<(...args: unknown[]) => void>();
+
 // Mock react-router-dom
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
-    useNavigate: vi.fn(() => vi.fn()),
+    useNavigate: vi.fn(() => mockNavigate),
     useSearchParams: vi.fn(() => [
       new URLSearchParams(mockView === "grid" ? "" : `view=${mockView}`),
       vi.fn(),
@@ -246,6 +248,73 @@ describe("SceneSearch", () => {
       expect(updater(page)).toEqual({
         findScenes: { count: 1, scenes: [{ id: "12", instanceId: "B" }] },
       });
+    });
+  });
+
+  describe("Playing a scene", () => {
+    it("clicking a card navigates with a queue whose entries hold no performers, tags or streams", () => {
+      const row = (id: string, instanceId: string) => ({
+        id,
+        instanceId,
+        title: `Scene ${id} on ${instanceId}`,
+        files: [{ path: `/m/${id}.mp4`, basename: `${id}.mp4`, duration: 60 }],
+        paths: { screenshot: `/s/${id}`, preview: `/p/${id}`, sprite: "/x" },
+        studio: { id: "9", name: "Studio", instanceId },
+        performers: [{ id: "1", name: "Someone" }],
+        tags: [{ id: "2", name: "A tag" }],
+        sceneStreams: [{ url: "/stream" }],
+      });
+      mockUseSceneList.mockReturnValue({
+        data: {
+          findScenes: {
+            count: 2,
+            scenes: [row("12", "A"), row("12", "B")],
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+      render(<SceneSearch title="Scenes" />);
+      const gridProps = must(mockSceneGridProps.mock.calls.at(-1))[0];
+      const onSceneClick = gridProps.onSceneClick as (
+        scene: Record<string, unknown>
+      ) => void;
+
+      // The second card: scene 12 on server B, not the first scene 12
+      onSceneClick(row("12", "B"));
+
+      const [, options] = must(mockNavigate.mock.calls.at(-1)) as [
+        string,
+        { state: { scene: unknown; playlist: Record<string, unknown> } },
+      ];
+      const playlist = options.state.playlist;
+      expect(playlist.currentIndex).toBe(1);
+      expect(playlist.scenes).toEqual([
+        {
+          sceneId: "12",
+          instanceId: "A",
+          position: 0,
+          scene: {
+            title: "Scene 12 on A",
+            paths: { screenshot: "/s/12" },
+            files: [{ duration: 60, basename: "12.mp4" }],
+            studio: { name: "Studio" },
+          },
+        },
+        {
+          sceneId: "12",
+          instanceId: "B",
+          position: 1,
+          scene: {
+            title: "Scene 12 on B",
+            paths: { screenshot: "/s/12" },
+            files: [{ duration: 60, basename: "12.mp4" }],
+            studio: { name: "Studio" },
+          },
+        },
+      ]);
+      // The clicked scene itself still travels whole, for the player's codec check
+      expect(options.state.scene).toMatchObject({ id: "12", instanceId: "B" });
     });
   });
 

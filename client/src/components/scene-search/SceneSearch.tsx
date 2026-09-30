@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { type LibrarySearchParams } from "../../api";
 import { useSceneList } from "../../api/hooks";
@@ -13,6 +14,7 @@ import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
+import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import TimelineView from "../timeline/TimelineView";
@@ -240,27 +242,19 @@ const SceneSearch = ({
     const currentScenes =
       (findScenes?.scenes as Record<string, unknown>[]) || [];
     const currentIndex = currentScenes.findIndex(
-      (s: Record<string, unknown>) => s.id === scene.id
+      (s: Record<string, unknown>) =>
+        s.id === scene.id && s.instanceId === scene.instanceId
     );
 
     // Build navigation state
     const navigationState: Record<string, unknown> = {
       scene,
-      playlist: {
+      playlist: buildPlaybackQueue({
         id: "virtual-grid",
         name: title || "Scene Grid",
-        shuffle: false,
-        repeat: "none",
-        scenes: currentScenes.map(
-          (s: Record<string, unknown>, idx: number) => ({
-            sceneId: s.id,
-            instanceId: s.instanceId,
-            scene: s,
-            position: idx,
-          })
-        ),
+        scenes: currentScenes as unknown as NormalizedScene[],
         currentIndex: currentIndex >= 0 ? currentIndex : 0,
-      },
+      }),
     };
 
     // Only capture fromPageTitle if provided

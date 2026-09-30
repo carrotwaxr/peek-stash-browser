@@ -13,6 +13,7 @@ import { useConfig } from "../../contexts/ConfigContext";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
+import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import SceneCarousel from "./SceneCarousel";
 
 interface WatchHistoryEntry {
@@ -140,19 +141,12 @@ const ContinueWatchingCarousel = ({
           scene,
           fromPageTitle: "Home",
           shouldResume: true, // Auto-resume from continue watching
-          playlist: {
+          playlist: buildPlaybackQueue({
             id: "virtual-carousel",
             name: "Continue Watching",
-            shuffle: false,
-            repeat: "none",
-            scenes: scenes.map((s, idx) => ({
-              sceneId: s.id,
-              instanceId: s.instanceId,
-              scene: s,
-              position: idx,
-            })),
+            scenes,
             currentIndex: currentIndex >= 0 ? currentIndex : 0,
-          },
+          }),
         },
       }
     );

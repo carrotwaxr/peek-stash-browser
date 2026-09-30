@@ -6,6 +6,7 @@ import { apiDelete, libraryApi } from "../../api";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import {
   Button,
   LoadingSpinner,
@@ -352,19 +353,12 @@ const WatchHistory = () => {
                 linkState={{
                   scene,
                   shouldResume: true, // Auto-resume from watch history
-                  playlist: {
+                  playlist: buildPlaybackQueue({
                     id: "virtual-history",
                     name: "Watch History",
-                    shuffle: false,
-                    repeat: "none",
-                    scenes: scenes.map((s, idx) => ({
-                      sceneId: s.id,
-                      instanceId: s.instanceId,
-                      scene: s,
-                      position: idx,
-                    })),
+                    scenes: scenes as unknown as NormalizedScene[],
                     currentIndex: index,
-                  },
+                  }),
                 }}
                 exists={true}
                 sceneId={scene.id as string | undefined}
