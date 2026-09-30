@@ -73,11 +73,15 @@ const HiddenItemsPage = () => {
   const { unhideEntity, unhideAll } = useHiddenEntities();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
+  // The URL names the tab, so the highlighted tab, the list and Back agree
   const urlTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<TabId>(
-    isTabId(urlTab) ? urlTab : "all"
-  );
-  const [page, setPage] = useState(1);
+  const activeTab: TabId = isTabId(urlTab) ? urlTab : "all";
+  // A tab starts on its first page, whichever way the URL brought us to it
+  const [pageOf, setPageOf] = useState({ tab: activeTab, page: 1 });
+  const page = pageOf.tab === activeTab ? pageOf.page : 1;
+  const setPage = (next: number) => {
+    setPageOf({ tab: activeTab, page: next });
+  };
   const [restoringAll, setRestoringAll] = useState(false);
 
   // Navigation state for back button
@@ -91,9 +95,9 @@ const HiddenItemsPage = () => {
   // A restore can empty the last page: step back to the new last one
   useEffect(() => {
     if (data && page > 1 && page > totalPages) {
-      setPage(Math.max(1, totalPages));
+      setPageOf({ tab: activeTab, page: Math.max(1, totalPages) });
     }
-  }, [data, page, totalPages]);
+  }, [data, page, totalPages, activeTab]);
 
   const tabCount = (id: TabId): number => {
     if (!data) return TAB_COUNT_LOADING;
@@ -106,12 +110,6 @@ const HiddenItemsPage = () => {
     { id: "all", label: "All", count: tabCount("all") },
     ...TYPE_TABS.map((tab) => ({ ...tab, count: tabCount(tab.id) })),
   ];
-
-  const handleTabChange = (tabId: string) => {
-    if (!isTabId(tabId)) return;
-    setActiveTab(tabId);
-    setPage(1);
-  };
 
   const refreshList = () =>
     queryClient.invalidateQueries({
@@ -188,11 +186,7 @@ const HiddenItemsPage = () => {
         )}
       </div>
 
-      <TabNavigation
-        tabs={tabs}
-        defaultTab="all"
-        onTabChange={handleTabChange}
-      />
+      <TabNavigation tabs={tabs} defaultTab="all" />
 
       <div className="p-4">
         {isLoading ? (

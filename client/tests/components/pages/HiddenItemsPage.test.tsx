@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createQueryWrapper, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,6 +82,20 @@ function renderPage(route = "/hidden-items") {
   });
 }
 
+/** Stands in for the browser's Back button */
+const BrowserBack = () => {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => {
+        void navigate(-1);
+      }}
+    >
+      Browser back
+    </button>
+  );
+};
+
 describe("HiddenItemsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -140,6 +154,45 @@ describe("HiddenItemsPage", () => {
     await screen.findByText("Tag");
     expect(mockApiGet).toHaveBeenCalledWith(
       "/user/hidden-entities?entityType=tag&page=1&per_page=50"
+    );
+  });
+
+  it("Back from a tab returns to the tab the URL names, on its first page", async () => {
+    mockApiGet.mockResolvedValue({
+      items: [visibleScene],
+      total: 120,
+      counts: { ...COUNTS, scene: 120, tag: 0 },
+    });
+    const QueryWrapper = createQueryWrapper();
+    render(
+      <MemoryRouter initialEntries={["/hidden-items"]}>
+        <QueryWrapper>
+          <HiddenItemsPage />
+          <BrowserBack />
+        </QueryWrapper>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Scenes 120" }));
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenLastCalledWith(
+        "/user/hidden-entities?entityType=scene&page=1&per_page=50"
+      )
+    );
+    await screen.findByText("A visible scene");
+    fireEvent.click(must(screen.getAllByRole("button", { name: /next/i })[0]));
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenLastCalledWith(
+        "/user/hidden-entities?entityType=scene&page=2&per_page=50"
+      )
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browser back" }));
+
+    await waitFor(() =>
+      expect(mockApiGet).toHaveBeenLastCalledWith(
+        "/user/hidden-entities?page=1&per_page=50"
+      )
     );
   });
 
