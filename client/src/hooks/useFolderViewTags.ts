@@ -1,5 +1,9 @@
 // client/src/hooks/useFolderViewTags.ts
-import type { TagTreeRow, TagTreeScope } from "@peek/shared-types";
+import type {
+  TagTreeRow,
+  TagTreeScope,
+  UntaggedKind,
+} from "@peek/shared-types";
 import { useTagTree } from "../api/hooks";
 
 /** The detail page a folder view sits on, each as "id:instanceId" (or a bare id) */
@@ -26,15 +30,25 @@ function scopeOf(filters: FolderViewFilters | null): TagTreeScope | undefined {
 /**
  * The tags for the folder view, fetched only while it is active: every tag
  * the user can see, or on a detail page the tags on its scenes and their
- * ancestors (the compact tag tree; each row names its instance).
+ * ancestors (the compact tag tree; each row names its instance), with the
+ * count of the page's untagged items (`untagged`, its type) the Untagged
+ * folder lists.
  */
 export function useFolderViewTags(
   isActive: boolean,
-  filters: FolderViewFilters | null = null
+  filters: FolderViewFilters | null = null,
+  untagged?: UntaggedKind
 ) {
   const { data, isLoading, error, refetch } = useTagTree(
     scopeOf(filters),
-    isActive
+    isActive,
+    untagged
   );
-  return { tags: data?.tags ?? NO_TAGS, isLoading, error, refetch };
+  return {
+    tags: data?.tags ?? NO_TAGS,
+    untaggedCount: data?.untagged ?? 0,
+    isLoading,
+    error,
+    refetch,
+  };
 }

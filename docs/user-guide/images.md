@@ -132,6 +132,10 @@ Filter to see images from specific galleries:
 
 With **Include sub-tags** on, a chosen tag also matches its sub-tags, and "has all of" matches an image tagged with any sub-tag of each chosen tag. With more than one Stash server, a tag or studio picked from one server (and its sub-tags or sub-studios) matches only that server's content.
 
+### By Tag Count
+
+**Tag Count** filters by how many tags an image has, the ones its galleries give it included: 0 to 0 lists the untagged images, as the folder view's **Untagged** folder does.
+
 ### Combined Filters
 
 Combine multiple filters for precise results:

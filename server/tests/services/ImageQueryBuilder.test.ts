@@ -509,6 +509,23 @@ describe("ImageQueryBuilder", () => {
       expect(ids(result.items)).toEqual([testImageIds[0]]);
     });
 
+    it("tag_count counts the image's tag rows: EQUALS 0 lists the untagged image", async () => {
+      await prisma.imageTag.deleteMany({
+        where: { imageId: testImageIds[1], imageInstanceId: A },
+      });
+
+      const untagged = await run({
+        filter: { tag_count: { modifier: "EQUALS", value: 0 } },
+      });
+      expect(ids(untagged.items)).toEqual([testImageIds[1]]);
+      expect(untagged.total).toBe(1);
+
+      const two = await run({
+        filter: { tag_count: { modifier: "GREATER_THAN", value: 1 } },
+      });
+      expect(ids(two.items)).toEqual([testImageIds[2]]);
+    });
+
     it("filters by tag INCLUDES", async () => {
       const result = await run({ filter: { tags: criterion([ref("tag-2")]) } });
 

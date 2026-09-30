@@ -240,6 +240,11 @@ export interface TagTreeScope {
  */
 export interface FindTagTreeRequest {
   scope?: TagTreeScope;
+  /**
+   * The folder view's page type: the response carries how many of its items
+   * have no tag of their own (the Untagged folder)
+   */
+  untagged?: UntaggedKind;
 }
 
 /** A tag in the tree. Its parents and their ids are on its own instance. */
@@ -272,8 +277,18 @@ export interface TagTreeRow {
   o_counter: number;
 }
 
+/** A folder view's page type, whose untagged items the tree can count */
+export type UntaggedKind = "scene" | "gallery" | "image";
+
 export interface FindTagTreeResponse {
   tags: TagTreeRow[];
+  /**
+   * With `untagged` in the request: the items of that type the user can see
+   * with no tag of their own, the total of the Untagged folder's list
+   * (`tag_count` EQUALS 0). With a scope, the scope's scenes (galleries and
+   * images 0, as the scoped rows count).
+   */
+  untagged?: number;
 }
 
 // =============================================================================

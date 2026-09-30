@@ -1,4 +1,4 @@
-import type { TagTreeScope } from "@peek/shared-types";
+import type { TagTreeScope, UntaggedKind } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
@@ -31,14 +31,29 @@ export function useTagDetail(id: string | undefined, instanceId?: string) {
 }
 
 /**
- * The compact tag tree (hierarchy and folder views), whole or scoped; fetched
- * only while `enabled`
+ * The compact tag tree (hierarchy and folder views), whole or scoped, with
+ * the Untagged count of the folder view's type (`untagged`); fetched only
+ * while `enabled`
  */
-export function useTagTree(scope: TagTreeScope | undefined, enabled: boolean) {
+export function useTagTree(
+  scope: TagTreeScope | undefined,
+  enabled: boolean,
+  untagged?: UntaggedKind
+) {
   return useQuery({
-    queryKey: queryKeys.tags.tree(scope as Record<string, unknown> | undefined),
+    queryKey: queryKeys.tags.tree(
+      scope as Record<string, unknown> | undefined,
+      untagged
+    ),
     queryFn: enabled
-      ? ({ signal }) => libraryApi.findTagTree(scope, signal)
+      ? ({ signal }) =>
+          libraryApi.findTagTree(
+            {
+              ...(scope ? { scope } : {}),
+              ...(untagged ? { untagged } : {}),
+            },
+            signal
+          )
       : skipToken,
   });
 }

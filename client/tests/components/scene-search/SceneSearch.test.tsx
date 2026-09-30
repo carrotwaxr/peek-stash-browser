@@ -346,7 +346,7 @@ describe("SceneSearch", () => {
       expect(lastSent().scene_filter?.performers).toEqual(PERFORMER);
       // The folders are the performer's scenes' tags
       expect(api.findTagTree).toHaveBeenCalledWith(
-        { performer: "1:a" },
+        { scope: { performer: "1:a" }, untagged: "scene" },
         expect.anything()
       );
     });
@@ -390,7 +390,7 @@ describe("SceneSearch", () => {
         })
       );
       expect(api.findTagTree).toHaveBeenCalledWith(
-        { tag: "9:a" },
+        { scope: { tag: "9:a" }, untagged: "scene" },
         expect.anything()
       );
     });

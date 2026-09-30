@@ -118,6 +118,10 @@ const GALLERY_TAGS: JunctionTarget = {
   refInstanceCol: "tagInstanceId",
 };
 
+/** The gallery's tags: its `GalleryTag` rows on its own instance */
+const GALLERY_TAG_COUNT =
+  "(SELECT COUNT(*) FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId)";
+
 /** A gallery's performers */
 const GALLERY_PERFORMERS: JunctionTarget = {
   kind: "junction",
@@ -231,6 +235,10 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
           visibleCount(ctx, "g.imageCount", "images")
         )
       );
+    }
+    // The gallery's own tag rows; EQUALS 0 is the folder view's Untagged
+    if (filter.tag_count) {
+      push(buildNumericFilter(filter.tag_count, GALLERY_TAG_COUNT));
     }
 
     // Text

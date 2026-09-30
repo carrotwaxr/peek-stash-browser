@@ -1,12 +1,25 @@
 // client/src/utils/buildFolderTree.ts
+import type { UntaggedKind } from "@peek/shared-types";
 import { indexTagHierarchy, tagTreeKey } from "./buildTagTree";
 import { parseCompositeKey } from "./compositeKey";
 
-/** The Untagged folder's id (A10b brings the folder back as a real filter) */
+/**
+ * The Untagged folder's id, in the folder path like a tag key: it lists the
+ * items with no tag of their own (`tag_count` EQUALS 0) and holds no folders
+ */
 export const UNTAGGED_FOLDER_ID = "__untagged__";
+
+const UNTAGGED_NAME = "Untagged";
 
 /** A tag tree row's count of the page's type: what a folder counts */
 export type FolderCountField = "scene_count" | "gallery_count" | "image_count";
+
+/** The page's type, whose untagged items the tree counts for Untagged */
+export const UNTAGGED_KIND = {
+  scene_count: "scene",
+  gallery_count: "gallery",
+  image_count: "image",
+} as const satisfies Record<FolderCountField, UntaggedKind>;
 
 /**
  * The fields the folder view reads from a tag (a row of the tag tree). Its
@@ -24,14 +37,15 @@ export interface FolderTreeTag {
   image_path?: string | null;
 }
 
-/** A folder at the current level: a tag */
+/** A folder at the current level: a tag, or Untagged */
 export interface FolderNode<T extends FolderTreeTag> {
-  /** The tag's `tagTreeKey` ("id:instanceId") */
+  /** The tag's `tagTreeKey` ("id:instanceId"), or `UNTAGGED_FOLDER_ID` */
   id: string;
-  tag: T;
+  /** Null for Untagged */
+  tag: T | null;
   name: string;
   thumbnail: string | null;
-  /** The items of the page's type that carry the tag itself */
+  /** The items of the page's type that carry the tag itself (Untagged: no tag) */
   count: number;
   isFolder: true;
 }
@@ -77,6 +91,8 @@ export function resolveFolderPath(
  * shown while its subtree (the tag or a descendant) holds a tag with items
  * of the page's type (`countField` above 0). A folder's `count` is its tag's
  * own. Items are not placed here: the list pages the folder's own items.
+ * The root ends with Untagged while the tree counts untagged items of the
+ * page's type (`untaggedCount`).
  *
  * Tags go by `tagTreeKey` ("id:instanceId"), paths too, so two instances'
  * same-numbered tags are two folders. Each tag's parents are read once; the
@@ -86,13 +102,17 @@ export function resolveFolderPath(
 export function buildFolderTree<T extends FolderTreeTag>(
   tags: readonly T[],
   currentPath: readonly string[],
-  countField: FolderCountField
+  countField: FolderCountField,
+  untaggedCount = 0
 ): FolderTree<T> {
   const { byKey, parentKeys, childKeys, rootKeys } = indexTagHierarchy(tags);
 
   const breadcrumbs = currentPath.map((key) => ({
     id: key,
-    name: byKey.get(key)?.name || "Unknown",
+    name:
+      key === UNTAGGED_FOLDER_ID
+        ? UNTAGGED_NAME
+        : byKey.get(key)?.name || "Unknown",
   }));
 
   const countOf = (tag: T) => tag[countField] ?? 0;
@@ -133,6 +153,17 @@ export function buildFolderTree<T extends FolderTreeTag>(
     });
   }
   folders.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (currentTagKey === undefined && untaggedCount > 0) {
+    folders.push({
+      id: UNTAGGED_FOLDER_ID,
+      tag: null,
+      name: UNTAGGED_NAME,
+      thumbnail: null,
+      count: untaggedCount,
+      isFolder: true,
+    });
+  }
 
   return { folders, breadcrumbs };
 }

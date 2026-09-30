@@ -300,6 +300,57 @@ test.describe("List navigation", () => {
     }
   });
 
+  test("the Untagged folder lists the untagged images, its badge their total", async ({
+    page,
+  }) => {
+    const tree = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/library/tags/tree" &&
+        r.request().method() === "POST"
+    );
+    await page.goto("/images?view=folder");
+    const treeResponse = await tree;
+    // The tree counts the page's type only
+    expect(treeResponse.request().postDataJSON()).toEqual({
+      untagged: "image",
+    });
+    const { untagged } = (await treeResponse.json()) as { untagged?: number };
+    const total = requireData(
+      untagged !== undefined && untagged > 0 ? untagged : undefined,
+      "an untagged image"
+    );
+
+    const folder = page.locator("button:has(h3)").filter({
+      has: page.getByRole("heading", { name: "Untagged", exact: true }),
+    });
+    const noun = total === 1 ? "image" : "images";
+    await expect(folder.getByLabel(`${total} ${noun}`)).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const listed = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/library/images" &&
+        r.request().method() === "POST"
+    );
+    await folder.click();
+    const response = await listed;
+    const body = response.request().postDataJSON() as {
+      image_filter?: Record<string, unknown>;
+    };
+    expect(body.image_filter).toEqual({
+      tag_count: { value: 0, modifier: "EQUALS" },
+    });
+    const answer = (await response.json()) as { findImages: { count: number } };
+    expect(answer.findImages.count).toBe(total);
+    await expect(page).toHaveURL(
+      (url) => url.searchParams.get("folderPath") === "__untagged__"
+    );
+    await expect(
+      page.getByText(`${total} ${noun} in this folder`)
+    ).toBeVisible();
+  });
+
   // The other list pages have no empty state yet (LG-13): their empty-results
   // tests come with item 57, one per page here
   test("a scene search that matches nothing shows the empty state", async ({

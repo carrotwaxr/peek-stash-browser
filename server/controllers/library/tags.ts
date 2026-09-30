@@ -2,7 +2,10 @@ import { z } from "zod";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
-import { loadTagTree } from "../../services/TagTreeService.js";
+import {
+  loadTagTree,
+  loadUntaggedCount,
+} from "../../services/TagTreeService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -142,12 +145,15 @@ const tagTreeRequest = z.strictObject({
       group: scopeRef.optional(),
     })
     .optional(),
+  untagged: z.enum(["scene", "gallery", "image"]).optional(),
 });
 
 /**
  * The compact tag tree for the Tags page's hierarchy view and the folder
  * view: every tag the user can see, or with a scope the tags on its visible
- * scenes and their visible ancestors (services/TagTreeService.ts)
+ * scenes and their visible ancestors; with `untagged`, how many items of
+ * that type have no tag of their own, the folder view's Untagged folder
+ * (services/TagTreeService.ts)
  */
 export const findTagTree = async (
   req: TypedLibraryRequest<FindTagTreeRequest | undefined>,
@@ -162,13 +168,20 @@ export const findTagTree = async (
       })),
     });
   }
-  const userId = req.user.id;
-  const tags = await loadTagTree({
-    userId,
+  const { scope, untagged: kind } = parsed.data;
+  const options = {
+    userId: req.user.id,
     allowedInstanceIds: req.allowedInstanceIds,
-    scope: parsed.data.scope,
-  });
-  res.json({ tags });
+    scope,
+  };
+  // In turn, not together (server-sql.md)
+  const tags = await loadTagTree(options);
+  if (kind === undefined) {
+    res.json({ tags });
+    return;
+  }
+  const untagged = await loadUntaggedCount({ ...options, kind });
+  res.json({ tags, untagged });
 };
 
 /** GET /api/library/tags/:id/counts: the tag page's tab counts */

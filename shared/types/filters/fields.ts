@@ -210,6 +210,8 @@ export const GALLERY_FIELDS = {
   scenes: ref("scene"),
   rating100: num(),
   image_count: num(),
+  /** The gallery's tags; 0 is the folder view's Untagged */
+  tag_count: count(),
   date: date(),
   created_at: date(),
   updated_at: date(),
@@ -227,6 +229,8 @@ export const IMAGE_FIELDS = {
   galleries: ref("gallery"),
   rating100: num({ modifiers: COUNT_MODIFIERS }),
   o_counter: num({ modifiers: COUNT_MODIFIERS }),
+  /** The image's tags, its galleries' included; 0 is the folder view's Untagged */
+  tag_count: count(),
   date: date(),
   created_at: date(),
   updated_at: date(),

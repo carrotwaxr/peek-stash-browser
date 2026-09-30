@@ -26,6 +26,7 @@ Galleries support five view modes:
 | **Tags** | Filter by tags, with "Include sub-tags". With sub-tags on, "has all of" matches a gallery tagged with any sub-tag of each chosen tag |
 | **Rating** | 0-100 range slider |
 | **Image Count** | Range filter for number of images |
+| **Tag Count** | Range filter for number of tags; 0 to 0 lists the untagged galleries |
 | **Favorites** | Show only favorited galleries |
 | **Has Favorite Image** | Show galleries containing at least one favorited image |
 

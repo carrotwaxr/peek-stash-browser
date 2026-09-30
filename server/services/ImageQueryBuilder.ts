@@ -107,6 +107,13 @@ function imageJunction(
 }
 
 const IMAGE_TAGS = imageJunction("ImageTag", "it", "tag");
+
+/**
+ * The image's tags: its `ImageTag` rows on its own instance, which hold the
+ * tags its galleries give it too (sync writes them)
+ */
+const IMAGE_TAG_COUNT =
+  "(SELECT COUNT(*) FROM ImageTag itc WHERE itc.imageId = i.id AND itc.imageInstanceId = i.stashInstanceId)";
 const IMAGE_PERFORMERS = imageJunction("ImagePerformer", "ip", "performer");
 const IMAGE_GALLERIES = imageJunction("ImageGallery", "ig", "gallery");
 
@@ -166,6 +173,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     }
     if (filter.o_counter) {
       push(buildNumericFilter(filter.o_counter, USER_O_COUNT));
+    }
+
+    // The image's tag rows; EQUALS 0 is the folder view's Untagged
+    if (filter.tag_count) {
+      push(buildNumericFilter(filter.tag_count, IMAGE_TAG_COUNT));
     }
 
     // Related entities

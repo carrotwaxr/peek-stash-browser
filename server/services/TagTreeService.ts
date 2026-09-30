@@ -18,10 +18,16 @@
  * three conditions, so the walk stops at a hidden or restricted ancestor:
  * the child it would have led to becomes a root, and the ancestor's own
  * parents are not reached through it.
+ *
+ * The folder view's Untagged folder asks for one more count, of its page's
+ * type (`loadUntaggedCount`), under the same three conditions.
  */
 import prisma from "../prisma/singleton.js";
-import type { TagTreeRow } from "../types/api/index.js";
-import type { TagTreeQueryRow } from "../types/internal/queryRows.js";
+import type { TagTreeRow, UntaggedKind } from "../types/api/index.js";
+import type {
+  TagTreeQueryRow,
+  UntaggedCountRow,
+} from "../types/internal/queryRows.js";
 import type { FilterRef } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
@@ -86,7 +92,7 @@ ${excludedCountsJoinSql("tag", "t")}`,
  */
 function visible(
   alias: string,
-  entityType: "tag" | "scene",
+  entityType: "tag" | "scene" | "gallery" | "image",
   userId: number,
   instanceIds: readonly string[]
 ): { join: Fragment; where: Fragment } {
@@ -301,4 +307,88 @@ export async function loadTagTree({
     rows.map((r) => entityKey(r.id, r.stashInstanceId))
   );
   return rows.map((row) => toTreeRow(row, visibleKeys, scenes !== null));
+}
+
+/** A scene's stored count of its own `SceneTag` rows (the scene list's `tag_count`) */
+const SCENE_UNTAGGED = "s.tagCount = 0";
+
+/**
+ * Each type's table and its untagged condition, as its list's `tag_count`
+ * EQUALS 0 reads it: a scene's stored count (its browse index), a gallery's
+ * and an image's junction rows (an image's hold its galleries' tags too)
+ */
+const UNTAGGED = {
+  scene: { table: "StashScene", alias: "s", where: SCENE_UNTAGGED },
+  gallery: {
+    table: "StashGallery",
+    alias: "g",
+    where:
+      "NOT EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId)",
+  },
+  image: {
+    table: "StashImage",
+    alias: "i",
+    where:
+      "NOT EXISTS (SELECT 1 FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId)",
+  },
+} as const satisfies Record<
+  UntaggedKind,
+  { table: string; alias: string; where: string }
+>;
+
+export interface LoadUntaggedCountOptions extends LoadTagTreeOptions {
+  readonly kind: UntaggedKind;
+}
+
+/**
+ * The folder view's Untagged count, in one statement: the items of the kind
+ * the user can see (live, on the allowed instances, under the exclusion
+ * anti-join with the instance: invariant 3) with no tag of their own, the
+ * total of the list's `tag_count` EQUALS 0. With a scope, the scope's
+ * visible untagged scenes; galleries and images 0, as the scoped tree's
+ * counts are. Only the page's kind is counted: the image count reads every
+ * live image (52 to 82 ms on the prod snapshot's 142k).
+ */
+export async function loadUntaggedCount({
+  userId,
+  allowedInstanceIds,
+  scope,
+  kind,
+}: LoadUntaggedCountOptions): Promise<number> {
+  if (allowedInstanceIds.length === 0) return 0;
+  const scenes = scope ? scopeScenes(scope) : null;
+  if (scenes && kind !== "scene") return 0;
+
+  const { table, alias, where } = UNTAGGED[kind];
+  const entity = visible(alias, kind, userId, allowedInstanceIds);
+  const query: Fragment = scenes
+    ? {
+        sql: `WITH scope_scene(id, inst) AS (
+${scenes.sql}
+)
+SELECT COUNT(*) AS n
+FROM scope_scene x
+CROSS JOIN StashScene s ON s.id = x.id AND s.stashInstanceId = x.inst
+${entity.join.sql}
+WHERE ${entity.where.sql} AND ${where}`,
+        params: [
+          ...scenes.params,
+          ...entity.join.params,
+          ...entity.where.params,
+        ],
+      }
+    : {
+        sql: `SELECT COUNT(*) AS n
+FROM ${table} ${alias}
+${entity.join.sql}
+WHERE ${entity.where.sql} AND ${where}`,
+        params: [...entity.join.params, ...entity.where.params],
+      };
+
+  const [row] = await prisma.$queryRawUnsafe<UntaggedCountRow[]>(
+    query.sql,
+    ...query.params
+  );
+  // One row always: COUNT(*) with no GROUP BY
+  return Number(row?.n ?? 0);
 }

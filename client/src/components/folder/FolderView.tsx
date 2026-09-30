@@ -9,6 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import {
   type FolderCountField,
+  UNTAGGED_FOLDER_ID,
   buildFolderTree,
   resolveFolderPath,
 } from "../../utils/buildFolderTree";
@@ -37,6 +38,11 @@ interface Props {
   tags: FolderViewTag[];
   /** The tree's count of the page's type, the folders' badges */
   countField: FolderCountField;
+  /**
+   * The tree's count of the page's untagged items: the root shows Untagged
+   * while it is above 0
+   */
+  untaggedCount?: number;
   /** The page's item, lower case: one and many ("gallery", "galleries") */
   entityLabel: { one: string; many: string };
   renderItem: (item: Record<string, unknown>) => ReactNode;
@@ -58,8 +64,9 @@ interface Props {
  * Folder view for browsing content by tag hierarchy: the open folder's
  * sub-folders, unpaged, above its own items, the list's page as it is (the
  * owner asks for the folder's tag at depth 0 and pages it). At the root,
- * folders only. Each folder shows how many items of the page's type carry
- * its tag directly.
+ * folders only, Untagged last while the page's type has untagged items.
+ * Each folder shows how many items of the page's type carry its tag
+ * directly.
  * Desktop: Split-pane with tree sidebar + content grid
  * Mobile: Stacked with breadcrumb + content grid
  * The path lists tag keys ("id:instanceId"); a path bookmarked with bare ids
@@ -70,6 +77,7 @@ const FolderView = ({
   itemCount,
   tags,
   countField,
+  untaggedCount = 0,
   entityLabel,
   renderItem,
   gridDensity = "medium",
@@ -103,8 +111,8 @@ const FolderView = ({
   }, [currentPath, urlPath, setSearchParams]);
 
   const { folders, breadcrumbs } = useMemo(
-    () => buildFolderTree(tags, currentPath, countField),
-    [tags, currentPath, countField]
+    () => buildFolderTree(tags, currentPath, countField, untaggedCount),
+    [tags, currentPath, countField, untaggedCount]
   );
   const atRoot = currentPath.length === 0;
   const { many } = entityLabel;
@@ -162,7 +170,11 @@ const FolderView = ({
     if (items.length === 0) {
       return (
         <EmptyState
-          title={`No ${many} directly in ${folderName}`}
+          title={
+            currentPath.at(-1) === UNTAGGED_FOLDER_ID
+              ? `No untagged ${many}`
+              : `No ${many} directly in ${folderName}`
+          }
           {...(folders.length > 0 && {
             description: `Open a folder above for its ${many}`,
           })}

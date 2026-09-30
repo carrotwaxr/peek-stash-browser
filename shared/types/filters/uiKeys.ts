@@ -186,6 +186,7 @@ export const GALLERY_UI_KEYS = [
   },
   { key: "rating", field: "rating100" },
   { key: "imageCount", field: "image_count" },
+  { key: "tagCount", field: "tag_count" },
   { key: "favorite", field: "favorite" },
   { key: "hasFavoriteImage", field: "hasFavoriteImage" },
 ] as const satisfies UiKeysOf<typeof GALLERY_FIELDS>;
@@ -216,6 +217,7 @@ export const IMAGE_UI_KEYS = [
   { key: "rating", field: "rating100" },
   { key: "favorite", field: "favorite" },
   { key: "oCounter", field: "o_counter" },
+  { key: "tagCount", field: "tag_count" },
 ] as const satisfies UiKeysOf<typeof IMAGE_FIELDS>;
 
 export const CLIP_UI_KEYS = [

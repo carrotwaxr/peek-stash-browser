@@ -1285,6 +1285,14 @@ export const GALLERY_FILTER_OPTIONS = withTextLimits("gallery", [
     max: 1000,
   },
   {
+    key: "tagCount",
+    label: "Tag Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 50,
+  },
+  {
     key: "favorite",
     label: "Favorite Galleries",
     type: "checkbox",
@@ -1390,6 +1398,14 @@ export const IMAGE_FILTER_OPTIONS = withTextLimits("image", [
     defaultValue: {},
     min: 0,
     max: 1000,
+  },
+  {
+    key: "tagCount",
+    label: "Tag Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 50,
   },
 ]);
 
@@ -1552,6 +1568,19 @@ const rangeCriterion = (
     return { modifier: "LESS_THAN", value: max * scale + 1 };
   }
   return undefined;
+};
+
+/**
+ * A count a view fixes as a permanent filter (the folder view's Untagged:
+ * `tag_count` EQUALS 0), which wins over the panel's range of that count
+ */
+const fixedCount = (
+  value: unknown
+): { modifier: "EQUALS"; value: number } | undefined => {
+  const fixed = rangeOf(value) as { modifier?: unknown; value?: unknown };
+  return fixed.modifier === "EQUALS" && isWholeNumber(fixed.value)
+    ? { modifier: "EQUALS", value: fixed.value }
+    : undefined;
 };
 
 type DateRangeCriterion =
@@ -1765,7 +1794,12 @@ export const buildSceneFilter = (filters: FilterState): SceneFilterInput => {
   put(sceneFilter, "framerate", rangeCriterion(filters.framerate));
   put(sceneFilter, "performer_count", rangeCriterion(filters.performerCount));
   put(sceneFilter, "performer_age", rangeCriterion(filters.performerAge));
-  put(sceneFilter, "tag_count", rangeCriterion(filters.tagCount));
+  // The folder view's Untagged fixes it
+  put(
+    sceneFilter,
+    "tag_count",
+    fixedCount(filters.tag_count) ?? rangeCriterion(filters.tagCount)
+  );
 
   put(sceneFilter, "date", dateCriterion(filters.date));
   put(sceneFilter, "created_at", dateCriterion(filters.createdAt));
@@ -2018,6 +2052,12 @@ export const buildGalleryFilter = (
 
   put(galleryFilter, "rating100", rangeCriterion(filters.rating));
   put(galleryFilter, "image_count", rangeCriterion(filters.imageCount));
+  // The folder view's Untagged fixes it
+  put(
+    galleryFilter,
+    "tag_count",
+    fixedCount(filters.tag_count) ?? rangeCriterion(filters.tagCount)
+  );
   put(galleryFilter, "title", textCriterion(filters.title));
 
   put(
@@ -2051,6 +2091,12 @@ export const buildImageFilter = (filters: FilterState): ImageFilterInput => {
 
   put(imageFilter, "rating100", rangeCriterion(filters.rating));
   put(imageFilter, "o_counter", rangeCriterion(filters.oCounter));
+  // The folder view's Untagged fixes it
+  put(
+    imageFilter,
+    "tag_count",
+    fixedCount(filters.tag_count) ?? rangeCriterion(filters.tagCount)
+  );
 
   // Performers, studios and tags match through the image's galleries too
   // (the server's gallery-umbrella inheritance)
