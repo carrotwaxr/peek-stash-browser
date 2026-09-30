@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
+import { type ColumnConfig, presetColumnsOf } from "../../config/tableColumns";
 import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
 import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
@@ -51,6 +52,11 @@ interface SearchControlsProps {
   viewModes?: ViewModeConfig[];
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
+  /**
+   * Shows a preset's table columns: called when a loaded preset carries
+   * them, and once when the default preset resolves with them
+   */
+  onPresetColumns?: (columns: ColumnConfig) => void;
   contextSettings?: SettingConfig[];
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
@@ -84,6 +90,7 @@ const SearchControls = ({
   viewModes,
   currentTableColumns = null,
   tableColumnsPopover = null,
+  onPresetColumns,
   contextSettings = NO_SETTINGS,
   isRefreshing = false,
 }: SearchControlsProps) => {
@@ -132,6 +139,7 @@ const SearchControls = ({
     setZoomLevel,
     setGridDensity,
     loadPreset,
+    activePreset,
   } = listState;
   const sortField = sort.field;
   const sortDirection = sort.direction;
@@ -229,9 +237,23 @@ const SearchControls = ({
   }, [highlightedFilterKey]);
 
   const handleLoadPreset = useCallback(
-    (preset: PresetToLoad) => loadPreset(preset),
-    [loadPreset]
+    (preset: PresetToLoad) => {
+      loadPreset(preset);
+      const columns = presetColumnsOf(preset.tableColumns);
+      if (columns) onPresetColumns?.(columns);
+    },
+    [loadPreset, onPresetColumns]
   );
+
+  // The default preset's table columns show once it resolves with them
+  const shownDefaultColumnsRef = useRef<string | null>(null);
+  useEffect(() => {
+    const columns = presetColumnsOf(activePreset?.tableColumns);
+    if (!activePreset || !columns || !onPresetColumns) return;
+    if (shownDefaultColumnsRef.current === activePreset.id) return;
+    shownDefaultColumnsRef.current = activePreset.id;
+    onPresetColumns(columns);
+  }, [activePreset, onPresetColumns]);
 
   const handlePageChange = useCallback(
     (page: number) => {

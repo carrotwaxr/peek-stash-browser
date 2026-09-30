@@ -4,7 +4,8 @@
  * changes marked unsaved; a failed load offers Retry and no editor, so a
  * save cannot replace the stored column defaults with a partial set.
  * The tab reads and saves through the user-settings query, so a change
- * reaches every mounted reader at once (item 52).
+ * reaches every mounted reader at once (item 52); its table columns are the
+ * ones the tables save.
  */
 import type { NormalizedScene } from "@peek/shared-types";
 import {
@@ -20,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../../src/api";
 import CustomizationTab from "../../../../src/components/settings/tabs/CustomizationTab";
 import SceneCardPreview from "../../../../src/components/ui/SceneCardPreview";
+import { useTableColumns } from "../../../../src/hooks/useTableColumns";
 import { showError, showSuccess } from "../../../../src/utils/toast";
 import { flushPromises, must } from "../../../testUtils";
 
@@ -55,9 +57,28 @@ const renderTab = () =>
 /** The table-column editor's card, found by its heading. */
 async function tableColumns(): Promise<HTMLElement> {
   const title = await screen.findByRole("heading", {
-    name: "Table View Default Columns",
+    name: "Table Columns",
   });
   return must(title.closest<HTMLElement>(".p-6"), "table columns section");
+}
+
+/** A scene table's column toggle, as the table's columns popover calls it */
+function SceneTableDuration() {
+  const { toggleColumn } = useTableColumns("scene");
+  return (
+    <button type="button" onClick={() => toggleColumn("duration")}>
+      Toggle Duration on the table
+    </button>
+  );
+}
+
+/** The editor's checkbox for a column, found by its label */
+function columnBox(section: HTMLElement, label: string): HTMLInputElement {
+  const row = must(
+    within(section).getByText(label).closest("div"),
+    `the ${label} row`
+  );
+  return within(row).getByRole<HTMLInputElement>("checkbox");
 }
 
 /** Toggle the first column that is not required. */
@@ -106,7 +127,36 @@ describe("CustomizationTab", () => {
     fireEvent.click(save);
 
     await waitFor(() => expect(save).toBeDisabled());
-    expect(showSuccess).toHaveBeenCalledWith("Table column defaults saved!");
+    expect(showSuccess).toHaveBeenCalledWith("Table columns saved!");
+  });
+
+  it("a column toggled on the Scenes table shows in Settings' table columns", async () => {
+    mockApiPut.mockResolvedValue({ success: true });
+    const { rerender } = render(
+      <SignedInWithQuery>
+        <SceneTableDuration />
+      </SignedInWithQuery>
+    );
+    const toggle = await screen.findByRole("button", {
+      name: "Toggle Duration on the table",
+    });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(1));
+    await flushPromises();
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
+
+    // Settings opens after the table (the same query client)
+    rerender(
+      <SignedInWithQuery>
+        <SceneTableDuration />
+        <CustomizationTab />
+      </SignedInWithQuery>
+    );
+    const section = await tableColumns();
+
+    expect(columnBox(section, "Duration")).toBeChecked();
+    expect(mockApiGet).toHaveBeenCalledTimes(1);
   });
 
   it("a failed view preference save shows the server's message and keeps the stored value", async () => {
@@ -133,7 +183,7 @@ describe("CustomizationTab", () => {
 
     expect(await screen.findByText("Database busy")).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "Table View Default Columns" })
+      screen.queryByRole("heading", { name: "Table Columns" })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText("Wall View Preview Behavior")

@@ -1106,11 +1106,6 @@
       "count": 1
     }
   },
-  "src/hooks/useTableColumns.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
   "src/hooks/useUserStats.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2

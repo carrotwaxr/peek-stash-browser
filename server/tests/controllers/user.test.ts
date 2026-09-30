@@ -411,6 +411,26 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(400);
     });
 
+    it("accepts clip table columns", async () => {
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
+      const tableColumnDefaults = {
+        scene: { visible: ["title"], order: ["title", "date"] },
+        clip: { visible: ["title", "scene"], order: ["scene", "title"] },
+      };
+      const req = reqFor(updateUserSettings, {
+        body: { tableColumnDefaults },
+        user: USER,
+      });
+      const res = resFor(updateUserSettings);
+      await updateUserSettings(req, res);
+      expect(res._getOkBody().success).toBe(true);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({ tableColumnDefaults }),
+        })
+      );
+    });
+
     it("rejects tableColumnDefaults with missing arrays", async () => {
       const req = reqFor(updateUserSettings, {
         body: malformed({

@@ -312,6 +312,7 @@ const EntityListPage = ({
     hideColumn,
     moveColumn,
     getColumnConfig,
+    applyPresetColumns,
   } = useTableColumns(config.tableEntity ?? entityType);
 
   const documentTitle = embed ? null : <DocumentTitle title={title} />;
@@ -477,6 +478,7 @@ const EntityListPage = ({
           }
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={columnsPopover}
+          onPresetColumns={applyPresetColumns}
         >
           {renderResults()}
         </SearchControls>

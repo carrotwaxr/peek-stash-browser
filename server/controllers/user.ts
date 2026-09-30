@@ -1,5 +1,7 @@
-import type { GetUserRestrictionsResponse } from "@peek/shared-types/api/user.js";
-import { ENTITY_KINDS } from "@peek/shared-types/filters/index.js";
+import {
+  type GetUserRestrictionsResponse,
+  TABLE_COLUMN_KINDS,
+} from "@peek/shared-types/api/user.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
@@ -384,7 +386,7 @@ export const updateUserSettings = async (
         Partial<TableColumnsConfig> | null | undefined
       >;
       for (const [entityType, config] of Object.entries(submittedDefaults)) {
-        if (!(ENTITY_KINDS as readonly string[]).includes(entityType)) {
+        if (!(TABLE_COLUMN_KINDS as readonly string[]).includes(entityType)) {
           res.status(400).json({
             error: `Invalid entity type in table column defaults: ${entityType}`,
           });

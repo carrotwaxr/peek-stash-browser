@@ -2,8 +2,8 @@
  * The scene list (Scenes, and a detail page's Scenes tab) on the list page
  * shell: its state in the URL, the page's own filter kept in every view,
  * the hide and play handlers, and its loading and error states. The library
- * API is mocked; the controls, pagination, timeline and folder views are the
- * real ones, the scene card a stub.
+ * API is mocked; the controls, pagination, table, timeline and folder views
+ * are the real ones, the scene card a stub.
  */
 import {
   act,
@@ -41,18 +41,6 @@ vi.mock("@/api", () => ({
     findGroupsMinimal: vi.fn().mockResolvedValue([]),
     findGalleriesMinimal: vi.fn().mockResolvedValue([]),
   },
-}));
-vi.mock("@/hooks/useTableColumns", () => ({
-  useTableColumns: vi.fn(() => ({
-    allColumns: [],
-    visibleColumns: [],
-    visibleColumnIds: [],
-    columnOrder: [],
-    toggleColumn: vi.fn(),
-    hideColumn: vi.fn(),
-    moveColumn: vi.fn(),
-    getColumnConfig: vi.fn(() => ({})),
-  })),
 }));
 // Shows itself while the library is initializing (its own test covers when)
 vi.mock("@/components/ui/LibraryInitializingBanner", () => ({
@@ -539,6 +527,54 @@ describe("SceneSearch", () => {
       expect(
         screen.getByRole("navigation", { name: /folder navigation/i })
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Table columns", () => {
+    /** A scene preset saved in table view: Rating, then Title */
+    const RATINGS_TABLE = {
+      id: "ratings",
+      name: "Ratings table",
+      filters: {},
+      sort: "date",
+      direction: "DESC",
+      viewMode: "table",
+      tableColumns: {
+        visible: ["title", "rating"],
+        order: ["rating", "title", "date", "studio"],
+      },
+    };
+
+    /** The table's column headers, left to right (the columns button has none) */
+    const headers = () =>
+      screen
+        .getAllByRole("columnheader")
+        .map((th) => th.textContent)
+        .filter(Boolean);
+
+    it("loading a preset saved in table view restores its columns", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
+      renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: ["/scenes"],
+        presets: { scene: [RATINGS_TABLE] },
+      });
+      await screen.findByText("scene-1");
+
+      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
+      fireEvent.click(await screen.findByText("Ratings table"));
+
+      await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
+    });
+
+    it("a default preset saved in table view opens with its columns", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
+      renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: ["/scenes"],
+        presets: { scene: [RATINGS_TABLE] },
+        defaultPresets: { scene: "ratings" },
+      });
+
+      await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
     });
   });
 

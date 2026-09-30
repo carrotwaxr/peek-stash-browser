@@ -20,6 +20,7 @@ const ENTITY_TYPES = [
   { id: "gallery", label: "Galleries" },
   { id: "image", label: "Images" },
   { id: "group", label: "Groups" },
+  { id: "clip", label: "Clips" },
 ];
 
 interface ColumnConfig {
@@ -34,7 +35,8 @@ interface Props {
 }
 
 /**
- * Settings component for configuring default table columns per entity type.
+ * The table columns of each list type: the same saved value a table's own
+ * column controls change.
  */
 const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const [activeEntity, setActiveEntity] = useState("scene");
@@ -157,11 +159,11 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
         className="text-lg font-semibold mb-4"
         style={{ color: "var(--text-primary)" }}
       >
-        Table View Default Columns
+        Table Columns
       </h3>
       <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-        Configure which columns are shown by default when switching to table
-        view.
+        The columns each list shows in table view. Changing a table&apos;s
+        columns on its page saves them here too.
       </p>
 
       {/* Entity type tabs */}
