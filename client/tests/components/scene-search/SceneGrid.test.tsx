@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SceneGrid from "../../../src/components/scene-search/SceneGrid";
@@ -18,9 +18,18 @@ vi.mock("../../../src/components/ui/index", async (importOriginal) => {
   const actual = await importOriginal<typeof uiModule>();
   return {
     ...actual,
+    // A card is its checkbox: pressed when selected, shift reports a range
     SceneCard: (props: CardProps) => {
       cardSpy(props);
-      return null;
+      const { scene, onToggleSelect, isSelected } = props;
+      if (!onToggleSelect) return null;
+      return (
+        <button
+          data-testid={`card-${scene.id}-${scene.instanceId}`}
+          aria-pressed={isSelected}
+          onClick={(e) => onToggleSelect(scene, { range: e.shiftKey })}
+        />
+      );
     },
   };
 });
@@ -97,5 +106,122 @@ describe("SceneGrid empty list", () => {
     expect(screen.getByTestId("empty-state")).toHaveTextContent(
       "No scenes found | Try adjusting your search filters"
     );
+  });
+});
+
+describe("SceneGrid selection", () => {
+  const sceneList = (ids: string[], instanceId = "a") =>
+    ids.map((id) => ({ id, instanceId, title: id }) as NormalizedScene);
+
+  const pressed = () =>
+    screen
+      .getAllByTestId(/^card-/)
+      .filter((el) => el.getAttribute("aria-pressed") === "true")
+      .map((el) => el.getAttribute("data-testid"));
+
+  const renderGrid = (props: Partial<ComponentProps<typeof SceneGrid>>) => {
+    const tree = (p: Partial<ComponentProps<typeof SceneGrid>>) => (
+      <MemoryRouter>
+        <SceneGrid scenes={sceneList(["1", "2", "3", "4", "5", "6"])} {...p} />
+      </MemoryRouter>
+    );
+    const view = render(tree(props));
+    return {
+      ...view,
+      update: (next: Partial<ComponentProps<typeof SceneGrid>>) =>
+        view.rerender(tree({ ...props, ...next })),
+    };
+  };
+
+  it("selecting 3 then changing the filter (a new selectionScope) clears the selection and the bulk bar", () => {
+    const { update } = renderGrid({ selectionScope: "filter-a" });
+    for (const id of ["1", "2", "3"]) {
+      fireEvent.click(screen.getByTestId(`card-${id}-a`));
+    }
+    expect(pressed()).toHaveLength(3);
+    expect(screen.getByText("Clear")).toBeInTheDocument();
+
+    update({ selectionScope: "filter-b" });
+
+    expect(pressed()).toEqual([]);
+    expect(screen.queryByText("Clear")).not.toBeInTheDocument();
+  });
+
+  it("the same selectionScope keeps the selection through a refetch", () => {
+    const { update } = renderGrid({ selectionScope: "filter-a" });
+    fireEvent.click(screen.getByTestId("card-2-a"));
+    update({
+      scenes: sceneList(["1", "2", "3", "4", "5", "6"]),
+      selectionScope: "filter-a",
+    });
+    expect(pressed()).toEqual(["card-2-a"]);
+  });
+
+  it("a page change clears the selection", () => {
+    renderGrid({
+      selectionScope: "p1",
+      currentPage: 1,
+      totalPages: 3,
+      onPageChange: vi.fn(),
+    });
+    fireEvent.click(screen.getByTestId("card-2-a"));
+    expect(pressed()).toHaveLength(1);
+
+    fireEvent.click(must(screen.getAllByRole("button", { name: /next/i })[0]));
+
+    expect(pressed()).toEqual([]);
+  });
+
+  it("Select All selects exactly the visible page", () => {
+    renderGrid({ selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-1-a"));
+    fireEvent.click(screen.getByRole("button", { name: "Select All (6)" }));
+
+    expect(pressed()).toHaveLength(6);
+  });
+
+  it("click card 2's checkbox, shift-click card 5's: cards 2 to 5 are selected", () => {
+    renderGrid({ selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-2-a"));
+    fireEvent.click(screen.getByTestId("card-5-a"), { shiftKey: true });
+
+    expect(pressed()).toEqual(["card-2-a", "card-3-a", "card-4-a", "card-5-a"]);
+  });
+
+  it("a shift-click with no earlier click selects just that card", () => {
+    renderGrid({ selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-4-a"), { shiftKey: true });
+
+    expect(pressed()).toEqual(["card-4-a"]);
+  });
+
+  it("a range forgets its anchor when the scope changes", () => {
+    const { update } = renderGrid({ selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-2-a"));
+    update({ selectionScope: "p2" });
+    fireEvent.click(screen.getByTestId("card-5-a"), { shiftKey: true });
+
+    expect(pressed()).toEqual(["card-5-a"]);
+  });
+
+  it("with B:12 and A:12 on the page, selecting B:12 does not mark A:12", () => {
+    const scenes = [...sceneList(["12"], "a"), ...sceneList(["12"], "b")];
+    renderGrid({ scenes, selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-12-b"));
+
+    expect(pressed()).toEqual(["card-12-b"]);
+  });
+
+  it("a range over two servers' scenes with one id selects each by its instance", () => {
+    const scenes = [
+      ...sceneList(["12"], "a"),
+      ...sceneList(["12"], "b"),
+      ...sceneList(["13"], "a"),
+    ];
+    renderGrid({ scenes, selectionScope: "p1" });
+    fireEvent.click(screen.getByTestId("card-12-b"));
+    fireEvent.click(screen.getByTestId("card-13-a"), { shiftKey: true });
+
+    expect(pressed()).toEqual(["card-12-b", "card-13-a"]);
   });
 });

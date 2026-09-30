@@ -93,7 +93,14 @@ const SCENE_LIST: ListPageConfig = {
   ),
   // The grid with selection and bulk actions; every card gets the page's
   // one click handler, not a closure per card
-  renderGrid: ({ items, loading, gridDensity, ctx, emptyMessage }) => (
+  renderGrid: ({
+    items,
+    loading,
+    gridDensity,
+    ctx,
+    emptyMessage,
+    selectionScope,
+  }) => (
     <SceneGrid
       scenes={items as unknown as NormalizedScene[]}
       density={gridDensity}
@@ -105,6 +112,7 @@ const SCENE_LIST: ListPageConfig = {
       fromPageTitle={ctx.fromPageTitle}
       emptyMessage={emptyMessage}
       emptyDescription="Try adjusting your search filters"
+      selectionScope={selectionScope}
     />
   ),
   skeleton: { aspect: "landscape", heightRem: 5 },

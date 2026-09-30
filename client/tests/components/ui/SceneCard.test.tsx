@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { type ComponentProps, createElement } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -184,6 +184,50 @@ describe("navigation", () => {
     fireEvent.keyDown(card, { key: "Enter" });
 
     expect(router.state.location.pathname).toBe("/scene/1");
+  });
+});
+
+describe("selection checkbox", () => {
+  const scene = partialScene({
+    id: "1",
+    instanceId: "inst-1",
+    title: "Test Scene",
+    paths: { screenshot: "/screenshot.jpg" },
+    files: [{ duration: 3600 }],
+    performers: [],
+    groups: [],
+    galleries: [],
+    tags: [],
+    inheritedTags: [],
+  });
+
+  const renderCard = (props: Partial<ComponentProps<typeof SceneCard>>) => {
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <SceneCard scene={scene} hideRatingControls {...props} />,
+      },
+    ]);
+    return render(<RouterProvider router={router} />);
+  };
+
+  it("no selection checkbox without onToggleSelect", () => {
+    renderCard({});
+
+    // The folder and timeline views render cards that cannot select
+    expect(screen.queryByRole("button", { name: /select scene/i })).toBeNull();
+  });
+
+  it("the checkbox reports a range when shift is held", () => {
+    const onToggleSelect = vi.fn();
+    renderCard({ onToggleSelect });
+    const checkbox = screen.getByRole("button", { name: /select scene/i });
+
+    fireEvent.click(checkbox);
+    fireEvent.click(checkbox, { shiftKey: true });
+
+    expect(onToggleSelect).toHaveBeenNthCalledWith(1, scene, { range: false });
+    expect(onToggleSelect).toHaveBeenNthCalledWith(2, scene, { range: true });
   });
 });
 

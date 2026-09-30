@@ -290,6 +290,7 @@ const Recommended = () => {
           totalPages={totalPages}
           onPageChange={handlePageChange}
           onHideSuccess={handleHideSuccess}
+          selectionScope={`${page}:${perPage}`}
           emptyMessage={message ?? "No Recommendations Yet"}
           emptyDescription={
             (criteria

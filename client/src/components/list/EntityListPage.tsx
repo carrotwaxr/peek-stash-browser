@@ -421,6 +421,7 @@ const EntityListPage = ({
         gridDensity,
         ctx: cardContext,
         emptyMessage: config.emptyMessage,
+        selectionScope: listState.listKey,
       });
     }
 

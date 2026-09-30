@@ -7,7 +7,10 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
-import { useCardSelection } from "../../hooks/useCardSelection";
+import {
+  type ToggleSelectOptions,
+  useCardSelection,
+} from "../../hooks/useCardSelection";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import {
   CardContainer,
@@ -62,7 +65,10 @@ export interface BaseCardProps {
   linkTo?: string;
   selectionMode?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: (entity: Record<string, unknown> | undefined) => void;
+  onToggleSelect?: (
+    entity: Record<string, unknown> | undefined,
+    options?: ToggleSelectOptions
+  ) => void;
   indicators?: CardIndicator[];
   ratingControlsProps?: RatingControlsProps;
   displayPreferences?: { showDescription?: boolean };
