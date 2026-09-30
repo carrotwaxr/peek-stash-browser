@@ -30,6 +30,7 @@ const SceneStats = ({
   return (
     <CardStatusIcons
       className={classNames}
+      instanceId={scene.instanceId}
       isReadOnly={isReadOnly}
       oCount={scene.o_counter}
       playCount={watchHistory?.playCount ?? scene.play_count}

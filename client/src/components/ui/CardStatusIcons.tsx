@@ -3,6 +3,8 @@ import PlayCountIndicator from "./PlayCountIndicator";
 
 interface Props {
   className?: string;
+  /** The scene's instance, sent with an O press */
+  instanceId?: string;
   isReadOnly?: boolean;
   oCount: number;
   playCount: number;
@@ -12,6 +14,7 @@ interface Props {
 
 export default function CardStatusIcons({
   className = "",
+  instanceId,
   isReadOnly = false,
   oCount,
   playCount,
@@ -25,6 +28,7 @@ export default function CardStatusIcons({
     >
       <OCounterButton
         initialCount={oCount}
+        instanceId={instanceId}
         interactive={!isReadOnly}
         sceneId={sceneId}
         size={size}

@@ -819,6 +819,8 @@ Watch history tracking endpoints.
 
 **Controller:** `pingWatchHistory` in `../controllers/watchHistory.ts`
 
+**Body:** `sceneId`, `instanceId` (required) and `currentTime`; optional `quality`, `sessionStart` and `seekEvents`. Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404. A viewing session counts one play per scene on its own instance.
+
 ---
 
 ### POST /api/watch-history/save-activity
@@ -826,6 +828,8 @@ Watch history tracking endpoints.
 **Authentication:** Required
 
 **Controller:** `saveActivity` in `../controllers/watchHistory.ts`
+
+**Body:** `sceneId`, `instanceId` (required); optional `resumeTime` and `playDuration`. Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
 
 ---
 
@@ -835,6 +839,8 @@ Watch history tracking endpoints.
 
 **Controller:** `incrementPlayCount` in `../controllers/watchHistory.ts`
 
+**Body:** `sceneId`, `instanceId` (required). Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
+
 ---
 
 ### POST /api/watch-history/increment-o
@@ -842,6 +848,8 @@ Watch history tracking endpoints.
 **Authentication:** Required
 
 **Controller:** `incrementOCounter` in `../controllers/watchHistory.ts`
+
+**Body:** `sceneId`; `instanceId` optional for now (with none, the server picks the first instance where the user can see the scene). A scene the user cannot see answers 404.
 
 ---
 
