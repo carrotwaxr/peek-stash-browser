@@ -25,6 +25,7 @@ import type {
 } from "../../types/parsedFilters.js";
 import { PAIR_INLINE_LIMIT } from "../../utils/sqlClauses.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import {
   type LargeLibraryPlanner,
   largeLibraryPlanner,
@@ -230,6 +231,7 @@ async function seed(): Promise<void> {
       ]),
     ],
   });
+  await mirrorInheritedTags([A, B]);
 
   await prisma.sceneTag.createMany({
     data: [
@@ -494,14 +496,21 @@ describeWithDb("Ref clause shapes", () => {
       expect(lines).toContain(
         "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
       );
+      // S3: the inherited arm joins the list, read by its own tag index
+      expect(lines).toContain(
+        "SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx"
+      );
       expect(lines).toMatch(/LIST SUBQUERY/);
       expect(lines).not.toContain("sqlite_autoindex_SceneTag_1");
+      expect(lines).not.toContain("VIRTUAL TABLE");
     }
 
     const created = await plan(createdPage);
     expect(created).toContain("CORRELATED SCALAR SUBQUERY");
     expect(created).toContain("sqlite_autoindex_SceneTag_1");
+    expect(created).toContain("sqlite_autoindex_SceneInheritedTag_1");
     expect(created).not.toContain("SceneTag_tagId_tagInstanceId_idx");
+    expect(created).not.toContain("VIRTUAL TABLE");
   });
 
   // L9: a count walks no order, so under an indexed sort too it reads the
@@ -533,12 +542,16 @@ describeWithDb("Ref clause shapes", () => {
     expect(countPlan).toContain(
       "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
     );
+    expect(countPlan).toContain(
+      "SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx"
+    );
     expect(countPlan).toMatch(/LIST SUBQUERY/);
     expect(countPlan).not.toContain("sqlite_autoindex_SceneTag_1");
 
     const pagePlan = await plan(page);
     expect(pagePlan).toContain("CORRELATED SCALAR SUBQUERY");
     expect(pagePlan).toContain("sqlite_autoindex_SceneTag_1");
+    expect(pagePlan).toContain("sqlite_autoindex_SceneInheritedTag_1");
   });
 
   // L9: above the inline limit an indexed sort's page reads the refs list's
@@ -570,11 +583,19 @@ describeWithDb("Ref clause shapes", () => {
     expect(pagePlan).toContain(
       "SEARCH st USING INDEX SceneTag_tagId_tagInstanceId_idx"
     );
+    expect(pagePlan).toContain(
+      "SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx"
+    );
     expect(pagePlan).toMatch(/LIST SUBQUERY/);
     expect(pagePlan).not.toContain("tags_matched");
+    // Only the refs list reads json_each; no scene's inherited list does
+    expect(pagePlan).not.toMatch(/SCAN je\b/);
 
     const countPlan = await plan(count);
     expect(countPlan).toContain("MATERIALIZE tags_matched");
+    expect(countPlan).toContain(
+      "SEARCH sit USING INDEX SceneInheritedTag_tagId_tagInstanceId_idx"
+    );
     expect(countPlan).not.toContain("CORRELATED");
   });
 

@@ -35,6 +35,7 @@ import {
   resFor,
   testUser,
 } from "../../tests/helpers/controllerTestUtils.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -138,6 +139,7 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
         inheritedTagIds: JSON.stringify([INHERITED_TAG_ID]),
       })),
     });
+    await mirrorInheritedTags([TEST_INSTANCE]);
     await prisma.stashScene.createMany({
       data: BULK_SCENE_IDS.map((id) => ({
         id,

@@ -32,6 +32,7 @@ import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
 import type { RefCriterion } from "../../types/parsedFilters.js";
 import type { EntityRef } from "../../utils/entityRef.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -125,6 +126,7 @@ async function seed(): Promise<void> {
       { ...live("1", B), inheritedTagIds: "[]" },
     ],
   });
+  await mirrorInheritedTags([A, B]);
   await prisma.stashGallery.createMany({
     data: [live("1"), gone("2")].map((row) => ({
       ...row,

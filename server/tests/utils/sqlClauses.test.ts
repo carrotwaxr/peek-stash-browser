@@ -90,6 +90,13 @@ const SCENE_TAGS: JunctionTarget = {
   refInstanceCol: "tagInstanceId",
 };
 
+/** A scene's inherited tags, the same columns in their own junction */
+const SCENE_INHERITED_TAGS: JunctionTarget = {
+  ...SCENE_TAGS,
+  table: "SceneInheritedTag",
+  alias: "sit",
+};
+
 const A = "inst-a";
 const B = "inst-b";
 const ref = (id: string, instanceId = A): FilterRef => ({ id, instanceId });
@@ -393,28 +400,29 @@ describe("refClause", () => {
     expect(clause.params).toEqual(["1", "inst-a", "2", "inst-a"]);
   });
 
-  it("an inherited JSON list adds one json_each arm for all the refs, each bound with the parent's instance", () => {
+  it("an inherited junction adds its own EXISTS arm for all the refs, read by its key, never json_each", () => {
     const clause = refClause(SCENE_TAGS, [ref("1"), bare("2")], "INCLUDES", {
       ...OPTS,
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
     });
 
     expect(clause.sql).toBe(
-      `(${TAG_EXISTS}(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?) OR (je.value = ?)))`
+      `(${TAG_EXISTS}(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?) OR (sit.tagId = ?))))`
     );
+    expect(clause.sql).not.toContain("json_each");
     expect(clause.params).toEqual(["1", "inst-a", "2", "1", "inst-a", "2"]);
   });
 
   describe("a list read whole and sorted (sortedByIndex false, L8)", () => {
     const SORTED = {
       ...OPTS,
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
       sortedByIndex: false,
     };
     const TAG_IN =
       "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE (";
 
-    it("a small INCLUDES reads the junction by its ref columns as a row-value IN, the inherited arm as before", () => {
+    it("a small INCLUDES reads both junctions by their ref columns as one row-value IN", () => {
       const clause = refClause(
         SCENE_TAGS,
         [ref("1"), bare("2")],
@@ -423,7 +431,7 @@ describe("refClause", () => {
       );
 
       expect(clause.sql).toBe(
-        `(${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?) OR (je.value = ?)))`
+        `${TAG_IN}(st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?) OR (sit.tagId = ?)))`
       );
       expect(clause.params).toEqual(["1", "inst-a", "2", "1", "inst-a", "2"]);
       expect(clause.ctes).toBeUndefined();
@@ -474,7 +482,7 @@ describe("refClause", () => {
       expect(matched).toEqual(
         refClause(SCENE_TAGS, refs, "INCLUDES", {
           ...OPTS,
-          inheritedJson: "inheritedTagIds",
+          inheritedJunction: SCENE_INHERITED_TAGS,
         })
       );
     });
@@ -491,7 +499,7 @@ describe("refClause", () => {
       expect(
         refClause(SCENE_TAGS, refs, "INCLUDES", {
           ...OPTS,
-          inheritedJson: "inheritedTagIds",
+          inheritedJunction: SCENE_INHERITED_TAGS,
         })
       ).toEqual(walked);
     });
@@ -500,16 +508,16 @@ describe("refClause", () => {
   describe("a large set under an indexed sort (sortedByIndex true, L9)", () => {
     const WALKED = {
       ...OPTS,
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
       sortedByIndex: true,
     };
 
-    it("reads the junction rows of the refs list by the ref index as a row-value IN, and the inherited arm probes the list", () => {
+    it("reads both junctions' rows of the refs list by their ref indexes as one row-value IN", () => {
       const refs = [...many(PAIR_INLINE_LIMIT), bare("bare")];
       const clause = refClause(SCENE_TAGS, refs, "INCLUDES", WALKED);
 
       expect(clause.sql).toBe(
-        "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value, s.stashInstanceId) IN (SELECT id, inst FROM tags_refs)))"
+        "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM tags_refs r CROSS JOIN SceneInheritedTag sit ON sit.tagId = r.id AND sit.tagInstanceId = r.inst)"
       );
       expect(clause.params).toEqual([]);
       // Only the refs: no matched set is built, and a bare ref is one pair per allowed instance
@@ -578,7 +586,7 @@ describe("refClause", () => {
   it("switches from inline pairs to the matched CTE above PAIR_INLINE_LIMIT and never emits a row-value NOT IN", () => {
     const inline = refClause(SCENE_TAGS, many(PAIR_INLINE_LIMIT), "INCLUDES", {
       ...OPTS,
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
     });
     expect(inline.ctes).toBeUndefined();
     // Each ref binds its id and instance in the direct arm and the inherited arm
@@ -587,7 +595,7 @@ describe("refClause", () => {
     const refs = many(PAIR_INLINE_LIMIT + 1);
     const large = refClause(SCENE_TAGS, refs, "INCLUDES", {
       ...OPTS,
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
     });
     expect(large.sql).toBe(
       "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM tags_matched)"
@@ -601,7 +609,7 @@ describe("refClause", () => {
       },
       {
         name: "tags_matched",
-        sql: "tags_matched(id, inst) AS MATERIALIZED (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION SELECT x.id, x.stashInstanceId FROM StashScene x, json_each(x.inheritedTagIds) je WHERE x.deletedAt IS NULL AND (je.value, x.stashInstanceId) IN (SELECT id, inst FROM tags_refs))",
+        sql: "tags_matched(id, inst) AS MATERIALIZED (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION SELECT sit.sceneId, sit.sceneInstanceId FROM tags_refs r CROSS JOIN SceneInheritedTag sit ON sit.tagId = r.id AND sit.tagInstanceId = r.inst)",
         params: [],
       },
     ]);

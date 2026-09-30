@@ -143,6 +143,13 @@ const SCENE_PERFORMERS = junction(
   "performerInstanceId"
 );
 const SCENE_TAGS = junction("SceneTag", "st", "tagId", "tagInstanceId");
+/** The scene's inherited tags, written by scene tag inheritance */
+const SCENE_INHERITED_TAGS = junction(
+  "SceneInheritedTag",
+  "sit",
+  "tagId",
+  "tagInstanceId"
+);
 const SCENE_GROUPS = junction("SceneGroup", "sg", "groupId", "groupInstanceId");
 const SCENE_GALLERIES = junction(
   "SceneGallery",
@@ -439,14 +446,15 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
   /**
    * The tag filter: the scene's own tags (SceneTag) and its inherited tags
-   * (the inheritedTagIds JSON list). With a depth, INCLUDES_ALL is one
-   * clause per selected tag, each with its own descendants (QUERIES-08).
-   * Under a sort with an index the page walks it and probes each scene's
-   * tags (above 64 refs, against the scenes SceneTag's tag index lists for
-   * the refs); under one without, the tagged scenes are read from
-   * SceneTag's tag index (above 64 refs, the matched set). The count reads
-   * every match in no order, so it takes the second form whatever the sort
-   * (`sortedByIndex`, L8, L9).
+   * (SceneInheritedTag), each arm in the same shape, read by index. With a
+   * depth, INCLUDES_ALL is one clause per selected tag, each with its own
+   * descendants (QUERIES-08). Under a sort with an index the page walks it
+   * and probes each scene's tags by the junctions' keys (above 64 refs,
+   * against the scenes the junctions' tag indexes list for the refs); under
+   * one without, the tagged scenes are read from the junctions' tag indexes
+   * (above 64 refs, the matched set). The count reads every match in no
+   * order, so it takes the second form whatever the sort (`sortedByIndex`,
+   * L8, L9).
    */
   private async tagClause(
     criterion: RefCriterion,
@@ -454,7 +462,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", SCENE_TAGS, criterion, ctx, {
       name: "tags",
-      inheritedJson: "inheritedTagIds",
+      inheritedJunction: SCENE_INHERITED_TAGS,
       sortedByIndex: INDEXED_SORTS.has(ctx.sortField),
     });
   }

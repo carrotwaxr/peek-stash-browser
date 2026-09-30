@@ -332,12 +332,12 @@ const TAG_SCENES_DELTA = countInto(
      ${excludedWhere("scene")}
      GROUP BY j.tagId, j.tagInstanceId
      UNION ALL
-     SELECT je.value AS id, c.stashInstanceId AS instanceId, COUNT(DISTINCT c.id) AS n
+     SELECT it.tagId AS id, it.tagInstanceId AS instanceId, COUNT(*) AS n
      ${excludedFrom("StashScene")}
-     CROSS JOIN json_each(c.inheritedTagIds) je
+     CROSS JOIN SceneInheritedTag it ON it.sceneId = c.id AND it.sceneInstanceId = c.stashInstanceId
      ${excludedWhere("scene")}
-     AND NOT EXISTS (SELECT 1 FROM SceneTag j WHERE j.sceneId = c.id AND j.sceneInstanceId = c.stashInstanceId AND j.tagId = je.value AND j.tagInstanceId = c.stashInstanceId)
-     GROUP BY je.value, c.stashInstanceId
+     AND NOT EXISTS (SELECT 1 FROM SceneTag j WHERE j.sceneId = it.sceneId AND j.sceneInstanceId = it.sceneInstanceId AND j.tagId = it.tagId AND j.tagInstanceId = it.tagInstanceId)
+     GROUP BY it.tagId, it.tagInstanceId
    ) WHERE true GROUP BY id, instanceId`
 );
 
@@ -1287,18 +1287,20 @@ class ExclusionComputationService {
           usersJson
         );
       case "inherited":
+        // The scenes inheriting the tags, by SceneInheritedTag's tag index;
+        // a scene inheriting two of them is one row (INSERT OR IGNORE)
         return tx.$executeRawUnsafe(
           `${HOLD_EDGE_HEAD}s.id, s.stashInstanceId, 'pending', ?
-           FROM StashScene s
+           FROM json_each(?) t
+           CROSS JOIN SceneInheritedTag it ON it.tagId = t.value AND it.tagInstanceId = ?
+           CROSS JOIN StashScene s ON s.id = it.sceneId AND s.stashInstanceId = it.sceneInstanceId
            CROSS JOIN json_each(?) u
-           WHERE s.stashInstanceId = ? AND s.deletedAt IS NULL
-             AND EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')) it
-                         WHERE it.value IN (SELECT value FROM json_each(?)))`,
+           WHERE s.deletedAt IS NULL`,
           edge.target,
           now,
-          usersJson,
+          idsJson,
           instanceId,
-          idsJson
+          usersJson
         );
     }
   }
@@ -1991,12 +1993,13 @@ class ExclusionComputationService {
           "s.stashInstanceId",
           allowedInstanceIds
         );
+        // Driven from the refs by SceneInheritedTag's tag index
         return {
-          sql: `SELECT s.id, s.stashInstanceId AS instanceId
-            FROM StashScene s
-            WHERE s.deletedAt IS NULL AND ${inst.sql}
-              AND EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')) it
-                          JOIN ${REFS_TABLE} r ON r.id = it.value AND r.inst = s.stashInstanceId)`,
+          sql: `SELECT DISTINCT s.id, s.stashInstanceId AS instanceId
+            FROM ${REFS_TABLE} r
+            CROSS JOIN SceneInheritedTag it ON it.tagId = r.id AND it.tagInstanceId = r.inst
+            CROSS JOIN StashScene s ON s.id = it.sceneId AND s.stashInstanceId = it.sceneInstanceId
+            WHERE s.deletedAt IS NULL AND ${inst.sql}`,
           params: inst.params,
         };
       }
@@ -2092,11 +2095,11 @@ class ExclusionComputationService {
           sql: `${head}
           AND NOT EXISTS (SELECT 1 FROM SceneTag st JOIN ${REFS_TABLE} r ON r.id = st.tagId AND r.inst = st.tagInstanceId
                           WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)
-          AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')) it
-                          JOIN ${REFS_TABLE} r ON r.id = it.value AND r.inst = s.stashInstanceId)
+          AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag it JOIN ${REFS_TABLE} r ON r.id = it.tagId AND r.inst = it.tagInstanceId
+                          WHERE it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId)
           AND (? = 1
                OR EXISTS (SELECT 1 FROM SceneTag st2 WHERE st2.sceneId = s.id AND st2.sceneInstanceId = s.stashInstanceId)
-               OR EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]'))))`,
+               OR EXISTS (SELECT 1 FROM SceneInheritedTag it2 WHERE it2.sceneId = s.id AND it2.sceneInstanceId = s.stashInstanceId))`,
           params: [...inst.params, flag],
         };
       }
@@ -2104,7 +2107,7 @@ class ExclusionComputationService {
         target: "scene",
         sql: `${head}
         AND NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)
-        AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')))`,
+        AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag it WHERE it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId)`,
         params: [...inst.params],
       };
     }

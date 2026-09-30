@@ -249,7 +249,7 @@ const EDGE_STUDIO_GALLERY =
 const EDGE_STUDIO_IMAGE =
   /FROM StashImage x[\s\S]*JOIN _peek_refs r ON r\.id = x\.studioId/;
 const EDGE_INHERITED =
-  /FROM StashScene s[\s\S]*AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/;
+  /FROM _peek_refs r[\s\S]*CROSS JOIN SceneInheritedTag it ON it\.tagId = r\.id/;
 const CONTENT_TAG_SCENE =
   /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag st/;
 const CONTENT_GALLERY_SCENE = /FROM StashScene x[\s\S]*SceneGallery/;
@@ -1124,7 +1124,10 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
     expect(content).toHaveLength(1);
     const [sql, ...params] = must(content[0]);
     expect(sql).toContain("FROM StashScene s");
-    expect(sql).toContain("json_each(COALESCE(s.inheritedTagIds");
+    expect(sql).toContain(
+      "NOT EXISTS (SELECT 1 FROM SceneInheritedTag it JOIN _peek_refs r"
+    );
+    expect(sql).not.toContain("inheritedTagIds");
     expect(sql).toContain("JOIN _peek_refs r");
     expect(params[params.length - 1]).toBe(1);
     expect(createdRows()).toEqual(
@@ -1233,7 +1236,7 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
     expect(noItem).toHaveLength(1);
     expect(must(noItem[0])[0]).not.toContain("_peek_refs");
     expect(must(noItem[0])[0]).toContain(
-      "NOT EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')))"
+      "NOT EXISTS (SELECT 1 FROM SceneInheritedTag it WHERE it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId)"
     );
     expect(createdRows()).toEqual(
       expect.arrayContaining([
@@ -1388,7 +1391,7 @@ describe("cascades (Rule 3)", () => {
 
     expect(queriesMatching(EDGE_INHERITED)).toHaveLength(1);
     expect(must(queriesMatching(EDGE_INHERITED)[0])[0]).toContain(
-      "JOIN _peek_refs r ON r.id = it.value AND r.inst = s.stashInstanceId"
+      "CROSS JOIN SceneInheritedTag it ON it.tagId = r.id AND it.tagInstanceId = r.inst"
     );
     expect(createdRows()).toEqual(
       expect.arrayContaining([

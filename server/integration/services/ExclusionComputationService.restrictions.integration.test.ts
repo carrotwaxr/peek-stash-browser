@@ -40,6 +40,7 @@ import {
   IMAGE_DEFAULTS,
 } from "../../tests/helpers/syncRowDefaults.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -229,6 +230,7 @@ async function seed(): Promise<void> {
       { id: "s8", stashInstanceId: B, studioId: "3" },
     ],
   });
+  await mirrorInheritedTags([A, B]);
 
   await prisma.stashClip.createMany({
     data: [

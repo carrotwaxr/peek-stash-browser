@@ -28,6 +28,7 @@ import {
 } from "../../tests/helpers/fixtures.js";
 import { must } from "../../tests/helpers/must.js";
 import type { RefCriterion } from "../../types/parsedFilters.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -218,6 +219,7 @@ async function seed(): Promise<void> {
       { id: SC_RELATIONS, stashInstanceId: B, title: "Relations on B" },
     ],
   });
+  await mirrorInheritedTags([A, B]);
   await prisma.stashImage.createMany({
     data: [
       { id: IM_HIDDEN, stashInstanceId: A },

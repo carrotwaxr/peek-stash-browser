@@ -34,6 +34,7 @@ import { linkCountService } from "../../services/LinkCountService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -235,6 +236,7 @@ async function seed(): Promise<void> {
       { ...on("1", B), inheritedTagIds: "[]" },
     ],
   });
+  await mirrorInheritedTags([A, B]);
   await prisma.stashGallery.createMany({
     data: [{ ...on("1"), studioId: "1", studioInstanceId: A }, { ...on("2") }],
   });

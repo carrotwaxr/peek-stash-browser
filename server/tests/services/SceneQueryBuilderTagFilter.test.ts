@@ -4,7 +4,7 @@
  * Bug #424: the carousel tag filter received composite keys
  * ("284:instance-1") and used them as bare tagId values. The parser now
  * hands the builder (id, instance) pairs, and the tag clause matches each
- * as a pair on the SceneTag junction and the inherited list, through the
+ * as a pair on the SceneTag junction and the SceneInheritedTag junction, through the
  * hierarchy expansion (item 34b): a descendant carries the instance it was
  * found on, a bare ref expands on every allowed instance. With a depth,
  * INCLUDES_ALL is one clause per selected tag with its own descendants
@@ -54,7 +54,7 @@ const tagClause = (criterion: RefCriterion, sortField = "created_at") =>
 
 /** The small tag-index form (L8) of ref 284 on instance-1 */
 const IN_FORM =
-  "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?)))";
+  "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))";
 
 /** The bare term of the inline shape, which matches an id on every instance */
 const BARE_TERM = "(st.tagId = ?)";
@@ -180,7 +180,7 @@ describe("SceneQueryBuilder tag clause", () => {
   });
 
   describe("SQL structure", () => {
-    it("generates SceneTag EXISTS subquery and the inherited json_each arm for INCLUDES", async () => {
+    it("a tag filter's inherited arm reads SceneInheritedTag, never json_each", async () => {
       const result = await tagClause({
         refs: [ref("284")],
         modifier: "INCLUDES",
@@ -188,8 +188,11 @@ describe("SceneQueryBuilder tag clause", () => {
       });
 
       expect(result.sql).toContain("EXISTS (SELECT 1 FROM SceneTag st");
-      expect(result.sql).toContain("json_each(s.inheritedTagIds)");
-      expect(result.sql).toContain("je.value = ? AND s.stashInstanceId = ?");
+      expect(result.sql).toContain(
+        "EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?)))"
+      );
+      expect(result.sql).not.toContain("json_each");
+      expect(result.sql).not.toContain("inheritedTagIds");
     });
 
     it("generates AND-joined checks for INCLUDES_ALL", async () => {
@@ -250,7 +253,7 @@ describe("SceneQueryBuilder tag clause", () => {
       "random",
       "filesize",
     ])(
-      "a sort with no index (%s) reads SceneTag by its tag index as a list, and the inherited arm as before",
+      "a sort with no index (%s) reads SceneTag and SceneInheritedTag by their tag indexes as one list",
       async (sortField) => {
         const result = await tagClause(
           { refs: [ref("284")], modifier: "INCLUDES", depth: 0 },
@@ -294,7 +297,7 @@ describe("SceneQueryBuilder tag clause", () => {
       );
 
       expect(result.sql).toBe(
-        "((s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value, s.stashInstanceId) IN (SELECT id, inst FROM tags_refs)))"
+        "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM tags_refs r CROSS JOIN SceneInheritedTag sit ON sit.tagId = r.id AND sit.tagInstanceId = r.inst)"
       );
       expect(result.ctes?.map((c) => c.name)).toEqual(["tags_refs"]);
       expect(result.count?.sql).toBe(

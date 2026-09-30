@@ -144,26 +144,44 @@ const TAG_SCENES = junctionCounts(
 );
 
 /**
- * A tag's live scenes that inherit it (`inheritedTagIds`, on the scene's
- * instance) and hold no SceneTag row for it, each once. The whole-library
- * form reads every live scene's list once; the scoped form too, probing
- * the pairs, since the lists have no index.
+ * A tag's live scenes that inherit it (SceneInheritedTag) and hold no
+ * SceneTag row for it, each once (the junction's key makes a scene one row
+ * per tag). As `junctionCounts`: the junction's rows by tag, minus those of
+ * soft-deleted scenes found from the scene table, never a scene row read
+ * per junction row. The whole-library form reads the junction once; the
+ * scoped form drives from the pairs by its tag index.
  */
+const NOT_DIRECT = `NOT EXISTS (
+          SELECT 1 FROM SceneTag d
+          WHERE d.sceneId = j.sceneId AND d.sceneInstanceId = j.sceneInstanceId
+            AND d.tagId = j.tagId AND d.tagInstanceId = j.tagInstanceId
+        )`;
 const inheritedOnly = (scoped: boolean) => `
-      SELECT je.value AS id, s.stashInstanceId AS instanceId, COUNT(DISTINCT s.id) AS n
-      FROM StashScene s CROSS JOIN json_each(s.inheritedTagIds) je
-      WHERE s.deletedAt IS NULL${
-        scoped
-          ? `
-        AND (je.value, s.stashInstanceId) IN (SELECT id, instanceId FROM pairs)`
-          : ""
-      }
-        AND NOT EXISTS (
-          SELECT 1 FROM SceneTag j
-          WHERE j.sceneId = s.id AND j.sceneInstanceId = s.stashInstanceId
-            AND j.tagId = je.value AND j.tagInstanceId = s.stashInstanceId
-        )
-      GROUP BY je.value, s.stashInstanceId`;
+      SELECT t.id, t.instanceId, t.n - COALESCE(dl.n, 0) AS n
+      FROM (
+        SELECT j.tagId AS id, j.tagInstanceId AS instanceId, COUNT(*) AS n
+        FROM ${
+          scoped
+            ? `pairs pr
+        CROSS JOIN SceneInheritedTag j ON j.tagId = pr.id AND j.tagInstanceId = pr.instanceId`
+            : "SceneInheritedTag j"
+        }
+        WHERE ${NOT_DIRECT}
+        GROUP BY j.tagId, j.tagInstanceId
+      ) t
+      LEFT JOIN (
+        SELECT j.tagId AS id, j.tagInstanceId AS instanceId, COUNT(*) AS n
+        FROM StashScene c
+        CROSS JOIN SceneInheritedTag j ON j.sceneId = c.id AND j.sceneInstanceId = c.stashInstanceId
+        WHERE c.deletedAt IS NOT NULL${
+          scoped
+            ? `
+          AND (+j.tagId, +j.tagInstanceId) IN (SELECT id, instanceId FROM pairs)`
+            : ""
+        }
+          AND ${NOT_DIRECT}
+        GROUP BY j.tagId, j.tagInstanceId
+      ) dl ON dl.id = t.id AND dl.instanceId = t.instanceId`;
 
 /**
  * A studio's live scenes, galleries or collections: the rows whose
@@ -395,10 +413,9 @@ const THROUGH: Record<keyof LinkSources, string[]> = {
     `SELECT 'tags', l.tagId, l.tagInstanceId
      FROM json_each(?) p
      CROSS JOIN SceneTag l ON l.sceneId = ${PAIR.id} AND l.sceneInstanceId = ${PAIR.instanceId}`,
-    `SELECT 'tags', je.value, s.stashInstanceId
+    `SELECT 'tags', l.tagId, l.tagInstanceId
      FROM json_each(?) p
-     CROSS JOIN StashScene s ON s.id = ${PAIR.id} AND s.stashInstanceId = ${PAIR.instanceId}
-     CROSS JOIN json_each(s.inheritedTagIds) je`,
+     CROSS JOIN SceneInheritedTag l ON l.sceneId = ${PAIR.id} AND l.sceneInstanceId = ${PAIR.instanceId}`,
     `SELECT 'groups', l.groupId, l.groupInstanceId
      FROM json_each(?) p
      CROSS JOIN SceneGroup l ON l.sceneId = ${PAIR.id} AND l.sceneInstanceId = ${PAIR.instanceId}`,
@@ -458,12 +475,11 @@ const THROUGH: Record<keyof LinkSources, string[]> = {
   ],
 };
 
-/** The tags in the inherited lists of the scenes bound as pairs */
+/** The inherited tags (SceneInheritedTag) of the scenes bound as pairs */
 const INHERITED_TAGS_SQL = `
-  SELECT DISTINCT je.value AS id, s.stashInstanceId AS instanceId
+  SELECT DISTINCT l.tagId AS id, l.tagInstanceId AS instanceId
   FROM json_each(?) p
-  CROSS JOIN StashScene s ON s.id = ${PAIR.id} AND s.stashInstanceId = ${PAIR.instanceId}
-  CROSS JOIN json_each(s.inheritedTagIds) je`;
+  CROSS JOIN SceneInheritedTag l ON l.sceneId = ${PAIR.id} AND l.sceneInstanceId = ${PAIR.instanceId}`;
 
 /** A count as a raw read returns it (COUNT is a bigint, a column a number) */
 type RawCount = number | bigint;
@@ -511,7 +527,7 @@ class LinkCountService {
    * Recounts the count columns of every live performer, studio, tag,
    * collection and gallery ("all") or of the rows in `scope`, and writes
    * the ones that moved. Runs after scene tag inheritance (a tag's
-   * `sceneCountAll` reads `inheritedTagIds`).
+   * `sceneCountAll` reads SceneInheritedTag).
    */
   async rebuildLinkCounts(
     scope: LinkCountScope | "all",
@@ -617,10 +633,10 @@ class LinkCountService {
   }
 
   /**
-   * The tags in the inherited lists (`inheritedTagIds`) of these scenes, as
-   * stored now. Sync reads them before and after scene tag inheritance
-   * rewrites the lists: a tag either side lists may have gained or lost a
-   * scene.
+   * The inherited tags (SceneInheritedTag) of these scenes, as stored now.
+   * Sync reads them before and after scene tag inheritance rewrites them
+   * (the rows and the JSON column in one unit per batch): a tag either side
+   * lists may have gained or lost a scene.
    */
   async inheritedTagsOf(scenes: readonly EntityRef[]): Promise<EntityRef[]> {
     const refs = distinctRefs(scenes);

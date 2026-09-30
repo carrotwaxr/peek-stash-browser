@@ -484,7 +484,7 @@ describe("SceneQueryBuilder", () => {
         "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?) OR (st.tagId = ? AND st.tagInstanceId = ?)))"
       );
       expect(sql).toContain(
-        "EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE (je.value = ? AND s.stashInstanceId = ?) OR (je.value = ? AND s.stashInstanceId = ?))"
+        "EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?) OR (sit.tagId = ? AND sit.tagInstanceId = ?)))"
       );
       expect(params.filter((p) => p === "284")).toHaveLength(2);
       expect(params).not.toContain("284:inst-a");

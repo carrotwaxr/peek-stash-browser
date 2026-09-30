@@ -1,5 +1,5 @@
 import prisma from "../prisma/singleton.js";
-import { dbWrite } from "../utils/dbWrite.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import {
   type EntityRef,
   compositeKey,
@@ -9,7 +9,10 @@ import {
 } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 
-/** Scenes per batch: one read of their sources and one UPDATE (a dbWrite unit). */
+/**
+ * Scenes per batch: one read of their sources, then one write unit (the
+ * JSON column and the SceneInheritedTag rows, one transaction).
+ */
 const BATCH_SIZE = 500;
 
 /** A scene as the batch reads it. */
@@ -77,7 +80,10 @@ const sourceKey = (type: SourceType, id: string, instanceId: string) =>
  * Rules:
  * - Direct scene tags are NOT included in inheritedTagIds (they're already in SceneTag)
  * - Tags are deduplicated across all sources
- * - Stored as JSON array for efficient querying
+ * - Stored twice, in one transaction per batch: the JSON array the API and
+ *   the cards read (`inheritedTagIds`), and one SceneInheritedTag row per
+ *   tag (on the scene's instance), which the tag filter, the tag counts and
+ *   the exclusion compute read by index
  * - Multi-instance aware: uses composite keys (id:instanceId) to prevent cross-instance contamination
  * - A soft-deleted performer, studio, group or tag passes nothing on: Stash
  *   deleted or merged it, and the scenes still linking to it are fetched
@@ -88,9 +94,9 @@ const sourceKey = (type: SourceType, id: string, instanceId: string) =>
  */
 class SceneTagInheritanceService {
   /**
-   * Recompute `inheritedTagIds` for `scope`: every live scene ("all", the
-   * default), or the live scenes among the given refs (soft-deleted and
-   * unknown refs are skipped), 500 at a time.
+   * Recompute `inheritedTagIds` and the SceneInheritedTag rows for `scope`:
+   * every live scene ("all", the default), or the live scenes among the
+   * given refs (soft-deleted and unknown refs are skipped), 500 at a time.
    */
   async computeInheritedTags(
     scope: readonly EntityRef[] | "all" = "all"
@@ -373,6 +379,8 @@ WHERE s.deletedAt IS NULL`,
       instanceId: string;
       inheritedTagIds: string;
     }[] = [];
+    /** The junction rows: [sceneId, instanceId, tagId] */
+    const rows: [string, string, string][] = [];
 
     for (const scene of scenes) {
       const sceneKey = entityKey(scene.id, scene.stashInstanceId);
@@ -420,26 +428,58 @@ WHERE s.deletedAt IS NULL`,
         instanceId: scene.stashInstanceId,
         inheritedTagIds: JSON.stringify(Array.from(inheritedTags)),
       });
+      for (const tagId of inheritedTags) {
+        rows.push([scene.id, scene.stashInstanceId, tagId]);
+      }
     }
 
-    // Bulk update using raw SQL for performance
-    // SQLite doesn't support UPDATE FROM, so we use CASE expressions
-    // Each CASE arm and the WHERE match the (id, stashInstanceId) pair, so two
-    // instances sharing a scene id keep their own tags. Every value is bound.
+    // One unit per batch: the JSON column (a CASE UPDATE, since SQLite has
+    // no UPDATE FROM), then the batch's junction rows replaced. Each CASE
+    // arm and the WHERE match the (id, stashInstanceId) pair, so two
+    // instances sharing a scene id keep their own tags; the junction
+    // statements take the pairs and rows as one JSON parameter each. Every
+    // value is bound. Reads of either (LinkCountService.inheritedTagsOf,
+    // around this step) see both old or both new.
     if (updates.length > 0) {
       const cases = updates
         .map(() => "WHEN id = ? AND stashInstanceId = ? THEN ?")
         .join(" ");
       const pairs = updates.map(() => "(?, ?)").join(", ");
-      await dbWrite("inheritance.sceneTags", () =>
-        prisma.$executeRawUnsafe(
+      const updateParams = [
+        ...updates.flatMap((u) => [u.id, u.instanceId, u.inheritedTagIds]),
+        ...updates.flatMap((u) => [u.id, u.instanceId]),
+      ];
+      const scenesJson = pairsJson(
+        updates.map((u) => ({ id: u.id, instanceId: u.instanceId }))
+      );
+      const rowsJson = JSON.stringify(rows);
+      await dbWriteTransaction("inheritance.sceneTags", async (tx) => {
+        await tx.$executeRawUnsafe(
           `UPDATE StashScene
          SET inheritedTagIds = CASE ${cases} END
          WHERE (id, stashInstanceId) IN (VALUES ${pairs})`,
-          ...updates.flatMap((u) => [u.id, u.instanceId, u.inheritedTagIds]),
-          ...updates.flatMap((u) => [u.id, u.instanceId])
-        )
-      );
+          ...updateParams
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM SceneInheritedTag
+           WHERE rowid IN (
+             SELECT sit.rowid FROM json_each(?) p
+             CROSS JOIN SceneInheritedTag sit
+               ON sit.sceneId = json_extract(p.value, '$[0]')
+              AND sit.sceneInstanceId = json_extract(p.value, '$[1]')
+           )`,
+          scenesJson
+        );
+        if (rows.length > 0) {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO SceneInheritedTag (sceneId, sceneInstanceId, tagId, tagInstanceId)
+             SELECT json_extract(r.value, '$[0]'), json_extract(r.value, '$[1]'),
+                    json_extract(r.value, '$[2]'), json_extract(r.value, '$[1]')
+             FROM json_each(?) r`,
+            rowsJson
+          );
+        }
+      });
     }
   }
 }
