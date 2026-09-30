@@ -1,5 +1,5 @@
-import { MemoryRouter } from "react-router-dom";
 import { render, waitFor } from "@testing-library/react";
+import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchableGrid from "../../../src/components/ui/SearchableGrid";

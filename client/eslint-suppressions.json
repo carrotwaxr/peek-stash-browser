@@ -625,10 +625,10 @@
   },
   "src/components/ui/FilterPresets.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
+      "count": 6
     }
   },
   "src/components/ui/HelpModal.tsx": {

@@ -1,6 +1,6 @@
 // tests/hooks/useFilterState.test.jsx
-import { MemoryRouter } from "react-router-dom";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "../../src/api";
 import { useFilterState } from "../../src/hooks/useFilterState";

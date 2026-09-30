@@ -7,9 +7,9 @@
  * Key principle: Test what SHOULD happen, not what currently happens.
  * If a test fails, investigate whether it's a bug in the code or the test.
  */
-import { MemoryRouter } from "react-router-dom";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchControls from "../../../src/components/ui/SearchControls";
