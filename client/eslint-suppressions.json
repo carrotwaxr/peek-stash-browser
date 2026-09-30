@@ -404,11 +404,6 @@
       "count": 2
     }
   },
-  "src/components/settings/ContentRestrictionsModal.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    }
-  },
   "src/components/settings/CustomThemeEditor.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
