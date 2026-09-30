@@ -42,6 +42,9 @@ vi.mock("../../../middleware/auth.js", () => ({
   requireCacheReady: vi.fn(
     (_req: Request, _res: Response, next: NextFunction) => next()
   ),
+  requirePickerReady: vi.fn(
+    (_req: Request, _res: Response, next: NextFunction) => next()
+  ),
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", async (importOriginal) => {

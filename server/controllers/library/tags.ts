@@ -4,7 +4,6 @@ import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { loadTagTree } from "../../services/TagTreeService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -14,7 +13,7 @@ import type {
   FindTagsMinimalResponse,
   FindTagsRequest,
   FindTagsResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
@@ -31,7 +30,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * findTags using SQL query builder
  */
 export const findTags = async (
-  req: TypedAuthRequest<FindTagsRequest>,
+  req: TypedLibraryRequest<FindTagsRequest>,
   res: TypedResponse<
     FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -45,8 +44,7 @@ export const findTags = async (
   // A detail page asks for its tag by id
   const lookup = singleIdRef(request.filter.ids);
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const { items: tags, total } = await tagQueryBuilder.execute({
     userId,
@@ -142,13 +140,17 @@ export const findTags = async (
  * ForbiddenError (403) reaches the central error handler.
  */
 export const findTagsMinimal = async (
-  req: TypedAuthRequest<FindTagsMinimalRequest>,
+  req: TypedLibraryRequest<FindTagsMinimalRequest>,
   res: TypedResponse<FindTagsMinimalResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("tag", req.body, { userId });
 
-  const tags = await findMinimalEntities(req.user, request);
+  const tags = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
   res.json({ tags });
 };
 
@@ -181,7 +183,7 @@ const tagTreeRequest = z.strictObject({
  * scenes and their visible ancestors (services/TagTreeService.ts)
  */
 export const findTagTree = async (
-  req: TypedAuthRequest<FindTagTreeRequest | undefined>,
+  req: TypedLibraryRequest<FindTagTreeRequest | undefined>,
   res: TypedResponse<FindTagTreeResponse>
 ) => {
   const parsed = tagTreeRequest.safeParse(req.body ?? {});
@@ -196,7 +198,7 @@ export const findTagTree = async (
   const userId = req.user.id;
   const tags = await loadTagTree({
     userId,
-    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+    allowedInstanceIds: req.allowedInstanceIds,
     scope: parsed.data.scope,
   });
   res.json({ tags });

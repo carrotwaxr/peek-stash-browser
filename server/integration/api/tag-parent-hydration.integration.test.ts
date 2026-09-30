@@ -5,6 +5,7 @@ import { findStudios } from "../../controllers/library/studios.js";
 import { findTags } from "../../controllers/library/tags.js";
 import type { RequestUser } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   reqFor,
   resFor,
@@ -105,14 +106,28 @@ async function recordHandler(
 const tagsRequest = (body: object) =>
   recordHandler(async (user) => {
     const res = resFor(findTags);
-    await findTags(reqFor(findTags, { body, user }), res);
+    await findTags(
+      reqFor(findTags, {
+        body,
+        user,
+        allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
+      }),
+      res
+    );
     return res._getStatus();
   });
 
 const studiosRequest = (body: object) =>
   recordHandler(async (user) => {
     const res = resFor(findStudios);
-    await findStudios(reqFor(findStudios, { body, user }), res);
+    await findStudios(
+      reqFor(findStudios, {
+        body,
+        user,
+        allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
+      }),
+      res
+    );
     return res._getStatus();
   });
 
@@ -184,6 +199,7 @@ describe("Tag Parent Name Hydration", () => {
         reqFor(findPerformers, {
           body: { ids: [TEST_ENTITIES.performerWithScenes] },
           user,
+          allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
         }),
         res
       );
@@ -198,6 +214,7 @@ describe("Tag Parent Name Hydration", () => {
         reqFor(findGroups, {
           body: { ids: [TEST_ENTITIES.groupWithScenes] },
           user,
+          allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
         }),
         res
       );

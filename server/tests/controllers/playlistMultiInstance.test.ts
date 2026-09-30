@@ -50,10 +50,6 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistItems: vi.fn(),
 }));
 
-vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn(() => Promise.resolve(["inst-A", "inst-B"])),
-}));
-
 vi.mock("../../services/PlaylistAccessService.js", () => ({
   getPlaylistAccess: vi.fn(),
   getUserGroups: vi.fn(),
@@ -132,14 +128,17 @@ describe("Playlist reads through PlaylistQueryService", () => {
     vi.resetAllMocks();
   });
 
-  it("getUserPlaylists attaches each playlist's previews and visible count", async () => {
+  it("getUserPlaylists passes req.allowedInstanceIds to the builder or service: each playlist's previews and visible count", async () => {
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
       partialRow({ id: 1, userId: USER.id, name: "Mixed" }),
       partialRow({ id: 2, userId: USER.id, name: "Nothing visible" }),
     ]);
     mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
 
-    const req = reqFor(getUserPlaylists, { user: USER });
+    const req = reqFor(getUserPlaylists, {
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
     const res = resFor(getUserPlaylists);
     await getUserPlaylists(req, res);
 
@@ -173,7 +172,10 @@ describe("Playlist reads through PlaylistQueryService", () => {
     ]);
     mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
 
-    const req = reqFor(getSharedPlaylists, { user: USER });
+    const req = reqFor(getSharedPlaylists, {
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
     const res = resFor(getSharedPlaylists);
     await getSharedPlaylists(req, res);
 
@@ -201,7 +203,11 @@ describe("Playlist reads through PlaylistQueryService", () => {
     );
     mockItems.mockResolvedValueOnce({ items, totalItems: 2 });
 
-    const req = reqFor(getPlaylist, { params: { id: "3" }, user: USER });
+    const req = reqFor(getPlaylist, {
+      params: { id: "3" },
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
 
@@ -231,6 +237,7 @@ describe("Playlist reads through PlaylistQueryService", () => {
       params: { id: "3" },
       query: { page: "2", per_page: "500" },
       user: USER,
+      allowedInstanceIds: ALLOWED,
     });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
@@ -254,6 +261,7 @@ describe("Playlist reads through PlaylistQueryService", () => {
       params: { id: "3" },
       query: { page: "abc" },
       user: USER,
+      allowedInstanceIds: ALLOWED,
     });
     const res = resFor(getPlaylist);
 
@@ -265,7 +273,11 @@ describe("Playlist reads through PlaylistQueryService", () => {
   it("getPlaylist answers 404 without reading items when the viewer has no access", async () => {
     mockGetAccess.mockResolvedValueOnce({ level: "none" });
 
-    const req = reqFor(getPlaylist, { params: { id: "3" }, user: USER });
+    const req = reqFor(getPlaylist, {
+      params: { id: "3" },
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
 

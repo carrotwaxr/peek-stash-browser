@@ -27,10 +27,16 @@ import {
   isLibraryReady,
   requireAdmin,
   requireCacheReady,
+  requirePickerReady,
   setTokenCookie,
+  withAllowedInstances,
 } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import {
+  getEnabledSyncedInstanceIds,
+  getUserAllowedInstanceIds,
+} from "../../services/UserInstanceService.js";
+import type { TypedLibraryRequest } from "../../types/api/express.js";
 import {
   _resetJwtSecretForTesting,
   getJwtSecret,
@@ -54,6 +60,7 @@ vi.mock(
 // The instances each user sees (enabled, selected, first sync done)
 vi.mock("../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn(),
+  getEnabledSyncedInstanceIds: vi.fn(),
 }));
 
 // Mock logger
@@ -69,6 +76,12 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
+const mockEnabledSynced = vi.mocked(getEnabledSyncedInstanceIds);
+
+/** The list a readiness middleware put on the request, if any */
+function allowedOn(req: object): readonly string[] | undefined {
+  return (req as Partial<TypedLibraryRequest>).allowedInstanceIds;
+}
 
 /** The fields the middleware's user lookup selects. */
 const MOCK_USER: User = partialRow({
@@ -861,6 +874,114 @@ describe("Auth Middleware", () => {
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(mockAllowedInstances).not.toHaveBeenCalled();
       expect(nextFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("allowed instances on the request", () => {
+    it("requireCacheReady puts the user's allowed instances on the request, read once", async () => {
+      mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
+      const req = createMockReq({ user: MOCK_USER });
+      const { res, statusFn } = createMockRes();
+
+      await requireCacheReady(req, res, nextFn);
+
+      expect(allowedOn(req)).toEqual(["inst-a", "inst-b"]);
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_USER.id
+      );
+      expect(nextFn).toHaveBeenCalledOnce();
+      expect(statusFn).not.toHaveBeenCalled();
+    });
+
+    it("withAllowedInstances attaches an empty list and calls next, with no 503", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      const req = createMockReq({ user: MOCK_USER });
+      const { res, statusFn } = createMockRes();
+
+      await withAllowedInstances(req, res, nextFn);
+
+      expect(allowedOn(req)).toEqual([]);
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_USER.id
+      );
+      expect(nextFn).toHaveBeenCalledOnce();
+      expect(statusFn).not.toHaveBeenCalled();
+    });
+
+    it("withAllowedInstances answers 401 without a signed-in user", async () => {
+      const req = createMockReq();
+      const { res, statusFn } = createMockRes();
+
+      await withAllowedInstances(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(mockAllowedInstances).not.toHaveBeenCalled();
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("requirePickerReady lets an admin's `scope: allEnabled` request through with every enabled, synced instance when the admin's own instances are all on their first sync", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      mockEnabledSynced.mockResolvedValue(["inst-a", "inst-b"]);
+      const req = createMockReq({
+        user: MOCK_ADMIN,
+        body: { scope: "allEnabled" },
+      });
+      const { res, statusFn } = createMockRes();
+
+      await requirePickerReady(req, res, nextFn);
+
+      expect(allowedOn(req)).toEqual(["inst-a", "inst-b"]);
+      expect(mockEnabledSynced).toHaveBeenCalledOnce();
+      expect(mockAllowedInstances).not.toHaveBeenCalled();
+      expect(nextFn).toHaveBeenCalledOnce();
+      expect(statusFn).not.toHaveBeenCalled();
+    });
+
+    it("requirePickerReady gives an admin without the scope their own list, and 503 when it is empty", async () => {
+      mockAllowedInstances.mockResolvedValue([]);
+      const req = createMockReq({ user: MOCK_ADMIN, body: {} });
+      const { res, statusFn } = createMockRes();
+
+      await requirePickerReady(req, res, nextFn);
+
+      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(
+        MOCK_ADMIN.id
+      );
+      expect(mockEnabledSynced).not.toHaveBeenCalled();
+      expect(statusFn).toHaveBeenCalledWith(503);
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("requirePickerReady answers 503 for an admin's scope when no instance has finished its first sync", async () => {
+      mockEnabledSynced.mockResolvedValue([]);
+      const req = createMockReq({
+        user: MOCK_ADMIN,
+        body: { scope: "allEnabled" },
+      });
+      const { res, statusFn } = createMockRes();
+
+      await requirePickerReady(req, res, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(503);
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("requirePickerReady gives a USER sending the scope their own list", async () => {
+      // The parser's 403 follows in the handler
+      mockAllowedInstances.mockResolvedValue(["inst-a"]);
+      mockEnabledSynced.mockResolvedValue(["inst-a", "inst-b"]);
+      const req = createMockReq({
+        user: MOCK_USER,
+        body: { scope: "allEnabled" },
+      });
+      const { res, statusFn } = createMockRes();
+
+      await requirePickerReady(req, res, nextFn);
+
+      expect(allowedOn(req)).toEqual(["inst-a"]);
+      expect(mockEnabledSynced).not.toHaveBeenCalled();
+      expect(nextFn).toHaveBeenCalledOnce();
+      expect(statusFn).not.toHaveBeenCalled();
     });
   });
 

@@ -24,6 +24,7 @@ import { findStudios } from "../../controllers/library/studios.js";
 import { findTags } from "../../controllers/library/tags.js";
 import type { RequestUser } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   reqFor,
   resFor,
@@ -73,7 +74,14 @@ const detailBody = (filterKey: string, id: string, instanceId: string) => ({
 /** The tags one request answers */
 async function tagsFor(body: object) {
   const res = resFor(findTags);
-  await findTags(reqFor(findTags, { body, user: viewer }), res);
+  await findTags(
+    reqFor(findTags, {
+      body,
+      user: viewer,
+      allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
+    }),
+    res
+  );
   expect(res._getStatus()).toBe(200);
   return res._getOkBody().findTags.tags;
 }
@@ -81,7 +89,14 @@ async function tagsFor(body: object) {
 /** The studios one request answers */
 async function studiosFor(body: object) {
   const res = resFor(findStudios);
-  await findStudios(reqFor(findStudios, { body, user: viewer }), res);
+  await findStudios(
+    reqFor(findStudios, {
+      body,
+      user: viewer,
+      allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
+    }),
+    res
+  );
   expect(res._getStatus()).toBe(200);
   return res._getOkBody().findStudios.studios;
 }
@@ -361,6 +376,7 @@ describeWithDb(
           reqFor(findPerformers, {
             body: detailBody("performer_filter", PERFORMER, A),
             user: viewer,
+            allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
           }),
           res
         );
@@ -380,6 +396,7 @@ describeWithDb(
           reqFor(findGroups, {
             body: detailBody("group_filter", GROUP, A),
             user: viewer,
+            allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
           }),
           res
         );

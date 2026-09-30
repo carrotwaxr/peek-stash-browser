@@ -1,5 +1,4 @@
 import { clipService } from "../services/ClipService.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   GetClipByIdParams,
   GetClipByIdResponse,
@@ -10,7 +9,10 @@ import type {
   GetClipsResponse,
 } from "../types/api/clips.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type {
+  TypedLibraryRequest,
+  TypedResponse,
+} from "../types/api/express.js";
 import {
   parseClipQuery,
   parseSceneClipsRequest,
@@ -23,7 +25,7 @@ import {
  * parameter narrows them to one)
  */
 export const getClips = async (
-  req: TypedAuthRequest<never, Record<string, string>, GetClipsQuery>,
+  req: TypedLibraryRequest<never, Record<string, string>, GetClipsQuery>,
   res: TypedResponse<GetClipsResponse | ApiErrorResponse>
 ) => {
   // A ValidationError (400) reaches the central error handler
@@ -31,7 +33,7 @@ export const getClips = async (
 
   const userId = req.user.id;
   const { page, perPage } = request;
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const result = await clipService.getClips({
     userId,
@@ -53,14 +55,14 @@ export const getClips = async (
  * Get single clip, on the user's instances, with their exclusions
  */
 export const getClipById = async (
-  req: TypedAuthRequest<never, GetClipByIdParams>,
+  req: TypedLibraryRequest<never, GetClipByIdParams>,
   res: TypedResponse<GetClipByIdResponse | ApiErrorResponse>
 ) => {
   // A ValidationError (400) reaches the central error handler
   const id = parseStashId(req.params.id, "id");
 
   const userId = req.user.id;
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const clip = await clipService.getClipById({
     userId,
@@ -82,7 +84,11 @@ export const getClipById = async (
  * else its id on every instance the user sees
  */
 export const getClipsForScene = async (
-  req: TypedAuthRequest<never, GetClipsForSceneParams, GetClipsForSceneQuery>,
+  req: TypedLibraryRequest<
+    never,
+    GetClipsForSceneParams,
+    GetClipsForSceneQuery
+  >,
   res: TypedResponse<GetClipsForSceneResponse | ApiErrorResponse>
 ) => {
   // A ValidationError (400) reaches the central error handler
@@ -92,7 +98,7 @@ export const getClipsForScene = async (
 
   const userId = req.user.id;
   const { sceneId, includeUngenerated, specificInstanceId } = request;
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const clips = await clipService.getClipsForScene({
     userId,

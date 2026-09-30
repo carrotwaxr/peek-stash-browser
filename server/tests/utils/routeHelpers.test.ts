@@ -5,12 +5,17 @@
  * handlers need no sign-in check of their own.
  */
 import { describe, expect, it, vi } from "vitest";
+import type { TypedLibraryRequest } from "../../types/api/express.js";
 import type {
   ApiErrorResponse,
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  LIBRARY_HANDLER,
+  authenticated,
+  libraryHandler,
+} from "../../utils/routeHelpers.js";
 import {
   malformed,
   reqFor,
@@ -85,5 +90,64 @@ describe("authenticated()", () => {
     await expect(
       Promise.resolve(authenticated(failing)(req, resFor(failing), vi.fn()))
     ).rejects.toThrow("database is locked");
+  });
+});
+
+/** A list handler: it reads the instances a readiness middleware resolved. */
+const listHandler = vi.fn(
+  (
+    req: TypedLibraryRequest,
+    res: TypedResponse<{ instances: readonly string[] } | ApiErrorResponse>
+  ): Promise<void> => {
+    res.json({ instances: req.allowedInstanceIds });
+    return Promise.resolve();
+  }
+);
+
+describe("libraryHandler()", () => {
+  it("libraryHandler rejects with an error naming the missing middleware when no middleware set the instances", async () => {
+    listHandler.mockClear();
+    const req = reqFor(listHandler, { user: testUser() });
+    const res = resFor(listHandler);
+
+    await expect(
+      Promise.resolve(libraryHandler(listHandler)(req, res, vi.fn()))
+    ).rejects.toThrow(
+      "allowedInstanceIds missing: the route needs requireCacheReady, requirePickerReady or withAllowedInstances"
+    );
+    expect(listHandler).not.toHaveBeenCalled();
+  });
+
+  it("answers 401 and never calls the handler when req.user is missing", async () => {
+    listHandler.mockClear();
+    const req = reqFor(listHandler, { allowedInstanceIds: ["inst-a"] });
+    const res = resFor(listHandler);
+
+    await libraryHandler(listHandler)(req, res, vi.fn());
+
+    expect(listHandler).not.toHaveBeenCalled();
+    expect(res._getStatus()).toBe(401);
+  });
+
+  it("calls the handler with the request's instances, an empty list included", async () => {
+    for (const instances of [["inst-a", "inst-b"], []]) {
+      listHandler.mockClear();
+      const req = reqFor(listHandler, {
+        user: testUser(),
+        allowedInstanceIds: instances,
+      });
+      const res = resFor(listHandler);
+      const next = vi.fn();
+
+      await libraryHandler(listHandler)(req, res, next);
+
+      expect(listHandler).toHaveBeenCalledWith(req, res, next);
+      expect(res._getOkBody()).toEqual({ instances });
+    }
+  });
+
+  it("tags what it returns, for the route guard check", () => {
+    expect(libraryHandler(listHandler)[LIBRARY_HANDLER]).toBe(true);
+    expect(LIBRARY_HANDLER in authenticated(handler)).toBe(false);
   });
 });

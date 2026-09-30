@@ -327,6 +327,7 @@ export type {
 export type {
   TypedRequest,
   TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "./express.js";
 

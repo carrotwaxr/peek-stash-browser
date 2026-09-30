@@ -44,7 +44,7 @@ import userStatsRoutes from "../routes/userStats.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import { logger } from "../utils/logger.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { authenticated, libraryHandler } from "../utils/routeHelpers.js";
 import { getBuildDate, getServerVersion } from "../utils/serverVersion.js";
 import { resolveTrustProxy } from "../utils/trustProxy.js";
 
@@ -166,7 +166,7 @@ export const setupAPI = () => {
     "/api/scenes/:id/clips",
     authenticate,
     requireCacheReady,
-    authenticated(getClipsForScene)
+    libraryHandler(getClipsForScene)
   );
 
   // Whether the user's library can be shown yet (the client's re-check while

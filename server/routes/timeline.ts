@@ -1,7 +1,7 @@
 import express from "express";
 import { getDateDistribution } from "../controllers/timelineController.js";
 import { authenticate, requireCacheReady } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ router.use(authenticate);
 router.get(
   "/:entityType/distribution",
   requireCacheReady,
-  authenticated(getDateDistribution)
+  libraryHandler(getDateDistribution)
 );
 
 export default router;

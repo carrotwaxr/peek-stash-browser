@@ -148,6 +148,12 @@ export interface ReqParts<H extends Handler> {
   remoteAddress?: string | undefined;
   /** `req.url`, for handlers that read the path they were called on. */
   url?: string | undefined;
+  /**
+   * The instances a readiness middleware (`requireCacheReady`,
+   * `requirePickerReady`, `withAllowedInstances`) put on the request; left
+   * out, the request has none, as when a route lost that middleware.
+   */
+  allowedInstanceIds?: readonly string[] | undefined;
 }
 
 /**
@@ -179,6 +185,10 @@ export function reqFor<H extends Handler>(
       ? {}
       : { socket: { remoteAddress: parts.remoteAddress } };
   const url = parts.url === undefined ? {} : { url: parts.url };
+  const instances =
+    parts.allowedInstanceIds === undefined
+      ? {}
+      : { allowedInstanceIds: parts.allowedInstanceIds };
   // The one cast: a test request carries only the parts a handler reads
   return {
     body,
@@ -191,6 +201,7 @@ export function reqFor<H extends Handler>(
     get: header,
     ...socket,
     ...url,
+    ...instances,
   } as ReqFor<H>;
 }
 

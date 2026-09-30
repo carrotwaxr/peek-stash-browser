@@ -9,10 +9,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserStats } from "../../controllers/userStats.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
 // Mock dependencies BEFORE imports
@@ -28,17 +27,13 @@ vi.mock("../../services/RankingComputeService.js", () => ({
   },
 }));
 
-vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn(),
-}));
-
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockStatsService = vi.mocked(userStatsAggregationService);
 const mockRankingService = vi.mocked(rankingComputeService, true);
-const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
+const ALLOWED = ["inst-a", "inst-b"];
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -75,7 +70,6 @@ describe("UserStats Controller", () => {
 
     mockRankingService.ensureFresh.mockResolvedValue(undefined);
     mockStatsService.getUserStats.mockResolvedValue(SAMPLE_STATS);
-    mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
   });
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -85,7 +79,7 @@ describe("UserStats Controller", () => {
       const req = reqFor(getUserStats);
       const res = resFor(getUserStats);
 
-      await authenticated(getUserStats)(req, res, vi.fn());
+      await libraryHandler(getUserStats)(req, res, vi.fn());
 
       expect(res._getStatus()).toBe(401);
     });
@@ -94,7 +88,7 @@ describe("UserStats Controller", () => {
       const req = reqFor(getUserStats, { user: malformed({}) });
       const res = resFor(getUserStats);
 
-      await authenticated(getUserStats)(req, res, vi.fn());
+      await libraryHandler(getUserStats)(req, res, vi.fn());
 
       expect(res._getStatus()).toBe(401);
     });
@@ -104,7 +98,10 @@ describe("UserStats Controller", () => {
 
   describe("sortBy parameter", () => {
     it("defaults to 'engagement' when no sortBy is provided", async () => {
-      const req = reqFor(getUserStats, { user: USER });
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
@@ -118,6 +115,7 @@ describe("UserStats Controller", () => {
     it("accepts 'oCount' as a valid sortBy", async () => {
       const req = reqFor(getUserStats, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: { sortBy: "oCount" },
       });
       const res = resFor(getUserStats);
@@ -133,6 +131,7 @@ describe("UserStats Controller", () => {
     it("accepts 'playCount' as a valid sortBy", async () => {
       const req = reqFor(getUserStats, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: { sortBy: "playCount" },
       });
       const res = resFor(getUserStats);
@@ -148,6 +147,7 @@ describe("UserStats Controller", () => {
     it("falls back to 'engagement' for an invalid sortBy value", async () => {
       const req = reqFor(getUserStats, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: { sortBy: "invalidField" },
       });
       const res = resFor(getUserStats);
@@ -174,7 +174,10 @@ describe("UserStats Controller", () => {
         events.push("stats read");
         return Promise.resolve(SAMPLE_STATS);
       });
-      const req = reqFor(getUserStats, { user: USER });
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
@@ -190,7 +193,10 @@ describe("UserStats Controller", () => {
       mockRankingService.ensureFresh.mockRejectedValue(
         new Error("disk I/O error")
       );
-      const req = reqFor(getUserStats, { user: USER });
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await expect(getUserStats(req, res)).rejects.toThrow("disk I/O error");
@@ -203,13 +209,15 @@ describe("UserStats Controller", () => {
   // ─── Allowed instances ────────────────────────────────────────────────────
 
   describe("allowed instances", () => {
-    it("reads the stats over the viewer's allowed instances", async () => {
-      const req = reqFor(getUserStats, { user: USER });
+    it("passes req.allowedInstanceIds to the builder or service: the stats over the viewer's allowed instances", async () => {
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
-      expect(mockAllowedInstances).toHaveBeenCalledExactlyOnceWith(1);
       expect(mockStatsService.getUserStats).toHaveBeenCalledExactlyOnceWith(1, {
         sortBy: "engagement",
         allowedInstanceIds: ["inst-a", "inst-b"],
@@ -221,7 +229,10 @@ describe("UserStats Controller", () => {
 
   describe("happy path", () => {
     it("returns stats from the aggregation service", async () => {
-      const req = reqFor(getUserStats, { user: USER });
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await getUserStats(req, res);
@@ -239,7 +250,10 @@ describe("UserStats Controller", () => {
         new Error("Service failure")
       );
 
-      const req = reqFor(getUserStats, { user: USER });
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getUserStats);
 
       await expect(getUserStats(req, res)).rejects.toThrow("Service failure");

@@ -3,8 +3,12 @@ import {
   findGroups,
   findGroupsMinimal,
 } from "../../controllers/library/groups.js";
-import { authenticate, requireCacheReady } from "../../middleware/auth.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  authenticate,
+  requireCacheReady,
+  requirePickerReady,
+} from "../../middleware/auth.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -12,13 +16,13 @@ const router = express.Router();
 router.use(authenticate);
 
 // Find groups with filters
-router.post("/groups", requireCacheReady, authenticated(findGroups));
+router.post("/groups", requireCacheReady, libraryHandler(findGroups));
 
 // Minimal data for filter dropdowns
 router.post(
   "/groups/minimal",
-  requireCacheReady,
-  authenticated(findGroupsMinimal)
+  requirePickerReady,
+  libraryHandler(findGroupsMinimal)
 );
 
 export default router;

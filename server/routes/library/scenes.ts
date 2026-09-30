@@ -5,7 +5,7 @@ import {
   getRecommendedScenes,
 } from "../../controllers/library/scenes.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -13,20 +13,20 @@ const router = express.Router();
 router.use(authenticate);
 
 // Find scenes with filters
-router.post("/scenes", requireCacheReady, authenticated(findScenes));
+router.post("/scenes", requireCacheReady, libraryHandler(findScenes));
 
 // Find similar scenes
 router.get(
   "/scenes/:id/similar",
   requireCacheReady,
-  authenticated(findSimilarScenes)
+  libraryHandler(findSimilarScenes)
 );
 
 // Get recommended scenes
 router.get(
   "/scenes/recommended",
   requireCacheReady,
-  authenticated(getRecommendedScenes)
+  libraryHandler(getRecommendedScenes)
 );
 
 export default router;

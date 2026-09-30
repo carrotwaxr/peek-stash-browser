@@ -22,6 +22,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { must } from "../../tests/helpers/must.js";
 import type { MinimalEntity } from "../../types/api/index.js";
 import type { MinimalKind } from "../../types/parsedFilters.js";
@@ -150,7 +151,10 @@ describeWithDb("findMinimalEntities (integration)", () => {
   let onlyA: number;
   let everyone: number;
 
-  /** The request as the parser gives it (reject mode), answered for the user */
+  /**
+   * The request as the parser gives it (reject mode), answered for the user
+   * on their allowed instances, as requirePickerReady resolves them
+   */
   async function find(
     userId: number,
     entity: MinimalKind,
@@ -158,7 +162,8 @@ describeWithDb("findMinimalEntities (integration)", () => {
   ): Promise<MinimalEntity[]> {
     return findMinimalEntities(
       { id: userId, role: "USER" },
-      parseMinimalRequest(entity, body, { userId })
+      parseMinimalRequest(entity, body, { userId }),
+      await getUserAllowedInstanceIds(userId)
     );
   }
 
@@ -428,16 +433,21 @@ describeWithDb("findMinimalEntities (integration)", () => {
       },
       { userId: viewer }
     );
+    const instanceIds = await getUserAllowedInstanceIds(viewer);
     const recorder = recordStatements();
     let rows: MinimalEntity[] = [];
     try {
-      rows = await findMinimalEntities({ id: viewer, role: "USER" }, request);
+      rows = await findMinimalEntities(
+        { id: viewer, role: "USER" },
+        request,
+        instanceIds
+      );
     } finally {
       recorder.restore();
     }
 
     expect(names(rows)).toEqual(["Mx 01", "Mx 02"]);
-    // One raw read besides the instance scope (model calls, not recorded)
+    // One raw read: the instances are the request's
     expect(recorder.statements).toHaveLength(1);
     // Its LIMIT is the page size, held to 100
     const { params } = must(recorder.statements[0], "the statement");

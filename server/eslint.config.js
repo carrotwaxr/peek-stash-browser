@@ -140,6 +140,25 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", ...RESTRICTED, DYNAMIC_IMPORT_RULE],
     },
   },
+  // Handlers read the request's instances; they never look them up
+  {
+    files: ["controllers/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/services/UserInstanceService.js"],
+              importNames: ["getUserAllowedInstanceIds"],
+              message:
+                "read req.allowedInstanceIds (set by requireCacheReady, requirePickerReady or withAllowedInstances)",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // The one place that calls $transaction
   {
     files: ["utils/dbWrite.ts"],

@@ -38,10 +38,6 @@ vi.mock("../../../services/MinimalEntityQuery.js", () => ({
   findMinimalEntities: vi.fn(),
 }));
 
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -84,6 +80,7 @@ describe("Studios Controller", () => {
       const req = reqFor(findStudios, {
         body: { filter: {}, studio_filter: {} },
         user: defaultUser,
+        allowedInstanceIds: ["inst-a", "inst-b"],
       });
       const res = resFor(findStudios);
 
@@ -92,7 +89,7 @@ describe("Studios Controller", () => {
       // The builder reads the parsed request and the viewer's instances
       const call = must(mockStudioQueryBuilder.execute.mock.calls[0])[0];
       expect(call).toMatchObject({
-        allowedInstanceIds: ["default"],
+        allowedInstanceIds: ["inst-a", "inst-b"],
         request: { page: 1, sort: { field: "name", direction: "ASC" } },
       });
       expect(res._getStatus()).toBe(200);
@@ -259,7 +256,7 @@ describe("Studios Controller", () => {
   // ─── findStudiosMinimal ─────────────────────────────────────
 
   describe("findStudiosMinimal", () => {
-    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+    it("passes req.allowedInstanceIds to the builder or service: one page from findMinimalEntities, for the parsed request", async () => {
       const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
       mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findStudiosMinimal, {
@@ -269,18 +266,23 @@ describe("Studios Controller", () => {
           count_filter: { min_scene_count: 1 },
         },
         user: defaultUser,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
-        entity: "studio",
-        q: "al",
-        perPage: 20,
-        ids: [{ id: "1", instanceId: "inst-a" }],
-        countFilter: { min_scene_count: 1 },
-      });
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(
+        defaultUser,
+        {
+          entity: "studio",
+          q: "al",
+          perPage: 20,
+          ids: [{ id: "1", instanceId: "inst-a" }],
+          countFilter: { min_scene_count: 1 },
+        },
+        ["inst-a"]
+      );
       expect(res._getOkBody()).toEqual({ studios: rows });
     });
 

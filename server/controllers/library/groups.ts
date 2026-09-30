@@ -1,7 +1,6 @@
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -9,7 +8,7 @@ import type {
   FindGroupsMinimalResponse,
   FindGroupsRequest,
   FindGroupsResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import {
@@ -25,7 +24,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * Uses GroupQueryBuilder for SQL-native filtering (Phase 3 scalability)
  */
 export const findGroups = async (
-  req: TypedAuthRequest<FindGroupsRequest>,
+  req: TypedLibraryRequest<FindGroupsRequest>,
   res: TypedResponse<
     FindGroupsResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -44,8 +43,7 @@ export const findGroups = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   // Use SQL-native query builder
   const { items: groups, total } = await groupQueryBuilder.execute({
@@ -141,12 +139,16 @@ export const findGroups = async (
  * ForbiddenError (403) reaches the central error handler.
  */
 export const findGroupsMinimal = async (
-  req: TypedAuthRequest<FindGroupsMinimalRequest>,
+  req: TypedLibraryRequest<FindGroupsMinimalRequest>,
   res: TypedResponse<FindGroupsMinimalResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("group", req.body, { userId });
 
-  const groups = await findMinimalEntities(req.user, request);
+  const groups = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
   res.json({ groups });
 };

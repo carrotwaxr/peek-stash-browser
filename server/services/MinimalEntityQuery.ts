@@ -30,10 +30,6 @@ import { disambiguateEntityNames } from "../utils/entityInstanceId.js";
 import { instanceColumnClause, pairs } from "../utils/sqlClauses.js";
 import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import {
-  getEnabledSyncedInstanceIds,
-  getUserAllowedInstanceIds,
-} from "./UserInstanceService.js";
 
 type SqlParam = string | number | boolean;
 
@@ -146,7 +142,7 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
 function buildQuery(
   config: MinimalConfig,
   excludedFor: number | undefined,
-  instanceIds: string[],
+  instanceIds: readonly string[],
   request: ParsedMinimalRequest<MinimalKind>
 ): { sql: string; params: SqlParam[] } {
   const where: string[] = ["x.deletedAt IS NULL"];
@@ -213,49 +209,50 @@ function displayName(kind: MinimalKind, row: MinimalEntityQueryRow): string {
 
 /** What a picker lists from: its instances, and whose exclusions apply */
 interface PickerReach {
-  readonly instanceIds: string[];
+  readonly instanceIds: readonly string[];
   readonly excludedFor: number | undefined;
 }
 
 /**
- * What a picker lists from: the viewer's allowed instances less their
- * exclusions, or with scope "allEnabled" every enabled instance past its
- * first sync with no exclusions (the admin's Content Restrictions editor).
- * A viewer who is not an admin sending the scope is refused (403) before
- * any read.
+ * What a picker lists from: the request's instances (`requirePickerReady`
+ * resolved them: the viewer's allowed instances, or with an admin's scope
+ * "allEnabled" every enabled instance past its first sync), less the
+ * viewer's exclusions without the scope, with none with it (the admin's
+ * Content Restrictions editor). A viewer who is not an admin sending the
+ * scope is refused (403) before any read.
  */
-async function pickerReach(
+function pickerReach(
   viewer: MinimalViewer,
-  request: ParsedMinimalRequest<MinimalKind>
-): Promise<PickerReach> {
+  request: ParsedMinimalRequest<MinimalKind>,
+  instanceIds: readonly string[]
+): PickerReach {
   if (request.scope === undefined) {
-    return {
-      instanceIds: await getUserAllowedInstanceIds(viewer.id),
-      excludedFor: viewer.id,
-    };
+    return { instanceIds, excludedFor: viewer.id };
   }
   if (viewer.role !== "ADMIN") {
     throw new ForbiddenError(
       "Only an administrator can list every server's entities"
     );
   }
-  return {
-    instanceIds: await getEnabledSyncedInstanceIds(),
-    excludedFor: undefined,
-  };
+  return { instanceIds, excludedFor: undefined };
 }
 
-/** One page of what a picker lists for the viewer, in name order */
+/**
+ * One page of what a picker lists for the viewer, in name order, from
+ * `instanceIds` (the request's, from `requirePickerReady`; none lists
+ * nothing)
+ */
 export async function findMinimalEntities(
   viewer: MinimalViewer,
-  request: ParsedMinimalRequest<MinimalKind>
+  request: ParsedMinimalRequest<MinimalKind>,
+  instanceIds: readonly string[]
 ): Promise<MinimalEntity[]> {
-  const { instanceIds, excludedFor } = await pickerReach(viewer, request);
-  if (instanceIds.length === 0) return [];
+  const reach = pickerReach(viewer, request, instanceIds);
+  if (reach.instanceIds.length === 0) return [];
   const query = buildQuery(
     CONFIGS[request.entity],
-    excludedFor,
-    instanceIds,
+    reach.excludedFor,
+    reach.instanceIds,
     request
   );
   const rows = await prisma.$queryRawUnsafe<MinimalEntityQueryRow[]>(

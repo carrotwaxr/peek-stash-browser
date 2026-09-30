@@ -1,11 +1,10 @@
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
   FindImagesRequest,
   FindImagesResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import { parseListRequest, singleIdRef } from "../../utils/listRequest.js";
@@ -16,7 +15,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * Find images endpoint - uses SQL-native ImageQueryBuilder
  */
 export const findImages = async (
-  req: TypedAuthRequest<FindImagesRequest>,
+  req: TypedLibraryRequest<FindImagesRequest>,
   res: TypedResponse<
     FindImagesResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -33,8 +32,7 @@ export const findImages = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   // The request's instance_id (specificInstanceId) narrows the list to
   // one instance

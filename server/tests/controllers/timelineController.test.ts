@@ -17,10 +17,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["inst-a"]),
-}));
-
 vi.mock("../../services/TimelineService.js", () => ({
   timelineService: {
     getDistribution: vi.fn(),
@@ -46,6 +42,7 @@ describe("timelineController", () => {
         params: { entityType: "scene" },
         query: { granularity: "months" },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       const res = resFor(getDateDistribution);
@@ -69,6 +66,7 @@ describe("timelineController", () => {
         params: { entityType: "scene" },
         query: {},
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       const res = resFor(getDateDistribution);
@@ -97,6 +95,7 @@ describe("timelineController", () => {
           groupId: "g1:inst-a",
         },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       await getDateDistribution(req, resFor(getDateDistribution));
@@ -122,6 +121,7 @@ describe("timelineController", () => {
         params: { entityType: "gallery" },
         query: { tagId: "t1:inst-a" },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       await getDateDistribution(req, resFor(getDateDistribution));
@@ -140,6 +140,7 @@ describe("timelineController", () => {
         params: { entityType: "invalid" },
         query: { granularity: "months" },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       const res = resFor(getDateDistribution);
@@ -155,6 +156,7 @@ describe("timelineController", () => {
         params: { entityType: "scene" },
         query: { granularity: "invalid" },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       const res = resFor(getDateDistribution);
@@ -174,6 +176,7 @@ describe("timelineController", () => {
         params: { entityType: "scene" },
         query: { granularity: "months" },
         user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
       });
 
       const res = resFor(getDateDistribution);

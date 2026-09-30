@@ -3,8 +3,12 @@ import {
   findGalleries,
   findGalleriesMinimal,
 } from "../../controllers/library/galleries.js";
-import { authenticate, requireCacheReady } from "../../middleware/auth.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  authenticate,
+  requireCacheReady,
+  requirePickerReady,
+} from "../../middleware/auth.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -16,14 +20,14 @@ router.post(
   "/galleries",
   authenticate,
   requireCacheReady,
-  authenticated(findGalleries)
+  libraryHandler(findGalleries)
 );
 
 router.post(
   "/galleries/minimal",
   authenticate,
-  requireCacheReady,
-  authenticated(findGalleriesMinimal)
+  requirePickerReady,
+  libraryHandler(findGalleriesMinimal)
 );
 
 export default router;

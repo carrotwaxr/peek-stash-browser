@@ -334,6 +334,7 @@ describe("Playlist queries (integration)", () => {
     // Through the handler: the shared list answers with the recipient's view
     const req = reqFor(getSharedPlaylists, {
       user: testUser({ id: recipient.id, username: recipient.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(recipient.id),
     });
     const res = resFor(getSharedPlaylists);
     await getSharedPlaylists(req, res);
@@ -345,6 +346,7 @@ describe("Playlist queries (integration)", () => {
   it("the owner's list counts and previews what the owner can see", async () => {
     const req = reqFor(getUserPlaylists, {
       user: testUser({ id: owner.id, username: owner.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(owner.id),
     });
     const res = resFor(getUserPlaylists);
     await getUserPlaylists(req, res);
@@ -408,6 +410,7 @@ describe("Playlist queries (integration)", () => {
         params: { id: String(pq) },
         query: { page: "2", per_page: "2" },
         user: testUser({ id: viewer.id, username: viewer.username }),
+        allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
       });
       const res = resFor(getPlaylist);
       await getPlaylist(req, res);
@@ -478,6 +481,7 @@ describe("Playlist queries (integration)", () => {
     const req = reqFor(getPlaylist, {
       params: { id: String(pq) },
       user: testUser({ id: owner.id, username: owner.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(owner.id),
     });
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);

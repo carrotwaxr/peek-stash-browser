@@ -13,8 +13,8 @@ import {
   updatePlaylist,
   updatePlaylistShares,
 } from "../controllers/playlist.js";
-import { authenticate } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { authenticate, withAllowedInstances } from "../middleware/auth.js";
+import { authenticated, libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -22,13 +22,13 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get playlists shared with current user
-router.get("/shared", authenticated(getSharedPlaylists));
+router.get("/shared", withAllowedInstances, libraryHandler(getSharedPlaylists));
 
 // Get all user playlists
-router.get("/", authenticated(getUserPlaylists));
+router.get("/", withAllowedInstances, libraryHandler(getUserPlaylists));
 
 // Get single playlist with items
-router.get("/:id", authenticated(getPlaylist));
+router.get("/:id", withAllowedInstances, libraryHandler(getPlaylist));
 
 // Create new playlist
 router.post("/", authenticated(createPlaylist));

@@ -7,11 +7,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
-import type * as userInstanceModule from "../../services/UserInstanceService.js";
-import {
-  getEnabledSyncedInstanceIds,
-  getUserAllowedInstanceIds,
-} from "../../services/UserInstanceService.js";
 import type { MinimalEntityQueryRow } from "../../types/internal/queryRows.js";
 import type { MinimalKind } from "../../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
@@ -23,29 +18,32 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-vi.mock("../../services/UserInstanceService.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof userInstanceModule>()),
-  getUserAllowedInstanceIds: vi.fn(),
-  getEnabledSyncedInstanceIds: vi.fn(),
-}));
-
 vi.mock("../../utils/entityInstanceId.js", () => ({
   disambiguateEntityNames: vi.fn(),
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockAllowed = vi.mocked(getUserAllowedInstanceIds);
-const mockEnabled = vi.mocked(getEnabledSyncedInstanceIds);
 const mockDisambiguate = vi.mocked(disambiguateEntityNames);
 
 const USER = 7;
 const AS_USER = { id: USER, role: "USER" };
 const AS_ADMIN = { id: USER, role: "ADMIN" };
 
-function find(entity: MinimalKind, body: object, viewer = AS_USER) {
+/**
+ * One picker request. `instanceIds` is the list the route's
+ * `requirePickerReady` put on the request: the viewer's allowed instances,
+ * or with an admin's scope every enabled, synced one.
+ */
+function find(
+  entity: MinimalKind,
+  body: object,
+  viewer = AS_USER,
+  instanceIds: readonly string[] = ["a", "b"]
+) {
   return findMinimalEntities(
     viewer,
-    parseMinimalRequest(entity, body, { userId: USER })
+    parseMinimalRequest(entity, body, { userId: USER }),
+    instanceIds
   );
 }
 
@@ -65,17 +63,21 @@ function row(fields: Partial<MinimalEntityQueryRow>): MinimalEntityQueryRow {
 describe("findMinimalEntities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAllowed.mockResolvedValue(["a", "b"]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockDisambiguate.mockImplementation((entities) => entities);
   });
 
   it("sends nothing and lists nothing without an allowed instance", async () => {
-    mockAllowed.mockResolvedValue([]);
-
-    await expect(find("performer", {})).resolves.toEqual([]);
-    expect(mockAllowed).toHaveBeenCalledWith(USER);
+    await expect(find("performer", {}, AS_USER, [])).resolves.toEqual([]);
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("lists from the instances it is given, reading no list itself", async () => {
+    await find("performer", {}, AS_USER, ["inst-x"]);
+
+    const { sql, params } = statement();
+    expect(sql).toContain("x.stashInstanceId IN (?)");
+    expect(params).toEqual([USER, "performer", "inst-x", 50]);
   });
 
   it("reads one page in name order: exclusion join with the instance, live, allowed instances", async () => {
@@ -204,13 +206,9 @@ describe("findMinimalEntities", () => {
   });
   describe("scope allEnabled (the Content Restrictions editor)", () => {
     it("with scope the statement has no exclusion join", async () => {
-      mockAllowed.mockResolvedValue(["a"]);
-      mockEnabled.mockResolvedValue(["a", "b", "c"]);
+      // requirePickerReady resolved every enabled, synced instance
+      await find("tag", { scope: "allEnabled" }, AS_ADMIN, ["a", "b", "c"]);
 
-      await find("tag", { scope: "allEnabled" }, AS_ADMIN);
-
-      // Every enabled, synced instance in place of the admin's own
-      expect(mockAllowed).not.toHaveBeenCalled();
       const { sql, params } = statement();
       expect(sql).not.toContain("UserExcludedEntity");
       expect(sql).not.toContain("e.id IS NULL");
@@ -222,7 +220,6 @@ describe("findMinimalEntities", () => {
     });
 
     it("with scope every other clause stays, its params in order", async () => {
-      mockEnabled.mockResolvedValue(["a", "b"]);
       const request = {
         ids: ["12:a", "13"],
         filter: { q: "50%", per_page: 20 },
@@ -261,21 +258,15 @@ describe("findMinimalEntities", () => {
     });
 
     it("sends nothing and lists nothing when no enabled instance has synced", async () => {
-      mockEnabled.mockResolvedValue([]);
-
       await expect(
-        find("studio", { scope: "allEnabled" }, AS_ADMIN)
+        find("studio", { scope: "allEnabled" }, AS_ADMIN, [])
       ).resolves.toEqual([]);
       expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
     });
 
-    it("an admin without the scope keeps their own instances", async () => {
-      mockAllowed.mockResolvedValue(["a"]);
+    it("an admin without the scope keeps their own exclusions", async () => {
+      await find("tag", {}, AS_ADMIN, ["a"]);
 
-      await find("tag", {}, AS_ADMIN);
-
-      expect(mockEnabled).not.toHaveBeenCalled();
-      expect(mockAllowed).toHaveBeenCalledWith(USER);
       expect(statement().params).toEqual([USER, "tag", "a", 50]);
     });
 
@@ -283,8 +274,6 @@ describe("findMinimalEntities", () => {
       await expect(find("tag", { scope: "allEnabled" })).rejects.toThrow(
         ForbiddenError
       );
-      expect(mockAllowed).not.toHaveBeenCalled();
-      expect(mockEnabled).not.toHaveBeenCalled();
       expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
     });
   });

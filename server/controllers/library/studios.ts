@@ -1,7 +1,6 @@
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -9,7 +8,7 @@ import type {
   FindStudiosMinimalResponse,
   FindStudiosRequest,
   FindStudiosResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import {
@@ -24,7 +23,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * findStudios using SQL query builder
  */
 export const findStudios = async (
-  req: TypedAuthRequest<FindStudiosRequest>,
+  req: TypedLibraryRequest<FindStudiosRequest>,
   res: TypedResponse<
     FindStudiosResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -43,8 +42,7 @@ export const findStudios = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const { items: studios, total } = await studioQueryBuilder.execute({
     userId,
@@ -142,12 +140,16 @@ export const findStudios = async (
  * ForbiddenError (403) reaches the central error handler.
  */
 export const findStudiosMinimal = async (
-  req: TypedAuthRequest<FindStudiosMinimalRequest>,
+  req: TypedLibraryRequest<FindStudiosMinimalRequest>,
   res: TypedResponse<FindStudiosMinimalResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("studio", req.body, { userId });
 
-  const studios = await findMinimalEntities(req.user, request);
+  const studios = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
   res.json({ studios });
 };
