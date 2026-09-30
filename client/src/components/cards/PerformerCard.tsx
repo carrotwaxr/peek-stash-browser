@@ -180,6 +180,8 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         ratingControlsProps={{
           entityId: performer.id,
           instanceId: performer.instanceId,
+          // The title is JSX (name and gender icon), so name the performer
+          entityTitle: performer.name,
           initialRating: performer.rating,
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,

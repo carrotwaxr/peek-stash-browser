@@ -139,6 +139,24 @@ describe("PerformerCard", () => {
   });
 });
 
+describe("PerformerCard hide name", () => {
+  it("names the performer, not its JSX title, in the hide dialog and toast", () => {
+    render(
+      <PerformerCard
+        performer={partialPerformer({
+          id: "7",
+          instanceId: "inst-a",
+          name: "Jane Doe",
+          tags: [],
+        })}
+      />
+    );
+
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    expect(props.ratingControlsProps?.entityTitle).toBe("Jane Doe");
+  });
+});
+
 describe("PerformerCard indicators", () => {
   beforeEach(() => {
     vi.clearAllMocks();

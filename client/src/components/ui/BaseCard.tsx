@@ -11,13 +11,12 @@ import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio
 import {
   CardContainer,
   CardDescription,
+  CardHideMenu,
   CardImage,
   CardIndicators,
-  CardMenuRow,
   CardRatingRow,
   CardTitle,
 } from "./CardComponents";
-import EntityMenu from "./EntityMenu";
 
 export interface CardIndicator {
   type: string;
@@ -43,7 +42,6 @@ export interface RatingControlsProps {
     entityType: string,
     instanceId: string
   ) => void;
-  onHideClick?: (hideInfo: Record<string, unknown>) => void;
   onOCounterChange?: (entityId: string, count: number) => void;
   onRatingChange?: (entityId: string, rating: number) => void;
   onFavoriteChange?: (entityId: string, value: boolean) => void;
@@ -240,8 +238,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
             Menu placement logic:
             1. If rating controls visible → menu in rating row
             2. If rating controls hidden but indicators visible → menu in indicators row
-            3. If indicators hidden but showMenu enabled → standalone CardMenuRow
-            4. If everything hidden → no extra row
+            3. If everything hidden → no extra row
         */}
         {(() => {
           // Extract settings from ratingControlsProps
@@ -252,25 +249,20 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
               ratingControlsProps.showOCounter);
           const showMenu = ratingControlsProps?.showMenu ?? true;
           const hasIndicators = indicators.length > 0;
+          // What the hide dialog and toast call the entity
+          const entityTitle =
+            ratingControlsProps?.entityTitle ??
+            (typeof title === "string" ? title : undefined);
 
           // Build menu component for indicators row (when needed)
           const menuForIndicators =
             !hasRatingControls && showMenu && ratingControlsProps ? (
-              <EntityMenu
+              <CardHideMenu
                 entityType={ratingControlsProps.entityType || entityType}
                 entityId={ratingControlsProps.entityId}
-                entityName={ratingControlsProps.entityTitle ?? ""}
                 instanceId={ratingControlsProps.instanceId}
-                onHide={
-                  ratingControlsProps.onHideClick as
-                    | ((payload: {
-                        entityType: string;
-                        entityId: string;
-                        entityName: string;
-                        instanceId: string;
-                      }) => void)
-                    | undefined
-                }
+                entityTitle={entityTitle}
+                onHideSuccess={ratingControlsProps.onHideSuccess}
               />
             ) : null;
 
@@ -290,7 +282,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                   entityType={ratingControlsProps.entityType || entityType}
                   entityId={ratingControlsProps.entityId}
                   instanceId={ratingControlsProps.instanceId}
-                  entityTitle={ratingControlsProps.entityTitle}
+                  entityTitle={entityTitle}
                   initialRating={ratingControlsProps.initialRating ?? null}
                   initialFavorite={ratingControlsProps.initialFavorite ?? false}
                   initialOCounter={ratingControlsProps.initialOCounter ?? 0}
@@ -308,20 +300,6 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                   showMenu={ratingControlsProps.showMenu}
                 />
               )}
-
-              {/* Standalone menu row - only if no indicators and no rating controls but menu enabled */}
-              {!hasIndicators &&
-                !hasRatingControls &&
-                showMenu &&
-                ratingControlsProps && (
-                  <CardMenuRow
-                    entityType={ratingControlsProps.entityType || entityType}
-                    entityId={ratingControlsProps.entityId}
-                    instanceId={ratingControlsProps.instanceId}
-                    entityTitle={ratingControlsProps.entityTitle}
-                    onHideSuccess={ratingControlsProps.onHideSuccess}
-                  />
-                )}
             </>
           );
         })()}
