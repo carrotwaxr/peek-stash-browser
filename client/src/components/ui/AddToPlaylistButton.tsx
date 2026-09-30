@@ -10,6 +10,8 @@ import Paper from "./Paper";
 interface Props {
   sceneId?: string;
   sceneIds?: string[];
+  /** Scenes with their instances; takes precedence over `sceneId`/`sceneIds` */
+  scenes?: ReadonlyArray<{ id: string; instanceId: string }>;
   compact?: boolean;
   buttonText?: string;
   icon?: ReactNode;
@@ -23,6 +25,7 @@ interface Props {
 const AddToPlaylistButton = ({
   sceneId,
   sceneIds,
+  scenes,
   compact = false,
   buttonText,
   icon,
@@ -51,7 +54,9 @@ const AddToPlaylistButton = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Support both single sceneId and multiple sceneIds
-  const scenesToAdd = sceneIds ?? (sceneId ? [sceneId] : []);
+  const scenesToAdd: Array<{ id: string; instanceId?: string }> =
+    scenes?.map((s) => ({ ...s })) ??
+    (sceneIds ?? (sceneId ? [sceneId] : [])).map((id) => ({ id }));
   const isMultiple = scenesToAdd.length > 1;
 
   // Auto-detect menu position when opening
@@ -131,9 +136,12 @@ const AddToPlaylistButton = ({
       let addedCount = 0;
       let skippedCount = 0;
 
-      for (const sceneId of scenesToAdd) {
+      for (const scene of scenesToAdd) {
         try {
-          await apiPost(`/playlists/${playlistId}/items`, { sceneId });
+          await apiPost(`/playlists/${playlistId}/items`, {
+            sceneId: scene.id,
+            ...(scene.instanceId && { instanceId: scene.instanceId }),
+          });
           addedCount++;
         } catch (err) {
           if (err instanceof ApiError && err.status === 400) {
