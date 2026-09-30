@@ -4,7 +4,6 @@ import { hasAnyCriteria } from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -15,7 +14,7 @@ import type {
   FindSimilarScenesResponse,
   GetRecommendedScenesQuery,
   GetRecommendedScenesResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
   WithStashUrl,
 } from "../../types/api/index.js";
@@ -63,7 +62,7 @@ export function addStreamabilityInfo(
  * Lists scenes through SceneQueryBuilder: filters, sort and paging run in SQL
  */
 export const findScenes = async (
-  req: TypedAuthRequest<FindScenesRequest>,
+  req: TypedLibraryRequest<FindScenesRequest>,
   res: TypedResponse<
     FindScenesResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -77,8 +76,7 @@ export const findScenes = async (
   // A detail page asks for its scene by id
   const lookup = singleIdRef(request.filter.ids);
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   // Execute query (applyExclusions defaults to true)
   const result = await sceneQueryBuilder.execute({
@@ -149,7 +147,7 @@ export const findScenes = async (
  * scene builder, which applies the exclusions and allowed instances again.
  */
 export const findSimilarScenes = async (
-  req: TypedAuthRequest<
+  req: TypedLibraryRequest<
     unknown,
     FindSimilarScenesParams,
     FindSimilarScenesQuery
@@ -194,7 +192,7 @@ export const findSimilarScenes = async (
     return;
   }
 
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
   const scenes = await sceneQueryBuilder.getByRefs({
     userId,
     refs: pageRefs,
@@ -235,7 +233,7 @@ export const findSimilarScenes = async (
  * what the user can see.
  */
 export const getRecommendedScenes = async (
-  req: TypedAuthRequest<
+  req: TypedLibraryRequest<
     unknown,
     Record<string, string>,
     GetRecommendedScenesQuery
@@ -254,7 +252,7 @@ export const getRecommendedScenes = async (
   // request scores with the ones stored
   void rankingComputeService.ensureFresh(userId);
 
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
   const { refs, criteria } = await recommendationService.getRankedRefs(
     userId,
     allowedInstanceIds

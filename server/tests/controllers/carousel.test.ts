@@ -26,12 +26,11 @@ import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
 import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { NormalizedScene } from "../../types/index.js";
 import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { logger } from "../../utils/logger.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import { authenticated, libraryHandler } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
@@ -53,10 +52,6 @@ vi.mock("../../services/SceneQueryBuilder.js", () => ({
 }));
 
 // The user's instances: enabled, selected and past their first sync
-vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn(),
-}));
-
 // Mock library/scenes helpers
 vi.mock("../../controllers/library/scenes.js", () => ({
   addStreamabilityInfo: vi.fn((scenes: unknown[]) => scenes),
@@ -70,7 +65,6 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
-const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 const mockLogger = vi.mocked(logger, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
@@ -108,7 +102,6 @@ const withStashUrl = (scenes: NormalizedScene[]) =>
 describe("Carousel Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAllowedInstances.mockResolvedValue(["inst-a"]);
   });
 
   // ==========================================================================
@@ -631,12 +624,15 @@ describe("Carousel Controller", () => {
         body: { rules: RULES },
       });
       const res = resFor(previewCarousel);
-      await authenticated(previewCarousel)(req, res, vi.fn());
+      await libraryHandler(previewCarousel)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 when rules are missing", async () => {
-      const req = reqFor(previewCarousel, { user: USER });
+      const req = reqFor(previewCarousel, {
+        user: USER,
+        allowedInstanceIds: ["inst-a"],
+      });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
       expect(res._getStatus()).toBe(400);
@@ -657,6 +653,7 @@ describe("Carousel Controller", () => {
           direction: "DESC",
         },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
@@ -671,6 +668,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(previewCarousel, {
         body: { rules: RULES, sort: "rating" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await expect(previewCarousel(req, res)).rejects.toThrow("Query failed");
@@ -687,7 +685,7 @@ describe("Carousel Controller", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(executeCarouselById, { params: { id: "1" } });
       const res = resFor(executeCarouselById);
-      await authenticated(executeCarouselById)(req, res, vi.fn());
+      await libraryHandler(executeCarouselById)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
     });
 
@@ -697,6 +695,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(executeCarouselById, {
         params: { id: "999" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
@@ -716,6 +715,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
@@ -742,6 +742,7 @@ describe("Carousel Controller", () => {
         const req = reqFor(executeCarouselById, {
           params: { id: "stale-rule" },
           user: USER,
+          allowedInstanceIds: ["inst-a"],
         });
         const res = resFor(executeCarouselById);
         await executeCarouselById(req, res);
@@ -766,6 +767,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(executeCarouselById);
       await expect(executeCarouselById(req, res)).rejects.toThrow(
@@ -796,6 +798,7 @@ describe("Carousel Controller", () => {
           direction: "DESC",
         },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
@@ -820,6 +823,7 @@ describe("Carousel Controller", () => {
           sort: "random",
         },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
@@ -840,6 +844,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
@@ -847,10 +852,9 @@ describe("Carousel Controller", () => {
       expect(mockAddStreamability).toHaveBeenCalledWith(scenes, USER);
     });
 
-    it("lists only the user's instances, with the parsed filter and sort", async () => {
+    it("passes req.allowedInstanceIds to the builder or service, with the parsed filter and sort", async () => {
       mockQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
       mockAddStreamability.mockReturnValue([]);
-      mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
 
       const req = reqFor(previewCarousel, {
         body: {
@@ -865,11 +869,11 @@ describe("Carousel Controller", () => {
           direction: "asc",
         },
         user: USER,
+        allowedInstanceIds: ["inst-a", "inst-b"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
-      expect(mockAllowedInstances).toHaveBeenCalledWith(1);
       expect(mockQueryBuilder.execute).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 1,
@@ -898,6 +902,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(previewCarousel, {
         body: { rules: RULES },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);
@@ -921,6 +926,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(executeCarouselById, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
@@ -942,6 +948,7 @@ describe("Carousel Controller", () => {
       const req = reqFor(previewCarousel, {
         body: malformed({ rules: { not_a_field: { value: 1 } } }),
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
 
@@ -967,6 +974,7 @@ describe("Carousel Controller", () => {
           direction: "ASC",
         },
         user: USER,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(previewCarousel);
       await previewCarousel(req, res);

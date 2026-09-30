@@ -30,10 +30,6 @@ vi.mock("../../../services/ImageQueryBuilder.js", () => ({
   imageQueryBuilder: { execute: vi.fn() },
 }));
 
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -123,6 +119,7 @@ describe("Images Controller", () => {
       const req = reqFor(findImages, {
         body: { filter: {}, image_filter: {} },
         user: defaultUser,
+        allowedInstanceIds: ["inst-a", "inst-b"],
       });
       const res = resFor(findImages);
 
@@ -132,7 +129,7 @@ describe("Images Controller", () => {
       const call = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(call).toMatchObject({
         userId: 1,
-        allowedInstanceIds: ["default"],
+        allowedInstanceIds: ["inst-a", "inst-b"],
         request: { page: 1, sort: { field: "title", direction: "ASC" } },
       });
       expect(res._getStatus()).toBe(200);

@@ -45,10 +45,6 @@ vi.mock("../../../services/MinimalEntityQuery.js", () => ({
   findMinimalEntities: vi.fn(),
 }));
 
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -89,6 +85,7 @@ describe("Tags Controller", () => {
       const req = reqFor(findTags, {
         body: { filter: {}, tag_filter: {} },
         user: defaultUser,
+        allowedInstanceIds: ["inst-a", "inst-b"],
       });
       const res = resFor(findTags);
 
@@ -97,7 +94,7 @@ describe("Tags Controller", () => {
       // The builder reads the parsed request and the viewer's instances
       const call = must(mockTagQueryBuilder.execute.mock.calls[0])[0];
       expect(call).toMatchObject({
-        allowedInstanceIds: ["default"],
+        allowedInstanceIds: ["inst-a", "inst-b"],
         request: { page: 1, sort: { field: "name", direction: "ASC" } },
       });
       expect(res._getStatus()).toBe(200);
@@ -270,7 +267,7 @@ describe("Tags Controller", () => {
   // ─── findTagsMinimal ────────────────────────────────────────
 
   describe("findTagsMinimal", () => {
-    it("answers one page from findMinimalEntities, for the parsed request", async () => {
+    it("passes req.allowedInstanceIds to the builder or service: one page from findMinimalEntities, for the parsed request", async () => {
       const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
       mockFindMinimalEntities.mockResolvedValue(rows);
       const req = reqFor(findTagsMinimal, {
@@ -280,18 +277,23 @@ describe("Tags Controller", () => {
           count_filter: { min_scene_count: 1 },
         },
         user: defaultUser,
+        allowedInstanceIds: ["inst-a"],
       });
       const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      expect(mockFindMinimalEntities).toHaveBeenCalledWith(defaultUser, {
-        entity: "tag",
-        q: "al",
-        perPage: 20,
-        ids: [{ id: "1", instanceId: "inst-a" }],
-        countFilter: { min_scene_count: 1 },
-      });
+      expect(mockFindMinimalEntities).toHaveBeenCalledWith(
+        defaultUser,
+        {
+          entity: "tag",
+          q: "al",
+          perPage: 20,
+          ids: [{ id: "1", instanceId: "inst-a" }],
+          countFilter: { min_scene_count: 1 },
+        },
+        ["inst-a"]
+      );
       expect(res._getOkBody()).toEqual({ tags: rows });
     });
 
@@ -341,14 +343,18 @@ describe("Tags Controller", () => {
     it("answers the whole tree on the user's allowed instances", async () => {
       mockLoadTagTree.mockResolvedValue([row]);
 
-      const req = reqFor(findTagTree, { body: {}, user: defaultUser });
+      const req = reqFor(findTagTree, {
+        body: {},
+        user: defaultUser,
+        allowedInstanceIds: ["inst-a", "inst-b"],
+      });
       const res = resFor(findTagTree);
 
       await findTagTree(req, res);
 
       expect(mockLoadTagTree).toHaveBeenCalledWith({
         userId: defaultUser.id,
-        allowedInstanceIds: ["default"],
+        allowedInstanceIds: ["inst-a", "inst-b"],
         scope: undefined,
       });
       expect(res._getOkBody()).toEqual({ tags: [row] });

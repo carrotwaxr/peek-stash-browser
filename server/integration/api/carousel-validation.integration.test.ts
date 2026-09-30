@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getRecommendedScenes } from "../../controllers/library/scenes.js";
 import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   reqFor,
   resFor,
@@ -367,6 +368,7 @@ describe("carousel, recommended and similar requests", () => {
       const req = reqFor(getRecommendedScenes, {
         query: { page: "1", per_page: "1000" },
         user: testUser({ id, username: "access_it_carousel_rec" }),
+        allowedInstanceIds: await getUserAllowedInstanceIds(id),
       });
       const res = resFor(getRecommendedScenes);
       const recorder = recordStatements();

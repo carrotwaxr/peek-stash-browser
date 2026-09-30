@@ -40,6 +40,23 @@ export interface TypedAuthRequest<
 }
 
 /**
+ * Typed request for a list handler (`libraryHandler`): the signed-in user,
+ * and the instances the user sees content from, resolved once for the
+ * request by `requireCacheReady`, `requirePickerReady` or
+ * `withAllowedInstances`. An empty list matches nothing in every reader.
+ */
+export type TypedLibraryRequest<
+  TBody = unknown,
+  TParams extends Record<string, string> = Record<string, string>,
+  TQuery extends Record<string, string | string[] | undefined> = Record<
+    string,
+    string | undefined
+  >,
+> = TypedAuthRequest<TBody, TParams, TQuery> & {
+  readonly allowedInstanceIds: readonly string[];
+};
+
+/**
  * Typed response with json body generic
  * Note: Express Response.json returns Response, not the body type
  */

@@ -23,10 +23,9 @@ import rankingComputeService from "../../../services/RankingComputeService.js";
 import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { getUserAllowedInstanceIds } from "../../../services/UserInstanceService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
 import { logger } from "../../../utils/logger.js";
-import { authenticated } from "../../../utils/routeHelpers.js";
+import { libraryHandler } from "../../../utils/routeHelpers.js";
 import {
   malformed,
   reqFor,
@@ -69,10 +68,6 @@ vi.mock("../../../services/RecommendationService.js", () => ({
 
 vi.mock("../../../services/EntityAccessService.js", () => ({
   resolveAccessibleInstanceId: vi.fn().mockResolvedValue("inst-a"),
-}));
-
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
 }));
 
 vi.mock("../../../services/RankingComputeService.js", () => ({
@@ -130,7 +125,6 @@ const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
 const mockLogger = vi.mocked(logger, true);
 const mockRankingService = vi.mocked(rankingComputeService, true);
 const mockRecommendationService = vi.mocked(recommendationService, true);
-const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -215,7 +209,7 @@ describe("findScenes", () => {
     const req = reqFor(findScenes, { body: { filter: {}, scene_filter: {} } });
     const res = resFor(findScenes);
 
-    await authenticated(findScenes)(req, res, vi.fn());
+    await libraryHandler(findScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
     expect(res._getBody()).toEqual({ error: "Unauthorized" });
@@ -240,6 +234,22 @@ describe("findScenes", () => {
     const body = res._getOkBody();
     expect(body.findScenes.count).toBe(1);
     expect(body.findScenes.scenes).toHaveLength(1);
+  });
+
+  it("passes req.allowedInstanceIds to the builder or service", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({ items: [], total: 0 });
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+      allowedInstanceIds: ["inst-a", "inst-b"],
+    });
+    const res = resFor(findScenes);
+
+    await findScenes(req, res);
+
+    expect(mockSceneQueryBuilder.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ allowedInstanceIds: ["inst-a", "inst-b"] })
+    );
   });
 
   it("findScenes logs its timings at DEBUG, not INFO", async () => {
@@ -447,7 +457,7 @@ describe("findSimilarScenes", () => {
     });
     const res = resFor(findSimilarScenes);
 
-    await authenticated(findSimilarScenes)(req, res, vi.fn());
+    await libraryHandler(findSimilarScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
   });
@@ -518,6 +528,7 @@ describe("findSimilarScenes", () => {
       params: { id: "101" },
       user: testUser(),
       query: { page: "2", instanceId: "inst-a" },
+      allowedInstanceIds: ["default"],
     });
     const res = resFor(findSimilarScenes);
 
@@ -626,14 +637,13 @@ describe("getRecommendedScenes", () => {
       refs: [],
       criteria: noCriteria,
     });
-    mockAllowedInstances.mockResolvedValue(["default"]);
   });
 
   it("returns 401 when user is not authenticated", async () => {
     const req = reqFor(getRecommendedScenes, { query: { page: "1" } });
     const res = resFor(getRecommendedScenes);
 
-    await authenticated(getRecommendedScenes)(req, res, vi.fn());
+    await libraryHandler(getRecommendedScenes)(req, res, vi.fn());
 
     expect(res._getStatus()).toBe(401);
     expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
@@ -691,11 +701,11 @@ describe("getRecommendedScenes", () => {
     expect(body.criteria).toEqual(someCriteria);
   });
 
-  it("asks for the ranked list of the user's instances", async () => {
-    mockAllowedInstances.mockResolvedValue(["inst-a", "inst-b"]);
+  it("passes req.allowedInstanceIds to the builder or service: the ranked list of the request's instances", async () => {
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },
+      allowedInstanceIds: ["inst-a", "inst-b"],
     });
     const res = resFor(getRecommendedScenes);
 
@@ -724,6 +734,7 @@ describe("getRecommendedScenes", () => {
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "2", per_page: "2" },
+      allowedInstanceIds: ["default"],
     });
     const res = resFor(getRecommendedScenes);
 

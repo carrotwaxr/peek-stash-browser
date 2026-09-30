@@ -30,10 +30,6 @@ vi.mock("../../../services/MinimalEntityQuery.js", () => ({
   findMinimalEntities: vi.fn(),
 }));
 
-vi.mock("../../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["default"]),
-}));
-
 vi.mock("../../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -72,6 +68,7 @@ describe("findPerformers", () => {
     const req = reqFor(findPerformers, {
       body: { filter: { page: 1, per_page: 20 } },
       user: testUser({ role: "ADMIN" }),
+      allowedInstanceIds: ["inst-a", "inst-b"],
     });
     const res = resFor(findPerformers);
 
@@ -82,7 +79,7 @@ describe("findPerformers", () => {
       vi.mocked(performerQueryBuilder).execute.mock.calls[0]
     )[0];
     expect(call).toMatchObject({
-      allowedInstanceIds: ["default"],
+      allowedInstanceIds: ["inst-a", "inst-b"],
       request: { page: 1, perPage: 20, sort: { field: "name" } },
     });
     expect(res._getStatus()).toBe(200);
@@ -182,7 +179,7 @@ describe("findPerformers", () => {
 });
 
 describe("findPerformersMinimal", () => {
-  it("answers one page from findMinimalEntities, for the parsed request", async () => {
+  it("passes req.allowedInstanceIds to the builder or service: one page from findMinimalEntities, for the parsed request", async () => {
     const rows = [{ id: "1", instanceId: "inst-a", name: "Alpha" }];
     mockFindMinimalEntities.mockResolvedValue(rows);
     const req = reqFor(findPerformersMinimal, {
@@ -192,18 +189,23 @@ describe("findPerformersMinimal", () => {
         count_filter: { min_scene_count: 1 },
       },
       user: testUser(),
+      allowedInstanceIds: ["inst-a"],
     });
     const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 
-    expect(mockFindMinimalEntities).toHaveBeenCalledWith(testUser(), {
-      entity: "performer",
-      q: "al",
-      perPage: 20,
-      ids: [{ id: "1", instanceId: "inst-a" }],
-      countFilter: { min_scene_count: 1 },
-    });
+    expect(mockFindMinimalEntities).toHaveBeenCalledWith(
+      testUser(),
+      {
+        entity: "performer",
+        q: "al",
+        perPage: 20,
+        ids: [{ id: "1", instanceId: "inst-a" }],
+        countFilter: { min_scene_count: 1 },
+      },
+      ["inst-a"]
+    );
     expect(res._getOkBody()).toEqual({ performers: rows });
   });
 

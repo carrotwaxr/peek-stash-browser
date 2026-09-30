@@ -3,7 +3,10 @@ import type { JsonValue } from "@prisma/client/runtime/library";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
+import {
+  getEnabledSyncedInstanceIds,
+  getUserAllowedInstanceIds,
+} from "../services/UserInstanceService.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
 import { shouldLogOnce } from "../utils/logThrottle.js";
@@ -295,37 +298,122 @@ export const requireAdmin = (
  * Whether the user has an instance to show: false on a fresh install before
  * its first sync, or while every instance the user sees is still on its
  * first sync (an instance shows once that sync's exclusions are computed).
- * `requireCacheReady` and `GET /api/library/ready` both answer from it.
+ * `GET /api/library/ready` answers from it; `requireCacheReady` applies the
+ * same rule to the list it puts on the request.
  */
 export const isLibraryReady = async (userId: number): Promise<boolean> =>
   (await getUserAllowedInstanceIds(userId)).length > 0;
 
+/** The 503 a list route answers while the viewer has no instance to show */
+function answerInitializing(res: Response): void {
+  res.status(503).json({
+    error: "Server is initializing",
+    message: "Cache is still loading. Please wait a moment and try again.",
+    ready: false,
+  });
+}
+
+/**
+ * The signed-in user, or a 401 answered: the readiness middleware run after
+ * authenticate, and fail closed on a route that lost it
+ */
+function signedInUser(req: Request, res: Response): RequestUser | undefined {
+  const { user } = req as Partial<AuthenticatedRequest>;
+  if (!user) {
+    res.status(401).json({ error: "Access denied. No token provided." });
+    return undefined;
+  }
+  return user;
+}
+
+/**
+ * Puts the request's instance list where `libraryHandler` handlers read it
+ * (`TypedLibraryRequest.allowedInstanceIds`)
+ */
+function attachAllowedInstances(
+  req: Request,
+  allowedInstanceIds: readonly string[]
+): void {
+  (req as { allowedInstanceIds?: readonly string[] }).allowedInstanceIds =
+    allowedInstanceIds;
+}
+
 /**
  * Library routes answer 503 `ready: false` while the user's library is not
- * ready (`isLibraryReady`). The client shows its sync notice and re-checks
- * `GET /api/library/ready` every 5 seconds instead of retrying. An empty
- * instance list matches nothing in every reader, so the routes behind it
- * would answer an empty library; this answers 503 first. A failed lookup is
- * an error, not a 503: the rejection reaches the central handler (500).
- * Runs after authenticate.
+ * ready: none of the instances the user sees has finished its first sync.
+ * The client shows its sync notice and re-checks `GET /api/library/ready`
+ * every 5 seconds instead of retrying. Otherwise the user's allowed
+ * instances, read once for the request, go on `req.allowedInstanceIds` for
+ * the `libraryHandler` handler after it. A failed lookup is an error, not a
+ * 503: the rejection reaches the central handler (500). Runs after
+ * authenticate.
  */
 export const requireCacheReady = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const { user } = req as Partial<AuthenticatedRequest>;
-  if (!user) {
-    res.status(401).json({ error: "Access denied. No token provided." });
+  const user = signedInUser(req, res);
+  if (!user) return;
+  const allowedInstanceIds = await getUserAllowedInstanceIds(user.id);
+  if (allowedInstanceIds.length === 0) {
+    answerInitializing(res);
     return;
   }
-  if (!(await isLibraryReady(user.id))) {
-    res.status(503).json({
-      error: "Server is initializing",
-      message: "Cache is still loading. Please wait a moment and try again.",
-      ready: false,
-    });
+  attachAllowedInstances(req, allowedInstanceIds);
+  next();
+};
+
+/**
+ * Puts the user's allowed instances on the request as `requireCacheReady`
+ * does, with no 503: an empty list stays empty and every reader matches
+ * nothing through `instanceClause`. For the routes whose pages have their
+ * own gate: the playlist reads, user stats and the timeline. Runs after
+ * authenticate.
+ */
+export const withAllowedInstances = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = signedInUser(req, res);
+  if (!user) return;
+  attachAllowedInstances(req, await getUserAllowedInstanceIds(user.id));
+  next();
+};
+
+/**
+ * Readiness for the five `/minimal` pickers. An admin's Content
+ * Restrictions editor sends `scope: "allEnabled"`: its list is every
+ * enabled instance past its first sync (`getEnabledSyncedInstanceIds`),
+ * whatever the admin selected, so an admin whose own instances are all on
+ * their first sync can still restrict another user. Anyone else, and an
+ * admin without the scope, gets their own allowed instances. An empty list
+ * answers 503 as `requireCacheReady` does. The parser still validates
+ * `scope` (400 for any other value), and a USER sending it is refused (403)
+ * by the query. Runs after authenticate.
+ */
+export const requirePickerReady = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = signedInUser(req, res);
+  if (!user) return;
+  const body: unknown = req.body;
+  const allEnabled =
+    user.role === "ADMIN" &&
+    typeof body === "object" &&
+    body !== null &&
+    !Array.isArray(body) &&
+    (body as Record<string, unknown>).scope === "allEnabled";
+  const allowedInstanceIds = allEnabled
+    ? await getEnabledSyncedInstanceIds()
+    : await getUserAllowedInstanceIds(user.id);
+  if (allowedInstanceIds.length === 0) {
+    answerInitializing(res);
     return;
   }
+  attachAllowedInstances(req, allowedInstanceIds);
   next();
 };

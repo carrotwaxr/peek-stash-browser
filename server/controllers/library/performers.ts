@@ -1,6 +1,5 @@
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -8,7 +7,7 @@ import type {
   FindPerformersMinimalResponse,
   FindPerformersRequest,
   FindPerformersResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import {
@@ -24,7 +23,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * Uses PerformerQueryBuilder for SQL-native filtering, sorting, and pagination.
  */
 export const findPerformers = async (
-  req: TypedAuthRequest<FindPerformersRequest>,
+  req: TypedLibraryRequest<FindPerformersRequest>,
   res: TypedResponse<
     FindPerformersResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -43,8 +42,7 @@ export const findPerformers = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   const { items: performers, total } = await performerQueryBuilder.execute({
     userId,
@@ -108,12 +106,16 @@ export const findPerformers = async (
  * (400) or ForbiddenError (403) reaches the central error handler.
  */
 export const findPerformersMinimal = async (
-  req: TypedAuthRequest<FindPerformersMinimalRequest>,
+  req: TypedLibraryRequest<FindPerformersMinimalRequest>,
   res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("performer", req.body, { userId });
 
-  const performers = await findMinimalEntities(req.user, request);
+  const performers = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
   res.json({ performers });
 };

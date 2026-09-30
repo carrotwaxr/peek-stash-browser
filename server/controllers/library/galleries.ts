@@ -1,7 +1,6 @@
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -9,7 +8,7 @@ import type {
   FindGalleriesMinimalResponse,
   FindGalleriesRequest,
   FindGalleriesResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import {
@@ -25,7 +24,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * Uses GalleryQueryBuilder for SQL-native filtering (Phase 3 scalability)
  */
 export const findGalleries = async (
-  req: TypedAuthRequest<FindGalleriesRequest>,
+  req: TypedLibraryRequest<FindGalleriesRequest>,
   res: TypedResponse<
     FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse
   >
@@ -44,8 +43,7 @@ export const findGalleries = async (
   // Exclusions apply to every user; an admin's rows hold only their own hides
   const applyExclusions = true;
 
-  // Get user's allowed instance IDs for multi-instance filtering
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+  const { allowedInstanceIds } = req;
 
   // Use SQL-native query builder
   const { items: galleries, total } = await galleryQueryBuilder.execute({
@@ -133,12 +131,16 @@ export const findGalleries = async (
  * central error handler.
  */
 export const findGalleriesMinimal = async (
-  req: TypedAuthRequest<FindGalleriesMinimalRequest>,
+  req: TypedLibraryRequest<FindGalleriesMinimalRequest>,
   res: TypedResponse<FindGalleriesMinimalResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("gallery", req.body, { userId });
 
-  const galleries = await findMinimalEntities(req.user, request);
+  const galleries = await findMinimalEntities(
+    req.user,
+    request,
+    req.allowedInstanceIds
+  );
   res.json({ galleries });
 };

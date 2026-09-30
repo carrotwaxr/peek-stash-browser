@@ -18,7 +18,6 @@ import {
   type ClipWithRelations,
   clipService,
 } from "../../services/ClipService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -33,16 +32,11 @@ vi.mock("../../services/ClipService.js", () => ({
   },
 }));
 
-vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn(),
-}));
-
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockClipService = vi.mocked(clipService);
-const mockAllowed = vi.mocked(getUserAllowedInstanceIds);
 const ALLOWED = ["inst-1", "inst-2"];
 
 const USER = { id: 1, username: "testuser", role: "USER" };
@@ -50,25 +44,23 @@ const USER = { id: 1, username: "testuser", role: "USER" };
 describe("Clips Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAllowed.mockResolvedValue(ALLOWED);
   });
 
   // ─── getClips ─────────────────────────────────────────────────────────────
 
   describe("getClips", () => {
-    it("returns paginated clips with default query params", async () => {
+    it("passes req.allowedInstanceIds to the builder or service: paginated clips with default query params", async () => {
       const clips: ClipWithRelations[] = [
         partialRow({ id: "c1" }),
         partialRow({ id: "c2" }),
       ];
       mockClipService.getClips.mockResolvedValue({ clips, total: 2 });
 
-      const req = reqFor(getClips, { user: USER });
+      const req = reqFor(getClips, { user: USER, allowedInstanceIds: ALLOWED });
       const res = resFor(getClips);
 
       await getClips(req, res);
 
-      expect(mockAllowed).toHaveBeenCalledWith(1);
       expect(mockClipService.getClips).toHaveBeenCalledWith({
         userId: 1,
         allowedInstanceIds: ALLOWED,
@@ -96,6 +88,7 @@ describe("Clips Controller", () => {
 
       const req = reqFor(getClips, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: {
           page: "3",
           perPage: "10",
@@ -147,6 +140,7 @@ describe("Clips Controller", () => {
 
       const req = reqFor(getClips, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: {
           tagIds: "1,2,3",
           sceneTagIds: "4,5:inst-1",
@@ -175,6 +169,7 @@ describe("Clips Controller", () => {
 
       const req = reqFor(getClips, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: { sortBy: "random_42" },
       });
       const res = resFor(getClips);
@@ -191,6 +186,7 @@ describe("Clips Controller", () => {
 
       const req = reqFor(getClips, {
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: { perPage: "1000", page: "0" },
       });
       const res = resFor(getClips);
@@ -218,7 +214,11 @@ describe("Clips Controller", () => {
     ])(
       "a bad %s answers 400 before any query",
       async (path, query: Record<string, string>) => {
-        const req = reqFor(getClips, { user: USER, query });
+        const req = reqFor(getClips, {
+          user: USER,
+          query,
+          allowedInstanceIds: ALLOWED,
+        });
         const res = resFor(getClips);
 
         await expect(getClips(req, res)).rejects.toMatchObject({
@@ -239,6 +239,7 @@ describe("Clips Controller", () => {
 
         const req = reqFor(getClips, {
           user: USER,
+          allowedInstanceIds: ALLOWED,
           query: { clipsB7Unknown: "1" },
         });
         const res = resFor(getClips);
@@ -254,7 +255,11 @@ describe("Clips Controller", () => {
     it("calculates totalPages correctly", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 50 });
 
-      const req = reqFor(getClips, { user: USER, query: { perPage: "24" } });
+      const req = reqFor(getClips, {
+        user: USER,
+        query: { perPage: "24" },
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getClips);
 
       await getClips(req, res);
@@ -265,7 +270,7 @@ describe("Clips Controller", () => {
     it("returns totalPages 0 when there are no results", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = reqFor(getClips, { user: USER });
+      const req = reqFor(getClips, { user: USER, allowedInstanceIds: ALLOWED });
       const res = resFor(getClips);
 
       await getClips(req, res);
@@ -276,7 +281,7 @@ describe("Clips Controller", () => {
     it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClips.mockRejectedValue(new Error("DB down"));
 
-      const req = reqFor(getClips, { user: USER });
+      const req = reqFor(getClips, { user: USER, allowedInstanceIds: ALLOWED });
       const res = resFor(getClips);
 
       await expect(getClips(req, res)).rejects.toThrow("DB down");
@@ -295,7 +300,11 @@ describe("Clips Controller", () => {
       });
       mockClipService.getClipById.mockResolvedValue(clip);
 
-      const req = reqFor(getClipById, { params: { id: "101" }, user: USER });
+      const req = reqFor(getClipById, {
+        params: { id: "101" },
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getClipById);
 
       await getClipById(req, res);
@@ -315,6 +324,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipById, {
         params: { id: "999999" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(getClipById);
 
@@ -328,6 +338,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipById, {
         params: { id: "nonexistent" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(getClipById);
 
@@ -341,7 +352,11 @@ describe("Clips Controller", () => {
     it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClipById.mockRejectedValue(new Error("Unexpected"));
 
-      const req = reqFor(getClipById, { params: { id: "101" }, user: USER });
+      const req = reqFor(getClipById, {
+        params: { id: "101" },
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
       const res = resFor(getClipById);
 
       await expect(getClipById(req, res)).rejects.toThrow("Unexpected");
@@ -363,6 +378,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipsForScene, {
         params: { id: "42" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(getClipsForScene);
 
@@ -384,6 +400,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipsForScene, {
         params: { id: "42" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: {
           includeUngenerated: "true",
         },
@@ -406,6 +423,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipsForScene, {
         params: { id: "42" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
         query: {
           instanceId: "inst-1",
         },
@@ -430,7 +448,12 @@ describe("Clips Controller", () => {
     ])(
       "a bad %s answers 400 before any query",
       async (path, params: { id: string }, query: Record<string, string>) => {
-        const req = reqFor(getClipsForScene, { params, user: USER, query });
+        const req = reqFor(getClipsForScene, {
+          params,
+          user: USER,
+          query,
+          allowedInstanceIds: ALLOWED,
+        });
         const res = resFor(getClipsForScene);
 
         await expect(getClipsForScene(req, res)).rejects.toMatchObject({
@@ -447,6 +470,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipsForScene, {
         params: { id: "42" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(getClipsForScene);
 

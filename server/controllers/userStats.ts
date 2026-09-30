@@ -1,12 +1,11 @@
 import rankingComputeService from "../services/RankingComputeService.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import {
   type TopListSortBy,
   userStatsAggregationService,
 } from "../services/UserStatsAggregationService.js";
 import type {
   ApiErrorResponse,
-  TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
   UserStatsResponse,
 } from "../types/api/index.js";
@@ -25,7 +24,7 @@ function isValidSortBy(value: unknown): value is TopListSortBy {
  * - sortBy: "engagement" | "oCount" | "playCount" (default: "engagement")
  */
 export async function getUserStats(
-  req: TypedAuthRequest,
+  req: TypedLibraryRequest,
   res: TypedResponse<UserStatsResponse | ApiErrorResponse>
 ) {
   const userId = req.user.id;
@@ -42,7 +41,7 @@ export async function getUserStats(
   // Everything counted is on an instance the viewer sees
   const stats = await userStatsAggregationService.getUserStats(userId, {
     sortBy,
-    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+    allowedInstanceIds: req.allowedInstanceIds,
   });
 
   res.json(stats);

@@ -5,7 +5,6 @@ import {
   DEFAULT_CAROUSEL_DIRECTION,
   DEFAULT_CAROUSEL_SORT,
 } from "../services/StoredFilterCleaner.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
   CarouselPreference,
@@ -21,6 +20,7 @@ import type {
   PreviewCarouselRequest,
   PreviewCarouselResponse,
   TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
   UpdateCarouselParams,
   UpdateCarouselRequest,
@@ -268,7 +268,7 @@ export const deleteCarousel = async (
  * Executes the carousel query and returns matching scenes
  */
 export const previewCarousel = async (
-  req: TypedAuthRequest<PreviewCarouselRequest>,
+  req: TypedLibraryRequest<PreviewCarouselRequest>,
   res: TypedResponse<PreviewCarouselResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -292,7 +292,12 @@ export const previewCarousel = async (
   );
 
   // Execute the carousel query
-  const scenes = await executeCarouselQuery(userId, query, req.user);
+  const scenes = await executeCarouselQuery(
+    userId,
+    req.allowedInstanceIds,
+    query,
+    req.user
+  );
 
   res.json({ scenes });
 };
@@ -300,19 +305,19 @@ export const previewCarousel = async (
 /**
  * Runs a carousel's parsed scene query for the user: their exclusions
  * (applyExclusions defaults to true) and only their instances (enabled,
- * selected and past their first sync; invariant 11). The routes answer 503
- * before this when the user has none (an empty list matches nothing).
+ * selected and past their first sync; invariant 11), as `requireCacheReady`
+ * put them on the request. The routes answer 503 before this when the user
+ * has none (an empty list matches nothing).
  *
  * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
  */
 export async function executeCarouselQuery(
   userId: number,
+  allowedInstanceIds: readonly string[],
   query: ParsedListRequest<"scene">,
   viewer: { role: string } | undefined
 ): Promise<WithStashUrl<NormalizedScene>[]> {
   const startTime = Date.now();
-
-  const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
   const result = await sceneQueryBuilder.execute({
     userId,
@@ -335,7 +340,7 @@ export async function executeCarouselQuery(
  * Used by the homepage to render a specific carousel
  */
 export const executeCarouselById = async (
-  req: TypedAuthRequest<unknown, ExecuteCarouselByIdParams>,
+  req: TypedLibraryRequest<unknown, ExecuteCarouselByIdParams>,
   res: TypedResponse<ExecuteCarouselByIdResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -368,7 +373,12 @@ export const executeCarouselById = async (
   );
   logIgnoredStoredRule(carouselId, query.ignored);
 
-  const scenes = await executeCarouselQuery(userId, query, req.user);
+  const scenes = await executeCarouselQuery(
+    userId,
+    req.allowedInstanceIds,
+    query,
+    req.user
+  );
 
   res.json({
     carousel: {

@@ -5,9 +5,11 @@ import {
   type TimelineFilters,
   timelineService,
 } from "../services/TimelineService.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type {
+  TypedLibraryRequest,
+  TypedResponse,
+} from "../types/api/express.js";
 import type {
   GetDateDistributionParams,
   GetDateDistributionQuery,
@@ -18,7 +20,7 @@ const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
 const VALID_GRANULARITIES: Granularity[] = ["years", "months", "weeks", "days"];
 
 export async function getDateDistribution(
-  req: TypedAuthRequest<
+  req: TypedLibraryRequest<
     never,
     GetDateDistributionParams,
     GetDateDistributionQuery
@@ -49,7 +51,7 @@ export async function getDateDistribution(
   const distribution = await timelineService.getDistribution(
     entityType as TimelineEntityType,
     userId,
-    await getUserAllowedInstanceIds(userId),
+    req.allowedInstanceIds,
     granularity as Granularity,
     Object.keys(filters).length > 0 ? filters : undefined
   );

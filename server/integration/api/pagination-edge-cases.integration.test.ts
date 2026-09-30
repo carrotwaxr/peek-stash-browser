@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { findScenes } from "../../controllers/library/scenes.js";
 import prisma from "../../prisma/singleton.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   reqFor,
   resFor,
@@ -109,6 +110,7 @@ async function recordScenePage(filter: {
   const req = reqFor(findScenes, {
     body: { filter },
     user: testUser({ id: admin.id, username: admin.username, role: "ADMIN" }),
+    allowedInstanceIds: await getUserAllowedInstanceIds(admin.id),
   });
   const res = resFor(findScenes);
   const recorder = recordStatements();

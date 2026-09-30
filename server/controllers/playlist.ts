@@ -8,7 +8,6 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
 } from "../services/PlaylistQueryService.js";
-import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import type {
   AddSceneToPlaylistParams,
   AddSceneToPlaylistRequest,
@@ -31,6 +30,7 @@ import type {
   ReorderPlaylistRequest,
   ReorderPlaylistResponse,
   TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
   UpdatePlaylistParams,
   UpdatePlaylistRequest,
@@ -51,7 +51,7 @@ import { emptyToNull } from "../utils/sqlHelpers.js";
  * the item count the user can see (PlaylistQueryService)
  */
 export const getUserPlaylists = async (
-  req: TypedAuthRequest,
+  req: TypedLibraryRequest,
   res: TypedResponse<GetUserPlaylistsResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -67,7 +67,7 @@ export const getUserPlaylists = async (
 
   const previews = await loadPlaylistPreviews({
     userId,
-    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+    allowedInstanceIds: req.allowedInstanceIds,
     playlistIds: playlists.map((p) => p.id),
   });
 
@@ -89,7 +89,7 @@ export const getUserPlaylists = async (
  * exclusions and instances, never the owner's (invariant 10)
  */
 export const getSharedPlaylists = async (
-  req: TypedAuthRequest,
+  req: TypedLibraryRequest,
   res: TypedResponse<GetSharedPlaylistsResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -133,7 +133,7 @@ export const getSharedPlaylists = async (
 
   const previews = await loadPlaylistPreviews({
     userId,
-    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+    allowedInstanceIds: req.allowedInstanceIds,
     playlistIds: sharedPlaylists.map((p) => p.id),
   });
 
@@ -169,7 +169,7 @@ export const getSharedPlaylists = async (
  * items the user can see (PlaylistQueryService.loadPlaylistItems)
  */
 export const getPlaylist = async (
-  req: TypedAuthRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
+  req: TypedLibraryRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
   res: TypedResponse<GetPlaylistResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -202,7 +202,7 @@ export const getPlaylist = async (
   const { paging } = request;
   const { items, totalItems } = await loadPlaylistItems({
     userId,
-    allowedInstanceIds: await getUserAllowedInstanceIds(userId),
+    allowedInstanceIds: req.allowedInstanceIds,
     playlistId,
     paging,
   });

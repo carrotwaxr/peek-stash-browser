@@ -10,16 +10,34 @@
  * - Every route without either is on PUBLIC_ROUTES.
  * - The routes behind `requireAdmin` are exactly ADMIN_ROUTES, each after a
  *   session check.
+ * - Every route ending in a `libraryHandler()` handler runs requireCacheReady,
+ *   requirePickerReady or withAllowedInstances before it, so the handler has
+ *   the viewer's instances on the request.
  */
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { authenticate, requireAdmin } from "../../middleware/auth.js";
+import {
+  authenticate,
+  requireAdmin,
+  requireCacheReady,
+  requirePickerReady,
+  withAllowedInstances,
+} from "../../middleware/auth.js";
 import { requireAdminOnceSetupStarted } from "../../middleware/setupGuards.js";
 import { authenticateStreamRequest } from "../../middleware/streamAuth.js";
+import { LIBRARY_HANDLER } from "../../utils/routeHelpers.js";
 import type * as routeHelpersModule from "../../utils/routeHelpers.js";
 import { ADMIN_ROUTES } from "../helpers/adminRoutes.js";
+
+/** A handler `libraryHandler()` returned: it checks the user as `authenticated()` does */
+function isLibraryHandler(handler: unknown): boolean {
+  return (
+    typeof handler === "function" &&
+    (handler as unknown as Record<symbol, unknown>)[LIBRARY_HANDLER] === true
+  );
+}
 
 /** Every handler `authenticated()` returned while the routers were built. */
 const { wrapped } = vi.hoisted(() => ({ wrapped: new WeakSet() }));
@@ -47,6 +65,35 @@ const PUBLIC_ROUTES = [
   // Public only until setup starts, then the admin's (requireAdminOnceSetupStarted)
   "POST /api/setup/test-stash-connection",
   "POST /api/setup/create-stash-instance",
+];
+
+/** The routes whose handler reads `req.allowedInstanceIds` (`libraryHandler`). */
+const LIBRARY_ROUTES = [
+  "POST /api/library/scenes",
+  "GET /api/library/scenes/:id/similar",
+  "GET /api/library/scenes/recommended",
+  "POST /api/library/performers",
+  "POST /api/library/performers/minimal",
+  "POST /api/library/studios",
+  "POST /api/library/studios/minimal",
+  "POST /api/library/tags",
+  "POST /api/library/tags/minimal",
+  "POST /api/library/tags/tree",
+  "POST /api/library/groups",
+  "POST /api/library/groups/minimal",
+  "POST /api/library/galleries",
+  "POST /api/library/galleries/minimal",
+  "POST /api/library/images",
+  "GET /api/clips",
+  "GET /api/clips/:id",
+  "GET /api/scenes/:id/clips",
+  "POST /api/carousels/preview",
+  "GET /api/carousels/:id/execute",
+  "GET /api/playlists",
+  "GET /api/playlists/shared",
+  "GET /api/playlists/:id",
+  "GET /api/user-stats",
+  "GET /api/timeline/:entityType/distribution",
 ];
 
 /** Where `initializers/api.ts` mounts each router (checked below). */
@@ -244,7 +291,11 @@ describe("route guards", () => {
     );
     const unguarded = routes
       .filter((route) => typeof route.handler === "function")
-      .filter((route) => wrapped.has(route.handler as object))
+      .filter(
+        (route) =>
+          wrapped.has(route.handler as object) ||
+          isLibraryHandler(route.handler)
+      )
       .filter((route) => !guarded.includes(route))
       .map((route) => route.key);
     expect(unguarded).toEqual([]);
@@ -279,5 +330,25 @@ describe("route guards", () => {
         route.before.lastIndexOf(requireAdmin)
       );
     }
+  });
+
+  it("runs requireCacheReady, requirePickerReady or withAllowedInstances before every libraryHandler() handler", () => {
+    const library = routes.filter((route) => isLibraryHandler(route.handler));
+    expect(library.map((route) => route.key).sort()).toEqual(
+      [...LIBRARY_ROUTES].sort()
+    );
+    // The pickers take an admin's scope: requirePickerReady
+    for (const route of library.filter((r) => r.key.endsWith("/minimal"))) {
+      expect(route.before).toContain(requirePickerReady);
+    }
+    const unready = library
+      .filter(
+        (route) =>
+          !route.before.includes(requireCacheReady) &&
+          !route.before.includes(requirePickerReady) &&
+          !route.before.includes(withAllowedInstances)
+      )
+      .map((route) => route.key);
+    expect(unready).toEqual([]);
   });
 });

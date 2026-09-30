@@ -1,7 +1,7 @@
 import express from "express";
 import { getClipById, getClips } from "../controllers/clips.js";
 import { authenticate, requireCacheReady } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(authenticate);
 router.use(requireCacheReady);
 
-router.get("/", authenticated(getClips));
-router.get("/:id", authenticated(getClipById));
+router.get("/", libraryHandler(getClips));
+router.get("/:id", libraryHandler(getClipById));
 
 export default router;

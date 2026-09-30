@@ -3,8 +3,12 @@ import {
   findPerformers,
   findPerformersMinimal,
 } from "../../controllers/library/performers.js";
-import { authenticate, requireCacheReady } from "../../middleware/auth.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  authenticate,
+  requireCacheReady,
+  requirePickerReady,
+} from "../../middleware/auth.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -12,13 +16,13 @@ const router = express.Router();
 router.use(authenticate);
 
 // Find performers with filters
-router.post("/performers", requireCacheReady, authenticated(findPerformers));
+router.post("/performers", requireCacheReady, libraryHandler(findPerformers));
 
 // Minimal data for filter dropdowns
 router.post(
   "/performers/minimal",
-  requireCacheReady,
-  authenticated(findPerformersMinimal)
+  requirePickerReady,
+  libraryHandler(findPerformersMinimal)
 );
 
 export default router;

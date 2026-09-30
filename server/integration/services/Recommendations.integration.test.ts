@@ -18,6 +18,7 @@ import { getRecommendedScenes } from "../../controllers/library/scenes.js";
 import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   reqFor,
   resFor,
@@ -112,6 +113,7 @@ async function recommended(viewer: Viewer, page: number, perPage: number) {
   const req = reqFor(getRecommendedScenes, {
     query: { page: String(page), per_page: String(perPage) },
     user: testUser({ id: viewer.id, username: viewer.username }),
+    allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
   });
   const res = resFor(getRecommendedScenes);
   await getRecommendedScenes(req, res);

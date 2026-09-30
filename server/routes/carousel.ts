@@ -9,7 +9,7 @@ import {
   updateCarousel,
 } from "../controllers/carousel.js";
 import { authenticate, requireCacheReady } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { authenticated, libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -21,7 +21,7 @@ router.get("/", authenticated(getUserCarousels));
 
 // Preview carousel results without saving. Scenes are listed only from the
 // user's instances: none ready yet answers 503 ready:false, as the lists do
-router.post("/preview", requireCacheReady, authenticated(previewCarousel));
+router.post("/preview", requireCacheReady, libraryHandler(previewCarousel));
 
 // Get single carousel by ID
 router.get("/:id", authenticated(getCarousel));
@@ -30,7 +30,7 @@ router.get("/:id", authenticated(getCarousel));
 router.get(
   "/:id/execute",
   requireCacheReady,
-  authenticated(executeCarouselById)
+  libraryHandler(executeCarouselById)
 );
 
 // Create new carousel

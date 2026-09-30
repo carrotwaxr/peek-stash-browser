@@ -222,6 +222,36 @@ describe("Picker scope allEnabled (integration)", () => {
     }
   });
 
+  it("an admin whose selected instances are all on their first sync still lists every synced instance's tags with scope allEnabled, and gets 503 without the scope", async () => {
+    // The admin selects A only; A goes back to its first sync
+    const { firstSyncedAt } = await prisma.stashInstance.findUniqueOrThrow({
+      where: { id: FX.A },
+      select: { firstSyncedAt: true },
+    });
+    await prisma.stashInstance.update({
+      where: { id: FX.A },
+      data: { firstSyncedAt: null },
+    });
+    try {
+      const scoped = await pick(scopeAdmin.client, "tags", {
+        filter: { q: FX_ID.SAME },
+        scope: "allEnabled",
+      });
+      expect(scoped.status).toBe(200);
+      expect(refs(scoped.data.tags)).toEqual([ref(FX_ID.SAME, FX.B)]);
+
+      const own = await pick(scopeAdmin.client, "tags", {
+        filter: { q: FX_ID.SAME },
+      });
+      expect(own.status).toBe(503);
+    } finally {
+      await prisma.stashInstance.update({
+        where: { id: FX.A },
+        data: { firstSyncedAt },
+      });
+    }
+  });
+
   it("a USER sending scope allEnabled gets 403", async () => {
     for (const picker of PICKERS) {
       const res = await pick(plainUser.client, picker, {

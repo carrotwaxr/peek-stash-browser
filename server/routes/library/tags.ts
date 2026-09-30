@@ -4,8 +4,12 @@ import {
   findTags,
   findTagsMinimal,
 } from "../../controllers/library/tags.js";
-import { authenticate, requireCacheReady } from "../../middleware/auth.js";
-import { authenticated } from "../../utils/routeHelpers.js";
+import {
+  authenticate,
+  requireCacheReady,
+  requirePickerReady,
+} from "../../middleware/auth.js";
+import { libraryHandler } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -13,12 +17,16 @@ const router = express.Router();
 router.use(authenticate);
 
 // Find tags with filters
-router.post("/tags", requireCacheReady, authenticated(findTags));
+router.post("/tags", requireCacheReady, libraryHandler(findTags));
 
 // Minimal data for filter dropdowns
-router.post("/tags/minimal", requireCacheReady, authenticated(findTagsMinimal));
+router.post(
+  "/tags/minimal",
+  requirePickerReady,
+  libraryHandler(findTagsMinimal)
+);
 
 // The compact tag tree (hierarchy and folder views), optionally scoped
-router.post("/tags/tree", requireCacheReady, authenticated(findTagTree));
+router.post("/tags/tree", requireCacheReady, libraryHandler(findTagTree));
 
 export default router;

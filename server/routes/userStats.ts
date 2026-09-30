@@ -1,7 +1,7 @@
 import express from "express";
 import { getUserStats } from "../controllers/userStats.js";
-import { authenticate } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { authenticate, withAllowedInstances } from "../middleware/auth.js";
+import { libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -9,6 +9,6 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get user stats
-router.get("/", authenticated(getUserStats));
+router.get("/", withAllowedInstances, libraryHandler(getUserStats));
 
 export default router;
