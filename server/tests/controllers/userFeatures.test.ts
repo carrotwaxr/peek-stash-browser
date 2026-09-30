@@ -1417,8 +1417,9 @@ describe("User Controller — Features", () => {
         user: USER,
       });
       const res = resFor(updateUserStashInstances);
-      await updateUserStashInstances(req, res);
-      expect(res._getStatus()).toBe(400);
+      await expect(updateUserStashInstances(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+      });
     });
 
     it("returns 400 for invalid instance IDs", async () => {
@@ -1578,6 +1579,40 @@ describe("User Controller — Features", () => {
       const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(res._getOkBody().success).toBe(true);
+    });
+  });
+
+  describe("completeSetup selection", () => {
+    it("replaces the selection in one transaction, each id once, and rejects a non-string id", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(3);
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "inst-1" }),
+      ]);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+      const res = resFor(completeSetup);
+      await completeSetup(
+        reqFor(completeSetup, {
+          body: { selectedInstanceIds: ["inst-1", "inst-1"] },
+          user: USER,
+        }),
+        res
+      );
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.userStashInstance.createMany).toHaveBeenCalledWith({
+        data: [{ userId: USER.id, instanceId: "inst-1" }],
+      });
+
+      vi.clearAllMocks();
+      await expect(
+        completeSetup(
+          reqFor(completeSetup, {
+            body: malformed({ selectedInstanceIds: [7] }),
+            user: USER,
+          }),
+          resFor(completeSetup)
+        )
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
-import { adminClient } from "../helpers/testClient.js";
+import {
+  adminClient,
+  findTestInstanceId,
+  readInstanceSelection,
+  restoreInstanceSelection,
+  setInstanceSelection,
+} from "../helpers/testClient.js";
 
 interface UserSettings {
   settings: {
@@ -258,5 +264,39 @@ describe("User Settings API - cardDisplaySettings", () => {
               0)
       ).toBe(true);
     });
+  });
+});
+
+describe("User Settings API - PUT /api/user/stash-instances", () => {
+  let instanceId: string;
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    instanceId = await findTestInstanceId();
+    await setInstanceSelection([instanceId]);
+  });
+
+  afterAll(restoreInstanceSelection);
+
+  it("a duplicated id saves each id once and answers 200", async () => {
+    const response = await adminClient.put<{
+      success: boolean;
+      selectedInstanceIds: string[];
+    }>("/api/user/stash-instances", { instanceIds: [instanceId, instanceId] });
+
+    expect(response.status).toBe(200);
+    expect(response.data.selectedInstanceIds).toEqual([instanceId]);
+    expect(await readInstanceSelection()).toEqual([instanceId]);
+  });
+
+  it("a non-string id answers 400 naming instanceIds and keeps the selection", async () => {
+    const response = await adminClient.put<{
+      error: string;
+      issues?: Array<{ path: string; message: string }>;
+    }>("/api/user/stash-instances", { instanceIds: [instanceId, 7] });
+
+    expect(response.status).toBe(400);
+    expect(response.data.issues?.[0]?.path).toMatch(/^instanceIds/);
+    expect(await readInstanceSelection()).toEqual([instanceId]);
   });
 });
