@@ -21,6 +21,7 @@ paths:
 - `UserHiddenEntity` already stores a bare `entityId` and a separate `instanceId`.
 - An empty `instanceId` means the record applies to every instance (`splitGlobalScoped`).
 - INCLUDE mode compares (id, instance) pairs from `getAllEntityIdsWithInstance`. Comparing bare IDs includes tag 6 on every server when the admin picked tag 6 on one (#437).
+- `GET /user/:id/restrictions` answers each list parsed (`StoredRestriction`): a stored value that is not a JSON array of strings comes back as `entityIds: null, unreadable: true`, and the editor blocks editing and offers a confirmed Clear all restrictions (`DELETE`). A Show-only list can be stored as `[]` after its server is deleted; it still hides the whole type, and the editor keeps Save off until the admin chooses items or removes the list (owner decision, 2026-09-29).
 
 ## Computation
 
