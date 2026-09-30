@@ -5,6 +5,7 @@ import { History, Trash2 } from "lucide-react";
 import { apiDelete, libraryApi } from "../../api";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import {
   Button,
   LoadingSpinner,
@@ -15,6 +16,8 @@ import {
 
 interface WatchHistoryEntry {
   sceneId: string;
+  /** Null until the per-user instance columns are required (PR 5's B7). */
+  instanceId: string | null;
   resumeTime?: number;
   playCount?: number;
   playDuration?: number;
@@ -73,13 +76,21 @@ const WatchHistory = () => {
       try {
         setLoading(true);
 
-        // Extract scene IDs from watch history
-        const sceneIds: string[] = historyList.map((wh) => wh.sceneId);
+        // "id:instanceId" refs: scene ids repeat across servers
+        const sceneRefs: string[] = historyList.map((wh) =>
+          makeCompositeKey(wh.sceneId, wh.instanceId)
+        );
+        const historyByScene = new Map(
+          historyList.map((wh) => [
+            makeCompositeKey(wh.sceneId, wh.instanceId),
+            wh,
+          ])
+        );
 
         // Fetch scenes in bulk - must set per_page to match number of IDs
         const response = (await libraryApi.findScenes({
-          ids: sceneIds,
-          filter: { per_page: sceneIds.length },
+          ids: sceneRefs,
+          filter: { per_page: sceneRefs.length },
         })) as Record<string, Record<string, unknown>>;
         const fetchedScenes = (response?.findScenes?.scenes || []) as Record<
           string,
@@ -90,7 +101,9 @@ const WatchHistory = () => {
         const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map(
           (scene: Record<string, unknown>) => {
             const watchHistory =
-              historyList.find((wh) => wh.sceneId === scene.id) ?? null;
+              historyByScene.get(
+                makeCompositeKey(scene.id as string, scene.instanceId as string)
+              ) ?? null;
             const files = scene.files as
               | Array<{ duration?: number }>
               | undefined;
@@ -326,7 +339,7 @@ const WatchHistory = () => {
           <div className="space-y-3">
             {scenes.map((scene, index) => (
               <SceneListItem
-                key={scene.id}
+                key={makeCompositeKey(scene.id, scene.instanceId)}
                 scene={scene as unknown as NormalizedScene}
                 watchHistory={{
                   resumeTime: scene.resumeTime as number | undefined,

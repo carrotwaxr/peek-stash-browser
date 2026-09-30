@@ -138,7 +138,7 @@ const VideoPlayer = () => {
     watchHistory,
     loading: loadingWatchHistory,
     updateQuality,
-  } = useWatchHistory(scene?.id ?? "", playerRef);
+  } = useWatchHistory(scene?.id ?? "", scene?.instanceId ?? "", playerRef);
 
   // ============================================================================
   // CUSTOM HOOKS: VIDEO PLAYER LOGIC

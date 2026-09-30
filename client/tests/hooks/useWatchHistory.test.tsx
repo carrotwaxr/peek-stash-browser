@@ -31,13 +31,15 @@ describe("useWatchHistory", () => {
       const mockHistory = { resumeTime: 120, oCount: 3, playCount: 10 };
       apiGetMock.mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
+      const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(apiGet).toHaveBeenCalledWith("/watch-history/scene-1");
+      expect(apiGet).toHaveBeenCalledWith(
+        "/watch-history/scene-1?instanceId=inst-1"
+      );
       expect(result.current.watchHistory).toEqual(mockHistory);
       expect(result.current.error).toBeNull();
     });
@@ -45,7 +47,7 @@ describe("useWatchHistory", () => {
     it("handles fetch error", async () => {
       apiGetMock.mockRejectedValue(new Error("Not found"));
 
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
+      const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -57,8 +59,32 @@ describe("useWatchHistory", () => {
 
     it("does not fetch without sceneId", async () => {
       const { result } = renderHook(() =>
-        useWatchHistory(untrusted<string>(null))
+        useWatchHistory(untrusted<string>(null), "inst-1")
       );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(apiGet).not.toHaveBeenCalled();
+    });
+
+    it("sends the scene's instance", async () => {
+      apiGetMock.mockResolvedValue({});
+
+      const { result } = renderHook(() => useWatchHistory("7", "server-b"));
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(apiGet).toHaveBeenCalledWith(
+        "/watch-history/7?instanceId=server-b"
+      );
+    });
+
+    it("does not fetch without an instance", async () => {
+      const { result } = renderHook(() => useWatchHistory("7", ""));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -70,7 +96,7 @@ describe("useWatchHistory", () => {
     it("does not fetch when not authenticated", async () => {
       useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
+      const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -84,7 +110,7 @@ describe("useWatchHistory", () => {
     it("stores quality value in ref", async () => {
       apiGetMock.mockResolvedValue({});
 
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
+      const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -103,7 +129,7 @@ describe("useWatchHistory", () => {
         .mockResolvedValueOnce({ oCount: 1 })
         .mockResolvedValueOnce({ oCount: 5 });
 
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
+      const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
 
       await waitFor(() => {
         expect(result.current.watchHistory).toEqual({ oCount: 1 });

@@ -12,9 +12,9 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { dbWriteTransaction } from "../utils/dbWrite.js";
-import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 
 /**
  * Increment O counter for an image
@@ -204,9 +204,14 @@ export async function getImageViewHistory(
     return;
   }
 
-  // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
-  const instanceId =
-    requestInstanceId || (await getEntityInstanceId("image", imageId));
+  if (
+    typeof requestInstanceId !== "string" ||
+    !INSTANCE_ID_PATTERN.test(requestInstanceId)
+  ) {
+    res.status(400).json({ error: "instanceId is required" });
+    return;
+  }
+  const instanceId = requestInstanceId;
 
   const viewHistory = await prisma.imageViewHistory.findUnique({
     where: { userId_instanceId_imageId: { userId, instanceId, imageId } },

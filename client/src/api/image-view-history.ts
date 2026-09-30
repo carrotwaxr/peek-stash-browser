@@ -16,8 +16,8 @@ export const imageViewHistoryApi = {
       ...(instanceId && { instanceId }),
     }),
 
-  getViewHistory: (imageId: string, instanceId?: string) =>
+  getViewHistory: (imageId: string, instanceId: string) =>
     apiGet(
-      `/image-view-history/${imageId}${instanceId ? `?instanceId=${instanceId}` : ""}`
+      `/image-view-history/${imageId}?instanceId=${encodeURIComponent(instanceId)}`
     ),
 };

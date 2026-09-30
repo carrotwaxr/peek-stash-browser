@@ -24,10 +24,10 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
-import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Keyed by user and scene id
@@ -471,6 +471,7 @@ export async function getWatchHistory(
   res: TypedResponse<GetWatchHistoryResponse | ApiErrorResponse>
 ) {
   const { sceneId } = req.params;
+  const { instanceId } = req.query;
   const userId = req.user.id;
 
   if (!sceneId) {
@@ -478,8 +479,10 @@ export async function getWatchHistory(
     return;
   }
 
-  // Get scene instanceId
-  const instanceId = await getEntityInstanceId("scene", sceneId);
+  if (typeof instanceId !== "string" || !INSTANCE_ID_PATTERN.test(instanceId)) {
+    res.status(400).json({ error: "instanceId is required" });
+    return;
+  }
 
   const watchHistory = await prisma.watchHistory.findUnique({
     where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
