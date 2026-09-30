@@ -190,7 +190,7 @@ ORDER BY playlistId, rn`;
 async function loadItemScenes(
   userId: number,
   allowedInstanceIds: readonly string[],
-  items: ReadonlyArray<{ sceneId: string; instanceId: string | null }>
+  items: ReadonlyArray<{ sceneId: string; instanceId: string }>
 ): Promise<Map<string, NormalizedScene>> {
   const refs = distinctRefs(
     items.flatMap((item): EntityRef[] => {
@@ -234,10 +234,7 @@ export async function loadPlaylistItems(
     const scenes = await loadItemScenes(userId, allowedInstanceIds, rows);
     const items = rows.map((row) => ({
       ...row,
-      scene:
-        row.instanceId === null
-          ? null
-          : (scenes.get(entityKey(row.sceneId, row.instanceId)) ?? null),
+      scene: scenes.get(entityKey(row.sceneId, row.instanceId)) ?? null,
     }));
     return {
       items,

@@ -333,7 +333,7 @@ describe("DownloadService", () => {
       const result = await service.getDownloadablePlaylistItems(7, 5);
 
       expect(prisma.playlistItem.findMany).toHaveBeenCalledWith({
-        where: { playlistId: 5, instanceId: { not: null } },
+        where: { playlistId: 5 },
         orderBy: { position: "asc" },
         select: { sceneId: true, instanceId: true },
       });

@@ -26,7 +26,7 @@ async function itemsOf(playlistId: number): Promise<string[]> {
     where: { playlistId },
     orderBy: { position: "asc" },
   });
-  return rows.map((r) => `${r.sceneId}@${r.instanceId ?? ""}`);
+  return rows.map((r) => `${r.sceneId}@${r.instanceId}`);
 }
 
 describe("Playlist items keep each scene's instance (integration)", () => {

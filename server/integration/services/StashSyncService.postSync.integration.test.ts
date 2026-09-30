@@ -613,20 +613,7 @@ async function clearSeed(): Promise<void> {
     select: { id: true },
   });
   const userIds = users.map((u) => u.id);
-  // Stats and rankings have no foreign key to User
-  await prisma.userEntityStats.deleteMany({
-    where: { userId: { in: userIds } },
-  });
-  await prisma.userPerformerStats.deleteMany({
-    where: { userId: { in: userIds } },
-  });
-  await prisma.userStudioStats.deleteMany({
-    where: { userId: { in: userIds } },
-  });
-  await prisma.userTagStats.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.userEntityRanking.deleteMany({
-    where: { userId: { in: userIds } },
-  });
+  // Every per-user row cascades from its user
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 
   await prisma.userExcludedEntity.deleteMany({

@@ -307,13 +307,14 @@ describe("align database with schema migration", () => {
         instanceId: "inst-b",
       },
     });
-    await client.userEntityStats.create({
-      data: {
-        userId: user.id,
-        entityType: "scene",
-        instanceId: "default",
-        visibleCount: 1,
-      },
+    // Raw SQL: the app's client no longer has the model (20260930000100
+    // drops the table)
+    await insert(client, "UserEntityStats", {
+      userId: user.id,
+      entityType: "scene",
+      instanceId: "default",
+      visibleCount: 1,
+      updatedAt: Date.now(),
     });
     await client.sceneRating.create({
       data: {

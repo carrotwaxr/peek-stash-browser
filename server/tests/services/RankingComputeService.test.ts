@@ -6,7 +6,7 @@
  * `ensureFresh`: at most one recompute per user per hour, shared by
  * concurrent callers.
  */
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
@@ -463,39 +463,58 @@ describe("RankingComputeService", () => {
   });
 
   describe("a user deleted while the recompute runs", () => {
-    it("each written batch ends by deleting the rows it wrote unless the user still exists", async () => {
-      setupRankingMocks({
-        performerStats: [
-          {
-            entityId: "p1",
-            instanceId: "i1",
-            playCount: 1,
-            oCount: 0,
-            playDuration: 60,
-            libraryPresence: 1,
-          },
-        ],
-      });
+    const performerStats = [
+      {
+        entityId: "p1",
+        instanceId: "i1",
+        playCount: 1,
+        oCount: 0,
+        playDuration: 60,
+        libraryPresence: 1,
+      },
+    ];
+
+    it("a written batch is the delete and the insert only: the foreign key to User refuses rows of a missing user", async () => {
+      setupRankingMocks({ performerStats });
 
       await rankingComputeService.recomputeAllRankings(9);
 
-      // One written type (performers); the empty ones only delete
-      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
-      const [strings, ...values] = must(mockPrisma.$executeRaw.mock.calls[0]);
-      const sql = Array.isArray(strings) ? strings.join("?") : "";
-      expect(sql.replace(/\s+/g, " ")).toContain(
-        'DELETE FROM UserEntityRanking WHERE userId = ? AND NOT EXISTS (SELECT 1 FROM "User" WHERE id = ?)'
-      );
-      expect(values).toEqual([9, 9]);
-      // In the same batch as the write, after it
-      const order = [
-        must(
-          mockPrisma.userEntityRanking.createMany.mock.invocationCallOrder[0]
-        ),
-        must(mockPrisma.$executeRaw.mock.invocationCallOrder[0]),
-      ];
-      expect(order).toEqual([...order].sort((a, b) => a - b));
+      expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+      expect(mockPrisma.userEntityRanking.createMany).toHaveBeenCalledTimes(1);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("a batch the foreign key refuses (P2003) resolves as nothing written, logged at debug", async () => {
+      const txMock = setupRankingMocks({ performerStats });
+      txMock.userEntityRanking.createMany.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          "Foreign key constraint violated",
+          { code: "P2003", clientVersion: "test" }
+        )
+      );
+
+      await expect(
+        rankingComputeService.recomputeAllRankings(9)
+      ).resolves.toBeUndefined();
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        "Rankings not written: the user no longer exists",
+        { userId: 9, entityType: "performer" }
+      );
+    });
+
+    it("any other write error still fails the recompute", async () => {
+      const txMock = setupRankingMocks({ performerStats });
+      txMock.userEntityRanking.createMany.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        })
+      );
+
+      await expect(
+        rankingComputeService.recomputeAllRankings(9)
+      ).rejects.toThrow("Unique constraint failed");
     });
   });
 
@@ -601,12 +620,12 @@ describe("RankingComputeService", () => {
   });
 
   describe("instanceId handling", () => {
-    it("defaults empty instanceId to empty string", async () => {
+    it("writes each ranking on its entity's instance", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
           {
             entityId: "perf1",
-            instanceId: null, // null from DB
+            instanceId: "inst-2",
             playCount: 5,
             oCount: 1,
             playDuration: 600,
@@ -618,7 +637,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      expect(must(rankings[0]).instanceId).toBe("");
+      expect(must(rankings[0]).instanceId).toBe("inst-2");
     });
   });
 

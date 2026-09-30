@@ -30,6 +30,7 @@
  * deletion); a recompute already running then writes nothing more, since
  * it read what came before, and the one started after it has the last word.
  */
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { dbWrite, dbWriteBatchIf } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
@@ -297,7 +298,7 @@ class RankingComputeService {
       const engagementRate = engagementScore / Math.max(libraryPresence, 1);
       return {
         entityId: e.entityId,
-        instanceId: e.instanceId || "",
+        instanceId: e.instanceId,
         playCount,
         oCount,
         playDuration,
@@ -356,34 +357,43 @@ class RankingComputeService {
 
     // Replace this user's rankings of the type in one batch: the statements
     // are built first, so the unit makes no Node round trip under the lock.
-    // The last one removes them again when the user was deleted while this
-    // recompute ran: the table has no foreign key to User to refuse them,
-    // and deleteUser's unit runs either before this one or after it.
-    await dbWriteBatchIf("rankings", current, [
-      prisma.userEntityRanking.deleteMany({
-        where: { userId, entityType },
-      }),
-      prisma.userEntityRanking.createMany({
-        data: rankings.map((r) => ({
+    // A user deleted while this recompute ran (deleteUser's unit ran first)
+    // has no row for the foreign key: the batch is refused and rolls back,
+    // and there is nothing left to write for them.
+    try {
+      await dbWriteBatchIf("rankings", current, [
+        prisma.userEntityRanking.deleteMany({
+          where: { userId, entityType },
+        }),
+        prisma.userEntityRanking.createMany({
+          data: rankings.map((r) => ({
+            userId,
+            instanceId: r.instanceId,
+            entityType,
+            entityId: r.entityId,
+            playCount: r.playCount,
+            playDuration: r.playDuration,
+            oCount: r.oCount,
+            engagementScore: r.engagementScore,
+            libraryPresence: r.libraryPresence,
+            engagementRate: r.engagementRate,
+            percentileRank: r.percentileRank,
+          })),
+        }),
+      ]);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003"
+      ) {
+        logger.debug("Rankings not written: the user no longer exists", {
           userId,
-          instanceId: r.instanceId || "",
           entityType,
-          entityId: r.entityId,
-          playCount: r.playCount,
-          playDuration: r.playDuration,
-          oCount: r.oCount,
-          engagementScore: r.engagementScore,
-          libraryPresence: r.libraryPresence,
-          engagementRate: r.engagementRate,
-          percentileRank: r.percentileRank,
-        })),
-      }),
-      prisma.$executeRaw`
-        DELETE FROM UserEntityRanking
-        WHERE userId = ${userId}
-          AND NOT EXISTS (SELECT 1 FROM "User" WHERE id = ${userId})
-      `,
-    ]);
+        });
+        return;
+      }
+      throw error;
+    }
   }
 
   /**

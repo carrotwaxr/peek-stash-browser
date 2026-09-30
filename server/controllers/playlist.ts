@@ -578,7 +578,7 @@ export const reorderPlaylist = async (
     select: { sceneId: true, instanceId: true },
   });
   const inPlaylist = new Set(
-    stored.map((row) => entityKey(row.sceneId, row.instanceId ?? ""))
+    stored.map((row) => entityKey(row.sceneId, row.instanceId))
   );
   const missing = moves.findIndex(
     (item) => !inPlaylist.has(entityKey(item.sceneId, item.instanceId))

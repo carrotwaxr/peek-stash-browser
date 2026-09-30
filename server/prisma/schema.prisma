@@ -79,7 +79,12 @@ model User {
 
   // Pre-computed exclusions cache
   excludedEntities UserExcludedEntity[]
-  entityStats      UserEntityStats[]
+
+  // Per-user play statistics and rankings
+  performerStats UserPerformerStats[]
+  studioStats    UserStudioStats[]
+  tagStats       UserTagStats[]
+  entityRankings UserEntityRanking[]
 
   // Custom carousels
   customCarousels UserCarousel[]
@@ -125,7 +130,7 @@ model UserGroupMembership {
 model WatchHistory {
   id         Int     @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID (null for legacy single-instance data)
+  instanceId String  // Stash instance ID
   sceneId    String  // Stash scene ID
 
   // Playback tracking (syncs with Stash)
@@ -190,7 +195,7 @@ model PlaylistShare {
 model PlaylistItem {
   id         Int      @id @default(autoincrement())
   playlistId Int
-  instanceId String? // Stash instance ID (for cross-instance playlists)
+  instanceId String  // Stash instance ID (for cross-instance playlists)
   sceneId    String  // Stash scene ID
   position   Int // Order in playlist
   addedAt    DateTime @default(now())
@@ -218,7 +223,7 @@ model CustomTheme {
 model SceneRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   sceneId    String  // Stash scene ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -237,7 +242,7 @@ model SceneRating {
 model PerformerRating {
   id          Int      @id @default(autoincrement())
   userId      Int
-  instanceId  String? // Stash instance ID
+  instanceId  String  // Stash instance ID
   performerId String  // Stash performer ID
   rating      Int? // 0-100, null if not rated
   favorite    Boolean  @default(false)
@@ -256,7 +261,7 @@ model PerformerRating {
 model StudioRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   studioId   String  // Stash studio ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -275,7 +280,7 @@ model StudioRating {
 model TagRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   tagId      String  // Stash tag ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -294,7 +299,7 @@ model TagRating {
 model GalleryRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   galleryId  String  // Stash gallery ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -313,7 +318,7 @@ model GalleryRating {
 model GroupRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   groupId    String  // Stash group ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -332,7 +337,7 @@ model GroupRating {
 model ImageRating {
   id         Int      @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   imageId    String  // Stash image ID
   rating     Int? // 0-100, null if not rated
   favorite   Boolean  @default(false)
@@ -351,7 +356,7 @@ model ImageRating {
 model ImageViewHistory {
   id         Int     @id @default(autoincrement())
   userId     Int
-  instanceId String? // Stash instance ID
+  instanceId String  // Stash instance ID
   imageId    String  // Stash image ID
 
   // View tracking (incremented when image is viewed in Lightbox)
@@ -398,7 +403,7 @@ model UserContentRestriction {
 model UserPerformerStats {
   id          Int    @id @default(autoincrement())
   userId      Int
-  instanceId  String @default("")
+  instanceId  String
   performerId String // Stash performer ID
 
   // Aggregated statistics from all scenes featuring this performer
@@ -409,6 +414,8 @@ model UserPerformerStats {
 
   updatedAt DateTime @updatedAt
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, instanceId, performerId])
   @@index([userId])
   @@index([performerId])
@@ -418,7 +425,7 @@ model UserPerformerStats {
 model UserStudioStats {
   id         Int    @id @default(autoincrement())
   userId     Int
-  instanceId String @default("")
+  instanceId String
   studioId   String // Stash studio ID
 
   // Aggregated statistics from all scenes produced by this studio
@@ -426,6 +433,8 @@ model UserStudioStats {
   playCount Int @default(0) // Total play count
 
   updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, instanceId, studioId])
   @@index([userId])
@@ -436,7 +445,7 @@ model UserStudioStats {
 model UserTagStats {
   id         Int    @id @default(autoincrement())
   userId     Int
-  instanceId String @default("")
+  instanceId String
   tagId      String // Stash tag ID
 
   // Aggregated statistics from all scenes tagged with this tag
@@ -444,6 +453,8 @@ model UserTagStats {
   playCount Int @default(0) // Total play count
 
   updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, instanceId, tagId])
   @@index([userId])
@@ -456,7 +467,7 @@ model UserTagStats {
 model UserEntityRanking {
   id         Int    @id @default(autoincrement())
   userId     Int
-  instanceId String @default("")
+  instanceId String
   entityType String // 'performer' | 'studio' | 'tag' | 'scene'
   entityId   String // Stash entity ID
 
@@ -472,6 +483,8 @@ model UserEntityRanking {
   percentileRank   Float @default(0) // 0-100, where 100 = top ranked among user's engaged entities of this type
 
   updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, instanceId, entityType, entityId])
   @@index([userId, entityType, percentileRank(sort: Desc)])
@@ -565,20 +578,6 @@ model UserExcludedEntity {
   @@index([userId, entityType])
   @@index([entityType, entityId])
   @@index([userId, entityType, reason]) // For groupBy stats queries
-}
-
-// Pre-computed visible counts (avoids expensive COUNT queries)
-model UserEntityStats {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  entityType   String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
-  instanceId   String   @default("") // Stash instance ID for per-instance counts
-  visibleCount Int      // total - excluded
-  updatedAt    DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, entityType, instanceId])
 }
 
 // Track which data migrations have been applied

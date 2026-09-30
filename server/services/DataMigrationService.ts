@@ -31,9 +31,10 @@ interface Migration {
 }
 
 /**
- * The per-user tables with no relation to User, so a user's delete never
- * cascaded to them. deleteUser deletes their rows itself; a foreign key
- * with ON DELETE CASCADE would need each table rebuilt.
+ * The per-user tables that had no relation to User, so a user's delete
+ * never cascaded to them. Migration 20260930000100 rebuilt them with a
+ * foreign key (ON DELETE CASCADE) and left out rows of missing users, so
+ * this entry finds nothing on a database past it; it stays as history.
  */
 const UNLINKED_USER_TABLES = [
   "UserPerformerStats",

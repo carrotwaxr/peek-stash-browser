@@ -3,25 +3,27 @@
  *
  * Every table with a `userId` column holds per-user data. The list is read
  * from the database, so a table added later fails the first check here
- * until the test seeds it, and the delete is then proven for it too. Most
- * of these tables cascade from User through a foreign key;
- * UserPerformerStats, UserStudioStats, UserTagStats and UserEntityRanking
- * have none, so `deleteUser` deletes their rows itself, and data migration
- * 008 deletes the rows earlier deletes left behind.
+ * until the test seeds it, and the delete is then proven for it too. Every
+ * one cascades from User through a foreign key, so `deleteUser` deletes only
+ * the user. UserPerformerStats, UserStudioStats, UserTagStats and
+ * UserEntityRanking had no key before `20260930000100`; data migration 008
+ * deleted the rows earlier deletes had left behind there.
  *
  * The users here never log in, so the server starts no ranking recompute
  * for them (routes/auth.ts) that could land between the steps.
  */
+import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { deleteOrphanedUserRows } from "../../services/DataMigrationService.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TEST_CONFIG } from "../helpers/config.js";
 import { adminClient } from "../helpers/testClient.js";
 
 const PASSWORD = "user_delete_it_pass_1";
 const GROUP_NAME = "user_delete_it_group";
-/** The per-user tables with no foreign key to User */
+/** The per-user tables that had no foreign key to User (data migration 008) */
 const UNLINKED_TABLES = [
   "UserPerformerStats",
   "UserStudioStats",
@@ -127,10 +129,6 @@ function seeders(
       prisma.userEntityRanking.create({
         data: { ...entity, entityType: "performer", entityId: "1" },
       }),
-    UserEntityStats: () =>
-      prisma.userEntityStats.create({
-        data: { ...entity, entityType: "scene", visibleCount: 1 },
-      }),
     UserExcludedEntity: () =>
       prisma.userExcludedEntity.create({
         data: {
@@ -160,17 +158,40 @@ function seeders(
   };
 }
 
-/** One row in each unlinked table, for the user id given */
-async function seedUnlinked(userId: number, instanceId: string) {
-  const entity = { userId, instanceId };
-  await prisma.userPerformerStats.create({
-    data: { ...entity, performerId: "1" },
+/**
+ * One row in each formerly unlinked table, for the user id given. Their
+ * foreign key to User refuses a row for a missing user through Prisma, whose
+ * pool keeps foreign keys on, so the rows go in through a connection of
+ * their own with them off, as a delete run with foreign keys off left them.
+ */
+function seedUnlinked(userId: number, instanceId: string): void {
+  const db = new DatabaseSync(TEST_CONFIG.databasePath, {
+    enableForeignKeyConstraints: false,
+    timeout: 10_000,
   });
-  await prisma.userStudioStats.create({ data: { ...entity, studioId: "1" } });
-  await prisma.userTagStats.create({ data: { ...entity, tagId: "1" } });
-  await prisma.userEntityRanking.create({
-    data: { ...entity, entityType: "performer", entityId: "1" },
-  });
+  try {
+    const now = Date.now();
+    for (const [table, columns] of [
+      ["UserPerformerStats", { performerId: "1" }],
+      ["UserStudioStats", { studioId: "1" }],
+      ["UserTagStats", { tagId: "1" }],
+      ["UserEntityRanking", { entityType: "performer", entityId: "1" }],
+    ] as const) {
+      const row: Record<string, string | number> = {
+        userId,
+        instanceId,
+        ...columns,
+        updatedAt: now,
+      };
+      const names = Object.keys(row);
+      db.prepare(
+        `INSERT INTO "${table}" (${names.map((n) => `"${n}"`).join(", ")})
+         VALUES (${names.map(() => "?").join(", ")})`
+      ).run(...Object.values(row));
+    }
+  } finally {
+    db.close();
+  }
 }
 
 describe("Deleting a user (integration)", () => {
@@ -257,9 +278,9 @@ describe("Deleting a user (integration)", () => {
     const orphanA = newest.id + 1000;
     const orphanB = newest.id + 1001;
     orphanIds.push(orphanA, orphanB);
-    await seedUnlinked(liveId, instanceId);
-    await seedUnlinked(orphanA, instanceId);
-    await seedUnlinked(orphanB, instanceId);
+    seedUnlinked(liveId, instanceId);
+    seedUnlinked(orphanA, instanceId);
+    seedUnlinked(orphanB, instanceId);
 
     // Data migration 008's body, one row per unit, so each table takes
     // more than one chunk
