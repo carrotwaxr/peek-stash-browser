@@ -116,4 +116,74 @@ test.describe("Gallery lightbox", () => {
       await context.close();
     }
   });
+
+  test("r then 4 in the lightbox rates the image and leaves the gallery unrated", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    const user = await createUser(page.request, "lightbox-rate");
+    userId = user.id;
+
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const userPage = await context.newPage();
+
+      // 1. Open the first gallery; its page has r-then-number hotkeys of its own
+      const list = new ListPage(userPage);
+      await list.goto("/galleries");
+      const galleries = await list.waitForResults("Gallery");
+      requireData(galleries > 0, "a gallery");
+      await list.cards("Gallery").first().locator("a:has(.card-title)").click();
+      const firstImage = userPage.locator(".wall-item").first();
+      await expect(firstImage).toBeVisible({ timeout: 15_000 });
+      const galleryId = /\/gallery\/([^/?]+)/.exec(userPage.url())?.[1];
+      expect(galleryId, `the gallery id in ${userPage.url()}`).toBeTruthy();
+
+      // 2. Open the lightbox and press r then 4
+      await firstImage.click();
+      await expect(
+        userPage.getByRole("dialog", { name: "Image viewer" })
+      ).toBeVisible();
+      const [ratingResponse] = await Promise.all([
+        userPage.waitForResponse(
+          (r) =>
+            r.request().method() === "PUT" &&
+            r.url().includes("/api/ratings/image/") &&
+            r.ok()
+        ),
+        (async () => {
+          await userPage.keyboard.press("r");
+          await userPage.keyboard.press("4");
+        })(),
+      ]);
+      const body = ratingResponse.request().postDataJSON() as {
+        rating: number | null;
+        instanceId: string;
+      };
+      expect(body.rating).toBe(80);
+
+      // 3. The gallery behind the lightbox kept no rating
+      const listed = await userPage.request.post("/api/library/galleries", {
+        data: { ids: [`${String(galleryId)}:${body.instanceId}`] },
+      });
+      expect(listed.ok(), await listed.text()).toBeTruthy();
+      const rows = (
+        (await listed.json()) as {
+          findGalleries: { galleries: { rating100: number | null }[] };
+        }
+      ).findGalleries.galleries;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.rating100 ?? null).toBeNull();
+
+      // 4. The lightbox's info drawer shows the image's new rating (80 = 8.0)
+      await userPage.getByRole("button", { name: "Show image info" }).click();
+      await expect(
+        userPage.getByRole("button", { name: "Rating: 8.0", exact: true })
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
 });

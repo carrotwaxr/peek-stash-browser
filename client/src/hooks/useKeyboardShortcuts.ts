@@ -1,8 +1,11 @@
 import type React from "react";
 import { useEffect, useRef } from "react";
+import { buildKeyCombo } from "../utils/keyTargets";
 
 /**
- * Reusable keyboard shortcut hook for the entire application
+ * The video player's keyboard shortcuts (its own capture-phase listener).
+ * Every other shortcut goes through `useShortcutScope`; N4 moves the player
+ * there too and deletes this hook.
  *
  * Provides context-aware keyboard shortcut registration with proper event handling,
  * input field detection, modifier key support, and cleanup.
@@ -128,67 +131,6 @@ function isTypingInInput(target: EventTarget | null) {
   // Allow Space on buttons (for activation)
   // All other inputs should block shortcuts
   return (isInput || isContentEditable) && !isButton;
-}
-
-/**
- * Build key combination string from keyboard event
- * Handles modifiers (ctrl, shift, alt, meta) and normalizes key names
- *
- * @param {KeyboardEvent} event - Keyboard event
- * @returns {string} Key combination string (e.g., "ctrl+shift+a", "space", "shift+>")
- */
-function buildKeyCombo(event: KeyboardEvent) {
-  const parts = [];
-
-  // Normalize key name first
-  let key = normalizeKey(event.key);
-
-  // Add modifiers in consistent order
-  if (event.ctrlKey || event.metaKey) parts.push("ctrl");
-  if (event.altKey) parts.push("alt");
-
-  // Only add shift for special characters and non-letter keys
-  // Letters should ignore shift (K and k both become "k")
-  const isLetter = /^[a-z]$/i.test(event.key);
-  if (event.shiftKey && !isLetter) {
-    parts.push("shift");
-    // For shifted symbols, use the actual character (e.g., ">" instead of ".")
-    if (event.key.length === 1) {
-      key = event.key;
-    }
-  }
-
-  parts.push(key);
-
-  return parts.join("+");
-}
-
-/**
- * Normalize key names for consistency
- * @param {string} key - Raw key from event.key
- * @returns {string} Normalized key name
- */
-function normalizeKey(key: string) {
-  // Map of special keys to normalized names
-  const keyMap: Record<string, string> = {
-    " ": "space",
-    ArrowUp: "up",
-    ArrowDown: "down",
-    ArrowLeft: "left",
-    ArrowRight: "right",
-    Escape: "esc",
-    Enter: "enter",
-    Tab: "tab",
-    Backspace: "backspace",
-    Delete: "del",
-    Home: "home",
-    End: "end",
-    PageUp: "pageup",
-    PageDown: "pagedown",
-  };
-
-  // Use mapped name if available, otherwise lowercase the key
-  return keyMap[key] || key.toLowerCase();
 }
 
 /**

@@ -21,8 +21,42 @@ Peek supports keyboard navigation for remotes, wireless keyboards, or couch brow
 | `Tab` | Move to next focusable element |
 | `Shift+Tab` | Move to previous focusable element |
 | `Enter` | Activate/click the focused element |
-| `Space` | Activate buttons (also play/pause in video player) |
-| `Escape` | Go back or close modals |
+| `Space` | Activate the focused button (also play/pause in video player) |
+| `Escape` | Close the open lightbox or dialog |
+| `?` | Open the keyboard shortcuts help |
+
+### Go To a Page
+
+Press `g`, then a letter, within one second:
+
+| Keys | Page |
+|------|------|
+| `g` `s` | Scenes |
+| `g` `r` | Recommended |
+| `g` `p` | Performers |
+| `g` `u` | Studios |
+| `g` `t` | Tags |
+| `g` `c` or `g` `v` | Collections |
+| `g` `l` | Galleries |
+| `g` `y` | Playlists |
+| `g` `z` | Settings |
+
+### Rate and Favorite
+
+On a scene, performer, studio, tag, collection or gallery page, and on the image open in the lightbox, press `r`, then within one second:
+
+| Keys | Action |
+|------|--------|
+| `r` `1` to `r` `5` | Rate 1 to 5 stars (20, 40, 60, 80 or 100) |
+| `r` `0` | Clear the rating |
+| `r` `f` | Toggle favorite |
+
+### Which Keys Go Where
+
+- **A lightbox or dialog takes every key while it is open.** With an image open in the lightbox, `r` `4` rates that image, never the performer, studio, tag or gallery page behind it, and `g` shortcuts wait until you close it.
+- **Typing in a field never triggers a shortcut.** In a search box or text field, letters, numbers and `Space` type as usual; only `Escape` reaches the page.
+- **The focused control keeps its own keys.** `Space` and `Enter` press the focused button or link, and the arrow keys move a focused slider, list or menu.
+- **The second key of a pair goes only to the first.** After `r`, the next key rates; after `g`, the next key opens a page. Nothing else reacts to it, so `r` `4` on a scene page rates the scene and does not seek the video.
 
 ### Arrow Key Navigation
 
@@ -54,14 +88,11 @@ Arrow keys navigate through grid layouts and lists:
 2. Press `Enter` to open the scene detail page
 3. Press `Escape` to go back to the grid
 
-**Quick actions on scene cards:**
+**On a focused scene card:**
 
 | Key | Action |
 |-----|--------|
 | `Enter` | Open scene detail page |
-| `P` | Play scene immediately (when focused) |
-| `+` | Add to playlist (opens playlist selector) |
-| `F` | Toggle favorite (when supported) |
 
 ### Scene Detail Page
 
@@ -336,10 +367,9 @@ Perfect setup for couch browsing:
 **Browse and queue efficiently:**
 
 1. Navigate scene grid with arrow keys
-2. Press `+` on scenes you want to watch
-3. Add all to "Watch Later" playlist
-4. Open playlist and press Play
-5. Lean back and enjoy
+2. Select the scenes you want to watch and add them to a "Watch Later" playlist from the selection bar
+3. Open the playlist and press Play
+4. Lean back and enjoy
 
 ## Next Steps
 

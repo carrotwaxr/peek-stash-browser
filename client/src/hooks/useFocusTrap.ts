@@ -1,9 +1,11 @@
 import type React from "react";
 import { useEffect, useRef } from "react";
+import { useShortcutScope } from "./useShortcutScope";
 
 /**
- * Custom hook for trapping focus within a container (modal, dropdown, etc.)
- * Prevents Tab navigation from escaping the container
+ * Traps focus within a container (a modal dialog): Tab cannot leave it, and
+ * the dialog is a modal `overlay` scope on the shortcut stack, so while it is
+ * open no page, player or global shortcut runs and Escape calls `onEscape`.
  *
  * @param {boolean} enabled Whether focus trap is enabled
  * @param {Function} onEscape Optional callback when Escape is pressed
@@ -15,6 +17,13 @@ export const useFocusTrap = (
 ) => {
   const containerRef = useRef<HTMLElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  useShortcutScope({
+    layer: "overlay",
+    enabled,
+    root: () => containerRef.current,
+    ...(onEscape ? { keys: { esc: () => onEscape() } } : {}),
+  });
 
   useEffect(() => {
     if (!enabled || !containerRef.current) return;
@@ -52,16 +61,6 @@ export const useFocusTrap = (
       const lastElement = focusableElements[focusableElements.length - 1];
       if (!firstElement || !lastElement) return;
 
-      // Handle Escape key
-      if (e.key === "Escape") {
-        if (onEscape) {
-          e.preventDefault();
-          e.stopPropagation();
-          onEscape();
-        }
-        return;
-      }
-
       // Handle Tab key
       if (e.key === "Tab") {
         if (e.shiftKey) {
@@ -93,7 +92,7 @@ export const useFocusTrap = (
         previousActiveElement.current.focus();
       }
     };
-  }, [enabled, onEscape]);
+  }, [enabled]);
 
   return containerRef;
 };

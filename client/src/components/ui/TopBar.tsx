@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { getOrderedNavItems } from "../../constants/navigation";
-import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useScrollDirection } from "../../hooks/useScrollDirection";
+import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { PeekLogo } from "../branding/PeekLogo";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
@@ -36,15 +36,10 @@ const TopBar = ({ navPreferences = [] }: Props) => {
   const scrollDirection = useScrollDirection(100);
 
   // Help dialog hotkey (? or Shift+/)
-  useKeyboardShortcuts(
-    {
-      "shift+?": () => setIsHelpModalOpen(true),
-    },
-    {
-      enabled: true,
-      context: "help-dialog",
-    }
-  );
+  useShortcutScope({
+    layer: "global",
+    keys: { "shift+?": () => setIsHelpModalOpen(true) },
+  });
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences).filter(

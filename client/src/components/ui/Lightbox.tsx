@@ -21,8 +21,9 @@ import {
 } from "react-zoom-pan-pinch";
 import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { useFullscreen } from "../../hooks/useFullscreen";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
+import { ratingSequence } from "../../utils/ratingSequence";
 import MetadataDrawer from "./MetadataDrawer";
 
 // Percentage of screen width on each side that triggers navigation on click
@@ -80,6 +81,9 @@ const Lightbox = ({
     enabled: isOpen,
   });
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The dialog element: the root of the lightbox's keyboard scope
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   // Zoom/pan state
   const [zoomScale, setZoomScale] = useState(1);
@@ -605,13 +609,6 @@ const Lightbox = ({
     };
   }, [currentIndex, images, isOpen, imageLoaded]);
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: isOpen && images.length > 0,
-    setRating: (newRating) => void handleRatingChange(newRating),
-    toggleFavorite: () => void handleFavoriteChange(!isFavorite),
-  });
-
   // Auto-advance slideshow
   useEffect(() => {
     if (isPlaying) {
@@ -632,63 +629,55 @@ const Lightbox = ({
     };
   }, [isPlaying, intervalDuration, goToNext]);
 
-  // Keyboard controls
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (
-        (e.target as HTMLElement)?.tagName === "INPUT" ||
-        (e.target as HTMLElement)?.tagName === "TEXTAREA"
-      )
-        return;
-
-      switch (e.key) {
-        case "Escape":
-          if (drawerOpen) {
-            setDrawerOpen(false);
-          } else {
-            handleCloseWithFullscreenExit();
-          }
-          break;
-        case "ArrowLeft":
-          goToPrevious();
-          break;
-        case "ArrowRight":
-          goToNext();
-          break;
-        case " ":
-          e.preventDefault();
-          toggleSlideshow();
-          break;
-        case "i":
-        case "I":
-          setDrawerOpen((prev) => !prev);
-          break;
-        case "f":
-        case "F":
-          void toggleFullscreen();
-          break;
-        default:
-          break;
-      }
+  // Keyboard: while open the lightbox is a modal overlay scope, so it takes
+  // every key and nothing behind it (the page's own r-then-number rating, g
+  // navigation) runs. r then 1-5, 0 or f rates or favorites the image.
+  const hasImages = isOpen && images.length > 0;
+  const withControls =
+    (action: () => void): (() => void) =>
+    () => {
+      action();
       showControls();
     };
+  useShortcutScope({
+    layer: "overlay",
+    enabled: hasImages,
+    root: () => dialogRef.current,
+    keys: {
+      esc: withControls(() => {
+        if (drawerOpen) {
+          setDrawerOpen(false);
+        } else {
+          handleCloseWithFullscreenExit();
+        }
+      }),
+      left: withControls(goToPrevious),
+      right: withControls(goToNext),
+      space: withControls(toggleSlideshow),
+      i: withControls(() => setDrawerOpen((prev) => !prev)),
+      f: withControls(() => void toggleFullscreen()),
+    },
+    sequences: {
+      r: ratingSequence(
+        (newRating) => void handleRatingChange(newRating),
+        () => void handleFavoriteChange(!isFavorite)
+      ),
+    },
+  });
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    isOpen,
-    handleCloseWithFullscreenExit,
-    goToPrevious,
-    goToNext,
-    toggleSlideshow,
-    drawerOpen,
-    isFullscreen,
-    toggleFullscreen,
-    showControls,
-  ]);
+  // Focus moves into the dialog when it opens (its keys act while focus is
+  // inside it) and back to where it was when it closes
+  useEffect(() => {
+    if (!hasImages) return;
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [hasImages]);
 
   // Cleanup timers
   useEffect(() => {
@@ -747,7 +736,12 @@ const Lightbox = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image viewer"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center outline-none"
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.95)",
       }}
