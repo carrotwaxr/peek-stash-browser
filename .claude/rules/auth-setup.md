@@ -37,4 +37,5 @@ paths:
 - `create-stash-instance` and `test-stash-connection`: public and rate-limited only while there is no user and no instance; from the moment either exists they need the admin session (`requireAdminOnceSetupStarted` in `middleware/setupGuards.ts`).
 - `create-stash-instance` still only works while there are no instances, and hides the connection error text. It skips the connection test when `NODE_ENV=test`, for E2E setup.
 - `test-stash-connection` gives the reason for a failure, and the Stash version, only to admins; everyone else gets pass or fail. No response carries `details`; the full error goes to the log.
+- Peek keeps one enabled instance. `updateStashInstance` and `deleteInstance` check it inside their write unit (`LastEnabledInstanceError`, 400). `/setup/status` counts any instance, disabled included, for `setupComplete`.
 - There is no reset endpoint and no `/auth/first-time-password`. To start setup over, delete the database file.
