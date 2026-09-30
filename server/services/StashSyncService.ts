@@ -806,7 +806,8 @@ interface BatchWrite {
   junctions: ReadonlyArray<readonly [JunctionName, readonly JunctionRow[]]>;
   /**
    * Recomputes the columns the rows derive from themselves and their new
-   * junction rows, after the inserts (scenes: `refreshSceneDerivedColumns`)
+   * junction rows, after the inserts (`refreshSceneDerivedColumns`,
+   * `refreshImageDerivedColumns`)
    */
   refreshDerived?(tx: Prisma.TransactionClient): Promise<unknown>;
   /** The change diff, from the rows and links as they were before the write */
@@ -823,7 +824,7 @@ interface BatchWrite {
  * connection (item 42, SYNC-11): the rows' stored state, the old junction
  * rows (deleted and returned, for the change diff), the rows, the new
  * junction rows, the columns derived from them (`refreshDerived`, scenes'
- * sort columns), then the holds: once the diff says what changed, a
+ * and images' sort columns), then the holds: once the diff says what changed, a
  * `pending` exclusion row per user of `holdFrom` for each changed entity and
  * what it links to (`holdForRecompute`), so a user with restrictions or
  * hidden items never sees a change before their recompute at the end of
@@ -1417,24 +1418,39 @@ export const ENTITY_SYNC: {
 // ==================== Scene Sync ====================
 
 /**
+ * The title a card shows, ASCII lower-cased, as an expression over the row's
+ * "title" and "filePath": the sort key of a scene's and an image's title
+ * order (`titleSort`).
+ *
+ * `title || getSceneFallbackTitle(filePath)` (`utils/titleUtils.ts`, which
+ * `getImageFallbackTitle` matches): the title, else the file name after the
+ * last `/` or `\`, the last extension stripped (the whole path when it ends
+ * in a separator; NULL without a path). lower() folds ASCII only (Prisma's
+ * SQLite has no ICU), exactly what COLLATE NOCASE compared, so a BINARY
+ * order on the stored value is the case-insensitive order of the displayed
+ * title, and the index needs no collation `schema.prisma` cannot declare.
+ * The file name part runs only for an untitled row: COALESCE stops at the
+ * title. Read inside out: `path`; `name`, what follows the last separator
+ * (`rtrim` by every character but the separators leaves the directory
+ * part); `dot`, `name` up to its last `.`; `ext`, what follows it, stripped
+ * when non-empty and free of `/` (the regex `\.[^/.]+$`).
+ */
+const TITLE_SORT_SQL = `lower(COALESCE(NULLIF("title", ''), (
+    SELECT CASE WHEN dot <> '' AND ext <> '' AND instr(ext, '/') = 0
+      THEN substr(name, 1, length(dot) - 1) ELSE name END
+    FROM (SELECT name, dot, substr(name, length(dot) + 1) AS ext
+      FROM (SELECT name, rtrim(name, replace(name, '.', '')) AS dot
+        FROM (SELECT COALESCE(NULLIF(substr(path, length(rtrim(path, replace(replace(path, '/', ''), '\\', ''))) + 1), ''), path) AS name
+          FROM (SELECT NULLIF("filePath", '') AS path)))))))`;
+
+/**
  * The scene columns derived from a scene's row and its junction rows, as the
  * SET list of an UPDATE of "StashScene" (item 67 (c), DB-07). The list sorts
  * and filters on them through its `(deletedAt, <column>, id)` indexes instead
  * of computing them for every scene on every request.
  *
- * - `titleSort`: the title the scene's card shows, `title ||
- *   getSceneFallbackTitle(filePath)` (`utils/titleUtils.ts`): its title, else
- *   its file name after the last `/` or `\`, the last extension stripped
- *   (the whole path when it ends in a separator; NULL without a path).
- *   lower() folds ASCII only (Prisma's SQLite has no ICU), exactly what
- *   COLLATE NOCASE compared, so a BINARY order on the stored value is the
- *   case-insensitive order of the displayed title, and the index needs no
- *   collation `schema.prisma` cannot declare. The file name part runs only
- *   for an untitled scene: COALESCE stops at the title. Read inside out:
- *   `path`; `name`, what follows the last separator (`rtrim` by every
- *   character but the separators leaves the directory part); `dot`, `name`
- *   up to its last `.`; `ext`, what follows it, stripped when non-empty and
- *   free of `/` (the regex `\.[^/.]+$`).
+ * - `titleSort`: the title the scene's card shows, ASCII lower-cased
+ *   (`TITLE_SORT_SQL`).
  * - `performerCount`, `tagCount`: the scene's `ScenePerformer` and `SceneTag`
  *   rows, as the count filters and sorts counted them (deleted far sides
  *   included).
@@ -1442,13 +1458,7 @@ export const ENTITY_SYNC: {
  * Migration `20260925001100_scene_sort_columns` backfills with a copy of
  * this text: change both together.
  */
-export const SCENE_DERIVED_COLUMNS_SQL = `"titleSort" = lower(COALESCE(NULLIF("title", ''), (
-    SELECT CASE WHEN dot <> '' AND ext <> '' AND instr(ext, '/') = 0
-      THEN substr(name, 1, length(dot) - 1) ELSE name END
-    FROM (SELECT name, dot, substr(name, length(dot) + 1) AS ext
-      FROM (SELECT name, rtrim(name, replace(name, '.', '')) AS dot
-        FROM (SELECT COALESCE(NULLIF(substr(path, length(rtrim(path, replace(replace(path, '/', ''), '\\', ''))) + 1), ''), path) AS name
-          FROM (SELECT NULLIF("filePath", '') AS path))))))),
+export const SCENE_DERIVED_COLUMNS_SQL = `"titleSort" = ${TITLE_SORT_SQL},
   "performerCount" = (SELECT COUNT(*) FROM "ScenePerformer" sp WHERE sp."sceneId" = "StashScene"."id" AND sp."sceneInstanceId" = "StashScene"."stashInstanceId"),
   "tagCount" = (SELECT COUNT(*) FROM "SceneTag" st WHERE st."sceneId" = "StashScene"."id" AND st."sceneInstanceId" = "StashScene"."stashInstanceId")`;
 
@@ -2313,6 +2323,38 @@ async function processGalleriesBatch(
 
 // ==================== Image Sync ====================
 
+/**
+ * The image columns derived from an image's row, as the SET list of an
+ * UPDATE of "StashImage" (routed C7): `titleSort`, the title the image's
+ * card shows (`getImageFallbackTitle`), ASCII lower-cased
+ * (`TITLE_SORT_SQL`), which the list's title order, the contract's default
+ * image sort, reads through `StashImage_browse_titleSort_idx`.
+ *
+ * Migration `20261001000100_image_title_sort` backfills with a copy of this
+ * text: change both together.
+ */
+export const IMAGE_DERIVED_COLUMNS_SQL = `"titleSort" = ${TITLE_SORT_SQL}`;
+
+/**
+ * Recomputes the derived columns (`IMAGE_DERIVED_COLUMNS_SQL`) of a batch's
+ * images on `instanceId`, on its transaction after the upsert. Only the sync
+ * upsert writes an image's title or path, so the batches keep every image's
+ * key current. One bound statement; the primary key finds each image.
+ */
+export async function refreshImageDerivedColumns(
+  db: Pick<PrismaClient, "$executeRawUnsafe">,
+  imageIds: readonly string[],
+  instanceId: string
+): Promise<void> {
+  if (imageIds.length === 0) return;
+  await db.$executeRawUnsafe(
+    `UPDATE "StashImage" SET ${IMAGE_DERIVED_COLUMNS_SQL}
+     WHERE "id" IN (SELECT value FROM json_each(?)) AND "stashInstanceId" = ?`,
+    JSON.stringify(imageIds),
+    instanceId
+  );
+}
+
 async function processImagesBatch(
   images: SyncImage[],
   stashInstanceId: string,
@@ -2445,6 +2487,8 @@ async function processImagesBatch(
       ["ImageTag", tagRows],
       ["ImageGallery", galleryRows],
     ],
+    refreshDerived: (tx) =>
+      refreshImageDerivedColumns(tx, imageIds, instanceId),
     holdFrom: await usersToHold(run, instanceId),
     // An image's junction rows and studio are not compared: gallery
     // inheritance writes into them (lead decision, 2026-09-24)

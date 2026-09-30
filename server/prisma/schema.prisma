@@ -1065,6 +1065,9 @@ model StashImage {
   height   Int?
   fileSize BigInt? // bytes
 
+  // === Derived by sync (IMAGE_DERIVED_COLUMNS_SQL in StashSyncService.ts) ===
+  titleSort String? // the displayed title (title, else file name without extension), ASCII lower-cased
+
   // === Stash paths (raw, transformed at read time) ===
   pathThumbnail String? // Thumbnail URL path
   pathPreview   String? // Preview URL path
@@ -1089,6 +1092,7 @@ model StashImage {
   @@index([deletedAt])
   @@index([title])
   @@index([deletedAt, stashCreatedAt(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashImage_browse_idx")
+  @@index([deletedAt, titleSort, id, stashInstanceId], map: "StashImage_browse_titleSort_idx")
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }

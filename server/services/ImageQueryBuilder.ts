@@ -63,12 +63,6 @@ const SELECT_COLUMNS = `
     v.lastViewedAt AS userLastViewedAt
   `.trim();
 
-/**
- * The file name from the path: '/images/My Image.jpg' -> 'My Image.jpg',
- * as `getImageFallbackTitle` shows it (with the extension here)
- */
-const FILE_NAME = `REPLACE(i.filePath, RTRIM(i.filePath, REPLACE(i.filePath, '/', '')), '')`;
-
 /** The viewer's rating and O count; none is 0 */
 const USER_RATING = "COALESCE(r.rating, 0)";
 const USER_O_COUNT = "COALESCE(v.oCount, 0)";
@@ -132,10 +126,11 @@ class ImageQueryBuilder extends EntityQueryBuilder<
       params: [],
     });
     return {
-      // The displayed title: the title, else the file name
-      title: column(
-        `COALESCE(NULLIF(i.title, ''), ${FILE_NAME}) COLLATE NOCASE`
-      ),
+      // The displayed title (the title, else the file name without its
+      // extension), ASCII lower-cased, stored by sync
+      // (IMAGE_DERIVED_COLUMNS_SQL): a page walks
+      // StashImage_browse_titleSort_idx instead of sorting every image
+      title: column("i.titleSort"),
       date: column("i.date"),
       created_at: column("i.stashCreatedAt"),
       updated_at: column("i.stashUpdatedAt"),

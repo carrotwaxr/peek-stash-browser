@@ -140,6 +140,7 @@ const BROWSE_INDEXES = [
   ],
   ["StashScene_browse_tagCount_idx", "StashScene", "tagCount", "ASC"],
   ["StashImage_browse_idx", "StashImage", "stashCreatedAt", "DESC"],
+  ["StashImage_browse_titleSort_idx", "StashImage", "titleSort", "ASC"],
 ] as const;
 
 /** The scene sorts on an index, each with the index serving it */
@@ -255,6 +256,33 @@ describe("browse indexes", () => {
         const label = `${direction} on ${allowedInstanceIds.length}`;
 
         expect(plan, label).toContain("USING INDEX StashImage_browse_idx ");
+        expect(plan, label).not.toContain("TEMP B-TREE");
+      }
+    }
+  });
+
+  it("images by title use StashImage_browse_titleSort_idx with no temp B-tree", async () => {
+    for (const direction of [
+      "ASC",
+      "DESC",
+    ] as const satisfies readonly SortDirection[]) {
+      for (const allowedInstanceIds of INSTANCE_SETS) {
+        const { sql, params } = await pageStatement(() =>
+          imageQueryBuilder.execute({
+            userId: 1,
+            allowedInstanceIds,
+            request: parsedListRequest("image", {
+              page: 100,
+              sort: { field: "title", direction, seed: undefined },
+            }),
+          })
+        );
+        const plan = (await planner.planOf(sql, ...params)).join("\n");
+        const label = `${direction} on ${allowedInstanceIds.length}`;
+
+        expect(plan, label).toContain(
+          "USING INDEX StashImage_browse_titleSort_idx "
+        );
         expect(plan, label).not.toContain("TEMP B-TREE");
       }
     }
