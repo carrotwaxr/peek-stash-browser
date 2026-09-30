@@ -514,7 +514,7 @@ function dropsRule(key: string, value: unknown): boolean {
     DEFAULT_SORT.scene.direction,
     { userId: 0 }
   );
-  return parsed.dropped.length > 0;
+  return parsed.ignored.length > 0;
 }
 
 /**
@@ -552,16 +552,16 @@ export function cleanCarouselRules(
   }
 
   // The sort as the carousel runs it: Scene Number needs a collection rule
-  const dropped = parseStoredSceneQuery(
+  const ignored = parseStoredSceneQuery(
     isPlainObject(cleanedRules) ? cleanedRules : {},
     sort,
     direction,
     { userId: 0 }
-  ).dropped;
+  ).ignored;
   const fixed = cleanSort(
     { sort, direction },
     { field: DEFAULT_CAROUSEL_SORT, direction: DEFAULT_CAROUSEL_DIRECTION },
-    !dropped.some((problem) => problem.path === "sort"),
+    !ignored.some((problem) => problem.path === "sort"),
     tally
   );
 

@@ -30,6 +30,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import type { NormalizedScene } from "../../types/index.js";
 import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
+import { logger } from "../../utils/logger.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
@@ -70,6 +71,7 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
 const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
+const mockLogger = vi.mocked(logger, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -720,6 +722,41 @@ describe("Carousel Controller", () => {
 
       const body = res._getOkBody();
       expect(body.scenes).toBeDefined();
+    });
+
+    it("executing a carousel whose stored rule has an unknown key lists the scenes and logs the ignored path once", async () => {
+      const scenes = [SAMPLE_SCENE];
+      mockPrisma.userCarousel.findFirst.mockResolvedValue({
+        ...SAMPLE_CAROUSEL,
+        id: "stale-rule",
+        rules: { a1_not_a_field: { value: 1 } },
+      });
+      mockQueryBuilder.execute.mockResolvedValue({
+        items: scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(withStashUrl(scenes));
+      mockLogger.warn.mockClear();
+
+      for (const attempt of [1, 2]) {
+        const req = reqFor(executeCarouselById, {
+          params: { id: "stale-rule" },
+          user: USER,
+        });
+        const res = resFor(executeCarouselById);
+        await executeCarouselById(req, res);
+        expect(res._getStatus(), `request ${attempt}`).toBe(200);
+        expect(res._getOkBody().scenes).toHaveLength(1);
+      }
+
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "Stored carousel rule ignored",
+        objectContaining({
+          carouselId: "stale-rule",
+          path: "rules.a1_not_a_field",
+        })
+      );
     });
 
     it("a failure reaches the error handler: unexpected error", async () => {

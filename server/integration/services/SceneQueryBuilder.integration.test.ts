@@ -20,7 +20,6 @@ function request(
     sort,
     filter: {},
     specificInstanceId: undefined,
-    dropped: [],
   };
 }
 

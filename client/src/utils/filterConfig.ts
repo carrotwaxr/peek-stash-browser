@@ -4,6 +4,8 @@
 import {
   CLIP_PARAMS,
   type EntityKind,
+  FIELDS,
+  type FieldSpec,
   GALLERY_FIELDS,
   GENDERS,
   GROUP_FIELDS,
@@ -11,6 +13,7 @@ import {
   type GroupFilterInput,
   IMAGE_FIELDS,
   type ImageFilterInput,
+  type ListKind,
   ORIENTATIONS,
   PERFORMER_FIELDS,
   type PerformerFilterInput,
@@ -23,6 +26,7 @@ import {
   type StudioFilterInput,
   TAG_FIELDS,
   type TagFilterInput,
+  UI_KEYS,
 } from "@peek/shared-types";
 import type { ClipFilterParams } from "../api/clips";
 import { UNITS, feetInchesToCm, inchesToCm, lbsToKg } from "./unitConversions";
@@ -47,6 +51,8 @@ export interface FilterOption {
   min?: number;
   max?: number;
   step?: number;
+  /** A text option's most characters: its contract field's limit */
+  maxLength?: number;
   valueUnit?: string;
   collapsible?: boolean;
   defaultOpen?: boolean;
@@ -283,7 +289,26 @@ const GROUP_MODIFIER_OPTIONS = [
   { value: "EXCLUDES", label: "NOT in these" },
 ];
 
-export const SCENE_FILTER_OPTIONS = [
+/**
+ * A list's options with each text option carrying its contract field's
+ * `maxLength`, so an input holds what the server takes (a longer value is a
+ * 400, item 38)
+ */
+function withTextLimits<T>(kind: ListKind, options: T[]): T[] {
+  const fields: Readonly<Record<string, FieldSpec>> =
+    kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+  return options.map((option) => {
+    const { key, type } = option as FilterOption;
+    if (type !== "text") return option;
+    const uiKey = UI_KEYS[kind].find((entry) => entry.key === key);
+    const spec = uiKey ? fields[uiKey.field] : undefined;
+    return spec?.kind === "text"
+      ? { ...option, maxLength: spec.maxLength }
+      : option;
+  });
+}
+
+export const SCENE_FILTER_OPTIONS = withTextLimits("scene", [
   // Common Filters
   {
     type: "section-header",
@@ -564,9 +589,9 @@ export const SCENE_FILTER_OPTIONS = [
     min: 0,
     max: 50,
   },
-];
+]);
 
-export const PERFORMER_FILTER_OPTIONS = [
+export const PERFORMER_FILTER_OPTIONS = withTextLimits("performer", [
   // Common Filters
   {
     type: "section-header",
@@ -812,9 +837,9 @@ export const PERFORMER_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Search details...",
   },
-];
+]);
 
-export const STUDIO_FILTER_OPTIONS = [
+export const STUDIO_FILTER_OPTIONS = withTextLimits("studio", [
   // Common Filters
   {
     type: "section-header",
@@ -913,9 +938,9 @@ export const STUDIO_FILTER_OPTIONS = [
     type: "date-range",
     defaultValue: {},
   },
-];
+]);
 
-export const TAG_FILTER_OPTIONS = [
+export const TAG_FILTER_OPTIONS = withTextLimits("tag", [
   // Common Filters
   {
     type: "section-header",
@@ -1034,9 +1059,9 @@ export const TAG_FILTER_OPTIONS = [
     type: "date-range",
     defaultValue: {},
   },
-];
+]);
 
-export const GROUP_FILTER_OPTIONS = [
+export const GROUP_FILTER_OPTIONS = withTextLimits("group", [
   // Common Filters
   {
     type: "section-header",
@@ -1180,9 +1205,9 @@ export const GROUP_FILTER_OPTIONS = [
     defaultValue: [],
     placeholder: "Select collections...",
   },
-];
+]);
 
-export const GALLERY_FILTER_OPTIONS = [
+export const GALLERY_FILTER_OPTIONS = withTextLimits("gallery", [
   // Common Filters
   {
     type: "section-header",
@@ -1273,10 +1298,10 @@ export const GALLERY_FILTER_OPTIONS = [
     defaultValue: false,
     placeholder: "Has at least one favorited image",
   },
-];
+]);
 
 // Image filter options (with gallery-umbrella inheritance)
-export const IMAGE_FILTER_OPTIONS = [
+export const IMAGE_FILTER_OPTIONS = withTextLimits("image", [
   // Common Filters
   {
     type: "section-header",
@@ -1366,10 +1391,10 @@ export const IMAGE_FILTER_OPTIONS = [
     min: 0,
     max: 1000,
   },
-];
+]);
 
 // Clip filter options (Peek server API)
-export const CLIP_FILTER_OPTIONS = [
+export const CLIP_FILTER_OPTIONS = withTextLimits("clip", [
   // Common Filters
   {
     type: "section-header",
@@ -1435,7 +1460,7 @@ export const CLIP_FILTER_OPTIONS = [
     ],
     placeholder: "Filter by preview status",
   },
-];
+]);
 
 /**
  * The panel's state to the request's filter. Each builder returns the list's
@@ -2125,7 +2150,7 @@ export const buildClipFilter = (filters: FilterState): ClipFilterParams => {
  * - min/max: For range type, the bounds
  * - valueUnit: Optional unit label (e.g., "minutes")
  */
-export const CAROUSEL_FILTER_DEFINITIONS = [
+export const CAROUSEL_FILTER_DEFINITIONS = withTextLimits("scene", [
   // Sorted alphabetically by label
   {
     key: "bitrate",
@@ -2312,7 +2337,7 @@ export const CAROUSEL_FILTER_DEFINITIONS = [
     type: "text",
     placeholder: "Search title...",
   },
-];
+]);
 
 /**
  * Convert carousel rules (stored format) to filter state (UI format).

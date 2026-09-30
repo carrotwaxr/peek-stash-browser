@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { DEFAULT_SORT } from "@peek/shared-types";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
@@ -64,6 +65,34 @@ function hasIncludingCollection(filter: unknown): boolean {
   if (typeof filter !== "object" || filter === null) return false;
   const { value, modifier } = filter as { value?: unknown; modifier?: unknown };
   return Array.isArray(value) && value.length > 0 && modifier !== "EXCLUDES";
+}
+
+/** Whether a filter state, the page's permanent criteria merged in, offers the Scene Number sort */
+function offersSceneIndex(filters: Record<string, unknown>): boolean {
+  return (
+    hasIncludingCollection(filters.groups) ||
+    hasIncludingCollection({
+      value: filters.groupIds,
+      modifier: filters.groupIdsModifier,
+    })
+  );
+}
+
+/**
+ * The sort a query carries for these filters: Scene Number without an
+ * including collection filter is a 400 (item 38), so the scene default takes
+ * its place. The sort the list keeps is reset by an effect below.
+ */
+function sortOffered(
+  artifactType: string,
+  field: string,
+  filters: Record<string, unknown>
+): string {
+  return artifactType === "scene" &&
+    field === "scene_index" &&
+    !offersSceneIndex(filters)
+    ? DEFAULT_SORT.scene.field
+    : field;
 }
 
 const buildFilter = (
@@ -425,7 +454,9 @@ const SearchControls = ({
         page: currentPage,
         per_page: perPage,
         q: searchText,
-        sort: getSortWithSeed(sortField),
+        sort: getSortWithSeed(
+          sortOffered(artifactType, sortField, mergedFilters)
+        ),
       },
       ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
@@ -482,7 +513,9 @@ const SearchControls = ({
           page: 1, // Reset to first page when filters change
           per_page: perPage,
           q: searchText,
-          sort: getSortWithSeed(sortField),
+          sort: getSortWithSeed(
+            sortOffered(artifactType, sortField, mergedFilters)
+          ),
         },
         ...buildFilter(artifactType, mergedFilters, unitPreference),
       };
@@ -514,7 +547,9 @@ const SearchControls = ({
         page: 1,
         per_page: perPage,
         q: searchText,
-        sort: getSortWithSeed(sortField),
+        sort: getSortWithSeed(
+          sortOffered(artifactType, sortField, permanentFilters)
+        ),
       },
       ...buildFilter(artifactType, { ...permanentFilters }, unitPreference),
     };
@@ -553,7 +588,12 @@ const SearchControls = ({
         page: 1,
         per_page: perPage,
         q: searchText,
-        sort: getSortWithSeed(sortField),
+        sort: getSortWithSeed(
+          sortOffered(artifactType, sortField, {
+            ...localFilters,
+            ...permanentFilters,
+          })
+        ),
       },
       ...buildFilter(artifactType, localFilters, unitPreference),
     };
@@ -562,6 +602,7 @@ const SearchControls = ({
   }, [
     setFiltersAction,
     localFilters,
+    permanentFilters,
     sortDirection,
     perPage,
     searchText,
@@ -588,7 +629,9 @@ const SearchControls = ({
           page: 1,
           per_page: perPage,
           q: searchText,
-          sort: getSortWithSeed(sortField),
+          sort: getSortWithSeed(
+            sortOffered(artifactType, sortField, updatedFilters)
+          ),
         },
         ...buildFilter(artifactType, updatedFilters, unitPreference),
       };
@@ -916,8 +959,11 @@ const SearchControls = ({
     if (artifactType === "scene") {
       const hasGroupFilter =
         hasIncludingCollection(permanentGroups) ||
-        hasIncludingCollection(groupFilters) ||
-        hasIncludingCollection({ value: groupIds, modifier: groupIdsModifier });
+        offersSceneIndex({
+          groups: groupFilters,
+          groupIds,
+          groupIdsModifier,
+        });
       if (hasGroupFilter) {
         return SCENE_SORT_OPTIONS; // Full list with scene_index
       }
@@ -926,6 +972,26 @@ const SearchControls = ({
 
     return baseOptions;
   }, [artifactType, groupFilters, groupIds, groupIdsModifier, permanentGroups]);
+
+  // A sort the list no longer offers (Scene Number after its collection
+  // filter is removed) falls back to the default, so a saved or URL sort
+  // never reaches the server as a 400
+  useEffect(() => {
+    if (!isInitialized) return;
+    const offered = sortOffered(artifactType, sortField, {
+      ...filters,
+      ...permanentFilters,
+    });
+    if (offered !== sortField) setSortAction(offered, sortDirection);
+  }, [
+    isInitialized,
+    artifactType,
+    sortField,
+    sortDirection,
+    filters,
+    permanentFilters,
+    setSortAction,
+  ]);
 
   // Show loading state while fetching default presets
   if (isLoadingPresets) {

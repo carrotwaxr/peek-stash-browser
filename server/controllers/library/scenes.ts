@@ -23,7 +23,6 @@ import type { NormalizedScene } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import {
-  logDropped,
   parseListRequest,
   parseRecommendedRequest,
   parseSimilarScenesRequest,
@@ -73,7 +72,6 @@ export const findScenes = async (
   const userId = req.user.id;
   // A ValidationError (400) reaches the central error handler
   const request = parseListRequest("scene", req.body, { userId });
-  logDropped("POST /library/scenes", request.dropped);
 
   const { specificInstanceId } = request;
   // A detail page asks for its scene by id
@@ -164,7 +162,6 @@ export const findSimilarScenes = async (
   const request = parseSimilarScenesRequest(req.params.id, req.query, {
     userId,
   });
-  logDropped("GET /library/scenes/:id/similar", request.dropped);
 
   const { sceneId: id, page } = request;
   const perPage = 12;
@@ -250,7 +247,6 @@ export const getRecommendedScenes = async (
   // page >= 1 and per_page 1..250 (24 when absent); a ValidationError (400)
   // reaches the central error handler
   const request = parseRecommendedRequest(req.query, { userId });
-  logDropped("GET /library/scenes/recommended", request.dropped);
 
   const { page, perPage } = request;
 

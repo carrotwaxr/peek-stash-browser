@@ -382,7 +382,6 @@ class ClipQueryBuilder extends EntityQueryBuilder<
           ...(options.includeUngenerated ? {} : { isGenerated: true }),
         },
         specificInstanceId: undefined,
-        dropped: [],
       },
     });
   }

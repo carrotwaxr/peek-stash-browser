@@ -235,7 +235,6 @@ describe("Galleries Controller", () => {
         perPage: 20,
         ids: [{ id: "1", instanceId: "inst-a" }],
         countFilter: { min_scene_count: 1 },
-        dropped: [],
       });
       expect(res._getOkBody()).toEqual({ galleries: rows });
     });

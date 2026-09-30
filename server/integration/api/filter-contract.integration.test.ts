@@ -139,7 +139,7 @@ async function runList(
   sort: string | undefined,
   walk: Walk
 ): Promise<void> {
-  const parse = { userId: walk.userId, policy: "reject" } as const;
+  const parse = { userId: walk.userId } as const;
   const scope = {
     userId: walk.userId,
     allowedInstanceIds: walk.allowedInstanceIds,

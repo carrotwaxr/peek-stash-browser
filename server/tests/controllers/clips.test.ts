@@ -19,7 +19,6 @@ import {
   clipService,
 } from "../../services/ClipService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
-import { logger } from "../../utils/logger.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -45,7 +44,6 @@ vi.mock("../../utils/logger.js", () => ({
 const mockClipService = vi.mocked(clipService);
 const mockAllowed = vi.mocked(getUserAllowedInstanceIds);
 const ALLOWED = ["inst-1", "inst-2"];
-const mockLogger = vi.mocked(logger, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -140,7 +138,6 @@ describe("Clips Controller", () => {
             studioId: refs(["8", undefined]),
           },
           specificInstanceId: "inst-1",
-          dropped: [],
         },
       });
     });
@@ -232,14 +229,13 @@ describe("Clips Controller", () => {
       }
     );
 
-    describe("with PEEK_FILTER_POLICY=drop", () => {
+    describe("PEEK_FILTER_POLICY=drop no longer drops", () => {
       afterEach(() => {
         vi.unstubAllEnvs();
       });
 
-      it("an unknown parameter is logged and the request succeeds", async () => {
+      it("an unknown key answers 400", async () => {
         vi.stubEnv("PEEK_FILTER_POLICY", "drop");
-        mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
         const req = reqFor(getClips, {
           user: USER,
@@ -247,13 +243,11 @@ describe("Clips Controller", () => {
         });
         const res = resFor(getClips);
 
-        await getClips(req, res);
-
-        expect(res._getStatus()).toBe(200);
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          "Unknown filter input ignored",
-          objectContaining({ route: "GET /clips", path: "clipsB7Unknown" })
-        );
+        await expect(getClips(req, res)).rejects.toMatchObject({
+          statusCode: 400,
+          issues: [{ path: "clipsB7Unknown" }],
+        });
+        expect(mockClipService.getClips).not.toHaveBeenCalled();
       });
     });
 

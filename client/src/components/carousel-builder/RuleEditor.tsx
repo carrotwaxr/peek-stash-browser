@@ -22,6 +22,7 @@ interface FilterDefinition {
   supportsHierarchy?: boolean;
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
+  maxLength?: number;
   min?: number;
   max?: number;
   valueUnit?: string;
@@ -253,6 +254,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
           value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder={filterDef.placeholder || "Enter value..."}
+          maxLength={filterDef.maxLength}
           className="w-full px-3 py-2 rounded-lg border text-sm"
           style={{
             backgroundColor: "var(--bg-primary)",

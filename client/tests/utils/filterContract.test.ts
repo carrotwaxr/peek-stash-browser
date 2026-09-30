@@ -111,4 +111,31 @@ describe("client filter options and the shared contract", () => {
       expect(unknown).toEqual([]);
     }
   );
+
+  it.each(LIST_KINDS)(
+    "every %s text option carries its contract field's maxLength",
+    (kind) => {
+      const fields: Readonly<Record<string, FieldSpec>> =
+        kind === "clip" ? CLIP_PARAMS : FIELDS[kind];
+      const texts = FILTER_OPTIONS[kind].filter(
+        (option) => option.type === "text"
+      );
+      const limits = texts.map((option) => {
+        const uiKey = UI_KEYS[kind].find((key) => key.key === option.key);
+        const spec = uiKey ? fields[uiKey.field] : undefined;
+        return {
+          key: option.key,
+          maxLength: option.maxLength,
+          contract: spec?.kind === "text" ? spec.maxLength : undefined,
+        };
+      });
+
+      expect(limits.filter((limit) => limit.contract === undefined)).toEqual(
+        []
+      );
+      expect(
+        limits.filter((limit) => limit.maxLength !== limit.contract)
+      ).toEqual([]);
+    }
+  );
 });

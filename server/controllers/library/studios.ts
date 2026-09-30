@@ -13,7 +13,6 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import {
-  logDropped,
   parseListRequest,
   parseMinimalRequest,
   singleIdRef,
@@ -34,7 +33,6 @@ export const findStudios = async (
   const request = parseListRequest("studio", req.body, {
     userId: req.user.id,
   });
-  logDropped("POST /library/studios", request.dropped);
 
   const startTime = Date.now();
   const userId = req.user.id;
@@ -149,7 +147,6 @@ export const findStudiosMinimal = async (
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("studio", req.body, { userId });
-  logDropped("POST /library/studios/minimal", request.dropped);
 
   const studios = await findMinimalEntities(req.user, request);
   res.json({ studios });

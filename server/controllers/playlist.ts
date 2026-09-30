@@ -43,7 +43,7 @@ import {
   getEntityInstanceId,
   getEntityInstanceIds,
 } from "../utils/entityInstanceId.js";
-import { logDropped, parsePlaylistItemsRequest } from "../utils/listRequest.js";
+import { parsePlaylistItemsRequest } from "../utils/listRequest.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
@@ -175,7 +175,6 @@ export const getPlaylist = async (
   const userId = req.user.id;
   // A ValidationError (400) reaches the central error handler
   const request = parsePlaylistItemsRequest(req.query, { userId });
-  logDropped("GET /playlists/:id", request.dropped);
 
   const playlistId = parseInt(req.params.id);
 

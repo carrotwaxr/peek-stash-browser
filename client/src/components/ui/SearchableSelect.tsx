@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  MinimalEntity,
-  MinimalRequest,
-  MinimalScope,
+import {
+  type MinimalEntity,
+  type MinimalRequest,
+  type MinimalScope,
+  Q_MAX_LENGTH,
 } from "@peek/shared-types";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { libraryApi } from "../../api";
@@ -447,6 +448,7 @@ const SearchableSelect = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Type to search..."
+                maxLength={Q_MAX_LENGTH}
                 className="w-full pl-9 pr-3 py-2 rounded-md border text-sm"
                 style={{
                   backgroundColor: "var(--bg-secondary)",

@@ -45,7 +45,7 @@ const AS_ADMIN = { id: USER, role: "ADMIN" };
 function find(entity: MinimalKind, body: object, viewer = AS_USER) {
   return findMinimalEntities(
     viewer,
-    parseMinimalRequest(entity, body, { userId: USER, policy: "reject" })
+    parseMinimalRequest(entity, body, { userId: USER })
   );
 }
 

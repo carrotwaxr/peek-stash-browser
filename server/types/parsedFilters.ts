@@ -24,15 +24,6 @@ import type {
 } from "@peek/shared-types/filters/index.js";
 import type { MinimalCountFilter, MinimalScope } from "./api/index.js";
 
-/** What happens to unknown or invalid input: ignored with a record, or a 400 */
-export type FilterPolicy = "drop" | "reject";
-
-/** One piece of input the parser ignored (drop mode only) */
-export interface DroppedInput {
-  readonly path: string;
-  readonly reason: string;
-}
-
 /**
  * A parsed filter value. `instanceId` undefined is a bare legacy id, which
  * matches that id on every allowed instance (server-sql.md). The resolved
@@ -148,8 +139,6 @@ export interface ParsedListRequest<E extends EntityKind> {
   readonly filter: ParsedFilter<E>;
   /** `<entity>_filter.instance_id`, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
-  /** Drop mode only; empty in reject mode */
-  readonly dropped: readonly DroppedInput[];
 }
 
 /**
@@ -166,7 +155,6 @@ export interface ParsedClipQuery {
   readonly filter: ParsedClipFilter;
   /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
-  readonly dropped: readonly DroppedInput[];
 }
 
 /**
@@ -184,7 +172,6 @@ export interface ParsedSceneClipsQuery {
   readonly includeUngenerated: boolean;
   /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
-  readonly dropped: readonly DroppedInput[];
 }
 
 /** `GET /api/library/scenes/:id/similar`: 12 scenes a page */
@@ -195,7 +182,6 @@ export interface ParsedSimilarScenesQuery {
   readonly page: number;
   /** The seed's instance (`instanceId`), INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
-  readonly dropped: readonly DroppedInput[];
 }
 
 /** `GET /api/library/scenes/recommended` */
@@ -204,7 +190,6 @@ export interface ParsedRecommendedQuery {
   readonly page: number;
   /** 1..PER_PAGE_MAX; 24 when absent */
   readonly perPage: number;
-  readonly dropped: readonly DroppedInput[];
 }
 
 /** `GET /api/playlists/:id` */
@@ -217,7 +202,6 @@ export interface ParsedPlaylistItemsQuery {
   readonly paging:
     | { readonly page: number; readonly perPage: number }
     | undefined;
-  readonly dropped: readonly DroppedInput[];
 }
 
 /** The lists with a `/minimal` endpoint (the entity pickers) */
@@ -243,5 +227,4 @@ export interface ParsedMinimalRequest<E extends MinimalKind> {
    * Whether the user may send it is the query's check.
    */
   readonly scope: MinimalScope | undefined;
-  readonly dropped: readonly DroppedInput[];
 }

@@ -8,11 +8,7 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import {
-  logDropped,
-  parseListRequest,
-  singleIdRef,
-} from "../../utils/listRequest.js";
+import { parseListRequest, singleIdRef } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -28,7 +24,6 @@ export const findImages = async (
   const startTime = Date.now();
   // A ValidationError (400) reaches the central error handler
   const request = parseListRequest("image", req.body, { userId: req.user.id });
-  logDropped("POST /library/images", request.dropped);
 
   const userId = req.user.id;
   const { page, perPage, specificInstanceId } = request;
