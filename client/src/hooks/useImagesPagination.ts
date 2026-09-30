@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePaginatedLightbox } from "./usePaginatedLightbox";
+import {
+  type PageChangeOptions,
+  usePaginatedLightbox,
+} from "./usePaginatedLightbox";
 
 /**
  * Hook for managing paginated images with lightbox support.
@@ -10,11 +13,12 @@ import { usePaginatedLightbox } from "./usePaginatedLightbox";
  * @param {Array} options.dependencies - Additional dependencies for re-fetching (besides page)
  * @param {number} options.perPage - Images per page (default: 100)
  * @param {number} options.externalPage - External page number (from URL), makes hook use external state
- * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided)
+ * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided); a page turned from the lightbox passes `{ replace: true }`
  * @returns {Object} All state and handlers needed for PaginatedImageGrid
  */
 interface ImageItem {
   id: string;
+  instanceId?: string;
 }
 
 interface UseImagesPaginationOptions<T extends ImageItem = ImageItem> {
@@ -25,7 +29,7 @@ interface UseImagesPaginationOptions<T extends ImageItem = ImageItem> {
   dependencies?: unknown[];
   perPage?: number;
   externalPage: number;
-  onExternalPageChange: (page: number) => void;
+  onExternalPageChange: (page: number, options?: PageChangeOptions) => void;
 }
 
 export function useImagesPagination<T extends ImageItem = ImageItem>({
@@ -40,6 +44,8 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const fetchImagesRef = useRef(fetchImages);
+  // The latest page request: an earlier one that answers later is dropped
+  const requestSeqRef = useRef(0);
 
   // Keep fetchImages ref up to date
   useEffect(() => {
@@ -55,17 +61,21 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
     [perPage]
   );
 
-  // Paginated lightbox state and handlers
+  // Paginated lightbox state and handlers; the open image is in the URL
   const lightbox = usePaginatedLightbox({
     perPage,
     totalCount,
     externalPage,
     onExternalPageChange,
     fetchPage,
+    images,
+    ready: !isLoading,
   });
 
   // Fetch images when page or dependencies change
   useEffect(() => {
+    const seq = ++requestSeqRef.current;
+    const isLatest = () => seq === requestSeqRef.current;
     const loadImages = async () => {
       try {
         setIsLoading(true);
@@ -74,16 +84,18 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
           lightbox.currentPage,
           perPage
         );
+        if (!isLatest()) return;
         setImages(result.images ?? []);
         setTotalCount(result.count || 0);
 
         // Handle pending lightbox navigation after page loads
         lightbox.consumePendingLightboxIndex();
       } catch (err) {
+        if (!isLatest()) return;
         console.error("Error loading images:", err);
         setError(err);
       } finally {
-        setIsLoading(false);
+        if (isLatest()) setIsLoading(false);
       }
     };
 

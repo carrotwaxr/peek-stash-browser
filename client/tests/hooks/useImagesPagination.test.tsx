@@ -1,6 +1,6 @@
-// client/src/hooks/__tests__/useImagesPagination.test.jsx
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
+import { createRouterWrapper, must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
 import { useImagesPagination } from "../../src/hooks/useImagesPagination";
 
@@ -24,13 +24,15 @@ describe("useImagesPagination", () => {
       const mockImages = [{ id: "1" }, { id: "2" }];
       const fetchImages = createMockFetchImages(mockImages, 2);
 
-      const { result } = renderHook(() =>
-        useImagesPagination(
-          withoutExternalPage({
-            fetchImages,
-            perPage: 10,
-          })
-        )
+      const { result } = renderHook(
+        () =>
+          useImagesPagination(
+            withoutExternalPage({
+              fetchImages,
+              perPage: 10,
+            })
+          ),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -54,7 +56,7 @@ describe("useImagesPagination", () => {
               dependencies: [dep],
             })
           ),
-        { initialProps: { dep: "value1" } }
+        { initialProps: { dep: "value1" }, wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -72,13 +74,15 @@ describe("useImagesPagination", () => {
       const fetchError = new Error("Fetch failed");
       const fetchImages = vi.fn().mockRejectedValue(fetchError);
 
-      const { result } = renderHook(() =>
-        useImagesPagination(
-          withoutExternalPage({
-            fetchImages,
-            perPage: 10,
-          })
-        )
+      const { result } = renderHook(
+        () =>
+          useImagesPagination(
+            withoutExternalPage({
+              fetchImages,
+              perPage: 10,
+            })
+          ),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -94,13 +98,15 @@ describe("useImagesPagination", () => {
     it("uses externalPage when provided", async () => {
       const fetchImages = createMockFetchImages([], 100);
 
-      const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-          externalPage: 5,
-          onExternalPageChange: vi.fn(),
-        })
+      const { result } = renderHook(
+        () =>
+          useImagesPagination({
+            fetchImages,
+            perPage: 10,
+            externalPage: 5,
+            onExternalPageChange: vi.fn(),
+          }),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -124,7 +130,7 @@ describe("useImagesPagination", () => {
             externalPage,
             onExternalPageChange,
           }),
-        { initialProps: { externalPage: 1 } }
+        { initialProps: { externalPage: 1 }, wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -142,13 +148,15 @@ describe("useImagesPagination", () => {
       const fetchImages = createMockFetchImages([], 100);
       const onExternalPageChange = vi.fn();
 
-      const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-          externalPage: 1,
-          onExternalPageChange,
-        })
+      const { result } = renderHook(
+        () =>
+          useImagesPagination({
+            fetchImages,
+            perPage: 10,
+            externalPage: 1,
+            onExternalPageChange,
+          }),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -163,16 +171,69 @@ describe("useImagesPagination", () => {
       expect(onExternalPageChange).toHaveBeenCalledWith(3);
     });
 
+    it("a page fetch that resolves after a newer one is ignored", async () => {
+      type Page = { images: { id: string }[]; count: number };
+      const resolvers = new Map<number, (page: Page) => void>();
+      const fetchImages = vi.fn(
+        (page: number) =>
+          new Promise<Page>((resolve) => {
+            resolvers.set(page, resolve);
+          })
+      );
+
+      const { result, rerender } = renderHook(
+        ({ externalPage }) =>
+          useImagesPagination({
+            fetchImages,
+            perPage: 10,
+            externalPage,
+            onExternalPageChange: vi.fn(),
+          }),
+        { initialProps: { externalPage: 2 }, wrapper: createRouterWrapper() }
+      );
+      rerender({ externalPage: 3 });
+      await waitFor(() => {
+        expect(resolvers.size).toBe(2);
+      });
+
+      // Page 3 answers first, then the slower page 2
+      await act(async () => {
+        must(
+          resolvers.get(3),
+          "page 3's fetch"
+        )({
+          images: [{ id: "p3" }],
+          count: 30,
+        });
+        await Promise.resolve();
+      });
+      await act(async () => {
+        must(
+          resolvers.get(2),
+          "page 2's fetch"
+        )({
+          images: [{ id: "p2" }],
+          count: 30,
+        });
+        await Promise.resolve();
+      });
+
+      expect(result.current.images).toEqual([{ id: "p3" }]);
+      expect(result.current.isLoading).toBe(false);
+    });
+
     it("exposes lightbox handlers for pagination integration", async () => {
       const fetchImages = createMockFetchImages([], 100);
 
-      const { result } = renderHook(() =>
-        useImagesPagination(
-          withoutExternalPage({
-            fetchImages,
-            perPage: 10,
-          })
-        )
+      const { result } = renderHook(
+        () =>
+          useImagesPagination(
+            withoutExternalPage({
+              fetchImages,
+              perPage: 10,
+            })
+          ),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {
@@ -194,13 +255,15 @@ describe("useImagesPagination", () => {
       const mockImages = [{ id: "1", rating: 0 }];
       const fetchImages = createMockFetchImages(mockImages, 1);
 
-      const { result } = renderHook(() =>
-        useImagesPagination(
-          withoutExternalPage({
-            fetchImages,
-            perPage: 10,
-          })
-        )
+      const { result } = renderHook(
+        () =>
+          useImagesPagination(
+            withoutExternalPage({
+              fetchImages,
+              perPage: 10,
+            })
+          ),
+        { wrapper: createRouterWrapper() }
       );
 
       await waitFor(() => {

@@ -58,6 +58,8 @@ The lightbox supports:
 - Individual image rating and favoriting
 - O counter (your own count)
 - Navigation with automatic page boundary handling
+- Closing with your browser's Back button or the phone's back gesture, which leaves you on the gallery
+- A shareable address: with an image open, the page's address opens the viewer straight on that image
 
 **Scenes**
 

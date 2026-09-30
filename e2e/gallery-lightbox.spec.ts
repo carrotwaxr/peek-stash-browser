@@ -117,6 +117,57 @@ test.describe("Gallery lightbox", () => {
     }
   });
 
+  test("Back closes the lightbox and stays on the gallery", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    // Opening an image records a view: a throwaway user's, deleted with it
+    const user = await createUser(page.request, "lightbox-back");
+    userId = user.id;
+
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const userPage = await context.newPage();
+
+      // 1. Open the first gallery and wait for its images
+      const list = new ListPage(userPage);
+      await list.goto("/galleries");
+      const galleries = await list.waitForResults("Gallery");
+      requireData(galleries > 0, "a gallery");
+      await list.cards("Gallery").first().locator("a:has(.card-title)").click();
+      const firstImage = userPage.locator(".wall-item").first();
+      await expect(firstImage).toBeVisible({ timeout: 15_000 });
+      const galleryUrl = userPage.url();
+      const imageId = /^\/image\/([^/?]+)/.exec(
+        (await firstImage.getAttribute("href")) ?? ""
+      )?.[1];
+      expect(imageId, "the first image's id").toBeTruthy();
+
+      // 2. Opening the image puts it in the address as "id:instance"
+      await firstImage.click();
+      const viewer = userPage.getByRole("dialog", { name: "Image viewer" });
+      await expect(viewer).toBeVisible();
+      await expect
+        .poll(() => new URL(userPage.url()).searchParams.get("image"))
+        .toMatch(new RegExp(`^${String(imageId)}:.+`));
+      const imageUrl = userPage.url();
+
+      // 3. Back closes the viewer and stays on the gallery
+      await userPage.goBack();
+      await expect(viewer).toBeHidden();
+      expect(userPage.url()).toBe(galleryUrl);
+      await expect(firstImage).toBeVisible();
+
+      // 4. The image's address opens the viewer straight on it
+      await userPage.goto(imageUrl);
+      await expect(viewer).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await context.close();
+    }
+  });
+
   test("r then 4 in the lightbox rates the image and leaves the gallery unrated", async ({
     page,
     browser,

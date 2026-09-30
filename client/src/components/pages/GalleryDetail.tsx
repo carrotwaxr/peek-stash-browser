@@ -10,7 +10,10 @@ import { useConfig } from "../../contexts/ConfigContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
+import {
+  type PageChangeOptions,
+  usePaginatedLightbox,
+} from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -102,16 +105,17 @@ const GalleryDetail = () => {
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get("page") || "1") || 1;
 
+  // Keeps the tab and the open image; a page turned from the lightbox
+  // replaces the entry
   const handleImagePageChange = useCallback(
-    (newPage: number) => {
+    (newPage: number, options?: PageChangeOptions) => {
       const params = new URLSearchParams(searchParams);
       if (newPage === 1) {
         params.delete("page");
       } else {
         params.set("page", String(newPage));
       }
-      // Preserve tab param if present
-      setSearchParams(params);
+      setSearchParams(params, { replace: options?.replace === true });
     },
     [searchParams, setSearchParams]
   );
@@ -130,13 +134,17 @@ const GalleryDetail = () => {
     [galleryId, galleryInstanceId]
   );
 
-  // Paginated lightbox state and handlers
+  // Paginated lightbox state and handlers. The open image is in the URL
+  // (each image's own "id:instanceId"); an address naming one opens it once
+  // the gallery and its page have loaded.
   const lightbox = usePaginatedLightbox({
     perPage: PER_PAGE,
     totalCount,
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
     fetchPage,
+    images,
+    ready: galleryInstanceId !== undefined && !imagesLoading,
   });
 
   // Set page title to gallery name
@@ -154,6 +162,8 @@ const GalleryDetail = () => {
   useEffect(() => {
     // Waits for the gallery, whose own server the images are asked on
     if (!galleryId || !galleryInstanceId) return;
+    // A page asked for before the latest answers too late to be shown
+    let latest = true;
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
@@ -162,6 +172,7 @@ const GalleryDetail = () => {
           galleryInstanceId,
           { page: lightbox.currentPage, perPage: PER_PAGE }
         );
+        if (!latest) return;
         setImages(data.images);
         setTotalCount(data.count);
 
@@ -170,11 +181,14 @@ const GalleryDetail = () => {
       } catch (error) {
         console.error("Error loading images:", error);
       } finally {
-        setImagesLoading(false);
+        if (latest) setImagesLoading(false);
       }
     };
 
     void fetchImages();
+    return () => {
+      latest = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryId, galleryInstanceId, lightbox.currentPage]);
 

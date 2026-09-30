@@ -133,6 +133,10 @@ const renderPage = (url = "/images") =>
 
 const cards = () => screen.queryAllByTestId("image-card");
 
+/** The open image the URL names */
+const imageParam = (router: { state: { location: { search: string } } }) =>
+  new URLSearchParams(router.state.location.search).get("image");
+
 const twoImages = () =>
   api.findImages.mockResolvedValue(
     images([
@@ -413,12 +417,48 @@ describe("Images", () => {
           screen.getByRole("button", { name: "Open Image 25" })
         ).toBeInTheDocument()
       );
-      // The lightbox stays open on the new page's first image
+      // The lightbox stays open on the new page's first image, which the
+      // URL names in place of page 1's last
       expect(screen.getByTestId("lightbox")).toHaveAttribute("data-index", "0");
       expect(screen.getByTestId("lightbox")).toHaveAttribute(
         "data-is-open",
         "true"
       );
+      await waitFor(() => expect(imageParam(router)).toBe("25:a"));
+      expect(router.state.historyAction).toBe("REPLACE");
+    });
+
+    it("opening an image names it in the URL and Back closes the lightbox", async () => {
+      twoImages();
+      const { router } = renderPage("/images?page=1");
+      await waitFor(() => expect(cards()).toHaveLength(2));
+
+      fireEvent.click(screen.getByRole("button", { name: "Open Second" }));
+      await waitFor(() => expect(imageParam(router)).toBe("2:a"));
+      expect(router.state.historyAction).toBe("PUSH");
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(screen.getByTestId("lightbox")).toHaveAttribute(
+        "data-is-open",
+        "false"
+      );
+      expect(router.state.location.pathname).toBe("/images");
+      expect(router.state.location.search).toBe("?page=1");
+    });
+
+    it("an address naming an image opens the lightbox on it", async () => {
+      twoImages();
+      renderPage("/images?image=2%3Aa");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("lightbox")).toHaveAttribute(
+          "data-is-open",
+          "true"
+        )
+      );
+      expect(screen.getByTestId("lightbox")).toHaveAttribute("data-index", "1");
     });
   });
 

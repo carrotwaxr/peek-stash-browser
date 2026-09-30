@@ -34,6 +34,8 @@ Each image card displays:
 
 Click any image to open it in the full-screen lightbox viewer.
 
+The open image is part of the page's address. Your browser's **Back** button (or the phone's back gesture) closes the viewer and leaves you on the list where you were, and copying or bookmarking the address while an image is open opens the viewer straight on that image. Moving from image to image, even onto the next page, does not add history entries, so one Back always closes the viewer.
+
 ### Navigation
 
 **Keyboard:**
@@ -41,7 +43,7 @@ Click any image to open it in the full-screen lightbox viewer.
 | Key | Action |
 |-----|--------|
 | ← / → | Previous / Next image |
-| Escape | Close lightbox |
+| Escape (or Back) | Close lightbox |
 | F | Toggle fullscreen |
 | I | Toggle info drawer |
 | Space | Play/pause slideshow |
@@ -149,6 +151,8 @@ Navigate seamlessly across gallery pages:
 3. Press **→** to automatically load the next page
 4. Continue browsing without closing the lightbox
 
+**Back** closes the viewer and stays on the gallery; the gallery's address with an image open opens that image directly. The same holds for the Images tabs on performer, studio and tag pages.
+
 ### Inherited Metadata
 
 Images in galleries inherit metadata from the parent:
@@ -188,6 +192,7 @@ The lightbox is fully touch-optimized:
 
 - Swipe left/right to navigate
 - Tap center to show/hide controls
+- Use the back gesture to close the viewer
 - Pinch to zoom (coming soon)
 
 ### Keyboard-Only Navigation
