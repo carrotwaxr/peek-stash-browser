@@ -5,6 +5,7 @@ import {
   type ReactNode,
   forwardRef,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
 import { useCardSelection } from "../../hooks/useCardSelection";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
@@ -72,8 +73,10 @@ export interface BaseCardProps {
   renderOverlay?: () => ReactNode;
   renderImageContent?: () => ReactNode;
   renderAfterTitle?: () => ReactNode;
-  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
-  onNavigate?: (e: MouseEvent<HTMLElement>) => void;
+  /** A click on the card; Enter on the focused card calls it with no event */
+  onClick?: (e?: MouseEvent<HTMLDivElement>) => void;
+  /** Replaces link navigation; Enter on the focused card calls it with no event */
+  onNavigate?: (e?: MouseEvent<HTMLElement>) => void;
   className?: string;
   fromPageTitle?: string;
   linkState?: Record<string, unknown>;
@@ -157,12 +160,21 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
       onNavigate(e);
     };
 
-    // Keyboard navigation hook
+    const navigate = useNavigate();
+
+    // Enter or Space on the focused card does what a click on it does
     const { onKeyDown } = useCardKeyboardNav({
-      linkTo,
-      onCustomAction: selectionMode
-        ? () => onToggleSelect?.(entity)
-        : undefined,
+      onActivate: () => {
+        if (selectionMode) {
+          onToggleSelect?.(entity);
+        } else if (onNavigate) {
+          onNavigate();
+        } else if (onClick) {
+          onClick();
+        } else if (linkTo) {
+          void navigate(linkTo, { state: { fromPageTitle, ...linkState } });
+        }
+      },
     });
 
     // Merge display preferences with explicit props (props take precedence)

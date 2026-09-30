@@ -192,8 +192,8 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
 
     // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
     const handleClick = onClick
-      ? (e: React.MouseEvent<HTMLDivElement>) => {
-          e.preventDefault();
+      ? (e?: React.MouseEvent<HTMLDivElement>) => {
+          e?.preventDefault();
           onClick(image);
         }
       : undefined;

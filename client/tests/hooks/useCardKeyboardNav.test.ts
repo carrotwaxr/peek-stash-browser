@@ -65,13 +65,13 @@ describe("useCardKeyboardNav", () => {
     expect(navigate).toHaveBeenCalledWith("/scene/123");
   });
 
-  it("calls onCustomAction instead of navigate when provided", () => {
+  it("calls onActivate instead of navigate when provided", () => {
     const navigate = vi.fn();
-    const onCustomAction = vi.fn();
+    const onActivate = vi.fn();
     useNavigateMock.mockReturnValue(navigate);
 
     const { result } = renderHook(() =>
-      useCardKeyboardNav({ linkTo: "/scene/123", onCustomAction })
+      useCardKeyboardNav({ linkTo: "/scene/123", onActivate })
     );
 
     result.current.onKeyDown(
@@ -84,7 +84,7 @@ describe("useCardKeyboardNav", () => {
       })
     );
 
-    expect(onCustomAction).toHaveBeenCalled();
+    expect(onActivate).toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -109,5 +109,41 @@ describe("useCardKeyboardNav", () => {
     );
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("Enter on a button inside the card activates the button and does not navigate", () => {
+    const navigate = vi.fn();
+    const onActivate = vi.fn();
+    useNavigateMock.mockReturnValue(navigate);
+
+    const { result } = renderHook(() =>
+      useCardKeyboardNav({ linkTo: "/scene/123", onActivate })
+    );
+
+    const card = document.createElement("div");
+    const heart = document.createElement("button");
+    card.appendChild(heart);
+    document.body.appendChild(card);
+    heart.focus();
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+
+    result.current.onKeyDown(
+      keyEvent({
+        key: "Enter",
+        preventDefault,
+        stopPropagation,
+        target: heart,
+        currentTarget: card,
+      })
+    );
+
+    card.remove();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(onActivate).not.toHaveBeenCalled();
+    // The button keeps its own Enter: the default action is not cancelled
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
   });
 });
