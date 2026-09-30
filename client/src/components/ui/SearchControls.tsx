@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { DEFAULT_SORT } from "@peek/shared-types";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
@@ -14,33 +13,24 @@ import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 import { useTVMode } from "../../hooks/useTVMode";
 import {
   CLIP_FILTER_OPTIONS,
-  CLIP_SORT_OPTIONS,
   type FilterOption,
   GALLERY_FILTER_OPTIONS,
-  GALLERY_SORT_OPTIONS,
   GROUP_FILTER_OPTIONS,
-  GROUP_SORT_OPTIONS,
   IMAGE_FILTER_OPTIONS,
-  IMAGE_SORT_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
-  PERFORMER_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
-  SCENE_INDEX_SORT_OPTION,
   SCENE_SORT_OPTIONS,
   SCENE_SORT_OPTIONS_BASE,
   STUDIO_FILTER_OPTIONS,
-  STUDIO_SORT_OPTIONS,
   TAG_FILTER_OPTIONS,
-  TAG_SORT_OPTIONS,
-  buildClipFilter,
-  buildGalleryFilter,
-  buildGroupFilter,
-  buildImageFilter,
-  buildPerformerFilter,
-  buildSceneFilter,
-  buildStudioFilter,
-  buildTagFilter,
 } from "../../utils/filterConfig";
+import {
+  buildFilter,
+  getSortOptions,
+  hasIncludingCollection,
+  offersSceneIndex,
+  sortOffered,
+} from "../../utils/listQuery";
 // Note: parseSearchParams and buildSearchParams now handled by useFilterState hook
 import {
   ActiveFilterChips,
@@ -55,95 +45,6 @@ import {
   ViewModeToggle,
   ZoomSlider,
 } from "./index";
-
-/**
- * Whether a collection filter names at least one collection and includes it:
- * a list of ids, or `{ value, modifier }` with any modifier but EXCLUDES.
- */
-function hasIncludingCollection(filter: unknown): boolean {
-  if (Array.isArray(filter)) return filter.length > 0;
-  if (typeof filter !== "object" || filter === null) return false;
-  const { value, modifier } = filter as { value?: unknown; modifier?: unknown };
-  return Array.isArray(value) && value.length > 0 && modifier !== "EXCLUDES";
-}
-
-/** Whether a filter state, the page's permanent criteria merged in, offers the Scene Number sort */
-function offersSceneIndex(filters: Record<string, unknown>): boolean {
-  return (
-    hasIncludingCollection(filters.groups) ||
-    hasIncludingCollection({
-      value: filters.groupIds,
-      modifier: filters.groupIdsModifier,
-    })
-  );
-}
-
-/**
- * The sort a query carries for these filters: Scene Number without an
- * including collection filter is a 400 (item 38), so the scene default takes
- * its place. The sort the list keeps is reset by an effect below.
- */
-function sortOffered(
-  artifactType: string,
-  field: string,
-  filters: Record<string, unknown>
-): string {
-  return artifactType === "scene" &&
-    field === "scene_index" &&
-    !offersSceneIndex(filters)
-    ? DEFAULT_SORT.scene.field
-    : field;
-}
-
-const buildFilter = (
-  artifactType: string,
-  filters: Record<string, any>,
-  unitPreference: string
-) => {
-  switch (artifactType) {
-    case "performer":
-      return {
-        performer_filter: buildPerformerFilter(filters, unitPreference),
-      };
-    case "studio":
-      return { studio_filter: buildStudioFilter(filters) };
-    case "tag":
-      return { tag_filter: buildTagFilter(filters) };
-    case "group":
-      return { group_filter: buildGroupFilter(filters) };
-    case "gallery":
-      return { gallery_filter: buildGalleryFilter(filters) };
-    case "image":
-      return { image_filter: buildImageFilter(filters) };
-    case "clip":
-      return { clip_filter: buildClipFilter(filters) };
-    case "scene":
-    default:
-      return { scene_filter: buildSceneFilter(filters) };
-  }
-};
-
-const getSortOptions = (artifactType: string) => {
-  switch (artifactType) {
-    case "performer":
-      return PERFORMER_SORT_OPTIONS;
-    case "studio":
-      return STUDIO_SORT_OPTIONS;
-    case "tag":
-      return TAG_SORT_OPTIONS;
-    case "group":
-      return GROUP_SORT_OPTIONS;
-    case "gallery":
-      return GALLERY_SORT_OPTIONS;
-    case "image":
-      return IMAGE_SORT_OPTIONS;
-    case "clip":
-      return CLIP_SORT_OPTIONS;
-    case "scene":
-    default:
-      return SCENE_SORT_OPTIONS;
-  }
-};
 
 interface ViewModeConfig {
   id: string;

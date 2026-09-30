@@ -11,8 +11,12 @@ import {
   buildSceneFilter,
 } from "@/utils/filterConfig";
 import {
+  LIST_OWNED_KEYS,
   buildSearchParams as _buildSearchParams,
+  listOwnedKeys,
   parseSearchParams,
+  readListParams,
+  writeListParams,
 } from "@/utils/urlParams";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
@@ -666,5 +670,111 @@ describe("composite key round-tripping", () => {
     const multiParams = new URLSearchParams("tagIds=82,15&instance=inst-1");
     const multiResult = parseSearchParams(multiParams, mockFilterOptions);
     expect(multiResult.filters.tagIds).toEqual(["82", "15"]);
+  });
+});
+
+describe("list-owned keys (useListUrlState)", () => {
+  const missing = (keys: readonly string[], wanted: readonly string[]) =>
+    wanted.filter((key) => !keys.includes(key));
+
+  it("listOwnedKeys of scene includes tagIds, tagIdsModifier, tagIdsDepth and tagId", () => {
+    const keys = listOwnedKeys("scene");
+    expect(
+      missing(keys, [
+        "tagIds",
+        "tagIdsModifier",
+        "tagIdsDepth",
+        "tagId",
+        "performerId",
+        "rating_min",
+        "rating_max",
+        "date_start",
+        "date_end",
+        "q",
+        "sort",
+        "dir",
+        "page",
+        "per_page",
+        "view",
+        "zoom",
+        "grid_density",
+        "timeline_period",
+        "folderPath",
+      ])
+    ).toEqual([]);
+    expect(
+      keys.filter((key) =>
+        [
+          "tab",
+          "instance",
+          "includeSubTags",
+          "includeSubStudios",
+          "image",
+        ].includes(key)
+      )
+    ).toEqual([]);
+  });
+
+  it("LIST_OWNED_KEYS holds every list's keys", () => {
+    expect(
+      missing(LIST_OWNED_KEYS, ["studioIds", "galleryId", "sceneTagIds", "q"])
+    ).toEqual([]);
+    expect(LIST_OWNED_KEYS).not.toContain("tab");
+  });
+
+  const ctx = {
+    entity: "scene" as const,
+    filterOptions: SCENE_FILTER_OPTIONS,
+    shown: {
+      perPage: 48,
+      viewMode: "grid",
+      zoomLevel: "medium",
+      gridDensity: "medium",
+    },
+  };
+
+  it("writeListParams leaves keys it does not own", () => {
+    const prev = new URLSearchParams(
+      "tab=scenes&instance=abc&includeSubTags=true&image=5:abc&favorite=true&rating_min=60&page=3"
+    );
+    const next = writeListParams(
+      prev,
+      { filters: { tagIds: ["1:abc"] }, page: 1 },
+      ctx
+    );
+    expect(next.get("tab")).toBe("scenes");
+    expect(next.get("instance")).toBe("abc");
+    expect(next.get("includeSubTags")).toBe("true");
+    expect(next.get("image")).toBe("5:abc");
+    expect(next.get("tagIds")).toBe("1:abc");
+    expect(next.has("favorite")).toBe(false);
+    expect(next.has("rating_min")).toBe(false);
+    expect(next.has("page")).toBe(false);
+  });
+
+  it("writeListParams writes a presentation key only when it differs from what the page shows without it", () => {
+    const prev = new URLSearchParams("per_page=24&view=table");
+    const next = writeListParams(
+      prev,
+      { perPage: 48, viewMode: "wall", gridDensity: "small" },
+      ctx
+    );
+    expect(next.has("per_page")).toBe(false);
+    expect(next.get("view")).toBe("wall");
+    expect(next.get("grid_density")).toBe("small");
+    expect(next.has("zoom")).toBe(false);
+  });
+
+  it("readListParams counts the range and date forms and q as filters, and nothing else", () => {
+    const read = (query: string) =>
+      readListParams(new URLSearchParams(query), "scene", SCENE_FILTER_OPTIONS)
+        .hasFilters;
+    expect(read("rating_min=60")).toBe(true);
+    expect(read("date_start=2020-01-01")).toBe(true);
+    expect(read("tagId=5&instance=abc")).toBe(true);
+    expect(read("q=beach")).toBe(true);
+    expect(
+      read("instance=abc&tab=scenes&sort=title&view=wall&per_page=12&page=2")
+    ).toBe(false);
   });
 });
