@@ -18,6 +18,7 @@ paths:
 - Entity references in URLs and filter values are `"id:instanceId"`, built by `src/utils/compositeKey.ts`; a bare id means no instance was known.
 - A card's count opens a list through `getFilteredListPath` (`utils/entityLinks.ts`), built from that page's filter options: the singular param of the page's option for the entity type (`/scenes?tagId=5`) plus `instance`, which `urlParamsToFilters` joins into `id:instance`. A page with no such option gets no link.
 - After a Stash instance is added, edited, enabled, disabled or deleted, or a user's Content Sources change, call `invalidateInstanceQueries(queryClient)` (`api/hooks/useLibraryReady.ts`): the setup status and the library queries (`invalidateLibraryQueries`).
+- A card's `onHideSuccess(entityId, entityType, instanceId?)` carries the entity's instance, and list handlers remove the hidden item by `makeCompositeKey(id, instanceId)`, never by bare id. `useHideBulkAction` never sends a selection entry without an instance; it counts that entry as failed.
 
 ## useFilterState
 
