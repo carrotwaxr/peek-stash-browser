@@ -5,6 +5,7 @@ import type {
   UpdateStashInstanceResponse,
 } from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
+import { getErrorMessage } from "../../api/client";
 import { useAuth } from "../../hooks/useAuth";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
@@ -292,15 +293,28 @@ const StashInstanceSection = () => {
 
   const handleToggleEnabled = async (instance: {
     id: string;
+    name: string;
     enabled: boolean;
   }) => {
+    if (
+      instance.enabled &&
+      !confirm(
+        `Disable "${instance.name}"? Every user stops seeing its content ` +
+          "until you enable it again. Ratings, history and playlists are kept."
+      )
+    ) {
+      return;
+    }
+
     try {
       await apiPut(`/setup/stash-instance/${instance.id}`, {
         enabled: !instance.enabled,
       });
       await loadInstances();
     } catch (err) {
-      setError((err as Error).message || "Failed to update instance");
+      // A toast, so the list stays: the server refuses to disable the last
+      // enabled instance and says what to do instead
+      showError(getErrorMessage(err, "Failed to update instance"));
     }
   };
 

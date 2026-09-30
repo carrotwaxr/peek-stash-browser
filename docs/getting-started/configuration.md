@@ -40,8 +40,10 @@ A new instance appears in users' libraries once its first sync has finished, so 
 Each instance can be:
 
 - **Edited**: Update URL, API key, name, or priority
-- **Enabled/Disabled**: Temporarily hide an instance without deleting it
-- **Deleted**: Permanently remove it, with its cached library and every user's ratings, favorites, watch and O history, image views, playlist entries, hidden items and downloads for it. Peek refuses while a sync is running, and the last enabled instance cannot be deleted. To keep all of that, disable the instance instead.
+- **Enabled/Disabled**: Temporarily hide an instance without deleting it. Disabling asks to confirm.
+- **Deleted**: Permanently remove it, with its cached library and every user's ratings, favorites, watch and O history, image views, playlist entries, hidden items and downloads for it. Peek refuses while a sync is running. To keep all of that, disable the instance instead.
+
+Peek always keeps one enabled instance: the last one can be neither disabled nor deleted. Add another first, or change its address under **Edit**.
 
 ### Sync Status
 

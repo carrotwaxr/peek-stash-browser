@@ -33,7 +33,7 @@ import {
 } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -72,17 +72,25 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-// Mock StashSyncService; the controller maps SyncBusyError to 409
-const { SyncBusyError } = vi.hoisted(() => ({
+// Mock StashSyncService; the controller maps SyncBusyError to 409 and
+// LastEnabledInstanceError to 400
+const { SyncBusyError, LastEnabledInstanceError } = vi.hoisted(() => ({
   SyncBusyError: class SyncBusyError extends Error {
     constructor(readonly job: "sync" | "instance-delete") {
       super("Sync already in progress");
       this.name = "SyncBusyError";
     }
   },
+  LastEnabledInstanceError: class LastEnabledInstanceError extends Error {
+    constructor() {
+      super("The last enabled Stash instance");
+      this.name = "LastEnabledInstanceError";
+    }
+  },
 }));
 vi.mock("../../services/StashSyncService.js", () => ({
   SyncBusyError,
+  LastEnabledInstanceError,
   stashSyncService: {
     fullSync: vi.fn().mockResolvedValue(undefined),
     queueFullSync: vi.fn(),
@@ -124,6 +132,17 @@ const mockScheduler = vi.mocked(syncScheduler, true);
 const mockManager = vi.mocked(stashInstanceManager, true);
 const mockExclusions = vi.mocked(exclusionComputationService, true);
 const mockUsersSelecting = vi.mocked(getUsersSelecting);
+
+/** What a refused disable or delete of the last enabled instance says */
+const LAST_ENABLED_MESSAGE =
+  "Peek needs an enabled Stash instance. Add another instance first, or change this one's address under Edit.";
+
+/** `enabled` instances are enabled; `all` exist, disabled ones included */
+function instanceCounts({ enabled, all }: { enabled: number; all: number }) {
+  mockPrisma.stashInstance.count.mockImplementation(
+    prismaImpl((args) => (args?.where?.enabled === true ? enabled : all))
+  );
+}
 
 describe("Setup Controller", () => {
   beforeEach(() => {
@@ -184,15 +203,32 @@ describe("Setup Controller", () => {
       expect(res._getOkBody().hasStashInstance).toBe(false);
     });
 
-    it("counts only enabled instances", async () => {
+    it("setup status counts a disabled instance as configured", async () => {
       mockPrisma.user.count.mockResolvedValue(1);
-      mockPrisma.stashInstance.count.mockResolvedValue(0);
+      instanceCounts({ enabled: 0, all: 1 });
 
       const res = resFor(getSetupStatus);
       await getSetupStatus(reqFor(getSetupStatus), res);
 
-      expect(mockPrisma.stashInstance.count).toHaveBeenCalledWith({
-        where: { enabled: true },
+      const body = res._getOkBody();
+      expect(body.setupComplete).toBe(true);
+      expect(body.hasStashInstance).toBe(true);
+      // The multi-instance links read the enabled count
+      expect(body.stashInstanceCount).toBe(0);
+    });
+
+    it("setup status carries no userCount", async () => {
+      mockPrisma.user.count.mockResolvedValue(3);
+      instanceCounts({ enabled: 1, all: 1 });
+
+      const res = resFor(getSetupStatus);
+      await getSetupStatus(reqFor(getSetupStatus), res);
+
+      expect(res._getOkBody()).toEqual({
+        setupComplete: true,
+        hasUsers: true,
+        hasStashInstance: true,
+        stashInstanceCount: 1,
       });
     });
   });
@@ -803,29 +839,24 @@ describe("Setup Controller", () => {
       expect(res.status).toHaveBeenCalledWith(404);
     });
 
-    it("returns 400 when trying to delete the last enabled instance", async () => {
+    it("deleting the last enabled instance answers 400 with the message: the service refuses it inside its unit", async () => {
       mockPrisma.stashInstance.findUnique.mockResolvedValue(
-        partialRow({
-          id: "inst-a",
-          name: "Primary",
-        })
+        partialRow({ id: "inst-a", name: "Primary" })
       );
-      mockPrisma.stashInstance.count.mockResolvedValue(1);
-      mockPrisma.stashInstance.findFirst.mockResolvedValue(
-        partialRow({
-          id: "inst-a",
-        })
-      );
+      mockSync.deleteInstance.mockRejectedValue(new LastEnabledInstanceError());
 
       const res = resFor(deleteStashInstance);
-      await deleteStashInstance(
-        reqFor(deleteStashInstance, { params: { id: "inst-a" } }),
-        res
-      );
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getErrorBody().error).toContain("last enabled");
-      expect(mockPrisma.stashInstance.delete).not.toHaveBeenCalled();
+      await expect(
+        deleteStashInstance(
+          reqFor(deleteStashInstance, { params: { id: "inst-a" } }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: LAST_ENABLED_MESSAGE,
+      });
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockSync.deleteInstance).toHaveBeenCalledExactlyOnceWith("inst-a");
     });
   });
 
@@ -999,6 +1030,76 @@ describe("Setup Controller", () => {
       expect(must(reloaded)).toBeLessThan(must(recomputed));
     });
 
+    it("disabling the only enabled instance answers 400 with the message, and nothing changes: no update, no recompute, no reload", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      // No other instance is enabled
+      mockPrisma.stashInstance.count.mockResolvedValue(0);
+      mockUsersSelecting.mockResolvedValue([2]);
+
+      const res = resFor(updateStashInstance);
+      await expect(
+        updateStashInstance(
+          reqFor(updateStashInstance, {
+            body: { enabled: false },
+            params: { id: "inst-a" },
+          }),
+          res
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: LAST_ENABLED_MESSAGE,
+      });
+
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockPrisma.stashInstance.update).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeUsers).not.toHaveBeenCalled();
+      expect(mockManager.reload).not.toHaveBeenCalled();
+      expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+    });
+
+    it("disabling one of two enabled instances updates it and recomputes its users", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.count.mockResolvedValue(1);
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", enabled: false })
+      );
+      mockUsersSelecting.mockResolvedValue([2, 3]);
+
+      const res = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: false },
+          params: { id: "inst-a" },
+        }),
+        res
+      );
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(must(mockPrisma.stashInstance.update.mock.calls[0])[0]).toEqual(
+        objectContaining({
+          where: { id: "inst-a" },
+          data: { enabled: false },
+        })
+      );
+      expect(must(mockExclusions.recomputeUsers.mock.calls[0])[0]).toEqual([
+        2, 3,
+      ]);
+    });
+
     it("disabling an instance recomputes them too; the same state again does not", async () => {
       mockPrisma.stashInstance.findUnique.mockResolvedValue(
         partialRow({
@@ -1011,6 +1112,8 @@ describe("Setup Controller", () => {
       mockPrisma.stashInstance.update.mockResolvedValue(
         partialRow({ id: "inst-a", enabled: false })
       );
+      // Another instance stays enabled
+      mockPrisma.stashInstance.count.mockResolvedValue(1);
       mockUsersSelecting.mockResolvedValue([2]);
 
       await updateStashInstance(

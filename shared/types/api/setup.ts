@@ -18,7 +18,6 @@ export interface GetSetupStatusResponse {
   setupComplete: boolean;
   hasUsers: boolean;
   hasStashInstance: boolean;
-  userCount: number;
   stashInstanceCount: number;
 }
 

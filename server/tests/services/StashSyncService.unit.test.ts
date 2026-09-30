@@ -1556,6 +1556,38 @@ describe("StashSyncService queued full syncs", () => {
   });
 });
 
+describe("StashSyncService deleteInstance guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.user.findMany.mockResolvedValue([]);
+  });
+
+  it("deleteInstance of the last enabled instance throws LastEnabledInstanceError and writes nothing", async () => {
+    const { LastEnabledInstanceError, stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    mockPrisma.stashInstance.findUnique.mockResolvedValue(
+      partialRow({ id: "instance-last", enabled: true })
+    );
+    // No other instance is enabled
+    mockPrisma.stashInstance.count.mockResolvedValue(0);
+
+    await expect(
+      stashSyncService.deleteInstance("instance-last")
+    ).rejects.toBeInstanceOf(LastEnabledInstanceError);
+
+    expect(mockPrisma.stashInstance.count).toHaveBeenCalledWith({
+      where: { enabled: true, id: { not: "instance-last" } },
+    });
+    expect(mockPrisma.stashInstance.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.syncState.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.watchHistory.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.userHiddenEntity.deleteMany).not.toHaveBeenCalled();
+    expect(stashInstanceManager.reload).not.toHaveBeenCalled();
+    // The lock is free again
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+});
+
 describe("StashSyncService reProbeUngeneratedClips", () => {
   const PREVIEW = "http://stash-b:9999/scene/1/scene_marker/7/stream";
 
