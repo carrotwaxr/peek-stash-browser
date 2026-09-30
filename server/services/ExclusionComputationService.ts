@@ -2010,7 +2010,8 @@ class ExclusionComputationService {
    * - Galleries: 0 visible images
    * - Performers: 0 visible scenes AND 0 visible images
    * - Studios: 0 visible scenes AND 0 visible images
-   * - Groups: 0 visible scenes
+   * - Groups: 0 visible scenes and no visible, non-empty sub-group at any
+   *   depth (one recursive CTE over GroupRelation; UNION ends cycles)
    * - Tags: not attached to any visible scene, performer, studio, group,
    *   gallery or image, and no live child tag on the same instance
    *
@@ -2183,7 +2184,12 @@ class ExclusionComputationService {
       });
     }
 
-    // 4. Empty groups - groups with 0 visible scenes
+    // 4. Empty groups - groups with 0 visible scenes and no visible,
+    // non-empty sub-group at any depth. `nonempty` seeds from every visible
+    // group with a visible scene and climbs GroupRelation to each visible
+    // containing group; UNION deduplicates, which ends a containment cycle.
+    // It covers every group in scope even with `only`, since a listed
+    // group's emptiness depends on its sub-groups.
     const grpFilter = instanceColumnClause(
       "g.stashInstanceId",
       allowedInstanceIds
@@ -2195,19 +2201,33 @@ class ExclusionComputationService {
           Array<{ groupId: string; instanceId: string }>
         >(
           `
+      WITH RECURSIVE nonempty(id, inst) AS (
+        SELECT g.id, g.stashInstanceId FROM StashGroup g
+        WHERE g.deletedAt IS NULL
+          AND ${grpFilter.sql}
+          AND NOT EXISTS (SELECT 1 FROM ${ex.group} e WHERE e.id = g.id AND e.inst = g.stashInstanceId)
+          AND EXISTS (
+            SELECT 1 FROM SceneGroup sg
+            JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
+            WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId
+              AND s.deletedAt IS NULL
+              AND NOT EXISTS (SELECT 1 FROM ${ex.scene} e WHERE e.id = s.id AND e.inst = s.stashInstanceId)
+          )
+        UNION
+        SELECT gr.containingId, gr.containingInstanceId FROM nonempty n
+        JOIN GroupRelation gr ON gr.subId = n.id AND gr.subInstanceId = n.inst
+        JOIN StashGroup p ON p.id = gr.containingId AND p.stashInstanceId = gr.containingInstanceId
+        WHERE p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM ${ex.group} e WHERE e.id = p.id AND e.inst = p.stashInstanceId)
+      )
       SELECT g.id AS groupId, g.stashInstanceId AS instanceId
       FROM ${grpFrom}
       WHERE g.deletedAt IS NULL
       AND ${grpFilter.sql}
       AND NOT EXISTS (SELECT 1 FROM ${ex.group} e WHERE e.id = g.id AND e.inst = g.stashInstanceId)
-      AND NOT EXISTS (
-        SELECT 1 FROM SceneGroup sg
-        JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
-        WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId
-          AND s.deletedAt IS NULL
-          AND NOT EXISTS (SELECT 1 FROM ${ex.scene} e WHERE e.id = s.id AND e.inst = s.stashInstanceId)
-      )
+      AND NOT EXISTS (SELECT 1 FROM nonempty n WHERE n.id = g.id AND n.inst = g.stashInstanceId)
     `,
+          ...grpFilter.params,
           ...grpFilter.params
         );
 
