@@ -23,6 +23,8 @@ import type {
   FindTagsRequest,
   ListRequestInput,
   NormalizedImage,
+  RelationCountsResponse,
+  RelationCountsType,
   TagTreeScope,
 } from "@peek/shared-types";
 import { makeCompositeKey } from "../utils/compositeKey";
@@ -38,6 +40,21 @@ import { apiFetch, apiGet, apiPost } from "./client";
  */
 export type LibrarySearchParams<E extends EntityKind = EntityKind> =
   ListRequestInput<E>;
+
+/** The page's Include sub-tags or sub-studios toggle, as its counts take it */
+export interface RelationCountsOptions {
+  includeSubTags?: boolean;
+  includeSubStudios?: boolean;
+}
+
+/** Each detail page's counts endpoint, under /library */
+const COUNTS_PATHS: Record<RelationCountsType, string> = {
+  performer: "performers",
+  studio: "studios",
+  tag: "tags",
+  group: "groups",
+  gallery: "galleries",
+};
 
 // ── Single-entity lookup ───────────────────────────────────────────────
 
@@ -272,7 +289,7 @@ export const libraryApi = {
   // filter, so exclusions apply and each image carries the user's own data
   findGalleryImages: async (
     galleryId: string,
-    instanceId: string | null,
+    instanceId: string,
     { page = 1, perPage = 100 }: { page?: number; perPage?: number } = {}
   ): Promise<{ images: NormalizedImage[]; count: number }> => {
     const result = await apiPost<{
@@ -290,6 +307,26 @@ export const libraryApi = {
       images: result?.findImages?.images ?? [],
       count: result?.findImages?.count ?? 0,
     };
+  },
+
+  /**
+   * A detail page's tab counts, as the viewer sees them: each is the total
+   * of the tab's list (GET /library/<entities>/:id/counts)
+   */
+  getRelationCounts: <T extends RelationCountsType>(
+    type: T,
+    id: string,
+    instanceId: string,
+    options: RelationCountsOptions = {},
+    signal?: AbortSignal
+  ) => {
+    const query = new URLSearchParams({ instanceId });
+    if (options.includeSubTags) query.set("includeSubTags", "true");
+    if (options.includeSubStudios) query.set("includeSubStudios", "true");
+    return apiGet<RelationCountsResponse<T>>(
+      `/library/${COUNTS_PATHS[type]}/${encodeURIComponent(id)}/counts?${query.toString()}`,
+      signal
+    );
   },
 
   // Rating and favorite (PUT /ratings/:type/:id)

@@ -320,6 +320,12 @@ export type {
   // Images
   FindImagesRequest,
   FindImagesResponse,
+  // Detail page counts
+  RelationCountsByType,
+  RelationCountsType,
+  RelationCountsParams,
+  RelationCountsQuery,
+  RelationCountsResponse,
 } from "@peek/shared-types/api/library.js";
 
 // ---------------------------------------------------------------------------

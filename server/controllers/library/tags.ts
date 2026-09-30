@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { loadTagTree } from "../../services/TagTreeService.js";
 import type {
@@ -25,6 +24,7 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { relationCountsHandler } from "./relationCounts.js";
 
 /**
  * findTags using SQL query builder
@@ -75,44 +75,11 @@ export const findTags = async (
     return;
   }
 
-  // For single-entity requests (detail pages), get tag with computed counts
-  let resultTags = tags;
-  if (lookup && resultTags.length === 1) {
-    const firstTag = resultTags[0] as (typeof resultTags)[number];
-    const tagWithCounts = await stashEntityService.getTag(
-      firstTag.id,
-      firstTag.instanceId
-    );
-    if (tagWithCounts) {
-      const existingTag = firstTag;
-      resultTags = [
-        {
-          ...existingTag,
-          scene_count: tagWithCounts.scene_count,
-          image_count: tagWithCounts.image_count,
-          gallery_count: tagWithCounts.gallery_count,
-          performer_count: tagWithCounts.performer_count,
-          studio_count: tagWithCounts.studio_count,
-          group_count: tagWithCounts.group_count,
-          scene_marker_count: tagWithCounts.scene_marker_count,
-        },
-      ];
-      logger.debug("Computed counts for tag detail", {
-        tagId: existingTag.id,
-        tagName: existingTag.name,
-        sceneCount: tagWithCounts.scene_count,
-        imageCount: tagWithCounts.image_count,
-        galleryCount: tagWithCounts.gallery_count,
-        performerCount: tagWithCounts.performer_count,
-        studioCount: tagWithCounts.studio_count,
-        groupCount: tagWithCounts.group_count,
-      });
-    }
-  }
-
+  // A detail page reads its tag's counts from the row, as its card shows
+  // them; its tabs count through GET /tags/:id/counts
   // Add stashUrl to each tag; its parents and children come with the row,
   // as the viewer may see them
-  const tagsWithStashUrl = resultTags.map((tag) => ({
+  const tagsWithStashUrl = tags.map((tag) => ({
     ...tag,
     stashUrl: buildStashEntityUrl("tag", tag.id, tag.instanceId, req.user),
   }));
@@ -203,3 +170,6 @@ export const findTagTree = async (
   });
   res.json({ tags });
 };
+
+/** GET /api/library/tags/:id/counts: the tag page's tab counts */
+export const getTagCounts = relationCountsHandler("tag");

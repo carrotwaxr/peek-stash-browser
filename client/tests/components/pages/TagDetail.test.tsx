@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as hooksModule from "@/api/hooks";
 import TagDetail from "@/components/pages/TagDetail";
 import type * as uiModule from "@/components/ui/index";
 
@@ -17,8 +18,21 @@ interface SceneSearchProps {
   permanentFilters?: Record<string, unknown>;
 }
 
-const { findImages, grids, sceneSearch } = vi.hoisted(() => ({
+interface CountsQuery {
+  data: { counts: Record<string, number> } | undefined;
+}
+
+const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
   findImages: vi.fn<(params: Record<string, unknown>) => Promise<unknown>>(),
+  relationCounts:
+    vi.fn<
+      (
+        type: string,
+        id: string | undefined,
+        instanceId: string | undefined,
+        options?: Record<string, boolean>
+      ) => CountsQuery
+    >(),
   grids: {
     GalleryGrid: vi.fn<(props: GridProps) => null>(() => null),
     GroupGrid: vi.fn<(props: GridProps) => null>(() => null),
@@ -51,6 +65,10 @@ vi.mock("@/api", () => ({
     updateFavorite: vi.fn(),
   },
 }));
+vi.mock("@/api/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof hooksModule>()),
+  useRelationCounts: relationCounts,
+}));
 vi.mock("@/hooks/useEntityLookup", () => ({
   useEntityLookup: () => ({ status: "found", entity: tag, retry: vi.fn() }),
 }));
@@ -77,9 +95,22 @@ vi.mock("@/components/ui/index", async (importOriginal) => ({
   PaginatedImageGrid: () => null,
 }));
 
+const ALL_COUNTS = {
+  scenes: 3,
+  galleries: 2,
+  images: 4,
+  performers: 2,
+  studios: 2,
+  groups: 1,
+};
+
 function renderPage(search: string) {
+  return renderAt(`/tag/5?instance=inst-a&${search}`);
+}
+
+function renderAt(url: string) {
   return render(
-    <MemoryRouter initialEntries={[`/tag/5?instance=inst-a&${search}`]}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/tag/:tagId" element={<TagDetail />} />
       </Routes>
@@ -132,6 +163,7 @@ describe("TagDetail: Include sub-tags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
   });
 
   it.each(TABS)(
@@ -171,5 +203,93 @@ describe("TagDetail: Include sub-tags", () => {
       modifier: "INCLUDES",
       depth: -1,
     });
+  });
+});
+
+describe("TagDetail: counts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+  });
+
+  const tabButton = (label: string) =>
+    screen.queryByRole("button", { name: new RegExp(`^${label}\\b`) });
+
+  it("tab badges and the default tab follow the counts", () => {
+    relationCounts.mockReturnValue({
+      data: {
+        counts: {
+          scenes: 0,
+          galleries: 3,
+          images: 0,
+          performers: 2,
+          studios: 0,
+          groups: 1,
+        },
+      },
+    });
+    renderPage("");
+
+    expect(relationCounts).toHaveBeenLastCalledWith("tag", "5", "inst-a", {
+      includeSubTags: false,
+    });
+    // The first tab with content opens; empty tabs are hidden
+    expect(tabButton("Galleries")).toHaveTextContent("Galleries3");
+    expect(tabButton("Galleries")).toHaveAttribute("aria-current", "page");
+    expect(tabButton("Performers")).toHaveTextContent("Performers2");
+    expect(tabButton("Collections")).toHaveTextContent("Collections1");
+    expect(tabButton("Scenes")).toBeNull();
+    expect(tabButton("Images")).toBeNull();
+    expect(grids.GalleryGrid).toHaveBeenCalled();
+    expect(sceneSearch).not.toHaveBeenCalled();
+    // The statistics show the same numbers
+    const stats = must(
+      screen.getByText("Statistics").parentElement,
+      "the statistics card"
+    );
+    expect(stats).toHaveTextContent("Galleries:3");
+    expect(stats).toHaveTextContent("Performers:2");
+  });
+
+  it("while the counts load, every tab shows without a badge and none opens", () => {
+    relationCounts.mockReturnValue({ data: undefined });
+    renderPage("");
+
+    expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/);
+    expect(tabButton("Galleries")).toHaveTextContent(/^Galleries$/);
+    expect(sceneSearch).not.toHaveBeenCalled();
+    expect(grids.GalleryGrid).not.toHaveBeenCalled();
+    expect(screen.queryByText("This tag has no content in Peek")).toBeNull();
+  });
+
+  it("a tag with nothing to show says so once the counts answer", () => {
+    relationCounts.mockReturnValue({
+      data: {
+        counts: {
+          scenes: 0,
+          galleries: 0,
+          images: 0,
+          performers: 0,
+          studios: 0,
+          groups: 0,
+        },
+      },
+    });
+    renderPage("");
+
+    expect(screen.getByText("This tag has no content in Peek")).toBeVisible();
+  });
+
+  it("a bare-id link counts and filters on the tag's own server", () => {
+    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
+    renderAt("/tag/5?includeSubTags=true");
+
+    expect(relationCounts).toHaveBeenLastCalledWith("tag", "5", "inst-a", {
+      includeSubTags: true,
+    });
+    expect(
+      must(sceneSearch.mock.lastCall, "SceneSearch's props")[0].permanentFilters
+        ?.tags
+    ).toEqual({ value: ["5:inst-a"], modifier: "INCLUDES", depth: -1 });
   });
 });

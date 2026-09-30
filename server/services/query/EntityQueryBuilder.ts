@@ -328,11 +328,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const queryMs = Date.now() - queryStart;
 
     const countStart = Date.now();
-    const countRows = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-      this.statement(built, undefined),
-      ...this.params(built, undefined)
-    );
-    const total = Number(countRows[0]?.total ?? 0n);
+    const total = await this.countRows(built);
     const countMs = Date.now() - countStart;
 
     const items = rows.map((row) => this.transformRow(row));
@@ -348,6 +344,18 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     });
 
     return { items, total };
+  }
+
+  /**
+   * The total the request's list shows the viewer, as `execute` counts it,
+   * without reading a page: the count statement only (a detail page's tab
+   * counts, B19). The request's page and sort are not read, except for the
+   * shape a clause takes for its count.
+   */
+  async count(options: ListQueryOptions<K>): Promise<number> {
+    const { request } = options;
+    const ctx = this.context(options, request);
+    return this.countRows(await this.build(ctx, request));
   }
 
   /**
@@ -393,6 +401,15 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const items = rows.map((row) => this.transformRow(row));
     await this.populateRelations(items, ctx);
     return items;
+  }
+
+  /** The joined `COUNT(*)` of a built statement */
+  private async countRows(built: Built): Promise<number> {
+    const rows = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
+      this.statement(built, undefined),
+      ...this.params(built, undefined)
+    );
+    return Number(rows[0]?.total ?? 0n);
   }
 
   /** One page of raw rows, as SQLite returns them */

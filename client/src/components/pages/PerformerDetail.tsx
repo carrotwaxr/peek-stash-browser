@@ -1,9 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { NormalizedImage } from "@peek/shared-types";
-import type { TagRef } from "@peek/shared-types";
+import type {
+  NormalizedImage,
+  RelationCountsByType,
+  TagRef,
+} from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
@@ -19,6 +23,7 @@ import {
 } from "../../utils/unitConversions";
 import { GalleryGrid, GroupGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
@@ -60,31 +65,29 @@ const PerformerDetail = () => {
   const performer = lookup.entity ?? null;
   const isLoading = lookup.status === "loading";
 
-  // Compute tabs with counts for smart default selection
+  // Reads, tab filters and counts use the loaded performer's own server: a
+  // bare-id link names none
+  const performerInstanceId = performer?.instanceId as string | undefined;
+  const performerRef = makeCompositeKey(performerId ?? "", performerInstanceId);
+
+  // Each tab's count is the total of its list, as the viewer sees it; the
+  // tabs show no badge and none opens until the counts answer
+  const { data: countsData } = useRelationCounts(
+    "performer",
+    performerId,
+    performerInstanceId
+  );
+  const counts = countsData?.counts;
   const contentTabs = [
-    {
-      id: "scenes",
-      label: "Scenes",
-      count: (performer?.scene_count as number) || 0,
-    },
-    {
-      id: "galleries",
-      label: "Galleries",
-      count: (performer?.gallery_count as number) || 0,
-    },
-    {
-      id: "images",
-      label: "Images",
-      count: (performer?.image_count as number) || 0,
-    },
-    {
-      id: "groups",
-      label: "Collections",
-      count: (performer?.group_count as number) || 0,
-    },
-  ];
-  const effectiveDefaultTab =
-    contentTabs.find((t) => t.count > 0)?.id || "scenes";
+    { id: "scenes", label: "Scenes", count: counts?.scenes },
+    { id: "galleries", label: "Galleries", count: counts?.galleries },
+    { id: "images", label: "Images", count: counts?.images },
+    { id: "groups", label: "Collections", count: counts?.groups },
+  ].map((t) => ({ ...t, count: t.count ?? TAB_COUNT_LOADING }));
+  // The first tab with content, once the counts are in
+  const effectiveDefaultTab = counts
+    ? (contentTabs.find((t) => t.count > 0)?.id ?? "scenes")
+    : "";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -247,13 +250,18 @@ const PerformerDetail = () => {
 
         {/* Full Width Sections - Statistics, Tags, Links */}
         <div className="space-y-6 mb-8">
-          <PerformerStats performer={performer} performerId={performerId!} />
+          <PerformerStats
+            performer={performer}
+            counts={counts}
+            activeTab={activeTab}
+            defaultTab={effectiveDefaultTab}
+          />
           <PerformerLinks performer={performer} settings={settings} />
         </div>
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {contentTabs.every((t) => t.count === 0) ? (
+          {counts && contentTabs.every((t) => t.count === 0) ? (
             <div
               className="py-16 text-center"
               style={{ color: "var(--text-muted)" }}
@@ -273,14 +281,14 @@ const PerformerDetail = () => {
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
-                      value: [makeCompositeKey(performerId!, instanceId)],
+                      value: [performerRef],
                       modifier: "INCLUDES",
                     },
                   }}
                   permanentFiltersMetadata={{
                     performers: [
                       {
-                        id: makeCompositeKey(performerId!, instanceId),
+                        id: performerRef,
                         name: performer?.name as string,
                       },
                     ],
@@ -296,7 +304,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId!, instanceId)],
+                        value: [performerRef],
                         modifier: "INCLUDES",
                       },
                     },
@@ -308,8 +316,7 @@ const PerformerDetail = () => {
 
               {activeTab === "images" && (
                 <ImagesTab
-                  performerId={performerId}
-                  instanceId={instanceId}
+                  performerRef={performerRef}
                   performerName={performer?.name as string | undefined}
                 />
               )}
@@ -319,7 +326,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId!, instanceId)],
+                        value: [performerRef],
                         modifier: "INCLUDES",
                       },
                     },
@@ -641,19 +648,23 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
 
 interface PerformerStatsProps {
   performer: Record<string, unknown> | null;
-  performerId: string;
+  /** The tabs' counts; undefined while they load */
+  counts: RelationCountsByType["performer"] | undefined;
+  activeTab: string;
+  defaultTab: string;
 }
 
 const PerformerStats = ({
   performer,
-  performerId: _performerId,
+  counts,
+  activeTab,
+  defaultTab,
 }: PerformerStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === "scenes") {
+    if (tabId === defaultTab) {
       newParams.delete("tab");
     } else {
       newParams.set("tab", tabId);
@@ -665,12 +676,8 @@ const PerformerStats = ({
 
   // Calculate O-Count percentage
   const oCountPercentage =
-    performer?.scene_count && performer?.o_counter
-      ? (
-          ((performer.o_counter as number) /
-            (performer.scene_count as number)) *
-          100
-        ).toFixed(1)
+    counts?.scenes && performer?.o_counter
+      ? (((performer.o_counter as number) / counts.scenes) * 100).toFixed(1)
       : null;
 
   // Cap the progress bar width at 100% but show actual percentage
@@ -684,7 +691,7 @@ const PerformerStats = ({
       <div className="grid grid-cols-2 gap-4 mb-6">
         <StatField
           label="Scenes:"
-          value={(performer?.scene_count as number) || 0}
+          value={counts?.scenes}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("scenes")}
           isActive={activeTab === "scenes"}
@@ -696,21 +703,21 @@ const PerformerStats = ({
         />
         <StatField
           label="Galleries:"
-          value={(performer?.gallery_count as number) || 0}
+          value={counts?.galleries}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("galleries")}
           isActive={activeTab === "galleries"}
         />
         <StatField
           label="Images:"
-          value={(performer?.image_count as number) || 0}
+          value={counts?.images}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("images")}
           isActive={activeTab === "images"}
         />
         <StatField
           label="Collections:"
-          value={(performer?.group_count as number) || 0}
+          value={counts?.groups}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("groups")}
           isActive={activeTab === "groups"}
@@ -780,7 +787,7 @@ const PerformerStats = ({
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
             {performer?.o_counter as React.ReactNode} O-Counts in{" "}
-            {performer?.scene_count as React.ReactNode} scenes
+            {counts?.scenes} scenes
           </div>
         </div>
       )}
@@ -898,16 +905,12 @@ const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
 
 // Images Tab Component with Lightbox
 interface ImagesTabProps {
-  performerId: string | undefined;
-  instanceId: string | null;
+  /** The performer as "id:instanceId" */
+  performerRef: string;
   performerName: string | undefined;
 }
 
-const ImagesTab = ({
-  performerId,
-  instanceId,
-  performerName,
-}: ImagesTabProps) => {
+const ImagesTab = ({ performerRef, performerName }: ImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
@@ -933,7 +936,7 @@ const ImagesTab = ({
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
-            value: [makeCompositeKey(performerId!, instanceId)],
+            value: [performerRef],
             modifier: "INCLUDES",
           },
         },
@@ -943,13 +946,13 @@ const ImagesTab = ({
         count: data.findImages?.count || 0,
       };
     },
-    [performerId, instanceId]
+    [performerRef]
   );
 
   const { images, totalCount, isLoading, lightbox, setImages } =
     useImagesPagination<NormalizedImage>({
       fetchImages,
-      dependencies: [performerId, instanceId],
+      dependencies: [performerRef],
       externalPage: urlPage,
       onExternalPageChange: handleImagePageChange,
     });

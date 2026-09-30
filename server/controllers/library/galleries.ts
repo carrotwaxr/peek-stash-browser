@@ -1,6 +1,5 @@
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -18,6 +17,7 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { relationCountsHandler } from "./relationCounts.js";
 
 /**
  * Find galleries endpoint
@@ -72,32 +72,10 @@ export const findGalleries = async (
     return;
   }
 
-  // For single-entity requests (detail pages), get gallery with computed counts
-  let paginatedGalleries = galleries;
-  if (lookup && paginatedGalleries.length === 1) {
-    const existingGallery =
-      paginatedGalleries[0] as (typeof paginatedGalleries)[number];
-    const galleryWithCounts = await stashEntityService.getGallery(
-      existingGallery.id,
-      existingGallery.instanceId
-    );
-    if (galleryWithCounts) {
-      paginatedGalleries = [
-        {
-          ...existingGallery,
-          image_count: galleryWithCounts.image_count,
-        },
-      ];
-      logger.debug("Computed counts for gallery detail", {
-        galleryId: existingGallery.id,
-        galleryTitle: existingGallery.title,
-        imageCount: galleryWithCounts.image_count,
-      });
-    }
-  }
-
+  // A detail page reads its gallery's counts from the row, as its card
+  // shows them; its tabs count through GET /galleries/:id/counts
   // Add stashUrl to each gallery
-  const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
+  const galleriesWithStashUrl = galleries.map((gallery) => ({
     ...gallery,
     stashUrl: buildStashEntityUrl(
       "gallery",
@@ -144,3 +122,6 @@ export const findGalleriesMinimal = async (
   );
   res.json({ galleries });
 };
+
+/** GET /api/library/galleries/:id/counts: the gallery page's tab counts */
+export const getGalleryCounts = relationCountsHandler("gallery");

@@ -409,6 +409,41 @@ describe("EntityQueryBuilder", () => {
     ]);
   });
 
+  it("count runs execute's count statement alone and answers its total as a number", async () => {
+    const options = {
+      userId: 7,
+      allowedInstanceIds: ["inst-a"],
+      request: request({
+        filter: {
+          title: { modifier: "EQUALS", value: "x" },
+          details: { modifier: "EQUALS", value: "y" },
+        },
+      }),
+    } as const;
+    await builder.execute(options);
+    const [, executed] = statements();
+
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([{ total: 42n }]);
+    const total = await builder.count(options);
+
+    expect(total).toBe(42);
+    expect(statements()).toEqual([must(executed)]);
+    expect(must(statements()[0]).sql).toMatch(/SELECT COUNT\(\*\) AS total/);
+  });
+
+  it("count answers 0 when the statement returns no row", async () => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+    expect(
+      await builder.count({
+        userId: 1,
+        allowedInstanceIds: ["inst-a"],
+        request: request(),
+      })
+    ).toBe(0);
+  });
+
   it("random sort binds the seed three times and interpolates nothing", async () => {
     await builder.execute({
       userId: 1,

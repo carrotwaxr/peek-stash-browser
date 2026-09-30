@@ -12,7 +12,6 @@ import {
 } from "../../../controllers/library/tags.js";
 import { ValidationError } from "../../../middleware/errorHandler.js";
 import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { loadTagTree } from "../../../services/TagTreeService.js";
 import {
@@ -26,12 +25,6 @@ import { must } from "../../helpers/must.js";
 import { untrusted } from "../../helpers/untrusted.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getTag: vi.fn(),
-  },
-}));
 
 vi.mock("../../../services/TagQueryBuilder.js", () => ({
   tagQueryBuilder: { execute: vi.fn() },
@@ -63,7 +56,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 }));
 
 const mockLoadTagTree = vi.mocked(loadTagTree);
-const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
 const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
@@ -175,39 +167,7 @@ describe("Tags Controller", () => {
       expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("fetches detail counts for single-ID lookup", async () => {
-      const tag = createMockTag({ id: "101", instanceId: "default" });
-      mockTagQueryBuilder.execute.mockResolvedValue({
-        items: [tag],
-        total: 1,
-      });
-      mockStashEntityService.getTag.mockResolvedValue({
-        ...tag,
-        scene_count: 42,
-        image_count: 10,
-        gallery_count: 3,
-        performer_count: 5,
-        studio_count: 2,
-        group_count: 1,
-        scene_marker_count: 7,
-      });
-
-      const req = reqFor(findTags, {
-        body: { ids: ["101"], filter: {}, tag_filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findTags);
-
-      await findTags(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getTag).toHaveBeenCalledWith(
-        "101",
-        "default"
-      );
-    });
-
-    it("a detail answers the builder's row with the detail counts: the viewer's own fields, parents and children kept", async () => {
+    it("a detail answers the builder's row as it is: the card's counts, the viewer's own fields, parents and children", async () => {
       const parent = {
         id: "100",
         instanceId: "inst-b",
@@ -223,16 +183,12 @@ describe("Tags Controller", () => {
         rating100: 30,
         o_counter: 5,
         play_count: 6,
+        scene_count: 42,
+        scene_marker_count: 7,
         parents: [parent],
         children: [child],
       });
       mockTagQueryBuilder.execute.mockResolvedValue({ items: [tag], total: 1 });
-      // Stash's own favorite and no rating, with the detail counts
-      mockStashEntityService.getTag.mockResolvedValue({
-        ...createMockTag({ id: "101", instanceId: "inst-b", favorite: true }),
-        scene_count: 42,
-        parents: [{ id: "100" }],
-      });
 
       const req = reqFor(findTags, {
         body: { ids: ["101"], tag_filter: { instance_id: "inst-b" } },
@@ -243,7 +199,7 @@ describe("Tags Controller", () => {
       await findTags(req, res);
 
       expect(res._getOkBody().findTags.tags).toEqual([
-        { ...tag, scene_count: 42, stashUrl: null },
+        { ...tag, stashUrl: null },
       ]);
     });
 

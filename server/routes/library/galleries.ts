@@ -2,6 +2,7 @@ import express from "express";
 import {
   findGalleries,
   findGalleriesMinimal,
+  getGalleryCounts,
 } from "../../controllers/library/galleries.js";
 import {
   authenticate,
@@ -28,6 +29,13 @@ router.post(
   authenticate,
   requirePickerReady,
   libraryHandler(findGalleriesMinimal)
+);
+
+// The detail page's tab counts, as the viewer sees them
+router.get(
+  "/galleries/:id/counts",
+  requireCacheReady,
+  libraryHandler(getGalleryCounts)
 );
 
 export default router;

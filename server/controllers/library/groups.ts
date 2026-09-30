@@ -1,6 +1,5 @@
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import type {
   AmbiguousLookupResponse,
   ApiErrorResponse,
@@ -18,6 +17,7 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { relationCountsHandler } from "./relationCounts.js";
 
 /**
  * Find groups endpoint
@@ -72,37 +72,18 @@ export const findGroups = async (
     return;
   }
 
-  // For single-entity requests (detail pages), get group with computed counts
-  // and its place in the collection hierarchy
+  // A detail page's group comes with its place in the collection
+  // hierarchy; its counts are the row's, as its card shows them, and its
+  // tabs count through GET /groups/:id/counts
   let paginatedGroups = groups;
   if (lookup && paginatedGroups.length === 1) {
     const firstGroup = paginatedGroups[0] as (typeof paginatedGroups)[number];
-    const [groupWithCounts, hierarchy] = await Promise.all([
-      stashEntityService.getGroup(firstGroup.id, firstGroup.instanceId),
-      groupQueryBuilder.getHierarchy(
-        firstGroup.id,
-        firstGroup.instanceId,
-        userId
-      ),
-    ]);
-    const existingGroup = { ...firstGroup, ...hierarchy };
-    paginatedGroups = [existingGroup];
-    if (groupWithCounts) {
-      paginatedGroups = [
-        {
-          ...existingGroup,
-          scene_count: groupWithCounts.scene_count,
-          performer_count: groupWithCounts.performer_count,
-        },
-      ];
-
-      logger.debug("Computed counts for group detail", {
-        groupId: existingGroup.id,
-        groupName: existingGroup.name,
-        sceneCount: groupWithCounts.scene_count,
-        performerCount: groupWithCounts.performer_count,
-      });
-    }
+    const hierarchy = await groupQueryBuilder.getHierarchy(
+      firstGroup.id,
+      firstGroup.instanceId,
+      userId
+    );
+    paginatedGroups = [{ ...firstGroup, ...hierarchy }];
   }
 
   // Add stashUrl to each group
@@ -152,3 +133,6 @@ export const findGroupsMinimal = async (
   );
   res.json({ groups });
 };
+
+/** GET /api/library/groups/:id/counts: the collection page's tab counts */
+export const getGroupCounts = relationCountsHandler("group");

@@ -162,6 +162,8 @@ With **Show relationships** on, each indicator shows how many related items you 
 
 The counts on performer, studio, tag, collection and gallery cards (scenes, galleries, images, performers, collections) are what the page behind the card lists: Peek counts them from its copy of your library, and every sync keeps them current. They leave out what you cannot see (content restrictions and the items you hid) and equal the totals of the tabs on the page behind the card. A tag's scene count includes the scenes that inherit the tag from a performer, studio or collection, as the tag's Scenes tab does; a studio's counts do not include its sub-studios'. A tag page's marker count still comes from Stash. After a sync, a card may show a changed item for a few seconds until your view is recomputed.
 
+A detail page (performer, studio, tag, collection or gallery) counts its tabs the same way, as you see them: the numbers in its Statistics card and on its tab badges are the totals of the lists under the tabs, and the page opens on the first tab with something in it. With **Include sub-tags** or **Include sub-studios** on, the counts include the sub-tags' or sub-studios' content, as the tabs then list it. A page opened from a link that names no server shows the item on its own server.
+
 **Scene-specific:**
 
 - Show studio code (abbreviated studio name)

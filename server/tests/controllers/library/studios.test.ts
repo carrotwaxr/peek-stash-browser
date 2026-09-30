@@ -11,7 +11,6 @@ import {
 import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 // --- Imports ---
 
-import { stashEntityService } from "../../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
 import {
   malformed,
@@ -23,12 +22,6 @@ import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getStudio: vi.fn(),
-  },
-}));
 
 vi.mock("../../../services/StudioQueryBuilder.js", () => ({
   studioQueryBuilder: { execute: vi.fn() },
@@ -55,7 +48,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockStashEntityService = vi.mocked(stashEntityService);
 const mockStudioQueryBuilder = vi.mocked(studioQueryBuilder);
 const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
@@ -174,36 +166,7 @@ describe("Studios Controller", () => {
       expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("fetches detail counts for single-ID lookup", async () => {
-      const studio = createMockStudio({ id: "101", instanceId: "default" });
-      mockStudioQueryBuilder.execute.mockResolvedValue({
-        items: [studio],
-        total: 1,
-      });
-      mockStashEntityService.getStudio.mockResolvedValue({
-        ...studio,
-        scene_count: 100,
-        image_count: 50,
-        gallery_count: 10,
-        performer_count: 25,
-        group_count: 5,
-      });
-
-      const req = reqFor(findStudios, {
-        body: { ids: ["101"], filter: {}, studio_filter: {} },
-        user: defaultUser,
-      });
-      const res = resFor(findStudios);
-
-      await findStudios(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getStudio).toHaveBeenCalledWith(
-        "101",
-        "default"
-      );
-    });
-    it("a detail answers the builder's row with the detail counts: the viewer's favorite, rating and stats, parent and children kept", async () => {
+    it("a detail answers the builder's row as it is: the card's counts, the viewer's favorite, rating and stats, parent and children", async () => {
       const parent = {
         id: "100",
         instanceId: "inst-b",
@@ -220,23 +183,14 @@ describe("Studios Controller", () => {
         rating100: 20,
         o_counter: 3,
         play_count: 4,
+        scene_count: 100,
+        group_count: 5,
         parent_studio: parent,
         child_studios: [child],
       });
       mockStudioQueryBuilder.execute.mockResolvedValue({
         items: [studio],
         total: 1,
-      });
-      // Stash's own favorite and rating, with the detail counts
-      mockStashEntityService.getStudio.mockResolvedValue({
-        ...createMockStudio({
-          id: "101",
-          instanceId: "inst-b",
-          favorite: true,
-          rating100: 90,
-        }),
-        scene_count: 100,
-        group_count: 5,
       });
 
       const req = reqFor(findStudios, {
@@ -248,7 +202,7 @@ describe("Studios Controller", () => {
       await findStudios(req, res);
 
       expect(res._getOkBody().findStudios.studios).toEqual([
-        { ...studio, scene_count: 100, group_count: 5, stashUrl: null },
+        { ...studio, stashUrl: null },
       ]);
     });
   });

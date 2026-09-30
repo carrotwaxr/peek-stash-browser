@@ -17,6 +17,7 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { relationCountsHandler } from "./relationCounts.js";
 
 /**
  * Find performers using SQL query builder
@@ -119,3 +120,6 @@ export const findPerformersMinimal = async (
   );
   res.json({ performers });
 };
+
+/** GET /api/library/performers/:id/counts: the performer page's tab counts */
+export const getPerformerCounts = relationCountsHandler("performer");

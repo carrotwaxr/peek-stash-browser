@@ -12,7 +12,6 @@ import {
 
 import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
 import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
 import {
   malformed,
   reqFor,
@@ -23,12 +22,6 @@ import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getGroup: vi.fn(),
-  },
-}));
 
 vi.mock("../../../services/GroupQueryBuilder.js", () => ({
   groupQueryBuilder: {
@@ -66,7 +59,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGroupQueryBuilder = vi.mocked(groupQueryBuilder);
 const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
@@ -148,20 +140,20 @@ describe("Groups Controller", () => {
       expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("fetches detail counts for single-ID lookup, keeping the builder's tags", async () => {
+    it("a detail answers the builder's row: the card's counts and the builder's tags", async () => {
       const tags = [
         { id: "7", instanceId: "default", name: "Beach", image_path: null },
       ];
-      const group = createMockGroup({ id: "101", instanceId: "default", tags });
+      const group = createMockGroup({
+        id: "101",
+        instanceId: "default",
+        tags,
+        scene_count: 15,
+        performer_count: 8,
+      });
       mockGroupQueryBuilder.execute.mockResolvedValue({
         items: [group],
         total: 1,
-      });
-      mockStashEntityService.getGroup.mockResolvedValue({
-        ...group,
-        tags: [{ id: "7", name: "Unknown", image_path: null }],
-        scene_count: 15,
-        performer_count: 8,
       });
 
       const req = reqFor(findGroups, {
@@ -172,11 +164,6 @@ describe("Groups Controller", () => {
 
       await findGroups(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getGroup).toHaveBeenCalledWith(
-        "101",
-        "default"
-      );
       expect(res._getOkBody().findGroups.groups[0]).toMatchObject({
         scene_count: 15,
         performer_count: 8,
@@ -190,7 +177,6 @@ describe("Groups Controller", () => {
         items: [group],
         total: 1,
       });
-      mockStashEntityService.getGroup.mockResolvedValue(group);
       const hierarchy = {
         containing_groups: [
           {

@@ -8,6 +8,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as hooksModule from "@/api/hooks";
 import StudioDetail from "@/components/pages/StudioDetail";
 import type * as uiModule from "@/components/ui/index";
 
@@ -18,8 +19,13 @@ interface SceneSearchProps {
   permanentFilters?: Record<string, unknown>;
 }
 
-const { findImages, grids, sceneSearch } = vi.hoisted(() => ({
+const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
   findImages: vi.fn<(params: Record<string, unknown>) => Promise<unknown>>(),
+  relationCounts: vi.fn<
+    (...args: unknown[]) => {
+      data: { counts: Record<string, number> } | undefined;
+    }
+  >(),
   grids: {
     GalleryGrid: vi.fn<(props: GridProps) => null>(() => null),
     GroupGrid: vi.fn<(props: GridProps) => null>(() => null),
@@ -50,6 +56,10 @@ vi.mock("@/api", () => ({
     updateRating: vi.fn(),
     updateFavorite: vi.fn(),
   },
+}));
+vi.mock("@/api/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof hooksModule>()),
+  useRelationCounts: relationCounts,
 }));
 vi.mock("@/hooks/useEntityLookup", () => ({
   useEntityLookup: () => ({ status: "found", entity: studio, retry: vi.fn() }),
@@ -120,6 +130,42 @@ describe("StudioDetail: Include sub-studios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+    relationCounts.mockReturnValue({
+      data: {
+        counts: {
+          scenes: 3,
+          galleries: 2,
+          images: 4,
+          performers: 2,
+          groups: 1,
+        },
+      },
+    });
+  });
+
+  it("the counts follow the toggle, and open the first tab with content", () => {
+    relationCounts.mockReturnValue({
+      data: {
+        counts: {
+          scenes: 0,
+          galleries: 0,
+          images: 5,
+          performers: 1,
+          groups: 0,
+        },
+      },
+    });
+    renderPage("includeSubStudios=true");
+
+    expect(relationCounts).toHaveBeenLastCalledWith("studio", "5", "inst-a", {
+      includeSubStudios: true,
+    });
+    expect(screen.getByRole("button", { name: /^Images\b/ })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.queryByRole("button", { name: /^Scenes\b/ })).toBeNull();
+    expect(sceneSearch).not.toHaveBeenCalled();
   });
 
   it.each(["scenes", "galleries", "images", "groups"])(

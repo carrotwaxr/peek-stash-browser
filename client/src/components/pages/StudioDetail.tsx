@@ -6,11 +6,13 @@ import {
   IMAGE_FIELDS,
   type NormalizedImage,
   PERFORMER_FIELDS,
+  type RelationCountsByType,
   SCENE_FIELDS,
   type TagRef,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
@@ -22,6 +24,7 @@ import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
@@ -93,36 +96,31 @@ const StudioDetail = () => {
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
 
-  // Compute tabs with counts for smart default selection
+  // Reads, tab filters and counts use the loaded studio's own server: a
+  // bare-id link names none
+  const studioInstanceId = studio?.instanceId as string | undefined;
+  const studioRef = makeCompositeKey(studioId ?? "", studioInstanceId);
+
+  // Each tab's count is the total of its list, as the viewer sees it; the
+  // tabs show no badge and none opens until the counts answer
+  const { data: countsData } = useRelationCounts(
+    "studio",
+    studioId,
+    studioInstanceId,
+    { includeSubStudios }
+  );
+  const counts = countsData?.counts;
   const contentTabs = [
-    {
-      id: "scenes",
-      label: "Scenes",
-      count: (studio?.scene_count as number) || 0,
-    },
-    {
-      id: "galleries",
-      label: "Galleries",
-      count: (studio?.gallery_count as number) || 0,
-    },
-    {
-      id: "images",
-      label: "Images",
-      count: (studio?.image_count as number) || 0,
-    },
-    {
-      id: "performers",
-      label: "Performers",
-      count: (studio?.performer_count as number) || 0,
-    },
-    {
-      id: "groups",
-      label: "Collections",
-      count: (studio?.group_count as number) || 0,
-    },
-  ];
-  const effectiveDefaultTab =
-    contentTabs.find((t) => t.count > 0)?.id || "scenes";
+    { id: "scenes", label: "Scenes", count: counts?.scenes },
+    { id: "galleries", label: "Galleries", count: counts?.galleries },
+    { id: "images", label: "Images", count: counts?.images },
+    { id: "performers", label: "Performers", count: counts?.performers },
+    { id: "groups", label: "Collections", count: counts?.groups },
+  ].map((t) => ({ ...t, count: t.count ?? TAB_COUNT_LOADING }));
+  // The first tab with content, once the counts are in
+  const effectiveDefaultTab = counts
+    ? (contentTabs.find((t) => t.count > 0)?.id ?? "scenes")
+    : "";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -311,7 +309,12 @@ const StudioDetail = () => {
 
         {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
         <div className="space-y-6 mb-8">
-          <StudioStats studio={studio} studioId={studioId} />
+          <StudioStats
+            studio={studio}
+            counts={counts}
+            activeTab={activeTab}
+            defaultTab={effectiveDefaultTab}
+          />
           <StudioDetails
             studio={studio}
             settings={settings}
@@ -348,7 +351,7 @@ const StudioDetail = () => {
             </div>
           )}
 
-          {contentTabs.every((t) => t.count === 0) ? (
+          {counts && contentTabs.every((t) => t.count === 0) ? (
             <div
               className="py-16 text-center"
               style={{ color: "var(--text-muted)" }}
@@ -369,7 +372,7 @@ const StudioDetail = () => {
                   context="scene_studio"
                   permanentFilters={{
                     studios: {
-                      value: [makeCompositeKey(studioId!, instanceId)],
+                      value: [studioRef],
                       modifier: "INCLUDES",
                       ...(includeSubStudios && { depth: -1 }),
                     },
@@ -377,7 +380,7 @@ const StudioDetail = () => {
                   permanentFiltersMetadata={{
                     studios: [
                       {
-                        id: makeCompositeKey(studioId!, instanceId),
+                        id: studioRef,
                         name: studio?.name || "Unknown Studio",
                       },
                     ],
@@ -393,7 +396,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId!, instanceId)],
+                        value: [studioRef],
                         modifier: "INCLUDES",
                         ...(includeSubStudios && { depth: -1 }),
                       },
@@ -406,8 +409,7 @@ const StudioDetail = () => {
 
               {activeTab === "images" && (
                 <ImagesTab
-                  studioId={studioId}
-                  instanceId={instanceId}
+                  studioRef={studioRef}
                   studioName={studio?.name as string | undefined}
                   includeSubStudios={includeSubStudios}
                 />
@@ -418,7 +420,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId!, instanceId)],
+                        value: [studioRef],
                         modifier: "INCLUDES",
                       },
                     },
@@ -434,7 +436,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId!, instanceId)],
+                        value: [studioRef],
                         modifier: "INCLUDES",
                         ...(includeSubStudios && { depth: -1 }),
                       },
@@ -523,16 +525,23 @@ const StudioImage = ({ studio }: StudioImageProps) => {
 // Studio Stats Component
 interface StudioStatsProps {
   studio: Record<string, unknown> | null;
-  studioId: string | undefined;
+  /** The tabs' counts; undefined while they load */
+  counts: RelationCountsByType["studio"] | undefined;
+  activeTab: string;
+  defaultTab: string;
 }
 
-const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
+const StudioStats = ({
+  studio,
+  counts,
+  activeTab,
+  defaultTab,
+}: StudioStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === "scenes") {
+    if (tabId === defaultTab) {
       newParams.delete("tab");
     } else {
       newParams.set("tab", tabId);
@@ -621,35 +630,35 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatField
           label="Scenes:"
-          value={studio?.scene_count as number | undefined}
+          value={counts?.scenes}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("scenes")}
           isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
-          value={studio?.performer_count as number | undefined}
+          value={counts?.performers}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("performers")}
           isActive={activeTab === "performers"}
         />
         <StatField
           label="Images:"
-          value={studio?.image_count as number | undefined}
+          value={counts?.images}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("images")}
           isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
-          value={studio?.gallery_count as number | undefined}
+          value={counts?.galleries}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("galleries")}
           isActive={activeTab === "galleries"}
         />
         <StatField
           label="Collections:"
-          value={studio?.group_count as number | undefined}
+          value={counts?.groups}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("groups")}
           isActive={activeTab === "groups"}
@@ -819,15 +828,14 @@ const StudioDetails = ({
 
 // Images Tab Component with Lightbox
 interface StudioImagesTabProps {
-  studioId: string | undefined;
-  instanceId: string | null;
+  /** The studio as "id:instanceId" */
+  studioRef: string;
   studioName: string | undefined;
   includeSubStudios?: boolean;
 }
 
 const ImagesTab = ({
-  studioId,
-  instanceId,
+  studioRef,
   studioName,
   includeSubStudios = false,
 }: StudioImagesTabProps) => {
@@ -856,7 +864,7 @@ const ImagesTab = ({
         filter: { page, per_page: perPage },
         image_filter: {
           studios: {
-            value: [makeCompositeKey(studioId!, instanceId)],
+            value: [studioRef],
             modifier: "INCLUDES",
             ...(includeSubStudios && { depth: -1 }),
           },
@@ -867,12 +875,12 @@ const ImagesTab = ({
         count: data.findImages?.count || 0,
       };
     },
-    [studioId, instanceId, includeSubStudios]
+    [studioRef, includeSubStudios]
   );
 
   const paginationResult = useImagesPagination<NormalizedImage>({
     fetchImages,
-    dependencies: [studioId, instanceId, includeSubStudios],
+    dependencies: [studioRef, includeSubStudios],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });
