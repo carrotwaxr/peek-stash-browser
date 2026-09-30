@@ -107,7 +107,7 @@ Create appropriate groups/tags in Stash:
    - Check or uncheck **Also hide items with no ...** (see below)
 5. Click **Save Restrictions**
 
-Saving a list with no items is rejected; clear the list instead.
+Saving a list with no items is rejected; clear the list instead. A save applies completely or not at all: the lists and everything they hide are stored together, so if the save fails the user keeps their previous restrictions, and nothing is half-applied.
 
 ### The "Also hide items with no ..." Box
 

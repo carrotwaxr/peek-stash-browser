@@ -10,9 +10,21 @@
  * connection); getUserAllowedInstanceIds and the builders read them from the
  * database, so the server on :9999 sees them without a reload.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { getComputeClient } from "../../prisma/computeClient.js";
 import prisma from "../../prisma/singleton.js";
-import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import {
+  type RestrictionRowInput,
+  exclusionComputationService,
+} from "../../services/ExclusionComputationService.js";
 import {
   ENTITY_SYNC,
   type SyncEntityOf,
@@ -386,6 +398,68 @@ async function storedRows(userIds: number[]): Promise<string[]> {
   });
   return found.map(storedKey).sort();
 }
+
+/** The user's restriction rows as the save stores them, sorted. */
+async function storedRestrictions(userId: number): Promise<string[]> {
+  const found = await prisma.userContentRestriction.findMany({
+    where: { userId },
+    select: {
+      entityType: true,
+      mode: true,
+      entityIds: true,
+      restrictEmpty: true,
+    },
+  });
+  return found
+    .map((r) => `${r.entityType}|${r.mode}|${r.entityIds}|${r.restrictEmpty}`)
+    .sort();
+}
+
+/** The same keys for rows a save is given. */
+function inputKeys(rows: readonly RestrictionRowInput[]): string[] {
+  return rows
+    .map(
+      (r) =>
+        `${r.entityType}|${r.mode}|${JSON.stringify(r.entityIds)}|${r.restrictEmpty}`
+    )
+    .sort();
+}
+
+/** Every stored exclusion row of one user, sorted. */
+async function storedExclusions(userId: number): Promise<string[]> {
+  const found = await prisma.userExcludedEntity.findMany({
+    where: { userId },
+    select: {
+      userId: true,
+      entityType: true,
+      entityId: true,
+      instanceId: true,
+      reason: true,
+    },
+  });
+  return found.map(storedKey).sort();
+}
+
+/** The content-rule query of an INCLUDE tags rule (computeContentRuleExclusions). */
+const CONTENT_TAG_SCENE = /NOT EXISTS \(SELECT 1 FROM SceneTag st/;
+
+const SAVE_STUDIOS: RestrictionRowInput[] = [
+  {
+    entityType: "studios",
+    mode: "EXCLUDE",
+    entityIds: [`1:${A}`],
+    restrictEmpty: false,
+  },
+];
+
+const SAVE_INCLUDE_TAGS: RestrictionRowInput[] = [
+  {
+    entityType: "tags",
+    mode: "INCLUDE",
+    entityIds: [`1:${A}`],
+    restrictEmpty: true,
+  },
+];
 
 describeWithDb("ExclusionComputationService restrictions (integration)", () => {
   let userId: number;
@@ -1030,5 +1104,177 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     expect(sceneKeys.has(`s1@${A}`)).toBe(false);
     expect(sceneKeys.has(`s10@${A}`)).toBe(false);
     expect(sceneKeys.has(`s2@${A}`)).toBe(true);
+  }, 60000);
+  it("a save whose compute fails keeps the old restriction rows and the old exclusions", async () => {
+    await setRules(userId, [
+      { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
+    ]);
+    await recompute(userId);
+    const rowsBefore = await storedRestrictions(userId);
+    const exclusionsBefore = await storedExclusions(userId);
+    expect(exclusionsBefore.length).toBeGreaterThan(0);
+
+    // vi.spyOn cannot see the method through Prisma's client proxy, so the
+    // wrapper goes on by hand around the bound original and throws on the
+    // content-rule query the new rows need
+    const computeClient = await getComputeClient();
+    const original = computeClient.$queryRawUnsafe.bind(computeClient);
+    const query = vi
+      .fn(original)
+      .mockImplementation((sql: string, ...values: unknown[]) => {
+        if (CONTENT_TAG_SCENE.test(sql)) throw new Error("content rule failed");
+        return original(sql, ...values);
+      });
+    computeClient.$queryRawUnsafe =
+      query as typeof computeClient.$queryRawUnsafe;
+    try {
+      await expect(
+        exclusionComputationService.saveRestrictions(userId, SAVE_INCLUDE_TAGS)
+      ).rejects.toThrow("content rule failed");
+    } finally {
+      computeClient.$queryRawUnsafe = original;
+    }
+
+    expect(query.mock.calls.some(([sql]) => CONTENT_TAG_SCENE.test(sql))).toBe(
+      true
+    );
+    expect(await storedRestrictions(userId)).toEqual(rowsBefore);
+    expect(await storedExclusions(userId)).toEqual(exclusionsBefore);
+  }, 60000);
+
+  it("the restriction rows and the exclusions change inside one BEGIN IMMEDIATE", async () => {
+    await setRules(userId, [
+      { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
+    ]);
+    await recompute(userId);
+
+    const computeClient = await getComputeClient();
+    const original = computeClient.$executeRawUnsafe.bind(computeClient);
+    const exec = vi.fn(original);
+    computeClient.$executeRawUnsafe = exec;
+    try {
+      await exclusionComputationService.saveRestrictions(userId, SAVE_STUDIOS);
+    } finally {
+      computeClient.$executeRawUnsafe = original;
+    }
+
+    const sqls = exec.mock.calls.map(([sql]) => sql);
+    const begin = sqls.indexOf("BEGIN IMMEDIATE");
+    expect(begin).toBeGreaterThan(-1);
+    expect(sqls.indexOf("BEGIN IMMEDIATE", begin + 1)).toBe(-1);
+    const commit = sqls.indexOf("COMMIT", begin);
+    expect(commit).toBeGreaterThan(begin);
+    const unit = sqls.slice(begin + 1, commit);
+    expect(unit).toHaveLength(4);
+    expect(unit[0]).toBe("DELETE FROM UserContentRestriction WHERE userId = ?");
+    expect(unit[1]).toMatch(
+      /^INSERT INTO UserContentRestriction \(userId, entityType, mode, entityIds, restrictEmpty, createdAt, updatedAt\) SELECT /
+    );
+    expect(unit[2]).toMatch(
+      /^DELETE FROM UserExcludedEntity WHERE userId = \?/
+    );
+    expect(unit[3]).toMatch(/^INSERT OR IGNORE INTO UserExcludedEntity /);
+    expect(sqls).not.toContain("ROLLBACK");
+    // Nothing touches either table outside the unit
+    const outside = [...sqls.slice(0, begin), ...sqls.slice(commit + 1)];
+    expect(
+      outside.filter((sql) =>
+        /User(ContentRestriction|ExcludedEntity)/.test(sql)
+      )
+    ).toEqual([]);
+
+    expect(await storedRestrictions(userId)).toEqual(inputKeys(SAVE_STUDIOS));
+    await expectRows(userId, "studio", [...K(A, "restricted", "1", "3")]);
+    await expectRows(userId, "scene", [...K(A, "cascade", "s1", "s10")]);
+    // The old tag rule left nothing behind (B's tag 2 is empty either way)
+    expect(
+      (await rows(userId, "tag")).filter((r) => r.reason === "restricted")
+    ).toEqual([]);
+  }, 60000);
+
+  it("a save that arrives while the user's recompute runs lands after it, and its rows win", async () => {
+    await setRules(userId, [
+      { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
+    ]);
+    const computeClient = await getComputeClient();
+    const original = computeClient.$executeRawUnsafe.bind(computeClient);
+    const exec = vi.fn(original);
+    computeClient.$executeRawUnsafe = exec;
+    try {
+      const running = recompute(userId);
+      const saving = exclusionComputationService.saveRestrictions(
+        userId,
+        SAVE_STUDIOS
+      );
+      await Promise.all([running, saving]);
+    } finally {
+      computeClient.$executeRawUnsafe = original;
+    }
+
+    // Two swaps: the recompute's on the old rows, then the save's
+    const sqls = exec.mock.calls.map(([sql]) => sql);
+    const swaps = sqls.filter((sql) => sql === "BEGIN IMMEDIATE");
+    expect(swaps).toHaveLength(2);
+    const restrictionWrites = sqls
+      .map((sql, i) => [sql, i] as const)
+      .filter(([sql]) => /UserContentRestriction/.test(sql))
+      .map(([, i]) => i);
+    expect(restrictionWrites).toHaveLength(2);
+    const secondSwap = sqls.indexOf(
+      "BEGIN IMMEDIATE",
+      sqls.indexOf("BEGIN IMMEDIATE") + 1
+    );
+    expect(Math.min(...restrictionWrites)).toBeGreaterThan(secondSwap);
+
+    expect(await storedRestrictions(userId)).toEqual(inputKeys(SAVE_STUDIOS));
+    const stored = await storedExclusions(userId);
+    await expectRows(userId, "studio", [...K(A, "restricted", "1", "3")]);
+    expect(
+      (await rows(userId, "tag")).filter((r) => r.reason === "restricted")
+    ).toEqual([]);
+    await recompute(userId);
+    expect(await storedExclusions(userId)).toEqual(stored);
+  }, 60000);
+
+  it("a recompute requested during a save reads the saved rows", async () => {
+    await setRules(userId, [
+      { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
+    ]);
+    await recompute(userId);
+    const computeClient = await getComputeClient();
+    const original = computeClient.$executeRawUnsafe.bind(computeClient);
+    const exec = vi.fn(original);
+    computeClient.$executeRawUnsafe = exec;
+    try {
+      const saving = exclusionComputationService.saveRestrictions(
+        userId,
+        SAVE_STUDIOS
+      );
+      const requested = recompute(userId);
+      await Promise.all([saving, requested]);
+    } finally {
+      computeClient.$executeRawUnsafe = original;
+    }
+
+    // The save's swap first, with the rows; the recompute's after its COMMIT
+    const sqls = exec.mock.calls.map(([sql]) => sql);
+    const firstSwap = sqls.indexOf("BEGIN IMMEDIATE");
+    const firstCommit = sqls.indexOf("COMMIT", firstSwap);
+    const secondSwap = sqls.indexOf("BEGIN IMMEDIATE", firstSwap + 1);
+    expect(secondSwap).toBeGreaterThan(firstCommit);
+    expect(
+      sqls
+        .slice(firstSwap, firstCommit)
+        .some((sql) => /UserContentRestriction/.test(sql))
+    ).toBe(true);
+    expect(
+      sqls.slice(secondSwap).some((sql) => /UserContentRestriction/.test(sql))
+    ).toBe(false);
+
+    expect(await storedRestrictions(userId)).toEqual(inputKeys(SAVE_STUDIOS));
+    const stored = await storedExclusions(userId);
+    await expectRows(userId, "studio", [...K(A, "restricted", "1", "3")]);
+    await recompute(userId);
+    expect(await storedExclusions(userId)).toEqual(stored);
   }, 60000);
 });

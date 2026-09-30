@@ -29,7 +29,10 @@
  * the user's rows and inserts the new ones with INSERT ... SELECT (the
  * `exclusions.swap` writer unit), and the stats follow in one batch on the
  * main client. On a 180k-row user the lock is held for well under a second,
- * where a createMany of the same rows held it for over three.
+ * where a createMany of the same rows held it for over three. A restriction
+ * save (saveRestrictions) computes from the proposed rows and writes them in
+ * that same BEGIN IMMEDIATE, ahead of the exclusions, so a failure anywhere
+ * leaves both tables as they were.
  *
  * Who exclusions apply to lives in exclusionPolicy.ts: an admin's rows hold
  * only their own hides and cascades, so no read path needs a role check.
@@ -72,6 +75,7 @@ import {
 import {
   RESTRICTABLE_ENTITY_TYPES,
   type RestrictableEntityType,
+  type RestrictionMode,
   restrictionsApplyTo,
 } from "./exclusionPolicy.js";
 
@@ -120,6 +124,20 @@ interface RestrictionRule {
   exclude: ResolvedRef[];
   /** OR of the type's rows' flags. */
   restrictEmpty: boolean;
+}
+
+/** A restriction row as a save proposes it (validated by the controller). */
+export interface RestrictionRowInput {
+  entityType: RestrictableEntityType;
+  mode: RestrictionMode;
+  /** "id" or "id:instanceId" strings, as SearchableSelect sent them */
+  entityIds: string[];
+  restrictEmpty: boolean;
+}
+
+/** What a compute reads its rules from: the stored rows, or a save's. */
+interface RecomputeOptions {
+  restrictions?: readonly RestrictionRowInput[];
 }
 
 /** Entities whose exclusion propagates along EDGES. */
@@ -199,6 +217,15 @@ const INSERT_FROM_RESULT_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId
  * starts after every batch, is the one that clears them.
  */
 const DELETE_BEFORE_SWAP_SQL = `DELETE FROM UserExcludedEntity WHERE userId = ? AND NOT (reason = 'pending' AND computedAt >= ?)`;
+
+/**
+ * A save's rows, replaced inside the swap ahead of the exclusions. The rows
+ * travel as one JSON parameter (t: entityType, m: mode, ids: the entityIds
+ * array, stored as its JSON text, e: restrictEmpty); the dates are bound as
+ * Prisma stores DateTime, epoch milliseconds.
+ */
+const DELETE_RESTRICTIONS_SQL = `DELETE FROM UserContentRestriction WHERE userId = ?`;
+const INSERT_RESTRICTIONS_SQL = `INSERT INTO UserContentRestriction (userId, entityType, mode, entityIds, restrictEmpty, createdAt, updatedAt) SELECT ?, json_extract(value, '$.t'), json_extract(value, '$.m'), json_extract(value, '$.ids'), json_extract(value, '$.e'), ?, ? FROM json_each(?)`;
 
 /**
  * A hold (C18): one `pending` row per user of the JSON list `u` for each
@@ -500,6 +527,54 @@ class ExclusionComputationService {
     try {
       await recomputePromise;
     } finally {
+      this.forgetPending(userId, recomputePromise);
+    }
+  }
+
+  /**
+   * Replace the user's restriction rows and their exclusions in one write:
+   * the recompute runs on the proposed rows and its swap writes the rows
+   * and the exclusions in the same BEGIN IMMEDIATE, so a failed compute or
+   * a failed write leaves both tables as they were.
+   *
+   * A running recompute read the stored rows, the old ones, so the save
+   * never coalesces into it: it waits for it, then registers its own
+   * compute, and a recompute requested meanwhile queues behind the save and
+   * reads the committed rows. A plain recompute queued before the save can
+   * start beside it; computes are serialised on the compute connection, so
+   * one enqueued after the save opens its snapshot after the save's COMMIT
+   * and reads the saved rows, and one enqueued before is overwritten by the
+   * save's swap. Either way the stored state ends as the save says.
+   */
+  async saveRestrictions(
+    userId: number,
+    rows: readonly RestrictionRowInput[]
+  ): Promise<void> {
+    const pending = this.pendingRecomputes.get(userId);
+    if (pending) {
+      logger.info(
+        "ExclusionComputationService.saveRestrictions waiting for the running recompute",
+        { userId }
+      );
+      try {
+        await pending;
+      } catch {
+        /* the save computes on its own */
+      }
+    }
+
+    const savePromise = this.doRecomputeForUser(userId, { restrictions: rows });
+    this.pendingRecomputes.set(userId, savePromise);
+    try {
+      await savePromise;
+    } finally {
+      this.forgetPending(userId, savePromise);
+    }
+  }
+
+  /** Drop a finished compute's entry, unless a later one replaced it. */
+  private forgetPending(userId: number, finished: Promise<void>): void {
+    if (this.pendingRecomputes.get(userId) === finished) {
       this.pendingRecomputes.delete(userId);
     }
   }
@@ -518,9 +593,13 @@ class ExclusionComputationService {
    *   lock, as the `exclusions.swap` unit of the writer queue, and the stats
    *   batch follows outside it.
    */
-  private async doRecomputeForUser(userId: number): Promise<void> {
+  private async doRecomputeForUser(
+    userId: number,
+    { restrictions }: RecomputeOptions = {}
+  ): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", {
       userId,
+      ...(restrictions ? { savingRestrictions: restrictions.length } : {}),
     });
     const t0 = Date.now();
 
@@ -554,7 +633,7 @@ class ExclusionComputationService {
       // === COMPUTATION PHASE (read snapshot, no write lock) ===
       const computed = await readSnapshot(db, async () => {
         const rules = applyRestrictions
-          ? await this.loadRules(userId, db, allowedInstanceIds)
+          ? await this.loadRules(userId, db, allowedInstanceIds, restrictions)
           : [];
         const hidden = await this.loadHidden(userId, db);
 
@@ -685,7 +764,7 @@ class ExclusionComputationService {
         t5 = Date.now();
         await dbWrite("exclusions.swap", async () => {
           const started = Date.now();
-          await this.swapResult(db, userId, snapshotStartedAt);
+          await this.swapResult(db, userId, snapshotStartedAt, restrictions);
           swapMs = Date.now() - started;
         });
       } finally {
@@ -1058,18 +1137,42 @@ class ExclusionComputationService {
    * The swap: replace the user's rows with _peek_result inside one short
    * BEGIN IMMEDIATE on the compute connection (the TEMP table lives there).
    * `pending` holds written since `snapshotStartedAt` survive the DELETE and
-   * win the INSERT OR IGNORE. On any failure after the BEGIN the transaction
-   * is rolled back, so the user's old rows stay, and the error rethrown: a
-   * busy failure is retried by dbWrite with _peek_result still filled. A
-   * BEGIN that fails (busy) throws with nothing to roll back.
+   * win the INSERT OR IGNORE. A save's `restrictions` replace the user's
+   * UserContentRestriction rows first, in the same transaction (both tables
+   * are in the main database). On any failure after the BEGIN the
+   * transaction is rolled back, so the user's old rows stay in both tables,
+   * and the error rethrown: a busy failure is retried by dbWrite with
+   * _peek_result still filled. A BEGIN that fails (busy) throws with nothing
+   * to roll back.
    */
   private async swapResult(
     db: TransactionClient,
     userId: number,
-    snapshotStartedAt: number
+    snapshotStartedAt: number,
+    restrictions?: readonly RestrictionRowInput[]
   ): Promise<void> {
     await db.$executeRawUnsafe("BEGIN IMMEDIATE");
     try {
+      if (restrictions) {
+        await db.$executeRawUnsafe(DELETE_RESTRICTIONS_SQL, userId);
+        if (restrictions.length > 0) {
+          const now = Date.now();
+          await db.$executeRawUnsafe(
+            INSERT_RESTRICTIONS_SQL,
+            userId,
+            now,
+            now,
+            JSON.stringify(
+              restrictions.map((r) => ({
+                t: r.entityType,
+                m: r.mode,
+                ids: r.entityIds,
+                e: r.restrictEmpty,
+              }))
+            )
+          );
+        }
+      }
       await db.$executeRawUnsafe(
         DELETE_BEFORE_SWAP_SQL,
         userId,
@@ -1237,21 +1340,35 @@ class ExclusionComputationService {
   }
 
   /**
-   * Read the user's restriction rows, group them per type (Rule 1: one
-   * INCLUDE and one EXCLUDE row per type, restrictEmpty ORed) and resolve
-   * each list to its closure.
+   * Read the user's restriction rows (or take a save's `override` rows in
+   * their place), group them per type (Rule 1: one INCLUDE and one EXCLUDE
+   * row per type, restrictEmpty ORed) and resolve each list to its closure.
    */
   private async loadRules(
     userId: number,
     tx: TransactionClient,
-    allowedInstanceIds: string[]
+    allowedInstanceIds: string[],
+    override?: readonly RestrictionRowInput[]
   ): Promise<RestrictionRule[]> {
-    const rows = await tx.userContentRestriction.findMany({
-      where: { userId },
-    });
+    const rows = override
+      ? override.map((r) => ({
+          entityType: r.entityType,
+          mode: r.mode,
+          refs: r.entityIds.map(parseCompositeKey),
+          restrictEmpty: r.restrictEmpty,
+        }))
+      : (await tx.userContentRestriction.findMany({ where: { userId } })).map(
+          (r) => ({
+            entityType: r.entityType,
+            mode: r.mode,
+            refs: parseStoredIds(r.entityIds),
+            restrictEmpty: r.restrictEmpty,
+          })
+        );
 
     logger.debug("loadRules: found restrictions", {
       userId,
+      source: override ? "save" : "stored",
       restrictionCount: rows.length,
       types: rows.map((r) => `${r.entityType}:${r.mode}`),
     });
@@ -1280,7 +1397,7 @@ class ExclusionComputationService {
         exclude: [],
         restrictEmpty: false,
       };
-      const refs = parseStoredIds(row.entityIds);
+      const refs = row.refs;
       if (row.mode === "INCLUDE") {
         entry.include = [...(entry.include ?? []), ...refs];
       } else {

@@ -28,7 +28,10 @@ import {
   withComputeConnection,
 } from "../../prisma/computeClient.js";
 import prisma from "../../prisma/singleton.js";
-import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import {
+  type RestrictionRowInput,
+  exclusionComputationService,
+} from "../../services/ExclusionComputationService.js";
 import { getUserInstanceScope } from "../../services/UserInstanceService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
@@ -602,6 +605,213 @@ describe("ExclusionComputationService", () => {
       // The next recompute gets the connection
       await exclusionComputationService.recomputeForUser(31);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("saveRestrictions", () => {
+    const ROWS: RestrictionRowInput[] = [
+      {
+        entityType: "tags",
+        mode: "EXCLUDE",
+        entityIds: ["2:A"],
+        restrictEmpty: false,
+      },
+    ];
+    const ROWS_DELETE =
+      /^DELETE FROM UserContentRestriction WHERE userId = \?$/;
+    const ROWS_INSERT =
+      /^INSERT INTO UserContentRestriction \(userId, entityType, mode, entityIds, restrictEmpty, createdAt, updatedAt\) SELECT \?, json_extract\(value, '\$\.t'\), json_extract\(value, '\$\.m'\), json_extract\(value, '\$\.ids'\), json_extract\(value, '\$\.e'\), \?, \? FROM json_each\(\?\)$/;
+
+    /** Indexes of every BEGIN IMMEDIATE among the $executeRawUnsafe calls. */
+    function swapStarts(): number[] {
+      return execCalls()
+        .map(([sql], i) => (sql === "BEGIN IMMEDIATE" ? i : -1))
+        .filter((i) => i >= 0);
+    }
+
+    it("computes from the given rows, never the stored ones, and writes both tables inside the one BEGIN IMMEDIATE", async () => {
+      setupPipeline();
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        restriction("studios", "EXCLUDE", ["9:A"]),
+      ]);
+      fakeRaw([[RESOLVE_TAG, [{ id: "2", instanceId: "A" }]]]);
+      const before = Date.now();
+
+      await exclusionComputationService.saveRestrictions(1, ROWS);
+
+      expect(mockPrisma.userContentRestriction.findMany).not.toHaveBeenCalled();
+      expect(queriesMatching(RESOLVE_STUDIO)).toHaveLength(0);
+      expect(rowKeys(createdRows())).toEqual(new Set(["tag:2@A:restricted"]));
+
+      const [swapStart] = swapStarts();
+      expect(swapStarts()).toHaveLength(1);
+      const swapEnd = execCalls().findIndex(
+        ([sql], i) => i > must(swapStart) && sql === "COMMIT"
+      );
+      const swap = execCalls().slice(swapStart, swapEnd + 1);
+      expect(swap.map(([sql]) => sql)).toHaveLength(6);
+      const [deleteRowsSql, deleteRowsUser] = must(swap[1]);
+      expect(deleteRowsSql).toMatch(ROWS_DELETE);
+      expect(deleteRowsUser).toBe(1);
+      const [insertSql, insertUser, createdAt, updatedAt, json] = must(swap[2]);
+      expect(insertSql).toMatch(ROWS_INSERT);
+      expect(insertUser).toBe(1);
+      // Dates as Prisma stores DateTime: epoch milliseconds
+      expect(typeof createdAt).toBe("number");
+      expect(Number(createdAt)).toBeGreaterThanOrEqual(before);
+      expect(updatedAt).toBe(createdAt);
+      expect(JSON.parse(String(json))).toEqual([
+        { t: "tags", m: "EXCLUDE", ids: ["2:A"], e: false },
+      ]);
+      expect(must(swap[3])[0]).toMatch(SWAP_DELETE);
+      expect(must(swap[4])[0]).toMatch(SWAP_INSERT);
+      expect(must(swap[5])[0]).toBe("COMMIT");
+      // The one unit; the controller's batch is gone
+      expect(mockDbWrite).toHaveBeenCalledTimes(1);
+      expect(must(mockDbWrite.mock.calls[0])[0]).toBe("exclusions.swap");
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
+      expect(
+        mockPrisma.userContentRestriction.createMany
+      ).not.toHaveBeenCalled();
+    });
+
+    it("an empty list deletes the rows without an insert and computes with no rule", async () => {
+      setupPipeline();
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        restriction("tags", "EXCLUDE", ["2:A"]),
+      ]);
+      fakeRaw([[RESOLVE_TAG, [{ id: "2", instanceId: "A" }]]]);
+
+      await exclusionComputationService.saveRestrictions(1, []);
+
+      expect(queriesMatching(RESOLVE_TAG)).toHaveLength(0);
+      expect(createdRows()).toEqual([]);
+      const [swapStart] = swapStarts();
+      const swap = sqlFrom(/^BEGIN IMMEDIATE$/);
+      expect(swapStart).toBeGreaterThan(-1);
+      expect(swap.slice(0, 5)).toEqual([
+        "BEGIN IMMEDIATE",
+        expect.stringMatching(ROWS_DELETE) as string,
+        expect.stringMatching(SWAP_DELETE) as string,
+        expect.stringMatching(SWAP_INSERT) as string,
+        "COMMIT",
+      ]);
+      expect(swap.some((sql) => ROWS_INSERT.test(sql))).toBe(false);
+    });
+
+    it("waits for the running recompute and never coalesces into it", async () => {
+      setupPipeline();
+      const parked = parkFirstRecompute();
+
+      const running = exclusionComputationService.recomputeForUser(1);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const saving = exclusionComputationService.saveRestrictions(1, ROWS);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(parked.started()).toBe(1);
+
+      parked.release();
+      await Promise.all([running, saving]);
+
+      expect(parked.started()).toBe(2);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      // The rows went in with the second compute's swap, after the first's
+      const starts = swapStarts();
+      expect(starts).toHaveLength(2);
+      const rowsDelete = execCalls().findIndex(([sql]) =>
+        ROWS_DELETE.test(sql)
+      );
+      expect(rowsDelete).toBeGreaterThan(must(starts[1]));
+    });
+
+    it("a recompute requested during a save runs after it and reads the stored rows", async () => {
+      setupPipeline();
+      const parked = parkFirstRecompute();
+
+      const saving = exclusionComputationService.saveRestrictions(1, ROWS);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const requested = exclusionComputationService.recomputeForUser(1);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(parked.started()).toBe(1);
+
+      parked.release();
+      await Promise.all([saving, requested]);
+
+      expect(parked.started()).toBe(2);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      const starts = swapStarts();
+      expect(starts).toHaveLength(2);
+      const rowsDelete = execCalls().findIndex(([sql]) =>
+        ROWS_DELETE.test(sql)
+      );
+      expect(rowsDelete).toBeGreaterThan(must(starts[0]));
+      expect(rowsDelete).toBeLessThan(must(starts[1]));
+      // The second compute read the rows the first stored
+      expect(
+        mockPrisma.userContentRestriction.findMany
+      ).toHaveBeenCalledExactlyOnceWith({ where: { userId: 1 } });
+      const [readAt] =
+        mockPrisma.userContentRestriction.findMany.mock.invocationCallOrder;
+      const commitAt = must(
+        mockPrisma.$executeRawUnsafe.mock.invocationCallOrder[
+          execCalls().findIndex(
+            ([sql], i) => i > must(starts[0]) && sql === "COMMIT"
+          )
+        ]
+      );
+      expect(must(readAt)).toBeGreaterThan(commitAt);
+    });
+
+    it("a failing row insert rolls the unit back before the exclusions were touched", async () => {
+      setupPipeline();
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) =>
+          ROWS_INSERT.test(sql)
+            ? Promise.reject(new Error("disk I/O error"))
+            : 0
+        )
+      );
+
+      await expect(
+        exclusionComputationService.saveRestrictions(1, ROWS)
+      ).rejects.toThrow("disk I/O error");
+
+      const swap = sqlFrom(/^BEGIN IMMEDIATE$/);
+      expect(swap[0]).toBe("BEGIN IMMEDIATE");
+      expect(swap[1]).toMatch(ROWS_DELETE);
+      expect(swap[2]).toMatch(ROWS_INSERT);
+      expect(swap[3]).toBe("ROLLBACK");
+      expect(swap).not.toContain("COMMIT");
+      expect(swap.some((sql) => SWAP_DELETE.test(sql))).toBe(false);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(disconnectComputeClient).not.toHaveBeenCalled();
+    });
+
+    it("a failing exclusion insert rolls the rows back with it", async () => {
+      setupPipeline();
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) =>
+          SWAP_INSERT.test(sql)
+            ? Promise.reject(new Error("disk I/O error"))
+            : 0
+        )
+      );
+
+      await expect(
+        exclusionComputationService.saveRestrictions(1, ROWS)
+      ).rejects.toThrow("disk I/O error");
+
+      const swap = sqlFrom(/^BEGIN IMMEDIATE$/).slice(0, 6);
+      expect(swap.map((sql) => sql.slice(0, 40))).toEqual([
+        "BEGIN IMMEDIATE",
+        "DELETE FROM UserContentRestriction WHERE",
+        "INSERT INTO UserContentRestriction (user",
+        "DELETE FROM UserExcludedEntity WHERE use",
+        "INSERT OR IGNORE INTO UserExcludedEntity",
+        "ROLLBACK",
+      ]);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 
