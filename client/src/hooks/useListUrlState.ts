@@ -154,6 +154,13 @@ const positive = (value: unknown): number | null =>
 const nonEmpty = (value: unknown): string | null =>
   typeof value === "string" && value !== "" ? value : null;
 
+/** A query string with its keys sorted (a key's values keep their order) */
+const sortedQuery = (params: URLSearchParams): string => {
+  const sorted = new URLSearchParams(params);
+  sorted.sort();
+  return sorted.toString();
+};
+
 /** A preset's sort as the list reads it: a preset never carries a seed */
 const presetSort = (preset: SavedPreset | null) =>
   preset?.sort
@@ -310,13 +317,16 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     [entityType, filterOptions, shown]
   );
 
+  // A write that leaves the address as it is (its keys in any order)
+  // navigates nowhere: the router would still add a history entry, a Back
+  // step that changes nothing
   const write = useCallback(
     (patch: ListParamsPatch, history: "push" | "replace") => {
-      setSearchParams((prev) => writeListParams(prev, patch, writeContext), {
-        replace: history === "replace",
-      });
+      const next = writeListParams(searchParams, patch, writeContext);
+      if (sortedQuery(next) === sortedQuery(searchParams)) return;
+      setSearchParams(next, { replace: history === "replace" });
     },
-    [setSearchParams, writeContext]
+    [searchParams, setSearchParams, writeContext]
   );
 
   useEffect(() => {

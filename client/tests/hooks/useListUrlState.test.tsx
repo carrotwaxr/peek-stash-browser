@@ -571,13 +571,14 @@ describe("useListUrlState", () => {
 
       list.actions.length = 0;
       await actAsync(() => list.state.applyFilters({ favorite: true }));
-      await actAsync(() => list.state.removeFilter("favorite"));
       await actAsync(() => list.state.clearFilters());
+      await actAsync(() => list.state.applyFilters({ favorite: true }));
+      await actAsync(() => list.state.removeFilter("favorite"));
       await actAsync(() => list.state.setSort("rating"));
       await actAsync(() => list.state.setPage(2));
       await actAsync(() => list.state.setFolderPath(["5:abc"]));
       await actAsync(() => list.state.loadPreset(preset()));
-      expect(list.actions).toEqual(Array<string>(7).fill("PUSH"));
+      expect(list.actions).toEqual(Array<string>(8).fill("PUSH"));
     });
 
     it("setPage writes the page, omitted at 1", async () => {
@@ -637,6 +638,23 @@ describe("useListUrlState", () => {
       await actAsync(() => list.state.setQuery("beach"));
       expect(list.actions).toEqual([]);
       expect(list.state.page).toBe(2);
+    });
+
+    it("a change that leaves the address as it is adds no history entry", async () => {
+      const list = renderList(
+        "/galleries?view=folder&favorite=true&folderPath=1:abc",
+        GALLERY_OPTIONS
+      );
+      // Apply with no edits, the open folder, the filters already shown
+      await actAsync(() => list.state.applyFilters(list.state.filters));
+      await actAsync(() => list.state.setFolderPath(["1:abc"]));
+      expect(list.actions).toEqual([]);
+
+      const same = preset({ filters: { favorite: true }, viewMode: "grid" });
+      await actAsync(() => list.state.loadPreset(same));
+      expect(list.actions).toEqual(["PUSH"]);
+      await actAsync(() => list.state.loadPreset(same));
+      expect(list.actions).toEqual(["PUSH"]);
     });
 
     it("setFolderPath writes the path and resets the page", async () => {
