@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
+import { useIncrementalList } from "../../hooks/useIncrementalList";
 import {
   type FolderCountField,
   UNTAGGED_FOLDER_ID,
@@ -114,6 +115,12 @@ const FolderView = ({
     () => buildFolderTree(tags, currentPath, countField, untaggedCount),
     [tags, currentPath, countField, untaggedCount]
   );
+  // Folders mount in chunks; the sentinel after the last loads the next
+  const {
+    visible: visibleFolders,
+    sentinelRef: folderSentinelRef,
+    hasMore: hasMoreFolders,
+  } = useIncrementalList(folders);
   const atRoot = currentPath.length === 0;
   const { many } = entityLabel;
   const counted = (n: number) =>
@@ -199,7 +206,7 @@ const FolderView = ({
     <div className="space-y-6">
       {folders.length > 0 && (
         <div className={gridClasses}>
-          {folders.map((folder) => (
+          {visibleFolders.map((folder) => (
             <FolderCard
               key={folder.id}
               folder={folder}
@@ -208,6 +215,14 @@ const FolderView = ({
             />
           ))}
         </div>
+      )}
+      {hasMoreFolders && (
+        <div
+          ref={folderSentinelRef}
+          data-testid="folder-sentinel"
+          aria-hidden="true"
+          className="h-px"
+        />
       )}
       {atRoot
         ? folders.length === 0 && (

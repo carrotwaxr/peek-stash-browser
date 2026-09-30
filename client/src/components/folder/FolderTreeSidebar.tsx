@@ -6,6 +6,7 @@ import {
   LucideFolder,
   LucideFolderOpen,
 } from "lucide-react";
+import { useIncrementalList } from "../../hooks/useIncrementalList";
 import { buildTagTree, tagTreeKey } from "../../utils/buildTagTree";
 
 interface TagItem {
@@ -52,6 +53,21 @@ const FolderTreeSidebar = ({
       }),
     [tags]
   );
+
+  // Root folders mount in chunks; the sentinel after the last loads the next.
+  // The open folder's root always shows, even while it is past the chunk.
+  const {
+    visible: visibleRoots,
+    sentinelRef,
+    hasMore: hasMoreRoots,
+  } = useIncrementalList(tree);
+  const pinnedRoot = useMemo(() => {
+    const rootKey = currentPath[0];
+    if (!hasMoreRoots || !rootKey) return null;
+    if (visibleRoots.some((node) => tagTreeKey(node) === rootKey)) return null;
+    return tree.find((node) => tagTreeKey(node) === rootKey) ?? null;
+  }, [tree, visibleRoots, hasMoreRoots, currentPath]);
+  const shownRoots = pinnedRoot ? [...visibleRoots, pinnedRoot] : visibleRoots;
 
   // Create a map of tag keys to names for breadcrumb display
   const tagNameMap = useMemo(
@@ -173,7 +189,7 @@ const FolderTreeSidebar = ({
 
         {/* Tree nodes */}
         <div className="pb-2">
-          {tree.map((node) => (
+          {shownRoots.map((node) => (
             <TreeNode
               key={tagTreeKey(node)}
               node={node}
@@ -185,6 +201,14 @@ const FolderTreeSidebar = ({
               onNavigate={onNavigate}
             />
           ))}
+          {hasMoreRoots && (
+            <div
+              ref={sentinelRef}
+              data-testid="folder-tree-sentinel"
+              aria-hidden="true"
+              className="h-px"
+            />
+          )}
         </div>
       </div>
     </div>
