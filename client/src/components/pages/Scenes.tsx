@@ -1,25 +1,17 @@
-import { useRef } from "react";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import SceneSearch from "../scene-search/SceneSearch";
 
 const Scenes = () => {
   usePageTitle("Scenes");
-  const pageRef = useRef<HTMLDivElement>(null);
-
-  // Set initial focus to first scene card when page loads
-  useInitialFocus(pageRef, '[tabindex="0"]', true);
 
   return (
-    <div ref={pageRef}>
-      <SceneSearch
-        context="scene"
-        initialSort="created_at"
-        subtitle="Browse your complete scene library"
-        title="All Scenes"
-        fromPageTitle="Scenes"
-      />
-    </div>
+    <SceneSearch
+      context="scene"
+      initialSort="created_at"
+      subtitle="Browse your complete scene library"
+      title="All Scenes"
+      fromPageTitle="Scenes"
+    />
   );
 };
 

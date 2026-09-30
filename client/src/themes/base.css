@@ -229,22 +229,6 @@ pre,
   display: none;
 }
 
-/* Keyboard Navigation Styles */
-.keyboard-focused {
-  /* Enhanced focus ring for keyboard navigation */
-  outline: 3px solid var(--focus-ring-color) !important;
-  outline-offset: 2px !important;
-  box-shadow: var(--focus-ring-shadow) !important;
-  transform: scale(1.02) !important;
-  z-index: 10 !important;
-}
-
-.keyboard-focused:focus {
-  /* Override default focus styles when keyboard focused */
-  outline: 3px solid var(--focus-ring-color) !important;
-  box-shadow: var(--focus-ring-shadow) !important;
-}
-
 /* Hide focus indicators when not using keyboard */
 .mouse-user *:focus {
   outline: none !important;
@@ -257,13 +241,6 @@ pre,
     transform 0.15s ease,
     box-shadow 0.15s ease,
     outline 0.15s ease;
-}
-
-/* Special styling for grid navigation */
-.card-grid-responsive .keyboard-focused {
-  /* Ensure focused items are visible above neighbors */
-  position: relative;
-  z-index: 20;
 }
 
 /* Tooltip positioning adjustments for keyboard mode */

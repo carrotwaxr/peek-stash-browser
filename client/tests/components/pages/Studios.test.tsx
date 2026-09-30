@@ -17,17 +17,6 @@ vi.mock("react-router-dom", async () => {
 
 // Mock hooks
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/hooks/useGridPageTVNavigation", () => ({
-  useGridPageTVNavigation: vi.fn(() => ({
-    isTVMode: false,
-    searchControlsProps: {},
-    gridItemProps: () => ({ ref: vi.fn(), className: "", tabIndex: -1 }),
-    tvNavigation: { currentZone: "grid", isZoneActive: vi.fn() },
-    gridNavigation: { setItemRef: vi.fn(), isFocused: vi.fn() },
-    paginationHandlerRef: { current: null },
-  })),
-}));
-vi.mock("@/hooks/useFocusTrap", () => ({ useInitialFocus: vi.fn() }));
 vi.mock("@/hooks/useTableColumns", () => ({
   useTableColumns: vi.fn(() => ({
     allColumns: [],

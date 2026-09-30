@@ -13,18 +13,7 @@ import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Pagination from "../../../src/components/ui/Pagination";
 
-// Mock TV mode hook
-vi.mock("../../../src/hooks/useTVMode", () => ({
-  useTVMode: () => ({ isTVMode: false }),
-}));
-
-// Mock horizontal navigation hook
-vi.mock("../../../src/hooks/useHorizontalNavigation", () => ({
-  useHorizontalNavigation: () => ({
-    setItemRef: () => {},
-    isFocused: () => false,
-  }),
-}));
+// No TVModeProvider: Pagination reads no TV mode (TV focus is TVNavigator's)
 
 describe("Pagination", () => {
   const defaultProps = {
@@ -41,6 +30,12 @@ describe("Pagination", () => {
   });
 
   describe("Rendering", () => {
+    it("renders outside a TVModeProvider", () => {
+      render(<Pagination {...defaultProps} />);
+
+      expect(screen.getByLabelText("Next Page")).toBeInTheDocument();
+    });
+
     it("renders navigation buttons", () => {
       render(<Pagination {...defaultProps} />);
 

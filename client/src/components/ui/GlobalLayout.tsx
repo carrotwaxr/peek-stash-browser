@@ -4,9 +4,11 @@ import { apiGet } from "../../api";
 import { migrateNavPreferences } from "../../constants/navigation";
 import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
 import useScrollRestoration from "../../hooks/useScrollRestoration";
+import { useTVMode } from "../../hooks/useTVMode";
 import { RouteErrorBoundary } from "./ErrorBoundary";
 import PageLoader from "./PageLoader";
 import Sidebar from "./Sidebar";
+import TVNavigator from "./TVNavigator";
 import TopBar from "./TopBar";
 
 interface Props {
@@ -23,10 +25,12 @@ type NavPreference = ReturnType<typeof migrateNavPreferences>[number];
  * - TopBar (logo, help, settings, user menu)
  * - Main content area with responsive spacing, holding an error boundary and
  *   a Suspense so a failed or loading page keeps the sidebar
+ * - In TV mode, `TVNavigator`: arrows move focus by position on every page
  */
 const GlobalLayout = ({ children }: Props) => {
   const [navPreferences, setNavPreferences] = useState<NavPreference[]>([]);
   const location = useLocation();
+  const { isTVMode } = useTVMode();
 
   useEffect(() => {
     const loadNavPreferences = async () => {
@@ -54,6 +58,8 @@ const GlobalLayout = ({ children }: Props) => {
 
   return (
     <div className="layout-container min-h-screen">
+      {isTVMode && <TVNavigator />}
+
       {/* Sidebar navigation - hidden on mobile, visible lg+ */}
       <Sidebar
         navPreferences={

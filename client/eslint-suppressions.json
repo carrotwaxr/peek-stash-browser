@@ -355,7 +355,7 @@
   },
   "src/components/scene-search/SceneGrid.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
+      "count": 3
     }
   },
   "src/components/scene-search/SceneSearch.tsx": {
@@ -742,9 +742,6 @@
     }
   },
   "src/components/ui/Sidebar.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
@@ -1222,14 +1219,6 @@
       "count": 2
     }
   },
-  "src/hooks/useGridPageTVNavigation.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "src/hooks/useHiddenEntities.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
@@ -1241,11 +1230,6 @@
   "src/hooks/useHomeCarouselQueries.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
-    }
-  },
-  "src/hooks/useHorizontalNavigation.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
     }
   },
   "src/hooks/useImagesPagination.ts": {
@@ -1263,16 +1247,6 @@
       "count": 5
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
-  "src/hooks/useSpatialNavigation.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "src/hooks/useTVNavigation.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
   },

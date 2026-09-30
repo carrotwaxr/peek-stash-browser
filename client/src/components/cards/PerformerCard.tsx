@@ -12,7 +12,6 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 interface Props {
   performer: NormalizedPerformer;
   fromPageTitle?: string;
-  isTVMode?: boolean;
   tabIndex?: number;
   /** Called once the card's entity is hidden, with its instance */
   onHideSuccess?: (
@@ -23,10 +22,7 @@ interface Props {
 }
 
 const PerformerCard = forwardRef<HTMLDivElement, Props>(
-  (
-    { performer, fromPageTitle, isTVMode, tabIndex, onHideSuccess, ...rest },
-    ref
-  ) => {
+  ({ performer, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const performerSettings = getSettings("performer");
@@ -168,7 +164,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         }
         linkTo={getEntityPath("performer", performer, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
-        tabIndex={isTVMode ? tabIndex : -1}
+        tabIndex={tabIndex}
         description={performer.details}
         hideSubtitle
         indicators={indicatorsToShow}

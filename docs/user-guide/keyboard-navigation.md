@@ -2,12 +2,9 @@
 
 Peek supports keyboard navigation for remotes, wireless keyboards, or couch browsing.
 
-!!! warning "TV Mode Status"
-    TV Mode is a work-in-progress. Grid navigation works on most pages (Scenes, Performers, Studios, Tags), but some features and pages don't have full TV navigation yet. Best experience is currently with a wireless keyboard.
-
 ## Why Keyboard Navigation?
 
-- **TV Mode** - Navigate Peek with a remote (partial support)
+- **TV Mode** - Navigate Peek with a remote or arrow keys
 - **Accessibility** - Full keyboard support for users who prefer or require it
 - **Efficiency** - Navigate faster without reaching for the mouse
 - **Couch Browsing** - Control everything from your couch with a wireless keyboard
@@ -60,23 +57,22 @@ On a scene, performer, studio, tag, collection or gallery page, and on the image
 
 ### Arrow Key Navigation
 
-Arrow keys navigate through grid layouts and lists:
+In [TV Mode](#tv-mode) the arrow keys move focus to the nearest item in that direction, by where things are on the screen: the cards of any grid or carousel, a detail page's tabs, the search and sort controls, the pagination buttons and the sidebar. It works the same way on every page, detail pages, Clips and Recommended included, at any screen size.
 
-| Key | Action |
+| Key | Action (TV Mode) |
 |-----|--------|
-| `↑` | Move focus up (in grids and lists) |
-| `↓` | Move focus down (in grids and lists) |
-| `←` | Move focus left (in grids) |
-| `→` | Move focus right (in grids) |
+| `↑` `↓` `←` `→` | Move focus to the nearest item in that direction |
+| `Enter` | Open the focused card, or press the focused button or link |
+| `Page Up` / `Page Down` | Previous / next page of a list |
 
-**Grid Navigation:**
-- Scene grids automatically respond to arrow keys
-- Focus moves intelligently between rows and columns
-- Works on Scenes, Performers, Studios, Tags pages
+- `↓` from the last full row of a grid reaches a shorter last row.
+- `←` from the leftmost cards reaches the sidebar, and `→` comes back to the page. `↑` and `↓` stay on the side they are on.
+- In a search box, `←` and `→` move the cursor and `Space` types a space; `↑` or `↓` leaves the box.
+- With the lightbox or a dialog open, the arrows stay inside it. In the lightbox, `←` and `→` still show the previous and next image.
+- Drop-down lists (sort, page, per page) and sliders are skipped, since they use the arrow keys themselves: reach them with `Tab`, and change pages with `Page Up` and `Page Down`.
+- When a page opens, its first card takes focus.
 
-**List Navigation:**
-- Arrow up/down navigates vertical lists
-- Works in playlists, search results, settings
+Outside TV Mode the arrow keys scroll the page, and `Tab` moves through the page's links and buttons and the sidebar.
 
 ## Scene Browsing
 
@@ -199,22 +195,16 @@ The player's keys work when the player, or nothing, has focus. With focus on a b
 
 ## TV Mode
 
-!!! note "Work in Progress"
-    TV Mode is being actively developed. Grid navigation works on most browse pages, but full remote-only navigation isn't complete yet.
-
 ### What is TV Mode?
 
-TV Mode enables enhanced keyboard/remote navigation:
+TV Mode makes Peek work from the couch with arrow keys and Enter:
 
-- **Large Focus Indicators** - Easy to see what's selected from across the room
-- **Remote-Friendly Navigation** - Arrow keys and Enter for grid navigation
-- **Auto-Scroll** - Page scrolls to keep focused element visible
+- **Arrow keys move by position** - focus goes to the nearest item in the direction you press, on every page (see [Arrow Key Navigation](#arrow-key-navigation))
+- **Large Focus Indicators** - the focused card is enlarged and outlined, easy to see from across the room
+- **Auto-Scroll** - the page scrolls just enough to keep the focused item visible
+- **Page keys** - `Page Up` and `Page Down` change the page of a list
 
-**Current limitations:**
-
-- Some pages (Settings, modals) still require mouse or Tab navigation
-- Search/filter controls need Tab to navigate
-- Best paired with a wireless keyboard for full functionality
+Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in this browser.
 
 ### Using Peek on TV
 
@@ -224,7 +214,7 @@ TV Mode enables enhanced keyboard/remote navigation:
 2. Access Peek via web browser on that computer
 3. Use a **wireless keyboard** (e.g., Logitech K400) - recommended for best experience
 4. Enable TV Mode from the user menu
-5. Use arrow keys to navigate grids, Enter to select
+5. Use the arrow keys to move around, Enter to open, Page Up/Page Down to change pages
 
 **Alternative remotes** (limited support):
 
@@ -238,7 +228,7 @@ TV Mode enables enhanced keyboard/remote navigation:
 2. **Enable auto-hide cursor** in your OS settings
 3. **Increase font size** in browser settings (Ctrl +)
 4. **Use dark theme** for better viewing in dark rooms
-5. **Keep a mouse nearby** for features not yet TV-navigable
+5. **Keep a mouse nearby** for drop-down lists and sliders, which the arrow keys skip
 
 ## Settings Navigation
 
@@ -325,9 +315,9 @@ Basic screen reader support:
 ### Arrow keys scroll page instead of navigating
 
 **Solution:**
-- Click on the scene grid to focus it first
-- Use `Tab` to focus an element, then arrow keys work
-- Some areas use `Tab` navigation only
+- Turn on TV Mode from the user menu: outside it, the arrow keys scroll the page
+- In a text field, `←` and `→` move the cursor; press `↑` or `↓` to leave it
+- A drop-down list or slider keeps the arrow keys while it has focus; press `Tab` to move on
 
 ### Video player shortcuts not working
 
@@ -364,7 +354,7 @@ Perfect setup for couch browsing:
 
 **Browse and queue efficiently:**
 
-1. Navigate scene grid with arrow keys
+1. Navigate the scene grid with the arrow keys (TV Mode)
 2. Select the scenes you want to watch and add them to a "Watch Later" playlist from the selection bar
 3. Open the playlist and press Play
 4. Lean back and enjoy

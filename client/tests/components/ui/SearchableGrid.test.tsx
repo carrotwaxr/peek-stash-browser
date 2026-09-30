@@ -26,12 +26,6 @@ vi.mock("@/hooks/useFilterState", () => ({
 vi.mock("@/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
 }));
-vi.mock("@/hooks/useHorizontalNavigation", () => ({
-  useHorizontalNavigation: () => ({
-    setItemRef: () => {},
-    isFocused: () => false,
-  }),
-}));
 vi.mock("@/contexts/UnitPreferenceContext", () => ({
   useUnitPreference: () => ({ unitPreference: "metric" }),
 }));

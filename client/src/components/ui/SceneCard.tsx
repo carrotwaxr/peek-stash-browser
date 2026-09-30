@@ -37,8 +37,8 @@ interface Props {
   enableKeyboard?: boolean;
   showProgress?: boolean;
   /**
-   * TV-mode: indicates this card is the currently highlighted item via keyboard navigation.
-   * Provided by `useGridPageTVNavigation().gridItemProps`.
+   * TV mode: the card is the highlighted item, so its preview plays. No grid
+   * passes it since TV focus became DOM focus.
    */
   tvPreviewActive?: boolean;
 }

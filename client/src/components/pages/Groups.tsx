@@ -1,17 +1,12 @@
-import React, { useCallback, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { NormalizedGroup } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { useGroupList } from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
-import { useConfig } from "../../contexts/ConfigContext";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { getEntityPath } from "../../utils/entityLinks";
 import { GroupCard } from "../cards/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import {
@@ -30,12 +25,7 @@ const VIEW_MODES: { id: string; label: string }[] = [
 
 const Groups = () => {
   usePageTitle("Collections");
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("groups");
 
   // Table columns hook for table view
   const {
@@ -80,25 +70,6 @@ const Groups = () => {
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
-  // TV Navigation - use shared hook for all grid pages
-  const { isTVMode, searchControlsProps, gridItemProps } =
-    useGridPageTVNavigation({
-      items: currentGroups,
-      columns,
-      totalPages,
-      onItemSelect: (group) =>
-        void navigate(getEntityPath("group", group, hasMultipleInstances), {
-          state: { fromPageTitle: "Collections" },
-        }),
-    });
-
-  // Initial focus
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !isLoading && currentGroups.length > 0 && isTVMode
-  );
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -110,7 +81,7 @@ const Groups = () => {
 
   return (
     <PageLayout>
-      <div ref={pageRef}>
+      <div>
         <PageHeader
           title="Collections"
           subtitle="Browse collections and movies in your library"
@@ -141,7 +112,6 @@ const Groups = () => {
               onMoveColumn={moveColumn}
             />
           }
-          {...searchControlsProps}
         >
           {
             (({
@@ -233,29 +203,18 @@ const Groups = () => {
                   }
                 />
               ) : (
-                <div
-                  ref={gridRef}
-                  className={getGridClasses("standard", gridDensity)}
-                >
-                  {currentGroups.map(
-                    (group: Record<string, unknown>, index: number) => {
-                      const { tabIndex: _tabIndex, ...restItemProps } =
-                        gridItemProps(index);
-                      return (
-                        <GroupCard
-                          key={group.id as string}
-                          group={
-                            group as unknown as NormalizedGroup & {
-                              description?: string | null;
-                            }
-                          }
-                          fromPageTitle="Collections"
-                          tabIndex={isTVMode ? _tabIndex : -1}
-                          {...restItemProps}
-                        />
-                      );
-                    }
-                  )}
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {currentGroups.map((group: Record<string, unknown>) => (
+                    <GroupCard
+                      key={group.id as string}
+                      group={
+                        group as unknown as NormalizedGroup & {
+                          description?: string | null;
+                        }
+                      }
+                      fromPageTitle="Collections"
+                    />
+                  ))}
                 </div>
               )) as unknown as React.ReactNode
           }

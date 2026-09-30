@@ -8,6 +8,7 @@ import {
   RouteErrorBoundary,
 } from "../../../src/components/ui/ErrorBoundary";
 import GlobalLayout from "../../../src/components/ui/GlobalLayout";
+import { TVModeProvider } from "../../../src/contexts/TVModeProvider";
 
 const reloadOnceForNewVersion = vi.hoisted(() => vi.fn());
 
@@ -40,7 +41,9 @@ const Boom = (): never => {
 const renderLayout = (child: React.ReactNode) =>
   render(
     <MemoryRouter>
-      <GlobalLayout>{child}</GlobalLayout>
+      <TVModeProvider>
+        <GlobalLayout>{child}</GlobalLayout>
+      </TVModeProvider>
     </MemoryRouter>
   );
 

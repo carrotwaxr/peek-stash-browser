@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PER_PAGE_MAX } from "@peek/shared-types";
 import {
   LucideArrowLeft,
@@ -6,8 +6,6 @@ import {
   LucideArrowRight,
   LucideArrowRightToLine,
 } from "lucide-react";
-import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
-import { useTVMode } from "../../hooks/useTVMode";
 import Button from "./Button";
 
 interface Props {
@@ -20,9 +18,6 @@ interface Props {
   showInfo?: boolean;
   showPerPageSelector?: boolean;
   className?: string;
-  tvActive?: boolean;
-  onEscapeUp?: () => void;
-  onEscapeDown?: () => void;
 }
 
 /**
@@ -41,11 +36,7 @@ const Pagination = ({
   showInfo = true,
   showPerPageSelector = true,
   className = "",
-  tvActive = false,
-  onEscapeUp,
-  onEscapeDown,
 }: Props) => {
-  const { isTVMode } = useTVMode();
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customError, setCustomError] = useState(false);
@@ -117,44 +108,6 @@ const Pagination = ({
     }
   };
 
-  // Pagination zone items: First, Prev, PageSelect, Next, Last, PerPageSelect
-  const paginationItems = useMemo(() => {
-    const items = [
-      { id: "first", name: "First" },
-      { id: "prev", name: "Previous" },
-      { id: "page-select", name: "Page" },
-      { id: "next", name: "Next" },
-      { id: "last", name: "Last" },
-    ];
-    if (showPerPageSelector && onPerPageChange) {
-      items.push({ id: "per-page", name: "Per Page" });
-    }
-    return items;
-  }, [showPerPageSelector, onPerPageChange]);
-
-  // Horizontal navigation for pagination
-  const paginationNav = useHorizontalNavigation({
-    items: paginationItems,
-    enabled: isTVMode && tvActive,
-    onSelect: (item) => {
-      const element = document.querySelector<HTMLElement>(
-        `[data-tv-pagination-item="${item.id}"]`
-      );
-      if (element) {
-        element.click();
-        // For inputs/dropdowns, focus them so user can interact
-        if (item.id === "page-select") {
-          const select = element.querySelector("select");
-          if (select) select.focus();
-        } else if (item.id === "per-page") {
-          const input = element.querySelector("input");
-          if (input) input.focus();
-        }
-      }
-    },
-    onEscapeUp,
-    onEscapeDown,
-  });
   // Don't render if no pages at all
   if (!totalPages || totalPages < 1) return null;
 
@@ -179,11 +132,7 @@ const Pagination = ({
       <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 w-full sm:w-auto">
         <nav className="flex items-center gap-1 sm:gap-2">
           {/* First Page Button */}
-          <div
-            data-tv-pagination-item="first"
-            ref={(el) => paginationNav.setItemRef(0, el)}
-            className={paginationNav.isFocused(0) ? "keyboard-focus" : ""}
-          >
+          <div>
             <Button
               onClick={() => onPageChange?.(1)}
               disabled={currentPage <= 1}
@@ -196,11 +145,7 @@ const Pagination = ({
           </div>
 
           {/* Previous Page Button */}
-          <div
-            data-tv-pagination-item="prev"
-            ref={(el) => paginationNav.setItemRef(1, el)}
-            className={paginationNav.isFocused(1) ? "keyboard-focus" : ""}
-          >
+          <div>
             <Button
               onClick={() => onPageChange?.(currentPage - 1)}
               disabled={currentPage <= 1}
@@ -213,11 +158,7 @@ const Pagination = ({
           </div>
 
           {/* Page Dropdown */}
-          <div
-            data-tv-pagination-item="page-select"
-            ref={(el) => paginationNav.setItemRef(2, el)}
-            className={paginationNav.isFocused(2) ? "keyboard-focus" : ""}
-          >
+          <div>
             <select
               value={currentPage}
               onChange={(e) => onPageChange?.(parseInt(e.target.value))}
@@ -238,11 +179,7 @@ const Pagination = ({
           </div>
 
           {/* Next Page Button */}
-          <div
-            data-tv-pagination-item="next"
-            ref={(el) => paginationNav.setItemRef(3, el)}
-            className={paginationNav.isFocused(3) ? "keyboard-focus" : ""}
-          >
+          <div>
             <Button
               onClick={() => onPageChange?.(currentPage + 1)}
               disabled={currentPage >= totalPages}
@@ -255,11 +192,7 @@ const Pagination = ({
           </div>
 
           {/* Last Page Button */}
-          <div
-            data-tv-pagination-item="last"
-            ref={(el) => paginationNav.setItemRef(4, el)}
-            className={paginationNav.isFocused(4) ? "keyboard-focus" : ""}
-          >
+          <div>
             <Button
               onClick={() => onPageChange?.(totalPages)}
               disabled={currentPage >= totalPages}
@@ -281,11 +214,7 @@ const Pagination = ({
             >
               Per Page:
             </label>
-            <div
-              data-tv-pagination-item="per-page"
-              ref={(el) => paginationNav.setItemRef(5, el)}
-              className={`flex items-center gap-1 ${paginationNav.isFocused(5) ? "keyboard-focus" : ""}`}
-            >
+            <div className="flex items-center gap-1">
               {/* Preset dropdown */}
               <select
                 id="perPage"

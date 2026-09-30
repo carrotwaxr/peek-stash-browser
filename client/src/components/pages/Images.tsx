@@ -13,10 +13,7 @@ import { useImageList } from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { getGridClasses } from "../../constants/grids";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useTableColumns } from "../../hooks/useTableColumns";
@@ -57,9 +54,6 @@ const sameImage = (
 const Images = () => {
   usePageTitle("Images");
   const [searchParams] = useSearchParams();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("images");
   const { wallPlayback } = useWallPlayback();
 
   // Table columns hook for table view
@@ -283,22 +277,6 @@ const Images = () => {
     [updateImageInCache]
   );
 
-  // TV Navigation - use shared hook for all grid pages
-  // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
-  const { isTVMode, searchControlsProps, gridItemProps } =
-    useGridPageTVNavigation({
-      items: currentImages,
-      columns,
-      totalPages,
-      onItemSelect: handleImageClick,
-    });
-
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !isLoading && currentImages.length > 0 && isTVMode
-  );
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -310,7 +288,7 @@ const Images = () => {
 
   return (
     <PageLayout>
-      <div ref={pageRef}>
+      <div>
         <PageHeader
           title="Images"
           subtitle="Browse all images in your library"
@@ -341,7 +319,6 @@ const Images = () => {
               onMoveColumn={moveColumn}
             />
           }
-          {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
           {
@@ -475,30 +452,19 @@ const Images = () => {
                   ))}
                 </div>
               ) : (
-                <div
-                  ref={gridRef}
-                  className={getGridClasses("standard", gridDensity)}
-                >
-                  {currentImages.map(
-                    (image: Record<string, unknown>, index: number) => {
-                      const { tabIndex: _tabIndex, ...restItemProps } =
-                        gridItemProps(index);
-                      return (
-                        <ImageCard
-                          key={imageKey(image)}
-                          image={image as unknown as NormalizedImage}
-                          onClick={() => handleImageClick(image)}
-                          fromPageTitle="Images"
-                          tabIndex={isTVMode ? _tabIndex : -1}
-                          onOCounterChange={handleOCounterChange}
-                          onRatingChange={handleRatingChange}
-                          onFavoriteChange={handleFavoriteChange}
-                          onHideSuccess={handleHideSuccess}
-                          {...restItemProps}
-                        />
-                      );
-                    }
-                  )}
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {currentImages.map((image: Record<string, unknown>) => (
+                    <ImageCard
+                      key={imageKey(image)}
+                      image={image as unknown as NormalizedImage}
+                      onClick={() => handleImageClick(image)}
+                      fromPageTitle="Images"
+                      onOCounterChange={handleOCounterChange}
+                      onRatingChange={handleRatingChange}
+                      onFavoriteChange={handleFavoriteChange}
+                      onHideSuccess={handleHideSuccess}
+                    />
+                  ))}
                 </div>
               )) as unknown as React.ReactNode
           }
