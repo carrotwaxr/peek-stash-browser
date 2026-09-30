@@ -10,7 +10,9 @@
  * statistics the count checks each scene live on
  * `StashScene_id_stashInstanceId_deletedAt_idx`, which holds `deletedAt`,
  * from the index alone.)
- * A scene tag reads each junction by its tag index, the inherited one too.
+ * A scene tag reads each junction by its tag index, the inherited one too,
+ * and matches the list on the clip's own scene columns before the scene is
+ * read.
  * With statistics a studio drives from its own scenes (without them SQLite
  * walks the clips, so no plan here pins it). What the lists hold is pinned
  * by `ClipQueryBuilder.integration.test.ts`; the timings at 207k and 300k
@@ -118,6 +120,12 @@ describeWithDb("ClipQueryBuilder query plans", () => {
       );
       expect(shown).not.toContain("CORRELATED");
       expect(shown).not.toContain("VIRTUAL TABLE");
+      // The list is matched on the clip's own scene columns, so a clip
+      // without the tag is passed over before its scene is read
+      const list = plan.findIndex((line) => line.startsWith("LIST SUBQUERY"));
+      const scene = plan.findIndex((line) => line.startsWith("SEARCH s "));
+      expect(list, shown).toBeGreaterThan(0);
+      expect(list, shown).toBeLessThan(scene);
     }
   });
 });

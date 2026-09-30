@@ -669,6 +669,51 @@ describe("refClause", () => {
     expect(clause.params).toHaveLength(400);
   });
 
+  describe("a junction whose parent key is another row's columns (parentKey)", () => {
+    // A clip's scene: the junction rows are matched on the clip's own
+    // (sceneId, sceneInstanceId), so no shape needs the scene row first
+    const KEY = { parentKey: ["c.sceneId", "c.sceneInstanceId"] } as const;
+    const TAGS: JunctionTarget = { ...SCENE_TAGS, ...KEY };
+    const INHERITED: JunctionTarget = { ...SCENE_INHERITED_TAGS, ...KEY };
+    const opts = { ...OPTS, inheritedJunction: INHERITED };
+
+    it("the EXISTS and NOT EXISTS match the key's columns", () => {
+      const includes = refClause(TAGS, [ref("5")], "INCLUDES", opts);
+      expect(includes.sql).toBe(
+        "(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = c.sceneId AND sit.sceneInstanceId = c.sceneInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?))))"
+      );
+      expect(refClause(TAGS, [ref("5")], "EXCLUDES", opts).sql).toBe(
+        `NOT ${includes.sql}`
+      );
+    });
+
+    it("the list read whole matches the key as a row value", () => {
+      expect(
+        refClause(TAGS, [ref("5")], "INCLUDES", {
+          ...opts,
+          sortedByIndex: false,
+        }).sql
+      ).toBe(
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))"
+      );
+    });
+
+    it("above the inline limit the refs list and the matched set match the key", () => {
+      expect(
+        refClause(TAGS, many(65), "INCLUDES", { ...opts, sortedByIndex: true })
+          .sql
+      ).toBe(
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM tags_refs r CROSS JOIN SceneInheritedTag sit ON sit.tagId = r.id AND sit.tagInstanceId = r.inst)"
+      );
+      expect(refClause(TAGS, many(65), "INCLUDES", opts).sql).toBe(
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT id, inst FROM tags_matched)"
+      );
+      expect(refClause(TAGS, many(65), "EXCLUDES", opts).sql).toBe(
+        "(c.sceneId || ':' || c.sceneInstanceId) NOT IN (SELECT id || ':' || inst FROM tags_matched)"
+      );
+    });
+  });
+
   it("is empty with no refs", () => {
     expect(refClause(SCENE_TAGS, [], "INCLUDES", OPTS)).toEqual({
       sql: "",

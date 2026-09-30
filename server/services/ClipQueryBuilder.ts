@@ -160,12 +160,17 @@ const CLIP_TAGS: JunctionTarget = {
   refInstanceCol: "tagInstanceId",
 };
 
-/** A tag on the clip's scene (the joined scene `s`) */
+/**
+ * A tag on the clip's scene, matched on the clip's own scene columns: while
+ * the default page walks StashClip_browse_idx, a clip whose scene lacks the
+ * tag is passed over from the index before its scene is read
+ */
 const SCENE_TAGS: JunctionTarget = {
   kind: "junction",
   table: "SceneTag",
   alias: "st",
   parentAlias: "s",
+  parentKey: ["c.sceneId", "c.sceneInstanceId"],
   parentIdCol: "sceneId",
   parentInstanceCol: "sceneInstanceId",
   refIdCol: "tagId",
