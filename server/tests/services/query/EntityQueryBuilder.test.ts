@@ -252,7 +252,6 @@ function clipRequest(
     sort: { field: "seconds", direction: "ASC", seed: undefined },
     filter: {},
     specificInstanceId: undefined,
-    dropped: [],
     ...overrides,
   };
 }
@@ -267,7 +266,6 @@ function request(
     sort: { field: "created_at", direction: "DESC", seed: undefined },
     filter: {},
     specificInstanceId: undefined,
-    dropped: [],
     ...overrides,
   };
 }

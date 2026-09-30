@@ -12,7 +12,6 @@ import type {
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import {
-  logDropped,
   parseClipQuery,
   parseSceneClipsRequest,
   parseStashId,
@@ -29,7 +28,6 @@ export const getClips = async (
 ) => {
   // A ValidationError (400) reaches the central error handler
   const request = parseClipQuery(req.query, { userId: req.user.id });
-  logDropped("GET /clips", request.dropped);
 
   const userId = req.user.id;
   const { page, perPage } = request;
@@ -91,7 +89,6 @@ export const getClipsForScene = async (
   const request = parseSceneClipsRequest(req.params.id, req.query, {
     userId: req.user.id,
   });
-  logDropped("GET /scenes/:id/clips", request.dropped);
 
   const userId = req.user.id;
   const { sceneId, includeUngenerated, specificInstanceId } = request;

@@ -169,7 +169,6 @@ describeWithDb("Query builder sort direction (integration)", () => {
         },
         filter: {},
         specificInstanceId: undefined,
-        dropped: [],
       },
     });
 
@@ -205,7 +204,6 @@ describeWithDb("Query builder sort direction (integration)", () => {
           sort: { field: "title", direction, seed: undefined },
           filter: {},
           specificInstanceId: undefined,
-          dropped: [],
         },
       });
 

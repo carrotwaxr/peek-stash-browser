@@ -338,6 +338,52 @@ describe("SearchControls", () => {
       });
     });
 
+    describe("a sort the list no longer offers", () => {
+      type SortedQuery = { filter: { sort: string } };
+      const sceneIndexState = (filters = {}) => ({
+        filters,
+        sort: { field: "scene_index", direction: "ASC" },
+      });
+
+      it("Scene Number without a collection filter is reset to the default, and the query does not carry it", async () => {
+        const onQueryChange = vi.fn<(query: SortedQuery) => void>();
+        const setSort = vi.fn();
+        renderSearchControls(
+          { onQueryChange },
+          { ...sceneIndexState(), setSort }
+        );
+
+        await waitFor(() => {
+          expect(onQueryChange).toHaveBeenCalled();
+        });
+        const query = must(onQueryChange.mock.calls[0])[0];
+        expect(query.filter.sort).toBe("created_at");
+        expect(setSort).toHaveBeenCalledWith("created_at", "ASC");
+      });
+
+      it("Scene Number beside an including collection filter is kept", async () => {
+        const onQueryChange = vi.fn<(query: SortedQuery) => void>();
+        const setSort = vi.fn();
+        renderSearchControls(
+          { onQueryChange },
+          {
+            ...sceneIndexState({
+              groupIds: ["7:inst"],
+              groupIdsModifier: "INCLUDES",
+            }),
+            setSort,
+          }
+        );
+
+        await waitFor(() => {
+          expect(onQueryChange).toHaveBeenCalled();
+        });
+        const query = must(onQueryChange.mock.calls[0])[0];
+        expect(query.filter.sort).toBe("scene_index");
+        expect(setSort).not.toHaveBeenCalled();
+      });
+    });
+
     it("generates random seed for random sort", async () => {
       const user = userEvent.setup();
       const onQueryChange = vi.fn();

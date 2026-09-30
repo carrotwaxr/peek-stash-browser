@@ -448,7 +448,6 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       },
       filter: {},
       specificInstanceId: undefined,
-      dropped: [],
     } as unknown as ListRequests[K];
   }
 

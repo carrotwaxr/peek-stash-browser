@@ -580,7 +580,6 @@ describeWithDb("Tooltip relations (integration)", () => {
           },
         },
         specificInstanceId: undefined,
-        dropped: [],
       },
     });
     expect(scenes.map((s) => s.instanceId).sort()).toEqual(both);

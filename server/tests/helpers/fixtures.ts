@@ -163,7 +163,6 @@ export function parsedListRequest<E extends EntityKind>(
     sort: { field: sort.field, direction: sort.direction, seed: undefined },
     filter: {},
     specificInstanceId: undefined,
-    dropped: [],
     ...overrides,
   };
 }
@@ -183,7 +182,6 @@ export function parsedClipRequest(
     sort: { field: "stashCreatedAt", direction: "DESC", seed: undefined },
     filter: {},
     specificInstanceId: undefined,
-    dropped: [],
     ...overrides,
   };
 }

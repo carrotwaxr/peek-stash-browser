@@ -88,6 +88,8 @@ interface FilterControlProps {
   onChange: (value: unknown) => void;
   options?: SortOption[];
   placeholder?: string;
+  /** A text input's most characters (its contract field's limit) */
+  maxLength?: number;
   min?: number;
   max?: number;
   entityType?: string;
@@ -112,6 +114,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       onChange,
       options = [],
       placeholder = "",
+      maxLength,
       min,
       max,
       entityType,
@@ -306,6 +309,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               value={value as string | undefined}
               onChange={(e) => onChange(e.target.value)}
               placeholder={placeholder}
+              maxLength={maxLength}
               className={inputClasses}
               style={baseInputStyle}
             />

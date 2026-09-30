@@ -2,6 +2,7 @@
  * Reusable search input component with debouncing
  */
 import { useEffect, useRef, useState } from "react";
+import { Q_MAX_LENGTH } from "@peek/shared-types";
 import { useDebouncedValue } from "../../hooks/useDebounce";
 import Button from "./Button";
 
@@ -97,6 +98,7 @@ const SearchInput = ({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={placeholder}
+        maxLength={Q_MAX_LENGTH}
         autoFocus={autoFocus}
         className={`
           block w-full pl-10 pr-10 py-1 border rounded-md

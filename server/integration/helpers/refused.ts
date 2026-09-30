@@ -1,7 +1,6 @@
 /**
- * A request the parser refused. The integration run sets
- * `PEEK_FILTER_POLICY=reject` (globalSetup.ts), so unknown or invalid list
- * input answers 400 with one issue per problem, each naming its path.
+ * A request the parser refused. Unknown or invalid list input answers 400
+ * with one issue per problem, each naming its path.
  */
 import { expect } from "vitest";
 import type { ApiErrorResponse } from "../../types/api/index.js";

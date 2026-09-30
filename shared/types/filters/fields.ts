@@ -24,6 +24,9 @@ import {
   text,
 } from "./criteria.js";
 
+/** Longest search text (`q`) a list, clip or picker request takes */
+export const Q_MAX_LENGTH = 200;
+
 /** Most rows a list request returns; a larger per_page is held to it */
 export const PER_PAGE_MAX = 250;
 

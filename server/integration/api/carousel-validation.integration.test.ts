@@ -1,7 +1,6 @@
 /**
  * Carousel, recommendation and similar-scene requests through the one
- * parser (item 38), with the server in reject mode (`PEEK_FILTER_POLICY=
- * reject`, set by the global setup).
+ * parser (item 38): unknown or invalid input answers 400.
  *
  * A carousel's rules, sort and direction are checked against the scene
  * contract when it is saved or previewed; stored rules parse leniently when

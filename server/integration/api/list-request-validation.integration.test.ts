@@ -1,6 +1,6 @@
 /**
- * List requests through the one parser (item 38), with the server in reject
- * mode (`PEEK_FILTER_POLICY=reject`, set by the global setup).
+ * List requests through the one parser (item 38): unknown or invalid input
+ * answers 400.
  *
  * A sort outside the list's sort keys, an unknown filter field, a body that
  * is not an object and a bad clip parameter answer 400 with the path of what

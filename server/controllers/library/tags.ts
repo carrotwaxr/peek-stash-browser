@@ -19,7 +19,6 @@ import type {
 } from "../../types/api/index.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
 import {
-  logDropped,
   parseFilterRef,
   parseListRequest,
   parseMinimalRequest,
@@ -39,7 +38,6 @@ export const findTags = async (
 ) => {
   // A ValidationError (400) reaches the central error handler
   const request = parseListRequest("tag", req.body, { userId: req.user.id });
-  logDropped("POST /library/tags", request.dropped);
 
   const startTime = Date.now();
   const userId = req.user.id;
@@ -149,7 +147,6 @@ export const findTagsMinimal = async (
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("tag", req.body, { userId });
-  logDropped("POST /library/tags/minimal", request.dropped);
 
   const tags = await findMinimalEntities(req.user, request);
   res.json({ tags });

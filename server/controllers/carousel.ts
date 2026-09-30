@@ -30,7 +30,7 @@ import type {
 import type { NormalizedScene } from "../types/index.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
 import {
-  logDropped,
+  logIgnoredStoredRule,
   parseCarouselRequest,
   parseStoredSceneQuery,
 } from "../utils/listRequest.js";
@@ -117,7 +117,6 @@ export const createCarousel = async (
     },
     { userId }
   );
-  logDropped("POST /carousels", request.dropped);
 
   // Validate required fields
   if (!title || title.trim() === "") {
@@ -198,7 +197,6 @@ export const updateCarousel = async (
   // The parts sent, against the scene contract; a ValidationError (400)
   // reaches the central error handler
   const request = parseCarouselRequest({ rules, sort, direction }, { userId });
-  logDropped("PUT /carousels/:id", request.dropped);
 
   // Check ownership
   const existing = await prisma.userCarousel.findFirst({
@@ -292,7 +290,6 @@ export const previewCarousel = async (
     },
     { userId, perPage: CAROUSEL_SCENE_LIMIT, randomSeed: perLoadSeed(userId) }
   );
-  logDropped("POST /carousels/preview", query.dropped);
 
   // Execute the carousel query
   const scenes = await executeCarouselQuery(userId, query, req.user);
@@ -369,7 +366,7 @@ export const executeCarouselById = async (
       randomSeed: perLoadSeed(userId),
     }
   );
-  logDropped("GET /carousels/:id/execute", query.dropped);
+  logIgnoredStoredRule(carouselId, query.ignored);
 
   const scenes = await executeCarouselQuery(userId, query, req.user);
 

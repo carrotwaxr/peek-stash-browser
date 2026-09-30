@@ -158,7 +158,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
   ): Promise<MinimalEntity[]> {
     return findMinimalEntities(
       { id: userId, role: "USER" },
-      parseMinimalRequest(entity, body, { userId, policy: "reject" })
+      parseMinimalRequest(entity, body, { userId })
     );
   }
 
@@ -426,7 +426,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
         ids: [`${mxId(1)}:${FX.A}`, mxId(2)],
         count_filter: { min_scene_count: 0 },
       },
-      { userId: viewer, policy: "reject" }
+      { userId: viewer }
     );
     const recorder = recordStatements();
     let rows: MinimalEntity[] = [];

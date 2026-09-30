@@ -6,14 +6,10 @@
  * boundary, every modifier present and valid, the sort whitelisted, paging
  * clamped.
  *
- * Unknown or invalid input follows `PEEK_FILTER_POLICY`: `reject` answers
- * 400 with one issue per problem; `drop` (the default for this release)
- * ignores it and returns a record for `logDropped`. A body that is not an
- * object, and a bad id or instance naming what a request looks up (`ids`,
- * `instance_id`, a clip's `sceneId` and `instanceId`, a similar-scenes
- * seed's `instanceId`), are a 400 in both: ignoring those would answer a
- * detail page with the whole list. Stored carousel rules always parse
- * leniently: the user cannot fix them by resending.
+ * Unknown or invalid input answers 400 with one issue per problem, naming
+ * its path. Stored carousel rules parse leniently (`parseStoredSceneQuery`):
+ * the user cannot fix them by resending, so what the parser ignores is
+ * returned as `ignored` for the caller to log.
  */
 import {
   CLIP_PARAMS,
@@ -32,6 +28,7 @@ import {
   PER_PAGE_MAX,
   PRESENCE_MODIFIERS,
   type PresenceModifier,
+  Q_MAX_LENGTH,
   RANGE_MODIFIERS,
   type RangeModifier,
   type RefSpec,
@@ -51,9 +48,7 @@ import type {
   MinimalScope,
 } from "../types/api/index.js";
 import type {
-  DroppedInput,
   EnumCriterion,
-  FilterPolicy,
   FilterRef,
   MinimalKind,
   MultiEnumCriterion,
@@ -83,20 +78,28 @@ const RECOMMENDED_PER_PAGE_DEFAULT = 24;
 const PLAYLIST_ITEMS_PER_PAGE_DEFAULT = 50;
 /** A playlist page's most items */
 const PLAYLIST_ITEMS_PER_PAGE_MAX = 100;
-const Q_MAX_LENGTH = 200;
 /** A random seed is reduced to this, as the list controllers always did */
 const SEED_MODULUS = 1e8;
 /** Stash ids are integers */
 const ID_PATTERN = /^\d{1,20}$/;
 const RANDOM_SEED_PATTERN = /^random_(\d{1,15})$/;
 const INTEGER_PATTERN = /^\s*[+-]?\d+\s*$/;
-/** How often one route logs the same ignored path */
-const LOG_DROPPED_WINDOW_MS = 60 * 60 * 1000;
+/** How often one carousel logs the same ignored path */
+const LOG_IGNORED_WINDOW_MS = 60 * 60 * 1000;
+
+/** One piece of a stored rule the lenient parse ignored */
+export interface IgnoredInput {
+  readonly path: string;
+  readonly reason: string;
+}
+
+/** A stored carousel query: the scene query, and what the lenient parse ignored */
+export type ParsedStoredQuery = ParsedListRequest<"scene"> & {
+  readonly ignored: readonly IgnoredInput[];
+};
 
 export interface ParseOptions {
   readonly userId: number;
-  /** Default: `filterPolicy()` */
-  readonly policy?: FilterPolicy;
 }
 
 export interface StoredQueryOptions {
@@ -109,10 +112,7 @@ export interface StoredQueryOptions {
   readonly randomSeed?: number;
 }
 
-export interface CarouselRequestOptions extends StoredQueryOptions {
-  /** Default: `filterPolicy()` */
-  readonly policy?: FilterPolicy;
-}
+export type CarouselRequestOptions = StoredQueryOptions;
 
 /** A carousel's rules, sort and direction as a create, update or preview request sends them */
 export interface CarouselRequestInput {
@@ -122,21 +122,18 @@ export interface CarouselRequestInput {
   readonly direction?: unknown;
 }
 
-/** What the image does with unknown filter input: `PEEK_FILTER_POLICY`, `reject` or else `drop` */
-export function filterPolicy(): FilterPolicy {
-  return process.env.PEEK_FILTER_POLICY?.trim().toLowerCase() === "reject"
-    ? "reject"
-    : "drop";
-}
-
-/** Warns once an hour per route and path about input the parser ignored */
-export function logDropped(
-  route: string,
-  dropped: readonly DroppedInput[]
+/** Warns once an hour per carousel and path about stored rule input the parser ignored */
+export function logIgnoredStoredRule(
+  carouselId: string,
+  ignored: readonly IgnoredInput[]
 ): void {
-  for (const { path, reason } of dropped) {
-    if (shouldLogOnce(`${route} ${path}`, LOG_DROPPED_WINDOW_MS)) {
-      logger.warn("Unknown filter input ignored", { route, path, reason });
+  for (const { path, reason } of ignored) {
+    if (shouldLogOnce(`${carouselId} ${path}`, LOG_IGNORED_WINDOW_MS)) {
+      logger.warn("Stored carousel rule ignored", {
+        carouselId,
+        path,
+        reason,
+      });
     }
   }
 }
@@ -145,7 +142,7 @@ export function logDropped(
 // PROBLEMS
 // =============================================================================
 
-/** The problems found so far: thrown as one 400 in reject mode, returned as records in drop mode */
+/** The problems found so far: thrown as one 400, or returned as records for a stored rule */
 class Problems {
   private readonly issues: ApiErrorIssue[] = [];
 
@@ -162,22 +159,14 @@ class Problems {
     }
   }
 
-  /**
-   * Throws in reject mode, and in drop mode too when a problem is at one of
-   * the `lookupKeys` (or under it): the ids or instance naming what the
-   * request looks up. Dropping one would widen a detail page's lookup to the
-   * whole list, where the builders matched nothing before the parser.
-   */
-  finish(
-    policy: FilterPolicy,
-    lookupKeys: readonly string[] = []
-  ): DroppedInput[] {
-    if (this.issues.length === 0) return [];
-    const atLookupKey = ({ path }: ApiErrorIssue) =>
-      lookupKeys.some((key) => path === key || path.startsWith(`${key}.`));
-    if (policy === "reject" || this.issues.some(atLookupKey)) {
-      throw new ValidationError("Invalid request", { issues: this.issues });
-    }
+  /** Throws the 400 when any problem was found */
+  finish(): void {
+    if (this.issues.length === 0) return;
+    throw new ValidationError("Invalid request", { issues: this.issues });
+  }
+
+  /** The problems as records: only a stored carousel rule, which cannot be resent, ignores them */
+  ignored(): IgnoredInput[] {
     return this.issues.map(({ path, message }) => ({ path, reason: message }));
   }
 }
@@ -190,7 +179,7 @@ function pathOf(prefix: string, key: string): string {
   return prefix === "" ? key : `${prefix}.${key}`;
 }
 
-/** The 400 for a request body that is not an object, in both policies */
+/** The 400 for a request body that is not an object */
 function requireObject(value: unknown, path: string): Record<string, unknown> {
   if (isPlainObject(value)) return value;
   throw new ValidationError("Invalid request", {
@@ -751,7 +740,6 @@ export function parseListRequest<E extends EntityKind>(
   body: unknown,
   options: ParseOptions
 ): ParsedListRequest<E> {
-  const policy = options.policy ?? filterPolicy();
   const input = requireObject(body, "body");
   const problems = new Problems();
   const filterKey: string = FILTER_BODY_KEYS[entity];
@@ -823,6 +811,8 @@ export function parseListRequest<E extends EntityKind>(
     ) as typeof sortField;
   }
 
+  problems.finish();
+
   return {
     page: clampPage(state.page),
     perPage: clampPerPage(state.perPage, PER_PAGE_DEFAULT),
@@ -831,11 +821,6 @@ export function parseListRequest<E extends EntityKind>(
     // The one boundary cast: each criterion was validated by its field's schema
     filter: fields.criteria as ParsedFilter<E>,
     specificInstanceId: fields.specificInstanceId,
-    dropped: problems.finish(policy, [
-      "ids",
-      `${filterKey}.ids`,
-      `${filterKey}.instance_id`,
-    ]),
   };
 }
 
@@ -888,8 +873,7 @@ function parseCarouselParts(
 /** The carousel's parts as the scene query the builder runs */
 function carouselQuery(
   parts: CarouselParts,
-  options: StoredQueryOptions,
-  dropped: DroppedInput[]
+  options: StoredQueryOptions
 ): ParsedListRequest<"scene"> {
   return {
     page: clampPage(options.page),
@@ -905,40 +889,38 @@ function carouselQuery(
     // The boundary cast: each criterion was validated by its field's schema
     filter: parts.fields.criteria as ParsedFilter<"scene">,
     specificInstanceId: parts.fields.specificInstanceId,
-    dropped,
   };
 }
 
 /**
  * A carousel's stored rules, sort and direction: the scene filter parsed
- * leniently whatever the policy, with the page the caller wants.
+ * leniently, with the page the caller wants. What it ignored comes back as
+ * `ignored`, for the caller to log; a stored rule cannot be resent.
  */
 export function parseStoredSceneQuery(
   rules: unknown,
   sort: string,
   direction: string,
   options: StoredQueryOptions
-): ParsedListRequest<"scene"> {
+): ParsedStoredQuery {
   const problems = new Problems();
   const object = isPlainObject(rules) ? rules : undefined;
   if (!object) problems.add("rules", "Expected an object");
   const parts = parseCarouselParts(object, sort, direction, problems);
-  return carouselQuery(parts, options, problems.finish("drop"));
+  return { ...carouselQuery(parts, options), ignored: problems.ignored() };
 }
 
 /**
  * `POST /api/carousels`, `PUT /api/carousels/:id` and `POST
  * /api/carousels/preview`: the rules, sort and direction checked against
- * the scene contract as a scene list request is, by the policy, with the
- * carousel's page. A part not sent stays out (no criteria, the scene
- * default sort). Rules that are not an object, and a bad `rules.ids` or
- * `rules.instance_id`, are a 400 in both policies, as on the scene list.
+ * the scene contract as a scene list request is, with the carousel's page.
+ * A part not sent stays out (no criteria, the scene default sort). Rules
+ * that are not an object are a 400, as on the scene list.
  */
 export function parseCarouselRequest(
   input: CarouselRequestInput,
   options: CarouselRequestOptions
 ): ParsedListRequest<"scene"> {
-  const policy = options.policy ?? filterPolicy();
   const rules =
     input.rules === undefined ? undefined : requireObject(input.rules, "rules");
   const problems = new Problems();
@@ -948,11 +930,8 @@ export function parseCarouselRequest(
     input.direction,
     problems
   );
-  return carouselQuery(
-    parts,
-    options,
-    problems.finish(policy, ["rules.ids", "rules.instance_id"])
-  );
+  problems.finish();
+  return carouselQuery(parts, options);
 }
 
 // =============================================================================
@@ -1037,7 +1016,6 @@ export function parseClipQuery(
   query: unknown,
   options: ParseOptions
 ): ParsedClipQuery {
-  const policy = options.policy ?? filterPolicy();
   const input = requireObject(query, "query");
   const problems = new Problems();
 
@@ -1100,6 +1078,8 @@ export function parseClipQuery(
     ...(criteria as ParsedFields<typeof CLIP_PARAMS>),
     ...(isGenerated === undefined ? {} : { isGenerated }),
   };
+  problems.finish();
+
   return {
     page: clampPage(state.page),
     perPage: clampPerPage(state.perPage, CLIP_PER_PAGE_DEFAULT),
@@ -1107,11 +1087,10 @@ export function parseClipQuery(
     sort: resolveSort("clip", sortField, state.direction, options.userId),
     filter,
     specificInstanceId,
-    dropped: problems.finish(policy, ["sceneId", "instanceId"]),
   };
 }
 
-/** A path parameter holding a Stash id: a 400 in both policies otherwise */
+/** A path parameter holding a Stash id: a 400 otherwise */
 export function parseStashId(raw: unknown, path: string): string {
   if (typeof raw === "string" && ID_PATTERN.test(raw)) return raw;
   throw new ValidationError("Invalid request", {
@@ -1123,9 +1102,8 @@ export function parseStashId(raw: unknown, path: string): string {
 export function parseSceneClipsRequest(
   sceneId: unknown,
   query: unknown,
-  options: ParseOptions
+  _options: ParseOptions
 ): ParsedSceneClipsQuery {
-  const policy = options.policy ?? filterPolicy();
   const id = parseStashId(sceneId, "id");
   const input = requireObject(query, "query");
   const problems = new Problems();
@@ -1148,11 +1126,12 @@ export function parseSceneClipsRequest(
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
 
+  problems.finish();
+
   return {
     sceneId: id,
     includeUngenerated: includeUngenerated ?? false,
     specificInstanceId,
-    dropped: problems.finish(policy, ["instanceId"]),
   };
 }
 
@@ -1164,9 +1143,8 @@ export function parseSceneClipsRequest(
 export function parseSimilarScenesRequest(
   sceneId: unknown,
   query: unknown,
-  options: ParseOptions
+  _options: ParseOptions
 ): ParsedSimilarScenesQuery {
-  const policy = options.policy ?? filterPolicy();
   const id = parseStashId(sceneId, "id");
   const input = requireObject(query, "query");
   const problems = new Problems();
@@ -1184,21 +1162,20 @@ export function parseSimilarScenesRequest(
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
 
+  problems.finish();
+
   return {
     sceneId: id,
     page: clampPage(page),
     specificInstanceId,
-    // Dropping a bad instance would guess the seed's instance
-    dropped: problems.finish(policy, ["instanceId"]),
   };
 }
 
 /** `GET /api/library/scenes/recommended`: the page and page size */
 export function parseRecommendedRequest(
   query: unknown,
-  options: ParseOptions
+  _options: ParseOptions
 ): ParsedRecommendedQuery {
-  const policy = options.policy ?? filterPolicy();
   const input = requireObject(query, "query");
   const problems = new Problems();
   let page: number | undefined;
@@ -1210,10 +1187,11 @@ export function parseRecommendedRequest(
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
 
+  problems.finish();
+
   return {
     page: clampPage(page),
     perPage: clampPerPage(perPage, RECOMMENDED_PER_PAGE_DEFAULT),
-    dropped: problems.finish(policy),
   };
 }
 
@@ -1228,9 +1206,8 @@ export function parseRecommendedRequest(
  */
 export function parsePlaylistItemsRequest(
   query: unknown,
-  options: ParseOptions
+  _options: ParseOptions
 ): ParsedPlaylistItemsQuery {
-  const policy = options.policy ?? filterPolicy();
   const input = requireObject(query, "query");
   const problems = new Problems();
   let page: number | undefined;
@@ -1241,7 +1218,7 @@ export function parsePlaylistItemsRequest(
     ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
-  const dropped = problems.finish(policy);
+  problems.finish();
 
   return {
     paging:
@@ -1255,7 +1232,6 @@ export function parsePlaylistItemsRequest(
               PLAYLIST_ITEMS_PER_PAGE_MAX
             ),
           },
-    dropped,
   };
 }
 
@@ -1279,15 +1255,14 @@ const minimalIdList = z
  * `POST /api/library/<entities>/minimal` (the entity pickers): search text,
  * a page size, ids, count minimums and a scope; always name order, one page.
  * `ids` names what the request looks up and `scope` the instances it looks
- * in, so a bad one is a 400 in both policies. Whether the user may send the
+ * in, so a bad one is a 400. Whether the user may send the
  * scope is the query's check (findMinimalEntities: admins only).
  */
 export function parseMinimalRequest<E extends MinimalKind>(
   entity: E,
   body: unknown,
-  options: ParseOptions
+  _options: ParseOptions
 ): ParsedMinimalRequest<E> {
-  const policy = options.policy ?? filterPolicy();
   const input = requireObject(body, "body");
   const problems = new Problems();
 
@@ -1366,6 +1341,8 @@ export function parseMinimalRequest<E extends MinimalKind>(
 
   walk(input, "", handlers, problems, "Unknown request field");
 
+  problems.finish();
+
   return {
     entity,
     q,
@@ -1377,6 +1354,5 @@ export function parseMinimalRequest<E extends MinimalKind>(
     ids,
     countFilter,
     scope,
-    dropped: problems.finish(policy, ["ids", "scope"]),
   };
 }

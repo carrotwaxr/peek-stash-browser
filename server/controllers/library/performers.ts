@@ -12,7 +12,6 @@ import type {
   TypedResponse,
 } from "../../types/api/index.js";
 import {
-  logDropped,
   parseListRequest,
   parseMinimalRequest,
   singleIdRef,
@@ -34,7 +33,6 @@ export const findPerformers = async (
   const request = parseListRequest("performer", req.body, {
     userId: req.user.id,
   });
-  logDropped("POST /library/performers", request.dropped);
 
   const startTime = Date.now();
   const userId = req.user.id;
@@ -115,7 +113,6 @@ export const findPerformersMinimal = async (
 ) => {
   const userId = req.user.id;
   const request = parseMinimalRequest("performer", req.body, { userId });
-  logDropped("POST /library/performers/minimal", request.dropped);
 
   const performers = await findMinimalEntities(req.user, request);
   res.json({ performers });

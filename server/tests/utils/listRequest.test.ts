@@ -1,8 +1,8 @@
 /**
  * The one validated parser for list, clip, minimal and stored carousel
- * requests (item 38). Unknown or invalid input is answered with 400 in
- * `reject` mode and ignored with a record in `drop` mode; a body that is not
- * an object is a 400 in both.
+ * requests (item 38). Unknown or invalid input is answered with 400 naming
+ * its path; stored carousel rules parse leniently and report what they
+ * ignored.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import {
@@ -16,14 +16,9 @@ import {
 } from "vitest";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import type { ApiErrorIssue } from "../../types/api/index.js";
-import type {
-  FilterPolicy,
-  ParsedFilter,
-  RefCriterion,
-} from "../../types/parsedFilters.js";
+import type { ParsedFilter, RefCriterion } from "../../types/parsedFilters.js";
 import {
-  filterPolicy,
-  logDropped,
+  logIgnoredStoredRule,
   parseCarouselRequest,
   parseClipQuery,
   parseListRequest,
@@ -42,9 +37,8 @@ import { generateDailySeed } from "../../utils/seededRandom.js";
 import { must } from "../helpers/must.js";
 
 const USER_ID = 7;
-const POLICIES: readonly FilterPolicy[] = ["drop", "reject"];
 
-const opts = (policy: FilterPolicy) => ({ userId: USER_ID, policy });
+const opts = () => ({ userId: USER_ID });
 
 /** The issues of the ValidationError `fn` throws; fails when it throws nothing else. */
 function issuesOf(fn: () => unknown): ApiErrorIssue[] {
@@ -61,40 +55,34 @@ const paths = (issues: readonly { path: string }[]) =>
   issues.map((issue) => issue.path);
 
 describe("parseListRequest: pagination", () => {
-  it.each(POLICIES)(
-    "clamps page below 1 to 1 and per_page to 1..250; absent per_page is 40 (%s)",
-    (policy) => {
-      const low = parseListRequest(
-        "scene",
-        { filter: { page: 0, per_page: -5 } },
-        opts(policy)
-      );
-      expect(low.page).toBe(1);
-      expect(low.perPage).toBe(1);
-      expect(low.dropped).toEqual([]);
+  it("clamps page below 1 to 1 and per_page to 1..250; absent per_page is 40", () => {
+    const low = parseListRequest(
+      "scene",
+      { filter: { page: 0, per_page: -5 } },
+      opts()
+    );
+    expect(low.page).toBe(1);
+    expect(low.perPage).toBe(1);
 
-      const high = parseListRequest(
-        "scene",
-        { filter: { page: -1, per_page: 1000 } },
-        opts(policy)
-      );
-      expect(high.page).toBe(1);
-      expect(high.perPage).toBe(PER_PAGE_MAX);
+    const high = parseListRequest(
+      "scene",
+      { filter: { page: -1, per_page: 1000 } },
+      opts()
+    );
+    expect(high.page).toBe(1);
+    expect(high.perPage).toBe(PER_PAGE_MAX);
 
-      const absent = parseListRequest("scene", {}, opts(policy));
-      expect(absent.page).toBe(1);
-      expect(absent.perPage).toBe(40);
-      expect(absent.q).toBeUndefined();
-      expect(absent.filter).toEqual({});
-      expect(absent.specificInstanceId).toBeUndefined();
-    }
-  );
+    const absent = parseListRequest("scene", {}, opts());
+    expect(absent.page).toBe(1);
+    expect(absent.perPage).toBe(40);
+    expect(absent.q).toBeUndefined();
+    expect(absent.filter).toEqual({});
+    expect(absent.specificInstanceId).toBeUndefined();
+  });
 
   it("absent per_page is 24 for clips and 50 for minimal requests", () => {
-    expect(parseClipQuery({}, opts("reject")).perPage).toBe(24);
-    expect(parseMinimalRequest("performer", {}, opts("reject")).perPage).toBe(
-      50
-    );
+    expect(parseClipQuery({}, opts()).perPage).toBe(24);
+    expect(parseMinimalRequest("performer", {}, opts()).perPage).toBe(50);
   });
 
   it("a non-numeric page or per_page fails naming filter.per_page (reject)", () => {
@@ -102,28 +90,17 @@ describe("parseListRequest: pagination", () => {
       parseListRequest(
         "scene",
         { filter: { page: "abc", per_page: "many" } },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual(["filter.page", "filter.per_page"]);
-  });
-
-  it("a non-numeric page or per_page takes the default and records the drop (drop)", () => {
-    const parsed = parseListRequest(
-      "scene",
-      { filter: { page: "abc", per_page: "many" } },
-      opts("drop")
-    );
-    expect(parsed.page).toBe(1);
-    expect(parsed.perPage).toBe(40);
-    expect(paths(parsed.dropped)).toEqual(["filter.page", "filter.per_page"]);
   });
 
   it("numeric strings are read as numbers", () => {
     const parsed = parseListRequest(
       "scene",
       { filter: { page: "3", per_page: "25" } },
-      opts("reject")
+      opts()
     );
     expect(parsed.page).toBe(3);
     expect(parsed.perPage).toBe(25);
@@ -131,37 +108,26 @@ describe("parseListRequest: pagination", () => {
 
   it("q is trimmed; empty is undefined; over 200 characters is invalid", () => {
     expect(
-      parseListRequest("scene", { filter: { q: "  hello " } }, opts("reject")).q
+      parseListRequest("scene", { filter: { q: "  hello " } }, opts()).q
     ).toBe("hello");
     expect(
-      parseListRequest("scene", { filter: { q: "   " } }, opts("reject")).q
+      parseListRequest("scene", { filter: { q: "   " } }, opts()).q
     ).toBeUndefined();
     const long = "x".repeat(201);
     expect(
       paths(
         issuesOf(() =>
-          parseListRequest("scene", { filter: { q: long } }, opts("reject"))
+          parseListRequest("scene", { filter: { q: long } }, opts())
         )
       )
     ).toEqual(["filter.q"]);
-    const dropped = parseListRequest(
-      "scene",
-      { filter: { q: long } },
-      opts("drop")
-    );
-    expect(dropped.q).toBeUndefined();
-    expect(paths(dropped.dropped)).toEqual(["filter.q"]);
   });
 
   it("an unknown key in filter is invalid", () => {
     expect(
       paths(
         issuesOf(() =>
-          parseListRequest(
-            "scene",
-            { filter: { per_pages: 10 } },
-            opts("reject")
-          )
+          parseListRequest("scene", { filter: { per_pages: 10 } }, opts())
         )
       )
     ).toEqual(["filter.per_pages"]);
@@ -169,11 +135,11 @@ describe("parseListRequest: pagination", () => {
 });
 
 describe("parseListRequest: sort", () => {
-  it("only the entity's sort keys pass; constructor and __proto__ fall back to the default sort (drop)", () => {
+  it("a sort of the entity's own keys passes; another entity's key is invalid", () => {
     const ok = parseListRequest(
       "scene",
       { filter: { sort: "duration" } },
-      opts("drop")
+      opts()
     );
     expect(ok.sort).toEqual({
       field: "duration",
@@ -181,46 +147,35 @@ describe("parseListRequest: sort", () => {
       seed: undefined,
     });
 
-    for (const sort of ["constructor", "__proto__", "name"]) {
-      const parsed = parseListRequest(
-        "scene",
-        { filter: { sort } },
-        opts("drop")
-      );
-      expect(parsed.sort).toEqual({
-        field: "created_at",
-        direction: "DESC",
-        seed: undefined,
-      });
-      expect(paths(parsed.dropped)).toEqual(["filter.sort"]);
-    }
+    const issues = issuesOf(() =>
+      parseListRequest("scene", { filter: { sort: "name" } }, opts())
+    );
+    expect(paths(issues)).toEqual(["filter.sort"]);
   });
 
-  it("constructor and __proto__ fail naming filter.sort (reject)", () => {
+  it("constructor and __proto__ fail naming filter.sort", () => {
     for (const sort of ["constructor", "__proto__"]) {
       const issues = issuesOf(() =>
-        parseListRequest("scene", { filter: { sort } }, opts("reject"))
+        parseListRequest("scene", { filter: { sort } }, opts())
       );
       expect(paths(issues)).toEqual(["filter.sort"]);
     }
   });
 
   it("each list has its own default sort and direction", () => {
-    expect(parseListRequest("performer", {}, opts("reject")).sort).toEqual({
+    expect(parseListRequest("performer", {}, opts()).sort).toEqual({
       field: "name",
       direction: "ASC",
       seed: undefined,
     });
-    expect(parseListRequest("gallery", {}, opts("reject")).sort.field).toBe(
-      "title"
-    );
+    expect(parseListRequest("gallery", {}, opts()).sort.field).toBe("title");
   });
 
   it("random_123 gives sort random with seed 123; random gets the daily seed; random_abc is invalid", () => {
     const seeded = parseListRequest(
       "scene",
       { filter: { sort: "random_123" } },
-      opts("reject")
+      opts()
     );
     expect(seeded.sort).toEqual({
       field: "random",
@@ -231,7 +186,7 @@ describe("parseListRequest: sort", () => {
     const daily = parseListRequest(
       "scene",
       { filter: { sort: "random" } },
-      opts("reject")
+      opts()
     );
     expect(daily.sort.field).toBe("random");
     expect(daily.sort.seed).toBe(generateDailySeed(USER_ID));
@@ -239,31 +194,20 @@ describe("parseListRequest: sort", () => {
     const large = parseListRequest(
       "performer",
       { filter: { sort: "random_123456789012" } },
-      opts("reject")
+      opts()
     );
     expect(large.sort.seed).toBe(123456789012 % 1e8);
 
     expect(
       paths(
         issuesOf(() =>
-          parseListRequest(
-            "scene",
-            { filter: { sort: "random_abc" } },
-            opts("reject")
-          )
+          parseListRequest("scene", { filter: { sort: "random_abc" } }, opts())
         )
       )
     ).toEqual(["filter.sort"]);
-    const dropped = parseListRequest(
-      "scene",
-      { filter: { sort: "random_abc" } },
-      opts("drop")
-    );
-    expect(dropped.sort.field).toBe("created_at");
-    expect(paths(dropped.dropped)).toEqual(["filter.sort"]);
   });
 
-  it("scene_index needs an including groups criterion: a 400 in reject mode, the default sort in drop mode", () => {
+  it("scene_index needs an including groups criterion: a 400", () => {
     const body = (modifier?: string) => ({
       filter: { sort: "scene_index" },
       scene_filter:
@@ -273,30 +217,19 @@ describe("parseListRequest: sort", () => {
     });
     for (const modifier of [undefined, "EXCLUDES"]) {
       expect(
-        paths(
-          issuesOf(() =>
-            parseListRequest("scene", body(modifier), opts("reject"))
-          )
-        )
+        paths(issuesOf(() => parseListRequest("scene", body(modifier), opts())))
       ).toEqual(["filter.sort"]);
-      const dropped = parseListRequest("scene", body(modifier), opts("drop"));
-      expect(dropped.sort.field).toBe("created_at");
-      expect(paths(dropped.dropped)).toEqual(["filter.sort"]);
     }
     for (const modifier of ["INCLUDES", "INCLUDES_ALL"]) {
-      const parsed = parseListRequest("scene", body(modifier), opts("reject"));
+      const parsed = parseListRequest("scene", body(modifier), opts());
       expect(parsed.sort.field).toBe("scene_index");
-      expect(parsed.dropped).toEqual([]);
     }
   });
 
   it("direction asc is ASC; sideways is invalid", () => {
     expect(
-      parseListRequest(
-        "scene",
-        { filter: { direction: "asc" } },
-        opts("reject")
-      ).sort.direction
+      parseListRequest("scene", { filter: { direction: "asc" } }, opts()).sort
+        .direction
     ).toBe("ASC");
     expect(
       paths(
@@ -304,47 +237,21 @@ describe("parseListRequest: sort", () => {
           parseListRequest(
             "scene",
             { filter: { direction: "sideways" } },
-            opts("reject")
+            opts()
           )
         )
       )
     ).toEqual(["filter.direction"]);
-    const dropped = parseListRequest(
-      "scene",
-      { filter: { direction: "sideways" } },
-      opts("drop")
-    );
-    expect(dropped.sort.direction).toBe("DESC");
-    expect(paths(dropped.dropped)).toEqual(["filter.direction"]);
   });
 });
 
 describe("parseListRequest: filter fields", () => {
-  it("an unknown scene_filter key is dropped with its path (drop)", () => {
-    const parsed = parseListRequest(
-      "scene",
-      {
-        scene_filter: {
-          bogus: { value: 1 },
-          title: { value: "a", modifier: "INCLUDES" },
-        },
-      },
-      opts("drop")
-    );
-    expect(parsed.filter).toEqual({
-      title: { modifier: "INCLUDES", value: "a" },
-    });
-    expect(parsed.dropped).toEqual([
-      { path: "scene_filter.bogus", reason: "Unknown filter field" },
-    ]);
-  });
-
   it("an unknown scene_filter key fails with its path (reject)", () => {
     const issues = issuesOf(() =>
       parseListRequest(
         "scene",
         { scene_filter: { bogus: { value: 1 } } },
-        opts("reject")
+        opts()
       )
     );
     expect(issues).toEqual([
@@ -354,11 +261,7 @@ describe("parseListRequest: filter fields", () => {
 
   it("an unknown top-level key and another entity's filter key are invalid", () => {
     const issues = issuesOf(() =>
-      parseListRequest(
-        "scene",
-        { performer_filter: {}, extra: 1 },
-        opts("reject")
-      )
+      parseListRequest("scene", { performer_filter: {}, extra: 1 }, opts())
     );
     expect(paths(issues)).toEqual(["performer_filter", "extra"]);
   });
@@ -370,22 +273,9 @@ describe("parseListRequest: filter fields", () => {
     },
   };
 
-  it("an unknown modifier drops its whole criterion (drop)", () => {
-    const parsed = parseListRequest("scene", unknownModifiers, opts("drop"));
-    expect(parsed.filter).toEqual({});
-    expect(paths(parsed.dropped)).toEqual([
-      "scene_filter.performers.modifier",
-      "scene_filter.title.modifier",
-    ]);
-  });
-
   it("an unknown modifier fails naming it (reject)", () => {
     expect(
-      paths(
-        issuesOf(() =>
-          parseListRequest("scene", unknownModifiers, opts("reject"))
-        )
-      )
+      paths(issuesOf(() => parseListRequest("scene", unknownModifiers, opts())))
     ).toEqual([
       "scene_filter.performers.modifier",
       "scene_filter.title.modifier",
@@ -403,7 +293,7 @@ describe("parseListRequest: filter fields", () => {
                 studios: { value: ["1:default"], modifier: "INCLUDES_ALL" },
               },
             },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -414,7 +304,7 @@ describe("parseListRequest: filter fields", () => {
     const performer = parseListRequest(
       "performer",
       { performer_filter: { tags: { value: ["3:default"], modifier: null } } },
-      opts("reject")
+      opts()
     );
     expect(performer.filter.tags).toEqual({
       refs: [{ id: "3", instanceId: "default" }],
@@ -432,7 +322,7 @@ describe("parseListRequest: filter fields", () => {
           date: { value: "2024-01-05" },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(scene.filter.rating100).toEqual({
       modifier: "GREATER_THAN",
@@ -460,7 +350,7 @@ describe("parseListRequest: filter fields", () => {
           },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.performers).toEqual({
       refs: [
@@ -482,30 +372,16 @@ describe("parseListRequest: filter fields", () => {
     },
   };
 
-  it("1:bad id and abc are invalid refs; 1,001 values are invalid (reject)", () => {
+  it("1:bad id and abc are invalid refs; 1,001 values are invalid", () => {
     expect(
-      paths(issuesOf(() => parseListRequest("scene", badRefs, opts("reject"))))
+      paths(issuesOf(() => parseListRequest("scene", badRefs, opts())))
     ).toEqual([
       "scene_filter.performers.value.0",
       "scene_filter.performers.value.1",
     ]);
     expect(
-      paths(
-        issuesOf(() => parseListRequest("scene", tooManyRefs, opts("reject")))
-      )
+      paths(issuesOf(() => parseListRequest("scene", tooManyRefs, opts())))
     ).toEqual(["scene_filter.tags.value"]);
-  });
-
-  it("1:bad id and abc are invalid refs; 1,001 values are invalid (drop)", () => {
-    const parsedBad = parseListRequest("scene", badRefs, opts("drop"));
-    expect(parsedBad.filter.performers).toBeUndefined();
-    expect(paths(parsedBad.dropped)).toEqual([
-      "scene_filter.performers.value.0",
-      "scene_filter.performers.value.1",
-    ]);
-    const parsedMany = parseListRequest("scene", tooManyRefs, opts("drop"));
-    expect(parsedMany.filter.tags).toBeUndefined();
-    expect(paths(parsedMany.dropped)).toEqual(["scene_filter.tags.value"]);
   });
 
   it("1,000 values pass", () => {
@@ -516,7 +392,7 @@ describe("parseListRequest: filter fields", () => {
           tags: { value: Array.from({ length: 1000 }, (_, i) => `${i + 1}`) },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.tags?.refs).toHaveLength(1000);
   });
@@ -525,7 +401,7 @@ describe("parseListRequest: filter fields", () => {
     const parsed = parseListRequest(
       "scene",
       { ids: ["5:default", "6"] },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.ids).toEqual({
       refs: [
@@ -537,9 +413,7 @@ describe("parseListRequest: filter fields", () => {
     });
     expect(
       paths(
-        issuesOf(() =>
-          parseListRequest("scene", { ids: ["nope"] }, opts("reject"))
-        )
+        issuesOf(() => parseListRequest("scene", { ids: ["nope"] }, opts()))
       )
     ).toEqual(["ids.0"]);
   });
@@ -548,7 +422,7 @@ describe("parseListRequest: filter fields", () => {
     const joined = parseListRequest(
       "scene",
       { ids: ["5"], scene_filter: { ids: { value: ["6"] } } },
-      opts("reject")
+      opts()
     );
     expect(joined.filter.ids?.refs).toEqual([
       { id: "6", instanceId: undefined },
@@ -563,7 +437,7 @@ describe("parseListRequest: filter fields", () => {
               ids: ["5"],
               scene_filter: { ids: { value: ["6"], modifier: "EXCLUDES" } },
             },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -574,7 +448,7 @@ describe("parseListRequest: filter fields", () => {
     const parsed = parseListRequest(
       "scene",
       { scene_filter: { instance_id: "stash-2" } },
-      opts("reject")
+      opts()
     );
     expect(parsed.specificInstanceId).toBe("stash-2");
     expect(parsed.filter).toEqual({});
@@ -584,28 +458,16 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "scene",
             { scene_filter: { instance_id: "bad id!" } },
-            opts("reject")
-          )
-        )
-      )
-    ).toEqual(["scene_filter.instance_id"]);
-    // Not dropped either: the lookup would widen to every instance
-    expect(
-      paths(
-        issuesOf(() =>
-          parseListRequest(
-            "scene",
-            { scene_filter: { instance_id: "bad id!" } },
-            opts("drop")
+            opts()
           )
         )
       )
     ).toEqual(["scene_filter.instance_id"]);
   });
 
-  it("drop mode still refuses a bad id: ignoring it would answer a lookup with the whole list", () => {
+  it("a bad id is refused with every other issue of the request", () => {
     const refused = (body: unknown) =>
-      paths(issuesOf(() => parseListRequest("performer", body, opts("drop"))));
+      paths(issuesOf(() => parseListRequest("performer", body, opts())));
 
     expect(refused({ ids: ["abc"] })).toEqual(["ids.0"]);
     expect(
@@ -618,16 +480,12 @@ describe("parseListRequest: filter fields", () => {
     expect(
       refused({ ids: ["abc"], performer_filter: { not_a_field: 1 } })
     ).toEqual(["ids.0", "performer_filter.not_a_field"]);
-    // Other bad input is still dropped
-    const dropped = parseListRequest(
-      "performer",
-      { ids: ["5"], performer_filter: { tags: { value: ["abc"] } } },
-      opts("drop")
-    );
-    expect(dropped.filter.ids?.refs).toEqual([
-      { id: "5", instanceId: undefined },
-    ]);
-    expect(paths(dropped.dropped)).toEqual(["performer_filter.tags.value.0"]);
+    expect(
+      refused({
+        ids: ["5"],
+        performer_filter: { tags: { value: ["abc"] } },
+      })
+    ).toEqual(["performer_filter.tags.value.0"]);
   });
 
   it("depth is kept on hierarchical fields and dropped elsewhere", () => {
@@ -641,7 +499,7 @@ describe("parseListRequest: filter fields", () => {
           groups: { value: ["4"], depth: null },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.tags?.depth).toBe(-1);
     expect(parsed.filter.studios?.depth).toBe(2);
@@ -651,12 +509,11 @@ describe("parseListRequest: filter fields", () => {
       depth: 0,
     });
     expect(parsed.filter.groups?.depth).toBe(0);
-    expect(parsed.dropped).toEqual([]);
     expect(
       parseListRequest(
         "scene",
         { scene_filter: { tags: { value: ["1"], depth: null } } },
-        opts("reject")
+        opts()
       ).filter.tags?.depth
     ).toBe(0);
     expect(
@@ -665,7 +522,7 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "scene",
             { scene_filter: { tags: { value: ["1"], depth: -2 } } },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -679,7 +536,7 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "scene",
             { scene_filter: { rating100: { modifier: "BETWEEN", value: 10 } } },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -702,7 +559,7 @@ describe("parseListRequest: filter fields", () => {
           favorite: null,
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({
       rating100: { modifier: "BETWEEN", value: 10, value2: 20 },
@@ -710,7 +567,6 @@ describe("parseListRequest: filter fields", () => {
       date: { modifier: "NOT_NULL" },
       title: { modifier: "IS_NULL" },
     });
-    expect(parsed.dropped).toEqual([]);
   });
 
   it("a comparison without a value, a non-number and an unknown key in a criterion are invalid", () => {
@@ -724,7 +580,7 @@ describe("parseListRequest: filter fields", () => {
             o_counter: { value: 1, modifer: "EQUALS" },
           },
         },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -747,7 +603,7 @@ describe("parseListRequest: filter fields", () => {
           created_at: { value: "2024-02-05T10:00:00.123+02:00" },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.date).toEqual({
       modifier: "BETWEEN",
@@ -760,7 +616,7 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "scene",
             { scene_filter: { date: { value: "yesterday" } } },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -779,7 +635,7 @@ describe("parseListRequest: filter fields", () => {
           fake_tits: { value: "Natural" },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({
       name: { modifier: "EQUALS", value: "Jane" },
@@ -798,7 +654,7 @@ describe("parseListRequest: filter fields", () => {
             eye_color: { value: "Hazel", modifier: "INCLUDES" },
           },
         },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -817,7 +673,7 @@ describe("parseListRequest: filter fields", () => {
           orientation: { value: ["PORTRAIT", "SQUARE"] },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter.resolution).toEqual({
       modifier: "GREATER_THAN",
@@ -831,7 +687,7 @@ describe("parseListRequest: filter fields", () => {
       parseListRequest(
         "performer",
         { performer_filter: { gender: { value: "female" } } },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual(["performer_filter.gender.value"]);
@@ -841,7 +697,7 @@ describe("parseListRequest: filter fields", () => {
     const parsed = parseListRequest(
       "scene",
       { scene_filter: { favorite: true, organized: false } },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({ favorite: true, organized: false });
     expect(
@@ -850,7 +706,7 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "scene",
             { scene_filter: { favorite: "true" } },
-            opts("reject")
+            opts()
           )
         )
       )
@@ -868,7 +724,7 @@ describe("parseListRequest: filter fields", () => {
           },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({
       scenes: {
@@ -891,7 +747,7 @@ describe("parseListRequest: filter fields", () => {
             scenes: { value: ["1"] },
           },
         },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -904,18 +760,16 @@ describe("parseListRequest: filter fields", () => {
           parseListRequest(
             "tag",
             { tag_filter: { scenes_filter: "all" } },
-            opts("reject")
+            opts()
           )
         )
       )
     ).toEqual(["tag_filter.scenes_filter"]);
   });
 
-  it.each(POLICIES)("a body that is not an object fails (%s)", (policy) => {
+  it("a body that is not an object fails", () => {
     for (const body of ["scenes", null, 3, ["a"]]) {
-      const issues = issuesOf(() =>
-        parseListRequest("scene", body, opts(policy))
-      );
+      const issues = issuesOf(() => parseListRequest("scene", body, opts()));
       expect(issues).toEqual([{ path: "body", message: "Expected an object" }]);
     }
   });
@@ -923,34 +777,24 @@ describe("parseListRequest: filter fields", () => {
   it("a filter object that is not an object is invalid, and null is absent", () => {
     expect(
       paths(
-        issuesOf(() =>
-          parseListRequest("scene", { scene_filter: [] }, opts("reject"))
-        )
+        issuesOf(() => parseListRequest("scene", { scene_filter: [] }, opts()))
       )
     ).toEqual(["scene_filter"]);
     expect(
-      paths(
-        issuesOf(() =>
-          parseListRequest("scene", { filter: "x" }, opts("reject"))
-        )
-      )
+      paths(issuesOf(() => parseListRequest("scene", { filter: "x" }, opts())))
     ).toEqual(["filter"]);
     const parsed = parseListRequest(
       "scene",
       { filter: null, scene_filter: null, ids: null },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({});
-    expect(parsed.dropped).toEqual([]);
   });
 });
 
 describe("parseClipQuery", () => {
   it("query strings coerce: perPage '1000' gives 250; page below 1 is 1", () => {
-    const parsed = parseClipQuery(
-      { page: "0", perPage: "1000" },
-      opts("reject")
-    );
+    const parsed = parseClipQuery({ page: "0", perPage: "1000" }, opts());
     expect(parsed.page).toBe(1);
     expect(parsed.perPage).toBe(PER_PAGE_MAX);
     expect(parsed.sort).toEqual({
@@ -962,51 +806,43 @@ describe("parseClipQuery", () => {
     expect(parsed.filter).toEqual({});
     expect(parsed.q).toBeUndefined();
     expect(parsed.specificInstanceId).toBeUndefined();
-    expect(parsed.dropped).toEqual([]);
   });
 
   it("isGenerated true or false narrows to clips with or without a preview; absent lists every clip", () => {
-    expect(
-      parseClipQuery({ isGenerated: "true" }, opts("reject")).filter
-    ).toEqual({ isGenerated: true });
-    expect(
-      parseClipQuery({ isGenerated: "false" }, opts("reject")).filter
-    ).toEqual({ isGenerated: false });
-    expect(parseClipQuery({}, opts("reject")).filter.isGenerated).toBe(
-      undefined
-    );
+    expect(parseClipQuery({ isGenerated: "true" }, opts()).filter).toEqual({
+      isGenerated: true,
+    });
+    expect(parseClipQuery({ isGenerated: "false" }, opts()).filter).toEqual({
+      isGenerated: false,
+    });
+    expect(parseClipQuery({}, opts()).filter.isGenerated).toBe(undefined);
   });
 
   it("sortBy is whitelisted and sortDir is asc or desc", () => {
     const parsed = parseClipQuery(
       { sortBy: "seconds", sortDir: "asc" },
-      opts("reject")
+      opts()
     );
     expect(parsed.sort).toEqual({
       field: "seconds",
       direction: "ASC",
       seed: undefined,
     });
-    expect(
-      parseClipQuery({ sortBy: "random_42" }, opts("reject")).sort
-    ).toEqual({ field: "random", direction: "DESC", seed: 42 });
+    expect(parseClipQuery({ sortBy: "random_42" }, opts()).sort).toEqual({
+      field: "random",
+      direction: "DESC",
+      seed: 42,
+    });
     expect(
       paths(
         issuesOf(() =>
           parseClipQuery(
             { sortBy: "created_at", sortDir: "sideways", perPage: "abc" },
-            opts("reject")
+            opts()
           )
         )
       )
     ).toEqual(["sortBy", "sortDir", "perPage"]);
-    const dropped = parseClipQuery(
-      { sortBy: "created_at", sortDir: "sideways", perPage: "abc" },
-      opts("drop")
-    );
-    expect(dropped.perPage).toBe(24);
-    expect(dropped.sort.field).toBe("stashCreatedAt");
-    expect(paths(dropped.dropped)).toEqual(["sortBy", "sortDir", "perPage"]);
   });
 
   it("tagIds is a comma list of refs with tagIdsModifier; single refs take INCLUDES", () => {
@@ -1023,7 +859,7 @@ describe("parseClipQuery", () => {
         instanceId: "default",
         q: " intro ",
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({
       tagIds: {
@@ -1060,7 +896,7 @@ describe("parseClipQuery", () => {
     expect(parsed.specificInstanceId).toBe("default");
   });
 
-  it("an unknown modifier drops the criterion; a bad ref, a modifier for a single ref, an unknown key and a repeated key are invalid", () => {
+  it("an unknown modifier, a bad ref, a modifier for a single ref, an unknown key and a repeated key are invalid", () => {
     const issues = issuesOf(() =>
       parseClipQuery(
         {
@@ -1072,7 +908,7 @@ describe("parseClipQuery", () => {
           bogus: "1",
           performerIds: ["1", "2"],
         },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -1083,32 +919,23 @@ describe("parseClipQuery", () => {
       "bogus",
       "performerIds",
     ]);
-    const dropped = parseClipQuery(
-      { tagIds: "1", tagIdsModifier: "SOMETIMES", isGenerated: "maybe" },
-      opts("drop")
-    );
-    expect(dropped.filter).toEqual({});
-    expect(paths(dropped.dropped)).toEqual(["tagIdsModifier", "isGenerated"]);
   });
 
   it("an empty ref list is omitted; a query that is not an object fails", () => {
-    const parsed = parseClipQuery({ tagIds: " , " }, opts("reject"));
+    const parsed = parseClipQuery({ tagIds: " , " }, opts());
     expect(parsed.filter).toEqual({});
-    expect(issuesOf(() => parseClipQuery("x", opts("reject")))).toEqual([
+    expect(issuesOf(() => parseClipQuery("x", opts()))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);
   });
   it.each([
     { query: { sceneId: "abc" }, path: "sceneId.0" },
     { query: { instanceId: "bad id!" }, path: "instanceId" },
-  ])(
-    "drop mode still refuses a bad $path: ignoring it would list every clip",
-    ({ query, path }) => {
-      expect(
-        paths(issuesOf(() => parseClipQuery(query, opts("drop"))))
-      ).toEqual([path]);
-    }
-  );
+  ])("a bad $path is refused", ({ query, path }) => {
+    expect(paths(issuesOf(() => parseClipQuery(query, opts())))).toEqual([
+      path,
+    ]);
+  });
 });
 
 describe("parseMinimalRequest", () => {
@@ -1120,7 +947,7 @@ describe("parseMinimalRequest", () => {
         filter: { q: " a ", per_page: 1000 },
         count_filter: { min_scene_count: 1, min_image_count: 0 },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed).toEqual({
       entity: "gallery",
@@ -1131,23 +958,20 @@ describe("parseMinimalRequest", () => {
         { id: "13", instanceId: undefined },
       ],
       countFilter: { min_scene_count: 1, min_image_count: 0 },
-      dropped: [],
     });
-    expect(parseMinimalRequest("tag", {}, opts("reject"))).toEqual({
+    expect(parseMinimalRequest("tag", {}, opts())).toEqual({
       entity: "tag",
       q: undefined,
       perPage: 50,
       ids: undefined,
       countFilter: undefined,
-      dropped: [],
     });
     expect(
-      parseMinimalRequest("tag", { filter: { per_page: 0 } }, opts("reject"))
-        .perPage
+      parseMinimalRequest("tag", { filter: { per_page: 0 } }, opts()).perPage
     ).toBe(1);
     // An empty list names nothing to look up: no ids filter
     expect(
-      parseMinimalRequest("studio", { ids: [] }, opts("reject")).ids
+      parseMinimalRequest("studio", { ids: [] }, opts()).ids
     ).toBeUndefined();
   });
 
@@ -1156,7 +980,7 @@ describe("parseMinimalRequest", () => {
       parseMinimalRequest(
         "performer",
         { filter: { sort: "name", direction: "ASC", page: 1 } },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -1164,13 +988,6 @@ describe("parseMinimalRequest", () => {
       "filter.direction",
       "filter.page",
     ]);
-    const dropped = parseMinimalRequest(
-      "performer",
-      { filter: { sort: "rating", direction: "DESC", q: "x" } },
-      opts("drop")
-    );
-    expect(dropped.q).toBe("x");
-    expect(paths(dropped.dropped)).toEqual(["filter.sort", "filter.direction"]);
   });
 
   it("a negative count, an unknown count key and an unknown body key are invalid", () => {
@@ -1181,7 +998,7 @@ describe("parseMinimalRequest", () => {
           count_filter: { min_scene_count: -1, min_tag_count: 1 },
           performer_filter: {},
         },
-        opts("reject")
+        opts()
       )
     );
     expect(paths(issues)).toEqual([
@@ -1189,82 +1006,61 @@ describe("parseMinimalRequest", () => {
       "count_filter.min_tag_count",
       "performer_filter",
     ]);
-    const dropped = parseMinimalRequest(
-      "performer",
-      { count_filter: { min_tag_count: 1 } },
-      opts("drop")
-    );
-    expect(dropped.countFilter).toBeUndefined();
-    expect(paths(dropped.dropped)).toEqual(["count_filter.min_tag_count"]);
   });
 
-  it.each(POLICIES)(
-    "ids that are not ids, or more than 100 of them, fail in both policies (%s)",
-    (policy) => {
-      expect(
-        paths(
-          issuesOf(() =>
-            parseMinimalRequest(
-              "tag",
-              { ids: ["12:inst-a", "abc", "7:bad instance"] },
-              opts(policy)
-            )
-          )
-        )
-      ).toEqual(["ids.1", "ids.2"]);
-      const tooMany = Array.from({ length: 101 }, (_, i) => String(i + 1));
-      expect(
-        paths(
-          issuesOf(() =>
-            parseMinimalRequest("tag", { ids: tooMany }, opts(policy))
-          )
-        )
-      ).toEqual(["ids"]);
-      expect(
-        paths(
-          issuesOf(() =>
-            parseMinimalRequest("tag", { ids: "12" }, opts(policy))
-          )
-        )
-      ).toEqual(["ids"]);
-      expect(
-        parseMinimalRequest(
-          "tag",
-          { ids: Array.from({ length: 100 }, (_, i) => String(i + 1)) },
-          opts(policy)
-        ).ids
-      ).toHaveLength(100);
-    }
-  );
-
-  it.each(POLICIES)("a body that is not an object fails (%s)", (policy) => {
+  it("ids that are not ids, or more than 100 of them, fail", () => {
     expect(
-      issuesOf(() => parseMinimalRequest("studio", 1, opts(policy)))
-    ).toEqual([{ path: "body", message: "Expected an object" }]);
+      paths(
+        issuesOf(() =>
+          parseMinimalRequest(
+            "tag",
+            { ids: ["12:inst-a", "abc", "7:bad instance"] },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["ids.1", "ids.2"]);
+    const tooMany = Array.from({ length: 101 }, (_, i) => String(i + 1));
+    expect(
+      paths(
+        issuesOf(() => parseMinimalRequest("tag", { ids: tooMany }, opts()))
+      )
+    ).toEqual(["ids"]);
+    expect(
+      paths(issuesOf(() => parseMinimalRequest("tag", { ids: "12" }, opts())))
+    ).toEqual(["ids"]);
+    expect(
+      parseMinimalRequest(
+        "tag",
+        { ids: Array.from({ length: 100 }, (_, i) => String(i + 1)) },
+        opts()
+      ).ids
+    ).toHaveLength(100);
+  });
+
+  it("a body that is not an object fails", () => {
+    expect(issuesOf(() => parseMinimalRequest("studio", 1, opts()))).toEqual([
+      { path: "body", message: "Expected an object" },
+    ]);
   });
 
   it("reads scope allEnabled; no scope is the user's own instances", () => {
     expect(
-      parseMinimalRequest("tag", { scope: "allEnabled" }, opts("reject")).scope
+      parseMinimalRequest("tag", { scope: "allEnabled" }, opts()).scope
     ).toBe("allEnabled");
+    expect(parseMinimalRequest("tag", {}, opts()).scope).toBeUndefined();
     expect(
-      parseMinimalRequest("tag", {}, opts("reject")).scope
-    ).toBeUndefined();
-    expect(
-      parseMinimalRequest("tag", { scope: null }, opts("reject")).scope
+      parseMinimalRequest("tag", { scope: null }, opts()).scope
     ).toBeUndefined();
   });
 
-  it.each(POLICIES)(
-    "any other scope fails in both policies: it names the instances the request looks in (%s)",
-    (policy) => {
-      for (const scope of ["all", "ALLENABLED", "", 1, true, ["allEnabled"]]) {
-        expect(
-          issuesOf(() => parseMinimalRequest("tag", { scope }, opts(policy)))
-        ).toEqual([{ path: "scope", message: 'Expected "allEnabled"' }]);
-      }
+  it("any other scope fails: it names the instances the request looks in", () => {
+    for (const scope of ["all", "ALLENABLED", "", 1, true, ["allEnabled"]]) {
+      expect(
+        issuesOf(() => parseMinimalRequest("tag", { scope }, opts()))
+      ).toEqual([{ path: "scope", message: 'Expected "allEnabled"' }]);
     }
-  );
+  });
 });
 
 describe("parseListRequest: an empty value", () => {
@@ -1278,7 +1074,7 @@ describe("parseListRequest: an empty value", () => {
           height: { value: 170, value2: "", modifier: "GREATER_THAN" },
         },
       },
-      opts("reject")
+      opts()
     );
     expect(parsed.filter).toEqual({
       birthdate: { modifier: "IS_NULL" },
@@ -1296,7 +1092,7 @@ describe("parseListRequest: an empty value", () => {
             birthdate: { value: "", value2: "2000-01-01", modifier: "BETWEEN" },
           },
         },
-        opts("reject")
+        opts()
       )
     );
     expect(issues).toEqual([
@@ -1311,23 +1107,21 @@ describe("parseSceneClipsRequest", () => {
       parseSceneClipsRequest(
         "42",
         { includeUngenerated: "true", instanceId: "inst-1" },
-        opts("reject")
+        opts()
       )
     ).toEqual({
       sceneId: "42",
       includeUngenerated: true,
       specificInstanceId: "inst-1",
-      dropped: [],
     });
-    expect(parseSceneClipsRequest("42", {}, opts("reject"))).toEqual({
+    expect(parseSceneClipsRequest("42", {}, opts())).toEqual({
       sceneId: "42",
       includeUngenerated: false,
       specificInstanceId: undefined,
-      dropped: [],
     });
   });
 
-  it("a bad value and an unknown parameter are invalid, or dropped", () => {
+  it("a bad value and an unknown parameter are invalid", () => {
     const query = { includeUngenerated: "yes", page: "2" };
     expect(
       paths(
@@ -1335,35 +1129,18 @@ describe("parseSceneClipsRequest", () => {
           parseSceneClipsRequest(
             "42",
             { ...query, instanceId: "inst 1" },
-            opts("reject")
+            opts()
           )
         )
       )
     ).toEqual(["includeUngenerated", "page", "instanceId"]);
-
-    const dropped = parseSceneClipsRequest("42", query, opts("drop"));
-    expect(dropped.includeUngenerated).toBe(false);
-    expect(paths(dropped.dropped)).toEqual(["includeUngenerated", "page"]);
   });
 
-  it("drop mode still refuses a bad instanceId: the scene's clips would come from every instance", () => {
+  it("a scene id that is not a Stash id fails", () => {
     expect(
-      paths(
-        issuesOf(() =>
-          parseSceneClipsRequest("42", { instanceId: "inst 1" }, opts("drop"))
-        )
-      )
-    ).toEqual(["instanceId"]);
+      issuesOf(() => parseSceneClipsRequest("scene-1", {}, opts()))
+    ).toEqual([{ path: "id", message: "Expected an id" }]);
   });
-
-  it.each(POLICIES)(
-    "a scene id that is not a Stash id fails (%s)",
-    (policy) => {
-      expect(
-        issuesOf(() => parseSceneClipsRequest("scene-1", {}, opts(policy)))
-      ).toEqual([{ path: "id", message: "Expected an id" }]);
-    }
-  );
 });
 
 describe("parseStashId", () => {
@@ -1401,46 +1178,39 @@ describe("singleIdRef", () => {
 });
 
 describe("parseStoredSceneQuery", () => {
-  const original = process.env.PEEK_FILTER_POLICY;
-  afterEach(() => {
-    if (original === undefined) delete process.env.PEEK_FILTER_POLICY;
-    else process.env.PEEK_FILTER_POLICY = original;
+  it("a stored carousel rule with an unknown key still runs, and its ignored path is reported", () => {
+    const parsed = parseStoredSceneQuery(
+      {
+        tags: { value: ["284"], modifier: "INCLUDES_ALL" },
+        bogus: { value: 1 },
+        performers: { value: ["1"], modifier: "SOMETIMES" },
+      },
+      "rating",
+      "asc",
+      { userId: USER_ID, perPage: 12 }
+    );
+    expect(parsed.filter).toEqual({
+      tags: {
+        refs: [{ id: "284", instanceId: undefined }],
+        modifier: "INCLUDES_ALL",
+        depth: 0,
+      },
+    });
+    expect(parsed.sort).toEqual({
+      field: "rating",
+      direction: "ASC",
+      seed: undefined,
+    });
+    expect(parsed.page).toBe(1);
+    expect(parsed.perPage).toBe(12);
+    expect(parsed.ignored).toEqual([
+      { path: "rules.bogus", reason: "Unknown filter field" },
+      {
+        path: "rules.performers.modifier",
+        reason: expect.any(String) as string,
+      },
+    ]);
   });
-
-  it.each(POLICIES)(
-    "stored carousel rules parse in drop mode whatever the policy (%s)",
-    (policy) => {
-      process.env.PEEK_FILTER_POLICY = policy;
-      const parsed = parseStoredSceneQuery(
-        {
-          tags: { value: ["284"], modifier: "INCLUDES_ALL" },
-          bogus: { value: 1 },
-          performers: { value: ["1"], modifier: "SOMETIMES" },
-        },
-        "rating",
-        "asc",
-        { userId: USER_ID, perPage: 12 }
-      );
-      expect(parsed.filter).toEqual({
-        tags: {
-          refs: [{ id: "284", instanceId: undefined }],
-          modifier: "INCLUDES_ALL",
-          depth: 0,
-        },
-      });
-      expect(parsed.sort).toEqual({
-        field: "rating",
-        direction: "ASC",
-        seed: undefined,
-      });
-      expect(parsed.page).toBe(1);
-      expect(parsed.perPage).toBe(12);
-      expect(paths(parsed.dropped)).toEqual([
-        "rules.bogus",
-        "rules.performers.modifier",
-      ]);
-    }
-  );
 
   it("a random sort takes the given seed, else the daily one; a bad sort or direction takes the default", () => {
     const seeded = parseStoredSceneQuery({}, "random", "DESC", {
@@ -1461,7 +1231,7 @@ describe("parseStoredSceneQuery", () => {
       direction: "DESC",
       seed: undefined,
     });
-    expect(paths(bad.dropped)).toEqual(["sort", "direction"]);
+    expect(paths(bad.ignored)).toEqual(["sort", "direction"]);
   });
 
   it("rules that are not an object give an empty filter with a record", () => {
@@ -1469,16 +1239,15 @@ describe("parseStoredSceneQuery", () => {
       userId: USER_ID,
     });
     expect(parsed.filter).toEqual({});
-    expect(parsed.dropped).toEqual([
+    expect(parsed.ignored).toEqual([
       { path: "rules", reason: "Expected an object" },
     ]);
   });
 });
 
 describe("parseCarouselRequest", () => {
-  const carouselOpts = (policy: FilterPolicy) => ({
+  const carouselOpts = () => ({
     userId: USER_ID,
-    policy,
     perPage: 12,
     randomSeed: 99,
   });
@@ -1493,7 +1262,7 @@ describe("parseCarouselRequest", () => {
         sort: "random",
         direction: "asc",
       },
-      carouselOpts("reject")
+      carouselOpts()
     );
     expect(parsed).toEqual({
       page: 1,
@@ -1508,12 +1277,11 @@ describe("parseCarouselRequest", () => {
         },
       },
       specificInstanceId: "a",
-      dropped: [],
     });
   });
 
   it("parts not sent stay out: no filter and the scene defaults", () => {
-    const parsed = parseCarouselRequest({}, carouselOpts("reject"));
+    const parsed = parseCarouselRequest({}, carouselOpts());
     expect(parsed.filter).toEqual({});
     expect(parsed.sort).toEqual({
       field: "created_at",
@@ -1522,7 +1290,7 @@ describe("parseCarouselRequest", () => {
     });
   });
 
-  it("an unknown rule key, a bogus sort and direction sideways fail at their paths (reject)", () => {
+  it("an unknown rule key, a bogus sort and direction sideways fail at their paths", () => {
     expect(
       paths(
         issuesOf(() =>
@@ -1532,44 +1300,30 @@ describe("parseCarouselRequest", () => {
               sort: "bogus",
               direction: "sideways",
             },
-            carouselOpts("reject")
+            carouselOpts()
           )
         )
       )
     ).toEqual(["rules.not_a_field", "sort", "direction"]);
   });
 
-  it("the same input is dropped with records (drop)", () => {
-    const parsed = parseCarouselRequest(
-      {
-        rules: { not_a_field: { value: 1 }, favorite: true },
-        sort: "constructor",
-        direction: "DESC",
-      },
-      carouselOpts("drop")
-    );
-    expect(parsed.filter).toEqual({ favorite: true });
-    expect(parsed.sort.field).toBe("created_at");
-    expect(paths(parsed.dropped)).toEqual(["rules.not_a_field", "sort"]);
-  });
-
-  it("drop mode still refuses a bad rules.ids or rules.instance_id", () => {
+  it("a bad rules.ids or rules.instance_id fails at its path", () => {
     expect(
       paths(
         issuesOf(() =>
           parseCarouselRequest(
             { rules: { ids: { value: ["abc"] }, instance_id: "a b" } },
-            carouselOpts("drop")
+            carouselOpts()
           )
         )
       )
     ).toEqual(["rules.ids.value.0", "rules.instance_id"]);
   });
 
-  it.each(POLICIES)("rules that are not an object fail (%s)", (policy) => {
+  it("rules that are not an object fail", () => {
     for (const rules of [null, [], "x"]) {
       expect(
-        issuesOf(() => parseCarouselRequest({ rules }, carouselOpts(policy)))
+        issuesOf(() => parseCarouselRequest({ rules }, carouselOpts()))
       ).toEqual([{ path: "rules", message: "Expected an object" }]);
     }
   });
@@ -1581,109 +1335,82 @@ describe("parseSimilarScenesRequest", () => {
       parseSimilarScenesRequest(
         "42",
         { page: "3", instanceId: "inst-1" },
-        opts("reject")
+        opts()
       )
     ).toEqual({
       sceneId: "42",
       page: 3,
       specificInstanceId: "inst-1",
-      dropped: [],
     });
-    expect(parseSimilarScenesRequest("42", {}, opts("reject"))).toEqual({
+    expect(parseSimilarScenesRequest("42", {}, opts())).toEqual({
       sceneId: "42",
       page: 1,
       specificInstanceId: undefined,
-      dropped: [],
     });
-    expect(
-      parseSimilarScenesRequest("42", { page: "0" }, opts("reject")).page
-    ).toBe(1);
+    expect(parseSimilarScenesRequest("42", { page: "0" }, opts()).page).toBe(1);
   });
 
-  it("page abc and an unknown parameter are invalid, or dropped", () => {
+  it("page abc and an unknown parameter are invalid", () => {
     expect(
       paths(
         issuesOf(() =>
           parseSimilarScenesRequest(
             "42",
             { page: "abc", per_page: "5" },
-            opts("reject")
+            opts()
           )
         )
       )
     ).toEqual(["page", "per_page"]);
-    const dropped = parseSimilarScenesRequest(
-      "42",
-      { page: "abc", per_page: "5" },
-      opts("drop")
-    );
-    expect(dropped.page).toBe(1);
-    expect(paths(dropped.dropped)).toEqual(["page", "per_page"]);
   });
 
-  it.each(POLICIES)(
-    "a bad instanceId or scene id fails: the seed would be guessed (%s)",
-    (policy) => {
-      expect(
-        paths(
-          issuesOf(() =>
-            parseSimilarScenesRequest(
-              "42",
-              { instanceId: "inst 1" },
-              opts(policy)
-            )
-          )
+  it("a bad instanceId or scene id fails: the seed would be guessed", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseSimilarScenesRequest("42", { instanceId: "inst 1" }, opts())
         )
-      ).toEqual(["instanceId"]);
-      expect(
-        issuesOf(() => parseSimilarScenesRequest("s1", {}, opts(policy)))
-      ).toEqual([{ path: "id", message: "Expected an id" }]);
-    }
-  );
+      )
+    ).toEqual(["instanceId"]);
+    expect(issuesOf(() => parseSimilarScenesRequest("s1", {}, opts()))).toEqual(
+      [{ path: "id", message: "Expected an id" }]
+    );
+  });
 });
 
 describe("parseRecommendedRequest", () => {
   it("reads page and per_page: 24 by default, held to 1..250", () => {
-    expect(parseRecommendedRequest({}, opts("reject"))).toEqual({
+    expect(parseRecommendedRequest({}, opts())).toEqual({
       page: 1,
       perPage: 24,
-      dropped: [],
     });
     expect(
-      parseRecommendedRequest({ page: "2", per_page: "1000" }, opts("reject"))
-    ).toEqual({ page: 2, perPage: PER_PAGE_MAX, dropped: [] });
+      parseRecommendedRequest({ page: "2", per_page: "1000" }, opts())
+    ).toEqual({ page: 2, perPage: PER_PAGE_MAX });
     expect(
-      parseRecommendedRequest({ page: "-1", per_page: "0" }, opts("reject"))
-    ).toEqual({ page: 1, perPage: 1, dropped: [] });
+      parseRecommendedRequest({ page: "-1", per_page: "0" }, opts())
+    ).toEqual({ page: 1, perPage: 1 });
   });
 
-  it("page abc and an unknown parameter are invalid, or dropped", () => {
+  it("page abc and an unknown parameter are invalid", () => {
     expect(
       paths(
         issuesOf(() =>
-          parseRecommendedRequest(
-            { page: "abc", sort: "title" },
-            opts("reject")
-          )
+          parseRecommendedRequest({ page: "abc", sort: "title" }, opts())
         )
       )
     ).toEqual(["page", "sort"]);
-    const dropped = parseRecommendedRequest(
-      { page: "abc", per_page: ["1", "2"] },
-      opts("drop")
-    );
-    expect(dropped).toEqual({
-      page: 1,
-      perPage: 24,
-      dropped: [
-        { path: "page", reason: "Expected a number" },
-        { path: "per_page", reason: "Expected a number" },
-      ],
-    });
+    expect(
+      paths(
+        issuesOf(() =>
+          parseRecommendedRequest({ page: "abc", per_page: ["1", "2"] }, opts())
+        )
+      )
+    ).toEqual(["page", "per_page"]);
   });
 
-  it.each(POLICIES)("a query that is not an object fails (%s)", (policy) => {
-    expect(issuesOf(() => parseRecommendedRequest("x", opts(policy)))).toEqual([
+  it("a query that is not an object fails", () => {
+    expect(issuesOf(() => parseRecommendedRequest("x", opts()))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);
   });
@@ -1691,103 +1418,82 @@ describe("parseRecommendedRequest", () => {
 
 describe("parsePlaylistItemsRequest", () => {
   it("without page and per_page, every item: no paging", () => {
-    expect(parsePlaylistItemsRequest({}, opts("reject"))).toEqual({
+    expect(parsePlaylistItemsRequest({}, opts())).toEqual({
       paging: undefined,
-      dropped: [],
     });
   });
 
   it("reads page and per_page: 50 by default, held to 1..100", () => {
     expect(
-      parsePlaylistItemsRequest({ page: "2", per_page: "2" }, opts("reject"))
-    ).toEqual({ paging: { page: 2, perPage: 2 }, dropped: [] });
-    expect(parsePlaylistItemsRequest({ page: "3" }, opts("reject"))).toEqual({
+      parsePlaylistItemsRequest({ page: "2", per_page: "2" }, opts())
+    ).toEqual({ paging: { page: 2, perPage: 2 } });
+    expect(parsePlaylistItemsRequest({ page: "3" }, opts())).toEqual({
       paging: { page: 3, perPage: 50 },
-      dropped: [],
+    });
+    expect(parsePlaylistItemsRequest({ per_page: "10" }, opts())).toEqual({
+      paging: { page: 1, perPage: 10 },
     });
     expect(
-      parsePlaylistItemsRequest({ per_page: "10" }, opts("reject"))
-    ).toEqual({ paging: { page: 1, perPage: 10 }, dropped: [] });
+      parsePlaylistItemsRequest({ page: "2", per_page: "500" }, opts())
+    ).toEqual({ paging: { page: 2, perPage: 100 } });
     expect(
-      parsePlaylistItemsRequest({ page: "2", per_page: "500" }, opts("reject"))
-    ).toEqual({ paging: { page: 2, perPage: 100 }, dropped: [] });
-    expect(
-      parsePlaylistItemsRequest({ page: "-1", per_page: "0" }, opts("reject"))
-    ).toEqual({ paging: { page: 1, perPage: 1 }, dropped: [] });
+      parsePlaylistItemsRequest({ page: "-1", per_page: "0" }, opts())
+    ).toEqual({ paging: { page: 1, perPage: 1 } });
   });
 
-  it("page abc and an unknown parameter are invalid, or dropped", () => {
+  it("page abc and an unknown parameter are invalid", () => {
     expect(
       paths(
         issuesOf(() =>
-          parsePlaylistItemsRequest(
-            { page: "abc", sort: "title" },
-            opts("reject")
-          )
+          parsePlaylistItemsRequest({ page: "abc", sort: "title" }, opts())
         )
       )
     ).toEqual(["page", "sort"]);
-    // Nothing valid left: every item, as without paging
-    expect(
-      parsePlaylistItemsRequest({ page: "abc", sort: "title" }, opts("drop"))
-    ).toEqual({
-      paging: undefined,
-      dropped: [
-        { path: "page", reason: "Expected a number" },
-        { path: "sort", reason: "Unknown query parameter" },
-      ],
-    });
-    expect(
-      parsePlaylistItemsRequest(
-        { page: ["1", "2"], per_page: "5" },
-        opts("drop")
-      )
-    ).toEqual({
-      paging: { page: 1, perPage: 5 },
-      dropped: [{ path: "page", reason: "Expected a number" }],
-    });
-  });
-
-  it.each(POLICIES)("a query that is not an object fails (%s)", (policy) => {
-    expect(
-      issuesOf(() => parsePlaylistItemsRequest("x", opts(policy)))
-    ).toEqual([{ path: "query", message: "Expected an object" }]);
-  });
-});
-
-describe("filterPolicy", () => {
-  const original = process.env.PEEK_FILTER_POLICY;
-  afterEach(() => {
-    if (original === undefined) delete process.env.PEEK_FILTER_POLICY;
-    else process.env.PEEK_FILTER_POLICY = original;
-  });
-
-  it("is reject only when PEEK_FILTER_POLICY says so, else drop", () => {
-    process.env.PEEK_FILTER_POLICY = "reject";
-    expect(filterPolicy()).toBe("reject");
-    process.env.PEEK_FILTER_POLICY = "drop";
-    expect(filterPolicy()).toBe("drop");
-    process.env.PEEK_FILTER_POLICY = "bogus";
-    expect(filterPolicy()).toBe("drop");
-    delete process.env.PEEK_FILTER_POLICY;
-    expect(filterPolicy()).toBe("drop");
-  });
-
-  it("parseListRequest reads it when no policy is given", () => {
-    process.env.PEEK_FILTER_POLICY = "reject";
-    expect(() =>
-      parseListRequest("scene", { bogus: 1 }, { userId: USER_ID })
-    ).toThrow(ValidationError);
-    process.env.PEEK_FILTER_POLICY = "drop";
     expect(
       paths(
-        parseListRequest("scene", { bogus: 1 }, { userId: USER_ID }).dropped
+        issuesOf(() =>
+          parsePlaylistItemsRequest({ page: ["1", "2"], per_page: "5" }, opts())
+        )
       )
-    ).toEqual(["bogus"]);
+    ).toEqual(["page"]);
+  });
+
+  it("a query that is not an object fails", () => {
+    expect(issuesOf(() => parsePlaylistItemsRequest("x", opts()))).toEqual([
+      { path: "query", message: "Expected an object" },
+    ]);
   });
 });
 
-describe("logDropped", () => {
+describe("PEEK_FILTER_POLICY", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("with no PEEK_FILTER_POLICY set, an unknown scene_filter key answers 400 naming its path", () => {
+    vi.stubEnv("PEEK_FILTER_POLICY", undefined);
+    const issues = issuesOf(() =>
+      parseListRequest(
+        "scene",
+        { scene_filter: { bogus: { value: 1 } } },
+        { userId: USER_ID }
+      )
+    );
+    expect(paths(issues)).toEqual(["scene_filter.bogus"]);
+  });
+
+  it.each(["drop", "reject", "bogus"])(
+    "the variable is dead: %s still answers 400",
+    (policy) => {
+      vi.stubEnv("PEEK_FILTER_POLICY", policy);
+      expect(() =>
+        parseListRequest("scene", { bogus: 1 }, { userId: USER_ID })
+      ).toThrow(ValidationError);
+    }
+  );
+});
+
+describe("logIgnoredStoredRule", () => {
   beforeEach(() => {
     _resetLogThrottleForTesting();
   });
@@ -1795,31 +1501,31 @@ describe("logDropped", () => {
     vi.restoreAllMocks();
   });
 
-  it("warns once per route and path, naming both and the reason", () => {
+  it("warns once per carousel and path, naming both and the reason", () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
-    const dropped = [
-      { path: "scene_filter.bogus", reason: "Unknown filter field" },
-      { path: "filter.sort", reason: "Unknown sort" },
+    const ignored = [
+      { path: "rules.bogus", reason: "Unknown filter field" },
+      { path: "sort", reason: "Unknown sort" },
     ];
-    logDropped("POST /library/scenes", dropped);
-    logDropped("POST /library/scenes", dropped);
-    logDropped("POST /library/images", dropped.slice(0, 1));
+    logIgnoredStoredRule("c1", ignored);
+    logIgnoredStoredRule("c1", ignored);
+    logIgnoredStoredRule("c2", ignored.slice(0, 1));
     expect(warn).toHaveBeenCalledTimes(3);
-    expect(warn).toHaveBeenNthCalledWith(1, "Unknown filter input ignored", {
-      route: "POST /library/scenes",
-      path: "scene_filter.bogus",
+    expect(warn).toHaveBeenNthCalledWith(1, "Stored carousel rule ignored", {
+      carouselId: "c1",
+      path: "rules.bogus",
       reason: "Unknown filter field",
     });
-    expect(warn).toHaveBeenNthCalledWith(3, "Unknown filter input ignored", {
-      route: "POST /library/images",
-      path: "scene_filter.bogus",
+    expect(warn).toHaveBeenNthCalledWith(3, "Stored carousel rule ignored", {
+      carouselId: "c2",
+      path: "rules.bogus",
       reason: "Unknown filter field",
     });
   });
 
   it("logs nothing for an empty list", () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
-    logDropped("POST /library/scenes", []);
+    logIgnoredStoredRule("c1", []);
     expect(warn).not.toHaveBeenCalled();
   });
 });
