@@ -7,7 +7,7 @@
  * reaches every mounted reader at once (item 52); its table columns are the
  * ones the tables save.
  */
-import type { NormalizedScene } from "@peek/shared-types";
+import type { NormalizedScene, TableColumnsConfig } from "@peek/shared-types";
 import {
   fireEvent,
   render,
@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../../src/api";
 import CustomizationTab from "../../../../src/components/settings/tabs/CustomizationTab";
 import SceneCardPreview from "../../../../src/components/ui/SceneCardPreview";
+import { getColumnsForEntity } from "../../../../src/config/tableColumns";
 import { useTableColumns } from "../../../../src/hooks/useTableColumns";
 import { showError, showSuccess } from "../../../../src/utils/toast";
 import { flushPromises, must } from "../../../testUtils";
@@ -70,6 +71,28 @@ function SceneTableDuration() {
       Toggle Duration on the table
     </button>
   );
+}
+
+/** A performer table's toggle of its first optional column */
+function PerformerTableToggle() {
+  const { toggleColumn } = useTableColumns("performer");
+  const optional = must(
+    getColumnsForEntity("performer").find((col) => !col.mandatory),
+    "an optional performer column"
+  );
+  return (
+    <button type="button" onClick={() => toggleColumn(optional.id)}>
+      Toggle a column on the table
+    </button>
+  );
+}
+
+/** The table columns the nth PUT carried */
+function sentColumns(n: number): Record<string, TableColumnsConfig> {
+  const body = mockApiPut.mock.calls[n]?.[1] as {
+    tableColumnDefaults?: Record<string, TableColumnsConfig>;
+  };
+  return must(body.tableColumnDefaults, `the table columns of PUT ${n}`);
 }
 
 /** The editor's checkbox for a column, found by its label */
@@ -200,6 +223,36 @@ describe("CustomizationTab", () => {
     expect(
       within(section).getByRole("button", { name: "Save Changes" })
     ).toBeEnabled();
+  });
+
+  it("saving in Settings keeps another type's columns a table saved meanwhile", async () => {
+    mockApiPut.mockResolvedValue({ success: true });
+    render(
+      <SignedInWithQuery>
+        <PerformerTableToggle />
+        <CustomizationTab />
+      </SignedInWithQuery>
+    );
+    const section = await tableColumns();
+    // Scene's columns edited in Settings, not saved yet
+    fireEvent.click(columnBox(section, "Rating"));
+
+    // Meanwhile a performer table saves its columns
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle a column on the table" })
+    );
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
+    await flushPromises();
+    const performerColumns = sentColumns(0).performer;
+    expect(performerColumns).toBeDefined();
+
+    fireEvent.click(
+      within(section).getByRole("button", { name: "Save Changes" })
+    );
+
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(2));
+    expect(sentColumns(1).performer).toEqual(performerColumns);
+    expect(sentColumns(1).scene?.visible).toContain("rating");
   });
 
   it("a failed view preference save shows the server's message and keeps the stored value", async () => {
