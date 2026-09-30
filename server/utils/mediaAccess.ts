@@ -6,7 +6,10 @@
  * the request is served from, so hidden items, restrictions and instance
  * selection apply to thumbnails and streams as they do to lists.
  */
-import { canUserAccessEntity } from "../services/EntityAccessService.js";
+import {
+  canUserAccessEntity,
+  canUserSeeApartFromOwnHides,
+} from "../services/EntityAccessService.js";
 import { INSTANCE_ID_PATTERN, type MediaEntity } from "./stashMediaPath.js";
 
 /**
@@ -26,6 +29,16 @@ export function isValidInstanceId(value: unknown): value is string {
 }
 
 /**
+ * Whose rows a media check reads. "all": every exclusion row refuses, as on
+ * the stream and caption routes. "apartFromOwnHides": the user's own
+ * 'hidden' rows are set aside, so the stored media paths (thumbnails,
+ * covers, previews) of an entity the user hid still load, as its Hidden
+ * Items row shows it; a restriction, its cascades, a hide's cascade or a
+ * sync hold still refuses.
+ */
+export type MediaExclusions = "all" | "apartFromOwnHides";
+
+/**
  * True when the user may load every entity the media path names on the
  * instance the request names and is served from (a scene_marker path names
  * its scene and its clip; both must pass).
@@ -33,13 +46,14 @@ export function isValidInstanceId(value: unknown): value is string {
 export async function canUserLoadMedia(
   userId: number,
   entities: MediaEntity[],
-  instanceId: string
+  instanceId: string,
+  exclusions: MediaExclusions = "all"
 ): Promise<boolean> {
   if (entities.length === 0) return false;
+  const check =
+    exclusions === "all" ? canUserAccessEntity : canUserSeeApartFromOwnHides;
   const results = await Promise.all(
-    entities.map((e) =>
-      canUserAccessEntity(userId, e.entityType, e.entityId, instanceId)
-    )
+    entities.map((e) => check(userId, e.entityType, e.entityId, instanceId))
   );
   return results.every(Boolean);
 }

@@ -27,8 +27,8 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
-import type { TestClient } from "../helpers/testClient.js";
 import {
+  TestClient,
   adminClient,
   restoreInstanceSelection,
   selectTestInstanceOnly,
@@ -591,6 +591,33 @@ describe("Hidden items and content restrictions (integration)", () => {
         data: { coverPath: null },
       });
     }
+  });
+
+  it("a hidden scene's Hidden Items thumbnail loads, and a restricted one's stays refused", async () => {
+    const hide = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: testInstanceId,
+    });
+    expect(hide.status).toBe(200);
+    // Rows stored before hiding checked visibility: hidden, then restricted
+    // through the tag's cascade
+    await hideFor(hider.id, "scene", restrictedScene.id, testInstanceId);
+    await exclusionComputationService.recomputeForUser(hider.id);
+
+    const scene = must(
+      (await list("scene")).find((i) => i.entityId === visibleScene.id)
+    );
+    const thumbnail = must(scene.summary?.imageUrl, "scene thumbnail");
+    const restrictedThumbnail = `/api/proxy/stash?path=${encodeURIComponent(
+      `/scene/${restrictedScene.id}/screenshot`
+    )}&instanceId=${encodeURIComponent(testInstanceId)}`;
+
+    // A client of its own: nothing it has loaded before can answer for it
+    const fresh = new TestClient();
+    await fresh.login("access_it_hider", "access_it_pass_1");
+    expect((await fresh.get(thumbnail)).status).toBe(200);
+    expect((await fresh.get(restrictedThumbnail)).status).toBe(404);
   });
 
   it("hiding a clip removes it from /api/clips and its scene's clips, and nothing else", async () => {

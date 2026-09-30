@@ -153,7 +153,40 @@ function accessParams(
 }
 
 /** May this user see this one entity? One SQL round trip. */
-export async function canUserAccessEntity(
+export function canUserAccessEntity(
+  userId: number,
+  entityType: AccessEntityType,
+  entityId: string,
+  instanceId: string
+): Promise<boolean> {
+  return checkOne(ACCESS_WHERE, userId, entityType, entityId, instanceId);
+}
+
+/**
+ * Could this user see this one entity if they had hidden nothing? Rules 1 to
+ * 4 with only the user's own 'hidden' rows set aside, as the Hidden Items
+ * list reads them (resolveVisibleApartFromOwnHides): a restriction, its
+ * cascades, a hide's cascade or a sync hold still refuses. For the media of
+ * an entity the user hid, so its Hidden Items thumbnail loads. One SQL round
+ * trip.
+ */
+export function canUserSeeApartFromOwnHides(
+  userId: number,
+  entityType: AccessEntityType,
+  entityId: string,
+  instanceId: string
+): Promise<boolean> {
+  return checkOne(
+    ACCESS_WHERE_APART_FROM_OWN_HIDES,
+    userId,
+    entityType,
+    entityId,
+    instanceId
+  );
+}
+
+async function checkOne(
+  accessWhere: string,
   userId: number,
   entityType: AccessEntityType,
   entityId: string,
@@ -167,7 +200,7 @@ FROM ${source.table} x
 JOIN StashInstance si ON si.id = x.stashInstanceId AND si.enabled = 1
 ${source.join}
 WHERE x.id = ? AND x.stashInstanceId = ?
-  AND ${ACCESS_WHERE}
+  AND ${accessWhere}
   ${source.where}
 LIMIT 1`;
 

@@ -229,10 +229,10 @@ describe("media security", () => {
       expect(hide.status).toBe(200);
     }, 30_000);
 
-    it("a scene the user has hidden returns 404 on screenshot and stream", async () => {
+    it("a scene the user has hidden keeps its screenshot (Hidden Items shows it) and returns 404 on its stream", async () => {
       expect(
         (await media(screenshotPath, { cookie: mediaUserCookie })).status
-      ).toBe(404);
+      ).toBe(200);
       expect(
         (
           await media(streamPath, {

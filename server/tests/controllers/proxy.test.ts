@@ -12,7 +12,10 @@ import {
   proxyStashMedia,
 } from "../../controllers/proxy.js";
 import prisma from "../../prisma/singleton.js";
-import { canUserAccessEntity } from "../../services/EntityAccessService.js";
+import {
+  canUserAccessEntity,
+  canUserSeeApartFromOwnHides,
+} from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { stashInstanceRow } from "../helpers/fixtures.js";
@@ -30,6 +33,7 @@ vi.mock(
 
 vi.mock("../../services/EntityAccessService.js", () => ({
   canUserAccessEntity: vi.fn().mockResolvedValue(true),
+  canUserSeeApartFromOwnHides: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -89,6 +93,7 @@ vi.mock("stream", () => ({ pipeline: mockPipeline }));
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
+const mockSeeApartFromOwnHides = vi.mocked(canUserSeeApartFromOwnHides);
 
 // =============================================================================
 // Helpers
@@ -155,6 +160,7 @@ async function restoreDefaults() {
     )
   );
   mockCanUserAccessEntity.mockResolvedValue(true);
+  mockSeeApartFromOwnHides.mockResolvedValue(true);
 }
 
 /**
@@ -369,7 +375,7 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "instanceId is required",
       });
-      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      expect(mockSeeApartFromOwnHides).not.toHaveBeenCalled();
       expect(mockHttpGet).not.toHaveBeenCalled();
     });
   });
@@ -451,7 +457,7 @@ describe("Proxy Controller", () => {
         error: "Invalid path parameter",
       });
       expect(mockHttpGet).not.toHaveBeenCalled();
-      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      expect(mockSeeApartFromOwnHides).not.toHaveBeenCalled();
     });
 
     it("returns 400 for a hash-keyed sprite path", async () => {
@@ -482,9 +488,9 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
-    it("returns 404 when the user cannot access the entity in the path", async () => {
+    it("returns 404 when the user could not see the entity in the path apart from their own hides", async () => {
       setupHttpGetSuccess();
-      mockCanUserAccessEntity.mockResolvedValue(false);
+      mockSeeApartFromOwnHides.mockResolvedValue(false);
 
       const req = reqFor(proxyStashMedia, {
         query: { path: "/performer/5/image", instanceId: "inst-a" },
@@ -494,7 +500,7 @@ describe("Proxy Controller", () => {
 
       await proxyStashMedia(req, res);
 
-      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+      expect(mockSeeApartFromOwnHides).toHaveBeenCalledWith(
         7,
         "performer",
         "5",
@@ -517,13 +523,13 @@ describe("Proxy Controller", () => {
       });
       await proxyStashMedia(req, resFor(proxyStashMedia));
 
-      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+      expect(mockSeeApartFromOwnHides).toHaveBeenCalledWith(
         7,
         "scene",
         "2587",
         "inst-a"
       );
-      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+      expect(mockSeeApartFromOwnHides).toHaveBeenCalledWith(
         7,
         "clip",
         "429",
@@ -534,7 +540,7 @@ describe("Proxy Controller", () => {
       // Either entity hidden hides the clip media
       for (const hidden of ["scene", "clip"]) {
         mockHttpGet.mockClear();
-        mockCanUserAccessEntity.mockImplementation((_u, entityType) =>
+        mockSeeApartFromOwnHides.mockImplementation((_u, entityType) =>
           Promise.resolve(entityType !== hidden)
         );
         const res = resFor(proxyStashMedia);
@@ -569,7 +575,7 @@ describe("Proxy Controller", () => {
       });
       await proxyStashMedia(req, resFor(proxyStashMedia));
 
-      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+      expect(mockSeeApartFromOwnHides).toHaveBeenCalledWith(
         7,
         "performer",
         "5",
@@ -1567,9 +1573,10 @@ describe("Proxy Controller", () => {
         "http://stash-default:9999/scene/42/preview?apikey=key-default",
       ]);
       expect(
-        mockCanUserAccessEntity.mock.calls.map(
-          ([, , , instanceId]) => instanceId
-        )
+        [
+          ...mockSeeApartFromOwnHides.mock.calls,
+          ...mockCanUserAccessEntity.mock.calls,
+        ].map(([, , , instanceId]) => instanceId)
       ).toEqual(["default", "default"]);
       expect(responses.map((res) => res.status.mock.calls)).toEqual([
         [[200]],

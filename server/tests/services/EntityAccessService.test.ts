@@ -11,6 +11,7 @@ import prisma from "../../prisma/singleton.js";
 import {
   type AccessEntityType,
   canUserAccessEntity,
+  canUserSeeApartFromOwnHides,
   getVisibleEntityKeys,
   resolveAccessibleInstanceId,
   resolveVisibleApartFromOwnHides,
@@ -123,6 +124,34 @@ describe("EntityAccessService", () => {
       await expect(
         canUserAccessEntity(7, "scene", "42", "inst-a")
       ).rejects.toThrow("database is locked");
+    });
+  });
+
+  describe("canUserSeeApartFromOwnHides", () => {
+    it("sets aside only the user's own hides, with the same binds as canUserAccessEntity", async () => {
+      mockQuery.mockResolvedValueOnce([{ ok: 1 }]);
+      await expect(
+        canUserSeeApartFromOwnHides(7, "clip", "42", "inst-a")
+      ).resolves.toBe(true);
+
+      const { sql, params } = call();
+      expect(sql).toContain("AND e.reason <> 'hidden'");
+      // The clip's scene still refuses on any reason
+      expect(sql).toContain("es.entityType = 'scene'");
+      expect(sql).toContain("x.deletedAt IS NULL");
+      await canUserAccessEntity(7, "clip", "42", "inst-a");
+      expect(call(1).sql).not.toContain("reason");
+      expect(params).toEqual(call(1).params);
+    });
+
+    it("returns false without a query for an empty id or instance", async () => {
+      await expect(
+        canUserSeeApartFromOwnHides(7, "scene", "", "inst-a")
+      ).resolves.toBe(false);
+      await expect(
+        canUserSeeApartFromOwnHides(7, "scene", "42", "")
+      ).resolves.toBe(false);
+      expect(mockQuery).not.toHaveBeenCalled();
     });
   });
 
