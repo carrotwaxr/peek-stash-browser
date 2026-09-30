@@ -31,6 +31,7 @@ export const HIDEABLE_ENTITY_TYPES = [
   "group",
   "gallery",
   "image",
+  "clip",
 ] as const satisfies readonly HiddenEntityType[];
 
 export type EntityType = (typeof HIDEABLE_ENTITY_TYPES)[number];
@@ -120,6 +121,14 @@ const SUMMARY_SOURCES: Record<EntityType, SummarySource> = {
     fallbackB: "NULL",
     image: "x.pathThumbnail",
     fallback: (filePath) => getImageFallbackTitle(filePath),
+  },
+  clip: {
+    table: "StashClip",
+    name: "x.title",
+    fallbackA: "NULL",
+    fallbackB: "NULL",
+    image: "x.screenshotPath",
+    fallback: noFallback,
   },
 };
 

@@ -268,9 +268,10 @@ LIMIT 1`;
 }
 
 /**
- * The entity types a user can hide (clips follow their scene).
+ * The entity types a user can hide: every one, clips included (a hidden
+ * clip is hidden alone; a hidden scene hides its clips too).
  */
-export type HideableEntityType = Exclude<AccessEntityType, "clip">;
+export type HideableEntityType = AccessEntityType;
 
 /**
  * For hidden rows: where could this user see each entity if they had hidden

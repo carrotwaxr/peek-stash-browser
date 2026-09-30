@@ -68,6 +68,7 @@ const COUNTS = {
   group: 0,
   gallery: 0,
   image: 0,
+  clip: 0,
 };
 
 function renderPage(route = "/hidden-items") {
@@ -229,6 +230,31 @@ describe("HiddenItemsPage", () => {
         )
       );
     }
+  });
+
+  it("the Clips tab lists a hidden clip with its thumbnail", async () => {
+    const clip = hiddenRow(20, "clip", "31", "inst-a", {
+      name: "A hidden clip",
+      imageUrl: proxyUrl("/clip/31/screenshot", "inst-a"),
+    });
+    mockApiGet.mockResolvedValue({
+      items: [clip],
+      total: 1,
+      counts: { ...COUNTS, scene: 0, tag: 0, clip: 1 },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Clips 1" }));
+    expect(mockApiGet).toHaveBeenLastCalledWith(
+      "/user/hidden-entities?entityType=clip&page=1&per_page=50"
+    );
+    const img = await screen.findByAltText("A hidden clip");
+    await waitFor(() =>
+      expect(img).toHaveAttribute(
+        "src",
+        proxyUrl("/clip/31/screenshot", "inst-a")
+      )
+    );
   });
 
   it("restores a row without details on its own instance", async () => {

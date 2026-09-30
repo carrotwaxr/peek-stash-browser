@@ -50,7 +50,7 @@ function everyRefVisible() {
   );
 }
 
-const SEVEN_TYPES = [
+const HIDEABLE_TYPES = [
   "scene",
   "performer",
   "studio",
@@ -58,18 +58,19 @@ const SEVEN_TYPES = [
   "group",
   "gallery",
   "image",
+  "clip",
 ];
 
 describe("HIDEABLE_ENTITY_TYPES", () => {
-  it("lists the seven types a user can hide", () => {
-    expect(HIDEABLE_ENTITY_TYPES).toEqual(SEVEN_TYPES);
+  it("lists the eight types a user can hide (clips included)", () => {
+    expect(HIDEABLE_ENTITY_TYPES).toEqual(HIDEABLE_TYPES);
   });
 
-  it.each(SEVEN_TYPES)("isHideableEntityType(%j) is true", (type) => {
+  it.each(HIDEABLE_TYPES)("isHideableEntityType(%j) is true", (type) => {
     expect(isHideableEntityType(type)).toBe(true);
   });
 
-  it.each(["clip", "Scene", "scenes", "", "toString"])(
+  it.each(["marker", "Scene", "scenes", "", "toString"])(
     "isHideableEntityType(%j) is false",
     (type) => {
       expect(isHideableEntityType(type)).toBe(false);
@@ -324,11 +325,11 @@ describe("UserHiddenEntityService", () => {
 
       expect(mockPrisma.userHiddenEntity.groupBy).toHaveBeenCalledWith({
         by: ["entityType"],
-        where: { userId: 1, entityType: { in: SEVEN_TYPES } },
+        where: { userId: 1, entityType: { in: HIDEABLE_TYPES } },
         _count: { _all: true },
       });
       expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
-        where: { userId: 1, entityType: { in: SEVEN_TYPES } },
+        where: { userId: 1, entityType: { in: HIDEABLE_TYPES } },
         orderBy: [{ hiddenAt: "desc" }, { id: "desc" }],
         skip: 100,
         take: 50,
@@ -342,6 +343,7 @@ describe("UserHiddenEntityService", () => {
         group: 0,
         gallery: 0,
         image: 0,
+        clip: 0,
       });
     });
 
@@ -557,7 +559,7 @@ describe("UserHiddenEntityService", () => {
     it("leaves out a stored row of a type no one can hide, without checking it", async () => {
       everyRefVisible();
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-        hidden(1, "clip", "5", "i"),
+        hidden(1, "marker", "5", "i"),
       ]);
 
       const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
@@ -567,12 +569,12 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("counts no row of a type no one can hide", async () => {
-      groups({ scene: 2, clip: 4 });
+      groups({ scene: 2, marker: 4 });
 
       const result = await userHiddenEntityService.getHiddenEntities(1, PAGE);
 
       expect(result.total).toBe(2);
-      expect(result.counts).not.toHaveProperty("clip");
+      expect(result.counts).not.toHaveProperty("marker");
     });
   });
 

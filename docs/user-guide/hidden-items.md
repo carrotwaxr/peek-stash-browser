@@ -27,6 +27,7 @@ The same three-dot menu is available on:
 - Tag cards
 - Group/Collection cards
 - Gallery cards
+- Clip cards (on the Clips page)
 
 ### Bulk Actions (Scenes)
 
@@ -51,7 +52,7 @@ The page lists your hidden items newest first, 50 to a page, each with its thumb
 From the Hidden Items page:
 - Click **Restore** on individual items to unhide them. Restore finishes once the item shows again in your lists, so it can take a moment on a large library
 - Click **Restore All** to restore all hidden items at once, or every hidden item of the open tab's type
-- Use the tabs to filter by entity type (Scenes, Performers, Studios, etc.)
+- Use the tabs to filter by entity type (Scenes, Performers, Studios, Clips, etc.)
 
 ### Don't Ask Again
 
@@ -84,6 +85,7 @@ When you hide an entity:
 - **Hiding a Tag**: That tag, its child tags, and the scenes (including inherited tags), galleries, images, clip markers, performers, studios and collections tagged with any of them
 - **Hiding a Collection**: That collection and its scenes
 - **Hiding a Gallery**: That gallery, its images and the scenes linked to it
+- **Hiding a Clip**: Only that clip. Its scene and the scene's other clips stay; hiding a scene hides its clips too
 
 Hiding a tag or studio hides its whole subtree; unhiding the parent restores the children and their content at the next recompute. Performers, studios, collections and tags left with no visible content disappear from lists until some of their content is visible again.
 

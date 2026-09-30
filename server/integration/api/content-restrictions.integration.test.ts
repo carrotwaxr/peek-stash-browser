@@ -4,6 +4,7 @@ import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
   adminClient,
+  findTestInstanceId,
   restoreInstanceSelection,
   selectTestInstanceForClient,
   selectTestInstanceOnly,
@@ -508,23 +509,38 @@ describe("Content Restrictions Integration Tests", () => {
 
     describe("DELETE /api/user/hidden-entities/:entityType/:entityId", () => {
       it("should unhide an entity", async () => {
-        // First ensure we have something hidden
-        await testUserClient.post("/api/user/hidden-entities", {
+        const instanceId = await findTestInstanceId();
+        const stored = () =>
+          prisma.userHiddenEntity.count({
+            where: {
+              userId: testUserId,
+              entityType: "performer",
+              entityId: TEST_ENTITIES.performerWithScenes,
+              instanceId,
+            },
+          });
+
+        // First hide it, on the test instance
+        const hide = await testUserClient.post("/api/user/hidden-entities", {
           entityType: "performer",
           entityId: TEST_ENTITIES.performerWithScenes,
+          instanceId,
         });
+        expect(hide.status).toBe(200);
+        expect(await stored()).toBe(1);
 
         // Now unhide it
         const response = await testUserClient.delete<{
           success: boolean;
           message: string;
         }>(
-          `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}`
+          `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}?instanceId=${instanceId}`
         );
 
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
+        expect(await stored()).toBe(0);
       }, 30_000); // Hide + unhide both trigger exclusion recompute
     });
 

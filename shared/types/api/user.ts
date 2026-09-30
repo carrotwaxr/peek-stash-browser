@@ -489,7 +489,8 @@ export type HiddenEntityType =
   | "tag"
   | "group"
   | "gallery"
-  | "image";
+  | "image"
+  | "clip";
 
 /** GET /api/user/hidden-entities */
 export interface GetHiddenEntitiesQuery extends Record<

@@ -32,6 +32,7 @@ const TYPE_TABS: ReadonlyArray<{ id: HiddenEntityType; label: string }> = [
   { id: "group", label: "Collections" },
   { id: "gallery", label: "Galleries" },
   { id: "image", label: "Images" },
+  { id: "clip", label: "Clips" },
 ];
 
 const ENTITY_TYPE_LABELS: Record<HiddenEntityType, string> = {
@@ -42,6 +43,7 @@ const ENTITY_TYPE_LABELS: Record<HiddenEntityType, string> = {
   group: "Collection",
   gallery: "Gallery",
   image: "Image",
+  clip: "Clip",
 };
 
 const isTabId = (value: string | null): value is TabId =>
