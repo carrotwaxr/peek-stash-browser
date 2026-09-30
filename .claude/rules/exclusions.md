@@ -31,6 +31,7 @@ paths:
 - Cascades follow the junction rows sync writes. A missing junction row is a silent cascade miss, not an error.
 - Reason precedence: every restriction-derived reason is stored ahead of `hidden`, and restriction cascades run apart from hide cascades (order in the compute's file header). The Hidden Items list relies on it: a `hidden` row means the user would see the entity if they had hidden nothing. Merging the cascade sources again, or reordering the dedup, shows restricted entities' data there.
 - Every entity type is hideable, clips included. A clip hide stores one `hidden` row and no cascade (`clip` is not in `RESOLVE_TABLE`); `ClipQueryBuilder`'s exclusion anti-join and `EntityAccessService`'s clip source (which also checks the clip's scene) read it. Hiding a scene hides its clips; hiding a clip never touches its scene. `HiddenEntityType` in shared, `HideableEntityType` in `EntityAccessService` and `SUMMARY_SOURCES` in `UserHiddenEntityService` follow `HIDEABLE_ENTITY_TYPES`; a new type needs all three.
+- The swap also rewrites `UserExcludedContentCount` (the viewer's excluded links per entity, from `_peek_counts`), and a hide's unit increments it for the rows it adds; the builders subtract it from the live count columns, so a card equals the tab's total.
 
 ## Triggers
 
