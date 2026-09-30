@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
+import { useHoverCapable } from "../../hooks/useHoverCapable";
+import { useInView } from "../../hooks/useInView";
 import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
@@ -47,17 +49,28 @@ const SceneCardPreview = ({
   const [sprites, setSprites] = useState<SpriteData[]>([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
-  const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const [containerElement, setContainerElement] =
-    useState<HTMLDivElement | null>(null);
+  const hasHoverCapability = useHoverCapable();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [previewDataLoaded, setPreviewDataLoaded] = useState(false);
   const [activePreviewType, setActivePreviewType] = useState<string | null>(
     null
   ); // Track which type is actually being used (after fallback)
-  const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false); // True lazy loading for screenshots
+  // The screenshot loads once the card comes within 200px of the viewport,
+  // so the browser never queues a whole grid's images at once
+  const shouldLoadScreenshot = useInView(containerRef, {
+    rootMargin: "200px",
+    once: true,
+  });
+  // Scroll autoplay: the thumbnail is 90% visible, clear of the viewport's
+  // top and bottom 5% (whatever the device reports about hover)
+  const isInView = useInView(containerRef, {
+    rootMargin: "-5% 0px",
+    threshold: [0, 0.5, 0.9, 1.0],
+    minRatio: 0.9,
+    skip: !autoplayOnScroll,
+  });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // If hover is disabled (TV mode), ensure any previous hover state is cleared
@@ -92,77 +105,18 @@ const SceneCardPreview = ({
     setCurrentSpriteIndex(0);
   }
 
-  // Detect hover capability (mouse/trackpad vs touch-only)
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover)");
-    setHasHoverCapability(mediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setHasHoverCapability(e.matches);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // True lazy loading for screenshots - only load when card enters viewport
-  // This prevents the browser from queuing all 24+ images at once
-  useEffect(() => {
-    if (!containerElement || shouldLoadScreenshot) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setShouldLoadScreenshot(true);
-          observer.disconnect(); // Only need to trigger once
-        }
-      },
-      {
-        rootMargin: "200px", // Start loading slightly before visible
-        threshold: 0,
-      }
-    );
-    observer.observe(containerElement);
-
-    return () => observer.disconnect();
-  }, [containerElement, shouldLoadScreenshot]);
-
-  // Intersection Observer for scroll-based autoplay (when autoplayOnScroll is enabled)
-  useEffect(() => {
-    // When autoplayOnScroll is enabled, use intersection observer regardless of hover capability
-    // This fixes mobile devices that incorrectly report hover support
-    if (!autoplayOnScroll || !containerElement) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          // Only autoplay when thumbnail is mostly visible (90%) with clearance from viewport edges
-          // The 5% rootMargin shrink ensures thumbnail isn't right at viewport edge
-          const newIsInView =
-            entry.isIntersecting && entry.intersectionRatio >= 0.9;
-          setIsInView(newIsInView);
-        });
-      },
-      {
-        threshold: [0, 0.5, 0.9, 1.0],
-        rootMargin: "-5% 0px", // 5% clearance from top/bottom, no x-axis restriction
-      }
-    );
-    observer.observe(containerElement);
-
-    return () => observer.disconnect();
-  }, [autoplayOnScroll, containerElement]);
+  // Whether a preview shows now: in view under scroll autoplay, else the
+  // external active state (TV focus) or a hover on a device that can hover
+  const shouldShowAnimation = autoplayOnScroll
+    ? isInView
+    : (active ?? (hasHoverCapability ? isHovering : false));
 
   // Lazy-load preview data only when hovering or in view
   // Implements user preference with smart 404 fallback for high quality options
   useEffect(() => {
-    // Determine if we should trigger loading
-    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
-    const shouldTriggerLoad = autoplayOnScroll ? isInView : isUserActive;
-
-    // Don't load if not triggered yet, already loaded, no preview type, or already loading
+    // Don't load if not showing yet, already loaded, no preview type, or already loading
     if (
-      !shouldTriggerLoad ||
+      !shouldShowAnimation ||
       previewDataLoaded ||
       !preferredPreviewType ||
       isLoading
@@ -253,11 +207,7 @@ const SceneCardPreview = ({
 
     void loadPreview();
   }, [
-    isHovering,
-    isInView,
-    autoplayOnScroll,
-    active,
-    hasHoverCapability,
+    shouldShowAnimation,
     preferredPreviewType,
     previewDataLoaded,
     isLoading,
@@ -268,32 +218,17 @@ const SceneCardPreview = ({
     spriteCount,
   ]);
 
-  // Measure container width on mount and when hovering
+  // The sprite is scaled to the card's width, which matters only while a
+  // preview shows: measure it (and follow resizes) only then
   useEffect(() => {
-    if (!containerElement) return;
-
-    const updateWidth = () => {
-      if (containerElement) {
-        setContainerWidth(containerElement.offsetWidth);
-      }
-    };
-
-    // Set initial width
+    const container = containerRef.current;
+    if (!shouldShowAnimation || !container) return;
+    const updateWidth = () => setContainerWidth(container.offsetWidth);
     updateWidth();
-
-    // Update on resize
     const resizeObserver = new ResizeObserver(updateWidth);
-    resizeObserver.observe(containerElement);
-
+    resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
-  }, [containerElement]);
-
-  // Update width when starting to hover
-  useEffect(() => {
-    if (isHovering && containerElement && containerWidth === 0) {
-      setContainerWidth(containerElement.offsetWidth);
-    }
-  }, [isHovering, containerWidth, containerElement]);
+  }, [shouldShowAnimation]);
 
   // Cycle through sprites (only for sprite preview type)
   useEffect(() => {
@@ -302,13 +237,7 @@ const SceneCardPreview = ({
       return;
     }
 
-    // Determine if we should animate based on hover capability and autoplayOnScroll setting
-    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
-    const shouldAnimate = autoplayOnScroll
-      ? isInView // When autoplayOnScroll is enabled, animate when in view (mobile-first)
-      : isUserActive;
-
-    if (!shouldAnimate || sprites.length === 0) {
+    if (!shouldShowAnimation || sprites.length === 0) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -328,23 +257,7 @@ const SceneCardPreview = ({
         intervalRef.current = null;
       }
     };
-  }, [
-    activePreviewType,
-    isHovering,
-    isInView,
-    hasHoverCapability,
-    autoplayOnScroll,
-    active,
-    sprites.length,
-    cycleInterval,
-  ]);
-
-  // Determine if we should show animation based on hover/scroll state
-  const shouldShowAnimation = (() => {
-    if (autoplayOnScroll) return isInView;
-    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
-    return isUserActive;
-  })();
+  }, [activePreviewType, shouldShowAnimation, sprites.length, cycleInterval]);
 
   // For sprite preview, calculate scale factor
   const currentSprite = sprites[currentSpriteIndex];
@@ -376,7 +289,7 @@ const SceneCardPreview = ({
 
   return (
     <div
-      ref={setContainerElement}
+      ref={containerRef}
       className="w-full h-full relative overflow-hidden"
       onMouseEnter={() => {
         if (!disableHover && hasHoverCapability) setIsHovering(true);
@@ -385,8 +298,8 @@ const SceneCardPreview = ({
         if (!disableHover && hasHoverCapability) setIsHovering(false);
       }}
     >
-      {/* Screenshot base layer - true lazy loading via IntersectionObserver */}
-      {/* Only set src when card enters viewport to prevent browser from queuing all images */}
+      {/* Screenshot base layer, the card's only screenshot img: its src is set
+          once the card nears the viewport */}
       <img
         src={
           shouldLoadScreenshot

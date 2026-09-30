@@ -11,6 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import { libraryApi } from "../../api";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
+import { useInView } from "../../hooks/useInView";
 import { CardCountIndicators } from "./CardCountIndicators";
 import EntityMenu from "./EntityMenu";
 import { ExpandableDescription } from "./ExpandableDescription";
@@ -107,6 +108,11 @@ interface CardImageProps {
   fromPageTitle?: string;
   linkState?: Record<string, unknown>;
   onClickOverride?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  /**
+   * The children draw the image (a scene's preview draws its screenshot), so
+   * this draws no img of its own; with no `src` it still shows the placeholder
+   */
+  mediaInChildren?: boolean;
 }
 
 export const CardImage = ({
@@ -123,11 +129,15 @@ export const CardImage = ({
   fromPageTitle,
   linkState = {},
   onClickOverride,
+  mediaInChildren = false,
 }: CardImageProps) => {
-  const [lazyRef, isVisible] = useLazyLoad();
-  const ref = lazyRef as React.RefObject<
-    (HTMLAnchorElement & HTMLDivElement) | null
-  >;
+  const ref = useRef<(HTMLAnchorElement & HTMLDivElement) | null>(null);
+  const drawsMedia = Boolean(src) && !mediaInChildren;
+  const isVisible = useInView(ref, {
+    rootMargin: "200px",
+    once: true,
+    skip: !drawsMedia,
+  });
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
@@ -216,7 +226,7 @@ export const CardImage = ({
         >
           {getPlaceholderIcon()}
         </div>
-      ) : (
+      ) : mediaInChildren ? null : (
         <>
           {/* Placeholder shown while loading */}
           {!isLoaded && (
@@ -300,45 +310,15 @@ export const CardImage = ({
 };
 
 /**
- * Hook for true lazy loading via IntersectionObserver
+ * Hook for true lazy loading through the shared IntersectionObserver
+ * (`useInView`; everything loads at once without one)
  * Returns [ref, shouldLoad] - attach ref to container, use shouldLoad to conditionally set src
  */
 export const useLazyLoad = (
   rootMargin = "200px"
 ): [React.RefObject<HTMLElement | null>, boolean] => {
   const ref = useRef<HTMLElement | null>(null);
-  const [shouldLoad, setShouldLoad] = useState(false);
-
-  useEffect(() => {
-    if (!ref.current || shouldLoad) return;
-
-    // Check for IntersectionObserver support (for SSR or old browsers)
-    if (typeof IntersectionObserver === "undefined") {
-      setShouldLoad(true);
-      return;
-    }
-
-    let observer: IntersectionObserver;
-    try {
-      observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry?.isIntersecting) {
-            setShouldLoad(true);
-            observer.disconnect();
-          }
-        },
-        { rootMargin, threshold: 0 }
-      );
-      observer.observe(ref.current);
-    } catch {
-      // Fallback: load immediately if observer fails
-      setShouldLoad(true);
-      return;
-    }
-
-    return () => observer?.disconnect();
-  }, [shouldLoad, rootMargin]);
-
+  const shouldLoad = useInView(ref, { rootMargin, once: true });
   return [ref, shouldLoad];
 };
 

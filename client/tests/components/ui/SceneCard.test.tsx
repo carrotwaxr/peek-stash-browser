@@ -1,9 +1,9 @@
 import { createElement } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import SceneCard from "../../../src/components/ui/SceneCard";
 
 vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
@@ -184,5 +184,61 @@ describe("navigation", () => {
     fireEvent.keyDown(card, { key: "Enter" });
 
     expect(router.state.location.pathname).toBe("/scene/1");
+  });
+});
+
+describe("screenshot", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the card image draws no img of its own: the preview draws the screenshot", async () => {
+    // Everything observed is reported visible
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(private readonly callback: IntersectionObserverCallback) {}
+        observe(target: Element) {
+          queueMicrotask(() =>
+            this.callback(
+              [
+                {
+                  target,
+                  isIntersecting: true,
+                  intersectionRatio: 1,
+                } as IntersectionObserverEntry,
+              ],
+              this as unknown as IntersectionObserver
+            )
+          );
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const scene = partialScene({
+      id: "1",
+      instanceId: "inst-1",
+      title: "Test Scene",
+      paths: { screenshot: "/screenshot.jpg" },
+      files: [{ duration: 3600 }],
+      performers: [],
+      tags: [],
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/scenes",
+          element: <SceneCard scene={scene} hideRatingControls />,
+        },
+      ],
+      { initialEntries: ["/scenes"] }
+    );
+
+    const { container } = render(<RouterProvider router={router} />);
+    await act(() => Promise.resolve());
+
+    // The preview is mocked out here, so the card itself shows no img
+    expect(container.querySelectorAll("img")).toHaveLength(0);
   });
 });

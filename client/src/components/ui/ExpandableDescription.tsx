@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useTruncationDetection } from "../../hooks/useTruncationDetection";
 
 /**
  * Description text with inline "...more" link when truncated
@@ -17,7 +16,6 @@ interface Props {
 }
 
 export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
-  const [ref] = useTruncationDetection();
   const [isExpanded, setIsExpanded] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
 
@@ -70,7 +68,6 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
           3. "more" button positioned over the spacer
         */}
         <p
-          ref={ref as React.Ref<HTMLParagraphElement>}
           className="card-description leading-relaxed m-0"
           onClick={handleMoreClick}
           style={{
