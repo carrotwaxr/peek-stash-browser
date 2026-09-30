@@ -168,28 +168,41 @@ export const guestClient = new TestClient();
 let cachedTestInstanceId: string | null = null;
 
 /**
- * The primary test instance's id (highest priority / first configured),
- * leaving the admin's instance selection as it is. For a test that names the
- * instance in its refs (`id:instance`) whatever the selection.
+ * The test instance's id: the instance whose URL is the global setup's test
+ * Stash (`TEST_CONFIG.stashUrl`), not the highest priority one, so a second
+ * instance can never be taken for it. Leaves the admin's instance selection as
+ * it is. For a test that names the instance in its refs (`id:instance`)
+ * whatever the selection.
  */
 export async function findTestInstanceId(): Promise<string> {
   if (cachedTestInstanceId) return cachedTestInstanceId;
 
-  // Get all instances
   const instancesResponse = await adminClient.get<{
-    instances?: Array<{ id: string; name: string; priority: number }>;
+    instances?: Array<{ id: string; url: string }>;
   }>("/api/setup/stash-instances");
 
   if (!instancesResponse.ok || !instancesResponse.data.instances?.length) {
     throw new Error("No Stash instances configured");
   }
 
-  const testInstance = instancesResponse.data.instances.reduce((a, b) =>
-    a.priority < b.priority ? a : b
+  const stashUrl = TEST_CONFIG.stashUrl;
+  const { instances } = instancesResponse.data;
+  const testInstance = instances.find(
+    (instance) => normalizeUrl(instance.url) === normalizeUrl(stashUrl)
   );
+  if (!testInstance) {
+    const urls = instances.map((instance) => instance.url).join(", ");
+    throw new Error(
+      `No Stash instance has the test Stash's URL ${stashUrl}; the instances are: ${urls}`
+    );
+  }
 
   cachedTestInstanceId = testInstance.id;
   return cachedTestInstanceId;
+}
+
+function normalizeUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
 }
 
 /** The shared admin's selection before this file first changed it */

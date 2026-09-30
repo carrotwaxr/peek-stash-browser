@@ -45,6 +45,19 @@ export const TEST_CONFIG = {
     if (dir) return path.resolve(dir, file);
     return path.resolve(__dirname, "..", file);
   },
+  /**
+   * The test Stash's URL, which the global setup exports as STASH_URL for
+   * this run (the replay's, or the live test Stash's).
+   */
+  get stashUrl(): string {
+    const url = process.env.STASH_URL;
+    if (!url) {
+      throw new Error(
+        "STASH_URL is not set: the global setup exports the test Stash's URL"
+      );
+    }
+    return url;
+  },
   get databaseUrl() {
     return `file:${this.databasePath}`;
   },
