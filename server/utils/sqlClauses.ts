@@ -16,9 +16,8 @@
  * INCLUDES on a page walking a sort index reads the refs list's junction
  * rows instead (junctionRefsList). Never a ref list inside a correlated
  * subquery (re-evaluated per row, 12 s at 200k scenes; a materialized CTE
- * probed with IN from one is built once, plan `LIST SUBQUERY`, as in
- * junctionRefsList's inherited arm) and never a row-value
- * `NOT IN (subquery)` (78 s: the set is scanned per row).
+ * probed with IN from one is built once, plan `LIST SUBQUERY`) and never a
+ * row-value `NOT IN (subquery)` (78 s: the set is scanned per row).
  *
  * The exclusion join, the instance filters and the per-field clauses
  * (numbers, dates, text, career years, favorites) the builders share live
@@ -198,10 +197,12 @@ export interface RefClauseOptions {
   /** The instances a bare ref may match in the large shape, one pair each */
   readonly allowedInstanceIds: readonly string[];
   /**
-   * A JSON list column of the listed row holding inherited ref ids, matched
-   * as well (a scene's `inheritedTagIds`), unqualified. Junction targets only.
+   * A second junction holding the listed row's inherited refs, matched as
+   * well in the same shape as the target's own (a scene's
+   * `SceneInheritedTag` beside its `SceneTag`): the same columns, its own
+   * table and alias. Junction targets only.
    */
-  readonly inheritedJson?: string;
+  readonly inheritedJunction?: JunctionTarget;
   /** Most refs matched inline; Infinity keeps every set inline. Default PAIR_INLINE_LIMIT. */
   readonly inlineLimit?: number;
   /**
@@ -218,26 +219,42 @@ export interface RefClauseOptions {
   readonly sortedByIndex?: boolean;
 }
 
-/** The inline INCLUDES of a junction target: one EXISTS over all the pairs */
+/** The pairs matched on a junction's ref columns */
+function refPairs(
+  target: JunctionTarget,
+  refs: readonly FilterRef[]
+): SqlFragment {
+  return pairs(
+    `${target.alias}.${target.refIdCol}`,
+    `${target.alias}.${target.refInstanceCol}`,
+    refs
+  );
+}
+
+/**
+ * The inline INCLUDES of a junction target: one EXISTS over all the pairs,
+ * searching the junction's primary key from the listed row; with an
+ * inherited junction, one more EXISTS on it, OR-ed.
+ */
 function junctionIncludes(
   target: JunctionTarget,
   refs: readonly FilterRef[],
-  inheritedJson: string | undefined
+  inheritedJunction: JunctionTarget | undefined
 ): FilterClause {
-  const { alias: j, parentAlias: x } = target;
-  const p = pairs(
-    `${j}.${target.refIdCol}`,
-    `${j}.${target.refInstanceCol}`,
-    refs
-  );
-  const direct = `EXISTS (SELECT 1 FROM ${target.table} ${j} WHERE ${j}.${target.parentIdCol} = ${x}.id AND ${j}.${target.parentInstanceCol} = ${x}.stashInstanceId AND (${p.sql}))`;
-  if (inheritedJson === undefined) {
-    return { sql: direct, params: p.params };
-  }
-  const inherited = pairs("je.value", `${x}.stashInstanceId`, refs);
+  const exists = (t: JunctionTarget): SqlFragment => {
+    const p = refPairs(t, refs);
+    const { alias: j, parentAlias: x } = t;
+    return {
+      sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} WHERE ${j}.${t.parentIdCol} = ${x}.id AND ${j}.${t.parentInstanceCol} = ${x}.stashInstanceId AND (${p.sql}))`,
+      params: p.params,
+    };
+  };
+  const direct = exists(target);
+  if (inheritedJunction === undefined) return direct;
+  const inherited = exists(inheritedJunction);
   return {
-    sql: `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE ${inherited.sql}))`,
-    params: [...p.params, ...inherited.params],
+    sql: `(${direct.sql} OR ${inherited.sql})`,
+    params: [...direct.params, ...inherited.params],
   };
 }
 
@@ -253,28 +270,29 @@ function junctionIncludes(
  * their counts 195 against 233 and 104 against 185 (L8). A page under a
  * sort with an index keeps the EXISTS: it walks the index and stops at the
  * page (2 ms, where building the list first costs 30); its count, which
- * walks nothing, takes this form (L9). The inherited arm stays a per-row
- * EXISTS: its list is a JSON column, which no index reads.
+ * walks nothing, takes this form (L9). An inherited junction joins the list
+ * with UNION ALL, read by its own ref index: one list, built once.
  */
 function junctionInList(
   target: JunctionTarget,
   refs: readonly FilterRef[],
-  inheritedJson: string | undefined
+  inheritedJunction: JunctionTarget | undefined
 ): FilterClause {
-  const { alias: j, parentAlias: x } = target;
-  const p = pairs(
-    `${j}.${target.refIdCol}`,
-    `${j}.${target.refInstanceCol}`,
-    refs
+  const rows = (t: JunctionTarget): SqlFragment => {
+    const p = refPairs(t, refs);
+    const j = t.alias;
+    return {
+      sql: `SELECT ${j}.${t.parentIdCol}, ${j}.${t.parentInstanceCol} FROM ${t.table} ${j} WHERE (${p.sql})`,
+      params: p.params,
+    };
+  };
+  const arms = [target, ...(inheritedJunction ? [inheritedJunction] : [])].map(
+    rows
   );
-  const direct = `(${x}.id, ${x}.stashInstanceId) IN (SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${target.table} ${j} WHERE (${p.sql}))`;
-  if (inheritedJson === undefined) {
-    return { sql: direct, params: p.params };
-  }
-  const inherited = pairs("je.value", `${x}.stashInstanceId`, refs);
+  const x = target.parentAlias;
   return {
-    sql: `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE ${inherited.sql}))`,
-    params: [...p.params, ...inherited.params],
+    sql: `(${x}.id, ${x}.stashInstanceId) IN (${arms.map((a) => a.sql).join(" UNION ALL ")})`,
+    params: arms.flatMap((a) => a.params),
   };
 }
 
@@ -282,21 +300,29 @@ function junctionInList(
  * The large INCLUDES of a junction target for a page walking a sort index:
  * the listed rows named by the junction rows of the refs list (read by the
  * junction's ref index, one probe per ref), as a row-value IN SQLite builds
- * once and probes as the page walks the sort index; the inherited arm
- * probes the refs list per row. No matched set is built first: at 200k
- * scenes a tag whose subtree is 72 tags pages in 407 ms against 842, a set
- * of 72 rare tags in 9 against 145 (L9). The count and a sort with no index
- * keep the matched set, faster for a rare set there.
+ * once and probes as the page walks the sort index; an inherited junction's
+ * rows of the list join it with UNION ALL, read by its ref index. No
+ * matched set is built first: at 200k scenes a tag whose subtree is 72 tags
+ * pages in 407 ms against 842, a set of 72 rare tags in 9 against 145 (L9).
+ * The count and a sort with no index keep the matched set, faster for a
+ * rare set there.
  */
 function junctionRefsList(
   target: JunctionTarget,
   refsName: string,
-  inheritedJson: string | undefined
+  inheritedJunction: JunctionTarget | undefined
 ): string {
-  const { alias: j, parentAlias: x } = target;
-  const direct = `(${x}.id, ${x}.stashInstanceId) IN (SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${refsName} r CROSS JOIN ${target.table} ${j} ON ${j}.${target.refIdCol} = r.id AND ${j}.${target.refInstanceCol} = r.inst)`;
-  if (inheritedJson === undefined) return direct;
-  return `(${direct} OR EXISTS (SELECT 1 FROM json_each(${x}.${inheritedJson}) je WHERE (je.value, ${x}.stashInstanceId) IN (SELECT id, inst FROM ${refsName})))`;
+  const arms = [target, ...(inheritedJunction ? [inheritedJunction] : [])]
+    .map((t) => refsRows(t, refsName))
+    .join(" UNION ALL ");
+  const x = target.parentAlias;
+  return `(${x}.id, ${x}.stashInstanceId) IN (${arms})`;
+}
+
+/** A junction's rows of the refs list, driven from the refs by its ref index */
+function refsRows(target: JunctionTarget, refsName: string): string {
+  const j = target.alias;
+  return `SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${refsName} r CROSS JOIN ${target.table} ${j} ON ${j}.${target.refIdCol} = r.id AND ${j}.${target.refInstanceCol} = r.inst`;
 }
 
 /** The large shape's matched set: the listed rows holding any of the refs */
@@ -304,7 +330,7 @@ function matchedCte(
   target: JunctionTarget | ColumnTarget,
   name: string,
   refsName: string,
-  inheritedJson: string | undefined
+  inheritedJunction: JunctionTarget | undefined
 ): Cte {
   if (target.kind === "column") {
     return {
@@ -313,20 +339,19 @@ function matchedCte(
       params: [],
     };
   }
-  const j = target.alias;
   // Driven from the refs, so each is one index probe on the junction
-  const direct = `SELECT ${j}.${target.parentIdCol}, ${j}.${target.parentInstanceCol} FROM ${refsName} r CROSS JOIN ${target.table} ${j} ON ${j}.${target.refIdCol} = r.id AND ${j}.${target.refInstanceCol} = r.inst`;
-  if (inheritedJson === undefined) {
+  const direct = refsRows(target, refsName);
+  if (inheritedJunction === undefined) {
     return {
       name,
       sql: `${name}(id, inst) AS MATERIALIZED (SELECT DISTINCT ${direct.slice("SELECT ".length)})`,
       params: [],
     };
   }
-  // The inherited arm reads every live row's list once; UNION keeps the set
+  // The inherited junction's rows too, by its ref index; UNION keeps the set
   return {
     name,
-    sql: `${name}(id, inst) AS MATERIALIZED (${direct} UNION SELECT x.id, x.stashInstanceId FROM StashScene x, json_each(x.${inheritedJson}) je WHERE x.deletedAt IS NULL AND (je.value, x.stashInstanceId) IN (SELECT id, inst FROM ${refsName}))`,
+    sql: `${name}(id, inst) AS MATERIALIZED (${direct} UNION ${refsRows(inheritedJunction, refsName)})`,
     params: [],
   };
 }
@@ -400,7 +425,7 @@ export function refClause(
       opts.sortedByIndex === true
     ) {
       return {
-        sql: junctionRefsList(target, refsName, opts.inheritedJson),
+        sql: junctionRefsList(target, refsName, opts.inheritedJunction),
         params: [],
         ctes: [refsCte(refsName, refs, opts.allowedInstanceIds)],
       };
@@ -408,7 +433,7 @@ export function refClause(
     const setName = `${opts.name}_matched`;
     return matchedSetClause(target.parentAlias, setName, modifier, [
       refsCte(refsName, refs, opts.allowedInstanceIds),
-      matchedCte(target, setName, refsName, opts.inheritedJson),
+      matchedCte(target, setName, refsName, opts.inheritedJunction),
     ]);
   }
 
@@ -421,9 +446,9 @@ export function refClause(
   }
 
   if (modifier === "INCLUDES" && opts.sortedByIndex === false) {
-    return junctionInList(target, refs, opts.inheritedJson);
+    return junctionInList(target, refs, opts.inheritedJunction);
   }
-  const includes = junctionIncludes(target, refs, opts.inheritedJson);
+  const includes = junctionIncludes(target, refs, opts.inheritedJunction);
   return modifier === "INCLUDES"
     ? includes
     : { sql: `NOT ${includes.sql}`, params: includes.params };

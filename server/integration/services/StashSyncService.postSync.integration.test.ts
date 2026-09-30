@@ -64,6 +64,7 @@ import {
 import { logger } from "../../utils/logger.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { createApiUser } from "../helpers/accessFixture.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 import { UNREACHABLE_STASH_URL } from "../helpers/stashTarget.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -735,6 +736,7 @@ async function seedInheritanceSources(instanceId: string): Promise<void> {
     JSON.stringify([UNTOUCHED]),
     instanceId
   );
+  await mirrorInheritedTags([instanceId]);
 }
 
 /** A scene's inheritedTagIds as stored, sorted. */

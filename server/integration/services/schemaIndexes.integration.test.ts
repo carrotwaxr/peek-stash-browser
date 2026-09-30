@@ -33,6 +33,8 @@ import { recordStatements } from "../helpers/statementRecorder.js";
 /** Each junction with the prefix of its two sides' columns */
 const JUNCTIONS = [
   { table: "SceneTag", parent: "scene", child: "tag" },
+  // A scene's inherited tags (scene tag inheritance writes them)
+  { table: "SceneInheritedTag", parent: "scene", child: "tag" },
   { table: "ScenePerformer", parent: "scene", child: "performer" },
   { table: "SceneGroup", parent: "scene", child: "group" },
   { table: "SceneGallery", parent: "scene", child: "gallery" },

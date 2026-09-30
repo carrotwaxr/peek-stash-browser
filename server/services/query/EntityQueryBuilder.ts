@@ -197,7 +197,11 @@ export async function hierarchicalRefClause(
   target: JunctionTarget | ColumnTarget,
   criterion: RefCriterion,
   ctx: QueryContext,
-  opts: { name: string; inheritedJson?: string; sortedByIndex?: boolean }
+  opts: {
+    name: string;
+    inheritedJunction?: JunctionTarget;
+    sortedByIndex?: boolean;
+  }
 ): Promise<FilterClause> {
   const { sortedByIndex, ...rest } = opts;
   const options = { ...rest, allowedInstanceIds: ctx.allowedInstanceIds };

@@ -311,7 +311,7 @@ describe("Multi-Instance Isolation", () => {
         [/CROSS JOIN StashTag t ON/, [{ id: "tag1", instanceId: INST_A }]],
         [/FROM SceneTag j/, [{ id: "scene1", instanceId: INST_A }]],
         [
-          /FROM StashScene s[\s\S]*AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/,
+          /CROSS JOIN SceneInheritedTag it ON it\.tagId = r\.id/,
           [{ id: "scene2", instanceId: INST_A }],
         ],
         [/FROM PerformerTag j/, [{ id: "perf1", instanceId: INST_A }]],
@@ -325,9 +325,7 @@ describe("Multi-Instance Isolation", () => {
       // the allowed instances and the tag id never reaches SQL text
       expect(refsFill()).toBe(JSON.stringify([["tag1", INST_A]]));
       const inherited = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
-        /AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/.test(
-          c[0]
-        )
+        /CROSS JOIN SceneInheritedTag it ON it\.tagId = r\.id/.test(c[0])
       );
       expect(inherited).toBeDefined();
       expect(must(inherited)[0]).toContain("s.stashInstanceId IN (?, ?)");

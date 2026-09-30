@@ -732,7 +732,7 @@ model StashScene {
   deletedAt      DateTime?
 
   // === Inherited tags (denormalized for filtering) ===
-  inheritedTagIds String? // JSON array of tag IDs from performers, studio, groups
+  inheritedTagIds String? // JSON array of tag IDs from performers, studio, groups; filters read SceneInheritedTag
 
   // === Sort keys, written by sync (SCENE_DERIVED_COLUMNS_SQL in StashSyncService) ===
   titleSort      String? // the displayed title (title, else file name without extension), ASCII lower-cased
@@ -745,10 +745,11 @@ model StashScene {
 
   // === Junction table relations ===
   performers ScenePerformer[]
-  tags       SceneTag[]
-  groups     SceneGroup[]
-  galleries  SceneGallery[]
-  clips      StashClip[]
+  tags          SceneTag[]
+  inheritedTags SceneInheritedTag[]
+  groups        SceneGroup[]
+  galleries     SceneGallery[]
+  clips         StashClip[]
 
   @@index([studioId])
   @@index([date])
@@ -1174,6 +1175,22 @@ model SceneTag {
 
   scene StashScene @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
   tag   StashTag   @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+
+  @@id([sceneId, sceneInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
+}
+
+/// The scene's inherited tags (inheritedTagIds) as rows, written beside the
+/// JSON column by SceneTagInheritanceService, for the filters and counts to
+/// read by index. An inherited tag is on the scene's instance; no relation
+/// to StashTag.
+model SceneInheritedTag {
+  sceneId         String
+  sceneInstanceId String
+  tagId           String
+  tagInstanceId   String
+
+  scene StashScene @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
   @@id([sceneId, sceneInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
