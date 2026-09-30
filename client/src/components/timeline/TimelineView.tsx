@@ -52,7 +52,18 @@ interface Props {
   ) => ReactNode;
   onItemClick?: (item: Record<string, unknown>) => void;
   onDateFilterChange?: (range: DateFilterRange | null) => void;
+  /**
+   * With `period`: every change of the selection (a choice, a deselection, a
+   * zoom change, the auto-selected latest period). Without it: the selected
+   * period, once it changed.
+   */
   onPeriodChange?: (period: string | null) => void;
+  /**
+   * The selected period, held by the owner (the list's URL); the view shows
+   * it and reports changes through `onPeriodChange`. Left out, the view keeps
+   * its own selection, starting at `initialPeriod`.
+   */
+  period?: string | null;
   initialPeriod?: string | null;
   loading?: boolean;
   emptyMessage?: string;
@@ -68,6 +79,7 @@ function TimelineView({
   onItemClick,
   onDateFilterChange,
   onPeriodChange,
+  period,
   initialPeriod = null,
   loading = false,
   emptyMessage = "No items found",
@@ -75,6 +87,11 @@ function TimelineView({
   className = "",
   filters = null,
 }: Props) {
+  // Mounted without a period, the latest one is chosen once the timeline
+  // loads; read once, so the chosen period does not refetch the timeline
+  const [autoSelectRecent] = useState(() =>
+    period !== undefined ? !period : !initialPeriod
+  );
   const {
     zoomLevel,
     setZoomLevel,
@@ -86,10 +103,12 @@ function TimelineView({
     ZOOM_LEVELS,
   } = useTimelineState({
     entityType,
-    autoSelectRecent: !initialPeriod,
+    autoSelectRecent,
     initialPeriod,
     filters,
+    ...(period !== undefined ? { period, onPeriodChange } : {}),
   });
+  const controlled = period !== undefined;
 
   // Detect mobile devices for responsive layout
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -154,13 +173,15 @@ function TimelineView({
   // Sync period to URL separately - only when period actually changes from user action
   // Uses ref for callback to avoid infinite loop from callback identity changes
   useEffect(() => {
+    // A controlled period is reported by the timeline's state itself
+    if (controlled) return;
     const currentPeriod = selectedPeriod?.period || null;
     // Only sync to URL if the period has changed from what we last synced
     if (currentPeriod !== lastSyncedPeriodRef.current) {
       lastSyncedPeriodRef.current = currentPeriod;
       onPeriodChangeRef.current?.(currentPeriod);
     }
-  }, [selectedPeriod]);
+  }, [controlled, selectedPeriod]);
 
   const gridClasses = getGridClasses("standard", gridDensity);
 

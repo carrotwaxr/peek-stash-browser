@@ -17,6 +17,7 @@ import {
 } from "@/api/hooks/usePresets";
 import {
   type ListUrlState,
+  type ListView,
   type UseListUrlStateOptions,
   useListUrlState,
 } from "@/hooks/useListUrlState";
@@ -488,6 +489,33 @@ describe("useListUrlState", () => {
       expect(list.params().has("performerIds")).toBe(false);
       expect(list.params().has("performerIdsModifier")).toBe(false);
       expect(list.params().has("favorite")).toBe(false);
+    });
+  });
+
+  describe("a view's own filters", () => {
+    /** The open folder as `tags`, only in folder view */
+    const folderTags = ({ viewMode, folderPath }: ListView) =>
+      viewMode === "folder" && folderPath.length > 0
+        ? { tags: { value: folderPath.slice(-1), modifier: "INCLUDES" } }
+        : {};
+
+    it("join the permanent filters and lock their field, only in their view", () => {
+      const inFolder = renderList(
+        "/galleries?view=folder&folderPath=5:a&tagIds=9:a&favorite=true",
+        { ...GALLERY_OPTIONS, viewFilters: folderTags }
+      );
+      expect(inFolder.state.permanentFilters).toEqual({
+        tags: { value: ["5:a"], modifier: "INCLUDES" },
+      });
+      expect(inFolder.state.filters).toEqual({ favorite: true });
+      inFolder.unmount();
+
+      const inGrid = renderList("/galleries?folderPath=5:a&tagIds=9:a", {
+        ...GALLERY_OPTIONS,
+        viewFilters: folderTags,
+      });
+      expect(inGrid.state.permanentFilters).toEqual({});
+      expect(inGrid.state.filters).toEqual({ tagIds: ["9:a"] });
     });
   });
 

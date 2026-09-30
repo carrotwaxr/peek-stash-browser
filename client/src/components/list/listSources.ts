@@ -10,6 +10,7 @@ import type { LibrarySearchParams } from "../../api";
 import {
   useGalleryList,
   useGroupList,
+  useImageList,
   usePerformerList,
   useStudioList,
   useTagList,
@@ -22,7 +23,8 @@ export type ListSourceEntity =
   | "studio"
   | "group"
   | "tag"
-  | "gallery";
+  | "gallery"
+  | "image";
 
 export type ListRequest = Record<string, unknown> | null;
 
@@ -79,6 +81,13 @@ export const LIST_SOURCES: Record<ListSourceEntity, ListSource> = {
     listKey: (params) => queryKeys.galleries.list(undefined, params),
     result: "findGalleries",
     items: "galleries",
+  },
+  image: {
+    useList: (request) =>
+      useImageList(request as LibrarySearchParams<"image"> | null),
+    listKey: (params) => queryKeys.images.list(undefined, params),
+    result: "findImages",
+    items: "images",
   },
 };
 

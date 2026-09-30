@@ -171,4 +171,92 @@ describe("useTimelineState", () => {
       expect(result.current.isLoading).toBe(false);
     });
   });
+
+  describe("a controlled period", () => {
+    it("is the selection, at the zoom its form names", async () => {
+      apiGetMock.mockResolvedValue({ distribution: [] });
+      const onPeriodChange = vi.fn();
+
+      const { result, rerender } = renderHook(
+        ({ period }: { period: string | null }) =>
+          useTimelineState({ entityType: "image", period, onPeriodChange }),
+        { initialProps: { period: "2024" } }
+      );
+
+      expect(result.current.zoomLevel).toBe("years");
+      expect(result.current.selectedPeriod).toEqual({
+        period: "2024",
+        start: "2024-01-01",
+        end: "2024-12-31",
+        label: "2024",
+      });
+
+      // Back to another period: the selection follows the owner
+      rerender({ period: "2023-02" });
+      expect(result.current.zoomLevel).toBe("months");
+      expect(result.current.selectedPeriod?.label).toBe("February 2023");
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(onPeriodChange).not.toHaveBeenCalled();
+    });
+
+    it("reports a choice and a deselection through onPeriodChange, leaving the selection to the owner", async () => {
+      apiGetMock.mockResolvedValue({ distribution: [] });
+      const onPeriodChange = vi.fn();
+      const { result } = renderHook(() =>
+        useTimelineState({
+          entityType: "image",
+          period: "2024-03",
+          onPeriodChange,
+        })
+      );
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.selectPeriod("2024-04"));
+      expect(onPeriodChange).toHaveBeenLastCalledWith("2024-04");
+      expect(result.current.selectedPeriod?.period).toBe("2024-03");
+
+      act(() => result.current.selectPeriod("2024-03"));
+      expect(onPeriodChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it("reports the auto-selected latest period instead of keeping it", async () => {
+      apiGetMock.mockResolvedValue({
+        distribution: [
+          { period: "2024-01", count: 10 },
+          { period: "2024-03", count: 47 },
+        ],
+      });
+      const onPeriodChange = vi.fn();
+      const { result } = renderHook(() =>
+        useTimelineState({
+          entityType: "image",
+          autoSelectRecent: true,
+          period: null,
+          onPeriodChange,
+        })
+      );
+
+      await waitFor(() =>
+        expect(onPeriodChange).toHaveBeenCalledWith("2024-03")
+      );
+      expect(onPeriodChange).toHaveBeenCalledTimes(1);
+      expect(result.current.selectedPeriod).toBeNull();
+    });
+
+    it("a zoom change clears the period through onPeriodChange", async () => {
+      apiGetMock.mockResolvedValue({ distribution: [] });
+      const onPeriodChange = vi.fn();
+      const { result } = renderHook(() =>
+        useTimelineState({
+          entityType: "image",
+          period: "2024-03",
+          onPeriodChange,
+        })
+      );
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.setZoomLevel("years"));
+      expect(onPeriodChange).toHaveBeenLastCalledWith(null);
+    });
+  });
 });
