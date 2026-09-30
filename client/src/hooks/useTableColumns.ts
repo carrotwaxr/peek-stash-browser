@@ -151,8 +151,8 @@ function columnSavesFor(queryClient: QueryClient): ColumnSaves {
  * (`tableColumnDefaults[entityType]` in the user settings, the same value
  * Settings > Customization edits), else the system default. Every change
  * (show, hide, reorder) shows at once and saves as the type's columns.
- * `applyPresetColumns` shows a preset's columns without saving them; the
- * next change saves the columns then shown.
+ * `applyPresetColumns` shows a preset's columns without saving them (null
+ * returns to the saved ones); the next change saves the columns then shown.
  */
 export const useTableColumns = (entityType: string) => {
   const queryClient = useQueryClient();
@@ -287,10 +287,10 @@ export const useTableColumns = (entityType: string) => {
   /** The columns shown, as a preset saves them */
   const getColumnConfig = useCallback(() => columnConfig, [columnConfig]);
 
-  /** Show a preset's columns for this page, without saving them */
-  const applyPresetColumns = useCallback((columns: ColumnConfig) => {
-    const shown = presetColumnsOf(columns);
-    if (shown) setPresetColumns(shown);
+  /** Show a preset's columns for this page without saving them; null (a
+   * preset without columns) shows the saved columns again */
+  const applyPresetColumns = useCallback((columns: ColumnConfig | null) => {
+    setPresetColumns(presetColumnsOf(columns));
   }, []);
 
   return {
