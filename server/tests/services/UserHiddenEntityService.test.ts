@@ -597,7 +597,7 @@ describe("UserHiddenEntityService", () => {
       });
     });
 
-    it("an instance matches its own hide or one stored for every instance; no instance matches any hide", async () => {
+    it("a target matches its own hide or one stored for every instance", async () => {
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
         partialRow({ entityType: "scene", entityId: "1", instanceId: "" }),
         partialRow({ entityType: "scene", entityId: "2", instanceId: "A" }),
@@ -608,13 +608,12 @@ describe("UserHiddenEntityService", () => {
       const hidden = await userHiddenEntityService.findAlreadyHidden(1, [
         { entityType: "scene", entityId: "1", instanceId: "A" }, // "" covers A
         { entityType: "scene", entityId: "2", instanceId: "A" }, // same instance
-        { entityType: "scene", entityId: "2", instanceId: "" }, // any hide
         { entityType: "scene", entityId: "3", instanceId: "A" }, // other instance
-        { entityType: "scene", entityId: "4", instanceId: "" }, // other type
-        { entityType: "scene", entityId: "5", instanceId: "" }, // not hidden
+        { entityType: "scene", entityId: "4", instanceId: "A" }, // other type
+        { entityType: "scene", entityId: "5", instanceId: "A" }, // not hidden
       ]);
 
-      expect(hidden).toEqual([true, true, true, false, false, false]);
+      expect(hidden).toEqual([true, true, false, false, false]);
     });
 
     it("returns [] without a query for no targets", async () => {

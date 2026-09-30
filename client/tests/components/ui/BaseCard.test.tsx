@@ -129,6 +129,7 @@ describe("BaseCard", () => {
   it("accepts ratingControlsProps", () => {
     const ratingControlsProps = {
       entityId: "scene123",
+      instanceId: "inst-1",
       initialRating: 80,
       initialFavorite: true,
       initialOCounter: 5,
@@ -242,6 +243,7 @@ describe("BaseCard menu placement logic", () => {
   it("accepts showMenu setting in ratingControlsProps", () => {
     const ratingControlsProps = {
       entityId: "scene123",
+      instanceId: "inst-1",
       initialRating: 80,
       showRating: true,
       showFavorite: true,
@@ -260,6 +262,7 @@ describe("BaseCard menu placement logic", () => {
   it("accepts showMenu=false to hide menu", () => {
     const ratingControlsProps = {
       entityId: "scene123",
+      instanceId: "inst-1",
       showRating: true,
       showFavorite: true,
       showOCounter: false,
@@ -277,6 +280,7 @@ describe("BaseCard menu placement logic", () => {
   it("defaults showMenu to true when not specified", () => {
     const ratingControlsProps = {
       entityId: "scene123",
+      instanceId: "inst-1",
       showRating: true,
       showFavorite: true,
       showOCounter: false,

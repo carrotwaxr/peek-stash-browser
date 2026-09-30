@@ -1350,14 +1350,22 @@ describe("parseSimilarScenesRequest", () => {
     ).toEqual({
       sceneId: "42",
       page: 3,
-      specificInstanceId: "inst-1",
+      instanceId: "inst-1",
     });
-    expect(parseSimilarScenesRequest("42", {}, opts())).toEqual({
+    expect(
+      parseSimilarScenesRequest("42", { instanceId: "inst-1" }, opts())
+    ).toEqual({
       sceneId: "42",
       page: 1,
-      specificInstanceId: undefined,
+      instanceId: "inst-1",
     });
-    expect(parseSimilarScenesRequest("42", { page: "0" }, opts()).page).toBe(1);
+    expect(
+      parseSimilarScenesRequest(
+        "42",
+        { page: "0", instanceId: "inst-1" },
+        opts()
+      ).page
+    ).toBe(1);
   });
 
   it("page abc and an unknown parameter are invalid", () => {
@@ -1366,7 +1374,7 @@ describe("parseSimilarScenesRequest", () => {
         issuesOf(() =>
           parseSimilarScenesRequest(
             "42",
-            { page: "abc", per_page: "5" },
+            { page: "abc", per_page: "5", instanceId: "inst-1" },
             opts()
           )
         )
@@ -1374,7 +1382,13 @@ describe("parseSimilarScenesRequest", () => {
     ).toEqual(["page", "per_page"]);
   });
 
-  it("a bad instanceId or scene id fails: the seed would be guessed", () => {
+  it("a missing instanceId fails: the seed is never guessed", () => {
+    expect(
+      issuesOf(() => parseSimilarScenesRequest("42", { page: "2" }, opts()))
+    ).toEqual([{ path: "instanceId", message: "Required" }]);
+  });
+
+  it("a bad instanceId or scene id fails", () => {
     expect(
       paths(
         issuesOf(() =>
@@ -1382,9 +1396,11 @@ describe("parseSimilarScenesRequest", () => {
         )
       )
     ).toEqual(["instanceId"]);
-    expect(issuesOf(() => parseSimilarScenesRequest("s1", {}, opts()))).toEqual(
-      [{ path: "id", message: "Expected an id" }]
-    );
+    expect(
+      issuesOf(() =>
+        parseSimilarScenesRequest("s1", { instanceId: "inst-1" }, opts())
+      )
+    ).toEqual([{ path: "id", message: "Expected an id" }]);
   });
 });
 

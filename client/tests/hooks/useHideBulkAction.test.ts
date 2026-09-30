@@ -7,7 +7,7 @@ interface BulkHide {
   entities: Array<{
     entityType: string;
     entityId: string;
-    instanceId?: string;
+    instanceId: string;
   }>;
   skipConfirmation?: boolean;
 }
@@ -36,7 +36,7 @@ describe("useHideBulkAction", () => {
   });
 
   function render(
-    selectedScenes: ReadonlyArray<{ id: string | number; instanceId?: string }>
+    selectedScenes: ReadonlyArray<{ id: string | number; instanceId: string }>
   ) {
     const onComplete = vi.fn();
     const onHideSuccess = vi.fn();
@@ -71,26 +71,27 @@ describe("useHideBulkAction", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("never sends a scene without an instance, and counts it as failed", async () => {
-    const { result, onHideSuccess } = render([
+  it("reports the scenes the server failed to hide", async () => {
+    mockHideEntities.mockResolvedValueOnce({
+      success: true,
+      successCount: 1,
+      failCount: 1,
+    });
+    const { result, onComplete } = render([
       { id: "12", instanceId: "A" },
-      { id: "13" },
+      { id: "13", instanceId: "A" },
     ]);
 
     await act(async () => {
       await result.current.handleHideConfirm(false);
     });
 
-    expect(mockHideEntities).toHaveBeenCalledExactlyOnceWith({
-      entities: [{ entityType: "scene", entityId: "12", instanceId: "A" }],
-      skipConfirmation: false,
-    });
-    expect(onHideSuccess.mock.calls).toEqual([["12", "scene", "A"]]);
     expect(showError).toHaveBeenCalledWith("Hidden 1 scene, 1 failed");
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("sends nothing when no selected scene has an instance", async () => {
-    const { result, onComplete, onHideSuccess } = render([{ id: "13" }]);
+  it("sends nothing when no scene is selected", async () => {
+    const { result, onComplete, onHideSuccess } = render([]);
 
     await act(async () => {
       await result.current.handleHideConfirm(false);
@@ -98,7 +99,6 @@ describe("useHideBulkAction", () => {
 
     expect(mockHideEntities).not.toHaveBeenCalled();
     expect(onHideSuccess).not.toHaveBeenCalled();
-    expect(showError).toHaveBeenCalledWith("Hidden 0 scenes, 1 failed");
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

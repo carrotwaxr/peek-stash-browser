@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { actAsync } from "@tests/testUtils";
+import { actAsync, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import Images from "@/components/pages/Images";
@@ -63,15 +63,17 @@ vi.mock("@/constants/grids", () => ({
   getGridClasses: vi.fn(() => "grid-classes"),
 }));
 
+const { mockQueryClient, cardProps } = vi.hoisted(() => ({
+  mockQueryClient: { setQueryData: vi.fn(), invalidateQueries: vi.fn() },
+  cardProps: [] as Record<string, unknown>[],
+}));
+
 // Mock TanStack Query
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
   return {
     ...actual,
-    useQueryClient: vi.fn(() => ({
-      setQueryData: vi.fn(),
-      invalidateQueries: vi.fn(),
-    })),
+    useQueryClient: vi.fn(() => mockQueryClient),
   };
 });
 
@@ -118,11 +120,14 @@ vi.mock("@/api/queryKeys", () => ({
 
 // Mock child components
 vi.mock("@/components/cards/index", () => ({
-  ImageCard: (props: Record<string, unknown>) => (
-    <div data-testid="image-card">
-      {(props.image as Record<string, unknown>)?.title as string}
-    </div>
-  ),
+  ImageCard: (props: Record<string, unknown>) => {
+    cardProps.push(props);
+    return (
+      <div data-testid="image-card">
+        {(props.image as Record<string, unknown>)?.title as string}
+      </div>
+    );
+  },
 }));
 vi.mock("@/components/ui/Lightbox", () => ({
   default: (props: Record<string, unknown>) => (
@@ -229,6 +234,7 @@ vi.mock("@/components/table/index", () => ({
 describe("Images", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    cardProps.length = 0;
     mockViewMode = "grid";
     mockUseImageList.mockReturnValue({
       data: null,
@@ -510,6 +516,86 @@ describe("Images", () => {
         preview: "/pv",
         thumbnail: "/th",
       });
+    });
+  });
+
+  describe("Changes from a card", () => {
+    /** Two images with one id, one on each server */
+    const sharedId = () =>
+      mockUseImageList.mockReturnValue({
+        data: {
+          findImages: {
+            images: [
+              { id: "5", instanceId: "a", title: "On A", oCounter: 0 },
+              { id: "5", instanceId: "b", title: "On B", oCounter: 0 },
+            ],
+            count: 2,
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+
+    /** The list the cache update leaves, from the list the page shows */
+    const updatedList = () => {
+      const [, updater] = must(
+        mockQueryClient.setQueryData.mock.lastCall,
+        "the cache update"
+      ) as [unknown, (old: unknown) => unknown];
+      const old = mockUseImageList().data;
+      const next = updater(old) as {
+        findImages: { images: Record<string, unknown>[]; count: number };
+      };
+      return next.findImages;
+    };
+
+    const callbackOfLastCard = (name: string) =>
+      must(cardProps.at(-1)?.[name], `the card's ${name}`) as (
+        ...args: unknown[]
+      ) => void;
+
+    it("an O, a rating and a favorite change only the image on that instance", async () => {
+      sharedId();
+      await actAsync(() => {
+        render(<Images />);
+      });
+
+      callbackOfLastCard("onOCounterChange")("5", 4, "b");
+      expect(
+        updatedList().images.map((i) => [i.instanceId, i.oCounter])
+      ).toEqual([
+        ["a", 0],
+        ["b", 4],
+      ]);
+
+      callbackOfLastCard("onRatingChange")("5", 80, "a");
+      expect(
+        updatedList().images.map((i) => [i.instanceId, i.rating100])
+      ).toEqual([
+        ["a", 80],
+        ["b", undefined],
+      ]);
+
+      callbackOfLastCard("onFavoriteChange")("5", true, "b");
+      expect(
+        updatedList().images.map((i) => [i.instanceId, i.favorite])
+      ).toEqual([
+        ["a", undefined],
+        ["b", true],
+      ]);
+    });
+
+    it("a hide drops only the image on that instance", async () => {
+      sharedId();
+      await actAsync(() => {
+        render(<Images />);
+      });
+
+      callbackOfLastCard("onHideSuccess")("5", "image", "a");
+
+      const list = updatedList();
+      expect(list.images.map((i) => i.instanceId)).toEqual(["b"]);
+      expect(list.count).toBe(1);
     });
   });
 });

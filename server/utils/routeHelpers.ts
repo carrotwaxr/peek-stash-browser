@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedLibraryRequest } from "../types/api/express.js";
 
 /**
@@ -84,3 +85,25 @@ export function libraryHandler<
   return Object.assign(routeHandler, { [LIBRARY_HANDLER]: true as const });
 }
 /* eslint-enable @typescript-eslint/no-unnecessary-type-parameters */
+
+/**
+ * A per-user write (a rating, a play, an O press, an image view) names its
+ * entity's instance; the server never guesses one. Answers 400 and returns
+ * false when the body names none.
+ */
+export function requireInstanceId(
+  instanceId: unknown,
+  res: {
+    status: (code: number) => { json: (body: ApiErrorResponse) => unknown };
+  }
+): instanceId is string {
+  if (instanceId === undefined) {
+    res.status(400).json({ error: "Missing required field: instanceId" });
+    return false;
+  }
+  if (typeof instanceId !== "string" || instanceId === "") {
+    res.status(400).json({ error: "instanceId must be a non-empty string" });
+    return false;
+  }
+  return true;
+}

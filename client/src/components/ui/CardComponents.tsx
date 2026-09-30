@@ -617,7 +617,7 @@ export const CardIndicators = ({
 type HideSuccessHandler = (
   entityId: string,
   entityType: string,
-  instanceId?: string
+  instanceId: string
 ) => void;
 
 /**
@@ -628,7 +628,7 @@ interface CardMenuRowProps {
   entityType: string;
   entityId: string;
   /** The entity's Stash instance: its hide names it */
-  instanceId?: string;
+  instanceId: string;
   entityTitle?: string;
   onHideSuccess?: HideSuccessHandler;
 }
@@ -637,6 +637,7 @@ interface HideInfo {
   entityType: string;
   entityId: string;
   entityName: string;
+  instanceId: string;
   skipConfirmation?: boolean;
 }
 
@@ -726,7 +727,7 @@ export const CardMenuRow = ({
 interface CardRatingRowProps {
   entityType: string;
   entityId: string;
-  instanceId?: string;
+  instanceId: string;
   initialRating: number | null | undefined;
   initialFavorite: boolean;
   initialOCounter: number | null | undefined;

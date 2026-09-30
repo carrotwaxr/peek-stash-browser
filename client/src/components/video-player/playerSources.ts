@@ -27,7 +27,7 @@ function needsOffset(src: string): boolean {
 
 export function buildPlayerSources(scene: {
   id: string;
-  instanceId?: string | null;
+  instanceId: string;
   sceneStreams?: Array<{
     url: string;
     mime_type?: string | null;
@@ -51,12 +51,10 @@ export function buildPlayerSources(scene: {
   console.warn(
     "[VideoPlayer] No sceneStreams available, falling back to the Direct stream"
   );
-  const params = new URLSearchParams();
-  if (scene.instanceId) params.set("instanceId", scene.instanceId);
-  const query = params.toString();
+  const params = new URLSearchParams({ instanceId: scene.instanceId });
   return [
     {
-      src: `/api/scene/${encodeURIComponent(scene.id)}/proxy-stream/stream${query ? `?${query}` : ""}`,
+      src: `/api/scene/${encodeURIComponent(scene.id)}/proxy-stream/stream?${params.toString()}`,
       label: "Direct",
       offset: false,
     },

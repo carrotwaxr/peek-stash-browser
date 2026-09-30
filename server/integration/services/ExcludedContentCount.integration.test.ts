@@ -170,9 +170,8 @@ const SEED_IDS: Record<keyof typeof CARD_TABS, string[]> = {
 
 /**
  * One entity's card, by ref, as the grid shows it (null when hidden): the
- * list asked for every seeded id of the type, since a list answering one
- * id is a detail lookup, whose tag counts the tag controller still takes
- * from the by-id path (B19's)
+ * list asked for every seeded id of the type. A detail lookup (a one-id
+ * list) answers the same row, so the choice does not change the counts.
  */
 async function card(
   client: TestClient,

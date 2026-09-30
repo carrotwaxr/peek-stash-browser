@@ -95,12 +95,12 @@ describe("buildPlayerSources", () => {
     ]);
   });
 
-  it("falls back to a direct stream with no query when the scene has no instance", () => {
-    const sources = buildPlayerSources({ id: "a/b 5", instanceId: null });
+  it("the direct fallback names the instance and encodes the id", () => {
+    const sources = buildPlayerSources({ id: "a/b 5", instanceId: "i 1" });
 
     expect(sources).toEqual([
       {
-        src: "/api/scene/a%2Fb%205/proxy-stream/stream",
+        src: "/api/scene/a%2Fb%205/proxy-stream/stream?instanceId=i+1",
         label: "Direct",
         offset: false,
       },
@@ -136,6 +136,7 @@ describe("buildPlayerSources", () => {
     const source = must(
       buildPlayerSources({
         id: "5",
+        instanceId: "i",
         sceneStreams: [{ url: "/api/scene/5/proxy-stream/stream" }],
       })[0]
     );

@@ -105,7 +105,7 @@ export interface FindSimilarScenesQuery extends Record<
   string | undefined
 > {
   page?: string;
-  /** The seed's instance; without it, the first instance the user can see it on */
+  /** The seed's instance (required; a request without it answers 400) */
   instanceId?: string;
 }
 

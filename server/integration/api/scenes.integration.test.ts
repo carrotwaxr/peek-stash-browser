@@ -375,7 +375,9 @@ describe("Scene API", () => {
     it("returns similar scenes", async () => {
       const response = await adminClient.get<{
         scenes: Array<{ id: string; title: string }>;
-      }>(`/api/library/scenes/${TEST_ENTITIES.sceneWithRelations}/similar`);
+      }>(
+        `/api/library/scenes/${TEST_ENTITIES.sceneWithRelations}/similar?instanceId=${testInstanceId}`
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.scenes).toBeDefined();

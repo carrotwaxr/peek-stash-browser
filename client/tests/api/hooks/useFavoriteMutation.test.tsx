@@ -88,30 +88,6 @@ describe("useUpdateFavorite", () => {
     );
   });
 
-  it("calls updateFavorite with null instanceId when not provided", async () => {
-    (libraryApi.updateFavorite as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
-    });
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
-
-    await actAsync(() => {
-      result.current.mutate({
-        entityType: "performer",
-        entityId: "perf-1",
-        favorite: false,
-      });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.updateFavorite).toHaveBeenCalledWith(
-      "performer",
-      "perf-1",
-      false,
-      null
-    );
-  });
-
   it("invalidates scene queries on success with entityType='scene'", async () => {
     (libraryApi.updateFavorite as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
@@ -126,6 +102,7 @@ describe("useUpdateFavorite", () => {
         entityType: "scene",
         entityId: "scene-1",
         favorite: true,
+        instanceId: "instance-1",
       });
     });
 
@@ -149,6 +126,7 @@ describe("useUpdateFavorite", () => {
         entityType: "performer",
         entityId: "perf-1",
         favorite: true,
+        instanceId: "instance-1",
       });
     });
 
@@ -170,6 +148,7 @@ describe("useUpdateFavorite", () => {
         entityType: "unknown",
         entityId: "id-1",
         favorite: true,
+        instanceId: "instance-1",
       });
     });
 
@@ -188,6 +167,7 @@ describe("useUpdateFavorite", () => {
         entityType: "scene",
         entityId: "scene-1",
         favorite: true,
+        instanceId: "instance-1",
       });
     });
 

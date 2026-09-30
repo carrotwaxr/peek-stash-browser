@@ -14,6 +14,7 @@ import type {
 import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { requireInstanceId } from "../utils/routeHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 
 /**
@@ -31,13 +32,7 @@ export async function incrementImageOCounter(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   // Get user settings for syncToStash, and the image's instance if this
   // user can see it
@@ -122,13 +117,7 @@ export async function recordImageView(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   // The image's instance, if this user can see it
   const instanceId = await resolveAccessibleInstanceId(

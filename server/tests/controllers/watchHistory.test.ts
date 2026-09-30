@@ -124,7 +124,7 @@ describe("Watch History Controller", () => {
       partialRow({ duration: 600, stashInstanceId: "test-instance" })
     );
     mockResolve.mockImplementation((_userId, _type, _id, requested) =>
-      Promise.resolve(requested ?? "test-instance")
+      Promise.resolve(requested)
     );
     mockStatsWrites.mockResolvedValue(undefined);
     mockStats.statsWritesForScene.mockResolvedValue(mockStatsWrites);
@@ -623,7 +623,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementOCounter);
       await authenticated(incrementOCounter)(
         reqFor(incrementOCounter, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: undefined,
         }),
         res,
@@ -646,6 +646,25 @@ describe("Watch History Controller", () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
+    it("returns 400 and writes nothing when the request has no instance", async () => {
+      const res = resFor(incrementOCounter);
+      await incrementOCounter(
+        reqFor(incrementOCounter, {
+          body: malformed({ sceneId: "123" }),
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Missing required field: instanceId",
+      });
+      expect(mockResolve).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+    });
+
     it("should create new record with oCount=1 if none exists", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
@@ -665,7 +684,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementOCounter);
       await incrementOCounter(
         reqFor(incrementOCounter, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -719,7 +738,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementOCounter);
       await incrementOCounter(
         reqFor(incrementOCounter, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res

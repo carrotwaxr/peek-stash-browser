@@ -267,8 +267,7 @@ class UserHiddenEntityService {
   /**
    * For each target, has this user already hidden it? A target on an
    * instance is covered by a hide on that instance or one stored for every
-   * instance (""); a target without an instance by any hide of that type and
-   * id. One query for the whole batch.
+   * instance (""). One query for the whole batch.
    */
   async findAlreadyHidden(
     userId: number,
@@ -290,15 +289,11 @@ class UserHiddenEntityService {
     const stored = new Set(
       rows.map((r) => compositeKey(r.entityType, r.entityId, r.instanceId))
     );
-    const anyInstance = new Set(
-      rows.map((r) => compositeKey(r.entityType, r.entityId))
-    );
 
-    return targets.map((t) =>
-      t.instanceId
-        ? stored.has(compositeKey(t.entityType, t.entityId, t.instanceId)) ||
-          stored.has(compositeKey(t.entityType, t.entityId, ""))
-        : anyInstance.has(compositeKey(t.entityType, t.entityId))
+    return targets.map(
+      (t) =>
+        stored.has(compositeKey(t.entityType, t.entityId, t.instanceId)) ||
+        stored.has(compositeKey(t.entityType, t.entityId, ""))
     );
   }
 

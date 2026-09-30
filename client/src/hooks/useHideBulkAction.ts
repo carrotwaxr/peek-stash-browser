@@ -11,13 +11,12 @@ import { useHiddenEntities } from "./useHiddenEntities";
  * @returns {Object} - { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog }
  */
 interface UseHideBulkActionOptions {
-  /** A scene without an instance is never sent bare: it counts as failed */
-  selectedScenes: ReadonlyArray<{ id: string | number; instanceId?: string }>;
+  selectedScenes: ReadonlyArray<{ id: string | number; instanceId: string }>;
   onComplete: () => void;
   onHideSuccess?: (
     id: string | number,
     entityType: string,
-    instanceId?: string
+    instanceId: string
   ) => void;
 }
 
@@ -42,16 +41,10 @@ export const useHideBulkAction = ({
     setIsHiding(true);
     setHideDialogOpen(false);
 
-    // A hide names its instance; the server refuses one without
-    const sendable = selectedScenes.flatMap((scene) =>
-      scene.instanceId ? [{ id: scene.id, instanceId: scene.instanceId }] : []
-    );
-    const unsent = selectedScenes.length - sendable.length;
-
     const result =
-      sendable.length > 0
+      selectedScenes.length > 0
         ? await hideEntities({
-            entities: sendable.map((scene) => ({
+            entities: selectedScenes.map((scene) => ({
               entityType: "scene",
               entityId: String(scene.id),
               instanceId: scene.instanceId,
@@ -63,10 +56,10 @@ export const useHideBulkAction = ({
     setIsHiding(false);
 
     if (result.success) {
-      for (const scene of sendable) {
+      for (const scene of selectedScenes) {
         onHideSuccess?.(scene.id, "scene", scene.instanceId);
       }
-      const failCount = result.failCount + unsent;
+      const { failCount } = result;
       if (failCount === 0) {
         showSuccess(
           `${result.successCount} scene${result.successCount !== 1 ? "s" : ""} hidden`

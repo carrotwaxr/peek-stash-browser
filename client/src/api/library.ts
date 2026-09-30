@@ -334,10 +334,9 @@ export const libraryApi = {
     entityType: string,
     entityId: string,
     rating: number | null,
-    instanceId: string | null = null
+    instanceId: string
   ) => {
-    const data: Record<string, unknown> = { rating };
-    if (instanceId) data.instanceId = instanceId;
+    const data: Record<string, unknown> = { rating, instanceId };
     return ratingsApiInternal.update(entityType, entityId, data);
   },
 
@@ -345,10 +344,9 @@ export const libraryApi = {
     entityType: string,
     entityId: string,
     favorite: boolean,
-    instanceId: string | null = null
+    instanceId: string
   ) => {
-    const data: Record<string, unknown> = { favorite };
-    if (instanceId) data.instanceId = instanceId;
+    const data: Record<string, unknown> = { favorite, instanceId };
     return ratingsApiInternal.update(entityType, entityId, data);
   },
 

@@ -33,9 +33,13 @@ const RATED_TYPES = [
 ] as const;
 type RatedType = (typeof RATED_TYPES)[number];
 
-/** The rater's rating row for this type on instance B, if any. */
-async function findRatingOnB(type: RatedType, userId: number) {
-  const where = { userId, instanceId: FX.B };
+/** The rater's rating row for this type on an instance, if any. */
+async function findRatingOn(
+  instanceId: string,
+  type: RatedType,
+  userId: number
+) {
+  const where = { userId, instanceId };
   switch (type) {
     case "scene":
       return prisma.sceneRating.findFirst({ where });
@@ -53,6 +57,9 @@ async function findRatingOnB(type: RatedType, userId: number) {
       return prisma.imageRating.findFirst({ where });
   }
 }
+
+const findRatingOnB = (type: RatedType, userId: number) =>
+  findRatingOn(FX.B, type, userId);
 
 interface RatingResponse {
   success?: boolean;
@@ -129,15 +136,21 @@ describe("Ratings access (integration)", () => {
     expect(stored).toEqual([]);
   });
 
-  it("resolves a missing instanceId and still checks it", async () => {
-    // GLOBAL is hidden on every instance, so the guess finds no copy the
-    // rater can see.
-    const res = await rater.client.put(`/api/ratings/scene/${FX_ID.GLOBAL}`, {
-      rating: 50,
-    });
+  it.each(RATED_TYPES)(
+    "PUT /api/ratings/%s without an instance answers 400 and writes nothing",
+    async (type) => {
+      const before = await findRatingOn(FX.A, type, rater.id);
 
-    expect(res.status).toBe(404);
-  });
+      // SAME is visible on A: only the missing instance is wrong
+      const res = await rater.client.put<RatingResponse>(
+        `/api/ratings/${type}/${FX_ID.SAME}`,
+        { rating: 51, favorite: true }
+      );
+
+      expect(res.status).toBe(400);
+      expect(await findRatingOn(FX.A, type, rater.id)).toEqual(before);
+    }
+  );
 
   it("a regular user cannot switch on Sync to Stash", async () => {
     const res = await rater.client.put("/api/user/settings", {

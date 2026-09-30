@@ -6,7 +6,7 @@ interface UpdateRatingParams {
   entityType: string;
   entityId: string;
   rating: number | null;
-  instanceId?: string | null;
+  instanceId: string;
 }
 
 export function useUpdateRating() {
@@ -17,7 +17,7 @@ export function useUpdateRating() {
       entityType,
       entityId,
       rating,
-      instanceId = null,
+      instanceId,
     }: UpdateRatingParams) =>
       libraryApi.updateRating(entityType, entityId, rating, instanceId),
     onSuccess: (_data, { entityType }) => {

@@ -546,15 +546,25 @@ describe("Content Restrictions Integration Tests", () => {
 
     describe("DELETE /api/user/hidden-entities/all", () => {
       it("should unhide all entities", async () => {
-        // Hide a few entities
-        await testUserClient.post("/api/user/hidden-entities", {
-          entityType: "scene",
-          entityId: TEST_ENTITIES.sceneWithRelations,
-        });
-        await testUserClient.post("/api/user/hidden-entities", {
-          entityType: "performer",
-          entityId: TEST_ENTITIES.performerWithScenes,
-        });
+        // Hide a few entities, on the test instance
+        const instanceId = await findTestInstanceId();
+        const hideScene = await testUserClient.post(
+          "/api/user/hidden-entities",
+          {
+            entityType: "scene",
+            entityId: TEST_ENTITIES.sceneWithRelations,
+            instanceId,
+          }
+        );
+        const hidePerformer = await testUserClient.post(
+          "/api/user/hidden-entities",
+          {
+            entityType: "performer",
+            entityId: TEST_ENTITIES.performerWithScenes,
+            instanceId,
+          }
+        );
+        expect([hideScene.status, hidePerformer.status]).toEqual([200, 200]);
 
         // Unhide all
         const response = await testUserClient.delete<{
@@ -569,11 +579,13 @@ describe("Content Restrictions Integration Tests", () => {
       }, 30_000); // 2 hides + unhideAll; recompute can chain behind pending ops
 
       it("should unhide all entities of a specific type", async () => {
-        // Hide some scenes
-        await testUserClient.post("/api/user/hidden-entities", {
+        // Hide some scenes, on the test instance
+        const hide = await testUserClient.post("/api/user/hidden-entities", {
           entityType: "scene",
           entityId: TEST_ENTITIES.sceneWithRelations,
+          instanceId: await findTestInstanceId(),
         });
+        expect(hide.status).toBe(200);
 
         // Unhide all scenes
         const response = await testUserClient.delete<{

@@ -166,9 +166,8 @@ describeWithDb("EntityAccessService (integration)", () => {
           ])
         ).toEqual(new Set([entityKey(FX_ID.SAME, FX.A)]));
       }
-      // The legacy guess skips it too
       expect(
-        await resolveAccessibleInstanceId(v, "scene", FX_ID.B_ONLY, undefined)
+        await resolveAccessibleInstanceId(v, "scene", FX_ID.B_ONLY, FX.B)
       ).toBeNull();
     } finally {
       await prisma.stashInstance.update({
@@ -256,20 +255,23 @@ describeWithDb("EntityAccessService (integration)", () => {
     }
   });
 
-  it("the legacy guess picks only a copy the user can see", async () => {
+  it("resolveAccessibleInstanceId answers the request's instance only where the user can see the copy", async () => {
     const x = await createUser("access-it-x");
     await hideFor(x, "scene", FX_ID.SAME, FX.A);
 
-    // A comes first by priority, but x hid SAME there.
+    // x hid SAME on A only
     expect(
-      await resolveAccessibleInstanceId(x, "scene", FX_ID.SAME, undefined)
+      await resolveAccessibleInstanceId(x, "scene", FX_ID.SAME, FX.A)
+    ).toBeNull();
+    expect(
+      await resolveAccessibleInstanceId(x, "scene", FX_ID.SAME, FX.B)
     ).toBe(FX.B);
     expect(
-      await resolveAccessibleInstanceId(v, "scene", FX_ID.SAME, undefined)
+      await resolveAccessibleInstanceId(v, "scene", FX_ID.SAME, FX.A)
     ).toBe(FX.A);
     // GLOBAL is hidden for u on every instance.
     expect(
-      await resolveAccessibleInstanceId(u, "scene", FX_ID.GLOBAL, undefined)
+      await resolveAccessibleInstanceId(u, "scene", FX_ID.GLOBAL, FX.A)
     ).toBeNull();
   });
 

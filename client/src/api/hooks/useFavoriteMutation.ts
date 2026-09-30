@@ -6,7 +6,7 @@ interface UpdateFavoriteParams {
   entityType: string;
   entityId: string;
   favorite: boolean;
-  instanceId?: string | null;
+  instanceId: string;
 }
 
 export function useUpdateFavorite() {
@@ -17,7 +17,7 @@ export function useUpdateFavorite() {
       entityType,
       entityId,
       favorite,
-      instanceId = null,
+      instanceId,
     }: UpdateFavoriteParams) =>
       libraryApi.updateFavorite(entityType, entityId, favorite, instanceId),
     onSuccess: (_data, { entityType }) => {

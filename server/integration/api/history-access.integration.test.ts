@@ -93,11 +93,6 @@ describe("History access (integration)", () => {
         // GLOBAL is hidden on every instance
         { sceneId: FX_ID.GLOBAL, instanceId: FX.A },
       ];
-      if (route === "increment-o") {
-        // The O press keeps its optional instance until every client sends
-        // it: with none, the guess finds nothing either.
-        bodies.push({ sceneId: FX_ID.GLOBAL });
-      }
       if (route === "save-activity") {
         bodies.push({ sceneId: FX_ID.DELETED, instanceId: FX.A });
       }
@@ -173,6 +168,40 @@ describe("History access (integration)", () => {
       },
     });
     expect(rows).toEqual([]);
+  });
+
+  it("increment-o, an image view or O and a similar-scenes request without an instance answer 400 and write nothing", async () => {
+    const counts = async () => ({
+      scenes: await prisma.watchHistory.findMany({
+        where: { userId: viewer.id },
+        orderBy: [{ instanceId: "asc" }, { sceneId: "asc" }],
+      }),
+      images: await prisma.imageViewHistory.findMany({
+        where: { userId: viewer.id },
+        orderBy: [{ instanceId: "asc" }, { imageId: "asc" }],
+      }),
+    });
+    const before = await counts();
+
+    // SAME is visible on A: only the missing instance is wrong
+    const oScene = await viewer.client.post("/api/watch-history/increment-o", {
+      sceneId: FX_ID.SAME,
+    });
+    const view = await viewer.client.post("/api/image-view-history/view", {
+      imageId: FX_ID.SAME,
+    });
+    const oImage = await viewer.client.post(
+      "/api/image-view-history/increment-o",
+      { imageId: FX_ID.SAME }
+    );
+    const similar = await viewer.client.get(
+      `/api/library/scenes/${FX_ID.SAME}/similar`
+    );
+
+    expect([oScene.status, view.status, oImage.status, similar.status]).toEqual(
+      [400, 400, 400, 400]
+    );
+    expect(await counts()).toEqual(before);
   });
 
   /**

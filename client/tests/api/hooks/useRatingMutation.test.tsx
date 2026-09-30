@@ -113,30 +113,6 @@ describe("useUpdateRating", () => {
     );
   });
 
-  it("calls updateRating with null instanceId when not provided", async () => {
-    (libraryApi.updateRating as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
-    });
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useUpdateRating(), { wrapper });
-
-    await actAsync(() => {
-      result.current.mutate({
-        entityType: "performer",
-        entityId: "perf-1",
-        rating: 100,
-      });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.updateRating).toHaveBeenCalledWith(
-      "performer",
-      "perf-1",
-      100,
-      null
-    );
-  });
-
   it("invalidates scene queries on success with entityType='scene'", async () => {
     (libraryApi.updateRating as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
@@ -151,6 +127,7 @@ describe("useUpdateRating", () => {
         entityType: "scene",
         entityId: "scene-1",
         rating: 75,
+        instanceId: "instance-1",
       });
     });
 
@@ -174,6 +151,7 @@ describe("useUpdateRating", () => {
         entityType: "performer",
         entityId: "perf-1",
         rating: 90,
+        instanceId: "instance-1",
       });
     });
 
@@ -195,6 +173,7 @@ describe("useUpdateRating", () => {
         entityType: "scene",
         entityId: "scene-1",
         rating: 50,
+        instanceId: "instance-1",
       });
     });
 
@@ -214,6 +193,7 @@ describe("useUpdateRating", () => {
         entityType: "unknown",
         entityId: "id-1",
         rating: 50,
+        instanceId: "instance-1",
       });
     });
 
