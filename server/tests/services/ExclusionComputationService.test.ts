@@ -84,6 +84,8 @@ const SWAP_DELETE =
   /^DELETE FROM UserExcludedEntity WHERE userId = \? AND NOT \(reason = 'pending' AND computedAt >= \?\)$/;
 const SWAP_INSERT =
   /^INSERT OR IGNORE INTO UserExcludedEntity \(userId, entityType, entityId, instanceId, reason, computedAt\) SELECT \?, entityType, entityId, instanceId, reason, \? FROM _peek_result$/;
+const HIDDEN_INSERT =
+  /^INSERT OR IGNORE INTO UserHiddenEntity \(userId, entityType, entityId, instanceId, hiddenAt\) SELECT \?, json_extract\(value, '\$\.t'\), json_extract\(value, '\$\.id'\), json_extract\(value, '\$\.iid'\), \? FROM json_each\(\?\)$/;
 
 /** Route $queryRawUnsafe by SQL shape; unmatched queries return no rows. */
 function fakeRaw(routes: Array<[RegExp, unknown[]]>) {
@@ -142,7 +144,7 @@ function rowKeys(rows: WrittenRow[]): Set<string> {
   );
 }
 
-/** The rows addHiddenEntity merges, as the same keys. */
+/** The rows addHiddenEntities merges, as the same keys. */
 function mergedKeys(): Set<string> {
   return rowKeys(createdRows());
 }
@@ -823,17 +825,9 @@ describe("ExclusionComputationService", () => {
     });
   });
 
-  describe("addHiddenEntity", () => {
+  describe("addHiddenEntities", () => {
     it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.addHiddenEntity).toBe(
-        "function"
-      );
-    });
-  });
-
-  describe("removeHiddenEntity", () => {
-    it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.removeHiddenEntity).toBe(
+      expect(typeof exclusionComputationService.addHiddenEntities).toBe(
         "function"
       );
     });
@@ -1953,16 +1947,22 @@ describe("admins (Rule 7)", () => {
   });
 });
 
-describe("addHiddenEntity", () => {
+describe("addHiddenEntities", () => {
   beforeEach(() => setupPipeline());
 
-  it("addHiddenEntity uses the shared edges", async () => {
+  /** One target, as the single-hide path passes it. */
+  const hide = (entityType: string, entityId: string, instanceId = "") =>
+    exclusionComputationService.addHiddenEntities(1, [
+      { entityType, entityId, instanceId },
+    ]);
+
+  it("addHiddenEntities uses the shared edges", async () => {
     fakeRaw([
       [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
       [EDGE_GALLERY_TAG, [{ id: "g2", instanceId: "A" }]],
     ]);
 
-    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "A");
+    await hide("tag", "2", "A");
 
     expect(mergedKeys()).toEqual(
       new Set(["tag:2@A:hidden", "gallery:g2@A:cascade"])
@@ -1972,17 +1972,30 @@ describe("addHiddenEntity", () => {
       "WITH RECURSIVE"
     );
     // The compute runs in a read snapshot on the compute connection, then
-    // one INSERT OR IGNORE ... SELECT merges the rows in one short unit: an
-    // existing row keeps its reason, so a hide never masks a restriction.
+    // one short unit merges the rows with INSERT OR IGNORE ... SELECT (an
+    // existing row keeps its reason, so a hide never masks a restriction)
+    // and writes the hidden row, in one BEGIN IMMEDIATE.
     expect(mockWithComputeConnection).toHaveBeenCalledTimes(1);
     const sqls = execCalls().map(([sql]) => sql);
     expect(sqls[0]).toBe("BEGIN");
-    expect(sqls).toContain("COMMIT");
-    expect(sqls).not.toContain("BEGIN IMMEDIATE");
+    const unit = sqlFrom(/^BEGIN IMMEDIATE$/).filter(
+      (sql) => !/^DROP TABLE/.test(sql)
+    );
+    expect(unit).toHaveLength(4);
+    expect(unit[0]).toBe("BEGIN IMMEDIATE");
+    expect(unit[1]).toMatch(SWAP_INSERT);
+    expect(unit[2]).toMatch(HIDDEN_INSERT);
+    expect(unit[3]).toBe("COMMIT");
     const merges = execCalls().filter(([sql]) => SWAP_INSERT.test(sql));
     expect(merges).toHaveLength(1);
     expect(must(merges[0])[1]).toBe(1);
     expect(typeof must(merges[0])[2]).toBe("number");
+    const hidden = must(execCalls().find(([sql]) => HIDDEN_INSERT.test(sql)));
+    expect(hidden[1]).toBe(1);
+    expect(typeof hidden[2]).toBe("number");
+    expect(JSON.parse(String(hidden[3]))).toEqual([
+      { t: "tag", id: "2", iid: "A" },
+    ]);
     expect(sqls.some((sql) => SWAP_DELETE.test(sql))).toBe(false);
     expect(mockPrisma.userExcludedEntity.upsert).not.toHaveBeenCalled();
     expect(mockDbWrite).toHaveBeenCalledTimes(1);
@@ -2004,7 +2017,7 @@ describe("addHiddenEntity", () => {
       [EDGE_SCENE_TAG, [{ id: "s7", instanceId: "A" }]],
     ]);
 
-    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "A");
+    await hide("tag", "2", "A");
 
     expect(mergedKeys()).toEqual(
       new Set(["tag:2@A:hidden", "tag:7@A:hidden", "scene:s7@A:cascade"])
@@ -2025,12 +2038,7 @@ describe("addHiddenEntity", () => {
   it("should merge only the stored row when there are no descendants or cascades", async () => {
     fakeRaw([[RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]]]);
 
-    await exclusionComputationService.addHiddenEntity(
-      1,
-      "performer",
-      "perf1",
-      "A"
-    );
+    await hide("performer", "perf1", "A");
 
     expect(createdRows()).toHaveLength(1);
     expect(mergedKeys()).toEqual(new Set(["performer:perf1@A:hidden"]));
@@ -2043,12 +2051,7 @@ describe("addHiddenEntity", () => {
       [EDGE_SCENE_PERFORMER, [{ id: "scene1", instanceId: "A" }]],
     ]);
 
-    await exclusionComputationService.addHiddenEntity(
-      1,
-      "performer",
-      "perf1",
-      "A"
-    );
+    await hide("performer", "perf1", "A");
 
     expect(mergedKeys()).toEqual(
       new Set(["performer:perf1@A:hidden", "scene:scene1@A:cascade"])
@@ -2059,7 +2062,7 @@ describe("addHiddenEntity", () => {
     expect(must(fill)[1]).toBe(JSON.stringify([["perf1", "A"]]));
   });
 
-  it("a full recompute and addHiddenEntity write the same rows for the same hide", async () => {
+  it("a full recompute and addHiddenEntities write the same rows for the same hide", async () => {
     setupPipeline(["A", "B"]);
     const routes: Array<[RegExp, unknown[]]> = [
       [
@@ -2074,7 +2077,7 @@ describe("addHiddenEntity", () => {
     ];
     fakeRaw(routes);
 
-    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "");
+    await hide("tag", "2", "");
     const fromHide = mergedKeys();
 
     setupPipeline(["A", "B"]);
@@ -2102,73 +2105,75 @@ describe("addHiddenEntity", () => {
     expect(fromHide).toEqual(expected);
     expect(fromRecompute).toEqual(expected);
   });
-});
 
-describe("removeHiddenEntity", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Setup mocks for recomputeForUser which will be called async
-    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
+  it("a bulk hide expands each type once and merges everything in one unit", async () => {
+    setupPipeline(["A"]);
+    fakeRaw([
+      [
+        RESOLVE_PERFORMER,
+        [
+          { id: "p1", instanceId: "A" },
+          { id: "p2", instanceId: "A" },
+        ],
+      ],
+      [EDGE_SCENE_PERFORMER, [{ id: "s9", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.addHiddenEntities(1, [
+      { entityType: "performer", entityId: "p1", instanceId: "A" },
+      { entityType: "scene", entityId: "s1", instanceId: "A" },
+      { entityType: "performer", entityId: "p2", instanceId: "A" },
+    ]);
+
+    expect(mockWithComputeConnection).toHaveBeenCalledTimes(1);
+    expect(queriesMatching(RESOLVE_PERFORMER)).toHaveLength(1);
+    expect(mergedKeys()).toEqual(
+      new Set([
+        "performer:p1@A:hidden",
+        "performer:p2@A:hidden",
+        "scene:s1@A:hidden",
+        "scene:s9@A:cascade",
+      ])
+    );
+    expect(mockDbWrite).toHaveBeenCalledTimes(1);
+    expect(must(mockDbWrite.mock.calls[0])[0]).toBe("exclusions.hide");
+    const hidden = execCalls().filter(([sql]) => HIDDEN_INSERT.test(sql));
+    expect(hidden).toHaveLength(1);
+    expect(JSON.parse(String(must(hidden[0])[3]))).toEqual([
+      { t: "performer", id: "p1", iid: "A" },
+      { t: "scene", id: "s1", iid: "A" },
+      { t: "performer", id: "p2", iid: "A" },
+    ]);
   });
 
-  it("should queue async recompute via setImmediate", () => {
-    // Spy on setImmediate
-    const setImmediateSpy = vi.spyOn(global, "setImmediate");
+  it("rolls the unit back and rejects when the hidden rows fail", async () => {
+    fakeRaw([[RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]]]);
+    mockPrisma.$executeRawUnsafe.mockImplementation(
+      prismaImpl((sql: string) => {
+        if (HIDDEN_INSERT.test(sql)) throw new Error("hidden insert failed");
+        return 0;
+      })
+    );
 
-    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
+    await expect(hide("performer", "perf1", "A")).rejects.toThrow(
+      "hidden insert failed"
+    );
 
-    // Verify setImmediate was called
-    expect(setImmediateSpy).toHaveBeenCalled();
-
-    setImmediateSpy.mockRestore();
+    const unit = sqlFrom(/^BEGIN IMMEDIATE$/).filter(
+      (sql) => !/^DROP TABLE/.test(sql)
+    );
+    expect(unit[0]).toBe("BEGIN IMMEDIATE");
+    expect(unit[1]).toMatch(SWAP_INSERT);
+    expect(unit[2]).toMatch(HIDDEN_INSERT);
+    expect(unit[3]).toBe("ROLLBACK");
+    expect(unit).not.toContain("COMMIT");
   });
 
-  it("should call recomputeForUser asynchronously", async () => {
-    // Use fake timers to control setImmediate
-    vi.useFakeTimers();
+  it("does nothing for no targets", async () => {
+    await exclusionComputationService.addHiddenEntities(1, []);
 
-    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
-
-    // Transaction should not have been called yet (async)
-    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
-
-    // Run pending timers/immediate callbacks
-    await vi.runAllTimersAsync();
-
-    // Now recomputeForUser should have been called
-    expect(mockPrisma.$transaction).toHaveBeenCalled();
-
-    vi.useRealTimers();
-  });
-
-  it("should handle errors in async recompute gracefully", async () => {
-    vi.useFakeTimers();
-
-    // Make the transaction fail
-    mockPrisma.$transaction.mockRejectedValueOnce(new Error("Database error"));
-
-    // This should not throw
-    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
-
-    // Run the async callback - should not throw even if recompute fails
-    await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
-
-    vi.useRealTimers();
+    expect(mockWithComputeConnection).not.toHaveBeenCalled();
+    expect(mockDbWrite).not.toHaveBeenCalled();
   });
 });
 

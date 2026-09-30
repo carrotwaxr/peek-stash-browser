@@ -10,8 +10,7 @@ import {
 } from "../../services/UserHiddenEntityService.js";
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
 import { entityKey } from "../../utils/entityRef.js";
-import { anyOf } from "../helpers/matchers.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -27,8 +26,7 @@ vi.mock("../../services/EntityAccessService.js", () => ({
 // Mock ExclusionComputationService
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
-    addHiddenEntity: vi.fn().mockResolvedValue(undefined),
-    removeHiddenEntity: vi.fn(),
+    addHiddenEntities: vi.fn().mockResolvedValue(undefined),
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -110,80 +108,27 @@ describe("UserHiddenEntityService", () => {
   // ─── hideEntity ───────────────────────────────────────────────────
 
   describe("hideEntity", () => {
-    it("upserts the hidden entity record with correct composite key", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
+    it("hides one target through addHiddenEntities, the row and its exclusions together", async () => {
+      await userHiddenEntityService.hideEntity(5, "studio", "10", "inst-b");
 
-      await userHiddenEntityService.hideEntity(1, "scene", "42", "inst-a");
-
-      expect(mockPrisma.userHiddenEntity.upsert).toHaveBeenCalledWith({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "42",
-            instanceId: "inst-a",
-          },
-        },
-        create: {
-          userId: 1,
-          entityType: "scene",
-          entityId: "42",
-          instanceId: "inst-a",
-        },
-        update: {
-          hiddenAt: anyOf(Date),
-        },
-      });
+      expect(mockExclusion.addHiddenEntities).toHaveBeenCalledExactlyOnceWith(
+        5,
+        [{ entityType: "studio", entityId: "10", instanceId: "inst-b" }]
+      );
+      // The service writes no row of its own
+      expect(mockPrisma.userHiddenEntity.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.userHiddenEntity.create).not.toHaveBeenCalled();
     });
 
     it("defaults instanceId to empty string when not provided", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
-
-      await userHiddenEntityService.hideEntity(1, "performer", "7");
-
-      expect(mockPrisma.userHiddenEntity.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_entityType_entityId_instanceId: {
-              userId: 1,
-              entityType: "performer",
-              entityId: "7",
-              instanceId: "",
-            },
-          },
-        })
-      );
-    });
-
-    it("triggers exclusion computation with correct arguments", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
-
-      await userHiddenEntityService.hideEntity(5, "studio", "10", "inst-b");
-
-      expect(mockExclusion.addHiddenEntity).toHaveBeenCalledWith(
-        5,
-        "studio",
-        "10",
-        "inst-b"
-      );
-    });
-
-    it("passes empty instanceId to exclusion computation when not provided", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
-
       await userHiddenEntityService.hideEntity(5, "tag", "3");
 
-      expect(mockExclusion.addHiddenEntity).toHaveBeenCalledWith(
-        5,
-        "tag",
-        "3",
-        ""
-      );
+      expect(mockExclusion.addHiddenEntities).toHaveBeenCalledWith(5, [
+        { entityType: "tag", entityId: "3", instanceId: "" },
+      ]);
     });
 
     it("invalidates the cached hidden IDs for the user", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
-
       // Prime the cache
       mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
       await userHiddenEntityService.getHiddenEntityIds(1);
@@ -197,26 +142,45 @@ describe("UserHiddenEntityService", () => {
       expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
     });
 
-    it("works for all entity types", async () => {
-      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
-
-      const types: EntityType[] = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ];
-      for (const type of types) {
-        await userHiddenEntityService.hideEntity(1, type, "1", "inst");
-      }
-
-      expect(mockPrisma.userHiddenEntity.upsert).toHaveBeenCalledTimes(
-        types.length
+    it("rejects when the write fails", async () => {
+      mockExclusion.addHiddenEntities.mockRejectedValueOnce(
+        new Error("merge failed")
       );
-      expect(mockExclusion.addHiddenEntity).toHaveBeenCalledTimes(types.length);
+
+      await expect(
+        userHiddenEntityService.hideEntity(1, "scene", "1", "inst")
+      ).rejects.toThrow("merge failed");
+    });
+  });
+
+  // ─── hideEntities ─────────────────────────────────────────────────
+
+  describe("hideEntities", () => {
+    it("hides every target with one addHiddenEntities call", async () => {
+      const targets = [
+        { entityType: "scene" as const, entityId: "1", instanceId: "inst" },
+        { entityType: "performer" as const, entityId: "2", instanceId: "" },
+        { entityType: "image" as const, entityId: "3", instanceId: "inst" },
+      ];
+
+      await userHiddenEntityService.hideEntities(4, targets);
+
+      expect(mockExclusion.addHiddenEntities).toHaveBeenCalledExactlyOnceWith(
+        4,
+        targets
+      );
+    });
+
+    it("invalidates the cached hidden IDs for the user", async () => {
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      await userHiddenEntityService.getHiddenEntityIds(4);
+
+      await userHiddenEntityService.hideEntities(4, [
+        { entityType: "scene", entityId: "1", instanceId: "inst" },
+      ]);
+
+      await userHiddenEntityService.getHiddenEntityIds(4);
+      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -258,17 +222,48 @@ describe("UserHiddenEntityService", () => {
       });
     });
 
-    it("triggers removeHiddenEntity on the exclusion service", async () => {
-      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
-
-      await userHiddenEntityService.unhideEntity(3, "tag", "8", "inst-c");
-
-      expect(mockExclusion.removeHiddenEntity).toHaveBeenCalledWith(
-        3,
-        "tag",
-        "8",
-        "inst-c"
+    it("resolves only after the user's recompute, which runs after the delete", async () => {
+      const order: string[] = [];
+      mockPrisma.userHiddenEntity.deleteMany.mockImplementation(
+        prismaImpl(() => {
+          order.push("delete");
+          return { count: 1 };
+        })
       );
+      let finishRecompute!: () => void;
+      mockExclusion.recomputeForUser.mockImplementationOnce(() => {
+        order.push("recompute");
+        return new Promise<void>((resolve) => {
+          finishRecompute = resolve;
+        });
+      });
+
+      let resolved = false;
+      const unhide = userHiddenEntityService
+        .unhideEntity(3, "tag", "8", "inst-c")
+        .then(() => {
+          resolved = true;
+        });
+      await vi.waitFor(() => {
+        expect(order).toEqual(["delete", "recompute"]);
+      });
+      expect(resolved).toBe(false);
+
+      finishRecompute();
+      await unhide;
+      expect(resolved).toBe(true);
+      expect(mockExclusion.recomputeForUser).toHaveBeenCalledExactlyOnceWith(3);
+    });
+
+    it("rejects when the recompute fails", async () => {
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
+      mockExclusion.recomputeForUser.mockRejectedValueOnce(
+        new Error("recompute failed")
+      );
+
+      await expect(
+        userHiddenEntityService.unhideEntity(3, "tag", "8", "inst-c")
+      ).rejects.toThrow("recompute failed");
     });
 
     it("invalidates the cached hidden IDs for the user", async () => {

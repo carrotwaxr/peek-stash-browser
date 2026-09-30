@@ -127,6 +127,7 @@ vi.mock(
     userHiddenEntityService: {
       findAlreadyHidden: vi.fn(),
       hideEntity: vi.fn().mockResolvedValue(undefined),
+      hideEntities: vi.fn().mockResolvedValue(undefined),
       unhideEntity: vi.fn().mockResolvedValue(undefined),
       unhideAll: vi.fn().mockResolvedValue(5),
       getHiddenEntities: vi.fn().mockResolvedValue([]),
@@ -1086,7 +1087,32 @@ describe("User Controller — Features", () => {
       expect(res._getOkBody().success).toBe(true);
       expect(res._getOkBody().successCount).toBe(2);
       expect(res._getOkBody().failCount).toBe(0);
-      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(2);
+      // Every target in one call: one compute, one unit
+      expect(
+        userHiddenEntityService.hideEntities
+      ).toHaveBeenCalledExactlyOnceWith(USER.id, [
+        { entityType: "scene", entityId: "1", instanceId: "" },
+        { entityType: "performer", entityId: "2", instanceId: "" },
+      ]);
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("hides nothing and rejects when the write fails, for the error handler's 500", async () => {
+      vi.mocked(userHiddenEntityService.hideEntities).mockRejectedValueOnce(
+        new Error("merge failed")
+      );
+      const req = reqFor(hideEntities, {
+        body: {
+          entities: [
+            { entityType: "scene", entityId: "1" },
+            { entityType: "performer", entityId: "2" },
+          ],
+        },
+        user: USER,
+      });
+      const res = resFor(hideEntities);
+      await expect(hideEntities(req, res)).rejects.toThrow("merge failed");
+      expect(res.json).not.toHaveBeenCalled();
     });
 
     it("returns 404 naming the first target not visible, and hides nothing", async () => {
@@ -1105,7 +1131,7 @@ describe("User Controller — Features", () => {
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(404);
       expect(res._getBody()).toEqual({ error: "entities[1]: Not found" });
-      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+      expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
     });
 
     it("counts a target already hidden as hidden without writing it again", async () => {
@@ -1124,13 +1150,29 @@ describe("User Controller — Features", () => {
       await hideEntities(req, res);
       expect(res._getOkBody().successCount).toBe(2);
       expect(res._getOkBody().failCount).toBe(0);
-      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(1);
-      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
-        USER.id,
-        "scene",
-        "2",
-        ""
-      );
+      expect(
+        userHiddenEntityService.hideEntities
+      ).toHaveBeenCalledExactlyOnceWith(USER.id, [
+        { entityType: "scene", entityId: "2", instanceId: "" },
+      ]);
+    });
+
+    it("writes nothing when every target is already hidden", async () => {
+      mockAlreadyHidden.mockResolvedValueOnce([true, true]);
+      visibleIds();
+      const req = reqFor(hideEntities, {
+        body: {
+          entities: [
+            { entityType: "scene", entityId: "1" },
+            { entityType: "scene", entityId: "2" },
+          ],
+        },
+        user: USER,
+      });
+      const res = resFor(hideEntities);
+      await hideEntities(req, res);
+      expect(res._getOkBody().successCount).toBe(2);
+      expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
     });
 
     it("checks a 200-target bulk hide in a bounded number of queries", async () => {
@@ -1150,7 +1192,10 @@ describe("User Controller — Features", () => {
       expect(must(mockVisibleKeys.mock.calls[0])[2]).toHaveLength(100);
       expect(mockVisibleIds).toHaveBeenCalledTimes(1);
       expect(must(mockVisibleIds.mock.calls[0])[2]).toHaveLength(100);
-      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(200);
+      expect(userHiddenEntityService.hideEntities).toHaveBeenCalledTimes(1);
+      expect(
+        must(vi.mocked(userHiddenEntityService.hideEntities).mock.calls[0])[1]
+      ).toHaveLength(200);
     });
 
     it("returns 400 and hides nothing when any entityId is not a numeric Stash id", async () => {
@@ -1166,7 +1211,7 @@ describe("User Controller — Features", () => {
       const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+      expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
     });
 
     it("returns 400 for an unknown instanceId in bulk", async () => {
