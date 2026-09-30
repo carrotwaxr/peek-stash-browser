@@ -127,7 +127,11 @@ describe("navigation", () => {
       screen.getByText("Test Scene").closest("a"),
       "title link"
     );
-    return { router, imageLink, titleLink };
+    const card = must(
+      utils.container.firstElementChild as HTMLElement | null,
+      "card"
+    );
+    return { router, imageLink, titleLink, card };
   };
 
   it("clicking the title calls onClick once and navigates nothing else", () => {
@@ -157,6 +161,27 @@ describe("navigation", () => {
     const { router, titleLink } = renderCard();
 
     fireEvent.click(titleLink);
+
+    expect(router.state.location.pathname).toBe("/scene/1");
+  });
+
+  it("Enter on a focused scene card calls onClick with the scene (the page's playlist handler), like a click", () => {
+    const onClick = vi.fn();
+    const { router, card } = renderCard(onClick);
+
+    card.focus();
+    fireEvent.keyDown(card, { key: "Enter" });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledWith(scene);
+    expect(router.state.location.pathname).toBe("/scenes");
+  });
+
+  it("Enter on the card without onClick opens the scene like the link", () => {
+    const { router, card } = renderCard();
+
+    card.focus();
+    fireEvent.keyDown(card, { key: "Enter" });
 
     expect(router.state.location.pathname).toBe("/scene/1");
   });
