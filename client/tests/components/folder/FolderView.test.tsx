@@ -247,4 +247,70 @@ describe("FolderView", () => {
       expect(must(capturedSearchParams).get("folderPath")).toBe("5:a");
     });
   });
+
+  describe("controlled", () => {
+    it("a controlled path renders its folders and reports a click through onPathChange", () => {
+      const onPathChange = vi.fn();
+      const tags = [
+        { id: "1", instanceId: "a", name: "Root", parents: [] },
+        { id: "2", instanceId: "a", name: "Child", parents: [{ id: "1" }] },
+        {
+          id: "3",
+          instanceId: "a",
+          name: "Grandchild",
+          parents: [{ id: "2" }],
+        },
+      ];
+      const items = [
+        { id: "img1", instanceId: "a", tags: [{ id: "3" }] },
+        { id: "img2", instanceId: "a", tags: [{ id: "1" }] },
+      ];
+
+      // The URL names no folder: the path prop is the one shown
+      render(
+        <FolderView
+          items={items}
+          tags={tags}
+          path={["1:a"]}
+          onPathChange={onPathChange}
+          renderItem={(item) => (
+            <div key={String(item.id)}>{String(item.id)}</div>
+          )}
+        />,
+        { wrapper: createWrapper(["/?page=4"]) }
+      );
+
+      const folderCards = screen
+        .getAllByRole("button")
+        .filter((btn) => btn.querySelector("h3") !== null);
+      expect(
+        folderCards.map((btn) => btn.querySelector("h3")?.textContent)
+      ).toEqual(["Child"]);
+
+      fireEvent.click(must(folderCards[0]));
+
+      expect(onPathChange).toHaveBeenCalledTimes(1);
+      expect(onPathChange).toHaveBeenLastCalledWith(["1:a", "2:a"]);
+      // The owner writes the URL: the view leaves it alone
+      expect(must(capturedSearchParams).get("folderPath")).toBeNull();
+      expect(must(capturedSearchParams).get("page")).toBe("4");
+    });
+
+    it("a controlled path of bare ids is stored as tag keys by replace", () => {
+      const onPathChange = vi.fn();
+      render(
+        <FolderView
+          items={[]}
+          tags={[{ id: "5", instanceId: "a", name: "Five", parents: [] }]}
+          path={["5"]}
+          onPathChange={onPathChange}
+          renderItem={() => null}
+        />,
+        { wrapper: createWrapper(["/?folderPath=5"]) }
+      );
+
+      expect(must(capturedSearchParams).get("folderPath")).toBe("5:a");
+      expect(onPathChange).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -31,6 +31,7 @@ import {
   freshSeed,
   listKeyOf,
   listKeyWithoutPageOf,
+  lockedFieldsOf,
   parseSortValue,
   sortValue,
   withoutLockedFilters,
@@ -85,6 +86,19 @@ export interface UseListUrlStateOptions {
    * included, so the panel cannot turn the page's own criterion inside out
    */
   lockedFields?: readonly string[];
+  /**
+   * Permanent filters a view adds from its own state (the timeline's period
+   * as `date`, the open folder as `tags`): merged over `permanentFilters`,
+   * and their fields locked like `lockedFields`
+   */
+  viewFilters?: (view: ListView) => Record<string, unknown>;
+}
+
+/** The view and where in it the list is: what a view's own filters follow */
+export interface ListView {
+  viewMode: string;
+  timelinePeriod: string | null;
+  folderPath: string[];
 }
 
 export interface ListUrlState {
@@ -99,6 +113,8 @@ export interface ListUrlState {
   gridDensity: string;
   timelinePeriod: string | null;
   folderPath: string[];
+  /** The page's permanent filters with its view's (`viewFilters`) merged in */
+  permanentFilters: Record<string, unknown>;
   /** The default preset for this context, whichever of its fields applied */
   activePreset: SavedPreset | null;
   /** Presets resolved (cached after the first visit) and a random order seeded */
@@ -148,20 +164,14 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     sortOptions,
     viewModes,
     defaults,
-    permanentFilters = NO_FILTERS,
-    lockedFields: lockedFieldsOption = NO_LOCKS,
+    permanentFilters: pagePermanentFilters = NO_FILTERS,
+    lockedFields: pageLockedFields = NO_LOCKS,
+    viewFilters,
   } = options;
   const [searchParams, setSearchParams] = useSearchParams();
   const presetsQuery = useFilterPresets();
   const defaultPresetsQuery = useDefaultPresets();
   const { unitPreference } = useUnitPreference();
-
-  // Equal sets are one dependency, whichever array carries them
-  const lockedKey = lockedFieldsOption.join(",");
-  const lockedFields = useMemo(
-    () => (lockedKey === "" ? NO_LOCKS : lockedKey.split(",")),
-    [lockedKey]
-  );
 
   const presetContext = context ?? entityType;
   const presetsResolved =
@@ -198,6 +208,42 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     };
   }, [activePreset, defaults, viewModes]);
 
+  const view = useMemo<ListView>(
+    () => ({
+      viewMode:
+        url.view !== null && viewModes.includes(url.view)
+          ? url.view
+          : shown.viewMode,
+      timelinePeriod: url.timelinePeriod,
+      folderPath: url.folderPath,
+    }),
+    [url, viewModes, shown]
+  );
+
+  // The view's own filters join the page's, and lock their fields too
+  const viewOwn = useMemo(
+    () => (viewFilters ? viewFilters(view) : NO_FILTERS),
+    [viewFilters, view]
+  );
+  const permanentFilters = useMemo(
+    () =>
+      Object.keys(viewOwn).length === 0
+        ? pagePermanentFilters
+        : { ...pagePermanentFilters, ...viewOwn },
+    [pagePermanentFilters, viewOwn]
+  );
+
+  // Equal sets are one dependency, whichever array carries them
+  const lockedKey = [
+    ...new Set([...pageLockedFields, ...lockedFieldsOf(entityType, viewOwn)]),
+  ]
+    .sort()
+    .join(",");
+  const lockedFields = useMemo(
+    () => (lockedKey === "" ? NO_LOCKS : lockedKey.split(",")),
+    [lockedKey]
+  );
+
   const derived = useMemo(() => {
     const filters = withoutLockedFilters(
       entityType,
@@ -231,14 +277,9 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
       page: url.page,
       perPage: url.perPage ?? shown.perPage,
       q: url.q ?? "",
-      viewMode:
-        url.view !== null && viewModes.includes(url.view)
-          ? url.view
-          : shown.viewMode,
+      ...view,
       zoomLevel: url.zoom ?? shown.zoomLevel,
       gridDensity: url.gridDensity ?? shown.gridDensity,
-      timelinePeriod: url.timelinePeriod,
-      folderPath: url.folderPath,
     };
   }, [
     url,
@@ -248,7 +289,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     defaults,
     entityType,
     lockedFields,
-    viewModes,
+    view,
     shown,
   ]);
 
@@ -410,6 +451,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
 
   return {
     ...derived,
+    permanentFilters,
     activePreset,
     ready,
     listKey: listKeyOf(query),
