@@ -97,8 +97,6 @@ vi.mock("@/components/grids/index", () => ({
   GroupGrid: () => null,
   PerformerGrid: () => null,
   StudioGrid: () => null,
-  TagGrid: () => null,
-  ImageGrid: () => null,
 }));
 vi.mock("@/components/scene-search/SceneSearch", () => ({
   default: () => null,

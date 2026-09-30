@@ -31,8 +31,6 @@ const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
     GroupGrid: vi.fn<(props: GridProps) => null>(() => null),
     PerformerGrid: vi.fn<(props: GridProps) => null>(() => null),
     StudioGrid: vi.fn<(props: GridProps) => null>(() => null),
-    TagGrid: vi.fn<(props: GridProps) => null>(() => null),
-    ImageGrid: vi.fn<(props: GridProps) => null>(() => null),
   },
   sceneSearch: vi.fn<(props: SceneSearchProps) => null>(() => null),
 }));

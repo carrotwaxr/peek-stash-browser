@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import EmptyState from "./EmptyState";
+import ErrorMessage from "./ErrorMessage";
 import { LayoutRenderer } from "./LayoutRenderer";
-import Pagination from "./Pagination";
 
 interface Props {
   entityType: string;
@@ -10,11 +10,10 @@ interface Props {
   renderItem: (item: unknown, index: number) => ReactNode;
   loading?: boolean;
   error?: Error | null;
+  /** Shown as the error's Retry button */
+  onRetry?: () => void;
   emptyMessage?: string;
   emptyDescription?: string;
-  currentPage?: number;
-  totalPages?: number;
-  onPageChange?: ((page: number) => void) | null;
   renderSkeleton?: () => ReactNode;
   skeletonCount?: number;
   className?: string;
@@ -27,11 +26,9 @@ export const SearchResults = ({
   renderItem,
   loading = false,
   error,
+  onRetry,
   emptyMessage = "No items found",
   emptyDescription,
-  currentPage,
-  totalPages,
-  onPageChange,
   renderSkeleton,
   skeletonCount = 12,
   className = "",
@@ -63,9 +60,10 @@ export const SearchResults = ({
   // Error state
   if (error) {
     return (
-      <EmptyState
+      <ErrorMessage
         title="Error loading items"
-        description={error.message || "An error occurred"}
+        error={error}
+        {...(onRetry ? { onRetry } : {})}
       />
     );
   }
@@ -75,30 +73,17 @@ export const SearchResults = ({
     return <EmptyState title={emptyMessage} description={emptyDescription} />;
   }
 
-  // Results
+  // Results; the list's controls page it
   return (
-    <>
-      <LayoutRenderer
-        layoutType={layoutType}
-        entityType={entityType}
-        density={density}
-        items={items}
-        renderItem={renderItem}
-        loading={false}
-        className={className}
-      />
-
-      {/* Pagination - common across all layouts */}
-      {totalPages != null && totalPages > 1 && onPageChange && (
-        <nav role="navigation" aria-label="Pagination" className="mt-6">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={onPageChange}
-          />
-        </nav>
-      )}
-    </>
+    <LayoutRenderer
+      layoutType={layoutType}
+      entityType={entityType}
+      density={density}
+      items={items}
+      renderItem={renderItem}
+      loading={false}
+      className={className}
+    />
   );
 };
 

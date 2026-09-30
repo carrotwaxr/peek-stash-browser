@@ -31,7 +31,7 @@ const GalleryGrid = ({
           <GalleryCard
             key={gallery.id}
             gallery={gallery}
-            onHideSuccess={() => onHideSuccess(gallery.id, gallery.instanceId)}
+            onHideSuccess={onHideSuccess}
           />
         );
       }}

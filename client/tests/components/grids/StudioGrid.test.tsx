@@ -36,12 +36,15 @@ describe("StudioGrid", () => {
     const element = StudioGrid({});
     const mockStudio = { id: "1", name: "Test Studio" };
 
+    const onHideSuccess = () => {};
     const renderedCard = element.props.renderItem(mockStudio, 0, {
-      onHideSuccess: () => {},
+      onHideSuccess,
     });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.studio).toEqual(mockStudio);
     expect(renderedCard.key).toBe("1");
+    // The grid's one hide handler, not a new closure per card
+    expect(renderedCard).toHaveProperty("props.onHideSuccess", onHideSuccess);
   });
 });
