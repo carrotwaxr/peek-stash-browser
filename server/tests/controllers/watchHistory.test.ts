@@ -671,6 +671,59 @@ describe("Watch History Controller", () => {
       expect(res.status).toHaveBeenCalledWith(401);
     });
 
+    it("answers 400 without an instanceId", async () => {
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.watchHistory.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 for a malformed instanceId", async () => {
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          query: { instanceId: "a:b" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.watchHistory.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("reads the row of the requested instance", async () => {
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          query: { instanceId: "inst-b" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(mockPrisma.watchHistory.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_instanceId_sceneId: {
+            userId: 1,
+            instanceId: "inst-b",
+            sceneId: "123",
+          },
+        },
+      });
+    });
+
     it("should return exists:false when no watch history found", async () => {
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
 
@@ -678,6 +731,7 @@ describe("Watch History Controller", () => {
       await getWatchHistory(
         reqFor(getWatchHistory, {
           params: { sceneId: "123" },
+          query: { instanceId: "inst-a" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -709,6 +763,7 @@ describe("Watch History Controller", () => {
       await getWatchHistory(
         reqFor(getWatchHistory, {
           params: { sceneId: "123" },
+          query: { instanceId: "inst-a" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -743,6 +798,7 @@ describe("Watch History Controller", () => {
       await getWatchHistory(
         reqFor(getWatchHistory, {
           params: { sceneId: "123" },
+          query: { instanceId: "inst-a" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -771,6 +827,7 @@ describe("Watch History Controller", () => {
       await getWatchHistory(
         reqFor(getWatchHistory, {
           params: { sceneId: "123" },
+          query: { instanceId: "inst-a" },
           user: testUser({ id: 1 }),
         }),
         res

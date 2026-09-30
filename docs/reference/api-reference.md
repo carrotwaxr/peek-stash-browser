@@ -865,6 +865,8 @@ Watch history tracking endpoints.
 
 **Authentication:** Required
 
+**Query:** `instanceId` (required). Scene ids repeat across Stash servers, so the read names the scene's instance; a missing or malformed value answers 400.
+
 **Controller:** `getWatchHistory` in `../controllers/watchHistory.ts`
 
 ---
@@ -892,6 +894,8 @@ Image view history tracking endpoints.
 ### GET /api/image-view-history/:imageId
 
 **Authentication:** Required
+
+**Query:** `instanceId` (required). Image ids repeat across Stash servers, so the read names the image's instance; a missing or malformed value answers 400.
 
 **Controller:** `getImageViewHistory` in `../controllers/imageViewHistory.ts`
 

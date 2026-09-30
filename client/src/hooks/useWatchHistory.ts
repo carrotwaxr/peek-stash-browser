@@ -11,6 +11,7 @@ import { useAuth } from "./useAuth";
  * - Quality tracking
  *
  * @param {string} sceneId - Stash scene ID
+ * @param {string} instanceId - The scene's Stash instance (the server needs it: ids repeat across servers)
  * @param {Object} playerRef - React ref to Video.js player instance (unused, kept for API compat)
  * @returns {Object} Watch history state and methods
  */
@@ -21,6 +22,7 @@ interface WatchHistoryData {
 
 export function useWatchHistory(
   sceneId: string,
+  instanceId: string,
   _playerRef = { current: null }
 ) {
   const { isAuthenticated } = useAuth();
@@ -37,7 +39,7 @@ export function useWatchHistory(
    * Fetch watch history for this scene
    */
   const fetchWatchHistory = useCallback(async () => {
-    if (!sceneId || !isAuthenticated) {
+    if (!sceneId || !instanceId || !isAuthenticated) {
       setLoading(false);
       return;
     }
@@ -45,7 +47,9 @@ export function useWatchHistory(
     try {
       setLoading(true);
       setError(null);
-      const data = await apiGet<WatchHistoryData>(`/watch-history/${sceneId}`);
+      const data = await apiGet<WatchHistoryData>(
+        `/watch-history/${sceneId}?instanceId=${encodeURIComponent(instanceId)}`
+      );
       setWatchHistory(data);
     } catch (err) {
       console.error("Error fetching watch history:", err);
@@ -55,7 +59,7 @@ export function useWatchHistory(
     } finally {
       setLoading(false);
     }
-  }, [sceneId, isAuthenticated]);
+  }, [sceneId, instanceId, isAuthenticated]);
 
   /**
    * Update current quality setting

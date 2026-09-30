@@ -368,4 +368,81 @@ describe("History access (integration)", () => {
       });
     });
   });
+
+  /**
+   * The replay's libraries share ids, so one scene id is a different scene on
+   * each instance. A read names its instance; it never picks one.
+   */
+  describe("reads with two instances sharing an id", () => {
+    let reader: { id: number; client: TestClient };
+
+    beforeAll(async () => {
+      reader = await createApiUser("history_it_reader", "history_it_pass_1");
+    }, 60000);
+
+    afterAll(async () => {
+      const created = reader as typeof reader | undefined;
+      if (created) {
+        await prisma.watchHistory.deleteMany({ where: { userId: created.id } });
+        await prisma.imageViewHistory.deleteMany({
+          where: { userId: created.id },
+        });
+        await adminClient.delete(`/api/user/${created.id}`);
+      }
+    }, 60000);
+
+    it("each instance's resume point is read back on its own instance when two instances share the scene id", async () => {
+      for (const [instanceId, currentTime] of [
+        [FX.A, 10],
+        [FX.B, 20],
+      ] as const) {
+        const pinged = await reader.client.post("/api/watch-history/ping", {
+          sceneId: FX_ID.SAME,
+          instanceId,
+          currentTime,
+        });
+        expect(pinged.status).toBe(200);
+      }
+
+      const read = async (instanceId: string) =>
+        reader.client.get<{ exists: boolean; resumeTime: number | null }>(
+          `/api/watch-history/${FX_ID.SAME}?instanceId=${instanceId}`
+        );
+      const [a, b] = await Promise.all([read(FX.A), read(FX.B)]);
+
+      expect([a.status, b.status]).toEqual([200, 200]);
+      expect([a.data.resumeTime, b.data.resumeTime]).toEqual([10, 20]);
+    });
+
+    it("each instance's image views are read back on their own instance", async () => {
+      for (const [instanceId, views] of [
+        [FX.A, 1],
+        [FX.B, 2],
+      ] as const) {
+        for (let i = 0; i < views; i++) {
+          const viewed = await reader.client.post(
+            "/api/image-view-history/view",
+            { imageId: FX_ID.SAME, instanceId }
+          );
+          expect(viewed.status).toBe(200);
+        }
+      }
+
+      const read = async (instanceId: string) =>
+        reader.client.get<{ viewCount: number }>(
+          `/api/image-view-history/${FX_ID.SAME}?instanceId=${instanceId}`
+        );
+      const [a, b] = await Promise.all([read(FX.A), read(FX.B)]);
+
+      expect([a.data.viewCount, b.data.viewCount]).toEqual([1, 2]);
+    });
+
+    it("a read without an instance is refused", async () => {
+      const scene = await reader.client.get(`/api/watch-history/${FX_ID.SAME}`);
+      const image = await reader.client.get(
+        `/api/image-view-history/${FX_ID.SAME}`
+      );
+      expect([scene.status, image.status]).toEqual([400, 400]);
+    });
+  });
 });

@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "controllers/imageViewHistory.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "controllers/proxy.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2

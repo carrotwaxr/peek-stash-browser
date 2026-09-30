@@ -16,7 +16,6 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
-import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
@@ -29,11 +28,6 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-// Mock entityInstanceId (getImageViewHistory keeps its own lookup)
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("instance-1"),
-}));
-
 // Mock the access check: the request's instance when given, else "instance-1"
 vi.mock("../../services/EntityAccessService.js", () => ({
   resolveAccessibleInstanceId: vi.fn(),
@@ -45,7 +39,6 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
@@ -307,7 +300,6 @@ describe("Image View History Controller", () => {
       await incrementImageOCounter(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", undefined);
-      expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
     });
 
     it("logs warning when user has syncToStash enabled", async () => {
@@ -544,11 +536,35 @@ describe("Image View History Controller", () => {
       });
     });
 
+    it("answers 400 without an instanceId", async () => {
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
+      await getImageViewHistory(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockPrisma.imageViewHistory.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 for a malformed instanceId", async () => {
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        query: { instanceId: "a:b" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
+      await getImageViewHistory(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockPrisma.imageViewHistory.findUnique).not.toHaveBeenCalled();
+    });
+
     it("returns exists:false when no history found", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
 
       const req = reqFor(getImageViewHistory, {
         params: { imageId: "img-1" },
+        query: { instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(getImageViewHistory);
@@ -583,6 +599,7 @@ describe("Image View History Controller", () => {
 
       const req = reqFor(getImageViewHistory, {
         params: { imageId: "img-1" },
+        query: { instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(getImageViewHistory);
@@ -614,6 +631,7 @@ describe("Image View History Controller", () => {
 
       const req = reqFor(getImageViewHistory, {
         params: { imageId: "img-1" },
+        query: { instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(getImageViewHistory);
@@ -642,6 +660,7 @@ describe("Image View History Controller", () => {
 
       const req = reqFor(getImageViewHistory, {
         params: { imageId: "img-1" },
+        query: { instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(getImageViewHistory);
@@ -667,7 +686,6 @@ describe("Image View History Controller", () => {
       const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
-      expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
       expect(mockPrisma.imageViewHistory.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: objectContaining({
@@ -686,6 +704,7 @@ describe("Image View History Controller", () => {
 
       const req = reqFor(getImageViewHistory, {
         params: { imageId: "img-1" },
+        query: { instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(getImageViewHistory);

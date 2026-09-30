@@ -11,11 +11,14 @@ import {
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import SceneCarousel from "./SceneCarousel";
 
 interface WatchHistoryEntry {
   sceneId: string;
+  /** Null until the per-user instance columns are required (PR 5's B7). */
+  instanceId: string | null;
   resumeTime?: number;
   playCount?: number;
   lastPlayedAt?: string | null;
@@ -60,7 +63,11 @@ const ContinueWatchingCarousel = ({
   });
 
   const whList = watchHistoryList as WatchHistoryEntry[];
-  const sceneIds = useMemo(() => whList.map((wh) => wh.sceneId), [whList]);
+  // "id:instanceId" refs: scene ids repeat across servers
+  const sceneRefs = useMemo(
+    () => whList.map((wh) => makeCompositeKey(wh.sceneId, wh.instanceId)),
+    [whList]
+  );
 
   // The full scene of each watch history entry
   const {
@@ -68,20 +75,25 @@ const ContinueWatchingCarousel = ({
     isLoading: loadingScenes,
     error: scenesFetchError,
   } = useQuery({
-    queryKey: queryKeys.homeCarousels.continueWatching(sceneIds),
+    queryKey: queryKeys.homeCarousels.continueWatching(sceneRefs),
     queryFn: async ({ signal }) => {
       const response = (await libraryApi.findScenes(
-        { ids: sceneIds },
+        { ids: sceneRefs },
         signal
       )) as { findScenes?: { scenes?: NormalizedScene[] } };
       return response.findScenes?.scenes ?? [];
     },
-    enabled: ready && !loadingHistory && sceneIds.length > 0,
+    enabled: ready && !loadingHistory && sceneRefs.length > 0,
   });
 
   const scenes = useMemo((): SceneWithProgress[] => {
+    const historyByScene = new Map(
+      whList.map((wh) => [makeCompositeKey(wh.sceneId, wh.instanceId), wh])
+    );
     const withProgress = (fetchedScenes ?? []).map((scene) => {
-      const watchHistory = whList.find((wh) => wh.sceneId === scene.id);
+      const watchHistory = historyByScene.get(
+        makeCompositeKey(scene.id, scene.instanceId)
+      );
       return {
         ...scene,
         watchHistory: watchHistory ?? null,
@@ -110,11 +122,13 @@ const ContinueWatchingCarousel = ({
 
   // Waiting for the library only matters when there are scenes to show
   const initializing =
-    sceneIds.length > 0 && (!ready || isLibraryInitializing(scenesFetchError));
+    sceneRefs.length > 0 && (!ready || isLibraryInitializing(scenesFetchError));
   const loading = loadingHistory || loadingScenes;
 
   const handleSceneClick = (scene: NormalizedScene) => {
-    const currentIndex = scenes.findIndex((s) => s.id === scene.id);
+    const currentIndex = scenes.findIndex(
+      (s) => s.id === scene.id && s.instanceId === scene.instanceId
+    );
 
     void navigate(
       getEntityPath(
