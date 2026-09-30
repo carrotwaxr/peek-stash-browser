@@ -21,6 +21,7 @@ export const useHiddenEntities = () => {
    * @param {string} params.entityType - Type of entity (scene, performer, etc.)
    * @param {string} params.entityId - Entity ID
    * @param {string} params.entityName - Entity name (for display)
+   * @param {string} params.instanceId - The entity's Stash instance
    * @param {boolean} params.skipConfirmation - Skip confirmation dialog
    */
   const hideEntity = useCallback(
@@ -28,11 +29,13 @@ export const useHiddenEntities = () => {
       entityType,
       entityId,
       entityName,
+      instanceId,
       skipConfirmation = false,
     }: {
       entityType: string;
       entityId: string;
       entityName: string;
+      instanceId?: string;
       skipConfirmation?: boolean;
     }) => {
       setIsHiding(true);
@@ -40,6 +43,7 @@ export const useHiddenEntities = () => {
         await apiPost("/user/hidden-entities", {
           entityType,
           entityId,
+          ...(instanceId && { instanceId }),
         });
 
         showSuccess(`${entityName} has been hidden`);
@@ -71,7 +75,7 @@ export const useHiddenEntities = () => {
   /**
    * Hide multiple entities at once
    * @param {Object} params - Hide parameters
-   * @param {Array} params.entities - Array of {entityType, entityId} objects
+   * @param {Array} params.entities - Array of {entityType, entityId, instanceId} objects
    * @param {boolean} params.skipConfirmation - Skip confirmation dialog
    * @returns {Object} Result with successCount and failCount
    */
@@ -80,7 +84,11 @@ export const useHiddenEntities = () => {
       entities,
       skipConfirmation = false,
     }: {
-      entities: Array<{ entityType: string; entityId: string }>;
+      entities: Array<{
+        entityType: string;
+        entityId: string;
+        instanceId?: string;
+      }>;
       skipConfirmation?: boolean;
     }) => {
       setIsHiding(true);

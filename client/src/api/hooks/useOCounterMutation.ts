@@ -21,7 +21,10 @@ export function useIncrementOCounter() {
       if (sceneId) {
         return apiPost<IncrementOCounterResponse>(
           "/watch-history/increment-o",
-          { sceneId }
+          {
+            sceneId,
+            ...(instanceId && { instanceId }),
+          }
         );
       }
       if (imageId) {

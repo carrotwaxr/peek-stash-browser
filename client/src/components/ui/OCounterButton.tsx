@@ -9,6 +9,7 @@ import { useIncrementOCounter } from "../../api/hooks";
  *
  * @param {string} sceneId - Stash scene ID (for scene interactive mode)
  * @param {string} imageId - Stash image ID (for image interactive mode)
+ * @param {string} instanceId - The entity's Stash instance, sent with the increment
  * @param {number} initialCount - Initial O counter value
  * @param {Function} onChange - Optional callback after successful increment (receives new count)
  * @param {string} size - Size variant: small, medium, large
@@ -18,6 +19,7 @@ import { useIncrementOCounter } from "../../api/hooks";
 interface Props {
   sceneId?: string;
   imageId?: string;
+  instanceId?: string;
   initialCount?: number;
   onChange?: (count: number) => void;
   size?: "small" | "medium" | "large";
@@ -29,6 +31,7 @@ interface Props {
 const OCounterButton = ({
   sceneId,
   imageId,
+  instanceId,
   initialCount = 0,
   onChange,
   size = "small",
@@ -76,6 +79,7 @@ const OCounterButton = ({
       const response = await incrementMutation.mutateAsync({
         sceneId,
         imageId,
+        instanceId,
       });
 
       if (response?.success) {

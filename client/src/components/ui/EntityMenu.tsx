@@ -11,16 +11,24 @@ interface HidePayload {
   entityType: string;
   entityId: string;
   entityName: string;
+  instanceId?: string;
 }
 
 interface Props {
   entityType: string;
   entityId: string;
   entityName: string;
+  instanceId?: string;
   onHide?: (payload: HidePayload) => void;
 }
 
-const EntityMenu = ({ entityType, entityId, entityName, onHide }: Props) => {
+const EntityMenu = ({
+  entityType,
+  entityId,
+  entityName,
+  instanceId,
+  onHide,
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -81,7 +89,12 @@ const EntityMenu = ({ entityType, entityId, entityName, onHide }: Props) => {
     e.preventDefault();
     e.stopPropagation();
     setIsOpen(false);
-    onHide?.({ entityType, entityId, entityName });
+    onHide?.({
+      entityType,
+      entityId,
+      entityName,
+      ...(instanceId && { instanceId }),
+    });
   };
 
   // Capitalize first letter of entity type
