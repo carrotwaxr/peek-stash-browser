@@ -185,12 +185,14 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   // What the page shows for a presentation field the URL does not name
   const shown = useMemo<WriteListContext["shown"]>(() => {
     const presetView = nonEmpty(activePreset?.viewMode);
+    // A saved default view the page lacks (Wall on Performers) opens its first
+    const defaultView = viewModes.includes(defaults.viewMode)
+      ? defaults.viewMode
+      : (viewModes[0] ?? defaults.viewMode);
     return {
       perPage: positive(activePreset?.perPage) ?? defaults.perPage,
       viewMode:
-        presetView && viewModes.includes(presetView)
-          ? presetView
-          : defaults.viewMode,
+        presetView && viewModes.includes(presetView) ? presetView : defaultView,
       zoomLevel: nonEmpty(activePreset?.zoomLevel) ?? defaults.zoomLevel,
       gridDensity: nonEmpty(activePreset?.gridDensity) ?? defaults.gridDensity,
     };

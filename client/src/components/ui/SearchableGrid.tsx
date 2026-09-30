@@ -1,14 +1,5 @@
 import { type ReactNode, useCallback, useMemo } from "react";
-import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
-import type { LibrarySearchParams } from "../../api";
-import {
-  useGalleryList,
-  useGroupList,
-  usePerformerList,
-  useStudioList,
-} from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
-import { queryKeys } from "../../api/queryKeys";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import {
   useFilterOptions,
@@ -16,20 +7,18 @@ import {
   useLockedFields,
 } from "../../hooks/useListOptions";
 import { useListUrlState } from "../../hooks/useListUrlState";
-import { makeCompositeKey } from "../../utils/compositeKey";
 import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
+import {
+  type CardHideHandler,
+  LIST_SOURCES,
+  pickPage,
+  useHideFromList,
+} from "../list/listSources";
 import SearchControls from "./SearchControls";
 import SearchResults from "./SearchResults";
 
 /** The entities a detail tab lists through this grid */
 type EntityType = "performer" | "gallery" | "group" | "studio";
-
-/** A card's hide callback: the hidden entity, its type and its instance */
-type CardHideHandler = (
-  entityId: string,
-  entityType: string,
-  instanceId?: string
-) => void;
 
 export interface SearchableGridProps {
   entityType: EntityType;
@@ -53,57 +42,6 @@ export interface SearchableGridProps {
   density?: "small" | "medium" | "large";
 }
 
-type ListResult = UseQueryResult;
-type ListRequest = Record<string, unknown> | null;
-
-/**
- * Each entity's list hook, its query key and where its response holds the
- * page. The hooks share one shape, so the one an instance calls never changes
- * the hook order.
- */
-const LISTS: Record<
-  EntityType,
-  {
-    useList: (request: ListRequest) => ListResult;
-    listKey: (params: Record<string, unknown>) => readonly unknown[];
-    result: string;
-    items: string;
-  }
-> = {
-  performer: {
-    useList: (request) =>
-      usePerformerList(request as LibrarySearchParams<"performer"> | null),
-    listKey: (params) => queryKeys.performers.list(undefined, params),
-    result: "findPerformers",
-    items: "performers",
-  },
-  gallery: {
-    useList: (request) =>
-      useGalleryList(request as LibrarySearchParams<"gallery"> | null),
-    listKey: (params) => queryKeys.galleries.list(undefined, params),
-    result: "findGalleries",
-    items: "galleries",
-  },
-  group: {
-    useList: (request) =>
-      useGroupList(request as LibrarySearchParams<"group"> | null),
-    listKey: (params) => queryKeys.groups.list(undefined, params),
-    result: "findGroups",
-    items: "groups",
-  },
-  studio: {
-    useList: (request) =>
-      useStudioList(request as LibrarySearchParams<"studio"> | null),
-    listKey: (params) => queryKeys.studios.list(undefined, params),
-    result: "findStudios",
-    items: "studios",
-  },
-};
-
-type Row = Record<string, unknown>;
-type ListPage = Record<string, { count?: number } & Record<string, unknown>>;
-
-const NO_ROWS: Row[] = [];
 const NO_LOCKS: Record<string, unknown> = {};
 const GRID_ONLY = ["grid"] as const;
 
@@ -147,8 +85,7 @@ export const SearchableGrid = ({
   skeletonCount = 24,
   density = "medium",
 }: SearchableGridProps) => {
-  const list = LISTS[entityType];
-  const queryClient = useQueryClient();
+  const list = LIST_SOURCES[entityType];
   const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
   const lockedFields = useLockedFields(entityType, lockedFilters);
@@ -191,43 +128,12 @@ export const SearchableGrid = ({
 
   const { data, error, isPending, isPlaceholderData, refetch } =
     list.useList(request);
-  const response = (data as ListPage | undefined)?.[list.result];
-  const items = (response?.[list.items] as Row[] | undefined) ?? NO_ROWS;
-  const totalCount = response?.count ?? 0;
+  const { items, count: totalCount } = pickPage(list, data);
   const totalPages = Math.ceil(totalCount / perPage);
   // The library is on its first sync: loading, not an error
   const initializing = isLibraryInitializing(error);
 
-  // Drops the hidden item from this page's cached result; the hide's own
-  // invalidation refetches the lists afterwards
-  const handleHideSuccess = useCallback<CardHideHandler>(
-    (entityId, _entityType, instanceId) => {
-      if (!request) return;
-      const hidden = makeCompositeKey(entityId, instanceId);
-      queryClient.setQueryData<ListPage>(list.listKey(request), (old) => {
-        const current = old?.[list.result];
-        const rows = current?.[list.items] as Row[] | undefined;
-        if (!old || !current || !rows) return old;
-        const kept = rows.filter(
-          (row) =>
-            makeCompositeKey(
-              row.id as string,
-              row.instanceId as string | undefined
-            ) !== hidden
-        );
-        if (kept.length === rows.length) return old;
-        return {
-          ...old,
-          [list.result]: {
-            ...current,
-            [list.items]: kept,
-            count: Math.max(0, (current.count ?? 0) - 1),
-          },
-        };
-      });
-    },
-    [queryClient, list, request]
-  );
+  const handleHideSuccess = useHideFromList(list, request);
   const helpers = useMemo(
     () => ({ onHideSuccess: handleHideSuccess }),
     [handleHideSuccess]

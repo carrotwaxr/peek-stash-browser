@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { GalleryCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -29,7 +30,7 @@ const GalleryGrid = ({
         const gallery = item as ComponentProps<typeof GalleryCard>["gallery"];
         return (
           <GalleryCard
-            key={gallery.id}
+            key={makeCompositeKey(gallery.id, gallery.instanceId)}
             gallery={gallery}
             onHideSuccess={onHideSuccess}
           />

@@ -10,7 +10,7 @@ import { apiGet, apiPut } from "../api";
 import { getDefaultSettings } from "../config/entityDisplayConfig";
 import { useAuth } from "../hooks/useAuth";
 
-interface CardDisplaySettingsContextValue {
+export interface CardDisplaySettingsContextValue {
   getSettings: (entityType: string) => Record<string, unknown>;
   updateSettings: (
     entityType: string,
@@ -20,7 +20,8 @@ interface CardDisplaySettingsContextValue {
   isLoading: boolean;
 }
 
-const CardDisplaySettingsContext =
+/** Exported for tests, which provide a stub value */
+export const CardDisplaySettingsContext =
   createContext<CardDisplaySettingsContextValue | null>(null);
 
 export const CardDisplaySettingsProvider = ({
