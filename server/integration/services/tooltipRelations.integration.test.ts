@@ -22,6 +22,8 @@
  * - u: the default hides, which include HIDDEN_A's performer and tag on A
  * - v: no hides
  * - w: hides TIP.P15 on A
+ * - h1: hides TIP.HS_ONLY, R's only scene in S3 and GH
+ * - h2: hides TIP.HS_Z1, one of R's two scenes in S4
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -206,6 +208,8 @@ const names = (refs: Array<{ name: string }> | undefined) =>
  * - on B, rows with A's ids: S and S2, scene 1 in S (with Q@B), scene 2 in
  *   S2 (with P01@B and G02@B), and T on Q@B. Every one would appear under
  *   A's S, T or P01 if a join dropped the instance.
+ * - performer R with scenes HS_Z1 and HS_Z2 in studio S4 and HS_ONLY in
+ *   studio S3 and group GH: S4 comes first by shared scenes, S3 by name
  */
 const pad = (i: number) => String(i).padStart(2, "0");
 const TIP = {
@@ -221,6 +225,13 @@ const TIP = {
   SCENE: (i: number) => `77100${pad(i)}`,
   OWN_TAG: (i: number) => `77105${pad(i)}`,
   PAGE_STUDIO: (i: number) => `7711${String(i).padStart(3, "0")}`,
+  R: "7710218",
+  S3: "7710102",
+  S4: "7710103",
+  GH: "7710317",
+  HS_Z1: "7710017",
+  HS_Z2: "7710018",
+  HS_ONLY: "7710019",
 } as const;
 const ONE_TO_15 = Array.from({ length: 15 }, (_, i) => i + 1);
 
@@ -354,6 +365,36 @@ async function seedCappedFixture(): Promise<void> {
       })),
     ],
   });
+
+  await prisma.stashStudio.createMany({
+    data: [
+      { id: TIP.S3, stashInstanceId: A, name: "tip-S3" },
+      { id: TIP.S4, stashInstanceId: A, name: "tip-S4" },
+    ],
+  });
+  await prisma.stashPerformer.create({
+    data: { id: TIP.R, stashInstanceId: A, name: "tip-R" },
+  });
+  await prisma.stashGroup.create({
+    data: { id: TIP.GH, stashInstanceId: A, name: "tip-GH" },
+  });
+  await prisma.stashScene.createMany({
+    data: [
+      { id: TIP.HS_Z1, stashInstanceId: A, studioId: TIP.S4 },
+      { id: TIP.HS_Z2, stashInstanceId: A, studioId: TIP.S4 },
+      { id: TIP.HS_ONLY, stashInstanceId: A, studioId: TIP.S3 },
+    ],
+  });
+  await prisma.scenePerformer.createMany({
+    data: [TIP.HS_Z1, TIP.HS_Z2, TIP.HS_ONLY].map((sceneId) => ({
+      ...onScene(sceneId, A),
+      performerId: TIP.R,
+      performerInstanceId: A,
+    })),
+  });
+  await prisma.sceneGroup.create({
+    data: { ...onScene(TIP.HS_ONLY, A), groupId: TIP.GH, groupInstanceId: A },
+  });
 }
 
 async function studioOnA(userId: number, id: string) {
@@ -397,6 +438,8 @@ describeWithDb("Tooltip relations (integration)", () => {
   let v: number;
 
   let w: number;
+  let h1: number;
+  let h2: number;
 
   beforeAll(async () => {
     await seedAccessFixture();
@@ -406,6 +449,10 @@ describeWithDb("Tooltip relations (integration)", () => {
     w = await createUser("access-it-tip-w");
     await hideFixtureDefaults(u);
     await hideFor(w, "performer", TIP.P(15), FX.A);
+    h1 = await createUser("access-it-tip-h1");
+    h2 = await createUser("access-it-tip-h2");
+    await hideFor(h1, "scene", TIP.HS_ONLY, FX.A);
+    await hideFor(h2, "scene", TIP.HS_Z1, FX.A);
   }, 60000);
 
   afterAll(async () => {
@@ -484,6 +531,34 @@ describeWithDb("Tooltip relations (integration)", () => {
       [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3].map(TIP.P)
     );
     expect(tag.relation_totals?.performers).toBe(14);
+  });
+
+  it("a performer's card does not name a studio it shares only a scene the viewer hid", async () => {
+    const seen = await performerOnA(v, TIP.R);
+    expect(inOrder(seen.studios)).toEqual([TIP.S4, TIP.S3]);
+    expect(inOrder(seen.groups)).toEqual([TIP.GH]);
+
+    const r = await performerOnA(h1, TIP.R);
+    expect(inOrder(r.studios)).toEqual([TIP.S4]);
+    expect(inOrder(r.groups)).toEqual([]);
+    expect(r.relation_totals).toMatchObject({ studios: 1, groups: 0 });
+
+    // The other two paths through scenes: a studio's and a group's
+    const s3 = await studioOnA(h1, TIP.S3);
+    expect(s3.relation_totals?.performers).toBe(0);
+    expect((await studioOnA(v, TIP.S3)).relation_totals?.performers).toBe(1);
+    const gh = await groupOnA(h1, TIP.GH);
+    expect(inOrder(gh.performers)).toEqual([]);
+    expect(gh.relation_totals?.performers).toBe(0);
+    expect(inOrder((await groupOnA(v, TIP.GH)).performers)).toEqual([TIP.R]);
+  });
+
+  it("a shared scene the viewer hid does not count toward the order weight", async () => {
+    // Two shared scenes put S4 first; with one hidden the two tie on one
+    // and go by name
+    const r = await performerOnA(h2, TIP.R);
+    expect(inOrder(r.studios)).toEqual([TIP.S3, TIP.S4]);
+    expect(r.relation_totals?.studios).toBe(2);
   });
 
   it("B's same-id rows never appear under A's parents", async () => {

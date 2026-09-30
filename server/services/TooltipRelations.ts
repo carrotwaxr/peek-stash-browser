@@ -16,8 +16,10 @@
  * live (deletedAt IS NULL), with no UserExcludedEntity row for the user
  * (global or on the entity's instance), and on the parent's instance, which
  * the list already held to the user's allowed instances. A path through
- * scenes takes live scenes only, so a performer's card never names a studio
- * or collection it shares only a deleted scene with.
+ * scenes takes only the scenes the user can see (live, with no
+ * UserExcludedEntity row for the user on the scene's instance), so a
+ * performer's card never names a studio or collection it shares only a
+ * deleted or hidden scene with, and such a scene adds nothing to the order.
  *
  * The refs are the list rows' nested refs (`query/nestedRefs.ts`): names,
  * images and links, never Stash's own favorite or rating.
@@ -159,27 +161,40 @@ interface RelationSpec<R extends RelatedType> {
   related: R;
   /**
    * SELECT pid, pinst, rid, weight FROM page pg ...: each related id of each
-   * parent once, with the live scenes they share (0 through a junction)
+   * parent once, with the scenes they share that the user can see (0
+   * through a junction)
    */
   rel: string;
   /** Order by shared scenes, by the related entity's size, or by name */
   weight: "shared" | "size" | "none";
   /** TOOLTIP_LIMIT with a total; listed whole; or counted only */
   mode: "capped" | "all" | "total";
+  /** Whether `rel` binds the user, after the page (a path through scenes) */
+  relBindsUser: boolean;
 }
 
 type AnyRelationSpec = { [R in RelatedType]: RelationSpec<R> }[RelatedType];
 
-/** Each parent's live scenes, as `s`. */
+/**
+ * A scene's exclusion row for the user (bound), matched off by `es.id IS
+ * NULL` in the relation's WHERE.
+ */
+const SCENE_EXCLUSION = `LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityType = 'scene' AND es.entityId = s.id
+    AND (es.instanceId = '' OR es.instanceId = s.stashInstanceId)`;
+
+/** Each parent's live scenes, as `s`, and their exclusion rows, as `es`. */
 const SCENES_OF = {
   performer: `CROSS JOIN ScenePerformer ps ON ps.performerId = pg.pid AND ps.performerInstanceId = pg.pinst
-  JOIN StashScene s ON s.id = ps.sceneId AND s.stashInstanceId = ps.sceneInstanceId AND s.deletedAt IS NULL`,
+  JOIN StashScene s ON s.id = ps.sceneId AND s.stashInstanceId = ps.sceneInstanceId AND s.deletedAt IS NULL
+  ${SCENE_EXCLUSION}`,
   // The unary + keeps a database without statistics off
   // StashScene_stashInstanceId_idx (every scene of the instance): with it,
   // StashScene_studioId_idx
-  studio: `CROSS JOIN StashScene s ON s.studioId = pg.pid AND +s.stashInstanceId = pg.pinst AND s.deletedAt IS NULL`,
+  studio: `CROSS JOIN StashScene s ON s.studioId = pg.pid AND +s.stashInstanceId = pg.pinst AND s.deletedAt IS NULL
+  ${SCENE_EXCLUSION}`,
   group: `CROSS JOIN SceneGroup gs ON gs.groupId = pg.pid AND gs.groupInstanceId = pg.pinst
-  JOIN StashScene s ON s.id = gs.sceneId AND s.stashInstanceId = gs.sceneInstanceId AND s.deletedAt IS NULL`,
+  JOIN StashScene s ON s.id = gs.sceneId AND s.stashInstanceId = gs.sceneInstanceId AND s.deletedAt IS NULL
+  ${SCENE_EXCLUSION}`,
 } as const;
 
 /** The related ids of a scene `s`. */
@@ -199,7 +214,10 @@ const OF_SCENE = {
   },
 } as const;
 
-/** The entities of a parent's live scenes, by how many scenes they share. */
+/**
+ * The entities of the parent's scenes the user can see, by how many of them
+ * they share.
+ */
 function throughScenes<R extends keyof typeof OF_SCENE>(
   parent: keyof typeof SCENES_OF,
   related: R,
@@ -210,11 +228,12 @@ function throughScenes<R extends keyof typeof OF_SCENE>(
     related,
     weight: "shared",
     mode,
+    relBindsUser: true,
     rel: `SELECT pg.pid, pg.pinst, ${of.id}, COUNT(*)
   FROM page pg
   ${SCENES_OF[parent]}
   ${of.join}
-  WHERE ${of.id} IS NOT NULL
+  WHERE ${of.id} IS NOT NULL AND es.id IS NULL
   GROUP BY pg.pid, pg.pinst, ${of.id}`,
   };
 }
@@ -231,6 +250,7 @@ function throughJunction<R extends RelatedType>(
     related,
     weight: mode === "all" ? "none" : "size",
     mode,
+    relBindsUser: false,
     rel: `SELECT pg.pid, pg.pinst, j.${relatedIdCol}, 0
   FROM page pg
   CROSS JOIN ${junction} j ON j.${parentCols[0]} = pg.pid AND j.${parentCols[1]} = pg.pinst`,
@@ -265,6 +285,7 @@ const PARENT_RELATIONS: Record<TooltipParentType, readonly AnyRelationSpec[]> =
         related: "gallery",
         weight: "size",
         mode: "capped",
+        relBindsUser: false,
         rel: `SELECT pg.pid, pg.pinst, g.id, 0
   FROM page pg
   CROSS JOIN StashGallery g ON g.studioId = pg.pid AND +g.stashInstanceId = pg.pinst`,
@@ -289,8 +310,9 @@ const PAGE = `page(pid, pinst) AS (
 )`;
 
 /**
- * One relation's statement. Binds the page's pairs, the user, the related
- * entity type and, when capped, TOOLTIP_LIMIT.
+ * One relation's statement. Binds the page's pairs, the user when `rel` does
+ * (`relBindsUser`), the user again, the related entity type and, when
+ * capped, TOOLTIP_LIMIT.
  */
 function tooltipStatement<R extends RelatedType>(
   spec: RelationSpec<R>
@@ -339,11 +361,12 @@ async function loadRelation<R extends RelatedType>(
 ): Promise<void> {
   const related: RelatedEntity<R> = RELATED[spec.related];
   const sql = tooltipStatement(spec);
+  const head = spec.relBindsUser ? [parentsJson, userId] : [parentsJson];
 
   if (spec.mode === "total") {
     const rows = await prisma.$queryRawUnsafe<TooltipTotalRow[]>(
       sql,
-      parentsJson,
+      ...head,
       userId,
       spec.related
     );
@@ -359,7 +382,7 @@ async function loadRelation<R extends RelatedType>(
     Array<TooltipListRow & RelatedRow[R]>
   >(
     sql,
-    parentsJson,
+    ...head,
     userId,
     spec.related,
     ...(spec.mode === "capped" ? [TOOLTIP_LIMIT] : [])
