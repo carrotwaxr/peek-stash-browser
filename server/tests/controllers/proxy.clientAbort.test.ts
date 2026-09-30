@@ -25,6 +25,7 @@ import { proxyStashMedia } from "../../controllers/proxy.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
+import type * as mediaAccessModule from "../../utils/mediaAccess.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 import { stringContaining } from "../helpers/matchers.js";
@@ -53,7 +54,8 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-vi.mock("../../utils/mediaAccess.js", () => ({
+vi.mock("../../utils/mediaAccess.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof mediaAccessModule>()),
   canUserLoadMedia: vi.fn(() => Promise.resolve(true)),
 }));
 
@@ -148,7 +150,7 @@ describe("the media proxy's log when a response ends early", () => {
   async function browserRequests(): Promise<net.Socket> {
     const browser = net.connect(peekPort, "127.0.0.1");
     browser.write(
-      "GET /api/proxy/stash?path=/scene/1/screenshot HTTP/1.1\r\nHost: peek\r\n\r\n"
+      "GET /api/proxy/stash?path=/scene/1/screenshot&instanceId=inst-a HTTP/1.1\r\nHost: peek\r\n\r\n"
     );
     await vi.waitFor(() => expect(state.pipelineCalls).toHaveLength(1));
     return browser;

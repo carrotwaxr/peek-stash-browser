@@ -16,15 +16,14 @@ vi.mock("@/api/client", () => ({
 const mockApiGet = vi.mocked(apiGet);
 
 describe("getClipPreviewUrl", () => {
-  it("appends the instance", () => {
+  it("getClipPreviewUrl always names the instance", () => {
     expect(getClipPreviewUrl("5", "inst a")).toBe(
       "/api/proxy/clip/5/preview?instanceId=inst%20a"
     );
-  });
-
-  it("is unchanged without an instance", () => {
-    expect(getClipPreviewUrl("5")).toBe("/api/proxy/clip/5/preview");
-    expect(getClipPreviewUrl("5", "")).toBe("/api/proxy/clip/5/preview");
+    // An empty instance is sent as it is, and the server refuses it
+    expect(getClipPreviewUrl("5", "")).toBe(
+      "/api/proxy/clip/5/preview?instanceId="
+    );
   });
 });
 

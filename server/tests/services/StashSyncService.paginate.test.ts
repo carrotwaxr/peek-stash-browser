@@ -38,7 +38,6 @@ vi.mock(
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     get: vi.fn(),
-    getDefault: vi.fn(),
     getCredentials: vi.fn(() => ({ baseUrl: "http://stash", apiKey: "key" })),
   },
 }));

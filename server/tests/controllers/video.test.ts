@@ -791,23 +791,48 @@ describe("Video Controller", () => {
         expect(global.fetch).not.toHaveBeenCalled();
       });
 
-      it("checks the default instance when instanceId is absent", async () => {
-        const req = createMockReq({
-          query: {},
-          url: "/api/scene/123/proxy-stream/stream.m3u8",
-        });
-        vi.mocked(global.fetch).mockResolvedValue(
-          makeFetchResponse("#EXTM3U\n")
+      it("a stream or caption request without instanceId answers 400", async () => {
+        vi.mocked(global.fetch).mockImplementation(() =>
+          Promise.resolve(makeFetchResponse("#EXTM3U\n"))
         );
 
-        await proxyStashStream(req, resFor(proxyStashStream));
+        const responses = [];
+        for (const instanceId of [undefined, ["inst-a", "inst-a"]]) {
+          const query = malformed(
+            instanceId === undefined ? {} : { instanceId }
+          );
+          const stream = resFor(proxyStashStream);
+          await proxyStashStream(
+            createMockReq({
+              query,
+              url: "/api/scene/123/proxy-stream/stream.m3u8",
+            }),
+            stream
+          );
+          const caption = resFor(getCaption);
+          await getCaption(
+            reqFor(getCaption, {
+              params: { sceneId: "123" },
+              query: malformed({
+                lang: "en",
+                type: "vtt",
+                ...(instanceId === undefined ? {} : { instanceId }),
+              }),
+              user: USER,
+            }),
+            caption
+          );
+          responses.push(stream, caption);
+        }
 
-        expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
-          7,
-          "scene",
-          "123",
-          "inst-default"
-        );
+        for (const res of responses) {
+          expect(res.status).toHaveBeenCalledWith(400);
+          expect(res.json).toHaveBeenCalledWith({
+            error: "instanceId is required",
+          });
+        }
+        expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
       });
 
       it("forwards only resolution and start to Stash", async () => {
@@ -901,8 +926,12 @@ describe("Video Controller", () => {
         const req = createMockReq({
           params: { sceneId: "123", streamPath: "stream.mp4" },
           // A signed link's claims, which the handler's query type leaves out
-          query: malformed({ sig: "SECRETSIG", exp: "1" }),
-          url: "/api/scene/123/proxy-stream/stream.mp4?sig=SECRETSIG&exp=1",
+          query: malformed({
+            instanceId: "inst-a",
+            sig: "SECRETSIG",
+            exp: "1",
+          }),
+          url: "/api/scene/123/proxy-stream/stream.mp4?instanceId=inst-a&sig=SECRETSIG&exp=1",
         });
         const res = resFor(proxyStashStream);
 
@@ -1059,37 +1088,39 @@ describe("Video Controller", () => {
         );
       });
 
-      it("the owner's setup, `default` alone at priority 0, serves it whether a request names it or not", async () => {
+      it("the owner's setup, `default` alone at priority 0, serves it when named and refuses a request that names none", async () => {
         await loadInstances({ ...NAMED_DEFAULT, priority: 0 });
         vi.mocked(global.fetch).mockImplementation(() =>
           Promise.resolve(makeFetchResponse("", { contentType: "video/mp4" }))
         );
 
+        const responses = [];
         for (const query of [{ instanceId: "default" }, {}]) {
+          const res = resFor(proxyStashStream);
           await proxyStashStream(
             createMockReq({
               params: { sceneId: "123", streamPath: "stream" },
               query,
               url: "/api/scene/123/proxy-stream/stream",
             }),
-            resFor(proxyStashStream)
+            res
           );
+          responses.push(res);
         }
 
         const calls = vi.mocked(global.fetch).mock.calls;
         expect(calls.map(([url]) => url)).toEqual([
           "http://stash-default:9999/scene/123/stream",
-          "http://stash-default:9999/scene/123/stream",
         ]);
         expect(calls.map(([, init]) => init?.headers)).toEqual([
-          { ApiKey: "key-default" },
           { ApiKey: "key-default" },
         ]);
         expect(
           mockCanUserAccessEntity.mock.calls.map(
             ([, , , instanceId]) => instanceId
           )
-        ).toEqual(["default", "default"]);
+        ).toEqual(["default"]);
+        expect(must(responses[1]).status).toHaveBeenCalledWith(400);
       });
     });
   });

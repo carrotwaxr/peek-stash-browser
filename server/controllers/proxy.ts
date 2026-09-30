@@ -15,9 +15,12 @@ import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { ProxyOptions } from "../types/api/proxy.js";
 import { privateCacheControl } from "../utils/cacheControl.js";
 import { logger } from "../utils/logger.js";
-import { canUserLoadMedia } from "../utils/mediaAccess.js";
 import {
-  INSTANCE_ID_PATTERN,
+  INSTANCE_ID_REQUIRED,
+  canUserLoadMedia,
+  isValidInstanceId,
+} from "../utils/mediaAccess.js";
+import {
   SCENE_ID_PATTERN,
   parseStashMediaPath,
 } from "../utils/stashMediaPath.js";
@@ -94,40 +97,34 @@ function isClientGone(res: Response): boolean {
 }
 
 /**
- * The address and key of the instance to serve from (the one named, or the
- * highest-priority enabled instance), or null once the response is sent:
- * 404 for an instance that is not enabled (disabled or deleted; invariant
- * 11), 500 when none is named and none is configured.
+ * The address and key of the instance a request names, or null once the
+ * response is sent: 404 for an instance that is not enabled (disabled or
+ * deleted; invariant 11).
  */
 function credentialsOrRespond(
-  instanceId: string | undefined,
+  instanceId: string,
   res: TypedResponse<ApiErrorResponse>
 ): StashCredentials | null {
   try {
     return stashInstanceManager.getCredentials(instanceId);
   } catch (error) {
-    if (error instanceof UnknownInstanceError) {
-      res.status(404).json({ error: "Not found" });
-      return null;
-    }
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
+    if (!(error instanceof UnknownInstanceError)) throw error;
+    res.status(404).json({ error: "Not found" });
     return null;
   }
 }
 
 /**
- * The optional `?instanceId=` on the by-id routes narrows the row lookup, so
- * a multi-instance setup checks the row it will serve. Every id is an
- * ordinary id, "default" included; absent, the bare id picks the first row.
+ * True when the request names one well-formed instance; otherwise answers
+ * 400 before anything is read.
  */
-function rowInstanceFilter(
-  instanceId: string | undefined
-): { stashInstanceId: string } | Record<never, never> {
-  return instanceId === undefined ? {} : { stashInstanceId: instanceId };
+function instanceIdOrRespond(
+  instanceId: unknown,
+  res: TypedResponse<ApiErrorResponse>
+): instanceId is string {
+  if (isValidInstanceId(instanceId)) return true;
+  res.status(400).json({ error: INSTANCE_ID_REQUIRED });
+  return false;
 }
 
 // =============================================================================
@@ -293,7 +290,7 @@ function proxyHttpRequest({
  * Proxy scene video preview (MP4)
  * GET /api/proxy/scene/:id/preview?instanceId=
  * Requires a Peek session; the scene must be visible to the user.
- * Uses the scene's stashInstanceId to route to correct Stash server.
+ * Served from the instance `instanceId` names (400 without one).
  */
 export const proxyScenePreview = async (
   req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
@@ -311,31 +308,25 @@ export const proxyScenePreview = async (
     return;
   }
 
-  // Get scene from database to find its stashInstanceId
-  const scene = await prisma.stashScene.findFirst({
-    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
-    select: { stashInstanceId: true },
+  if (!instanceIdOrRespond(instanceId, res)) return;
+
+  // The scene on the instance the request names
+  const scene = await prisma.stashScene.findUnique({
+    where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
+    select: { deletedAt: true },
   });
 
-  if (!scene) {
+  if (!scene || scene.deletedAt) {
     res.status(404).json({ error: "Scene not found" });
     return;
   }
 
-  // The check uses the row actually served
-  if (
-    !(await canUserAccessEntity(
-      req.user.id,
-      "scene",
-      id,
-      scene.stashInstanceId
-    ))
-  ) {
+  if (!(await canUserAccessEntity(req.user.id, "scene", id, instanceId))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
 
-  const creds = credentialsOrRespond(scene.stashInstanceId, res);
+  const creds = credentialsOrRespond(instanceId, res);
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
@@ -369,7 +360,7 @@ export const proxyScenePreview = async (
  * Proxy scene WebP animated preview
  * GET /api/proxy/scene/:id/webp?instanceId=
  * Requires a Peek session; the scene must be visible to the user.
- * Uses the scene's stashInstanceId to route to correct Stash server.
+ * Served from the instance `instanceId` names (400 without one).
  */
 export const proxySceneWebp = async (
   req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
@@ -387,30 +378,25 @@ export const proxySceneWebp = async (
     return;
   }
 
-  // Get scene from database to find its stashInstanceId
-  const scene = await prisma.stashScene.findFirst({
-    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
-    select: { stashInstanceId: true },
+  if (!instanceIdOrRespond(instanceId, res)) return;
+
+  // The scene on the instance the request names
+  const scene = await prisma.stashScene.findUnique({
+    where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
+    select: { deletedAt: true },
   });
 
-  if (!scene) {
+  if (!scene || scene.deletedAt) {
     res.status(404).json({ error: "Scene not found" });
     return;
   }
 
-  if (
-    !(await canUserAccessEntity(
-      req.user.id,
-      "scene",
-      id,
-      scene.stashInstanceId
-    ))
-  ) {
+  if (!(await canUserAccessEntity(req.user.id, "scene", id, instanceId))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
 
-  const creds = credentialsOrRespond(scene.stashInstanceId, res);
+  const creds = credentialsOrRespond(instanceId, res);
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
@@ -472,13 +458,7 @@ export const proxyStashMedia = async (
     return;
   }
 
-  if (
-    instanceId !== undefined &&
-    (typeof instanceId !== "string" || !INSTANCE_ID_PATTERN.test(instanceId))
-  ) {
-    res.status(400).json({ error: "Invalid instanceId parameter" });
-    return;
-  }
+  if (!instanceIdOrRespond(instanceId, res)) return;
 
   if (!(await canUserLoadMedia(req.user.id, target.entities, instanceId))) {
     res.status(404).json({ error: "Not found" });
@@ -527,7 +507,7 @@ export const proxyStashMedia = async (
  * Falls back to screenshot if stream is unavailable.
  * Requires a Peek session; the clip and its scene must be visible to the
  * user (EntityAccessService's "clip" type covers both).
- * Uses the clip's stashInstanceId to route to correct Stash server.
+ * Served from the instance `instanceId` names (400 without one).
  */
 export const proxyClipPreview = async (
   req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
@@ -541,20 +521,20 @@ export const proxyClipPreview = async (
     return;
   }
 
-  // Get clip from database - include stashInstanceId for routing
-  const clip = await prisma.stashClip.findFirst({
-    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
-    select: { streamPath: true, screenshotPath: true, stashInstanceId: true },
+  if (!instanceIdOrRespond(instanceId, res)) return;
+
+  // The clip on the instance the request names
+  const clip = await prisma.stashClip.findUnique({
+    where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
+    select: { streamPath: true, screenshotPath: true, deletedAt: true },
   });
 
-  if (!clip) {
+  if (!clip || clip.deletedAt) {
     res.status(404).json({ error: "Clip preview not found" });
     return;
   }
 
-  if (
-    !(await canUserAccessEntity(req.user.id, "clip", id, clip.stashInstanceId))
-  ) {
+  if (!(await canUserAccessEntity(req.user.id, "clip", id, instanceId))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -567,7 +547,7 @@ export const proxyClipPreview = async (
     return;
   }
 
-  const creds = credentialsOrRespond(clip.stashInstanceId, res);
+  const creds = credentialsOrRespond(instanceId, res);
   if (!creds) return;
   const { apiKey } = creds;
 
@@ -602,7 +582,7 @@ export const proxyClipPreview = async (
  * GET /api/proxy/image/:imageId/:type?instanceId=
  * :type = "thumbnail" | "preview" | "image"
  * Requires a Peek session; the image must be visible to the user.
- * Uses the image's stashInstanceId to route to correct Stash server.
+ * Served from the instance `instanceId` names (400 without one).
  */
 export const proxyImage = async (
   req: TypedAuthRequest<
@@ -632,30 +612,25 @@ export const proxyImage = async (
     return;
   }
 
-  // Get image from database - include stashInstanceId for routing
-  const image = await prisma.stashImage.findFirst({
-    where: { id: imageId, deletedAt: null, ...rowInstanceFilter(instanceId) },
+  if (!instanceIdOrRespond(instanceId, res)) return;
+
+  // The image on the instance the request names
+  const image = await prisma.stashImage.findUnique({
+    where: { id_stashInstanceId: { id: imageId, stashInstanceId: instanceId } },
     select: {
       pathThumbnail: true,
       pathPreview: true,
       pathImage: true,
-      stashInstanceId: true,
+      deletedAt: true,
     },
   });
 
-  if (!image) {
+  if (!image || image.deletedAt) {
     res.status(404).json({ error: "Image not found" });
     return;
   }
 
-  if (
-    !(await canUserAccessEntity(
-      req.user.id,
-      "image",
-      imageId,
-      image.stashInstanceId
-    ))
-  ) {
+  if (!(await canUserAccessEntity(req.user.id, "image", imageId, instanceId))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -673,7 +648,7 @@ export const proxyImage = async (
     return;
   }
 
-  const creds = credentialsOrRespond(image.stashInstanceId, res);
+  const creds = credentialsOrRespond(instanceId, res);
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 

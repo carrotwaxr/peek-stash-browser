@@ -21,6 +21,7 @@ import { proxyStashMedia } from "../../controllers/proxy.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
+import type * as mediaAccessModule from "../../utils/mediaAccess.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 import { stringContaining } from "../helpers/matchers.js";
@@ -33,7 +34,8 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
-vi.mock("../../utils/mediaAccess.js", () => ({
+vi.mock("../../utils/mediaAccess.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof mediaAccessModule>()),
   canUserLoadMedia: vi.fn(() => Promise.resolve(true)),
 }));
 
@@ -155,7 +157,7 @@ describe("the media proxy when Stash fails mid-transfer", () => {
     signal?: AbortSignal
   ): Promise<Response> {
     const res = await fetch(
-      `${peekUrl}/api/proxy/stash?path=/scene/${sceneId}/screenshot`,
+      `${peekUrl}/api/proxy/stash?path=/scene/${sceneId}/screenshot&instanceId=inst-a`,
       signal ? { signal } : {}
     );
     // The response has started: its status and length are out

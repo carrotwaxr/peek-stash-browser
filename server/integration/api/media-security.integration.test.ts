@@ -184,6 +184,33 @@ describe("media security", () => {
     });
   });
 
+  describe("every media route names its instance", () => {
+    it("every media route answers 400 without instanceId", async () => {
+      const scene = TEST_ENTITIES.sceneWithRelations;
+      const image = TEST_ENTITIES.imageWithOwnProperties;
+      const paths = [
+        `/api/proxy/scene/${scene}/preview`,
+        `/api/proxy/scene/${scene}/webp`,
+        `/api/proxy/clip/1/preview`,
+        `/api/proxy/image/${image}/thumbnail`,
+        `/api/proxy/stash?path=%2Fscene%2F${scene}%2Fscreenshot`,
+        `/api/scene/${scene}/proxy-stream/stream.m3u8`,
+        `/api/scene/${scene}/proxy-stream/stream`,
+        `/api/scene/${scene}/caption?lang=en&type=srt`,
+      ];
+
+      const statuses = [];
+      for (const path of paths) {
+        statuses.push([
+          path,
+          (await media(path, { cookie: adminCookie })).status,
+        ]);
+      }
+
+      expect(statuses).toEqual(paths.map((path) => [path, 400]));
+    }, 30_000);
+  });
+
   describe("hidden entities", () => {
     const id = TEST_ENTITIES.sceneWithRelations;
     let screenshotPath: string;

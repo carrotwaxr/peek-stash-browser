@@ -208,7 +208,6 @@ vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => ({
     await importOriginal<typeof stashInstanceManagerModule>()
   ).UnknownInstanceError,
   stashInstanceManager: {
-    getDefault: vi.fn(() => mockStashClient),
     get: vi.fn(() => mockStashClient),
     getAllEnabled: vi.fn(() => [
       { id: "test-instance-uuid", name: "Test Instance" },
@@ -1654,7 +1653,7 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
       await import("../../services/StashSyncService.js");
     vi.mocked(stashInstanceManager.getCredentials).mockImplementationOnce(
       (id) => {
-        throw new UnknownInstanceError(String(id));
+        throw new UnknownInstanceError(id);
       }
     );
     const warn = vi.spyOn(logger, "warn");

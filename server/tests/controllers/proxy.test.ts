@@ -187,6 +187,194 @@ describe("Proxy Controller", () => {
   });
 
   // ===========================================================================
+  // Every media request names its instance
+  // ===========================================================================
+
+  describe("the instance a media request names", () => {
+    /** Runs each by-id route with `query`, returning each response. */
+    async function runByIdRoutes(query: Record<string, unknown>) {
+      const q = malformed(query);
+      const responses = {
+        preview: resFor(proxyScenePreview),
+        webp: resFor(proxySceneWebp),
+        clip: resFor(proxyClipPreview),
+        image: resFor(proxyImage),
+      };
+      await proxyScenePreview(
+        reqFor(proxyScenePreview, {
+          params: { id: "1" },
+          query: q,
+          user: USER,
+        }),
+        responses.preview
+      );
+      await proxySceneWebp(
+        reqFor(proxySceneWebp, { params: { id: "1" }, query: q, user: USER }),
+        responses.webp
+      );
+      await proxyClipPreview(
+        reqFor(proxyClipPreview, {
+          params: { id: "9" },
+          query: q,
+          user: USER,
+        }),
+        responses.clip
+      );
+      await proxyImage(
+        reqFor(proxyImage, {
+          params: { imageId: "3", type: "thumbnail" },
+          query: q,
+          user: USER,
+        }),
+        responses.image
+      );
+      return Object.values(responses);
+    }
+
+    function expectNothingRead(): void {
+      for (const model of [
+        mockPrisma.stashScene,
+        mockPrisma.stashClip,
+        mockPrisma.stashImage,
+      ]) {
+        expect(model.findUnique).not.toHaveBeenCalled();
+      }
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    }
+
+    it("each by-id media route answers 400 without instanceId and fetches nothing", async () => {
+      setupHttpGetSuccess();
+
+      for (const res of await runByIdRoutes({})) {
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          error: "instanceId is required",
+        });
+      }
+      expectNothingRead();
+    });
+
+    it("a repeated instanceId answers 400, not 500", async () => {
+      setupHttpGetSuccess();
+      const query = { instanceId: ["inst-a", "inst-b"] };
+
+      const media = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, {
+          query: malformed({ path: "/performer/5/image", ...query }),
+          user: USER,
+        }),
+        media
+      );
+
+      for (const res of [media, ...(await runByIdRoutes(query))]) {
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          error: "instanceId is required",
+        });
+      }
+      expectNothingRead();
+    });
+
+    it("with instanceId, the route serves that instance's row when two instances share the id", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      setupHttpGetSuccess();
+      // Both instances hold scene 1, clip 9 and image 3; only `default`'s
+      // row may be read, checked and fetched
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
+        partialRow({ stashInstanceId: "default", deletedAt: null })
+      );
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash-default:9999/scene/1/scene_marker/9/stream",
+          screenshotPath: null,
+          stashInstanceId: "default",
+          deletedAt: null,
+        })
+      );
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "/image/3/thumbnail",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "default",
+          deletedAt: null,
+        })
+      );
+
+      await runByIdRoutes({ instanceId: "default" });
+
+      const key = (id: string) => ({
+        id_stashInstanceId: { id, stashInstanceId: "default" },
+      });
+      expect(
+        must(mockPrisma.stashScene.findUnique.mock.calls[0])[0].where
+      ).toEqual(key("1"));
+      expect(
+        must(mockPrisma.stashScene.findUnique.mock.calls[1])[0].where
+      ).toEqual(key("1"));
+      expect(
+        must(mockPrisma.stashClip.findUnique.mock.calls[0])[0].where
+      ).toEqual(key("9"));
+      expect(
+        must(mockPrisma.stashImage.findUnique.mock.calls[0])[0].where
+      ).toEqual(key("3"));
+      expect(
+        mockCanUserAccessEntity.mock.calls.map(
+          ([, , , instanceId]) => instanceId
+        )
+      ).toEqual(["default", "default", "default", "default"]);
+      expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
+        "http://stash-default:9999/scene/1/preview?apikey=key-default",
+        "http://stash-default:9999/scene/1/webp?apikey=key-default",
+        "http://stash-default:9999/scene/1/scene_marker/9/stream?apikey=key-default",
+        "http://stash-default:9999/image/3/thumbnail?apikey=key-default",
+      ]);
+    });
+
+    it("a soft-deleted row on the named instance is not found", async () => {
+      setupHttpGetSuccess();
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
+        partialRow({ stashInstanceId: "inst-a", deletedAt: new Date() })
+      );
+
+      const res = resFor(proxyScenePreview);
+      await proxyScenePreview(
+        reqFor(proxyScenePreview, {
+          params: { id: "1" },
+          query: { instanceId: "inst-a" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("proxyStashMedia answers 400 without instanceId", async () => {
+      setupHttpGetSuccess();
+      const res = resFor(proxyStashMedia);
+
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, {
+          query: { path: "/performer/5/image" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "instanceId is required",
+      });
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================================================
   // proxyStashMedia
   // ===========================================================================
 
@@ -315,20 +503,6 @@ describe("Proxy Controller", () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
       expect(mockHttpGet).not.toHaveBeenCalled();
-
-      // Without an instance the default instance is checked
-      mockCanUserAccessEntity.mockClear();
-      const req2 = reqFor(proxyStashMedia, {
-        query: { path: "/performer/5/image" },
-        user: USER,
-      });
-      await proxyStashMedia(req2, resFor(proxyStashMedia));
-      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
-        7,
-        "performer",
-        "5",
-        "inst-default"
-      );
     });
 
     it("checks both the scene and the clip for a scene_marker path", async () => {
@@ -437,7 +611,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = reqFor(proxyStashMedia, {
-        query: { path: "/scene/1/screenshot?t=5" },
+        query: { path: "/scene/1/screenshot?t=5", instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyStashMedia);
@@ -457,6 +631,7 @@ describe("Proxy Controller", () => {
       const req = reqFor(proxyStashMedia, {
         query: {
           path: "/performer/6/image?t=5&apikey=evil&x=1&default=true&redirect=http://evil.test",
+          instanceId: "inst-a",
         },
         user: USER,
       });
@@ -475,7 +650,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess({ "cache-control": "public, max-age=604800" });
 
       const req = reqFor(proxyStashMedia, {
-        query: { path: "/scene/1/screenshot" },
+        query: { path: "/scene/1/screenshot", instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyStashMedia);
@@ -500,7 +675,7 @@ describe("Proxy Controller", () => {
         res.destroyed = true;
         await proxyStashMedia(
           reqFor(proxyStashMedia, {
-            query: { path: `/scene/${i + 1}/screenshot` },
+            query: { path: `/scene/${i + 1}/screenshot`, instanceId: "inst-a" },
             user: USER,
           }),
           res
@@ -512,7 +687,7 @@ describe("Proxy Controller", () => {
       const live = resFor(proxyStashMedia);
       await proxyStashMedia(
         reqFor(proxyStashMedia, {
-          query: { path: "/scene/9/screenshot" },
+          query: { path: "/scene/9/screenshot", instanceId: "inst-a" },
           user: USER,
         }),
         live
@@ -525,7 +700,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = reqFor(proxyStashMedia, {
-        query: { path: "/scene/1/screenshot" },
+        query: { path: "/scene/1/screenshot", instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyStashMedia);
@@ -560,6 +735,7 @@ describe("Proxy Controller", () => {
     it("returns 400 for a non-numeric id", async () => {
       const req = reqFor(proxyScenePreview, {
         params: { id: "scene-1" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
@@ -567,14 +743,15 @@ describe("Proxy Controller", () => {
       await proxyScenePreview(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(mockPrisma.stashScene.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.stashScene.findUnique).not.toHaveBeenCalled();
     });
 
     it("returns 404 when scene not found in DB", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+      mockPrisma.stashScene.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "999" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
@@ -585,8 +762,8 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
     });
 
-    it("filters the lookup by instanceId when given", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+    it("looks the row up by (id, instanceId)", async () => {
+      mockPrisma.stashScene.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "1" },
@@ -595,14 +772,14 @@ describe("Proxy Controller", () => {
       });
       await proxyScenePreview(req, resFor(proxyScenePreview));
 
-      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "1", deletedAt: null, stashInstanceId: "inst-b" },
-        select: { stashInstanceId: true },
+      expect(mockPrisma.stashScene.findUnique).toHaveBeenCalledWith({
+        where: { id_stashInstanceId: { id: "1", stashInstanceId: "inst-b" } },
+        select: { deletedAt: true },
       });
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({
           stashInstanceId: "inst-a",
         })
@@ -612,6 +789,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "42" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
@@ -629,7 +807,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when the row's instance is not enabled (disabled or deleted)", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({
           stashInstanceId: "bad-instance",
         })
@@ -638,6 +816,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "1" },
+        query: { instanceId: "bad-instance" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
@@ -651,7 +830,7 @@ describe("Proxy Controller", () => {
 
     it("with instanceId=default looks the row up on `default`", async () => {
       await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({ stashInstanceId: "default" })
       );
       setupHttpGetSuccess();
@@ -663,9 +842,9 @@ describe("Proxy Controller", () => {
       });
       await proxyScenePreview(req, resFor(proxyScenePreview));
 
-      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "42", deletedAt: null, stashInstanceId: "default" },
-        select: { stashInstanceId: true },
+      expect(mockPrisma.stashScene.findUnique).toHaveBeenCalledWith({
+        where: { id_stashInstanceId: { id: "42", stashInstanceId: "default" } },
+        select: { deletedAt: true },
       });
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash-default:9999/scene/42/preview?apikey=key-default",
@@ -675,7 +854,7 @@ describe("Proxy Controller", () => {
     });
 
     it("constructs correct Stash URL with preview path", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({
           stashInstanceId: "inst-a",
         })
@@ -684,6 +863,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "42" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
@@ -697,21 +877,24 @@ describe("Proxy Controller", () => {
       );
     });
 
-    it("queries prisma with deletedAt: null filter", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+    it("returns 404 for a soft-deleted scene", async () => {
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
+        partialRow({ deletedAt: new Date() })
+      );
+      setupHttpGetSuccess();
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "1" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyScenePreview);
 
       await proxyScenePreview(req, res);
 
-      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "1", deletedAt: null },
-        select: { stashInstanceId: true },
-      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
     });
   });
 
@@ -733,6 +916,7 @@ describe("Proxy Controller", () => {
     it("returns 400 for a non-numeric id", async () => {
       const req = reqFor(proxySceneWebp, {
         params: { id: "scene-7" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxySceneWebp);
@@ -740,13 +924,17 @@ describe("Proxy Controller", () => {
       await proxySceneWebp(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(mockPrisma.stashScene.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.stashScene.findUnique).not.toHaveBeenCalled();
     });
 
     it("returns 404 when scene not found in DB", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+      mockPrisma.stashScene.findUnique.mockResolvedValue(null);
 
-      const req = reqFor(proxySceneWebp, { params: { id: "999" }, user: USER });
+      const req = reqFor(proxySceneWebp, {
+        params: { id: "999" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxySceneWebp);
 
       await proxySceneWebp(req, res);
@@ -755,8 +943,8 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
     });
 
-    it("filters the lookup by instanceId when given", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+    it("looks the row up by (id, instanceId)", async () => {
+      mockPrisma.stashScene.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxySceneWebp, {
         params: { id: "7" },
@@ -765,14 +953,14 @@ describe("Proxy Controller", () => {
       });
       await proxySceneWebp(req, resFor(proxySceneWebp));
 
-      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "7", deletedAt: null, stashInstanceId: "inst-b" },
-        select: { stashInstanceId: true },
+      expect(mockPrisma.stashScene.findUnique).toHaveBeenCalledWith({
+        where: { id_stashInstanceId: { id: "7", stashInstanceId: "inst-b" } },
+        select: { deletedAt: true },
       });
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({
           stashInstanceId: "inst-a",
         })
@@ -780,7 +968,11 @@ describe("Proxy Controller", () => {
       mockCanUserAccessEntity.mockResolvedValue(false);
       setupHttpGetSuccess();
 
-      const req = reqFor(proxySceneWebp, { params: { id: "7" }, user: USER });
+      const req = reqFor(proxySceneWebp, {
+        params: { id: "7" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxySceneWebp);
 
       await proxySceneWebp(req, res);
@@ -796,14 +988,18 @@ describe("Proxy Controller", () => {
     });
 
     it("constructs correct Stash URL with webp path", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({
           stashInstanceId: "inst-a",
         })
       );
       setupHttpGetSuccess();
 
-      const req = reqFor(proxySceneWebp, { params: { id: "7" }, user: USER });
+      const req = reqFor(proxySceneWebp, {
+        params: { id: "7" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxySceneWebp);
 
       await proxySceneWebp(req, res);
@@ -835,10 +1031,11 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when clip not found in DB", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(null);
+      mockPrisma.stashClip.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyClipPreview, {
         params: { id: "99" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyClipPreview);
@@ -852,26 +1049,29 @@ describe("Proxy Controller", () => {
     });
 
     it("ignores soft-deleted clips", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(null);
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash:9999/scene/1/scene_marker/429/stream",
+          screenshotPath: null,
+          deletedAt: new Date(),
+        })
+      );
+      setupHttpGetSuccess();
 
       const req = reqFor(proxyClipPreview, {
         params: { id: "429" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
-      await proxyClipPreview(req, resFor(proxyClipPreview));
+      const res = resFor(proxyClipPreview);
+      await proxyClipPreview(req, res);
 
-      expect(mockPrisma.stashClip.findFirst).toHaveBeenCalledWith({
-        where: { id: "429", deletedAt: null },
-        select: {
-          streamPath: true,
-          screenshotPath: true,
-          stashInstanceId: true,
-        },
-      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
-    it("filters the lookup by instanceId when given", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(null);
+    it("looks the row up by (id, instanceId)", async () => {
+      mockPrisma.stashClip.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyClipPreview, {
         params: { id: "429" },
@@ -880,18 +1080,18 @@ describe("Proxy Controller", () => {
       });
       await proxyClipPreview(req, resFor(proxyClipPreview));
 
-      expect(mockPrisma.stashClip.findFirst).toHaveBeenCalledWith({
-        where: { id: "429", deletedAt: null, stashInstanceId: "inst-b" },
+      expect(mockPrisma.stashClip.findUnique).toHaveBeenCalledWith({
+        where: { id_stashInstanceId: { id: "429", stashInstanceId: "inst-b" } },
         select: {
           streamPath: true,
           screenshotPath: true,
-          stashInstanceId: true,
+          deletedAt: true,
         },
       });
     });
 
     it("checks the clip with canUserAccessEntity(userId, 'clip', id, instanceId)", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
         partialRow({
           streamPath: "http://stash:9999/scene/1/scene_marker/429/stream",
           screenshotPath: null,
@@ -902,6 +1102,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyClipPreview, {
         params: { id: "429" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       await proxyClipPreview(req, resFor(proxyClipPreview));
@@ -923,7 +1124,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when clip has no media path (both streamPath and screenshotPath null)", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
         partialRow({
           streamPath: null,
           screenshotPath: null,
@@ -931,7 +1132,11 @@ describe("Proxy Controller", () => {
         })
       );
 
-      const req = reqFor(proxyClipPreview, { params: { id: "1" }, user: USER });
+      const req = reqFor(proxyClipPreview, {
+        params: { id: "1" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxyClipPreview);
 
       await proxyClipPreview(req, res);
@@ -943,7 +1148,7 @@ describe("Proxy Controller", () => {
     });
 
     it("uses streamPath when available", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
         partialRow({
           streamPath: "http://stash:9999/scene/1/stream?start=10&end=30",
           screenshotPath: "http://stash:9999/scene/1/screenshot?t=10",
@@ -952,7 +1157,11 @@ describe("Proxy Controller", () => {
       );
       setupHttpGetSuccess();
 
-      const req = reqFor(proxyClipPreview, { params: { id: "1" }, user: USER });
+      const req = reqFor(proxyClipPreview, {
+        params: { id: "1" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxyClipPreview);
 
       await proxyClipPreview(req, res);
@@ -966,7 +1175,7 @@ describe("Proxy Controller", () => {
     });
 
     it("falls back to screenshotPath when streamPath is null", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue(
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
         partialRow({
           streamPath: null,
           screenshotPath: "http://stash:9999/scene/1/screenshot",
@@ -975,7 +1184,11 @@ describe("Proxy Controller", () => {
       );
       setupHttpGetSuccess();
 
-      const req = reqFor(proxyClipPreview, { params: { id: "2" }, user: USER });
+      const req = reqFor(proxyClipPreview, {
+        params: { id: "2" },
+        query: { instanceId: "inst-a" },
+        user: USER,
+      });
       const res = resFor(proxyClipPreview);
 
       await proxyClipPreview(req, res);
@@ -996,6 +1209,7 @@ describe("Proxy Controller", () => {
     it("returns 400 when imageId is missing", async () => {
       const req = reqFor(proxyImage, {
         params: malformed({ type: "thumbnail" }),
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1009,6 +1223,7 @@ describe("Proxy Controller", () => {
     it("returns 400 for a non-numeric id", async () => {
       const req = reqFor(proxyImage, {
         params: { imageId: "img-1", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1016,12 +1231,13 @@ describe("Proxy Controller", () => {
       await proxyImage(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(mockPrisma.stashImage.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.stashImage.findUnique).not.toHaveBeenCalled();
     });
 
     it("returns 400 when type is invalid", async () => {
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "poster" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1037,6 +1253,7 @@ describe("Proxy Controller", () => {
     it("returns 400 when type is missing", async () => {
       const req = reqFor(proxyImage, {
         params: malformed({ imageId: "1" }),
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1050,10 +1267,11 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when image not found", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
+      mockPrisma.stashImage.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyImage, {
         params: { imageId: "999", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1064,8 +1282,8 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Image not found" });
     });
 
-    it("filters the lookup by instanceId when given", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
+    it("looks the row up by (id, instanceId)", async () => {
+      mockPrisma.stashImage.findUnique.mockResolvedValue(null);
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
@@ -1074,19 +1292,19 @@ describe("Proxy Controller", () => {
       });
       await proxyImage(req, resFor(proxyImage));
 
-      expect(mockPrisma.stashImage.findFirst).toHaveBeenCalledWith({
-        where: { id: "1", deletedAt: null, stashInstanceId: "inst-b" },
+      expect(mockPrisma.stashImage.findUnique).toHaveBeenCalledWith({
+        where: { id_stashInstanceId: { id: "1", stashInstanceId: "inst-b" } },
         select: {
           pathThumbnail: true,
           pathPreview: true,
           pathImage: true,
-          stashInstanceId: true,
+          deletedAt: true,
         },
       });
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: "/image/1/thumbnail",
           pathPreview: null,
@@ -1099,6 +1317,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1116,7 +1335,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when image path for type is null", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: null,
           pathPreview: "/some/path",
@@ -1127,6 +1346,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1140,7 +1360,7 @@ describe("Proxy Controller", () => {
     });
 
     it("handles full URL paths (starting with http)", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: "http://stash:9999/image/1/thumbnail",
           pathPreview: null,
@@ -1152,6 +1372,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1167,7 +1388,7 @@ describe("Proxy Controller", () => {
     });
 
     it("handles relative paths (prepends stashUrl)", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: null,
           pathPreview: "/image/2/preview",
@@ -1179,6 +1400,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "2", type: "preview" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1194,7 +1416,7 @@ describe("Proxy Controller", () => {
     });
 
     it("handles full https URL paths", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: null,
           pathPreview: null,
@@ -1206,6 +1428,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "3", type: "image" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1220,26 +1443,24 @@ describe("Proxy Controller", () => {
       );
     });
 
-    it("queries prisma with deletedAt: null filter and correct select", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
+    it("returns 404 for a soft-deleted image", async () => {
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
+        partialRow({ pathThumbnail: "/thumb", deletedAt: new Date() })
+      );
+      setupHttpGetSuccess();
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "inst-a" },
         user: USER,
       });
       const res = resFor(proxyImage);
 
       await proxyImage(req, res);
 
-      expect(mockPrisma.stashImage.findFirst).toHaveBeenCalledWith({
-        where: { id: "1", deletedAt: null },
-        select: {
-          pathThumbnail: true,
-          pathPreview: true,
-          pathImage: true,
-          stashInstanceId: true,
-        },
-      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Image not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
     it("maps each valid type to the correct path field", async () => {
@@ -1259,11 +1480,14 @@ describe("Proxy Controller", () => {
       for (const { type, expectedPath } of typeMappings) {
         vi.clearAllMocks();
         await restoreDefaults();
-        mockPrisma.stashImage.findFirst.mockResolvedValue(partialRow(pathData));
+        mockPrisma.stashImage.findUnique.mockResolvedValue(
+          partialRow(pathData)
+        );
         setupHttpGetSuccess();
 
         const req = reqFor(proxyImage, {
           params: { imageId: "1", type },
+          query: { instanceId: "inst-a" },
           user: USER,
         });
         const res = resFor(proxyImage);
@@ -1279,7 +1503,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when the row's instance is not enabled (disabled or deleted)", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: "/thumb",
           pathPreview: null,
@@ -1291,6 +1515,7 @@ describe("Proxy Controller", () => {
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "bad-instance" },
         user: USER,
       });
       const res = resFor(proxyImage);
@@ -1308,96 +1533,50 @@ describe("Proxy Controller", () => {
   // ===========================================================================
 
   describe("an instance whose id is `default`", () => {
-    it("a row on `default` is served from `default` when another instance has the top priority", async () => {
-      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
-      setupHttpGetSuccess();
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({ stashInstanceId: "default" })
-      );
-      mockPrisma.stashClip.findFirst.mockResolvedValue(
-        partialRow({
-          streamPath: "http://stash-default:9999/scene/1/scene_marker/9/stream",
-          screenshotPath: null,
-          stashInstanceId: "default",
-        })
-      );
-      mockPrisma.stashImage.findFirst.mockResolvedValue(
-        partialRow({
-          pathThumbnail: "/image/3/thumbnail",
-          pathPreview: null,
-          pathImage: null,
-          stashInstanceId: "default",
-        })
-      );
-
-      await proxyScenePreview(
-        reqFor(proxyScenePreview, { params: { id: "1" }, user: USER }),
-        resFor(proxyScenePreview)
-      );
-      await proxySceneWebp(
-        reqFor(proxySceneWebp, { params: { id: "1" }, user: USER }),
-        resFor(proxySceneWebp)
-      );
-      await proxyClipPreview(
-        reqFor(proxyClipPreview, { params: { id: "9" }, user: USER }),
-        resFor(proxyClipPreview)
-      );
-      await proxyImage(
-        reqFor(proxyImage, {
-          params: { imageId: "3", type: "thumbnail" },
-          user: USER,
-        }),
-        resFor(proxyImage)
-      );
-
-      expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
-        "http://stash-default:9999/scene/1/preview?apikey=key-default",
-        "http://stash-default:9999/scene/1/webp?apikey=key-default",
-        "http://stash-default:9999/scene/1/scene_marker/9/stream?apikey=key-default",
-        "http://stash-default:9999/image/3/thumbnail?apikey=key-default",
-      ]);
-    });
-
-    it("the owner's setup, `default` alone at priority 0, serves it whether a request names it or not", async () => {
+    it("the owner's setup, `default` alone at priority 0, serves it when named and refuses a request that names none", async () => {
       await loadInstances({ ...NAMED_DEFAULT, priority: 0 });
       setupHttpGetSuccess();
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
         partialRow({ stashInstanceId: "default" })
       );
 
+      const responses = [];
       for (const query of [{ instanceId: "default" }, {}]) {
+        const media = resFor(proxyStashMedia);
         await proxyStashMedia(
           reqFor(proxyStashMedia, {
             query: { path: "/performer/5/image", ...query },
             user: USER,
           }),
-          resFor(proxyStashMedia)
+          media
         );
+        const preview = resFor(proxyScenePreview);
         await proxyScenePreview(
           reqFor(proxyScenePreview, {
             params: { id: "42" },
             query,
             user: USER,
           }),
-          resFor(proxyScenePreview)
+          preview
         );
+        responses.push(media, preview);
       }
 
-      const media =
-        "http://stash-default:9999/performer/5/image?apikey=key-default";
-      const preview =
-        "http://stash-default:9999/scene/42/preview?apikey=key-default";
       expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
-        media,
-        preview,
-        media,
-        preview,
+        "http://stash-default:9999/performer/5/image?apikey=key-default",
+        "http://stash-default:9999/scene/42/preview?apikey=key-default",
       ]);
       expect(
         mockCanUserAccessEntity.mock.calls.map(
           ([, , , instanceId]) => instanceId
         )
-      ).toEqual(["default", "default", "default", "default"]);
+      ).toEqual(["default", "default"]);
+      expect(responses.map((res) => res.status.mock.calls)).toEqual([
+        [[200]],
+        [[200]],
+        [[400]],
+        [[400]],
+      ]);
     });
   });
 
@@ -1476,7 +1655,10 @@ describe("Proxy Controller", () => {
         await restoreDefaults();
         setupHttpGetSuccess();
 
-        const req = reqFor(proxyStashMedia, { query: { path }, user: USER });
+        const req = reqFor(proxyStashMedia, {
+          query: { path, instanceId: "inst-a" },
+          user: USER,
+        });
         const res = resFor(proxyStashMedia);
 
         await proxyStashMedia(req, res);

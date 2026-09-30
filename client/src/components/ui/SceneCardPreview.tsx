@@ -6,9 +6,9 @@ import {
   getEvenlySpacedSprites,
 } from "../../utils/spriteSheet";
 
-/** The instance lets the server check the row it will serve on a multi-instance setup. */
-const withInstance = (url: string, instanceId?: string | null): string =>
-  instanceId ? `${url}?instanceId=${encodeURIComponent(instanceId)}` : url;
+/** Every media URL names the scene's instance: the server serves no other. */
+const withInstance = (url: string, instanceId: string): string =>
+  `${url}?instanceId=${encodeURIComponent(instanceId)}`;
 
 interface Props {
   scene: NormalizedScene;
