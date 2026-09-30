@@ -19,6 +19,8 @@ paths:
 - A card's count opens a list through `getFilteredListPath` (`utils/entityLinks.ts`), built from that page's filter options: the singular param of the page's option for the entity type (`/scenes?tagId=5`) plus `instance`, which `urlParamsToFilters` joins into `id:instance`. A page with no such option gets no link.
 - After a Stash instance is added, edited, enabled, disabled or deleted, or a user's Content Sources change, call `invalidateInstanceQueries(queryClient)` (`api/hooks/useLibraryReady.ts`): the setup status and the library queries (`invalidateLibraryQueries`).
 - A card's `onHideSuccess(entityId, entityType, instanceId?)` carries the entity's instance, and list handlers remove the hidden item by `makeCompositeKey(id, instanceId)`, never by bare id. `useHideBulkAction` never sends a selection entry without an instance; it counts that entry as failed.
+- After a hide, bulk hide, restore or Restore All, `useHiddenEntities` calls `invalidateExclusionDependents` (library queries, Recommended, stats; Hidden Items marked stale, not refetched). `invalidateInstanceQueries` calls it too. A new query that shows the user's visible set belongs under a root the library predicate matches, or in that helper.
+- `logout` removes the post-login redirect, clears the query cache and does a full load of /login.
 
 ## useFilterState
 
