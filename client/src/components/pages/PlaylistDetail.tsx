@@ -35,6 +35,10 @@ import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneTitle } from "../../utils/format";
+import {
+  type PlaybackQueue,
+  buildPlaybackQueue,
+} from "../../utils/playbackQueue";
 import { showError, showSuccess } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
 import SharePlaylistModal from "../playlists/SharePlaylistModal";
@@ -75,14 +79,6 @@ const isSameScene = (a: NormalizedScene, b: NormalizedScene) =>
 
 const isItemOf = (item: PlaylistItemResponse, scene: NormalizedScene) =>
   item.sceneId === scene.id && item.instanceId === scene.instanceId;
-
-/** An entry of the player's queue: the scene on its own server */
-const toQueueEntry = (item: PlaylistEntry, position: number) => ({
-  sceneId: item.sceneId,
-  instanceId: item.instanceId,
-  scene: item.scene,
-  position,
-});
 
 interface ApiError {
   data?: { error?: string; totalSizeMB?: number; maxSizeMB?: number };
@@ -375,16 +371,16 @@ const PlaylistDetail = () => {
           state: {
             scene: startScene.scene,
             shouldAutoplay: true, // Start playing immediately when entering from playlist
-            playlist: {
-              id: playlistId,
-              name: playlist!.name,
+            playlist: buildPlaybackQueue({
+              id: playlistId ?? "",
+              name: playlist!.name as string,
               autoplayNext: true, // Default to autoplay enabled
               shuffle,
-              repeat,
+              repeat: repeat as PlaybackQueue["repeat"],
               shuffleHistory: [], // Initialize empty history
-              scenes: validScenes.map(toQueueEntry),
+              scenes: validScenes.map((s) => s.scene as NormalizedScene),
               currentIndex: startIndex,
-            },
+            }),
           },
         }
       );
@@ -840,14 +836,14 @@ const PlaylistDetail = () => {
                 }
                 linkState={{
                   scene: item.scene,
-                  playlist: {
-                    id: playlistId,
-                    name: playlist.name,
+                  playlist: buildPlaybackQueue({
+                    id: playlistId ?? "",
+                    name: playlist.name as string,
                     shuffle,
-                    repeat,
+                    repeat: repeat as PlaybackQueue["repeat"],
                     scenes: scenes
                       .filter((s) => s.exists && s.scene)
-                      .map(toQueueEntry),
+                      .map((s) => s.scene as NormalizedScene),
                     currentIndex: scenes
                       .filter((s) => s.exists && s.scene)
                       .findIndex(
@@ -855,7 +851,7 @@ const PlaylistDetail = () => {
                           s.sceneId === item.sceneId &&
                           s.instanceId === item.instanceId
                       ),
-                  },
+                  }),
                 }}
                 dragHandle={
                   reorderMode && (

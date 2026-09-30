@@ -341,6 +341,14 @@ function isEntryOf(
   return entryServer === undefined || entryServer === instanceId;
 }
 
+/** What a navigation to a scene hands over in `location.state` */
+interface SceneLocationState {
+  playlist?: StoredPlaylist;
+  scene?: { files?: Array<Parameters<typeof canDirectPlayVideo>[0]> };
+  shouldResume?: boolean;
+  shouldAutoplay?: boolean;
+}
+
 // Outer component that wraps everything in ScenePlayerProvider
 const Scene = () => {
   const { sceneId } = useParams<{ sceneId: string }>();
@@ -352,15 +360,16 @@ const Scene = () => {
 
   // Capture location state in a ref to preserve it across re-renders
   // React Router sometimes loses state on initial render, so we store it once it arrives
-  const locationStateRef = useRef<Record<string, unknown> | null>(null);
+  const locationStateRef = useRef<SceneLocationState | null>(null);
 
   // Update ref synchronously during render (not in useEffect)
-  if (location.state && !locationStateRef.current) {
-    locationStateRef.current = location.state;
+  const navigationState = location.state as SceneLocationState | null;
+  if (navigationState && !locationStateRef.current) {
+    locationStateRef.current = navigationState;
   }
 
   // Extract data from location.state (prefer current state, fall back to ref)
-  const stateToUse = location.state || locationStateRef.current;
+  const stateToUse = navigationState ?? locationStateRef.current;
   let playlist = stateToUse?.playlist;
   const shouldResume = stateToUse?.shouldResume;
 
@@ -368,34 +377,49 @@ const Scene = () => {
   // Use a stable key that doesn't change when navigating between scenes
   const PLAYLIST_STORAGE_KEY = "currentPlaylist";
 
-  // If playlist came via location.state, save it
-  if (playlist) {
-    sessionStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(playlist));
-  }
+  // If playlist came via location.state, save it once per navigation, after
+  // render. A full storage (or a browser that refuses it) only loses the
+  // refresh support; the player still gets the queue from navigation state.
+  const statePlaylist = stateToUse?.playlist;
+  useEffect(() => {
+    if (!statePlaylist) return;
+    try {
+      sessionStorage.setItem(
+        PLAYLIST_STORAGE_KEY,
+        JSON.stringify(statePlaylist)
+      );
+    } catch (e) {
+      console.warn("Could not store the playback queue:", e);
+    }
+  }, [statePlaylist]);
 
   // If no playlist in location.state, try to restore from sessionStorage
   // This handles page refresh for auto-generated playlists
   if (!playlist) {
-    const storedPlaylist = sessionStorage.getItem(PLAYLIST_STORAGE_KEY);
-    if (storedPlaylist) {
-      try {
-        const parsed = JSON.parse(storedPlaylist) as StoredPlaylist;
+    try {
+      const storedPlaylist = sessionStorage.getItem(PLAYLIST_STORAGE_KEY);
+      if (storedPlaylist) {
+        const parsed = JSON.parse(storedPlaylist) as StoredPlaylist | null;
         // Verify the current scene, on this URL's server, is in this playlist
-        const currentIndex = Array.isArray(parsed.scenes)
+        const currentIndex = Array.isArray(parsed?.scenes)
           ? parsed.scenes.findIndex((entry) =>
               isEntryOf(entry, sceneId, instanceId)
             )
           : -1;
-        if (currentIndex >= 0) {
+        if (parsed && currentIndex >= 0) {
           // Resume the queue at the current scene
           playlist = { ...parsed, currentIndex };
         } else {
           // Scene not in stored playlist, clear it
           sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
         }
-      } catch (e) {
-        console.error("Failed to parse stored playlist:", e);
+      }
+    } catch (e) {
+      console.error("Failed to restore stored playlist:", e);
+      try {
         sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
+      } catch {
+        // Storage refuses even a removal: nothing left to clean up
       }
     }
   }

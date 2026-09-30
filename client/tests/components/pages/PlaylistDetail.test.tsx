@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import type * as routerModule from "react-router-dom";
 import {
   fireEvent,
   render,
@@ -17,6 +18,15 @@ const mockApiPost = vi.fn();
 const mockApiPut = vi.fn<(...args: unknown[]) => unknown>();
 const mockApiDelete = vi.fn<(...args: unknown[]) => unknown>();
 const mockGetMyPermissions = vi.fn();
+const { mockNavigate, rowLinkStates } = vi.hoisted(() => ({
+  mockNavigate: vi.fn<(...args: unknown[]) => void>(),
+  rowLinkStates: [] as unknown[],
+}));
+
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...(await importOriginal<typeof routerModule>()),
+  useNavigate: () => mockNavigate,
+}));
 
 vi.mock("@/api", () => ({
   apiGet: (...args: unknown[]) => mockApiGet(...args),
@@ -47,11 +57,18 @@ vi.mock("@/components/ui/index", async (importOriginal) => ({
   SceneListItem: ({
     dragHandle,
     actionButtons,
+    linkState,
   }: {
     dragHandle?: ReactNode;
     actionButtons?: ReactNode;
+    linkState?: unknown;
   }) => (
-    <div data-testid="playlist-row">
+    <div
+      data-testid="playlist-row"
+      ref={() => {
+        rowLinkStates.push(linkState);
+      }}
+    >
       {dragHandle}
       {actionButtons}
     </div>
@@ -225,5 +242,83 @@ describe("PlaylistDetail items on two servers", () => {
         ],
       });
     });
+  });
+  it("Play and a row link pass the same slim entries", async () => {
+    const full = (id: string, instanceId: string) => ({
+      id,
+      instanceId,
+      title: `Seven on ${instanceId}`,
+      files: [{ path: `/m/${id}.mp4`, basename: `${id}.mp4`, duration: 90 }],
+      paths: { screenshot: `/s/${instanceId}`, preview: "/p", sprite: "/x" },
+      studio: { id: "9", name: "Studio" },
+      performers: [{ id: "1", name: "Someone" }],
+      tags: [{ id: "2", name: "A tag" }],
+      sceneStreams: [{ url: "/stream" }],
+    });
+    mockApiGet.mockImplementation((endpoint: string) => {
+      if (endpoint === "/playlists/5")
+        return Promise.resolve({
+          playlist: {
+            id: 5,
+            name: "Mine",
+            items: [
+              {
+                sceneId: "7",
+                instanceId: "inst-a",
+                scene: full("7", "inst-a"),
+              },
+              {
+                sceneId: "7",
+                instanceId: "inst-b",
+                scene: full("7", "inst-b"),
+              },
+            ],
+          },
+          isOwner: true,
+        });
+      return Promise.reject(new Error(`unexpected GET ${endpoint}`));
+    });
+    rowLinkStates.length = 0;
+    renderPage();
+    await screen.findAllByTestId("playlist-row");
+
+    fireEvent.click(screen.getByTitle("Play Playlist"));
+
+    const [, options] = must(mockNavigate.mock.calls.at(-1)) as [
+      string,
+      { state: { playlist: { scenes: unknown[] } } },
+    ];
+    const expected = [
+      {
+        sceneId: "7",
+        instanceId: "inst-a",
+        position: 0,
+        scene: {
+          title: "Seven on inst-a",
+          paths: { screenshot: "/s/inst-a" },
+          files: [{ duration: 90, basename: "7.mp4" }],
+          studio: { name: "Studio" },
+        },
+      },
+      {
+        sceneId: "7",
+        instanceId: "inst-b",
+        position: 1,
+        scene: {
+          title: "Seven on inst-b",
+          paths: { screenshot: "/s/inst-b" },
+          files: [{ duration: 90, basename: "7.mp4" }],
+          studio: { name: "Studio" },
+        },
+      },
+    ];
+    expect(options.state.playlist.scenes).toEqual(expected);
+
+    // The second row's link carries the same entries, at its own index
+    const rowState = must(rowLinkStates.at(-1)) as {
+      playlist: { scenes: unknown[]; currentIndex: number };
+    };
+    expect(rowState.playlist.scenes).toEqual(expected);
+    expect(rowState.playlist.currentIndex).toBe(1);
   });
 });
