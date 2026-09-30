@@ -31,6 +31,7 @@ import type {
 import type { FilterRef } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
+import { sceneUntaggedSql } from "../utils/sqlClauses.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   excludedCountsJoinSql,
@@ -309,16 +310,14 @@ export async function loadTagTree({
   return rows.map((row) => toTreeRow(row, visibleKeys, scenes !== null));
 }
 
-/** A scene's stored count of its own `SceneTag` rows (the scene list's `tag_count`) */
-const SCENE_UNTAGGED = "s.tagCount = 0";
-
 /**
- * Each type's table and its untagged condition, as its list's `tag_count`
- * EQUALS 0 reads it: a scene's stored count (its browse index), a gallery's
- * and an image's junction rows (an image's hold its galleries' tags too)
+ * Each type's table and its untagged condition, as the Untagged folder's
+ * list reads it: a scene with no tag, its own or inherited (`tagged`
+ * false), a gallery or an image with no tag rows (`tag_count` EQUALS 0; an
+ * image's rows hold its galleries' tags too)
  */
 const UNTAGGED = {
-  scene: { table: "StashScene", alias: "s", where: SCENE_UNTAGGED },
+  scene: { table: "StashScene", alias: "s", where: sceneUntaggedSql("s") },
   gallery: {
     table: "StashGallery",
     alias: "g",
@@ -343,8 +342,8 @@ export interface LoadUntaggedCountOptions extends LoadTagTreeOptions {
 /**
  * The folder view's Untagged count, in one statement: the items of the kind
  * the user can see (live, on the allowed instances, under the exclusion
- * anti-join with the instance: invariant 3) with no tag of their own, the
- * total of the list's `tag_count` EQUALS 0. With a scope, the scope's
+ * anti-join with the instance: invariant 3) in no tag's folder, the total
+ * of the Untagged list (`UNTAGGED`). With a scope, the scope's
  * visible untagged scenes; galleries and images 0, as the scoped tree's
  * counts are. Only the page's kind is counted: the image count reads every
  * live image (52 to 82 ms on the prod snapshot's 142k).
@@ -358,6 +357,8 @@ export async function loadUntaggedCount({
   if (allowedInstanceIds.length === 0) return 0;
   const scenes = scope ? scopeScenes(scope) : null;
   if (scenes && kind !== "scene") return 0;
+  // A tag's scenes carry it, their own or inherited: none is untagged
+  if (scope?.tag) return 0;
 
   const { table, alias, where } = UNTAGGED[kind];
   const entity = visible(alias, kind, userId, allowedInstanceIds);

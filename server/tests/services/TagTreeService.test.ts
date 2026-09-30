@@ -282,7 +282,12 @@ describe("loadUntaggedCount", () => {
   });
 
   it.each([
-    ["scene", "StashScene s", "s", "s.tagCount = 0"],
+    [
+      "scene",
+      "StashScene s",
+      "s",
+      "(s.tagCount = 0 AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag sut WHERE sut.sceneId = s.id AND sut.sceneInstanceId = s.stashInstanceId))",
+    ],
     [
       "gallery",
       "StashGallery g",
@@ -296,7 +301,7 @@ describe("loadUntaggedCount", () => {
       "NOT EXISTS (SELECT 1 FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId)",
     ],
   ] as const)(
-    "counts the visible %ss with no tag of their own, under the exclusion join",
+    "counts the visible %ss in no tag's folder, under the exclusion join",
     async (kind, from, alias, untagged) => {
       await expect(
         loadUntaggedCount({ userId: 7, allowedInstanceIds: ["a", "b"], kind })
@@ -335,10 +340,25 @@ describe("loadUntaggedCount", () => {
       "CROSS JOIN StashScene s ON s.id = x.id AND s.stashInstanceId = x.inst"
     );
     expect(sql).toContain(
-      "s.deletedAt IS NULL AND se.id IS NULL AND s.stashInstanceId IN (?) AND s.tagCount = 0"
+      "s.deletedAt IS NULL AND se.id IS NULL AND s.stashInstanceId IN (?) AND (s.tagCount = 0 AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag sut"
     );
     expect(params).toEqual(["12", "a", 7, "a"]);
     expect(placeholders(sql)).toBe(params.length);
+  });
+
+  it("with a tag in the scope, 0 without a statement: every scene of a tag carries it", async () => {
+    await expect(
+      loadUntaggedCount({
+        userId: 7,
+        allowedInstanceIds: ["a"],
+        scope: {
+          tag: { id: "5", instanceId: "a" },
+          performer: { id: "12", instanceId: "a" },
+        },
+        kind: "scene",
+      })
+    ).resolves.toBe(0);
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 
   it("with a scope, galleries and images are 0 without a statement, as the scoped rows count", async () => {

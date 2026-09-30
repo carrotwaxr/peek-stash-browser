@@ -351,6 +351,22 @@ describe("SceneQueryBuilder", () => {
       expect(sql).not.toContain("COLLATE NOCASE");
     });
 
+    it("tagged false is a scene with no tag, own or inherited; true is its negation", async () => {
+      const untagged =
+        "(s.tagCount = 0 AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag sut WHERE sut.sceneId = s.id AND sut.sceneInstanceId = s.stashInstanceId))";
+
+      await run({ filter: { tagged: false } });
+      await run({ filter: { tagged: true } });
+
+      const pages = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      expect(pages).toHaveLength(2);
+      expect(pages[0]).toContain(`AND ${untagged}`);
+      expect(pages[0]).not.toContain(`NOT ${untagged}`);
+      expect(pages[1]).toContain(`NOT ${untagged}`);
+    });
+
     it("sorts and filters by performer_count and tag_count through the stored columns", async () => {
       await run({
         sort: { field: "performer_count", direction: "DESC", seed: undefined },

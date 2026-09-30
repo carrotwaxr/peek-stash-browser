@@ -351,6 +351,28 @@ describe("SceneSearch", () => {
       );
     });
 
+    it("Untagged on a performer page asks for the performer's scenes with no tag, own or inherited", async () => {
+      api.findTagTree.mockResolvedValue({
+        tags: [{ id: "5", instanceId: "a", name: "Five", parents: [] }],
+        untagged: 2,
+      });
+      api.findScenes.mockResolvedValue(scenes(rowsOf("bare"), 2));
+      renderListPage(<PerformerScenes />, {
+        initialEntries: [
+          "/performer/1?tab=scenes&view=folder&folderPath=__untagged__&tagCount_min=1",
+        ],
+      });
+
+      expect(await screen.findByText("bare-1")).toBeInTheDocument();
+      // Not tag_count, which counts a scene's own tags: a scene that
+      // inherits a tag is in that tag's folder
+      expect(lastSent().scene_filter).toEqual({
+        performers: PERFORMER,
+        tagged: false,
+      });
+      expect(screen.getByText("2 scenes in this folder")).toBeInTheDocument();
+    });
+
     /** A tag page's Scenes tab, with Include sub-tags on or off */
     const TagScenes = ({ includeSubTags }: { includeSubTags: boolean }) => (
       <SceneSearch

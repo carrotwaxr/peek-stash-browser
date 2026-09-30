@@ -1794,12 +1794,9 @@ export const buildSceneFilter = (filters: FilterState): SceneFilterInput => {
   put(sceneFilter, "framerate", rangeCriterion(filters.framerate));
   put(sceneFilter, "performer_count", rangeCriterion(filters.performerCount));
   put(sceneFilter, "performer_age", rangeCriterion(filters.performerAge));
-  // The folder view's Untagged fixes it
-  put(
-    sceneFilter,
-    "tag_count",
-    fixedCount(filters.tag_count) ?? rangeCriterion(filters.tagCount)
-  );
+  put(sceneFilter, "tag_count", rangeCriterion(filters.tagCount));
+  // The folder view's Untagged: no tag, own or inherited
+  if (typeof filters.tagged === "boolean") sceneFilter.tagged = filters.tagged;
 
   put(sceneFilter, "date", dateCriterion(filters.date));
   put(sceneFilter, "created_at", dateCriterion(filters.createdAt));

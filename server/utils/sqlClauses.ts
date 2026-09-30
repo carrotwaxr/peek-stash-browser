@@ -1069,3 +1069,13 @@ export function buildFavoriteFilter(
     return { sql: "(r.favorite = 0 OR r.favorite IS NULL)", params: [] };
   }
 }
+
+/**
+ * A scene with no tag, its own or inherited: its stored count of `SceneTag`
+ * rows is 0 (the browse index `(deletedAt, tagCount, ...)` reads it) and it
+ * has no `SceneInheritedTag` row (the junction's primary key). The folder
+ * view's Untagged: a scene with an inherited tag is in that tag's folder.
+ */
+export function sceneUntaggedSql(alias: string): string {
+  return `(${alias}.tagCount = 0 AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag ${alias}ut WHERE ${alias}ut.sceneId = ${alias}.id AND ${alias}ut.sceneInstanceId = ${alias}.stashInstanceId))`;
+}

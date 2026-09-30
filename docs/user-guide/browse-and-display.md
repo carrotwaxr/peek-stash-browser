@@ -87,7 +87,7 @@ Navigate content through your tag hierarchy as folders.
 - Use breadcrumbs to navigate back up
 - The root level lists the top-level folders only, no items
 - Opening a folder lists its sub-folders first, then the items that carry the folder's tag directly, paged like any list ("12 galleries in this folder"). An item tagged with the folder and with one of its sub-folders shows in both
-- The root ends with an **Untagged** folder while any item of the page's type has no tag of its own; its badge counts them, and opening it lists them, paged like any folder. An image's tags include the ones its galleries give it. On a performer, tag, studio or collection page, Untagged holds that page's scenes with no tag of their own
+- The root ends with an **Untagged** folder while any item of the page's type is in no other folder; its badge counts them, and opening it lists them, paged like any folder. A scene that inherits a tag (from its performers or studio) is in that tag's folder, not in Untagged, and an image's tags include the ones its galleries give it. On a performer, studio or collection page, Untagged holds that page's scenes with no tag
 - Inside a folder, including Untagged, the filter panel offers no **Tags** filter; inside Untagged it offers no **Tag Count** either
 
 ### Tag Hierarchy View
