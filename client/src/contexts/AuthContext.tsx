@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   ApiError,
-  REDIRECT_STORAGE_KEY,
   getErrorMessage,
   readRetryAfterSeconds,
 } from "../api/client";
@@ -91,9 +90,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsAuthenticated(false);
       setUser(null);
       // The next person to sign in on this browser gets neither this user's
-      // page nor this user's cached data. A full load also drops what
-      // components and contexts hold in memory.
-      sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+      // page, playlist queue nor cached data. Nothing in the tab's session
+      // storage outlives a sign-out. A full load also drops what components
+      // and contexts hold in memory.
+      sessionStorage.clear();
       queryClient.clear();
       window.location.assign("/login");
     }
