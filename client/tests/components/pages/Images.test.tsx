@@ -505,10 +505,9 @@ describe("Images", () => {
         thumbnail: "/api/proxy/image/7/thumbnail?instanceId=inst%20a",
       });
       expect(images[0]?.oCounter).toBe(3);
-      // No instance known: the request still names an (empty) one
-      expect(images[1]?.paths.image).toBe(
-        "/api/proxy/image/8/image?instanceId="
-      );
+      // No instance known: the path carries none, never an empty one
+      expect(images[1]?.paths.image).toBe("/api/proxy/image/8/image");
+      expect(images[1]?.paths.thumbnail).toBe("/api/proxy/image/8/thumbnail");
       expect(images[1]?.oCounter).toBe(0);
       // Paths the server sent are kept as they are
       expect(images[2]?.paths).toEqual({

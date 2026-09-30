@@ -513,9 +513,10 @@ const Images = () => {
               currentImages.map((img: Record<string, unknown>) => {
                 const paths = img.paths as Record<string, string> | undefined;
                 // The server serves an image only from the instance it names
-                const instanceQuery = `?instanceId=${encodeURIComponent(
-                  typeof img.instanceId === "string" ? img.instanceId : ""
-                )}`;
+                const instanceQuery =
+                  typeof img.instanceId === "string" && img.instanceId !== ""
+                    ? `?instanceId=${encodeURIComponent(img.instanceId)}`
+                    : "";
                 return {
                   ...img,
                   paths: {
