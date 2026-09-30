@@ -151,9 +151,9 @@ describe("Downloads page", () => {
     expect(screen.queryByText(/has expired/)).not.toBeInTheDocument();
   });
 
-  it("thumbnails without an instance ask for no instance", async () => {
+  it("an image download with no instance shows no thumbnail request", async () => {
     mockDownloads([
-      download({ id: 1, instanceId: null }),
+      download({ id: 1, instanceId: null, fileName: "scene.mp4" }),
       download({
         id: 2,
         type: "IMAGE",
@@ -165,15 +165,11 @@ describe("Downloads page", () => {
     ]);
 
     const { container } = render(<Downloads />);
-    await screen.findAllByText("file");
+    await screen.findByText("file");
 
-    const srcs = Array.from(container.querySelectorAll("img")).map((img) =>
-      img.getAttribute("src")
-    );
-    expect(srcs).toEqual([
-      `/api/proxy/stash?path=${encodeURIComponent("/scene/12/screenshot")}`,
-      "/api/proxy/image/34/thumbnail",
-    ]);
+    // Such rows answer 410 anyway; a thumbnail would only be refused
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getByText("scene")).toBeInTheDocument();
   });
 
   it("encodes the instance into the thumbnail URLs", async () => {

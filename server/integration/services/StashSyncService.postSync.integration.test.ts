@@ -479,7 +479,7 @@ function stubClients(byInstance: Record<string, StashClient>): void {
   );
   // Clip sync probes previews with its instance's own key
   vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation((id) =>
-    id !== undefined && clients.has(id)
+    clients.has(id)
       ? { baseUrl: "http://stash.invalid", apiKey: "postsync-it-key" }
       : realCredentials(id)
   );

@@ -34,7 +34,7 @@ export const setupSubtitles = (
   player: any,
   sceneId: string,
   captions: any[],
-  instanceId?: string
+  instanceId: string
 ) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
@@ -96,7 +96,7 @@ export const setupSubtitles = (
 
     const trackOptions = {
       kind: "captions", // Use "captions" not "subtitles" to match Stash
-      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}${instanceId ? `&instanceId=${instanceId}` : ""}`,
+      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}&instanceId=${encodeURIComponent(instanceId)}`,
       srclang: lang,
       label: label,
       default: setAsDefault,

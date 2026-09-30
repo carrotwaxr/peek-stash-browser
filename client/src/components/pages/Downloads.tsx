@@ -108,22 +108,24 @@ const EXPIRED_HINTS: Record<string, string> = {
  * @returns {JSX.Element} Thumbnail or type icon
  */
 const getDownloadThumbnail = (download: Record<string, unknown>) => {
-  // The thumbnail comes from the instance the download's entity lives on
+  // The thumbnail comes from the instance the download's entity lives on.
+  // A download stored without one (it answers 410) gets its type's icon: the
+  // media routes serve only the instance a request names
   const instanceId =
     typeof download.instanceId === "string" ? download.instanceId : "";
-  const instanceParam = instanceId
-    ? `instanceId=${encodeURIComponent(instanceId)}`
-    : "";
+  const instanceParam = `instanceId=${encodeURIComponent(instanceId)}`;
   // A playlist download has no entity (entityId is null)
   const entityId =
-    typeof download.entityId === "string" ? download.entityId : "";
+    typeof download.entityId === "string" && instanceId
+      ? download.entityId
+      : "";
 
   // For scenes and images, show actual thumbnail
   if (download.type === "SCENE" && entityId) {
     return (
       <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${entityId}/screenshot`)}${instanceParam ? `&${instanceParam}` : ""}`}
+          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${entityId}/screenshot`)}&${instanceParam}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -146,7 +148,7 @@ const getDownloadThumbnail = (download: Record<string, unknown>) => {
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/image/${entityId}/thumbnail${instanceParam ? `?${instanceParam}` : ""}`}
+          src={`/api/proxy/image/${entityId}/thumbnail?${instanceParam}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {

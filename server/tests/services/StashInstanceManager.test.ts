@@ -142,26 +142,6 @@ describe("StashInstanceManager", () => {
     });
   });
 
-  describe("getDefault", () => {
-    it("returns the highest priority instance", async () => {
-      const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
-      await manager.initialize();
-
-      const client = manager.getDefault();
-      expect(client).toBeDefined();
-      expect(client).toHaveProperty("url", INSTANCE_A.url);
-    });
-
-    it("throws when no instances are configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.getDefault()).toThrow(
-        "No Stash instance configured"
-      );
-    });
-  });
-
   describe("getDefaultConfig", () => {
     it("returns the config object for the default instance", async () => {
       const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
@@ -447,16 +427,6 @@ describe("StashInstanceManager", () => {
       });
     });
 
-    it("no id means the highest-priority enabled instance", async () => {
-      const { manager } = await importFresh([B_AT_0, DEFAULT_AT_5]);
-      await manager.initialize();
-
-      expect(manager.getCredentials()).toEqual({
-        baseUrl: "http://stash-b:9999",
-        apiKey: "key-b",
-      });
-    });
-
     it("a named instance that is not loaded (disabled or deleted) throws UnknownInstanceError", async () => {
       // findMany returns enabled instances only, so a disabled one is absent
       const { manager, mockPrisma } = await importFresh([B_AT_0, DEFAULT_AT_5]);
@@ -479,7 +449,7 @@ describe("StashInstanceManager", () => {
       );
     });
 
-    it("getCredentials('') throws UnknownInstanceError: an empty id is not 'no instance'", async () => {
+    it("getCredentials of an unknown or empty id throws UnknownInstanceError", async () => {
       // A row stored before instances were carried has instanceId "";
       // it must not be served from whichever instance comes first
       const { manager } = await importFresh([B_AT_0, DEFAULT_AT_5]);
@@ -488,43 +458,25 @@ describe("StashInstanceManager", () => {
         await import("../../services/StashInstanceManager.js");
 
       expect(() => manager.getCredentials("")).toThrow(UnknownInstanceError);
+      expect(() => manager.getCredentials("never-configured")).toThrow(
+        UnknownInstanceError
+      );
     });
 
-    it("no id and no instance configured is a configuration error, not an unknown instance", async () => {
+    it("with no instance configured, any id is an unknown instance", async () => {
       const { manager } = await importFresh([]);
       await manager.initialize();
       const { UnknownInstanceError } =
         await import("../../services/StashInstanceManager.js");
 
-      expect(() => manager.getCredentials()).toThrow(
-        "No Stash instance configured"
-      );
-      expect(() => manager.getCredentials()).not.toThrow(UnknownInstanceError);
-    });
-  });
-
-  describe("resolveInstanceId", () => {
-    it("a named instance is itself, `default` included, and no id is the highest-priority instance", async () => {
-      const { manager } = await importFresh([B_AT_0, DEFAULT_AT_5]);
-      await manager.initialize();
-
-      expect(manager.resolveInstanceId("default")).toBe("default");
-      expect(manager.resolveInstanceId("b")).toBe("b");
-      expect(manager.resolveInstanceId()).toBe("b");
-    });
-
-    it("throws when no id is given and no instance is configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.resolveInstanceId()).toThrow(
-        "No Stash instance configured"
+      expect(() => manager.getCredentials("default")).toThrow(
+        UnknownInstanceError
       );
     });
   });
 
   describe("the owner's setup: `default` as the only instance, at priority 0", () => {
-    it("serves `default` whether a request names it or names no instance", async () => {
+    it("serves `default` when a request names it", async () => {
       const { manager } = await importFresh([{ ...DEFAULT_AT_5, priority: 0 }]);
       await manager.initialize();
 
@@ -533,9 +485,6 @@ describe("StashInstanceManager", () => {
         apiKey: "key-default",
       };
       expect(manager.getCredentials("default")).toEqual(served);
-      expect(manager.getCredentials()).toEqual(served);
-      expect(manager.resolveInstanceId("default")).toBe("default");
-      expect(manager.resolveInstanceId()).toBe("default");
       expect(manager.getDefaultConfig().id).toBe("default");
     });
   });

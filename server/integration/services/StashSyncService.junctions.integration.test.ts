@@ -1254,7 +1254,7 @@ describeWithDb(
         stashInstanceManager.getCredentials.bind(stashInstanceManager);
       vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation(
         (id) =>
-          id !== undefined && INSTANCES.includes(id)
+          INSTANCES.includes(id)
             ? { baseUrl: "http://stash.invalid", apiKey: "junctions-it-key" }
             : realCredentials(id)
       );
@@ -1604,7 +1604,7 @@ describeWithDb(
         stashInstanceManager.getCredentials.bind(stashInstanceManager);
       vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation(
         (id) =>
-          id !== undefined && INSTANCES.includes(id)
+          INSTANCES.includes(id)
             ? { baseUrl: "http://stash.invalid", apiKey: "junctions-it-key" }
             : realCredentials(id)
       );

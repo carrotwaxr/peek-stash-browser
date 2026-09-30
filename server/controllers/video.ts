@@ -15,7 +15,11 @@ import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { privateCacheControl } from "../utils/cacheControl.js";
 import { redactUrl } from "../utils/logRedaction.js";
 import { logger } from "../utils/logger.js";
-import { canUserLoadMedia } from "../utils/mediaAccess.js";
+import {
+  INSTANCE_ID_REQUIRED,
+  canUserLoadMedia,
+  isValidInstanceId,
+} from "../utils/mediaAccess.js";
 import {
   INSTANCE_ID_PATTERN,
   SCENE_ID_PATTERN,
@@ -33,43 +37,21 @@ import {
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
 /**
- * The address and key of the instance to serve from (the one named, or the
- * highest-priority enabled instance), or null once the response is sent:
- * 404 for an instance that is not enabled (disabled or deleted; invariant
- * 11), 500 when none is named and none is configured.
+ * The address and key of the instance a request names, or null once the
+ * response is sent: 404 for an instance that is not enabled (disabled or
+ * deleted; invariant 11).
  */
 function credentialsOrRespond(
-  instanceId: string | undefined,
-  res: Response,
-  label: string
+  instanceId: string,
+  res: Response
 ): StashCredentials | null {
   try {
     return stashInstanceManager.getCredentials(instanceId);
   } catch (error) {
-    if (error instanceof UnknownInstanceError) {
-      res.status(404).send("Not found");
-      return null;
-    }
-    logger.error(`${label} Failed to get Stash instance credentials`, {
-      error,
-      instanceId,
-    });
-    res.status(500).send("Stash configuration missing");
+    if (!(error instanceof UnknownInstanceError)) throw error;
+    res.status(404).send("Not found");
     return null;
   }
-}
-
-/**
- * A present instanceId must be well-formed; absent means the highest-priority
- * enabled instance.
- */
-function isValidOptionalInstanceId(
-  instanceId: unknown
-): instanceId is string | undefined {
-  return (
-    instanceId === undefined ||
-    (typeof instanceId === "string" && INSTANCE_ID_PATTERN.test(instanceId))
-  );
 }
 
 // ============================================================================
@@ -92,7 +74,7 @@ function deleteApiKeyParams(params: URLSearchParams): void {
 function rewriteStashUri(
   uri: string,
   sceneId: string,
-  instanceId: string | undefined
+  instanceId: string
 ): string | null {
   if (!uri.trim()) {
     return null;
@@ -117,10 +99,8 @@ function rewriteStashUri(
 
     deleteApiKeyParams(queryParams);
 
-    // Add instanceId for multi-instance routing
-    if (instanceId) {
-      queryParams.set("instanceId", instanceId);
-    }
+    // Every segment names the instance, as the playlist request did
+    queryParams.set("instanceId", instanceId);
 
     // Extract the stream path (everything after /scene/{id}/)
     let streamPath: string;
@@ -155,7 +135,7 @@ const API_KEY_ANYWHERE = /apikey/i;
 function rewriteHlsLine(
   line: string,
   sceneId: string,
-  instanceId: string | undefined
+  instanceId: string
 ): string {
   if (!line.trim()) {
     return line;
@@ -210,7 +190,7 @@ function rewriteHlsPlaylist(
   content: string,
   sceneId: string,
   _stashBaseUrl: string,
-  instanceId?: string
+  instanceId: string
 ): string {
   return content
     .split("\n")
@@ -284,10 +264,13 @@ export const proxyStashStream = async (
 
     if (
       !SCENE_ID_PATTERN.test(sceneId) ||
-      !isAllowedStreamPath(streamPath, subPath) ||
-      !isValidOptionalInstanceId(instanceId)
+      !isAllowedStreamPath(streamPath, subPath)
     ) {
       res.status(400).send("Invalid stream path");
+      return;
+    }
+    if (!isValidInstanceId(instanceId)) {
+      res.status(400).json({ error: INSTANCE_ID_REQUIRED });
       return;
     }
 
@@ -311,7 +294,7 @@ export const proxyStashStream = async (
       new URLSearchParams(req.url.split("?")[1] ?? "")
     ).toString();
 
-    const creds = credentialsOrRespond(instanceId, res, "[PROXY]");
+    const creds = credentialsOrRespond(instanceId, res);
     if (!creds) return;
     const { baseUrl: stashBaseUrl, apiKey } = creds;
 
@@ -467,10 +450,13 @@ export const getCaption = async (
       !SCENE_ID_PATTERN.test(sceneId) ||
       typeof lang !== "string" ||
       typeof type !== "string" ||
-      !isAllowedCaption(lang, type) ||
-      !isValidOptionalInstanceId(instanceId)
+      !isAllowedCaption(lang, type)
     ) {
       res.status(400).send("Invalid caption parameters");
+      return;
+    }
+    if (!isValidInstanceId(instanceId)) {
+      res.status(400).json({ error: INSTANCE_ID_REQUIRED });
       return;
     }
 
@@ -486,10 +472,10 @@ export const getCaption = async (
     }
 
     logger.debug(
-      `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId ?? "(not specified)"}`
+      `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId}`
     );
 
-    const creds = credentialsOrRespond(instanceId, res, "[CAPTION]");
+    const creds = credentialsOrRespond(instanceId, res);
     if (!creds) return;
     const { baseUrl: stashUrl, apiKey } = creds;
 

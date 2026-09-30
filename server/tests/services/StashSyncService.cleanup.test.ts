@@ -31,7 +31,7 @@ vi.mock(
 );
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: { get: vi.fn(), getDefault: vi.fn() },
+  stashInstanceManager: { get: vi.fn() },
 }));
 
 vi.mock("../../services/MergeReconciliationService.js", () => ({

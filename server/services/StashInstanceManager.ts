@@ -106,20 +106,6 @@ class StashInstanceManager {
   }
 
   /**
-   * Get the default (highest priority) Stash instance.
-   * Returns the first enabled instance by priority order.
-   */
-  getDefault(): StashClient {
-    const first = this.instances.values().next().value;
-    if (!first) {
-      throw new Error(
-        "No Stash instance configured. Please complete the setup wizard."
-      );
-    }
-    return first;
-  }
-
-  /**
    * Get all enabled Stash instances as an array of [instanceId, client] tuples.
    * Useful for iterating over all instances during sync or cache operations.
    */
@@ -135,7 +121,8 @@ class StashInstanceManager {
   }
 
   /**
-   * Get the default instance config
+   * The highest-priority enabled instance's config. Only UserStatsService's
+   * fallbacks for rows without an instance read it; media never does.
    */
   getDefaultConfig(): StashInstance {
     const first = this.configs.values().next().value;
@@ -206,27 +193,12 @@ class StashInstanceManager {
   }
 
   /**
-   * The instance a request is served from: the one it names, or the
-   * highest-priority enabled instance when it names none. Every id is an
-   * ordinary id, "default" included (the owner's instance has that id).
-   * Throws when no instance is named and none is configured.
+   * The base URL and API key of the instance named. One that is not loaded
+   * (disabled, deleted, never configured, or "" from a row stored before
+   * instances were carried) throws UnknownInstanceError: a request is served
+   * only from the instance it names, never from another.
    */
-  resolveInstanceId(instanceId?: string): string {
-    return instanceId ?? this.getDefaultConfig().id;
-  }
-
-  /**
-   * The base URL and API key of the instance a request is served from (see
-   * resolveInstanceId). A named instance that is not loaded (disabled,
-   * deleted, or "" from a row stored before instances were carried) throws
-   * UnknownInstanceError; no instance named and none configured throws
-   * "No Stash instance configured". Anything stored about an entity names
-   * its instance: pass it, never nothing.
-   */
-  getCredentials(instanceId?: string): StashCredentials {
-    if (instanceId === undefined) {
-      return credentialsOf(this.getDefaultConfig());
-    }
+  getCredentials(instanceId: string): StashCredentials {
     return credentialsOf(this.loadedConfig(instanceId));
   }
 

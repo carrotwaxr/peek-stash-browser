@@ -2634,21 +2634,15 @@ class StashSyncService extends EventEmitter {
   private carriedChanges: SyncChangeSet | null = null;
 
   /**
-   * Get the Stash client for the specified instance ID, or default if not specified.
-   * This ensures sync operations target the correct Stash instance.
-   * While a job holds the lock, the client follows its abort: abort() ends a
-   * request in flight at once, rejecting with "Sync aborted".
+   * The Stash client of the instance a sync step targets; throws when that
+   * instance is not loaded (disabled or deleted). While a job holds the
+   * lock, the client follows its abort: abort() ends a request in flight at
+   * once, rejecting with "Sync aborted".
    */
-  private getStashClient(stashInstanceId?: string): StashClient {
-    let client: StashClient;
-    if (stashInstanceId) {
-      const found = stashInstanceManager.get(stashInstanceId);
-      if (!found) {
-        throw new Error(`Stash instance not found: ${stashInstanceId}`);
-      }
-      client = found;
-    } else {
-      client = stashInstanceManager.getDefault();
+  private getStashClient(stashInstanceId: string): StashClient {
+    const client = stashInstanceManager.get(stashInstanceId);
+    if (!client) {
+      throw new Error(`Stash instance not found: ${stashInstanceId}`);
     }
     return this.abortController
       ? client.withSignal(this.abortController.signal)

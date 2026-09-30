@@ -7,33 +7,38 @@
  * selection apply to thumbnails and streams as they do to lists.
  */
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import type { MediaEntity } from "./stashMediaPath.js";
+import { INSTANCE_ID_PATTERN, type MediaEntity } from "./stashMediaPath.js";
 
 /**
- * The instance a media request is served from, which the access check must
- * look at: the one it names ("default" is an ordinary id), or the
- * highest-priority enabled instance when it names none, as the proxies'
- * `getCredentials` resolves it.
+ * The error every media route answers with 400 when its `?instanceId=` is
+ * missing or malformed: media is served only from the instance a request
+ * names, never from a guessed one.
  */
-export function resolveMediaInstanceId(instanceId: string | undefined): string {
-  return stashInstanceManager.resolveInstanceId(instanceId);
+export const INSTANCE_ID_REQUIRED = "instanceId is required";
+
+/**
+ * A media request's `instanceId` as the routes accept it: one string
+ * matching INSTANCE_ID_PATTERN. A repeated parameter arrives as an array
+ * and is refused.
+ */
+export function isValidInstanceId(value: unknown): value is string {
+  return typeof value === "string" && INSTANCE_ID_PATTERN.test(value);
 }
 
 /**
- * True when the user may load every entity the media path names (a
- * scene_marker path names its scene and its clip; both must pass).
+ * True when the user may load every entity the media path names on the
+ * instance the request names and is served from (a scene_marker path names
+ * its scene and its clip; both must pass).
  */
 export async function canUserLoadMedia(
   userId: number,
   entities: MediaEntity[],
-  instanceId: string | undefined
+  instanceId: string
 ): Promise<boolean> {
   if (entities.length === 0) return false;
-  const resolved = resolveMediaInstanceId(instanceId);
   const results = await Promise.all(
     entities.map((e) =>
-      canUserAccessEntity(userId, e.entityType, e.entityId, resolved)
+      canUserAccessEntity(userId, e.entityType, e.entityId, instanceId)
     )
   );
   return results.every(Boolean);
