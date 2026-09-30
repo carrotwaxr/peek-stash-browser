@@ -79,6 +79,19 @@ export const tagTreeKey = (tag: { id: string; instanceId?: string | null }) =>
   makeCompositeKey(tag.id, tag.instanceId);
 
 /**
+ * A tree row's key: its path of `tagTreeKey`s from the root ("parentPath/key").
+ * A tag under two parents is two rows, so focus goes by this key while
+ * expansion goes by the tag's.
+ */
+export const tagTreeRowKey = (
+  parentRowKey: string | null,
+  tag: { id: string; instanceId?: string | null }
+) =>
+  parentRowKey === null
+    ? tagTreeKey(tag)
+    : `${parentRowKey}/${tagTreeKey(tag)}`;
+
+/**
  * Each tag's parents and children within `tags`, by `tagTreeKey`, reading
  * each tag's parents once. A parent that is not in `tags` (hidden, say) is
  * left out, so a tag whose every parent is missing is a root.

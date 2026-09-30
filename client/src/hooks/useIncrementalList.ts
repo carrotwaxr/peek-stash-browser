@@ -1,4 +1,10 @@
-import { type RefObject, useEffect, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useInView } from "./useInView";
 
 /** Rows a tree list mounts at a time (owner decision 11: no virtualization library) */
@@ -14,6 +20,11 @@ interface IncrementalList<T> {
   sentinelRef: RefObject<HTMLDivElement | null>;
   /** Items are left to show */
   hasMore: boolean;
+  /**
+   * Shows at least the first `count` items, in whole chunks (keyboard moves
+   * past the last visible row mount the rows they land on)
+   */
+  showAtLeast: (count: number) => void;
 }
 
 /**
@@ -50,12 +61,25 @@ export const useIncrementalList = <T>(
     }));
   }, [inView, chunk]);
 
+  const showAtLeast = useCallback(
+    (wanted: number) =>
+      setShown((prev) => {
+        const whole = Math.min(
+          Math.ceil(wanted / chunk) * chunk,
+          prev.items.length
+        );
+        return whole > prev.count ? { items: prev.items, count: whole } : prev;
+      }),
+    [chunk]
+  );
+
   if (typeof IntersectionObserver === "undefined") {
-    return { visible: items, sentinelRef, hasMore: false };
+    return { visible: items, sentinelRef, hasMore: false, showAtLeast };
   }
   return {
     visible: hasMore ? items.slice(0, count) : items,
     sentinelRef,
     hasMore,
+    showAtLeast,
   };
 };

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useIncrementalList } from "@/hooks/useIncrementalList";
 
@@ -38,13 +38,25 @@ const leave = () => observers.forEach((o) => o.report(false));
 
 const numbered = (n: number) => Array.from({ length: n }, (_, i) => i);
 
-const List = ({ items, chunk }: { items: number[]; chunk?: number }) => {
-  const { visible, sentinelRef, hasMore } = useIncrementalList(items, {
-    chunk,
-  });
+const List = ({
+  items,
+  chunk,
+  wanted = 0,
+}: {
+  items: number[];
+  chunk?: number;
+  wanted?: number;
+}) => {
+  const { visible, sentinelRef, hasMore, showAtLeast } = useIncrementalList(
+    items,
+    { chunk }
+  );
   return (
     <div>
       <span data-testid="count">{visible.length}</span>
+      <button type="button" onClick={() => showAtLeast(wanted)}>
+        show
+      </button>
       {hasMore && <div ref={sentinelRef} data-testid="sentinel" />}
     </div>
   );
@@ -107,6 +119,25 @@ describe("useIncrementalList", () => {
     // and the sentinel still pages the new list
     leave();
     reach();
+    expect(count()).toBe(400);
+  });
+
+  it("showAtLeast grows to the whole chunk holding that many, never shrinks", () => {
+    const { rerender } = render(<List items={numbered(1000)} wanted={201} />);
+    fireEvent.click(screen.getByText("show"));
+    expect(count()).toBe(400);
+
+    rerender(<List items={numbered(1000)} wanted={950} />);
+    // The same array was not passed: a new one resets, then grows
+    fireEvent.click(screen.getByText("show"));
+    expect(count()).toBe(1000);
+    expect(screen.queryByTestId("sentinel")).not.toBeInTheDocument();
+  });
+
+  it("showAtLeast below what shows changes nothing", () => {
+    render(<List items={numbered(1000)} wanted={10} />);
+    reach();
+    fireEvent.click(screen.getByText("show"));
     expect(count()).toBe(400);
   });
 

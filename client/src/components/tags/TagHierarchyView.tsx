@@ -10,14 +10,22 @@ import {
   type TagTreeSource,
   buildTagTree,
   tagTreeKey,
+  tagTreeRowKey,
 } from "../../utils/buildTagTree";
+import { isTVModeOn } from "../../utils/keyTargets";
 import Button from "../ui/Button";
 import TagTreeNode from "./TagTreeNode";
 
 /**
  * Hierarchy view for tags - displays tags as an expandable tree. Expansion
- * and focus go by each tag's `tagTreeKey` ("id:instanceId"), so two
- * instances' same-numbered tags expand apart.
+ * goes by each tag's `tagTreeKey` ("id:instanceId"), so two instances'
+ * same-numbered tags expand apart; focus goes by the row's `tagTreeRowKey`
+ * (its path), since a tag under two parents is two rows.
+ *
+ * The arrow keys move DOM focus from row to row (roving tabindex). An arrow
+ * with nowhere to go in the tree (Up on the first row, Left on a closed root)
+ * is left unhandled in TV mode, so TV focus takes it out of the tree; rows
+ * are TV items, so TV focus can come back in.
  */
 type TreeNode = TagTreeNodeData<TagTreeSource>;
 
@@ -26,11 +34,22 @@ const INITIAL_EXPAND_MAX_ROWS = 500;
 
 /** A row of the expanded tree, for keyboard navigation */
 interface VisibleNode {
+  /** The row's key: its path (`tagTreeRowKey`) */
   key: string;
+  /** The tag's key, which expansion goes by */
+  tagKey: string;
   /** The row it sits under, null at the root */
   parentKey: string | null;
   hasChildren: boolean;
+  /** The index of its root in the tree, to mount the chunk holding it */
+  rootIndex: number;
 }
+
+/** Focuses a row and scrolls it just into view, as TV focus does */
+const focusElement = (el: HTMLElement) => {
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
+};
 
 interface TagHierarchyViewProps {
   tags: readonly TagTreeSource[];
@@ -49,9 +68,13 @@ const TagHierarchyView = ({
 }: TagHierarchyViewProps) => {
   // Track which nodes are expanded (by tag key)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  // Track focused node for keyboard navigation
+  // The focused row's key (a path), for the roving tabindex
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const containerRef = useRef(null);
+  // Each mounted row's element by row key
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  // A row a key moved to before its chunk mounted: focus it once it does
+  const pendingFocusRef = useRef<string | null>(null);
   // Track if initial expansion has happened (prevents re-expanding after Collapse All)
   const hasInitializedRef = useRef(false);
 
@@ -71,6 +94,7 @@ const TagHierarchyView = ({
     visible: visibleRoots,
     sentinelRef,
     hasMore: hasMoreRoots,
+    showAtLeast: showRoots,
   } = useIncrementalList(tree);
 
   // Get all keys of nodes that have children (expandable nodes)
@@ -86,19 +110,43 @@ const TagHierarchyView = ({
     return keys;
   }, [tree]);
 
-  // Get all visible nodes (for keyboard nav)
+  // Every row of the expanded tree, mounted or not (for keyboard nav: a move
+  // past the last mounted row mounts the chunk it lands in)
   const visibleNodes = useMemo(() => {
     const nodes: VisibleNode[] = [];
-    const traverse = (node: TreeNode, parentKey: string | null) => {
-      const key = tagTreeKey(node);
-      nodes.push({ key, parentKey, hasChildren: node.children.length > 0 });
-      if (expandedIds.has(key)) {
-        node.children.forEach((child) => traverse(child, key));
+    const traverse = (
+      node: TreeNode,
+      parentKey: string | null,
+      rootIndex: number
+    ) => {
+      const key = tagTreeRowKey(parentKey, node);
+      const tagKey = tagTreeKey(node);
+      nodes.push({
+        key,
+        tagKey,
+        parentKey,
+        hasChildren: node.children.length > 0,
+        rootIndex,
+      });
+      if (expandedIds.has(tagKey)) {
+        node.children.forEach((child) => traverse(child, key, rootIndex));
       }
     };
-    visibleRoots.forEach((root) => traverse(root, null));
+    tree.forEach((root, rootIndex) => traverse(root, null, rootIndex));
     return nodes;
-  }, [visibleRoots, expandedIds]);
+  }, [tree, expandedIds]);
+
+  const nodeIndex = useMemo(
+    () => new Map(visibleNodes.map((node, index) => [node.key, index])),
+    [visibleNodes]
+  );
+
+  // The tabbable row: the focused one while it is still in the tree, else
+  // the first
+  const activeRowKey =
+    focusedId !== null && nodeIndex.has(focusedId)
+      ? focusedId
+      : (visibleNodes[0]?.key ?? null);
 
   // Initialize: expand first level (only on first load, not after Collapse All),
   // and only while that keeps the rows under INITIAL_EXPAND_MAX_ROWS
@@ -166,13 +214,46 @@ const TagHierarchyView = ({
     setFocusedId(id);
   }, []);
 
+  const registerRow = useCallback(
+    (rowKey: string, el: HTMLDivElement | null) => {
+      if (el) rowRefs.current.set(rowKey, el);
+      else rowRefs.current.delete(rowKey);
+    },
+    []
+  );
+
+  // Moves DOM focus to a row, mounting its chunk first when it is not yet
+  const focusRow = useCallback(
+    (node: VisibleNode) => {
+      setFocusedId(node.key);
+      const el = rowRefs.current.get(node.key);
+      if (el) {
+        focusElement(el);
+        return;
+      }
+      pendingFocusRef.current = node.key;
+      showRoots(node.rootIndex + 1);
+    },
+    [showRoots]
+  );
+
+  // A row a key moved to mounted in this render: focus it
+  useEffect(() => {
+    const key = pendingFocusRef.current;
+    if (key === null) return;
+    const el = rowRefs.current.get(key);
+    if (!el) return;
+    pendingFocusRef.current = null;
+    focusElement(el);
+  });
+
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!focusedId || visibleNodes.length === 0) return;
+      if (activeRowKey === null) return;
 
-      const currentIndex = visibleNodes.findIndex((n) => n.key === focusedId);
-      if (currentIndex === -1) return;
+      const currentIndex = nodeIndex.get(activeRowKey);
+      if (currentIndex === undefined) return;
 
       const currentNode = visibleNodes[currentIndex];
       if (!currentNode) return;
@@ -182,71 +263,64 @@ const TagHierarchyView = ({
       const firstNode = visibleNodes[0];
       const lastNode = visibleNodes[visibleNodes.length - 1];
 
+      // Whether the tree used the key; one it did not (an arrow with
+      // nowhere to go here) is TV focus's in TV mode
+      let handled = true;
       switch (e.key) {
         case "ArrowDown":
-          e.preventDefault();
-          if (nextNode) {
-            setFocusedId(nextNode.key);
-          }
+          if (nextNode) focusRow(nextNode);
+          else handled = false;
           break;
 
         case "ArrowUp":
-          e.preventDefault();
-          if (previousNode) {
-            setFocusedId(previousNode.key);
-          }
+          if (previousNode) focusRow(previousNode);
+          else handled = false;
           break;
 
         case "ArrowRight":
-          e.preventDefault();
-          if (currentNode.hasChildren) {
-            if (!expandedIds.has(currentNode.key)) {
-              handleToggle(currentNode.key);
-            } else if (nextNode) {
-              // Already expanded, move to first child
-              setFocusedId(nextNode.key);
-            }
+          if (!currentNode.hasChildren) {
+            handled = false;
+          } else if (!expandedIds.has(currentNode.tagKey)) {
+            handleToggle(currentNode.tagKey);
+          } else if (nextNode) {
+            // Already expanded, move to first child
+            focusRow(nextNode);
           }
           break;
 
         case "ArrowLeft":
-          e.preventDefault();
-          if (expandedIds.has(currentNode.key)) {
-            handleToggle(currentNode.key);
-          } else if (currentNode.parentKey) {
-            // Focus the row it sits under
-            setFocusedId(currentNode.parentKey);
+          // (the first view's expansion holds every root, leaves included)
+          if (currentNode.hasChildren && expandedIds.has(currentNode.tagKey)) {
+            handleToggle(currentNode.tagKey);
+          } else {
+            // Focus the row it sits under; a closed root has none
+            const parentIndex =
+              currentNode.parentKey === null
+                ? undefined
+                : nodeIndex.get(currentNode.parentKey);
+            const parentNode =
+              parentIndex === undefined ? undefined : visibleNodes[parentIndex];
+            if (parentNode) focusRow(parentNode);
+            else handled = false;
           }
           break;
 
         case "Home":
-          e.preventDefault();
-          if (firstNode) {
-            setFocusedId(firstNode.key);
-          }
+          if (firstNode) focusRow(firstNode);
           break;
 
         case "End":
-          e.preventDefault();
-          if (lastNode) {
-            setFocusedId(lastNode.key);
-          }
+          // Mounts every chunk up to the true last row
+          if (lastNode) focusRow(lastNode);
           break;
 
         default:
-          break;
+          return;
       }
+      if (handled || !isTVModeOn()) e.preventDefault();
     },
-    [focusedId, visibleNodes, expandedIds, handleToggle]
+    [activeRowKey, nodeIndex, visibleNodes, expandedIds, handleToggle, focusRow]
   );
-
-  // Set initial focus
-  useEffect(() => {
-    const firstNode = visibleNodes[0];
-    if (firstNode && !focusedId) {
-      setFocusedId(firstNode.key);
-    }
-  }, [visibleNodes, focusedId]);
 
   if (isLoading) {
     return (
@@ -317,8 +391,9 @@ const TagHierarchyView = ({
             isExpanded={expandedIds.has(tagTreeKey(rootTag))}
             expandedIds={expandedIds}
             onToggle={handleToggle}
-            focusedId={focusedId}
+            focusedId={activeRowKey}
             onFocus={handleFocus}
+            registerRow={registerRow}
           />
         ))}
         {hasMoreRoots && (

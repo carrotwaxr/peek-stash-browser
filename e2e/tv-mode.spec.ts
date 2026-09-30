@@ -239,6 +239,44 @@ test.describe("TV mode", () => {
     expect(to.x).toBeGreaterThan(from.x);
   });
 
+  test("the tag hierarchy takes focus; arrows move through it, up to its controls and left to the sidebar", async ({
+    page,
+  }) => {
+    await page.goto("/tags?view=hierarchy");
+    const tree = page.getByRole("tree", { name: "Tag hierarchy" });
+    const rows = tree.getByRole("treeitem");
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+    requireData((await rows.count()) >= 2 || null, "two tags");
+
+    // The first row takes the page's first focus
+    await expect(rows.first()).toBeFocused();
+
+    // Down moves real focus with the highlight
+    await page.keyboard.press("ArrowDown");
+    await expect(rows.nth(1)).toBeFocused();
+    await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+
+    // Up to the first row, then out of the tree to the controls above it
+    await page.keyboard.press("ArrowUp");
+    await expect(rows.first()).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(page.locator("main :focus")).toHaveCount(1);
+    await expect(tree.locator(":focus")).toHaveCount(0);
+
+    // Down from the controls enters the tree at its first row
+    await page.keyboard.press("ArrowDown");
+    await expect(rows.first()).toBeFocused();
+
+    // Left on a root closes it when open, then reaches the sidebar
+    if ((await rows.first().getAttribute("aria-expanded")) === "true") {
+      await page.keyboard.press("ArrowLeft");
+      await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+      await expect(rows.first()).toBeFocused();
+    }
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.locator("aside :focus")).toHaveCount(1);
+  });
+
   test("Enter on a focused scene card opens the scene with Next available", async ({
     page,
   }) => {

@@ -9,14 +9,41 @@
  * - Keyboard navigation
  * - Search filtering auto-expand
  */
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TagHierarchyView from "../../../src/components/tags/TagHierarchyView";
 
 // Wrapper to provide router context
 const renderWithRouter = (ui: React.ReactElement) => {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
+};
+
+/** The current path, shown beside the tree */
+const LocationPath = () => (
+  <span data-testid="location">{useLocation().pathname}</span>
+);
+
+/** The tree at /tags with the current path shown, to see where Enter goes */
+const renderAtTags = (ui: React.ReactElement) =>
+  render(
+    <MemoryRouter initialEntries={["/tags"]}>
+      <Routes>
+        <Route path="*" element={ui} />
+      </Routes>
+      <LocationPath />
+    </MemoryRouter>
+  );
+
+/** The tree row showing `name`; the nth when several do */
+const row = (name: string, nth = 0) => {
+  const found = screen
+    .getAllByRole("treeitem")
+    .filter((item) => item.textContent?.includes(name));
+  const item = found[nth];
+  if (!item) throw new Error(`no row ${nth} for ${name}`);
+  return item;
 };
 
 // Mock tags with hierarchy - includes parents array for buildTagTree
@@ -322,6 +349,131 @@ describe("TagHierarchyView", () => {
     });
   });
 
+  describe("keyboard focus", () => {
+    afterEach(() => {
+      document.documentElement.classList.remove("tv-mode");
+    });
+
+    it("Down then Enter opens the tag that has focus, not the one clicked before", async () => {
+      const user = userEvent.setup();
+      renderAtTags(
+        <TagHierarchyView
+          searchQuery=""
+          tags={mockFlatTags}
+          isLoading={false}
+        />
+      );
+
+      await user.click(row("Alpha"));
+      await user.keyboard("{ArrowDown}");
+      expect(row("Beta")).toHaveFocus();
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByTestId("location")).toHaveTextContent("/tag/11");
+    });
+
+    it("a tag under two parents is two nodes; Down from the second parent's child continues under the second parent", async () => {
+      const user = userEvent.setup();
+      const tags = [
+        { id: "1", name: "Parent One", parents: [] },
+        { id: "2", name: "Parent Two", parents: [] },
+        {
+          id: "3",
+          name: "Shared",
+          parents: [{ id: "1" }, { id: "2" }],
+        },
+        { id: "4", name: "Zed", parents: [{ id: "2" }] },
+      ];
+      renderWithRouter(
+        <TagHierarchyView searchQuery="" tags={tags} isLoading={false} />
+      );
+
+      await user.click(row("Shared", 1));
+      // Only the row clicked is selected, not the same tag under Parent One
+      expect(row("Shared", 0)).toHaveAttribute("aria-selected", "false");
+      expect(row("Shared", 1)).toHaveAttribute("aria-selected", "true");
+
+      await user.keyboard("{ArrowDown}");
+      expect(row("Zed")).toHaveFocus();
+      expect(row("Zed")).toHaveAttribute("aria-selected", "true");
+      expect(row("Shared", 1)).toHaveAttribute("tabindex", "-1");
+    });
+
+    it("a row focused from outside the tree becomes its selected, tabbable row", () => {
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={mockFlatTags}
+          isLoading={false}
+        />
+      );
+      // TV focus moves focus with .focus(), not through the tree's keys
+      act(() => row("Gamma").focus());
+      expect(row("Gamma")).toHaveAttribute("aria-selected", "true");
+      expect(row("Gamma")).toHaveAttribute("tabindex", "0");
+      expect(row("Alpha")).toHaveAttribute("tabindex", "-1");
+    });
+
+    it("rows are TV items, so TV focus can land on them", () => {
+      renderWithRouter(
+        <TagHierarchyView searchQuery="" tags={mockTags} isLoading={false} />
+      );
+      for (const item of screen.getAllByRole("treeitem")) {
+        expect(item).toHaveAttribute("data-tv-item");
+      }
+    });
+
+    it("in TV mode the tree leaves an arrow with nowhere to go in it to TV focus", async () => {
+      document.documentElement.classList.add("tv-mode");
+      const user = userEvent.setup();
+      renderWithRouter(
+        <TagHierarchyView searchQuery="" tags={mockTags} isLoading={false} />
+      );
+      await user.click(row("Child 1"));
+      await user.keyboard("{Home}");
+      const root = row("Parent Tag");
+      expect(root).toHaveFocus();
+
+      // Up from the first row: not handled, TV focus takes it
+      expect(fireEvent.keyDown(root, { key: "ArrowUp" })).toBe(true);
+      // Left on an open root closes it
+      expect(fireEvent.keyDown(root, { key: "ArrowLeft" })).toBe(false);
+      expect(root).toHaveAttribute("aria-expanded", "false");
+      // Left on a closed root: not handled, TV focus goes to the sidebar
+      expect(fireEvent.keyDown(root, { key: "ArrowLeft" })).toBe(true);
+      // Down from the last row: not handled
+      expect(fireEvent.keyDown(root, { key: "ArrowDown" })).toBe(true);
+    });
+
+    it("in TV mode Left on a root with no children goes straight to TV focus", async () => {
+      document.documentElement.classList.add("tv-mode");
+      const user = userEvent.setup();
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={mockFlatTags}
+          isLoading={false}
+        />
+      );
+      await user.click(row("Alpha"));
+      expect(fireEvent.keyDown(row("Alpha"), { key: "ArrowLeft" })).toBe(true);
+    });
+
+    it("outside TV mode the tree keeps every arrow, so the page does not scroll", async () => {
+      const user = userEvent.setup();
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={mockFlatTags}
+          isLoading={false}
+        />
+      );
+      await user.click(row("Alpha"));
+      expect(fireEvent.keyDown(row("Alpha"), { key: "ArrowUp" })).toBe(false);
+      expect(fireEvent.keyDown(row("Alpha"), { key: "ArrowLeft" })).toBe(false);
+    });
+  });
+
   describe("search filtering", () => {
     it("filters to show matching tags", () => {
       renderWithRouter(
@@ -535,7 +687,7 @@ describe("TagHierarchyView", () => {
       expect(screen.getAllByRole("treeitem")).toHaveLength(601);
     });
 
-    it("keyboard navigation stays on the rows mounted", () => {
+    it("End mounts the rest and focuses the true last row", () => {
       renderWithRouter(
         <TagHierarchyView
           searchQuery=""
@@ -543,9 +695,28 @@ describe("TagHierarchyView", () => {
           isLoading={false}
         />
       );
-      const items = screen.getAllByRole("treeitem");
+      expect(screen.getAllByRole("treeitem")).toHaveLength(200);
       fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
-      expect(items[199]).toHaveAttribute("aria-selected", "true");
+
+      expect(screen.getAllByRole("treeitem")).toHaveLength(500);
+      expect(row("Tag 00499")).toHaveFocus();
+      expect(row("Tag 00499")).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("Down from the last mounted row mounts the next chunk and moves on", async () => {
+      const user = userEvent.setup();
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={rootTags(500)}
+          isLoading={false}
+        />
+      );
+      await user.click(row("Tag 00199"));
+      await user.keyboard("{ArrowDown}");
+
+      expect(screen.getAllByRole("treeitem")).toHaveLength(400);
+      expect(row("Tag 00200")).toHaveFocus();
     });
   });
 });
