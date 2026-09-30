@@ -176,6 +176,9 @@ const VideoPlayer = () => {
     playNext: playNextInPlaylist,
     playPrevious: playPreviousInPlaylist,
     enabled: true,
+    // Keys act only while focus is in the player's element or on nothing
+    root: () =>
+      (playerRef.current as { el(): Element | null } | null)?.el() ?? null,
   });
 
   // Auto-fullscreen on mobile orientation change

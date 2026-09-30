@@ -1,13 +1,5 @@
-import { isShortcutSequencePending } from "../contexts/shortcutDispatcher";
 import { ratingSequence } from "../utils/ratingSequence";
 import { useShortcutScope } from "./useShortcutScope";
-
-/**
- * Whether an `r` sequence is waiting for its number. The player's
- * `useMediaKeys` still runs its own listener and reads this to leave 0-5 and
- * f to the rating keys; N4 moves the player onto the scope stack and deletes it.
- */
-export const isInRatingMode = () => isShortcutSequencePending("r");
 
 /**
  * Rating and favorite hotkeys for the page's entity (Stash-compatible): press

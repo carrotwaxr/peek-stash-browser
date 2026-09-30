@@ -1,7 +1,6 @@
 /**
  * Key names and the rules for which element owns a key, shared by the
- * shortcut dispatcher (`contexts/shortcutDispatcher.ts`) and the player's
- * `useKeyboardShortcuts`.
+ * shortcut dispatcher (`contexts/shortcutDispatcher.ts`).
  */
 
 const KEY_NAMES: Readonly<Record<string, string>> = {
