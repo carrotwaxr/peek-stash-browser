@@ -30,6 +30,7 @@ paths:
 - Recomputes for one user coalesce to at most two, the running one and one queued (#431). A "skip if one is pending" shortcut loses the admin's latest save. A save never coalesces into a running recompute: it waits for it and registers its own, and a recompute requested during a save queues behind it.
 - Cascades follow the junction rows sync writes. A missing junction row is a silent cascade miss, not an error.
 - Reason precedence: every restriction-derived reason is stored ahead of `hidden`, and restriction cascades run apart from hide cascades (order in the compute's file header). The Hidden Items list relies on it: a `hidden` row means the user would see the entity if they had hidden nothing. Merging the cascade sources again, or reordering the dedup, shows restricted entities' data there.
+- Every entity type is hideable, clips included. A clip hide stores one `hidden` row and no cascade (`clip` is not in `RESOLVE_TABLE`); `ClipQueryBuilder`'s exclusion anti-join and `EntityAccessService`'s clip source (which also checks the clip's scene) read it. Hiding a scene hides its clips; hiding a clip never touches its scene. `HiddenEntityType` in shared, `HideableEntityType` in `EntityAccessService` and `SUMMARY_SOURCES` in `UserHiddenEntityService` follow `HIDEABLE_ENTITY_TYPES`; a new type needs all three.
 
 ## Triggers
 
