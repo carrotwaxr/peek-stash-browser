@@ -29,9 +29,9 @@
  * An import that wrote anything makes the user's rankings and Recommended
  * list stale: every unit that wrote forgets both inside itself
  * (`afterCommit`), so a ranking write queued behind it writes nothing, and
- * after a history import they are forgotten once more when the stats
- * rebuild (which the rankings are computed from) is written. The next
- * stats page or Recommended page computes them from the imported data.
+ * after a history import the stats rebuild (which the rankings are computed
+ * from) forgets the rankings once more inside its own unit. The next stats
+ * page or Recommended page computes them from the imported data.
  *
  * The stats per type count entities once: read from Stash (`checked`),
  * given a row (`created`) or a changed one (`updated`).
@@ -617,7 +617,12 @@ async function importSceneHistory(
         },
         {
           afterCommit: (count) => {
-            if (count > 0) forgetComputed(userId);
+            if (count > 0) {
+              forgetComputed(userId);
+              // A stats rebuild that read the history before this page
+              // reads it again
+              userStatsService.bumpWriteGeneration(userId);
+            }
           },
         }
       );
@@ -648,8 +653,9 @@ export interface ImportResult {
  * in `failedInstances`; the others still run. After a history import that wrote something, the
  * user's per-entity stats are rebuilt from their history. Each unit that
  * wrote forgets the user's rankings and Recommended list inside itself, and
- * the stats rebuild forgets them again once it is written, so the next
- * stats and Recommended pages compute them again.
+ * the stats rebuild forgets the rankings again inside its own unit (the
+ * Recommended stamp reads the rankings), so the next stats and Recommended
+ * pages compute them again.
  */
 export async function importFromStash(
   userId: number,
@@ -693,6 +699,8 @@ export async function importFromStash(
   }
 
   if (historyWrote) {
+    // The rebuild forgets the rankings inside its own unit: they are
+    // computed from the stats it writes
     try {
       await userStatsService.rebuildAllStatsForUser(userId);
     } catch (error) {
@@ -702,14 +710,6 @@ export async function importFromStash(
         error,
       });
     }
-  }
-
-  if (historyWrote) {
-    // The rankings are computed from the rebuilt stats: a recompute started
-    // between the last history unit and the rebuild read the old ones.
-    // The rebuild's own unit is UserStatsService's, so this runs after it
-    // rather than inside it.
-    forgetComputed(userId);
   }
 
   return { stats, failedInstances };

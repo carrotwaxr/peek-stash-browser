@@ -3,14 +3,15 @@
  *
  * Tests that stats are correctly separated by instanceId, which is the core
  * fix in 3.3.2. Covers:
- * - updateStatsForScene resolving instanceId correctly
- * - rebuildAllStatsForUser separating stats by instance
+ * - statsWritesForScene: the upserts a play or an O press runs in its unit
+ * - rebuildAllStatsForUser separating stats by instance, and giving way to
+ *   a play that committed after its read
  * - Composite key behavior (performerId + instanceId)
- * - Edge cases: missing instanceId, empty string fallback
  */
-import { Prisma } from "@prisma/client";
+import { Prisma, type WatchHistory } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { logger } from "../../utils/logger.js";
 import { objectContaining } from "../helpers/matchers.js";
@@ -37,16 +38,9 @@ vi.mock("../../services/StashEntityService.js", () => ({
   },
 }));
 
-// Mock StashInstanceManager (used for default instanceId fallback)
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    getDefaultConfig: () => ({
-      id: "test-instance",
-      name: "Test Stash",
-      url: "http://localhost:9999/graphql",
-      apiKey: "test-api-key",
-    }),
-  },
+// A written rebuild forgets the user's rankings
+vi.mock("../../services/RankingComputeService.js", () => ({
+  rankingComputeService: { forget: vi.fn() },
 }));
 
 // Mock logger
@@ -67,262 +61,171 @@ describe("UserStatsService", () => {
     vi.clearAllMocks();
   });
 
-  describe("updateStatsForScene", () => {
-    it("passes instanceId to getScene when provided (#390)", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [],
-        studio: null,
-        tags: [],
+  describe("statsWritesForScene", () => {
+    /** The scene the stats writes read: two performers, a studio, a tag */
+    const SCENE = {
+      id: "scene-1",
+      performers: [
+        { id: "perf-1", name: "Jane" },
+        { id: "perf-2", name: "John" },
+      ],
+      studio: { id: "studio-1", name: "Studio A" },
+      tags: [{ id: "tag-1", name: "Tag A" }],
+    };
+
+    it("reads the scene on its instance before the unit, and writes nothing until run", async () => {
+      mockGetScene.mockResolvedValue(SCENE);
+
+      await userStatsService.statsWritesForScene(1, "scene-1", "inst-a", {
+        oCount: 0,
+        playCount: 1,
       });
 
-      await userStatsService.updateStatsForScene(
-        1,
-        "scene-1",
-        0,
-        1,
-        new Date(),
-        undefined,
-        "instance-xyz"
-      );
-
-      expect(mockGetScene).toHaveBeenCalledWith("scene-1", "instance-xyz");
-    });
-
-    it("uses provided instanceId for stats upsert", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [{ id: "perf-1", name: "Jane" }],
-        studio: { id: "studio-1", name: "Studio A" },
-        tags: [{ id: "tag-1", name: "Tag A" }],
-      });
-
-      await userStatsService.updateStatsForScene(
-        1,
-        "scene-1",
-        1,
-        1,
-        new Date(),
-        new Date(),
-        "instance-aaa"
-      );
-
-      // Performer stats should use the provided instanceId
-      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_instanceId_performerId: {
-              userId: 1,
-              instanceId: "instance-aaa",
-              performerId: "perf-1",
-            },
-          },
-          create: objectContaining({
-            instanceId: "instance-aaa",
-          }),
-        })
-      );
-
-      // Studio stats
-      expect(mockPrisma.userStudioStats.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_instanceId_studioId: {
-              userId: 1,
-              instanceId: "instance-aaa",
-              studioId: "studio-1",
-            },
-          },
-        })
-      );
-
-      // Tag stats
-      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_instanceId_tagId: {
-              userId: 1,
-              instanceId: "instance-aaa",
-              tagId: "tag-1",
-            },
-          },
-        })
-      );
-    });
-
-    it("resolves instanceId from DB when not provided", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [{ id: "perf-1", name: "Jane" }],
-        studio: null,
-        tags: [],
-      });
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({
-          stashInstanceId: "resolved-instance",
-        })
-      );
-
-      await userStatsService.updateStatsForScene(
-        1,
-        "scene-1",
-        0,
-        1
-        // No instanceId provided
-      );
-
-      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_instanceId_performerId: {
-              userId: 1,
-              instanceId: "resolved-instance",
-              performerId: "perf-1",
-            },
-          },
-        })
-      );
-    });
-
-    it("uses empty string when instanceId cannot be resolved", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [{ id: "perf-1", name: "Jane" }],
-        studio: null,
-        tags: [],
-      });
-      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
-
-      await userStatsService.updateStatsForScene(1, "scene-1", 0, 1);
-
-      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId_instanceId_performerId: {
-              userId: 1,
-              instanceId: "",
-              performerId: "perf-1",
-            },
-          },
-        })
-      );
-    });
-
-    it("silently returns when scene not found in cache", async () => {
-      mockGetScene.mockResolvedValue(null);
-
-      await userStatsService.updateStatsForScene(1, "nonexistent", 0, 1);
-
+      expect(mockGetScene).toHaveBeenCalledWith("scene-1", "inst-a");
       expect(mockPrisma.userPerformerStats.upsert).not.toHaveBeenCalled();
       expect(mockPrisma.userStudioStats.upsert).not.toHaveBeenCalled();
       expect(mockPrisma.userTagStats.upsert).not.toHaveBeenCalled();
     });
 
-    it("updates all performers in a multi-performer scene", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [
-          { id: "perf-1", name: "Jane" },
-          { id: "perf-2", name: "John" },
-          { id: "perf-3", name: "Alex" },
-        ],
-        studio: null,
-        tags: [],
-      });
+    it("upserts each performer, the studio and each tag with the increments, on the scene's instance, through the transaction given", async () => {
+      mockGetScene.mockResolvedValue(SCENE);
+      const playedAt = new Date("2026-09-01T10:00:00Z");
 
-      await userStatsService.updateStatsForScene(
+      const writes = await userStatsService.statsWritesForScene(
         1,
         "scene-1",
-        1,
-        1,
-        undefined,
-        undefined,
-        "inst-a"
+        "inst-a",
+        { oCount: 0, playCount: 1, lastPlayedAt: playedAt }
       );
+      await writes(mockPrisma);
 
-      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(3);
-    });
-
-    it("updates all tags in a multi-tag scene", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [],
-        studio: null,
-        tags: [
-          { id: "tag-1", name: "Tag A" },
-          { id: "tag-2", name: "Tag B" },
-        ],
-      });
-
-      await userStatsService.updateStatsForScene(
-        1,
-        "scene-1",
-        0,
-        1,
-        undefined,
-        undefined,
-        "inst-a"
-      );
-
-      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledTimes(2);
-    });
-
-    it("does not call studio upsert when scene has no studio", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [],
-        studio: null,
-        tags: [],
-      });
-
-      await userStatsService.updateStatsForScene(
-        1,
-        "scene-1",
-        0,
-        1,
-        undefined,
-        undefined,
-        "inst-a"
-      );
-
-      expect(mockPrisma.userStudioStats.upsert).not.toHaveBeenCalled();
-    });
-
-    it("handles errors gracefully without throwing", async () => {
-      mockGetScene.mockRejectedValue(new Error("DB error"));
-
-      // Should not throw
-      await expect(
-        userStatsService.updateStatsForScene(
-          1,
-          "scene-1",
-          0,
-          1,
-          undefined,
-          undefined,
-          "inst-a"
-        )
-      ).resolves.toBeUndefined();
-      expect(logger.error).toHaveBeenCalledWith(
-        "Error updating stats for scene",
-        expect.objectContaining({
+      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith({
+        where: {
+          userId_instanceId_performerId: {
+            userId: 1,
+            instanceId: "inst-a",
+            performerId: "perf-1",
+          },
+        },
+        create: {
           userId: 1,
-          sceneId: "scene-1",
           instanceId: "inst-a",
-          oCountDelta: 0,
-          playCountDelta: 1,
-          error: "DB error",
+          performerId: "perf-1",
+          oCounter: 0,
+          playCount: 1,
+          lastPlayedAt: playedAt,
+        },
+        update: {
+          oCounter: { increment: 0 },
+          playCount: { increment: 1 },
+          lastPlayedAt: { set: playedAt },
+        },
+      });
+      expect(mockPrisma.userStudioStats.upsert).toHaveBeenCalledWith({
+        where: {
+          userId_instanceId_studioId: {
+            userId: 1,
+            instanceId: "inst-a",
+            studioId: "studio-1",
+          },
+        },
+        create: {
+          userId: 1,
+          instanceId: "inst-a",
+          studioId: "studio-1",
+          oCounter: 0,
+          playCount: 1,
+        },
+        update: {
+          oCounter: { increment: 0 },
+          playCount: { increment: 1 },
+        },
+      });
+      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledWith({
+        where: {
+          userId_instanceId_tagId: {
+            userId: 1,
+            instanceId: "inst-a",
+            tagId: "tag-1",
+          },
+        },
+        create: {
+          userId: 1,
+          instanceId: "inst-a",
+          tagId: "tag-1",
+          oCounter: 0,
+          playCount: 1,
+        },
+        update: {
+          oCounter: { increment: 0 },
+          playCount: { increment: 1 },
+        },
+      });
+    });
+
+    it("an O press adds to oCounter and sets the performers' lastOAt", async () => {
+      mockGetScene.mockResolvedValue(SCENE);
+      const oAt = new Date("2026-09-01T11:00:00Z");
+
+      const writes = await userStatsService.statsWritesForScene(
+        1,
+        "scene-1",
+        "inst-a",
+        { oCount: 1, playCount: 0, lastOAt: oAt }
+      );
+      await writes(mockPrisma);
+
+      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          create: objectContaining({ oCounter: 1, playCount: 0, lastOAt: oAt }),
+          update: {
+            oCounter: { increment: 1 },
+            playCount: { increment: 0 },
+            lastOAt: { set: oAt },
+          },
         })
       );
     });
 
-    it("logs a failed stats write with its entity and still makes the others", async () => {
-      mockGetScene.mockResolvedValue({
-        id: "scene-1",
-        performers: [{ id: "perf-1", name: "Jane" }],
-        studio: { id: "studio-1", name: "Studio A" },
-        tags: [{ id: "tag-1", name: "Tag A" }],
-      });
+    it("a scene with no studio gets no studio upsert", async () => {
+      mockGetScene.mockResolvedValue({ ...SCENE, studio: null });
+
+      const writes = await userStatsService.statsWritesForScene(
+        1,
+        "scene-1",
+        "inst-a",
+        { oCount: 0, playCount: 1 }
+      );
+      await writes(mockPrisma);
+
+      expect(mockPrisma.userStudioStats.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it("a scene missing from the cache gets no stats writes, and is logged", async () => {
+      mockGetScene.mockResolvedValue(null);
+
+      const writes = await userStatsService.statsWritesForScene(
+        1,
+        "nonexistent",
+        "inst-a",
+        { oCount: 0, playCount: 1 }
+      );
+      await expect(writes(mockPrisma)).resolves.toBeUndefined();
+
+      expect(mockPrisma.userPerformerStats.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.userStudioStats.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.userTagStats.upsert).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Scene not found in cache for stats update",
+        { userId: 1, sceneId: "nonexistent", instanceId: "inst-a" }
+      );
+    });
+
+    it("a failed upsert rejects, so the history write it runs in fails with it", async () => {
+      mockGetScene.mockResolvedValue(SCENE);
       mockPrisma.userStudioStats.upsert.mockRejectedValueOnce(
         new Prisma.PrismaClientKnownRequestError("Foreign key failed", {
           code: "P2003",
@@ -330,34 +233,27 @@ describe("UserStatsService", () => {
         })
       );
 
-      await expect(
-        userStatsService.updateStatsForScene(
-          1,
-          "scene-1",
-          1,
-          0,
-          undefined,
-          new Date(),
-          "inst-a"
-        )
-      ).resolves.toBeUndefined();
-
-      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledTimes(1);
-      expect(logger.error).toHaveBeenCalledTimes(1);
-      expect(logger.error).toHaveBeenCalledWith(
-        "Error updating stats for scene",
-        expect.objectContaining({
-          userId: 1,
-          sceneId: "scene-1",
-          instanceId: "inst-a",
-          entityType: "studio",
-          entityId: "studio-1",
-          oCountDelta: 1,
-          playCountDelta: 0,
-          code: "P2003",
-        })
+      const writes = await userStatsService.statsWritesForScene(
+        1,
+        "scene-1",
+        "inst-a",
+        { oCount: 1, playCount: 0 }
       );
+
+      await expect(writes(mockPrisma)).rejects.toThrow("Foreign key failed");
+      // Nothing after the failed one is sent
+      expect(mockPrisma.userTagStats.upsert).not.toHaveBeenCalled();
+    });
+
+    it("a failed scene read rejects before the unit", async () => {
+      mockGetScene.mockRejectedValue(new Error("DB error"));
+
+      await expect(
+        userStatsService.statsWritesForScene(1, "scene-1", "inst-a", {
+          oCount: 0,
+          playCount: 1,
+        })
+      ).rejects.toThrow("DB error");
     });
   });
 
@@ -735,6 +631,114 @@ describe("UserStatsService", () => {
       expect(instAStudio.oCounter).toBe(1);
       expect(instBStudio.studioId).toBe("studio-1");
       expect(instBStudio.oCounter).toBe(3);
+    });
+  });
+
+  describe("rebuildAllStatsForUser against plays landing meanwhile", () => {
+    const HISTORY = [
+      partialRow<WatchHistory>({
+        sceneId: "scene-1",
+        instanceId: "inst-a",
+        oCount: 1,
+        playCount: 2,
+        oHistory: "[]",
+        playHistory: "[]",
+      }),
+    ];
+    const SCENES = [
+      {
+        id: "scene-1",
+        instanceId: "inst-a",
+        performers: [{ id: "perf-1", name: "Jane" }],
+        studio: null,
+        tags: [],
+      },
+    ];
+
+    beforeEach(() => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue(HISTORY);
+      mockPrisma.$transaction.mockResolvedValue([]);
+    });
+
+    it("writes once, and forgets the user's rankings inside its unit after the batch commits", async () => {
+      mockGetScenesByIdsWithRelations.mockResolvedValue(SCENES);
+
+      await userStatsService.rebuildAllStatsForUser(1);
+
+      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(rankingComputeService.forget).toHaveBeenCalledTimes(1);
+      expect(rankingComputeService.forget).toHaveBeenCalledWith(1);
+      // Inside the unit, once the batch committed: a ranking write queued
+      // behind the rebuild finds the user forgotten when it starts
+      expect(
+        must(
+          vi.mocked(rankingComputeService.forget).mock.invocationCallOrder[0]
+        )
+      ).toBeGreaterThan(
+        must(mockPrisma.$transaction.mock.invocationCallOrder[0])
+      );
+    });
+
+    it("reads again when a play commits between its read and its write", async () => {
+      // A play commits (its unit bumps the generation) while the rebuild
+      // reads the scenes of its first read
+      mockGetScenesByIdsWithRelations
+        .mockImplementationOnce(() => {
+          userStatsService.bumpWriteGeneration(1);
+          return Promise.resolve(SCENES);
+        })
+        .mockResolvedValue(SCENES);
+
+      await userStatsService.rebuildAllStatsForUser(1);
+
+      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledTimes(2);
+      // Only the second read's batch is written
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(rankingComputeService.forget).toHaveBeenCalledTimes(1);
+    });
+
+    it("another user's play does not make it read again", async () => {
+      mockGetScenesByIdsWithRelations
+        .mockImplementationOnce(() => {
+          userStatsService.bumpWriteGeneration(2);
+          return Promise.resolve(SCENES);
+        })
+        .mockResolvedValue(SCENES);
+
+      await userStatsService.rebuildAllStatsForUser(1);
+
+      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the stats and warns after four reads that each lost to a play", async () => {
+      mockGetScenesByIdsWithRelations.mockImplementation(() => {
+        userStatsService.bumpWriteGeneration(1);
+        return Promise.resolve(SCENES);
+      });
+
+      await expect(
+        userStatsService.rebuildAllStatsForUser(1)
+      ).resolves.toBeUndefined();
+
+      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledTimes(4);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(rankingComputeService.forget).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Stats rebuild kept the stats: plays kept landing while it read",
+        { userId: 1, attempts: 4 }
+      );
+    });
+
+    it("a failed batch rethrows and forgets nothing", async () => {
+      mockGetScenesByIdsWithRelations.mockResolvedValue(SCENES);
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error("disk full"));
+
+      await expect(userStatsService.rebuildAllStatsForUser(1)).rejects.toThrow(
+        "disk full"
+      );
+      expect(rankingComputeService.forget).not.toHaveBeenCalled();
     });
   });
 

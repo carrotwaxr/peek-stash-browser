@@ -18,15 +18,9 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
-// Mock StashInstanceManager to provide a default config for stream URL generation
+// Mock StashInstanceManager to provide instance configs for stream URL generation
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getDefaultConfig: () => ({
-      id: "test-instance",
-      name: "Test Stash",
-      url: "http://localhost:9999/graphql",
-      apiKey: "test-api-key",
-    }),
     getConfig: (id: string) => ({
       id,
       name: `Instance ${id}`,

@@ -42,7 +42,6 @@ vi.mock("../../../services/GroupQueryBuilder.js", () => ({
 vi.mock("../../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
   },
 }));
 

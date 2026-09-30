@@ -229,13 +229,22 @@ export function dbWriteBatch<T extends Prisma.PrismaPromise<unknown>[]>(
  * is asked when the unit starts, and when it answers false nothing is
  * written and the unit resolves to null. It answers from memory, with no
  * query, so the unit still makes no Node round trip under the lock.
+ * `afterCommit` (see DbWriteUnitOptions) runs only when the batch was
+ * written.
  */
 export function dbWriteBatchIf<T extends Prisma.PrismaPromise<unknown>[]>(
   label: string,
   wanted: () => boolean,
-  ops: [...T]
-) {
+  ops: [...T],
+  options?: DbWriteUnitOptions<DbWriteBatchResult<T>>
+): Promise<DbWriteBatchResult<T> | null> {
   return dbWrite(label, async () =>
-    wanted() ? prisma.$transaction(ops) : null
+    wanted()
+      ? runAfterCommit(
+          label,
+          (await prisma.$transaction(ops)) as DbWriteBatchResult<T>,
+          options?.afterCommit
+        )
+      : null
   );
 }

@@ -1,306 +1,153 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
-import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
-import { KEY_SEP, entityKey } from "../utils/entityRef.js";
+import { dbWriteBatchIf } from "../utils/dbWrite.js";
+import { entityKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
-import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
-import { emptyToNull } from "../utils/sqlHelpers.js";
+import { rankingComputeService } from "./RankingComputeService.js";
 import { stashEntityService } from "./StashEntityService.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
  * UserStatsService
  *
- * Manages pre-computed per-user statistics for performers, studios, and tags.
- * These stats are cached in the database to avoid expensive real-time calculations
- * from watch history on every request.
+ * Pre-computed per-user play and O stats for performers, studios and tags,
+ * each row on its entity's instance, kept so the stats page and the
+ * rankings never aggregate the whole watch history per request.
  *
- * Performance Impact:
- * - BEFORE: O(all_scenes × avg_performers_per_scene) ~60k operations per request
- * - AFTER: O(visible_performers) ~40 DB lookups per request
- * - Expected: 90-95% reduction in request time
+ * Two writers keep them:
+ * - A play or an O press adds its increments inside the history
+ *   transaction (`statsWritesForScene`), so the history row and its stats
+ *   commit together or not at all.
+ * - A rebuild (`rebuildAllStatsForUser`) replaces a user's stats from their
+ *   history. Every history unit that changes what the rebuild reads bumps
+ *   the user's write generation after it commits (`bumpWriteGeneration`),
+ *   and the rebuild writes only while the generation is the one it took
+ *   before its read (`dbWriteBatchIf`); otherwise it reads again.
  */
 
-/** The fields a failure log carries for an error: Prisma code and message. */
-function describeError(error: unknown): {
-  code?: string | undefined;
-  error: string;
-  stack?: string | undefined;
-} {
-  return {
-    code:
-      error instanceof Prisma.PrismaClientKnownRequestError
-        ? error.code
-        : undefined,
-    error: error instanceof Error ? error.message : "Unknown error",
-    stack: error instanceof Error ? error.stack : undefined,
-  };
+/** What one play or O press adds to each entity of its scene. */
+export interface StatsDeltas {
+  oCount: number;
+  playCount: number;
+  lastPlayedAt?: Date;
+  lastOAt?: Date;
+}
+
+/**
+ * The stats upserts of one scene, built from its relations read before the
+ * history unit: run them on the unit's transaction, after the history write.
+ */
+export type StatsWrites = (tx: Prisma.TransactionClient) => Promise<void>;
+
+/**
+ * How often a rebuild reads the history: once, then again up to three times
+ * while plays keep landing between its read and its write.
+ */
+const REBUILD_ATTEMPTS = 4;
+
+/** A rebuild's statements, and how many rows of each type it writes. */
+interface RebuildBatch {
+  ops: Prisma.PrismaPromise<unknown>[];
+  performerCount: number;
+  studioCount: number;
+  tagCount: number;
 }
 
 class UserStatsService {
   /**
-   * Update stats for all entities (performers, studio, tags) in a scene
-   * Called when watch history is created or updated
-   *
-   * @param userId - User ID
-   * @param sceneId - Scene ID
-   * @param oCountDelta - Change in O counter (can be negative for corrections)
-   * @param playCountDelta - Change in play count (can be negative for corrections)
-   * @param lastPlayedAt - Timestamp of last playback (optional)
-   * @param lastOAt - Timestamp of last O (optional)
-   *
-   * Each upsert carries its increment, and Prisma sends it as one
-   * INSERT ... ON CONFLICT DO UPDATE, so concurrent updates all count. A
-   * failed write doesn't stop the others: each failure is logged with its
-   * context, and the caller's history write, already committed, stands.
+   * Bumped by each history unit that changes the plays or O presses a
+   * rebuild reads, after it commits (in its `afterCommit`). In memory: a
+   * rebuild runs in this process, against this process's writes.
    */
-  async updateStatsForScene(
+  private readonly writeGenerations = new Map<number, number>();
+
+  /** The user's history changed: a rebuild that read it before gives way. */
+  bumpWriteGeneration(userId: number): void {
+    this.writeGenerations.set(userId, this.writeGeneration(userId) + 1);
+  }
+
+  private writeGeneration(userId: number): number {
+    return this.writeGenerations.get(userId) ?? 0;
+  }
+
+  /**
+   * The stats upserts for one play or O press of a scene: one
+   * INSERT ... ON CONFLICT DO UPDATE per performer, the studio and each tag,
+   * carrying the increments, on the scene's instance. The scene's relations
+   * are read here, before the caller's history unit; the upserts run inside
+   * it, on its transaction, so a failed one fails the history write too (the
+   * player retries). A scene missing from the cache gets no stats writes.
+   */
+  async statsWritesForScene(
     userId: number,
     sceneId: string,
-    oCountDelta: number,
-    playCountDelta: number,
-    lastPlayedAt?: Date,
-    lastOAt?: Date,
-    instanceId?: string
-  ): Promise<void> {
-    // What every failure log carries, so a lost stats write can be traced
-    const context = {
-      userId,
-      sceneId,
-      instanceId,
-      oCountDelta,
-      playCountDelta,
-    };
-
-    try {
-      // Get scene from cache to find all related entities
-      const scene = await stashEntityService.getScene(
+    instanceId: string,
+    deltas: StatsDeltas
+  ): Promise<StatsWrites> {
+    const scene = await stashEntityService.getScene(sceneId, instanceId);
+    if (!scene) {
+      logger.warn("Scene not found in cache for stats update", {
+        userId,
         sceneId,
-        emptyToNull(instanceId) ?? stashInstanceManager.getDefaultConfig().id
-      );
-      if (!scene) {
-        logger.warn("Scene not found in cache for stats update", { sceneId });
-        return;
-      }
-
-      // Resolve instanceId: use provided value, or look up from DB, or default to ""
-      let resolvedInstanceId = emptyToNull(instanceId) ?? "";
-      if (!resolvedInstanceId) {
-        const sceneRecord = await prisma.stashScene.findFirst({
-          where: { id: sceneId },
-          select: { stashInstanceId: true },
-        });
-        resolvedInstanceId = sceneRecord?.stashInstanceId ?? "";
-      }
-      context.instanceId = resolvedInstanceId;
-
-      // One write per performer, the studio and each tag
-      const studio = scene.studio;
-      const writes: {
-        entityType: "performer" | "studio" | "tag";
-        entityId: string;
-        run: () => Promise<void>;
-      }[] = [
-        ...scene.performers.map((performer) => ({
-          entityType: "performer" as const,
-          entityId: performer.id,
-          run: () =>
-            this.updatePerformerStats(
-              userId,
-              performer.id,
-              oCountDelta,
-              playCountDelta,
-              lastPlayedAt,
-              lastOAt,
-              resolvedInstanceId
-            ),
-        })),
-        ...(studio
-          ? [
-              {
-                entityType: "studio" as const,
-                entityId: studio.id,
-                run: () =>
-                  this.updateStudioStats(
-                    userId,
-                    studio.id,
-                    oCountDelta,
-                    playCountDelta,
-                    resolvedInstanceId
-                  ),
-              },
-            ]
-          : []),
-        ...scene.tags.map((tag) => ({
-          entityType: "tag" as const,
-          entityId: tag.id,
-          run: () =>
-            this.updateTagStats(
-              userId,
-              tag.id,
-              oCountDelta,
-              playCountDelta,
-              resolvedInstanceId
-            ),
-        })),
-      ];
-
-      // One write unit for the scene, its upserts one after another: each
-      // stands on its own (an autocommit upsert), so a failed one is logged
-      // with its context and the others still land
-      const results = await dbWrite("stats.scene", async () => {
-        const settled: PromiseSettledResult<void>[] = [];
-        for (const write of writes) {
-          settled.push(
-            await write.run().then(
-              (value) => ({ status: "fulfilled", value }),
-              (reason: unknown) => ({ status: "rejected", reason })
-            )
-          );
-        }
-        return settled;
+        instanceId,
       });
-      writes.forEach(({ entityType, entityId }, i) => {
-        const result = results[i];
-        if (result?.status === "rejected") {
-          logger.error("Error updating stats for scene", {
-            ...context,
-            entityType,
-            entityId,
-            ...describeError(result.reason),
-          });
-        }
-      });
-    } catch (error) {
-      logger.error("Error updating stats for scene", {
-        ...context,
-        ...describeError(error),
-      });
+      return () => Promise.resolve();
     }
-  }
 
-  /**
-   * Update stats for a specific performer
-   */
-  private async updatePerformerStats(
-    userId: number,
-    performerId: string,
-    oCountDelta: number,
-    playCountDelta: number,
-    lastPlayedAt?: Date,
-    lastOAt?: Date,
-    instanceId: string = ""
-  ): Promise<void> {
-    await prisma.userPerformerStats.upsert({
-      where: {
-        userId_instanceId_performerId: {
-          userId,
-          instanceId,
-          performerId,
-        },
-      },
-      create: {
-        userId,
-        instanceId,
-        performerId,
-        oCounter: Math.max(0, oCountDelta),
-        playCount: Math.max(0, playCountDelta),
-        ...(lastPlayedAt !== undefined ? { lastPlayedAt } : {}),
-        ...(lastOAt !== undefined ? { lastOAt } : {}),
-      },
-      update: {
-        oCounter: {
-          increment: oCountDelta,
-        },
-        playCount: {
-          increment: playCountDelta,
-        },
-        ...(lastPlayedAt && {
-          lastPlayedAt: {
-            set: lastPlayedAt,
+    const { oCount, playCount, lastPlayedAt, lastOAt } = deltas;
+    const created = {
+      oCounter: Math.max(0, oCount),
+      playCount: Math.max(0, playCount),
+    };
+    const increments = {
+      oCounter: { increment: oCount },
+      playCount: { increment: playCount },
+    };
+    const performerIds = scene.performers.map((p) => p.id);
+    const studioId = scene.studio?.id;
+    const tagIds = scene.tags.map((t) => t.id);
+
+    return async (tx) => {
+      for (const performerId of performerIds) {
+        await tx.userPerformerStats.upsert({
+          where: {
+            userId_instanceId_performerId: { userId, instanceId, performerId },
           },
-        }),
-        ...(lastOAt && {
-          lastOAt: {
-            set: lastOAt,
+          create: {
+            userId,
+            instanceId,
+            performerId,
+            ...created,
+            ...(lastPlayedAt !== undefined ? { lastPlayedAt } : {}),
+            ...(lastOAt !== undefined ? { lastOAt } : {}),
           },
-        }),
-      },
-    });
-  }
-
-  /**
-   * Update stats for a specific studio
-   */
-  private async updateStudioStats(
-    userId: number,
-    studioId: string,
-    oCountDelta: number,
-    playCountDelta: number,
-    instanceId: string = ""
-  ): Promise<void> {
-    await prisma.userStudioStats.upsert({
-      where: {
-        userId_instanceId_studioId: {
-          userId,
-          instanceId,
-          studioId,
-        },
-      },
-      create: {
-        userId,
-        instanceId,
-        studioId,
-        oCounter: Math.max(0, oCountDelta),
-        playCount: Math.max(0, playCountDelta),
-      },
-      update: {
-        oCounter: {
-          increment: oCountDelta,
-        },
-        playCount: {
-          increment: playCountDelta,
-        },
-      },
-    });
-  }
-
-  /**
-   * Update stats for a specific tag
-   */
-  private async updateTagStats(
-    userId: number,
-    tagId: string,
-    oCountDelta: number,
-    playCountDelta: number,
-    instanceId: string = ""
-  ): Promise<void> {
-    await prisma.userTagStats.upsert({
-      where: {
-        userId_instanceId_tagId: {
-          userId,
-          instanceId,
-          tagId,
-        },
-      },
-      create: {
-        userId,
-        instanceId,
-        tagId,
-        oCounter: Math.max(0, oCountDelta),
-        playCount: Math.max(0, playCountDelta),
-      },
-      update: {
-        oCounter: {
-          increment: oCountDelta,
-        },
-        playCount: {
-          increment: playCountDelta,
-        },
-      },
-    });
+          update: {
+            ...increments,
+            ...(lastPlayedAt !== undefined
+              ? { lastPlayedAt: { set: lastPlayedAt } }
+              : {}),
+            ...(lastOAt !== undefined ? { lastOAt: { set: lastOAt } } : {}),
+          },
+        });
+      }
+      if (studioId !== undefined) {
+        await tx.userStudioStats.upsert({
+          where: {
+            userId_instanceId_studioId: { userId, instanceId, studioId },
+          },
+          create: { userId, instanceId, studioId, ...created },
+          update: increments,
+        });
+      }
+      for (const tagId of tagIds) {
+        await tx.userTagStats.upsert({
+          where: { userId_instanceId_tagId: { userId, instanceId, tagId } },
+          create: { userId, instanceId, tagId, ...created },
+          update: increments,
+        });
+      }
+    };
   }
 
   /**
@@ -311,189 +158,45 @@ class UserStatsService {
    * - Admin tools
    *
    * WARNING: This is expensive! Only call when necessary.
+   *
+   * Reads the history and its scenes, then replaces the user's stats in one
+   * `stats.rebuild` batch, written only if no play or O press committed
+   * since the read (the user's write generation is unchanged when the unit
+   * starts). When one did, it reads again, up to REBUILD_ATTEMPTS reads in
+   * all; after that it keeps the stats as they are (every play unit kept
+   * them current) and logs a warning. A written rebuild forgets the user's
+   * rankings inside its unit: they are computed from these stats, so a
+   * ranking write queued behind it writes nothing.
    */
   async rebuildAllStatsForUser(userId: number): Promise<void> {
     try {
       logger.info("Rebuilding stats for user", { userId });
 
-      // Get all watch history for user
-      const watchHistory = await prisma.watchHistory.findMany({
-        where: { userId },
-      });
-
-      // Aggregate stats by entity
-      const performerStatsMap = new Map<
-        string,
-        {
-          oCounter: number;
-          playCount: number;
-          lastPlayedAt: Date | null;
-          lastOAt: Date | null;
-        }
-      >();
-      const studioStatsMap = new Map<
-        string,
-        {
-          oCounter: number;
-          playCount: number;
-        }
-      >();
-      const tagStatsMap = new Map<
-        string,
-        {
-          oCounter: number;
-          playCount: number;
-        }
-      >();
-
-      // Batch load all scenes for the watch history (with relations for performers/tags/studio)
-      // Group by instanceId to satisfy required parameter and avoid cross-instance collisions
-      const scenesByInstance = groupIdsByInstance(
-        watchHistory,
-        (wh) => wh.instanceId,
-        (wh) => wh.sceneId,
-        stashInstanceManager.getDefaultConfig().id
-      );
-      const scenes: NormalizedScene[] = [];
-      for (const [instId, ids] of scenesByInstance) {
-        scenes.push(
-          ...(await stashEntityService.getScenesByIdsWithRelations(ids, instId))
+      for (let attempt = 1; attempt <= REBUILD_ATTEMPTS; attempt++) {
+        const generation = this.writeGeneration(userId);
+        const batch = await this.buildRebuild(userId);
+        const written = await dbWriteBatchIf(
+          "stats.rebuild",
+          () => this.writeGeneration(userId) === generation,
+          batch.ops,
+          { afterCommit: () => rankingComputeService.forget(userId) }
         );
+        if (written !== null) {
+          logger.info("Stats rebuild complete", {
+            userId,
+            attempt,
+            performerCount: batch.performerCount,
+            studioCount: batch.studioCount,
+            tagCount: batch.tagCount,
+          });
+          return;
+        }
       }
-      // Use composite key (id + instanceId) to avoid cross-instance collisions
-      const sceneMap = new Map(
-        scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+
+      logger.warn(
+        "Stats rebuild kept the stats: plays kept landing while it read",
+        { userId, attempts: REBUILD_ATTEMPTS }
       );
-
-      for (const wh of watchHistory) {
-        const scene = sceneMap.get(entityKey(wh.sceneId, wh.instanceId));
-        if (!scene) continue;
-
-        // Get instanceId from the watch history record
-        const whInstanceId = wh.instanceId;
-
-        // Parse O history for timestamps
-        const oHistory = readHistory(wh.oHistory);
-        const playHistory = readHistory(wh.playHistory);
-
-        const lastPlayEntry =
-          playHistory.length > 0
-            ? playHistory[playHistory.length - 1]
-            : undefined;
-        const lastPlayedAt = lastPlayEntry ? new Date(lastPlayEntry) : null;
-        const lastOEntry =
-          oHistory.length > 0 ? oHistory[oHistory.length - 1] : undefined;
-        const lastOAt = lastOEntry ? new Date(lastOEntry) : null;
-
-        // Aggregate performers (using composite key: performerId + instanceId)
-        for (const performer of scene.performers) {
-          const statsKey = entityKey(performer.id, whInstanceId);
-          const existing = performerStatsMap.get(statsKey) ?? {
-            oCounter: 0,
-            playCount: 0,
-            lastPlayedAt: null,
-            lastOAt: null,
-          };
-
-          performerStatsMap.set(statsKey, {
-            oCounter: existing.oCounter + (wh.oCount || 0),
-            playCount: existing.playCount + (wh.playCount || 0),
-            lastPlayedAt:
-              lastPlayedAt &&
-              (!existing.lastPlayedAt || lastPlayedAt > existing.lastPlayedAt)
-                ? lastPlayedAt
-                : existing.lastPlayedAt,
-            lastOAt:
-              lastOAt && (!existing.lastOAt || lastOAt > existing.lastOAt)
-                ? lastOAt
-                : existing.lastOAt,
-          });
-        }
-
-        // Aggregate studio (using composite key: studioId + instanceId)
-        if (scene.studio) {
-          const statsKey = entityKey(scene.studio.id, whInstanceId);
-          const existing = studioStatsMap.get(statsKey) ?? {
-            oCounter: 0,
-            playCount: 0,
-          };
-
-          studioStatsMap.set(statsKey, {
-            oCounter: existing.oCounter + (wh.oCount || 0),
-            playCount: existing.playCount + (wh.playCount || 0),
-          });
-        }
-
-        // Aggregate tags (using composite key: tagId + instanceId)
-        for (const tag of scene.tags) {
-          const statsKey = entityKey(tag.id, whInstanceId);
-          const existing = tagStatsMap.get(statsKey) ?? {
-            oCounter: 0,
-            playCount: 0,
-          };
-
-          tagStatsMap.set(statsKey, {
-            oCounter: existing.oCounter + (wh.oCount || 0),
-            playCount: existing.playCount + (wh.playCount || 0),
-          });
-        }
-      }
-
-      // Replace the user's stats in one batch: the old rows go and the
-      // aggregated ones land together, with nothing computed under the lock
-      await dbWriteBatch("stats.rebuild", [
-        prisma.userPerformerStats.deleteMany({ where: { userId } }),
-        prisma.userStudioStats.deleteMany({ where: { userId } }),
-        prisma.userTagStats.deleteMany({ where: { userId } }),
-        // Performers
-        prisma.userPerformerStats.createMany({
-          data: Array.from(performerStatsMap.entries()).map(([key, stats]) => {
-            const [performerId, instanceId] = key.split(KEY_SEP);
-            return {
-              userId,
-              instanceId: instanceId ?? "",
-              performerId: performerId ?? "",
-              oCounter: stats.oCounter,
-              playCount: stats.playCount,
-              lastPlayedAt: stats.lastPlayedAt,
-              lastOAt: stats.lastOAt,
-            };
-          }),
-        }),
-        // Studios
-        prisma.userStudioStats.createMany({
-          data: Array.from(studioStatsMap.entries()).map(([key, stats]) => {
-            const [studioId, instanceId] = key.split(KEY_SEP);
-            return {
-              userId,
-              instanceId: instanceId ?? "",
-              studioId: studioId ?? "",
-              oCounter: stats.oCounter,
-              playCount: stats.playCount,
-            };
-          }),
-        }),
-        // Tags
-        prisma.userTagStats.createMany({
-          data: Array.from(tagStatsMap.entries()).map(([key, stats]) => {
-            const [tagId, instanceId] = key.split(KEY_SEP);
-            return {
-              userId,
-              instanceId: instanceId ?? "",
-              tagId: tagId ?? "",
-              oCounter: stats.oCounter,
-              playCount: stats.playCount,
-            };
-          }),
-        }),
-      ]);
-
-      logger.info("Stats rebuild complete", {
-        userId,
-        performerCount: performerStatsMap.size,
-        studioCount: studioStatsMap.size,
-        tagCount: tagStatsMap.size,
-      });
     } catch (error) {
       logger.error("Error rebuilding stats", {
         userId,
@@ -501,6 +204,176 @@ class UserStatsService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Reads the user's history and its scenes and builds the statements that
+   * replace their stats: the old rows go and the aggregated ones land, with
+   * nothing computed under the lock.
+   */
+  private async buildRebuild(userId: number): Promise<RebuildBatch> {
+    const watchHistory = await prisma.watchHistory.findMany({
+      where: { userId },
+    });
+
+    // Aggregate stats by entity, keyed by entity and instance; each value
+    // is the row to write
+    const performerStatsMap = new Map<
+      string,
+      {
+        performerId: string;
+        instanceId: string;
+        oCounter: number;
+        playCount: number;
+        lastPlayedAt: Date | null;
+        lastOAt: Date | null;
+      }
+    >();
+    const studioStatsMap = new Map<
+      string,
+      {
+        studioId: string;
+        instanceId: string;
+        oCounter: number;
+        playCount: number;
+      }
+    >();
+    const tagStatsMap = new Map<
+      string,
+      {
+        tagId: string;
+        instanceId: string;
+        oCounter: number;
+        playCount: number;
+      }
+    >();
+
+    // Batch load the history's scenes (with performers, tags and studio),
+    // one read per instance: a scene id means nothing without its instance
+    const sceneIdsByInstance = new Map<string, string[]>();
+    for (const wh of watchHistory) {
+      const ids = sceneIdsByInstance.get(wh.instanceId);
+      if (ids) ids.push(wh.sceneId);
+      else sceneIdsByInstance.set(wh.instanceId, [wh.sceneId]);
+    }
+    const scenes: NormalizedScene[] = [];
+    for (const [instanceId, ids] of sceneIdsByInstance) {
+      scenes.push(
+        ...(await stashEntityService.getScenesByIdsWithRelations(
+          ids,
+          instanceId
+        ))
+      );
+    }
+    const sceneMap = new Map(
+      scenes.map((s) => [entityKey(s.id, s.instanceId), s])
+    );
+
+    for (const wh of watchHistory) {
+      const scene = sceneMap.get(entityKey(wh.sceneId, wh.instanceId));
+      if (!scene) continue;
+
+      // Parse O history for timestamps
+      const oHistory = readHistory(wh.oHistory);
+      const playHistory = readHistory(wh.playHistory);
+
+      const lastPlayEntry =
+        playHistory.length > 0
+          ? playHistory[playHistory.length - 1]
+          : undefined;
+      const lastPlayedAt = lastPlayEntry ? new Date(lastPlayEntry) : null;
+      const lastOEntry =
+        oHistory.length > 0 ? oHistory[oHistory.length - 1] : undefined;
+      const lastOAt = lastOEntry ? new Date(lastOEntry) : null;
+
+      // Aggregate performers (keyed by performer and instance)
+      for (const performer of scene.performers) {
+        const statsKey = entityKey(performer.id, wh.instanceId);
+        const existing = performerStatsMap.get(statsKey) ?? {
+          performerId: performer.id,
+          instanceId: wh.instanceId,
+          oCounter: 0,
+          playCount: 0,
+          lastPlayedAt: null,
+          lastOAt: null,
+        };
+
+        performerStatsMap.set(statsKey, {
+          ...existing,
+          oCounter: existing.oCounter + wh.oCount,
+          playCount: existing.playCount + wh.playCount,
+          lastPlayedAt:
+            lastPlayedAt &&
+            (!existing.lastPlayedAt || lastPlayedAt > existing.lastPlayedAt)
+              ? lastPlayedAt
+              : existing.lastPlayedAt,
+          lastOAt:
+            lastOAt && (!existing.lastOAt || lastOAt > existing.lastOAt)
+              ? lastOAt
+              : existing.lastOAt,
+        });
+      }
+
+      // Aggregate studio (keyed by studio and instance)
+      if (scene.studio) {
+        const statsKey = entityKey(scene.studio.id, wh.instanceId);
+        const existing = studioStatsMap.get(statsKey) ?? {
+          studioId: scene.studio.id,
+          instanceId: wh.instanceId,
+          oCounter: 0,
+          playCount: 0,
+        };
+
+        studioStatsMap.set(statsKey, {
+          ...existing,
+          oCounter: existing.oCounter + wh.oCount,
+          playCount: existing.playCount + wh.playCount,
+        });
+      }
+
+      // Aggregate tags (keyed by tag and instance)
+      for (const tag of scene.tags) {
+        const statsKey = entityKey(tag.id, wh.instanceId);
+        const existing = tagStatsMap.get(statsKey) ?? {
+          tagId: tag.id,
+          instanceId: wh.instanceId,
+          oCounter: 0,
+          playCount: 0,
+        };
+
+        tagStatsMap.set(statsKey, {
+          ...existing,
+          oCounter: existing.oCounter + wh.oCount,
+          playCount: existing.playCount + wh.playCount,
+        });
+      }
+    }
+
+    return {
+      ops: [
+        prisma.userPerformerStats.deleteMany({ where: { userId } }),
+        prisma.userStudioStats.deleteMany({ where: { userId } }),
+        prisma.userTagStats.deleteMany({ where: { userId } }),
+        prisma.userPerformerStats.createMany({
+          data: Array.from(performerStatsMap.values(), (row) => ({
+            userId,
+            ...row,
+          })),
+        }),
+        prisma.userStudioStats.createMany({
+          data: Array.from(studioStatsMap.values(), (row) => ({
+            userId,
+            ...row,
+          })),
+        }),
+        prisma.userTagStats.createMany({
+          data: Array.from(tagStatsMap.values(), (row) => ({ userId, ...row })),
+        }),
+      ],
+      performerCount: performerStatsMap.size,
+      studioCount: studioStatsMap.size,
+      tagCount: tagStatsMap.size,
+    };
   }
 
   /**

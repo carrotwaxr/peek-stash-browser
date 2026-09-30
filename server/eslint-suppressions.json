@@ -34,11 +34,6 @@
       "count": 1
     }
   },
-  "utils/instanceUtils.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "utils/nfoGenerator.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5

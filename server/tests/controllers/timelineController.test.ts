@@ -8,12 +8,6 @@ import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getDefaultConfig: vi.fn().mockReturnValue({
-      id: "test-instance",
-      name: "Test Stash",
-      url: "http://localhost:9999/graphql",
-      apiKey: "test-api-key",
-    }),
     getAllConfigs: vi.fn().mockReturnValue([]),
     loadFromDatabase: vi.fn().mockResolvedValue(undefined),
   },
