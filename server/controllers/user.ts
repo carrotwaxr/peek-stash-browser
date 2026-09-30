@@ -1,4 +1,5 @@
 import { ENTITY_KINDS } from "@peek/shared-types/filters/index.js";
+import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -13,7 +14,10 @@ import {
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
 } from "../services/EntityAccessService.js";
-import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import {
+  type RestrictionRowInput,
+  exclusionComputationService,
+} from "../services/ExclusionComputationService.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { rankingComputeService } from "../services/RankingComputeService.js";
@@ -31,6 +35,7 @@ import {
 import {
   RESTRICTABLE_ENTITY_TYPES,
   RESTRICTION_MODES,
+  type RestrictableEntityType,
   type RestrictionMode,
   defaultRestrictEmpty,
   restrictionsApplyTo,
@@ -1300,6 +1305,12 @@ export const syncFromStash = async (
   });
 };
 
+function isRestrictableEntityType(
+  value: string
+): value is RestrictableEntityType {
+  return (RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(value);
+}
+
 /**
  * Get content restrictions for a user (Admin only)
  */
@@ -1307,9 +1318,13 @@ export const getUserRestrictions = async (
   req: TypedAuthRequest<never, GetUserRestrictionsParams>,
   res: TypedResponse<{ restrictions: unknown[] } | ApiErrorResponse>
 ) => {
-  const { userId } = req.params;
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
   const restrictions = await prisma.userContentRestriction.findMany({
-    where: { userId: parseInt(userId) },
+    where: { userId: targetUserId },
   });
 
   res.json({ restrictions });
@@ -1354,19 +1369,13 @@ export const updateUserRestrictions = async (
   }
 
   // Validate each restriction: one row per (type, mode), a non-empty list of
-  // "id" or "id:instanceId" strings, and an optional boolean restrictEmpty
+  // "id" or "id:instanceId" strings whose instance exists, and an optional
+  // boolean restrictEmpty
   const seenPairs = new Set<string>();
-  const rows: Array<{
-    userId: number;
-    entityType: string;
-    mode: RestrictionMode;
-    entityIds: string;
-    restrictEmpty: boolean;
-  }> = [];
+  const rows: RestrictionRowInput[] = [];
+  const namedInstances = new Map<string, string>(); // instanceId -> an entry
   for (const r of restrictions) {
-    if (
-      !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
-    ) {
+    if (!isRestrictableEntityType(r.entityType)) {
       res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
       return;
     }
@@ -1389,6 +1398,7 @@ export const updateUserRestrictions = async (
       });
       return;
     }
+    const entityIds: string[] = [];
     for (const id of r.entityIds) {
       if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
         res.status(400).json({
@@ -1396,6 +1406,11 @@ export const updateUserRestrictions = async (
         });
         return;
       }
+      const { instanceId } = parseEntityRef(id);
+      if (instanceId !== undefined && !namedInstances.has(instanceId)) {
+        namedInstances.set(instanceId, id);
+      }
+      entityIds.push(id);
     }
     if (r.restrictEmpty !== undefined && typeof r.restrictEmpty !== "boolean") {
       res
@@ -1404,28 +1419,38 @@ export const updateUserRestrictions = async (
       return;
     }
     rows.push({
-      userId: targetUserId,
       entityType: r.entityType,
       mode,
-      entityIds: JSON.stringify(r.entityIds),
+      entityIds,
       restrictEmpty: r.restrictEmpty ?? defaultRestrictEmpty(mode),
     });
   }
 
-  // Replace the stored rows in one batch transaction, so a failed insert
-  // rolls the delete back and the user keeps their old restrictions. A batch
-  // holds SQLite's write lock for just these two statements.
-  await dbWriteBatch("restrictions.save", [
-    prisma.userContentRestriction.deleteMany({
-      where: { userId: targetUserId },
-    }),
-    ...(rows.length > 0
-      ? [prisma.userContentRestriction.createMany({ data: rows })]
-      : []),
-  ]);
+  // The instance half of every "id:instanceId" entry names a configured
+  // Stash server, enabled or not (a disabled one's entries wait for it)
+  if (namedInstances.size > 0) {
+    const known = new Set(
+      (
+        await prisma.stashInstance.findMany({
+          where: { id: { in: [...namedInstances.keys()] } },
+          select: { id: true },
+        })
+      ).map((i) => i.id)
+    );
+    for (const [instanceId, entry] of namedInstances) {
+      if (!known.has(instanceId)) {
+        res.status(400).json({
+          error: `Unknown Stash instance in entity id: ${entry}`,
+        });
+        return;
+      }
+    }
+  }
 
-  // Recompute exclusions for this user once the new rows are committed
-  await exclusionComputationService.recomputeForUser(targetUserId);
+  // The rows and the exclusions they produce are written in one unit: the
+  // recompute runs on these rows and its swap stores both, so a failure
+  // leaves the user's old restrictions and old exclusions in place
+  await exclusionComputationService.saveRestrictions(targetUserId, rows);
 
   const saved = await prisma.userContentRestriction.findMany({
     where: { userId: targetUserId },
@@ -1445,15 +1470,23 @@ export const deleteUserRestrictions = async (
   req: TypedAuthRequest<never, DeleteUserRestrictionsParams>,
   res: TypedResponse<DeleteUserRestrictionsResponse | ApiErrorResponse>
 ) => {
-  const { userId } = req.params;
-  const targetUserId = parseInt(userId);
-
-  await prisma.userContentRestriction.deleteMany({
-    where: { userId: targetUserId },
+  const targetUserId = parseInt(req.params.userId);
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true },
   });
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
 
-  // Recompute exclusions for this user after restriction removal
-  await exclusionComputationService.recomputeForUser(targetUserId);
+  // Allowed for an admin target too (their rows are inert): the rows and
+  // the exclusions they produced go in one unit, like a save
+  await exclusionComputationService.saveRestrictions(targetUserId, []);
 
   res.json({
     success: true,

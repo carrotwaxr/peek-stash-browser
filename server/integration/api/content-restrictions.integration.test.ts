@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
@@ -180,9 +181,100 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.ok).toBe(false);
         expect(response.status).toBe(403);
       });
+
+      it("an id on an unknown instance answers 400 and writes nothing", async () => {
+        const before = await adminClient.get<{ restrictions: unknown[] }>(
+          `/api/user/${testUserId}/restrictions`
+        );
+        expect(before.ok).toBe(true);
+
+        const response = await adminClient.put<{ error: string }>(
+          `/api/user/${testUserId}/restrictions`,
+          {
+            restrictions: [
+              {
+                entityType: "tags",
+                mode: "EXCLUDE",
+                entityIds: [
+                  `${TEST_ENTITIES.restrictableTag}:no-such-instance`,
+                ],
+                restrictEmpty: false,
+              },
+            ],
+          }
+        );
+
+        expect(response.status).toBe(400);
+        expect(response.data.error).toContain(
+          `${TEST_ENTITIES.restrictableTag}:no-such-instance`
+        );
+        const after = await adminClient.get<{ restrictions: unknown[] }>(
+          `/api/user/${testUserId}/restrictions`
+        );
+        expect(after.data.restrictions).toEqual(before.data.restrictions);
+      });
     });
 
     describe("DELETE /api/user/:userId/restrictions", () => {
+      it("DELETE for an unknown user answers 404", async () => {
+        const response = await adminClient.delete<{ error: string }>(
+          "/api/user/999999/restrictions"
+        );
+
+        expect(response.status).toBe(404);
+      });
+
+      it("DELETE for a non-numeric id answers 400", async () => {
+        const response = await adminClient.delete<{ error: string }>(
+          "/api/user/abc/restrictions"
+        );
+
+        expect(response.status).toBe(400);
+      });
+
+      it("DELETE clears the rows and the exclusions they produced together", async () => {
+        const put = await adminClient.put(
+          `/api/user/${testUserId}/restrictions`,
+          {
+            restrictions: [
+              {
+                entityType: "tags",
+                mode: "EXCLUDE",
+                entityIds: [TEST_ENTITIES.restrictableTag],
+                restrictEmpty: false,
+              },
+            ],
+          }
+        );
+        expect(put.ok).toBe(true);
+        const restricted = {
+          userId: testUserId,
+          entityType: "tag",
+          entityId: TEST_ENTITIES.restrictableTag,
+          reason: "restricted",
+        };
+        expect(
+          await prisma.userExcludedEntity.count({ where: restricted })
+        ).toBeGreaterThan(0);
+
+        const response = await adminClient.delete<{ success: boolean }>(
+          `/api/user/${testUserId}/restrictions`
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.data.success).toBe(true);
+        expect(
+          await prisma.userContentRestriction.count({
+            where: { userId: testUserId },
+          })
+        ).toBe(0);
+        expect(
+          await prisma.userExcludedEntity.count({
+            where: { userId: testUserId, reason: "restricted" },
+          })
+        ).toBe(0);
+      }, 30_000);
+
       it("should delete all restrictions", async () => {
         // First create some restrictions
         await adminClient.put(`/api/user/${testUserId}/restrictions`, {

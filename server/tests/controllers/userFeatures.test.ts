@@ -109,6 +109,7 @@ vi.mock("../../services/PermissionService.js", () => ({
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
+    saveRestrictions: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -674,19 +675,14 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(400);
     });
 
-    it("replaces all restrictions and recomputes exclusions", async () => {
+    it("replaces all restrictions through one save unit", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
           id: 2,
           role: "USER",
         })
       );
-      mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
-        count: 1,
-      });
-      mockPrisma.userContentRestriction.createMany.mockResolvedValue({
-        count: 1,
-      });
+      mockExclusionService.saveRestrictions.mockResolvedValue(undefined);
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([
         partialRow({ id: 1, entityType: "tags", mode: "EXCLUDE" }),
       ]);
@@ -702,15 +698,16 @@ describe("User Controller — Features", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getOkBody().success).toBe(true);
-      expect(mockPrisma.userContentRestriction.deleteMany).toHaveBeenCalledWith(
-        {
-          where: { userId: 2 },
-        }
-      );
       expect(
-        mockPrisma.userContentRestriction.createMany
-      ).toHaveBeenCalledTimes(1);
-      expect(mockExclusionService.recomputeForUser).toHaveBeenCalledWith(2);
+        mockExclusionService.saveRestrictions
+      ).toHaveBeenCalledExactlyOnceWith(2, [
+        {
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: ["1", "2"],
+          restrictEmpty: false,
+        },
+      ]);
       expect(res._getOkBody().restrictions).toHaveLength(1);
     });
   });
@@ -726,10 +723,11 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(403);
     });
 
-    it("deletes all restrictions and recomputes exclusions", async () => {
-      mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
-        count: 3,
-      });
+    it("deletes all restrictions through one save unit", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 2, role: "USER" })
+      );
+      mockExclusionService.saveRestrictions.mockResolvedValue(undefined);
       const req = reqFor(deleteUserRestrictions, {
         params: { userId: "2" },
         user: ADMIN,
@@ -737,7 +735,9 @@ describe("User Controller — Features", () => {
       const res = resFor(deleteUserRestrictions);
       await deleteUserRestrictions(req, res);
       expect(res._getOkBody().success).toBe(true);
-      expect(mockExclusionService.recomputeForUser).toHaveBeenCalledWith(2);
+      expect(
+        mockExclusionService.saveRestrictions
+      ).toHaveBeenCalledExactlyOnceWith(2, []);
     });
   });
 

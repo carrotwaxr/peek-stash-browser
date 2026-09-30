@@ -5,7 +5,7 @@
  * regenerateRecoveryKey, adminResetPassword, adminRegenerateRecoveryKey,
  * getAllUsers, createUser, deleteUser, updateUserRole.
  */
-import type { Prisma, User, UserContentRestriction } from "@prisma/client";
+import type { User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,8 +15,10 @@ import {
   changePassword,
   createUser,
   deleteUser,
+  deleteUserRestrictions,
   getAllUsers,
   getRecoveryKey,
+  getUserRestrictions,
   getUserSettings,
   regenerateRecoveryKey,
   updateUserRestrictions,
@@ -89,6 +91,7 @@ vi.mock("../../services/PermissionService.js", () => ({
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
+    saveRestrictions: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -1346,16 +1349,11 @@ describe("User Controller", () => {
 
     beforeEach(() => {
       mockPrisma.user.findUnique.mockResolvedValue(TARGET);
-      mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
-        count: 0,
-      });
-      mockPrisma.userContentRestriction.createMany.mockResolvedValue({
-        count: 1,
-      });
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A" }),
+      ]);
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-      // Back to the mock's own $transaction (an array runs with Promise.all)
-      mockPrisma.$transaction.mockReset();
-      mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+      mockExclusions.saveRestrictions.mockResolvedValue(undefined);
     });
 
     it("returns 403 when non-admin", async () => {
@@ -1383,9 +1381,7 @@ describe("User Controller", () => {
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getErrorBody().error).toMatch(/administrators/);
-      expect(
-        mockPrisma.userContentRestriction.deleteMany
-      ).not.toHaveBeenCalled();
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
     });
 
     it("404 when the target does not exist", async () => {
@@ -1398,9 +1394,7 @@ describe("User Controller", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(404);
-      expect(
-        mockPrisma.userContentRestriction.deleteMany
-      ).not.toHaveBeenCalled();
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
     });
 
     it("400 on a duplicate (entityType, mode) pair", async () => {
@@ -1414,9 +1408,7 @@ describe("User Controller", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(
-        mockPrisma.userContentRestriction.deleteMany
-      ).not.toHaveBeenCalled();
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
     });
 
     it("400 on an empty entityIds list", async () => {
@@ -1428,9 +1420,7 @@ describe("User Controller", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(
-        mockPrisma.userContentRestriction.deleteMany
-      ).not.toHaveBeenCalled();
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
     });
 
     it("400 on a malformed id", async () => {
@@ -1447,9 +1437,7 @@ describe("User Controller", () => {
         const res = resFor(updateUserRestrictions);
         await updateUserRestrictions(req, res);
         expect(res._getStatus()).toBe(400);
-        expect(
-          mockPrisma.userContentRestriction.deleteMany
-        ).not.toHaveBeenCalled();
+        expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
       }
     });
 
@@ -1464,6 +1452,57 @@ describe("User Controller", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it("400 naming the entry whose instance does not exist, and saves nothing", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({ id: "A" }),
+      ]);
+      const req = reqFor(updateUserRestrictions, {
+        body: {
+          restrictions: [
+            tagRule("EXCLUDE", ["1:A", "2:Z"]),
+            { entityType: "studios", mode: "EXCLUDE", entityIds: ["7"] },
+          ],
+        },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
+      await updateUserRestrictions(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toContain("2:Z");
+      // One lookup of the distinct instances named, enabled or not
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledExactlyOnceWith(
+        { where: { id: { in: ["A", "Z"] } }, select: { id: true } }
+      );
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it("bare ids need no instance lookup", async () => {
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [tagRule("EXCLUDE", ["1", "2"])] },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
+      await updateUserRestrictions(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockPrisma.stashInstance.findMany).not.toHaveBeenCalled();
+      expect(mockExclusions.saveRestrictions).toHaveBeenCalledExactlyOnceWith(
+        3,
+        [
+          {
+            entityType: "tags",
+            mode: "EXCLUDE",
+            entityIds: ["1", "2"],
+            restrictEmpty: false,
+          },
+        ]
+      );
     });
 
     it("defaults restrictEmpty to true for INCLUDE and false for EXCLUDE when omitted", async () => {
@@ -1480,24 +1519,23 @@ describe("User Controller", () => {
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(200);
-      const data = mockPrisma.userContentRestriction.createMany.mock
-        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
-      expect(data).toEqual([
-        {
-          userId: 3,
-          entityType: "tags",
-          mode: "INCLUDE",
-          entityIds: JSON.stringify(["1:A"]),
-          restrictEmpty: true,
-        },
-        {
-          userId: 3,
-          entityType: "studios",
-          mode: "EXCLUDE",
-          entityIds: JSON.stringify(["7:A"]),
-          restrictEmpty: false,
-        },
-      ]);
+      expect(mockExclusions.saveRestrictions).toHaveBeenCalledExactlyOnceWith(
+        3,
+        [
+          {
+            entityType: "tags",
+            mode: "INCLUDE",
+            entityIds: ["1:A"],
+            restrictEmpty: true,
+          },
+          {
+            entityType: "studios",
+            mode: "EXCLUDE",
+            entityIds: ["7:A"],
+            restrictEmpty: false,
+          },
+        ]
+      );
     });
 
     it("keeps an explicit restrictEmpty value", async () => {
@@ -1510,12 +1548,11 @@ describe("User Controller", () => {
       });
       const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
-      const data = mockPrisma.userContentRestriction.createMany.mock
-        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
-      expect(must(data[0]).restrictEmpty).toBe(false);
+      const [, rows] = must(mockExclusions.saveRestrictions.mock.calls[0]);
+      expect(must(rows[0]).restrictEmpty).toBe(false);
     });
 
-    it("stores an INCLUDE and an EXCLUDE row for the same type and recomputes", async () => {
+    it("saves an INCLUDE and an EXCLUDE row for the same type in one unit, then answers the stored rows", async () => {
       const saved: UserContentRestriction[] = [
         partialRow({ id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" }),
         partialRow({ id: 11, userId: 3, entityType: "tags", mode: "EXCLUDE" }),
@@ -1535,69 +1572,37 @@ describe("User Controller", () => {
       await updateUserRestrictions(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(mockPrisma.userContentRestriction.deleteMany).toHaveBeenCalledWith(
-        {
-          where: { userId: 3 },
-        }
+      expect(mockExclusions.saveRestrictions).toHaveBeenCalledTimes(1);
+      const [userId, rows] = must(
+        mockExclusions.saveRestrictions.mock.calls[0]
       );
+      expect(userId).toBe(3);
+      expect(rows.map((r) => r.mode)).toEqual(["INCLUDE", "EXCLUDE"]);
+      // The controller writes nothing itself: the save's swap stores the rows
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
       expect(
         mockPrisma.userContentRestriction.createMany
-      ).toHaveBeenCalledTimes(1);
-      const data = mockPrisma.userContentRestriction.createMany.mock
-        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
-      expect(data.map((r) => r.mode)).toEqual(["INCLUDE", "EXCLUDE"]);
-      expect(mockExclusions.recomputeForUser).toHaveBeenCalledTimes(1);
-      expect(mockExclusions.recomputeForUser).toHaveBeenCalledWith(3);
+      ).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+      // The stored rows are read back after the unit resolved
       expect(mockPrisma.userContentRestriction.findMany).toHaveBeenCalledWith({
         where: { userId: 3 },
       });
+      const [savedAt] =
+        mockExclusions.saveRestrictions.mock.invocationCallOrder;
+      const [readAt] =
+        mockPrisma.userContentRestriction.findMany.mock.invocationCallOrder;
+      expect(must(savedAt)).toBeLessThan(must(readAt));
       expect(res._getOkBody().success).toBe(true);
       expect(res._getOkBody().restrictions).toEqual(saved);
     });
 
-    it("deletes and inserts in one batch transaction, then recomputes", async () => {
-      // Stand-ins the test only compares by identity
-      const deleteOp = partialRow<Prisma.PrismaPromise<Prisma.BatchPayload>>(
-        {}
-      );
-      const createOp = partialRow<Prisma.PrismaPromise<Prisma.BatchPayload>>(
-        {}
-      );
-      const order: string[] = [];
-      mockPrisma.userContentRestriction.deleteMany.mockReturnValue(deleteOp);
-      mockPrisma.userContentRestriction.createMany.mockReturnValue(createOp);
-      mockPrisma.$transaction.mockImplementation(
-        prismaImpl(() => {
-          order.push("transaction");
-          return [{ count: 0 }, { count: 1 }];
-        })
-      );
-      mockExclusions.recomputeForUser.mockImplementation(() => {
-        order.push("recompute");
-        return Promise.resolve();
-      });
-      const req = reqFor(updateUserRestrictions, {
-        body: { restrictions: [tagRule("EXCLUDE")] },
-        params: { userId: "3" },
-        user: ADMIN,
-      });
-      const res = resFor(updateUserRestrictions);
-      await updateUserRestrictions(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      // The batch form; the mock's parameter type is the callback overload's
-      const ops: unknown = must(mockPrisma.$transaction.mock.calls[0])[0];
-      if (!Array.isArray(ops)) throw new Error("expected a batch transaction");
-      expect(ops).toHaveLength(2);
-      expect(ops[0]).toBe(deleteOp);
-      expect(ops[1]).toBe(createOp);
-      expect(order).toEqual(["transaction", "recompute"]);
-    });
-
-    it("500 and no recompute when the transaction fails", async () => {
-      mockPrisma.$transaction.mockRejectedValue(
-        new Error("UNIQUE constraint failed")
+    it("a failed save throws (500) and reads nothing back", async () => {
+      mockExclusions.saveRestrictions.mockRejectedValue(
+        new Error("disk I/O error")
       );
       const req = reqFor(updateUserRestrictions, {
         body: { restrictions: [tagRule("EXCLUDE")] },
@@ -1606,11 +1611,105 @@ describe("User Controller", () => {
       });
       const res = resFor(updateUserRestrictions);
       await expect(updateUserRestrictions(req, res)).rejects.toThrow(
-        "UNIQUE constraint failed"
+        "disk I/O error"
       );
 
       expect(res.json).not.toHaveBeenCalled();
+      expect(mockPrisma.userContentRestriction.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteUserRestrictions", () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        userRow({ id: 3, username: "user3" })
+      );
+      mockExclusions.saveRestrictions.mockResolvedValue(undefined);
+    });
+
+    it("returns 403 when non-admin", async () => {
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "3" },
+        user: USER,
+      });
+      const res = resFor(deleteUserRestrictions);
+      await runRoute(userRoutes, "delete", "/:userId/restrictions", req, res);
+      expect(res._getStatus()).toBe(403);
+    });
+
+    it("400 on a non-numeric id", async () => {
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(deleteUserRestrictions);
+      await deleteUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it("404 when the user does not exist", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(deleteUserRestrictions);
+      await deleteUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(404);
+      expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it("saves an empty list in one unit, for an admin target too", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        userRow({ id: 3, username: "user3", role: "ADMIN" })
+      );
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(deleteUserRestrictions);
+      await deleteUserRestrictions(req, res);
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(mockExclusions.saveRestrictions).toHaveBeenCalledExactlyOnceWith(
+        3,
+        []
+      );
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
       expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getUserRestrictions", () => {
+    it("400 on a non-numeric id", async () => {
+      const req = reqFor(getUserRestrictions, {
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserRestrictions);
+      await getUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockPrisma.userContentRestriction.findMany).not.toHaveBeenCalled();
+    });
+
+    it("answers the user's rows", async () => {
+      const stored: UserContentRestriction[] = [
+        partialRow({ id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" }),
+      ];
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue(stored);
+      const req = reqFor(getUserRestrictions, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserRestrictions);
+      await getUserRestrictions(req, res);
+      expect(mockPrisma.userContentRestriction.findMany).toHaveBeenCalledWith({
+        where: { userId: 3 },
+      });
+      expect(res._getOkBody().restrictions).toEqual(stored);
     });
   });
 });
