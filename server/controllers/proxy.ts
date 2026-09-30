@@ -97,6 +97,13 @@ function isClientGone(res: Response): boolean {
 }
 
 /**
+ * The one answer for media the user may not load: a missing entity, a
+ * deleted one, one they cannot see and an instance that is not enabled all
+ * read the same, so the answer never tells which.
+ */
+const NOT_FOUND = "Not found";
+
+/**
  * The address and key of the instance a request names, or null once the
  * response is sent: 404 for an instance that is not enabled (disabled or
  * deleted; invariant 11).
@@ -109,7 +116,7 @@ function credentialsOrRespond(
     return stashInstanceManager.getCredentials(instanceId);
   } catch (error) {
     if (!(error instanceof UnknownInstanceError)) throw error;
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return null;
   }
 }
@@ -310,19 +317,11 @@ export const proxyScenePreview = async (
 
   if (!instanceIdOrRespond(instanceId, res)) return;
 
-  // The scene on the instance the request names
-  const scene = await prisma.stashScene.findUnique({
-    where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
-    select: { deletedAt: true },
-  });
-
-  if (!scene || scene.deletedAt) {
-    res.status(404).json({ error: "Scene not found" });
-    return;
-  }
-
+  // The access check finds the row itself (a missing or deleted scene is
+  // refused), so a missing scene and a refused one get the same answer
+  // after the same reads
   if (!(await canUserAccessEntity(req.user.id, "scene", id, instanceId))) {
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return;
   }
 
@@ -380,19 +379,11 @@ export const proxySceneWebp = async (
 
   if (!instanceIdOrRespond(instanceId, res)) return;
 
-  // The scene on the instance the request names
-  const scene = await prisma.stashScene.findUnique({
-    where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
-    select: { deletedAt: true },
-  });
-
-  if (!scene || scene.deletedAt) {
-    res.status(404).json({ error: "Scene not found" });
-    return;
-  }
-
+  // The access check finds the row itself (a missing or deleted scene is
+  // refused), so a missing scene and a refused one get the same answer
+  // after the same reads
   if (!(await canUserAccessEntity(req.user.id, "scene", id, instanceId))) {
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return;
   }
 
@@ -471,7 +462,7 @@ export const proxyStashMedia = async (
       "apartFromOwnHides"
     ))
   ) {
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return;
   }
 
@@ -533,19 +524,22 @@ export const proxyClipPreview = async (
 
   if (!instanceIdOrRespond(instanceId, res)) return;
 
+  // Access first: it finds the row itself, so a missing clip and a refused
+  // one get the same answer after the same reads
+  if (!(await canUserAccessEntity(req.user.id, "clip", id, instanceId))) {
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
+
   // The clip on the instance the request names
   const clip = await prisma.stashClip.findUnique({
     where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
     select: { streamPath: true, screenshotPath: true, deletedAt: true },
   });
 
+  // Deleted since the access check
   if (!clip || clip.deletedAt) {
-    res.status(404).json({ error: "Clip preview not found" });
-    return;
-  }
-
-  if (!(await canUserAccessEntity(req.user.id, "clip", id, instanceId))) {
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return;
   }
 
@@ -624,6 +618,13 @@ export const proxyImage = async (
 
   if (!instanceIdOrRespond(instanceId, res)) return;
 
+  // Access first: it finds the row itself, so a missing image and a refused
+  // one get the same answer after the same reads
+  if (!(await canUserAccessEntity(req.user.id, "image", imageId, instanceId))) {
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
+
   // The image on the instance the request names
   const image = await prisma.stashImage.findUnique({
     where: { id_stashInstanceId: { id: imageId, stashInstanceId: instanceId } },
@@ -635,13 +636,9 @@ export const proxyImage = async (
     },
   });
 
+  // Deleted since the access check
   if (!image || image.deletedAt) {
-    res.status(404).json({ error: "Image not found" });
-    return;
-  }
-
-  if (!(await canUserAccessEntity(req.user.id, "image", imageId, instanceId))) {
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: NOT_FOUND });
     return;
   }
 
