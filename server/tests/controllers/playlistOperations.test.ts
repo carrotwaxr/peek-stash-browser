@@ -3,19 +3,24 @@
  *
  * Tests createPlaylist, updatePlaylist, deletePlaylist, and duplicatePlaylist
  * controller functions. Covers validation, ownership checks, and the
- * access-control-based duplicate flow.
+ * access-control-based duplicate flow; and that the item writes (add,
+ * remove, reorder) take each scene's instance from the request.
  */
 import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  addSceneToPlaylist,
   createPlaylist,
   deletePlaylist,
   duplicatePlaylist,
   getPlaylistShares,
+  removeSceneFromPlaylist,
+  reorderPlaylist,
   updatePlaylist,
   updatePlaylistShares,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
+import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import {
   getPlaylistAccess,
@@ -47,10 +52,8 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
   getUserGroups: vi.fn(),
 }));
 
-// Mock entityInstanceId
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(() => Promise.resolve("instance-1")),
-  getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn(),
 }));
 
 // Mock PlaylistQueryService (the playlist reads, not under test here)
@@ -73,6 +76,7 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 const mockGetUserGroups = vi.mocked(getUserGroups);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
+const mockCanAccess = vi.mocked(canUserAccessEntity);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -613,6 +617,234 @@ describe("Playlist Controller Operations", () => {
       expect(res._getBody()).toEqual({
         error: "groupIds must be an array",
       });
+    });
+  });
+
+  describe("item writes name each scene's instance", () => {
+    it("add without an instance answers 400 and asks nothing", async () => {
+      const req = reqFor(addSceneToPlaylist, {
+        params: { id: "1" },
+        body: malformed({ sceneId: "42" }),
+        user: USER,
+      });
+      const res = resFor(addSceneToPlaylist);
+
+      await addSceneToPlaylist(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toBe("instanceId is required");
+      expect(mockGetAccess).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+    });
+
+    it("add of a scene the user cannot see answers 404", async () => {
+      mockGetAccess.mockResolvedValue({ level: "owner" });
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow<PlaylistWithItems>({ id: 1, userId: USER.id, items: [] })
+      );
+      mockCanAccess.mockResolvedValue(false);
+
+      const req = reqFor(addSceneToPlaylist, {
+        params: { id: "1" },
+        body: { sceneId: "42", instanceId: "inst-b" },
+        user: USER,
+      });
+      const res = resFor(addSceneToPlaylist);
+
+      await addSceneToPlaylist(req, res);
+
+      expect(mockCanAccess).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "42",
+        "inst-b"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+    });
+
+    it("add of a scene already there answers 409", async () => {
+      mockGetAccess.mockResolvedValue({ level: "owner" });
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow<PlaylistWithItems>({ id: 1, userId: USER.id, items: [] })
+      );
+      mockCanAccess.mockResolvedValue(true);
+      mockPrisma.playlistItem.findUnique.mockResolvedValue(
+        partialRow({
+          id: 9,
+          playlistId: 1,
+          sceneId: "42",
+          instanceId: "inst-b",
+        })
+      );
+
+      const req = reqFor(addSceneToPlaylist, {
+        params: { id: "1" },
+        body: { sceneId: "42", instanceId: "inst-b" },
+        user: USER,
+      });
+      const res = resFor(addSceneToPlaylist);
+
+      await addSceneToPlaylist(req, res);
+
+      expect(mockPrisma.playlistItem.findUnique).toHaveBeenCalledWith({
+        where: {
+          playlistId_instanceId_sceneId: {
+            playlistId: 1,
+            instanceId: "inst-b",
+            sceneId: "42",
+          },
+        },
+      });
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+    });
+
+    it("remove with a repeated instance answers 400", async () => {
+      const req = reqFor(removeSceneFromPlaylist, {
+        params: { id: "1", sceneId: "42" },
+        query: { instanceId: ["inst-a", "inst-b"] },
+        user: USER,
+      });
+      const res = resFor(removeSceneFromPlaylist);
+
+      await removeSceneFromPlaylist(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("remove of an item that is not there answers 404", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 1, userId: USER.id, name: "Mine" })
+      );
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 0 });
+
+      const req = reqFor(removeSceneFromPlaylist, {
+        params: { id: "1", sceneId: "42" },
+        query: { instanceId: "inst-b" },
+        user: USER,
+      });
+      const res = resFor(removeSceneFromPlaylist);
+
+      await removeSceneFromPlaylist(req, res);
+
+      expect(mockPrisma.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where: { playlistId: 1, instanceId: "inst-b", sceneId: "42" },
+      });
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it.each([
+      ["no instance", { sceneId: "42", position: 1 }, "items[1].instanceId"],
+      [
+        "no position",
+        { sceneId: "42", instanceId: "inst-b" },
+        "items[1].position",
+      ],
+      [
+        "a negative position",
+        { sceneId: "42", instanceId: "inst-b", position: -1 },
+        "items[1].position",
+      ],
+      ["not an object", "42", "items[1]"],
+    ])(
+      "reorder with an item of %s answers 400 naming the index",
+      async (_what, second, named) => {
+        const req = reqFor(reorderPlaylist, {
+          params: { id: "1" },
+          body: malformed({
+            items: [
+              { sceneId: "42", instanceId: "inst-a", position: 0 },
+              second,
+            ],
+          }),
+          user: USER,
+        });
+        const res = resFor(reorderPlaylist);
+
+        await reorderPlaylist(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res._getErrorBody().error).toContain(named);
+        expect(mockPrisma.playlist.findFirst).not.toHaveBeenCalled();
+      }
+    );
+
+    it("reorder updates each item on its own instance", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 1, userId: USER.id, name: "Mine" })
+      );
+      mockPrisma.playlistItem.findMany.mockResolvedValue([
+        partialRow({ sceneId: "42", instanceId: "inst-a" }),
+        partialRow({ sceneId: "42", instanceId: "inst-b" }),
+      ]);
+      mockPrisma.playlistItem.update.mockResolvedValue(partialRow({}));
+
+      const req = reqFor(reorderPlaylist, {
+        params: { id: "1" },
+        body: {
+          items: [
+            { sceneId: "42", instanceId: "inst-b", position: 0 },
+            { sceneId: "42", instanceId: "inst-a", position: 1 },
+          ],
+        },
+        user: USER,
+      });
+      const res = resFor(reorderPlaylist);
+
+      await reorderPlaylist(req, res);
+
+      expect(res._getOkBody()).toEqual(objectContaining({ success: true }));
+      expect(mockPrisma.playlistItem.update).toHaveBeenNthCalledWith(1, {
+        where: {
+          playlistId_instanceId_sceneId: {
+            playlistId: 1,
+            instanceId: "inst-b",
+            sceneId: "42",
+          },
+        },
+        data: { position: 0 },
+      });
+      expect(mockPrisma.playlistItem.update).toHaveBeenNthCalledWith(2, {
+        where: {
+          playlistId_instanceId_sceneId: {
+            playlistId: 1,
+            instanceId: "inst-a",
+            sceneId: "42",
+          },
+        },
+        data: { position: 1 },
+      });
+    });
+
+    it("reorder naming an item not in the playlist answers 400 and updates nothing", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 1, userId: USER.id, name: "Mine" })
+      );
+      mockPrisma.playlistItem.findMany.mockResolvedValue([
+        partialRow({ sceneId: "42", instanceId: "inst-a" }),
+      ]);
+
+      const req = reqFor(reorderPlaylist, {
+        params: { id: "1" },
+        body: {
+          items: [
+            { sceneId: "42", instanceId: "inst-a", position: 0 },
+            { sceneId: "42", instanceId: "inst-b", position: 1 },
+          ],
+        },
+        user: USER,
+      });
+      const res = resFor(reorderPlaylist);
+
+      await reorderPlaylist(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toBe(
+        "items[1] is not in this playlist"
+      );
+      expect(mockPrisma.playlistItem.update).not.toHaveBeenCalled();
     });
   });
 });

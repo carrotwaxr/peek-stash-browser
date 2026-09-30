@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet, apiPost } from "../../../src/api";
+import { ApiError } from "../../../src/api/client";
 import AddToPlaylistButton from "../../../src/components/ui/AddToPlaylistButton";
+import { showError, showWarning } from "../../../src/utils/toast";
 
 vi.mock("../../../src/api", () => ({
   apiGet: vi.fn(),
@@ -10,7 +12,11 @@ vi.mock("../../../src/api", () => ({
 
 vi.mock("../../../src/api/client", () => ({
   ApiError: class ApiError extends Error {
-    status = 0;
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+    }
   },
 }));
 
@@ -59,5 +65,48 @@ describe("AddToPlaylistButton", () => {
       sceneId: "1",
       instanceId: "inst-b",
     });
+  });
+
+  it("a 409 counts as already in the playlist", async () => {
+    vi.mocked(apiPost)
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new ApiError("Scene already in playlist", 409));
+
+    render(
+      <AddToPlaylistButton
+        scenes={[
+          { id: "1", instanceId: "inst-a" },
+          { id: "1", instanceId: "inst-b" },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle("Add to playlist"));
+    fireEvent.click(await screen.findByText("Mine"));
+
+    await waitFor(() =>
+      expect(showWarning).toHaveBeenCalledWith(
+        "Added 1 scenes, 1 already in playlist"
+      )
+    );
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it("any other refusal is an error, not already there", async () => {
+    vi.mocked(apiPost).mockRejectedValueOnce(
+      new ApiError("Scene not found", 404)
+    );
+
+    render(
+      <AddToPlaylistButton scenes={[{ id: "1", instanceId: "inst-a" }]} />
+    );
+
+    fireEvent.click(screen.getByTitle("Add to playlist"));
+    fireEvent.click(await screen.findByText("Mine"));
+
+    await waitFor(() =>
+      expect(showError).toHaveBeenCalledWith("Failed to add to playlist")
+    );
+    expect(showWarning).not.toHaveBeenCalled();
   });
 });

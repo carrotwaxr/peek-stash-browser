@@ -196,8 +196,9 @@ export interface AddSceneToPlaylistParams extends Record<string, string> {
   id: string;
 }
 
+/** The scene and its instance; the server never guesses the instance */
 export interface AddSceneToPlaylistRequest {
-  instanceId?: string;
+  instanceId: string;
   sceneId: string;
 }
 
@@ -217,12 +218,19 @@ export interface AddSceneToPlaylistResponse {
 // =============================================================================
 
 /**
- * DELETE /api/playlists/:id/items/:sceneId
- * Remove scene from playlist
+ * DELETE /api/playlists/:id/items/:sceneId?instanceId=
+ * Remove scene from playlist: the item of that scene on that instance
  */
 export interface RemoveSceneFromPlaylistParams extends Record<string, string> {
   id: string;
   sceneId: string;
+}
+
+export interface RemoveSceneFromPlaylistQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
+  instanceId?: string | string[];
 }
 
 export interface RemoveSceneFromPlaylistResponse {
@@ -244,7 +252,7 @@ export interface ReorderPlaylistParams extends Record<string, string> {
 
 export interface ReorderPlaylistRequest {
   items: Array<{
-    instanceId?: string;
+    instanceId: string;
     sceneId: string;
     position: number;
   }>;

@@ -362,6 +362,7 @@ export type {
   AddSceneToPlaylistRequest,
   AddSceneToPlaylistResponse,
   RemoveSceneFromPlaylistParams,
+  RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
   ReorderPlaylistParams,
   ReorderPlaylistRequest,

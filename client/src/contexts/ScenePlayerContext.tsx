@@ -43,6 +43,17 @@ interface ScenePlayerContextValue extends ScenePlayerState {
 
 const ScenePlayerContext = createContext<ScenePlayerContextValue | null>(null);
 
+/** The server a playlist queue entry's scene is on, or null if it names none */
+function entryInstanceId(entry: Record<string, unknown>): string | null {
+  if (typeof entry.instanceId === "string" && entry.instanceId) {
+    return entry.instanceId;
+  }
+  const scene = entry.scene as { instanceId?: unknown } | null | undefined;
+  return typeof scene?.instanceId === "string" && scene.instanceId
+    ? scene.instanceId
+    : null;
+}
+
 // ============================================================================
 // PROVIDER
 // ============================================================================
@@ -183,9 +194,12 @@ export function ScenePlayerProvider({
     const playlistScene = state.playlist?.scenes?.[state.currentIndex];
     const effectiveSceneId =
       (playlistScene?.sceneId as string | undefined) || sceneId;
-    // For playlists, get instanceId from playlist entry; otherwise use prop
-    const effectiveInstanceId =
-      (playlistScene?.instanceId as string | undefined) || instanceId;
+    // A playlist entry loads on its own server: the entry's instance, else
+    // its scene's (a queue saved before entries carried one). The prop is
+    // the starting scene's instance, never another entry's.
+    const effectiveInstanceId = playlistScene
+      ? entryInstanceId(playlistScene)
+      : instanceId;
 
     if (effectiveSceneId && ready) {
       void loadScene(effectiveSceneId, effectiveInstanceId);

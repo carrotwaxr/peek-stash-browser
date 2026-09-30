@@ -525,11 +525,14 @@ interface DeletePlaylistResponse {
 
 **Authentication:** Required
 
+Adds the scene on the named instance; the server never guesses one. Owners and users the playlist is shared with can add. Answers 400 when `sceneId` or `instanceId` is missing, 404 when the playlist is not theirs or the scene is not one this user can see (missing, hidden, restricted or on an instance they do not use), and 409 when that scene on that instance is already in the playlist.
+
 **Request Body:**
 
 ```typescript
 interface AddSceneToPlaylistRequest {
   sceneId: string;
+  instanceId: string;
 }
 ```
 
@@ -548,6 +551,7 @@ interface AddSceneToPlaylistResponse {
   item: {
   id: number;
   playlistId: number;
+  instanceId: string;
   sceneId: string;
   position: number;
   addedAt: Date;
@@ -559,9 +563,11 @@ interface AddSceneToPlaylistResponse {
 
 ---
 
-### DELETE /api/playlists/:id/items/:sceneId
+### DELETE /api/playlists/:id/items/:sceneId?instanceId=
 
 **Authentication:** Required
+
+Removes the item of that scene on that instance only (owner only); an item of the same scene id on another instance stays. Answers 400 without `instanceId`, and 404 when the playlist is not the user's or the item is not in it.
 
 **URL Parameters:**
 
@@ -569,6 +575,14 @@ interface AddSceneToPlaylistResponse {
 interface RemoveSceneFromPlaylistParams {
   id: string;
   sceneId: string;
+}
+```
+
+**Query Parameters:**
+
+```typescript
+interface RemoveSceneFromPlaylistQuery {
+  instanceId: string;
 }
 ```
 
@@ -589,12 +603,15 @@ interface RemoveSceneFromPlaylistResponse {
 
 **Authentication:** Required
 
+Sets each item's position (owner only). Every item names its scene and the scene's instance. Answers 400 naming the index (`items[2].instanceId is required`) for an item without a scene, an instance or a non-negative integer position, or one not in the playlist; nothing moves then.
+
 **Request Body:**
 
 ```typescript
 interface ReorderPlaylistRequest {
   items: Array<{
   sceneId: string;
+  instanceId: string;
   position: number;
 }>;
 }

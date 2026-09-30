@@ -309,6 +309,38 @@ const SceneContent = () => {
   );
 };
 
+/** A player queue as the Scene page stores it for a page refresh */
+interface StoredPlaylist {
+  scenes?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Is this queue entry the scene the URL names? Two servers can hold the same
+ * scene id, so with an instance in the URL the entry's instance (or, in a
+ * queue saved before entries carried one, its scene's) must match too.
+ */
+function isEntryOf(
+  entry: unknown,
+  sceneId: string | undefined,
+  instanceId: string | null
+): boolean {
+  if (typeof entry !== "object" || entry === null) return false;
+  const {
+    sceneId: entrySceneId,
+    instanceId: entryInstance,
+    scene,
+  } = entry as { sceneId?: unknown; instanceId?: unknown; scene?: unknown };
+  if (entrySceneId !== sceneId) return false;
+  if (!instanceId) return true;
+  const sceneInstance =
+    typeof scene === "object" && scene !== null
+      ? (scene as { instanceId?: unknown }).instanceId
+      : undefined;
+  const entryServer = entryInstance ?? sceneInstance;
+  return entryServer === undefined || entryServer === instanceId;
+}
+
 // Outer component that wraps everything in ScenePlayerProvider
 const Scene = () => {
   const { sceneId } = useParams<{ sceneId: string }>();
@@ -347,20 +379,16 @@ const Scene = () => {
     const storedPlaylist = sessionStorage.getItem(PLAYLIST_STORAGE_KEY);
     if (storedPlaylist) {
       try {
-        const parsed = JSON.parse(storedPlaylist);
-        // Verify the current scene is actually in this playlist
-        const sceneInPlaylist = (
-          parsed.scenes as Array<{ sceneId: string }>
-        )?.some((s: { sceneId: string }) => s.sceneId === sceneId);
-        if (sceneInPlaylist) {
-          playlist = parsed;
-          // Update currentIndex to match the current scene
-          const currentIndex = (
-            parsed.scenes as Array<{ sceneId: string }>
-          ).findIndex((s: { sceneId: string }) => s.sceneId === sceneId);
-          if (currentIndex >= 0) {
-            playlist.currentIndex = currentIndex;
-          }
+        const parsed = JSON.parse(storedPlaylist) as StoredPlaylist;
+        // Verify the current scene, on this URL's server, is in this playlist
+        const currentIndex = Array.isArray(parsed.scenes)
+          ? parsed.scenes.findIndex((entry) =>
+              isEntryOf(entry, sceneId, instanceId)
+            )
+          : -1;
+        if (currentIndex >= 0) {
+          // Resume the queue at the current scene
+          playlist = { ...parsed, currentIndex };
         } else {
           // Scene not in stored playlist, clear it
           sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);

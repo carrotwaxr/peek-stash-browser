@@ -51,6 +51,10 @@ interface CarouselDef {
 
 const SCENES_PER_CAROUSEL = 12;
 
+/** Two servers can hold the same scene id: a scene is its id on its server */
+const isSameScene = (a: NormalizedScene, b: NormalizedScene) =>
+  a.id === b.id && a.instanceId === b.instanceId;
+
 /**
  * Check if an ID is a custom carousel (prefixed with "custom-")
  */
@@ -116,9 +120,7 @@ const Home = () => {
     Record<string, unknown>[]
   >([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
-  const [selectedScenes, setSelectedScenes] = useState<
-    Record<string, unknown>[]
-  >([]);
+  const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -154,9 +156,9 @@ const Home = () => {
   }, [location.key]);
 
   const createSceneClickHandler =
-    (scenes: Record<string, unknown>[], carouselTitle: string) =>
-    (scene: Record<string, unknown>) => {
-      const currentIndex = scenes.findIndex((s) => s.id === scene.id);
+    (scenes: NormalizedScene[], carouselTitle: string) =>
+    (scene: NormalizedScene) => {
+      const currentIndex = scenes.findIndex((s) => isSameScene(s, scene));
 
       void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
         state: {
@@ -180,11 +182,11 @@ const Home = () => {
       return true; // Prevent fallback navigation in SceneCard
     };
 
-  const handleToggleSelect = (scene: Record<string, unknown>) => {
+  const handleToggleSelect = (scene: NormalizedScene) => {
     setSelectedScenes((prev) => {
-      const isSelected = prev.some((s) => s.id === scene.id);
+      const isSelected = prev.some((s) => isSameScene(s, scene));
       if (isSelected) {
-        return prev.filter((s) => s.id !== scene.id);
+        return prev.filter((s) => !isSameScene(s, scene));
       } else {
         return [...prev, scene];
       }
@@ -203,7 +205,7 @@ const Home = () => {
     handleHideConfirm,
     closeHideDialog,
   } = useHideBulkAction({
-    selectedScenes: selectedScenes as { id: string | number }[],
+    selectedScenes,
     onComplete: handleClearSelection,
   });
 
@@ -301,12 +303,8 @@ const Home = () => {
           return (
             <ContinueWatchingCarousel
               key={fetchKey}
-              selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-              onToggleSelect={
-                handleToggleSelect as unknown as (
-                  scene: NormalizedScene
-                ) => void
-              }
+              selectedScenes={selectedScenes}
+              onToggleSelect={handleToggleSelect}
             />
           );
         }
@@ -330,7 +328,7 @@ const Home = () => {
       {selectedScenes.length > 0 && (
         <>
           <BulkActionBar
-            selectedScenes={selectedScenes as unknown as NormalizedScene[]}
+            selectedScenes={selectedScenes}
             onClearSelection={handleClearSelection}
             actions={
               <>
@@ -347,7 +345,7 @@ const Home = () => {
                   </span>
                 </Button>
                 <AddToPlaylistButton
-                  sceneIds={selectedScenes.map((s) => String(s.id))}
+                  scenes={selectedScenes}
                   buttonText={
                     (
                       <span>
@@ -388,12 +386,12 @@ interface HomeCarouselProps {
   icon: React.ReactNode;
   fetchKey: string;
   createSceneClickHandler: (
-    scenes: Record<string, unknown>[],
+    scenes: NormalizedScene[],
     title: string
-  ) => (scene: Record<string, unknown>) => void;
+  ) => (scene: NormalizedScene) => boolean;
   carouselQueries: Record<string, () => Promise<unknown>>;
-  selectedScenes: Record<string, unknown>[];
-  onToggleSelect: (scene: Record<string, unknown>) => void;
+  selectedScenes: NormalizedScene[];
+  onToggleSelect: (scene: NormalizedScene) => void;
 }
 
 const HomeCarousel = ({
@@ -420,6 +418,8 @@ const HomeCarousel = ({
     enabled: ready,
   });
   const initializing = !ready || isLibraryInitializing(error);
+  // The carousel queries answer the scenes list's scenes
+  const carouselScenes = (scenes ?? []) as NormalizedScene[];
 
   // Silently skip failed carousels (non-initialization errors only)
   if (error && !initializing) {
@@ -432,17 +432,10 @@ const HomeCarousel = ({
       loading={isLoading || initializing}
       title={title}
       titleIcon={icon}
-      scenes={(scenes || []) as unknown as NormalizedScene[]}
-      onSceneClick={
-        createSceneClickHandler(
-          (scenes || []) as Record<string, unknown>[],
-          title
-        ) as unknown as (scene: NormalizedScene) => void
-      }
-      selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-      onToggleSelect={
-        onToggleSelect as unknown as (scene: NormalizedScene) => void
-      }
+      scenes={carouselScenes}
+      onSceneClick={createSceneClickHandler(carouselScenes, title)}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
       seeMoreUrl={getSeeMoreUrl(fetchKey) || undefined}
     />
   );
@@ -458,11 +451,11 @@ interface CustomCarouselProps {
   title: string;
   icon: React.ReactNode;
   createSceneClickHandler: (
-    scenes: Record<string, unknown>[],
+    scenes: NormalizedScene[],
     title: string
-  ) => (scene: Record<string, unknown>) => void;
-  selectedScenes: Record<string, unknown>[];
-  onToggleSelect: (scene: Record<string, unknown>) => void;
+  ) => (scene: NormalizedScene) => boolean;
+  selectedScenes: NormalizedScene[];
+  onToggleSelect: (scene: NormalizedScene) => void;
 }
 
 const CustomCarousel = ({
@@ -479,7 +472,7 @@ const CustomCarousel = ({
     queryKey: queryKeys.carousels.execute(carouselId),
     queryFn: ({ signal }) =>
       libraryApi.executeCarousel(carouselId, signal) as Promise<{
-        scenes?: Record<string, unknown>[];
+        scenes?: NormalizedScene[];
       }>,
     enabled: ready,
     // Its rules can change in Settings: ask again on every visit
@@ -504,16 +497,10 @@ const CustomCarousel = ({
       loading={isLoading || initializing}
       title={title}
       titleIcon={icon}
-      scenes={scenes as unknown as NormalizedScene[]}
-      onSceneClick={
-        createSceneClickHandler(scenes, title) as unknown as (
-          scene: NormalizedScene
-        ) => void
-      }
-      selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-      onToggleSelect={
-        onToggleSelect as unknown as (scene: NormalizedScene) => void
-      }
+      scenes={scenes}
+      onSceneClick={createSceneClickHandler(scenes, title)}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
       seeMoreUrl={
         carousel
           ? buildCustomCarouselUrl(

@@ -59,11 +59,6 @@ vi.mock("../../services/PermissionService.js", () => ({
   resolveUserPermissions: vi.fn(() => Promise.resolve({})),
 }));
 
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(),
-  getEntityInstanceIds: vi.fn(),
-}));
-
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
