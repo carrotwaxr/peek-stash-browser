@@ -106,6 +106,8 @@ Arrow keys navigate through grid layouts and lists:
 
 ## Video Player Controls
 
+The player's keys work when the player, or nothing, has focus. With focus on a button, menu, tab or field elsewhere on the scene page, `Space`, the arrow keys and `Home`/`End` do that control's own job instead of controlling the video.
+
 ### Playback Controls
 
 | Key | Action |
@@ -138,19 +140,15 @@ Arrow keys navigate through grid layouts and lists:
 |-----|--------|
 | `F` | Toggle fullscreen |
 | `Escape` | Exit fullscreen |
-| `T` | Toggle theater mode (when available) |
 
 ### Playlist Playback
 
-**While playing a playlist:**
+**While playing a playlist of two or more scenes:**
 
 | Key | Action |
 |-----|--------|
-| `N` or `Shift+→` | Next scene in playlist |
-| `P` or `Shift+←` | Previous scene in playlist |
-| `S` | Toggle shuffle |
-| `R` | Cycle repeat mode (Off → All → One) |
-| `Escape` | Exit playlist playback |
+| `Shift+N` | Next scene in playlist |
+| `Shift+P` | Previous scene in playlist |
 
 ## Search & Filtering
 

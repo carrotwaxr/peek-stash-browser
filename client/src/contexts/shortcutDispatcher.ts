@@ -79,9 +79,6 @@ interface PendingSequence {
 const isModal = (options: ShortcutScopeOptions) =>
   options.modal ?? options.layer === "overlay";
 
-// Every dispatcher with a pending sequence, for isShortcutSequencePending()
-const liveDispatchers = new Set<ShortcutDispatcher>();
-
 export class ShortcutDispatcher {
   private readonly scopes = new Set<RegisteredScope>();
   private nextOrder = 0;
@@ -111,19 +108,9 @@ export class ShortcutDispatcher {
     return null;
   };
 
-  /** Whether a sequence with this prefix is waiting for its second key. */
-  isSequencePending(prefix: string): boolean {
-    return (
-      this.pending !== null &&
-      this.pending.prefix === prefix &&
-      Date.now() - this.pending.at < SEQUENCE_TIMEOUT_MS
-    );
-  }
-
   private listen() {
     if (this.listening) return;
     this.listening = true;
-    liveDispatchers.add(this);
     window.addEventListener("keydown", this.handleKeyDown);
   }
 
@@ -131,7 +118,6 @@ export class ShortcutDispatcher {
     if (!this.listening) return;
     this.listening = false;
     this.pending = null;
-    liveDispatchers.delete(this);
     window.removeEventListener("keydown", this.handleKeyDown);
   }
 
@@ -247,18 +233,6 @@ function focusInside(
   }
   const root = options.root();
   return root !== null && root.contains(target);
-}
-
-/**
- * Whether any dispatcher has a sequence with this prefix waiting for its
- * second key. `useMediaKeys` reads it (through `isInRatingMode`) until N4 moves
- * the player onto the stack.
- */
-export function isShortcutSequencePending(prefix: string): boolean {
-  for (const dispatcher of liveDispatchers) {
-    if (dispatcher.isSequencePending(prefix)) return true;
-  }
-  return false;
 }
 
 // Outside a provider (a component test) scopes share one dispatcher

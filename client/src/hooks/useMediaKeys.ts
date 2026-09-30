@@ -1,22 +1,8 @@
 import type React from "react";
-import { useEffect, useMemo } from "react";
-import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts";
-import { isInRatingMode } from "./useRatingHotkeys";
+import { useMemo } from "react";
+import type { ShortcutHandler } from "../contexts/shortcutDispatcher";
+import { useShortcutScope } from "./useShortcutScope";
 
-/**
- * Hook for video player keyboard shortcuts
- * Uses the new useKeyboardShortcuts hook with YouTube-standard shortcuts
- *
- * Note: Keys that conflict with rating hotkeys (f, 0-5) check isInRatingMode()
- * and skip handling when in rating mode, allowing useRatingHotkeys to handle them.
- *
- * @param {Object} options Configuration options
- * @param {Object} options.playerRef Ref to Video.js player instance
- * @param {Object} options.playlist Current playlist object
- * @param {Function} options.playNext Callback to play next in playlist
- * @param {Function} options.playPrevious Callback to play previous in playlist
- * @param {boolean} options.enabled Whether controls are enabled
- */
 interface VideoPlayer {
   paused: () => boolean;
   play: () => void;
@@ -37,19 +23,37 @@ interface UsePlaylistMediaKeysOptions {
   playNext: (() => void) | null;
   playPrevious: (() => void) | null;
   enabled?: boolean;
+  /** The player's element: keys act only while focus is inside it or on nothing */
+  root: () => Element | null;
 }
 
+/**
+ * The video player's keyboard shortcuts (YouTube-standard keys) as one
+ * `player` scope. The scope acts only while focus is inside the player's
+ * element or on nothing, so Space, the arrows and Home/End on the page's
+ * buttons, menus and tabs do their own job. An `r` sequence owns the key
+ * after it, so `r` then 5 rates and does not jump to 50%.
+ *
+ * @param {Object} options Configuration options
+ * @param {Object} options.playerRef Ref to Video.js player instance
+ * @param {Object} options.playlist Current playlist object
+ * @param {Function} options.playNext Callback to play next in playlist
+ * @param {Function} options.playPrevious Callback to play previous in playlist
+ * @param {boolean} options.enabled Whether controls are enabled
+ * @param {Function} options.root The player's element
+ */
 export const usePlaylistMediaKeys = ({
   playerRef,
   playlist,
   playNext,
   playPrevious,
   enabled = true,
+  root,
 }: UsePlaylistMediaKeysOptions) => {
   const hasPlaylist = playlist && playlist.scenes && playlist.scenes.length > 1;
 
   // Define all keyboard shortcuts for the video player
-  const shortcuts = useMemo(
+  const keys = useMemo<Record<string, ShortcutHandler>>(
     () => ({
       // ============================================================================
       // PLAYBACK CONTROL
@@ -156,37 +160,24 @@ export const usePlaylistMediaKeys = ({
       },
 
       // Number keys for percentage jumps (0-9)
-      // Note: 0-5 conflict with rating hotkeys (r + 0-5 = set rating)
-      // Return false when in rating mode to let event propagate to rating hotkeys
+      // r then 0-5 sets the rating: the sequence owns the key after r
       "0": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 0);
-        return undefined;
       },
       "1": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 10);
-        return undefined;
       },
       "2": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 20);
-        return undefined;
       },
       "3": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 30);
-        return undefined;
       },
       "4": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 40);
-        return undefined;
       },
       "5": () => {
-        if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 50);
-        return undefined;
       },
       "6": () => jumpToPercentage(playerRef, 60),
       "7": () => jumpToPercentage(playerRef, 70),
@@ -244,10 +235,8 @@ export const usePlaylistMediaKeys = ({
       // DISPLAY CONTROL
       // ============================================================================
 
-      // Note: 'f' conflicts with rating hotkey (r + f = toggle favorite)
-      // Return false when in rating mode to let event propagate to rating hotkeys
+      // r then f toggles the favorite: the sequence owns the key after r
       f: () => {
-        if (isInRatingMode()) return false;
         const player = playerRef.current;
         if (player) {
           if (player.isFullscreen()) {
@@ -256,7 +245,6 @@ export const usePlaylistMediaKeys = ({
             player.requestFullscreen();
           }
         }
-        return undefined;
       },
 
       // ============================================================================
@@ -268,49 +256,30 @@ export const usePlaylistMediaKeys = ({
             // Hardware media keys
             mediatracknext: () => playNext(),
             mediatrackprevious: () => playPrevious(),
+            // Shift+N and Shift+P (letters ignore shift in the key name, so
+            // the handlers check it)
+            n: (event: KeyboardEvent) => {
+              if (!event.shiftKey) return false;
+              playNext();
+              return undefined;
+            },
+            p: (event: KeyboardEvent) => {
+              if (!event.shiftKey) return false;
+              playPrevious();
+              return undefined;
+            },
           }
         : {}),
     }),
     [playerRef, hasPlaylist, playNext, playPrevious]
   );
 
-  // Use the video player shortcuts hook
-  useVideoPlayerShortcuts(playerRef, shortcuts, {
-    enabled: enabled && !!playerRef.current,
+  useShortcutScope({
+    layer: "player",
+    enabled,
+    root,
+    keys,
   });
-
-  // Handle Shift+N/P separately since buildKeyCombo ignores shift for letters
-  useEffect(() => {
-    if (!hasPlaylist || !playNext || !playPrevious || !enabled) return;
-
-    const handleShiftNav = (event: KeyboardEvent) => {
-      // Only handle if shift is pressed
-      if (!event.shiftKey) return;
-
-      // Don't handle if user is typing in an input field
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-      if (key === "n") {
-        event.preventDefault();
-        playNext();
-      } else if (key === "p") {
-        event.preventDefault();
-        playPrevious();
-      }
-    };
-
-    document.addEventListener("keydown", handleShiftNav);
-    return () => document.removeEventListener("keydown", handleShiftNav);
-  }, [hasPlaylist, playNext, playPrevious, enabled]);
 };
 
 /**
