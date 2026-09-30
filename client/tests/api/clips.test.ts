@@ -73,6 +73,14 @@ describe("getClips", () => {
     });
   });
 
+  it("sends count=false for a page alone, and nothing for a counted page", async () => {
+    await getClips({ page: 2, count: false });
+    await getClips({ page: 1 });
+
+    expect(mockApiGet).toHaveBeenNthCalledWith(1, "/clips?page=2&count=false");
+    expect(mockApiGet).toHaveBeenNthCalledWith(2, "/clips?page=1");
+  });
+
   it("sends no isGenerated for every clip", async () => {
     await getClips({ page: 1 });
 

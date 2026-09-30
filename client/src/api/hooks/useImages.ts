@@ -1,4 +1,5 @@
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { fetchListPage, libraryListTotal } from "../../utils/listQuery";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
@@ -14,8 +15,15 @@ export function useImageList(
     queryFn:
       params === null
         ? skipToken
-        : ({ signal }) => libraryApi.findImages(params, signal),
-    // Keep the current results on screen while the next page loads
+        : (context) =>
+            fetchListPage(
+              context,
+              params,
+              libraryListTotal("findImages"),
+              (request) => libraryApi.findImages(request, context.signal)
+            ),
+    // Keep the current results on screen while the next page loads; a page
+    // change reuses the list's count (`fetchListPage`)
     placeholderData: keepPreviousData,
   });
 }

@@ -15,6 +15,7 @@ import type {
   FindTagsMinimalResponse,
   FindTagsRequest,
   FindTagsResponse,
+  ListCount,
   TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
@@ -35,7 +36,7 @@ import { relationCountsHandler } from "./relationCounts.js";
 export const findTags = async (
   req: TypedLibraryRequest<FindTagsRequest>,
   res: TypedResponse<
-    FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse
+    FindTagsResponse<ListCount> | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
   // A ValidationError (400) reaches the central error handler

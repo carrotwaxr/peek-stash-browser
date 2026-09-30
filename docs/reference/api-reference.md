@@ -1166,6 +1166,8 @@ interface DuplicateCustomThemeResponse {
 
 Library browsing endpoints for scenes, performers, studios, tags, groups, galleries, and images.
 
+A list request (`POST /api/library/<entities>`) answers one page and the list's total, `find<Entities>.count`. With `filter.count: false` it answers the page alone and `count` is `null`: the client sends it on a page change of a list whose total it already holds, so the count statement is not run again. `GET /api/clips` takes the same flag as `count=false`, and then answers `total` and `totalPages` as `null`. Any other value of either answers 400. A detail page's tab counts (`GET /api/library/<entities>/:id/counts`) always count.
+
 ### POST /api/library/galleries
 
 **Authentication:** Required

@@ -27,6 +27,8 @@ export interface GetClipsOptions extends ClipFilterParams {
   sortDir?: ClipQueryInput["sortDir"];
   sceneId?: string;
   q?: string;
+  /** false: the page alone, `total` and `totalPages` null (a page change reusing its count) */
+  count?: false;
 }
 
 /** `GET /api/clips`, with every parameter as the server's contract names it */
@@ -57,6 +59,7 @@ export async function getClips(options: GetClipsOptions = {}) {
   }
   if (options.studioId) query.studioId = options.studioId;
   if (options.q) query.q = options.q;
+  if (options.count === false) query.count = "false";
 
   const queryString = new URLSearchParams(
     Object.entries(query).filter(

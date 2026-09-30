@@ -267,6 +267,28 @@ describe("Clips Controller", () => {
       expect(res._getBody()).toMatchObject({ totalPages: 3 }); // ceil(50/24) = 3
     });
 
+    it("count=false asks the service for the page alone and answers total and totalPages null", async () => {
+      mockClipService.getClips.mockResolvedValue({ clips: [], total: null });
+
+      const req = reqFor(getClips, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+        query: { page: "2", count: "false" },
+      });
+      const res = resFor(getClips);
+
+      await getClips(req, res);
+
+      expect(must(mockClipService.getClips.mock.calls[0])[0].request).toEqual(
+        objectContaining({ page: 2, count: false })
+      );
+      expect(res._getBody()).toMatchObject({
+        page: 2,
+        total: null,
+        totalPages: null,
+      });
+    });
+
     it("returns totalPages 0 when there are no results", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 

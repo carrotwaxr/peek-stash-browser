@@ -174,7 +174,8 @@ export interface ByRefsOptions {
 
 export interface ListResult<Entity> {
   items: Entity[];
-  total: number;
+  /** null when the request asked for no count (`count: false`) */
+  total: number | null;
 }
 
 /** The seed of a random sort no request set (the parser always sets one) */
@@ -305,7 +306,11 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     ctx: QueryContext
   ): Promise<void>;
 
-  /** One page and its total, as the viewer sees the library (invariant 3) */
+  /**
+   * One page and its total, as the viewer sees the library (invariant 3).
+   * A request with `count: false` reads the page alone and answers a null
+   * total: a page change of a list whose total the client already holds.
+   */
   async execute(options: ListQueryOptions<K>): Promise<ListResult<Entity>> {
     const startTime = Date.now();
     const { request } = options;
@@ -332,7 +337,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const queryMs = Date.now() - queryStart;
 
     const countStart = Date.now();
-    const total = await this.countRows(built);
+    const total = request.count === false ? null : await this.countRows(built);
     const countMs = Date.now() - countStart;
 
     const items = rows.map((row) => this.transformRow(row));
@@ -354,7 +359,8 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    * The total the request's list shows the viewer, as `execute` counts it,
    * without reading a page: the count statement only (a detail page's tab
    * counts, B19). The request's page and sort are not read, except for the
-   * shape a clause takes for its count.
+   * shape a clause takes for its count. It counts whatever the request's
+   * `count` flag says.
    */
   async count(options: ListQueryOptions<K>): Promise<number> {
     const { request } = options;

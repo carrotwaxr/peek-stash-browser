@@ -65,11 +65,12 @@ export class ClipService {
   }
 
   /**
-   * Get clips with filtering and pagination, as the viewer sees the library
+   * Get clips with filtering and pagination, as the viewer sees the library;
+   * the total is null when the request asked for no count
    */
   async getClips(
     options: ListQueryOptions<"clip">
-  ): Promise<{ clips: ClipWithRelations[]; total: number }> {
+  ): Promise<{ clips: ClipWithRelations[]; total: number | null }> {
     const { items, total } = await clipQueryBuilder.execute(options);
     return {
       clips: items.map((clip) => this.transformClip(clip)),

@@ -1,4 +1,6 @@
 // shared/types/api/clips.ts
+import type { ListCount } from "./library.js";
+
 /**
  * Clips API Types
  *
@@ -26,14 +28,17 @@ export interface GetClipsQuery extends Record<
   studioId?: string;
   q?: string;
   instanceId?: string;
+  /** "false": the page alone, `total` and `totalPages` null */
+  count?: string;
 }
 
-export interface GetClipsResponse {
+/** `total` and `totalPages` are null when the request said `count=false` */
+export interface GetClipsResponse<Count extends ListCount = number> {
   clips: unknown[];
-  total: number;
+  total: Count;
   page: number;
   perPage: number;
-  totalPages: number;
+  totalPages: Count;
 }
 
 // =============================================================================

@@ -129,7 +129,7 @@ async function recordScenePage(filter: {
   return {
     limit: params[params.length - 2],
     offset: params[params.length - 1],
-    count: found.count,
+    count: must(found.count, "the list's total"),
     ids: found.scenes.map((s) => s.id),
   };
 }
