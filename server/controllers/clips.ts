@@ -1,3 +1,4 @@
+import { ValidationError } from "../middleware/errorHandler.js";
 import { clipService } from "../services/ClipService.js";
 import type {
   GetClipByIdParams,
@@ -8,16 +9,20 @@ import type {
   GetClipsQuery,
   GetClipsResponse,
 } from "../types/api/clips.js";
-import type { ApiErrorResponse } from "../types/api/common.js";
+import type {
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
+} from "../types/api/common.js";
 import type {
   TypedLibraryRequest,
   TypedResponse,
 } from "../types/api/express.js";
 import {
   parseClipQuery,
+  parseFilterRef,
   parseSceneClipsRequest,
-  parseStashId,
 } from "../utils/listRequest.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * GET /api/clips
@@ -52,26 +57,53 @@ export const getClips = async (
 
 /**
  * GET /api/clips/:id
- * Get single clip, on the user's instances, with their exclusions
+ * Get single clip, on the user's instances, with their exclusions. `:id` is
+ * `id` or `id:instanceId`; a bare id held by several instances answers 400.
  */
 export const getClipById = async (
   req: TypedLibraryRequest<never, GetClipByIdParams>,
-  res: TypedResponse<GetClipByIdResponse | ApiErrorResponse>
+  res: TypedResponse<
+    GetClipByIdResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
-  // A ValidationError (400) reaches the central error handler
-  const id = parseStashId(req.params.id, "id");
+  const ref = parseFilterRef(req.params.id);
+  if (!ref) {
+    // A ValidationError (400) reaches the central error handler
+    throw new ValidationError("Invalid request", {
+      issues: [{ path: "id", message: "Expected an id or id:instanceId" }],
+    });
+  }
 
   const userId = req.user.id;
   const { allowedInstanceIds } = req;
 
-  const clip = await clipService.getClipById({
+  const clips = await clipService.getClipById({
     userId,
     allowedInstanceIds,
-    id,
+    ref,
   });
 
+  const [clip] = clips;
   if (!clip) {
     res.status(404).json({ error: "Clip not found" });
+    return;
+  }
+
+  if (clips.length > 1) {
+    logger.warn("Ambiguous clip lookup", {
+      id: ref.id,
+      matchCount: clips.length,
+      instances: clips.map((c) => c.instanceId),
+    });
+    res.status(400).json({
+      error: "Ambiguous lookup",
+      message: `Multiple clips found with ID ${ref.id}. Use id:instanceId.`,
+      matches: clips.map((c) => ({
+        id: c.id,
+        title: c.title,
+        instanceId: c.instanceId,
+      })),
+    });
     return;
   }
 
@@ -80,8 +112,8 @@ export const getClipById = async (
 
 /**
  * GET /api/scenes/:id/clips
- * Get clips for a scene: the scene on the `instanceId` parameter's instance,
- * else its id on every instance the user sees
+ * Get clips for a scene: the scene on the required `instanceId` parameter's
+ * instance
  */
 export const getClipsForScene = async (
   req: TypedLibraryRequest<
@@ -97,13 +129,13 @@ export const getClipsForScene = async (
   });
 
   const userId = req.user.id;
-  const { sceneId, includeUngenerated, specificInstanceId } = request;
+  const { sceneId, includeUngenerated, instanceId } = request;
   const { allowedInstanceIds } = req;
 
   const clips = await clipService.getClipsForScene({
     userId,
     allowedInstanceIds,
-    scene: { id: sceneId, instanceId: specificInstanceId },
+    scene: { id: sceneId, instanceId },
     includeUngenerated,
   });
 

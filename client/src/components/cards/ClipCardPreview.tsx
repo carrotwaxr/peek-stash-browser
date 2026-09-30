@@ -16,7 +16,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
 
   // Get preview URLs (every clip from the API carries its instance)
   const previewUrl = clip.isGenerated
-    ? getClipPreviewUrl(clip.id, clip.instanceId ?? "")
+    ? getClipPreviewUrl(clip.id, clip.instanceId)
     : null;
   // Prefer the marker's own screenshot over the scene cover
   const screenshotUrl =

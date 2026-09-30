@@ -40,12 +40,12 @@ describe("ClipService", () => {
   });
 
   describe("getClipById", () => {
-    it("should return null for non-existent clip", async () => {
-      const clip = await clipService.getClipById({
+    it("should return no clip for a non-existent clip", async () => {
+      const clips = await clipService.getClipById({
         ...VIEWER,
-        id: "999999999",
+        ref: { id: "999999999", instanceId: undefined },
       });
-      expect(clip).toBeNull();
+      expect(clips).toEqual([]);
     });
   });
 
@@ -74,11 +74,16 @@ describe("ClipService", () => {
         },
       };
 
-      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce(rawClip);
+      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce([
+        rawClip,
+      ]);
 
-      const clip = await clipService.getClipById({ ...VIEWER, id: "marker-1" });
+      const [clip] = await clipService.getClipById({
+        ...VIEWER,
+        ref: { id: "marker-1", instanceId: undefined },
+      });
 
-      expect(clip).not.toBeNull();
+      expect(clip).toBeDefined();
       expect(must(clip).screenshotUrl).toBe(
         `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/42/screenshot")}&instanceId=default`
       );
@@ -119,11 +124,16 @@ describe("ClipService", () => {
         },
       };
 
-      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce(rawClip);
+      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce([
+        rawClip,
+      ]);
 
-      const clip = await clipService.getClipById({ ...VIEWER, id: "marker-2" });
+      const [clip] = await clipService.getClipById({
+        ...VIEWER,
+        ref: { id: "marker-2", instanceId: undefined },
+      });
 
-      expect(clip).not.toBeNull();
+      expect(clip).toBeDefined();
       expect(must(clip).screenshotUrl).toBeNull();
     });
 
@@ -151,11 +161,16 @@ describe("ClipService", () => {
         },
       };
 
-      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce(rawClip);
+      vi.spyOn(clipQueryBuilder, "getClipById").mockResolvedValueOnce([
+        rawClip,
+      ]);
 
-      const clip = await clipService.getClipById({ ...VIEWER, id: "marker-3" });
+      const [clip] = await clipService.getClipById({
+        ...VIEWER,
+        ref: { id: "marker-3", instanceId: undefined },
+      });
 
-      expect(clip).not.toBeNull();
+      expect(clip).toBeDefined();
       expect(must(clip).screenshotUrl).toBe(
         `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/99/screenshot")}&instanceId=${encodeURIComponent("instance-2")}`
       );

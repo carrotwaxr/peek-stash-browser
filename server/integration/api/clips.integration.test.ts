@@ -99,6 +99,61 @@ describe("Clip endpoints (integration)", () => {
     expect(ofHiddenScene.status).toBe(404);
   });
 
+  it("GET /api/clips/:id with a bare id held by two instances answers the ambiguous 400 with matches", async () => {
+    // Clip SAME is on A only; the same id on B, whose scene SAME exists too
+    await prisma.stashClip.create({
+      data: {
+        id: FX_ID.SAME,
+        stashInstanceId: FX.B,
+        sceneId: FX_ID.SAME,
+        sceneInstanceId: FX.B,
+        seconds: 1,
+      },
+    });
+    try {
+      const response = await adminClient.get<{
+        error: string;
+        matches: { id: string; instanceId: string }[];
+      }>(`/api/clips/${FX_ID.SAME}`);
+
+      expect(response.status).toBe(400);
+      expect(response.data.error).toBe("Ambiguous lookup");
+      expect(
+        response.data.matches
+          .map((m) => `${m.id}@${m.instanceId}`)
+          .sort((a, b) => a.localeCompare(b))
+      ).toEqual([`${FX_ID.SAME}@${FX.A}`, `${FX_ID.SAME}@${FX.B}`]);
+    } finally {
+      await prisma.stashClip.delete({
+        where: {
+          id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.B },
+        },
+      });
+    }
+  });
+
+  it("GET /api/clips/<id>:<instance> answers that instance's clip", async () => {
+    const own = await reader.client.get<ListedClip>(
+      `/api/clips/${FX_ID.SAME}:${FX.A}`
+    );
+    expect(own.status).toBe(200);
+    expect(keyOf(own.data)).toBe(`${FX_ID.SAME}@${FX.A}`);
+
+    // The id on an instance that holds no such clip
+    const other = await reader.client.get(`/api/clips/${FX_ID.SAME}:${FX.B}`);
+    expect(other.status).toBe(404);
+
+    const malformed = await reader.client.get(`/api/clips/${FX_ID.SAME}:a%20b`);
+    expect(malformed.status).toBe(400);
+  });
+
+  it("GET /api/scenes/:id/clips without instanceId answers 400", async () => {
+    const response = await reader.client.get(
+      `/api/scenes/${FX_ID.SAME}/clips?includeUngenerated=true`
+    );
+    expect(response.status).toBe(400);
+  });
+
   it("a scene's clips leave out a disabled instance's and a hidden scene's", async () => {
     const own = await reader.client.get<{ clips: ListedClip[] }>(
       `/api/scenes/${FX_ID.SAME}/clips?includeUngenerated=true&instanceId=${FX.A}`
@@ -107,13 +162,13 @@ describe("Clip endpoints (integration)", () => {
     expect(own.data.clips.map(keyOf)).toEqual([`${FX_ID.SAME}@${FX.A}`]);
 
     const onDisabled = await reader.client.get<{ clips: ListedClip[] }>(
-      `/api/scenes/${FX_ID.ON_OFF}/clips?includeUngenerated=true`
+      `/api/scenes/${FX_ID.ON_OFF}/clips?includeUngenerated=true&instanceId=${FX.OFF}`
     );
     expect(onDisabled.ok).toBe(true);
     expect(onDisabled.data.clips).toEqual([]);
 
     const ofHidden = await reader.client.get<{ clips: ListedClip[] }>(
-      `/api/scenes/${FX_ID.GLOBAL}/clips?includeUngenerated=true`
+      `/api/scenes/${FX_ID.GLOBAL}/clips?includeUngenerated=true&instanceId=${FX.A}`
     );
     expect(ofHidden.ok).toBe(true);
     expect(ofHidden.data.clips).toEqual([]);

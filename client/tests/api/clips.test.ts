@@ -7,7 +7,7 @@
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "@/api/client";
-import { getClipPreviewUrl, getClips } from "@/api/clips";
+import { getClipPreviewUrl, getClips, getClipsForScene } from "@/api/clips";
 
 vi.mock("@/api/client", () => ({
   apiGet: vi.fn(),
@@ -77,5 +77,31 @@ describe("getClips", () => {
     await getClips({ page: 1 });
 
     expect(mockApiGet).toHaveBeenCalledWith("/clips?page=1");
+  });
+});
+
+describe("getClipsForScene", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiGet.mockResolvedValue({});
+  });
+
+  it("always names the scene's instance", async () => {
+    await getClipsForScene("42", "inst a");
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/scenes/42/clips?instanceId=inst+a"
+    );
+  });
+
+  it("asks for ungenerated clips too on request", async () => {
+    await getClipsForScene("42", "server-a", true);
+
+    const url = must(mockApiGet.mock.calls[0])[0];
+    expect(url.startsWith("/scenes/42/clips?")).toBe(true);
+    expect(Object.fromEntries(new URLSearchParams(url.split("?")[1]))).toEqual({
+      includeUngenerated: "true",
+      instanceId: "server-a",
+    });
   });
 });

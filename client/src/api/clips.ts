@@ -66,18 +66,15 @@ export async function getClips(options: GetClipsOptions = {}) {
   return apiGet(`/clips${queryString ? `?${queryString}` : ""}`);
 }
 
+/** `GET /api/scenes/:id/clips`: the scene on its own instance, which the server requires */
 export async function getClipsForScene(
   sceneId: string,
-  instanceId?: string,
+  instanceId: string,
   includeUngenerated = false
 ) {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ instanceId });
   if (includeUngenerated) params.set("includeUngenerated", "true");
-  if (instanceId) params.set("instanceId", instanceId);
-  const queryString = params.toString();
-  return apiGet(
-    `/scenes/${sceneId}/clips${queryString ? `?${queryString}` : ""}`
-  );
+  return apiGet(`/scenes/${sceneId}/clips?${params.toString()}`);
 }
 
 /**

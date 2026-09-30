@@ -582,18 +582,18 @@ describe("ClipQueryBuilder", () => {
     });
   });
 
-  describe("a clip by id", () => {
-    it("matches the id on every allowed instance, with both exclusion joins, no LIMIT", async () => {
+  describe("a clip by ref", () => {
+    it("a bare id matches every allowed instance, with both exclusion joins, no LIMIT", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
-      const clip = await clipQueryBuilder.getClipById({
+      const clips = await clipQueryBuilder.getClipById({
         userId: 7,
         allowedInstanceIds: ALLOWED,
-        id: "101",
+        ref: bare("101"),
       });
 
-      expect(clip).toBeNull();
+      expect(clips).toEqual([]);
       expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
       const { sql, params } = statement(0);
       expect(sql).toContain("e.entityType = 'clip'");
@@ -605,22 +605,37 @@ describe("ClipQueryBuilder", () => {
       expect(params).toEqual([7, 7, "inst-a", "inst-b", "101"]);
     });
 
-    it("returns the row with its tags", async () => {
+    it("id:instanceId matches that instance only", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+      await clipQueryBuilder.getClipById({
+        userId: 7,
+        allowedInstanceIds: ALLOWED,
+        ref: { id: "101", instanceId: "inst-b" },
+      });
+
+      const { sql, params } = statement(0);
+      expect(sql).toContain("((c.id = ? AND c.stashInstanceId = ?))");
+      expect(params).toEqual([7, 7, "inst-a", "inst-b", "101", "inst-b"]);
+    });
+
+    it("returns every matching row with its tags", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([clipRow()])
         // Its primary tag and its tags
         .mockResolvedValue([]);
 
-      const clip = await clipQueryBuilder.getClipById({
+      const clips = await clipQueryBuilder.getClipById({
         userId: 7,
         allowedInstanceIds: ALLOWED,
-        id: "101",
+        ref: bare("101"),
       });
 
-      expect(clip).toEqual(
-        objectContaining({ id: "101", instanceId: "inst-a", tags: [] })
-      );
+      expect(clips).toEqual([
+        objectContaining({ id: "101", instanceId: "inst-a", tags: [] }),
+      ]);
     });
   });
 });

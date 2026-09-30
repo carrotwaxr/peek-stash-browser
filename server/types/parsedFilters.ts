@@ -170,8 +170,8 @@ export interface ParsedSceneClipsQuery {
   readonly sceneId: string;
   /** Clips without a generated preview too; false when absent */
   readonly includeUngenerated: boolean;
-  /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
-  readonly specificInstanceId: string | undefined;
+  /** The required `instanceId` parameter, INSTANCE_ID_PATTERN */
+  readonly instanceId: string;
 }
 
 /** `GET /api/library/scenes/:id/similar`: 12 scenes a page */

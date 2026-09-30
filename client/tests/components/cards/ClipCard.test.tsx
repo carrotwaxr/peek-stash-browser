@@ -17,6 +17,7 @@ const mockClip = {
   seconds: 120,
   endSeconds: 180,
   sceneId: "scene-1",
+  instanceId: "inst-a",
   isGenerated: true,
   primaryTag: { id: "tag-1", name: "Action", color: "#ff0000" },
   tags: [],

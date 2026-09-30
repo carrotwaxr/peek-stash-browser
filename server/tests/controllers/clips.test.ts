@@ -298,7 +298,7 @@ describe("Clips Controller", () => {
         id: "101",
         title: "Test Clip",
       });
-      mockClipService.getClipById.mockResolvedValue(clip);
+      mockClipService.getClipById.mockResolvedValue([clip]);
 
       const req = reqFor(getClipById, {
         params: { id: "101" },
@@ -312,14 +312,60 @@ describe("Clips Controller", () => {
       expect(mockClipService.getClipById).toHaveBeenCalledWith({
         userId: 1,
         allowedInstanceIds: ALLOWED,
-        id: "101",
+        ref: { id: "101", instanceId: undefined },
       });
       expect(res._getStatus()).toBe(200);
       expect(res._getBody()).toEqual(clip);
     });
 
+    it("reads id:instanceId as the clip on that instance", async () => {
+      const clip: ClipWithRelations = partialRow({ id: "101" });
+      mockClipService.getClipById.mockResolvedValue([clip]);
+
+      const req = reqFor(getClipById, {
+        params: { id: "101:inst-2" },
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+      const res = resFor(getClipById);
+
+      await getClipById(req, res);
+
+      expect(mockClipService.getClipById).toHaveBeenCalledWith({
+        userId: 1,
+        allowedInstanceIds: ALLOWED,
+        ref: { id: "101", instanceId: "inst-2" },
+      });
+      expect(res._getStatus()).toBe(200);
+    });
+
+    it("a bare id held by two instances answers the ambiguous 400 with matches", async () => {
+      mockClipService.getClipById.mockResolvedValue([
+        partialRow({ id: "101", title: "One", instanceId: "inst-1" }),
+        partialRow({ id: "101", title: "Two", instanceId: "inst-2" }),
+      ]);
+
+      const req = reqFor(getClipById, {
+        params: { id: "101" },
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+      const res = resFor(getClipById);
+
+      await getClipById(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toMatchObject({
+        error: "Ambiguous lookup",
+        matches: [
+          { id: "101", title: "One", instanceId: "inst-1" },
+          { id: "101", title: "Two", instanceId: "inst-2" },
+        ],
+      });
+    });
+
     it("returns 404 when clip is not found", async () => {
-      mockClipService.getClipById.mockResolvedValue(null);
+      mockClipService.getClipById.mockResolvedValue([]);
 
       const req = reqFor(getClipById, {
         params: { id: "999999" },
@@ -334,20 +380,23 @@ describe("Clips Controller", () => {
       expect(res._getBody()).toMatchObject({ error: "Clip not found" });
     });
 
-    it("an id that is not a Stash id answers 400 before any query", async () => {
-      const req = reqFor(getClipById, {
-        params: { id: "nonexistent" },
-        user: USER,
-        allowedInstanceIds: ALLOWED,
-      });
-      const res = resFor(getClipById);
+    it.each(["nonexistent", "101:inst 1", "101:"])(
+      "an id that is not a Stash ref (%s) answers 400 before any query",
+      async (id) => {
+        const req = reqFor(getClipById, {
+          params: { id },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        });
+        const res = resFor(getClipById);
 
-      await expect(getClipById(req, res)).rejects.toMatchObject({
-        statusCode: 400,
-        issues: [{ path: "id" }],
-      });
-      expect(mockClipService.getClipById).not.toHaveBeenCalled();
-    });
+        await expect(getClipById(req, res)).rejects.toMatchObject({
+          statusCode: 400,
+          issues: [{ path: "id" }],
+        });
+        expect(mockClipService.getClipById).not.toHaveBeenCalled();
+      }
+    );
 
     it("a failure reaches the error handler: the service throws", async () => {
       mockClipService.getClipById.mockRejectedValue(new Error("Unexpected"));
@@ -379,6 +428,7 @@ describe("Clips Controller", () => {
         params: { id: "42" },
         user: USER,
         allowedInstanceIds: ALLOWED,
+        query: { instanceId: "inst-1" },
       });
       const res = resFor(getClipsForScene);
 
@@ -387,7 +437,7 @@ describe("Clips Controller", () => {
       expect(mockClipService.getClipsForScene).toHaveBeenCalledWith({
         userId: 1,
         allowedInstanceIds: ALLOWED,
-        scene: { id: "42", instanceId: undefined },
+        scene: { id: "42", instanceId: "inst-1" },
         includeUngenerated: false,
       });
       expect(res._getStatus()).toBe(200);
@@ -403,6 +453,7 @@ describe("Clips Controller", () => {
         allowedInstanceIds: ALLOWED,
         query: {
           includeUngenerated: "true",
+          instanceId: "inst-1",
         },
       });
       const res = resFor(getClipsForScene);
@@ -412,7 +463,7 @@ describe("Clips Controller", () => {
       expect(mockClipService.getClipsForScene).toHaveBeenCalledWith({
         userId: 1,
         allowedInstanceIds: ALLOWED,
-        scene: { id: "42", instanceId: undefined },
+        scene: { id: "42", instanceId: "inst-1" },
         includeUngenerated: true,
       });
     });
@@ -441,10 +492,15 @@ describe("Clips Controller", () => {
     });
 
     it.each([
-      ["id", { id: "scene-1" }, {}],
-      ["includeUngenerated", { id: "42" }, { includeUngenerated: "yes" }],
+      ["id", { id: "scene-1" }, { instanceId: "inst-1" }],
+      [
+        "includeUngenerated",
+        { id: "42" },
+        { includeUngenerated: "yes", instanceId: "inst-1" },
+      ],
       ["instanceId", { id: "42" }, { instanceId: "inst 1" }],
-      ["sort", { id: "42" }, { sort: "title" }],
+      ["instanceId", { id: "42" }, {}],
+      ["sort", { id: "42" }, { sort: "title", instanceId: "inst-1" }],
     ])(
       "a bad %s answers 400 before any query",
       async (path, params: { id: string }, query: Record<string, string>) => {
@@ -470,6 +526,7 @@ describe("Clips Controller", () => {
       const req = reqFor(getClipsForScene, {
         params: { id: "42" },
         user: USER,
+        query: { instanceId: "inst-1" },
         allowedInstanceIds: ALLOWED,
       });
       const res = resFor(getClipsForScene);
