@@ -1,3 +1,4 @@
+import { ENTITY_KINDS } from "@peek/shared-types/filters/index.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
@@ -368,23 +369,13 @@ export const updateUserSettings = async (
     }
 
     if (tableColumnDefaults !== null) {
-      const validEntityTypes = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ];
-
       // The body is untrusted: a value may be null or lack either array
       const submittedDefaults = tableColumnDefaults as Record<
         string,
         Partial<TableColumnsConfig> | null | undefined
       >;
       for (const [entityType, config] of Object.entries(submittedDefaults)) {
-        if (!validEntityTypes.includes(entityType)) {
+        if (!(ENTITY_KINDS as readonly string[]).includes(entityType)) {
           res.status(400).json({
             error: `Invalid entity type in table column defaults: ${entityType}`,
           });

@@ -301,7 +301,7 @@ export const previewCarousel = async (
  * Runs a carousel's parsed scene query for the user: their exclusions
  * (applyExclusions defaults to true) and only their instances (enabled,
  * selected and past their first sync; invariant 11). The routes answer 503
- * before this when the user has none, since an empty list filters nothing.
+ * before this when the user has none (an empty list matches nothing).
  *
  * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
  */

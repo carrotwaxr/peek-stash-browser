@@ -835,6 +835,23 @@ describe("Auth Middleware", () => {
       expect(nextFn).not.toHaveBeenCalled();
     });
 
+    it("requireCacheReady passes a failed instance lookup on (next(error) or a rejection), never the 503 initializing answer", async () => {
+      mockAllowedInstances.mockRejectedValue(new Error("DB connection lost"));
+      const req = createMockReq({ user: MOCK_USER });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      const outcome = await requireCacheReady(req, res, nextFn).then(
+        () => null,
+        (error: unknown) => error
+      );
+
+      const forwarded =
+        outcome ?? (nextFn.mock.calls[0] as unknown[] | undefined)?.[0];
+      expect(forwarded).toBeInstanceOf(Error);
+      expect(statusFn).not.toHaveBeenCalledWith(503);
+      expect(jsonFn).not.toHaveBeenCalled();
+    });
+
     it("answers 401 without a signed-in user", async () => {
       const req = createMockReq();
       const { res, statusFn } = createMockRes();

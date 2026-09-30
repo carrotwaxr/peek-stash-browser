@@ -24,6 +24,7 @@ import {
   exclusionJoin,
   idClause,
   instanceClause,
+  instanceColumnClause,
   pairs,
   randomOrder,
   refClause,
@@ -292,6 +293,43 @@ describe("instanceClause", () => {
 
   it("an empty allowed list matches nothing", () => {
     expect(instanceClause("s", [])).toEqual({ sql: "1 = 0", params: [] });
+  });
+});
+
+describe("instanceColumnClause", () => {
+  it("an empty list is `1 = 0`", () => {
+    expect(instanceColumnClause("s.stashInstanceId", [])).toEqual({
+      sql: "1 = 0",
+      params: [],
+    });
+  });
+
+  it("one id is an IN on the column as given", () => {
+    expect(instanceColumnClause("x.stashInstanceId", [A])).toEqual({
+      sql: "x.stashInstanceId IN (?)",
+      params: ["inst-a"],
+    });
+  });
+
+  it("several ids are one IN with a placeholder each, in order", () => {
+    expect(instanceColumnClause("s.stashInstanceId", [A, B, "inst-c"])).toEqual(
+      {
+        sql: "s.stashInstanceId IN (?, ?, ?)",
+        params: ["inst-a", "inst-b", "inst-c"],
+      }
+    );
+  });
+
+  it("takes any column expression", () => {
+    expect(instanceColumnClause("p.instanceId", [A]).sql).toBe(
+      "p.instanceId IN (?)"
+    );
+  });
+
+  it("instanceClause is the alias's stashInstanceId column", () => {
+    expect(instanceClause("g", [A, B])).toEqual(
+      instanceColumnClause("g.stashInstanceId", [A, B])
+    );
   });
 });
 

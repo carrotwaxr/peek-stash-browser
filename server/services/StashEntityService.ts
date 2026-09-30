@@ -37,6 +37,7 @@ import {
   buildSceneStreams,
   inferStashStreamOptions,
 } from "../utils/sceneStreams.js";
+import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   getGalleryFallbackTitle,
@@ -45,7 +46,6 @@ import {
 } from "../utils/titleUtils.js";
 import type { ScoringScene } from "./RecommendationScoringService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { buildInstanceFilterClause } from "./UserInstanceService.js";
 import {
   galleryRef,
   groupRef,
@@ -248,9 +248,9 @@ class StashEntityService {
     allowedInstanceIds: string[]
   ): Promise<ScoringScene[]> {
     const startTime = Date.now();
-    const instanceFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "s.stashInstanceId"
+    const instanceFilter = instanceColumnClause(
+      "s.stashInstanceId",
+      allowedInstanceIds
     );
 
     const sql = `

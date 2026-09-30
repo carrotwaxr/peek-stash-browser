@@ -29,10 +29,10 @@ import type {
 } from "../types/internal/queryRows.js";
 import { type EntityRef, distinctRefs, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
+import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
-import { buildInstanceFilterClause } from "./UserInstanceService.js";
 
 /** The preview thumbnails a playlist shows */
 const PREVIEW_COUNT = 4;
@@ -101,10 +101,9 @@ function visibleItem(
   userId: number,
   allowedInstanceIds: readonly string[]
 ): { join: Fragment; where: Fragment } {
-  const instances = buildInstanceFilterClause(
-    [...allowedInstanceIds],
-    "s.stashInstanceId"
-  );
+  const instances = instanceColumnClause("s.stashInstanceId", [
+    ...allowedInstanceIds,
+  ]);
   return {
     join: {
       sql: `CROSS JOIN StashScene s ON s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId
