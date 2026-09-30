@@ -1,19 +1,35 @@
-import { type ReactNode, useCallback, useMemo, useState } from "react";
-import deepEqual from "fast-deep-equal";
-import { libraryApi } from "../../api";
-import { useAuth } from "../../hooks/useAuth";
+import { type ReactNode, useCallback, useMemo } from "react";
+import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
+import type { LibrarySearchParams } from "../../api";
+import {
+  useGalleryList,
+  useGroupList,
+  usePerformerList,
+  useStudioList,
+} from "../../api/hooks";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
+import { queryKeys } from "../../api/queryKeys";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import {
+  useFilterOptions,
+  useListDefaults,
+  useLockedFields,
+} from "../../hooks/useListOptions";
+import { useListUrlState } from "../../hooks/useListUrlState";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
 import SearchControls from "./SearchControls";
 import SearchResults from "./SearchResults";
 
-type EntityType =
-  | "scene"
-  | "performer"
-  | "gallery"
-  | "group"
-  | "studio"
-  | "tag"
-  | "image";
+/** The entities a detail tab lists through this grid */
+type EntityType = "performer" | "gallery" | "group" | "studio";
+
+/** A card's hide callback: the hidden entity, its type and its instance */
+type CardHideHandler = (
+  entityId: string,
+  entityType: string,
+  instanceId?: string
+) => void;
 
 export interface SearchableGridProps {
   entityType: EntityType;
@@ -23,18 +39,73 @@ export interface SearchableGridProps {
     item: unknown,
     index: number,
     helpers: {
-      /** Drops the hidden item: the id on that instance, not its namesakes */
-      onHideSuccess: (entityId: string, instanceId?: string) => void;
+      /**
+       * The card's `onHideSuccess`, one function for the whole grid: drops
+       * the hidden item, the id on that instance, not its namesakes
+       */
+      onHideSuccess: CardHideHandler;
     }
   ) => ReactNode;
   defaultSort?: string;
-  defaultFilters?: Record<string, unknown>;
-  onResultsChange?: (results: { items: unknown[]; count: number }) => void;
   emptyMessage?: string;
   emptyDescription?: string;
   skeletonCount?: number;
   density?: "small" | "medium" | "large";
 }
+
+type ListResult = UseQueryResult;
+type ListRequest = Record<string, unknown> | null;
+
+/**
+ * Each entity's list hook, its query key and where its response holds the
+ * page. The hooks share one shape, so the one an instance calls never changes
+ * the hook order.
+ */
+const LISTS: Record<
+  EntityType,
+  {
+    useList: (request: ListRequest) => ListResult;
+    listKey: (params: Record<string, unknown>) => readonly unknown[];
+    result: string;
+    items: string;
+  }
+> = {
+  performer: {
+    useList: (request) =>
+      usePerformerList(request as LibrarySearchParams<"performer"> | null),
+    listKey: (params) => queryKeys.performers.list(undefined, params),
+    result: "findPerformers",
+    items: "performers",
+  },
+  gallery: {
+    useList: (request) =>
+      useGalleryList(request as LibrarySearchParams<"gallery"> | null),
+    listKey: (params) => queryKeys.galleries.list(undefined, params),
+    result: "findGalleries",
+    items: "galleries",
+  },
+  group: {
+    useList: (request) =>
+      useGroupList(request as LibrarySearchParams<"group"> | null),
+    listKey: (params) => queryKeys.groups.list(undefined, params),
+    result: "findGroups",
+    items: "groups",
+  },
+  studio: {
+    useList: (request) =>
+      useStudioList(request as LibrarySearchParams<"studio"> | null),
+    listKey: (params) => queryKeys.studios.list(undefined, params),
+    result: "findStudios",
+    items: "studios",
+  },
+};
+
+type Row = Record<string, unknown>;
+type ListPage = Record<string, { count?: number } & Record<string, unknown>>;
+
+const NO_ROWS: Row[] = [];
+const NO_LOCKS: Record<string, unknown> = {};
+const GRID_ONLY = ["grid"] as const;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -60,183 +131,129 @@ function withLockedFilters(
   return merged;
 }
 
+/**
+ * A detail tab's list (a studio's Performers, a tag's Galleries): its state
+ * in the URL, its page through the entity's list hook and the query cache,
+ * so a slower earlier response never replaces a later one.
+ */
 export const SearchableGrid = ({
   entityType,
-  lockedFilters = {},
+  lockedFilters = NO_LOCKS,
   hideLockedFilters = false,
   renderItem,
   defaultSort = "name",
-
-  defaultFilters: _defaultFilters = {},
-  onResultsChange,
   emptyMessage,
   emptyDescription,
   skeletonCount = 24,
   density = "medium",
 }: SearchableGridProps) => {
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
-
-  const [lastQuery, setLastQuery] = useState<Record<string, unknown> | null>(
-    null
+  const list = LISTS[entityType];
+  const queryClient = useQueryClient();
+  const { unitPreference } = useUnitPreference();
+  const filterOptions = useFilterOptions(entityType);
+  const lockedFields = useLockedFields(entityType, lockedFilters);
+  const defaults = useListDefaults(entityType, defaultSort);
+  const sortOptions = useCallback(
+    (filters: Record<string, unknown>) => sortOptionsFor(entityType, filters),
+    [entityType]
   );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [data, setData] = useState<Array<Record<string, unknown>>>([]);
-  const [totalCount, setTotalCount] = useState(0);
 
-  // API method and key mappings (memoized to avoid recreating on each render)
-  const { apiMethod, responseKey, dataKey } = useMemo(() => {
-    const apiMethods = {
-      scene: "findScenes",
-      performer: "findPerformers",
-      gallery: "findGalleries",
-      group: "findGroups",
-      studio: "findStudios",
-      tag: "findTags",
-      image: "findImages",
-    };
+  const listState = useListUrlState({
+    entityType,
+    filterOptions,
+    sortOptions,
+    viewModes: GRID_ONLY,
+    defaults,
+    permanentFilters: lockedFilters,
+    lockedFields,
+  });
 
-    const responseKeys = {
-      scene: "findScenes",
-      performer: "findPerformers",
-      gallery: "findGalleries",
-      group: "findGroups",
-      studio: "findStudios",
-      tag: "findTags",
-      image: "findImages",
-    };
-
-    const dataKeys = {
-      scene: "scenes",
-      performer: "performers",
-      gallery: "galleries",
-      group: "groups",
-      studio: "studios",
-      tag: "tags",
-      image: "images",
-    };
-
-    return {
-      apiMethod: apiMethods[entityType],
-      responseKey: responseKeys[entityType],
-      dataKey: dataKeys[entityType],
-    };
-  }, [entityType]);
-
-  const handleQueryChange = useCallback(
-    async (newQuery: Record<string, unknown>) => {
-      if (isAuthLoading || !isAuthenticated) {
-        return;
-      }
-
-      const mergedQuery = withLockedFilters(newQuery, lockedFilters);
-
-      // Avoid duplicate queries
-      if (lastQuery && deepEqual(mergedQuery, lastQuery)) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setLastQuery(mergedQuery);
-        setError(null);
-
-        const fetchPage = (
-          libraryApi as unknown as Record<
-            string,
-            (
-              params: unknown
-            ) => Promise<Record<string, Record<string, unknown>>>
-          >
-        )[apiMethod];
-        if (!fetchPage) {
-          throw new Error(`Unknown library method: ${apiMethod}`);
-        }
-        const result = await fetchPage(mergedQuery);
-        const items = (result[responseKey]?.[dataKey] || []) as Array<
-          Record<string, unknown>
-        >;
-        const count = (result[responseKey]?.count || 0) as number;
-
-        setData(items);
-        setTotalCount(count);
-        onResultsChange?.({ items, count });
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [
-      apiMethod,
-      responseKey,
-      dataKey,
+  const { ready, filters, sort, page, perPage, q } = listState;
+  const request = useMemo(() => {
+    const query = buildListQuery(
+      entityType,
+      { ready, filters, sort, page, perPage, q },
       lockedFilters,
-      lastQuery,
-      isAuthLoading,
-      isAuthenticated,
-      onResultsChange,
-    ]
-  );
+      unitPreference
+    );
+    return query ? withLockedFilters(query, lockedFilters) : null;
+  }, [
+    entityType,
+    ready,
+    filters,
+    sort,
+    page,
+    perPage,
+    q,
+    lockedFilters,
+    unitPreference,
+  ]);
 
-  // Handle successful hide - remove item from local state
-  const handleHideSuccess = useCallback(
-    (entityId: string, instanceId?: string) => {
+  const { data, error, isPending, isPlaceholderData, refetch } =
+    list.useList(request);
+  const response = (data as ListPage | undefined)?.[list.result];
+  const items = (response?.[list.items] as Row[] | undefined) ?? NO_ROWS;
+  const totalCount = response?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / perPage);
+  // The library is on its first sync: loading, not an error
+  const initializing = isLibraryInitializing(error);
+
+  // Drops the hidden item from this page's cached result; the hide's own
+  // invalidation refetches the lists afterwards
+  const handleHideSuccess = useCallback<CardHideHandler>(
+    (entityId, _entityType, instanceId) => {
+      if (!request) return;
       const hidden = makeCompositeKey(entityId, instanceId);
-      setData((prevData) =>
-        prevData.filter(
-          (item) =>
+      queryClient.setQueryData<ListPage>(list.listKey(request), (old) => {
+        const current = old?.[list.result];
+        const rows = current?.[list.items] as Row[] | undefined;
+        if (!old || !current || !rows) return old;
+        const kept = rows.filter(
+          (row) =>
             makeCompositeKey(
-              item.id as string,
-              item.instanceId as string | undefined
+              row.id as string,
+              row.instanceId as string | undefined
             ) !== hidden
-        )
-      );
-      setTotalCount((prevCount) => Math.max(0, prevCount - 1));
+        );
+        if (kept.length === rows.length) return old;
+        return {
+          ...old,
+          [list.result]: {
+            ...current,
+            [list.items]: kept,
+            count: Math.max(0, (current.count ?? 0) - 1),
+          },
+        };
+      });
     },
-    []
+    [queryClient, list, request]
   );
-
-  // Calculate pagination
-  const currentPerPage =
-    ((lastQuery?.filter as Record<string, unknown> | undefined)
-      ?.per_page as number) || 24;
-  const totalPages = Math.ceil(totalCount / currentPerPage);
-
-  // Build filter key for locked filters if we need to hide them
-  const permanentFiltersMetadata = hideLockedFilters ? {} : lockedFilters;
+  const helpers = useMemo(
+    () => ({ onHideSuccess: handleHideSuccess }),
+    [handleHideSuccess]
+  );
 
   return (
     <SearchControls
       artifactType={entityType}
-      initialSort={defaultSort}
-      onQueryChange={(newQuery) => void handleQueryChange(newQuery)}
+      listState={listState}
       permanentFilters={lockedFilters}
-      permanentFiltersMetadata={permanentFiltersMetadata}
+      permanentFiltersMetadata={hideLockedFilters ? NO_LOCKS : lockedFilters}
       totalPages={totalPages}
       totalCount={totalCount}
+      isRefreshing={isPlaceholderData}
     >
       <SearchResults
         entityType={entityType}
         density={density}
-        items={data}
-        renderItem={(item, index) =>
-          renderItem(item, index, { onHideSuccess: handleHideSuccess })
-        }
-        loading={isLoading}
-        error={error}
+        items={items}
+        renderItem={(item, index) => renderItem(item, index, helpers)}
+        loading={isPending || initializing}
+        error={initializing ? null : error}
+        onRetry={() => void refetch()}
         emptyMessage={emptyMessage || `No ${entityType}s found`}
         emptyDescription={emptyDescription}
         skeletonCount={skeletonCount}
-        currentPage={
-          ((lastQuery?.filter as Record<string, unknown> | undefined)
-            ?.page as number) || 1
-        }
-        totalPages={totalPages}
-        onPageChange={() => {
-          // SearchControls manages pagination state, but we pass it through for SearchResults to render
-          // The actual page change is handled by SearchControls
-        }}
       />
     </SearchControls>
   );

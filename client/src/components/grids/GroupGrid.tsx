@@ -31,7 +31,7 @@ const GroupGrid = ({
           <GroupCard
             key={group.id}
             group={group}
-            onHideSuccess={() => onHideSuccess(group.id, group.instanceId)}
+            onHideSuccess={onHideSuccess}
           />
         );
       }}

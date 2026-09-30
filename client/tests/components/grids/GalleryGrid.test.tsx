@@ -36,12 +36,15 @@ describe("GalleryGrid", () => {
     const element = GalleryGrid({});
     const mockGallery = { id: "1", title: "Test Gallery" };
 
+    const onHideSuccess = () => {};
     const renderedCard = element.props.renderItem(mockGallery, 0, {
-      onHideSuccess: () => {},
+      onHideSuccess,
     });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.gallery).toEqual(mockGallery);
     expect(renderedCard.key).toBe("1");
+    // The grid's one hide handler, not a new closure per card
+    expect(renderedCard).toHaveProperty("props.onHideSuccess", onHideSuccess);
   });
 });

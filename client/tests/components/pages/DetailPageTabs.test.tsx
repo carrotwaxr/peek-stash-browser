@@ -128,8 +128,6 @@ vi.mock("@/components/grids/index", () => {
     GroupGrid: grid("GroupGrid"),
     PerformerGrid: grid("PerformerGrid"),
     StudioGrid: grid("StudioGrid"),
-    TagGrid: grid("TagGrid"),
-    ImageGrid: grid("ImageGrid"),
   };
 });
 vi.mock("@/components/scene-search/SceneSearch", () => ({

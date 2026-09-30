@@ -31,7 +31,7 @@ const StudioGrid = ({
           <StudioCard
             key={studio.id}
             studio={studio}
-            onHideSuccess={() => onHideSuccess(studio.id, studio.instanceId)}
+            onHideSuccess={onHideSuccess}
           />
         );
       }}

@@ -36,12 +36,15 @@ describe("PerformerGrid", () => {
     const element = PerformerGrid({});
     const mockPerformer = { id: "1", name: "Test" };
 
+    const onHideSuccess = () => {};
     const renderedCard = element.props.renderItem(mockPerformer, 0, {
-      onHideSuccess: () => {},
+      onHideSuccess,
     });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.performer).toEqual(mockPerformer);
     expect(renderedCard.key).toBe("1");
+    // The grid's one hide handler, not a new closure per card
+    expect(renderedCard).toHaveProperty("props.onHideSuccess", onHideSuccess);
   });
 });

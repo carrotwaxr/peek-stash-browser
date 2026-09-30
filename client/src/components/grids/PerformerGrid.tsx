@@ -33,9 +33,7 @@ const PerformerGrid = ({
           <PerformerCard
             key={performer.id}
             performer={performer}
-            onHideSuccess={() =>
-              onHideSuccess(performer.id, performer.instanceId)
-            }
+            onHideSuccess={onHideSuccess}
           />
         );
       }}
