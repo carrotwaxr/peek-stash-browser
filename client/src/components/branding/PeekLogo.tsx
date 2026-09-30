@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { getLandingPage } from "../../constants/navigation";
-import { useAuth } from "../../hooks/useAuth";
 
 interface PeekLogoProps {
   size?: "small" | "default" | "large";
@@ -13,14 +13,15 @@ export const PeekLogo = ({
 }: PeekLogoProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { data } = useUserSettings();
 
-  // Navigate to user's preferred landing page
-  // Passes current path so random mode excludes the current page
+  // Navigate to the user's landing page, from the settings query so a change
+  // in Settings applies at once. Passes the current path so random mode
+  // excludes the current page
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     const destination = getLandingPage(
-      user?.landingPagePreference,
+      data?.settings.landingPagePreference,
       location.pathname
     );
     void navigate(destination);

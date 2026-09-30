@@ -7,12 +7,20 @@
  * Key principle: Test what SHOULD happen, not what currently happens.
  * If a test fails, investigate whether it's a bug in the code or the test.
  */
+import { MemoryRouter as PlainMemoryRouter } from "react-router-dom";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
+import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
+import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as apiModule from "../../../src/api";
 import SearchControls from "../../../src/components/ui/SearchControls";
+import {
+  WALL_VIEW_SETTINGS,
+  useWallPlayback,
+} from "../../../src/hooks/useWallPlayback";
 
 // Create a mock state object that can be manipulated per test
 let mockFilterState = {};
@@ -56,6 +64,7 @@ vi.mock("../../../src/hooks/useFilterState", () => ({
 vi.mock("../../../src/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ presets: {}, defaults: {} }),
   apiPost: vi.fn().mockResolvedValue({}),
+  apiPut: vi.fn().mockResolvedValue({ success: true }),
   libraryApi: {
     findPerformers: vi
       .fn()
@@ -735,6 +744,57 @@ describe("SearchControls", () => {
       const results = screen.getByTestId("search-results");
       expect(results).not.toHaveAttribute("aria-busy");
       expect(results.style.opacity).toBe("1");
+    });
+  });
+
+  describe("Wall playback", () => {
+    /** What a list page hands its WallView: the user's wall playback. */
+    function WallPlaybackProbe() {
+      const { wallPlayback } = useWallPlayback();
+      return <p data-testid="wall-playback">{wallPlayback}</p>;
+    }
+
+    it("the Preview Behavior saved in the wall cog reaches the page's WallView", async () => {
+      vi.mocked(apiModule.apiGet).mockImplementation((path: string) =>
+        Promise.resolve(
+          path === "/user/settings"
+            ? userSettingsResponse({ wallPlayback: "static" })
+            : { presets: {}, defaults: {} }
+        )
+      );
+      mockFilterState = createMockFilterState({ viewMode: "wall" });
+      render(
+        <SignedInWithQuery>
+          <PlainMemoryRouter initialEntries={["/"]}>
+            <SearchControls
+              artifactType="scene"
+              onQueryChange={vi.fn()}
+              totalPages={1}
+              totalCount={1}
+              supportsWallView
+              contextSettings={WALL_VIEW_SETTINGS}
+            >
+              <WallPlaybackProbe />
+            </SearchControls>
+          </PlainMemoryRouter>
+        </SignedInWithQuery>
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("wall-playback")).toHaveTextContent("static")
+      );
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "View settings" }));
+      const select = await screen.findByLabelText("Preview Behavior");
+      expect(select).toHaveValue("static");
+      await user.selectOptions(select, "hover");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("wall-playback")).toHaveTextContent("hover")
+      );
+      expect(apiModule.apiPut).toHaveBeenCalledWith("/user/settings", {
+        wallPlayback: "hover",
+      });
     });
   });
 });

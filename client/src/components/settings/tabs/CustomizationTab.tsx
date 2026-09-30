@@ -1,74 +1,41 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPut, getErrorMessage } from "../../../api";
+import type { UpdateUserSettingsBody } from "@peek/shared-types";
+import { getErrorMessage } from "../../../api";
+import {
+  useUpdateUserSettings,
+  useUserSettings,
+} from "../../../api/hooks/useUserSettings";
 import { useUnitPreference } from "../../../contexts/UnitPreferenceContext";
 import { showError, showSuccess } from "../../../utils/toast";
 import { ErrorMessage } from "../../ui/index";
 import CardDisplaySettings from "../CardDisplaySettings";
 import TableColumnSettings from "../TableColumnSettings";
 
+type ViewPreferenceKey = keyof Pick<
+  UpdateUserSettingsBody,
+  "preferredPreviewQuality" | "wallPlayback" | "lightboxDoubleTapAction"
+>;
+
+/** A stable empty set of column defaults, so the editor keeps its edits. */
+const NO_TABLE_DEFAULTS = {};
+
 const CustomizationTab = () => {
-  const [loading, setLoading] = useState(true);
-  // After a failed load the editors would show defaults, and a table-column
-  // save would replace every stored entity's columns: show Retry instead
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
+  // The settings query: a save updates it, and every reader with it. After a
+  // failed load the editors would show defaults, and a table-column save
+  // would replace every stored entity's columns: show Retry instead
+  const { data, isPending, error, refetch } = useUserSettings();
+  const save = useUpdateUserSettings();
   const { unitPreference, setUnitPreference } = useUnitPreference();
-  const [preferredPreviewQuality, setPreferredPreviewQuality] =
-    useState("sprite");
-  const [wallPlayback, setWallPlayback] = useState("autoplay");
-  const [lightboxDoubleTapAction, setLightboxDoubleTapAction] =
-    useState("favorite");
-  const [tableColumnDefaults, setTableColumnDefaults] = useState<
-    Record<string, { visible: string[]; order: string[] }>
-  >({});
+  const settings = data?.settings;
+  const preferredPreviewQuality = settings?.preferredPreviewQuality ?? "sprite";
+  const wallPlayback = settings?.wallPlayback ?? "autoplay";
+  const lightboxDoubleTapAction =
+    settings?.lightboxDoubleTapAction ?? "favorite";
+  const tableColumnDefaults =
+    settings?.tableColumnDefaults ?? NO_TABLE_DEFAULTS;
 
-  // Load settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const data = await apiGet<{ settings: Record<string, unknown> }>(
-          "/user/settings"
-        );
-        const { settings } = data;
-
-        setPreferredPreviewQuality(
-          (settings.preferredPreviewQuality as string) || "sprite"
-        );
-        setWallPlayback((settings.wallPlayback as string) || "autoplay");
-        setLightboxDoubleTapAction(
-          (settings.lightboxDoubleTapAction as string) || "favorite"
-        );
-        setTableColumnDefaults(
-          (settings.tableColumnDefaults as Record<
-            string,
-            { visible: string[]; order: string[] }
-          >) || {}
-        );
-      } catch (err) {
-        setLoadError(getErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSettings();
-  }, [loadAttempt]);
-
-  const saveViewPreference = async (key: string, value: string) => {
+  const saveViewPreference = async (key: ViewPreferenceKey, value: string) => {
     try {
-      await apiPut("/user/settings", {
-        [key]: value,
-      });
-
-      if (key === "preferredPreviewQuality") {
-        setPreferredPreviewQuality(value);
-      } else if (key === "wallPlayback") {
-        setWallPlayback(value);
-      } else if (key === "lightboxDoubleTapAction") {
-        setLightboxDoubleTapAction(value);
-      }
+      await save.mutateAsync({ [key]: value });
       showSuccess("View preference saved!");
     } catch (err) {
       showError(getErrorMessage(err, "Failed to save view preference"));
@@ -81,10 +48,7 @@ const CustomizationTab = () => {
     newDefaults: Record<string, { visible: string[]; order: string[] }>
   ) => {
     try {
-      await apiPut("/user/settings", {
-        tableColumnDefaults: newDefaults,
-      });
-      setTableColumnDefaults(newDefaults);
+      await save.mutateAsync({ tableColumnDefaults: newDefaults });
       showSuccess("Table column defaults saved!");
     } catch (err) {
       showError(getErrorMessage(err, "Failed to save table column defaults"));
@@ -92,7 +56,7 @@ const CustomizationTab = () => {
     }
   };
 
-  if (loading) {
+  if (isPending) {
     return (
       <div
         className="flex items-center justify-center p-12"
@@ -103,12 +67,12 @@ const CustomizationTab = () => {
     );
   }
 
-  if (loadError) {
+  if (error) {
     return (
       <ErrorMessage
         title="Failed to load customization settings"
-        error={loadError}
-        onRetry={() => setLoadAttempt((n) => n + 1)}
+        error={getErrorMessage(error)}
+        onRetry={() => void refetch()}
       />
     );
   }

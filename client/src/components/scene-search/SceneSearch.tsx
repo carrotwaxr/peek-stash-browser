@@ -11,7 +11,10 @@ import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { useWallPlayback } from "../../hooks/useWallPlayback";
+import {
+  WALL_VIEW_SETTINGS,
+  useWallPlayback,
+} from "../../hooks/useWallPlayback";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
@@ -37,20 +40,6 @@ const VIEW_MODES = [
   { id: "timeline", label: "Timeline view" },
   { id: "folder", label: "Folder view" },
 ] as const;
-
-// Context settings for wall view preview behavior
-const WALL_VIEW_SETTINGS = [
-  {
-    key: "wallPlayback",
-    label: "Preview Behavior",
-    type: "select" as const,
-    options: [
-      { value: "autoplay", label: "Autoplay All" },
-      { value: "hover", label: "Play on Hover" },
-      { value: "static", label: "Static Thumbnails" },
-    ],
-  },
-];
 
 /**
  * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the
@@ -86,7 +75,7 @@ const SceneSearch = ({
   const { hasMultipleInstances } = useConfig();
 
   const columns = useGridColumns("scenes");
-  const { wallPlayback, updateWallPlayback } = useWallPlayback();
+  const { wallPlayback } = useWallPlayback();
 
   // Table columns hook for table view
   const {
@@ -331,8 +320,6 @@ const SceneSearch = ({
         totalCount={totalCount}
         syncToUrl={syncToUrl}
         supportsWallView={true}
-        wallPlayback={wallPlayback}
-        onWallPlaybackChange={updateWallPlayback}
         viewModes={
           VIEW_MODES as unknown as React.ComponentProps<
             typeof SearchControls
@@ -348,11 +335,7 @@ const SceneSearch = ({
             onMoveColumn={moveColumn}
           />
         }
-        contextSettings={
-          contextSettings as React.ComponentProps<
-            typeof SearchControls
-          >["contextSettings"]
-        }
+        contextSettings={contextSettings}
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
@@ -409,7 +392,7 @@ const SceneSearch = ({
                 items={currentScenes}
                 entityType="scene"
                 zoomLevel={zoomLevel as "small" | "medium" | "large"}
-                playbackMode={wallPlayback as "autoplay" | "hover" | "static"}
+                playbackMode={wallPlayback}
                 onItemClick={handleSceneClick}
                 loading={isLoading}
                 emptyMessage="No scenes found"
