@@ -133,9 +133,17 @@ describe("entityDisplayConfig", () => {
       expect(settings).toEqual([]);
     });
 
-    it("tag entity does not have showRating setting", () => {
-      const settings = getAvailableSettings("tag");
-      expect(settings).not.toContain("showRating");
+    it("every type that TagCard-style cards wire with rating controls offers showRating and showFavorite", () => {
+      for (const type of ["performer", "studio", "tag", "group"]) {
+        expect(getAvailableSettings(type)).toEqual(
+          expect.arrayContaining(["showRating", "showFavorite", "showOCounter"])
+        );
+        expect(getDefaultSettings(type)).toMatchObject({
+          showRating: true,
+          showFavorite: true,
+          showOCounter: true,
+        });
+      }
     });
   });
 
