@@ -29,6 +29,7 @@ import {
   StudioGrid,
 } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import RelationCountsError from "../ui/RelationCountsError";
 import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
@@ -99,7 +100,11 @@ const TagDetail = () => {
 
   // Each tab's count is the total of its list, as the viewer sees it; the
   // tabs show no badge and none opens until the counts answer
-  const { data: countsData } = useRelationCounts("tag", tagId, tagInstanceId, {
+  const {
+    data: countsData,
+    error: countsError,
+    refetch: refetchCounts,
+  } = useRelationCounts("tag", tagId, tagInstanceId, {
     includeSubTags,
   });
   const counts = countsData?.counts;
@@ -342,6 +347,10 @@ const TagDetail = () => {
               <TabNavigation
                 tabs={contentTabs}
                 defaultTab={effectiveDefaultTab}
+              />
+              <RelationCountsError
+                error={counts ? null : countsError}
+                onRetry={() => void refetchCounts()}
               />
 
               {/* Tab Content */}
