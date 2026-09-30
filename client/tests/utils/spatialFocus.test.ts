@@ -262,3 +262,92 @@ describe("moveFocus", () => {
     expect(document.activeElement?.id).toBe("b");
   });
 });
+
+describe("moveFocus on a detail page's tab", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  // Viewport rects measured live at 1920 px on a performer page whose Scenes
+  // tab (active, so disabled) shows a grid under its controls and pager
+  const LAYOUT: Record<string, [number, number, number, number]> = {
+    back: [272, -1263, 340, -1229],
+    "top-search": [272, -1089, 700, -1055],
+    stats: [1054, -319, 1090, -285],
+    "link-1": [296, -79, 416, -51],
+    "link-2": [424, -79, 557, -51],
+    "tab-scenes": [272, 5, 423, 56],
+    "tab-collections": [427, 5, 592, 56],
+    search: [723, 242, 1107, 276],
+    sort: [1119, 240, 1300, 276],
+    filters: [1332, 242, 1420, 276],
+    preset: [827, 289, 965, 323],
+    "view-grid": [1270, 289, 1318, 323],
+    first: [845, 454, 880, 488],
+    prev: [887, 454, 922, 488],
+    next: [929, 454, 969, 488],
+    last: [973, 454, 1013, 488],
+    "page-select": [1020, 455, 1110, 483],
+    "per-page": [1197, 455, 1300, 483],
+    "card-0": [288, 500, 498, 846],
+    "card-1": [510, 500, 720, 846],
+  };
+
+  function renderPerformerTab() {
+    document.body.innerHTML = `
+      <main>
+        <button id="back">Back</button>
+        <input id="top-search" />
+        <div><button id="stats">3</button></div>
+        <div><a href="/g/1" id="link-1">Big Tit Bimbos</a><a href="/g/2" id="link-2">Perfect Naturals</a></div>
+        <nav>
+          <button id="tab-scenes" aria-current="page" disabled>Scenes229</button>
+          <button id="tab-collections">Collections3</button>
+        </nav>
+        <div>
+          <div><input id="search" /><select id="sort"><option>a</option></select><button id="filters">Filters</button></div>
+          <div><button id="preset">Load Preset</button><button id="view-grid">Grid</button></div>
+        </div>
+        <div>
+          <button id="first" disabled>First</button><button id="prev" disabled>Previous</button>
+          <button id="next">Next</button><button id="last">Last</button>
+          <select id="page-select"><option>1</option></select>
+          <select id="per-page"><option>24</option></select>
+        </div>
+        <div>
+          <div data-tv-item tabindex="-1" id="card-0"></div>
+          <div data-tv-item tabindex="-1" id="card-1"></div>
+        </div>
+      </main>`;
+    for (const [id, [left, top, right, bottom]] of Object.entries(LAYOUT)) {
+      place(must(document.getElementById(id), id), {
+        left,
+        top,
+        right,
+        bottom,
+      });
+    }
+  }
+
+  it("Up from the first card reaches the pager first, then the controls, then the tab bar, before the header", () => {
+    renderPerformerTab();
+    must(document.getElementById("card-0"), "card-0").focus();
+
+    const path: string[] = [];
+    while (moveFocus("up", document.body)) {
+      path.push(document.activeElement?.id ?? "");
+      if (path.length > 10) break;
+    }
+
+    expect(["next", "last", "page-select", "per-page"]).toContain(path[0]);
+    const tab = path.indexOf("tab-collections");
+    expect(tab).toBeGreaterThan(0);
+    // Every step before the tab bar is a control or the pager
+    expect(
+      path.slice(0, tab).every((id) => {
+        const [, top, , bottom] = must(LAYOUT[id], id);
+        return top > 56 && bottom < 500;
+      })
+    ).toBe(true);
+  });
+});

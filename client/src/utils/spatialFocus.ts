@@ -32,9 +32,8 @@ function isBeyond(from: Rect, to: Rect, direction: Direction): boolean {
   }
 }
 
-/** The gap between the edges along the direction, and the centres' offset across it */
-function distance(from: Rect, to: Rect, direction: Direction) {
-  const vertical = direction === "up" || direction === "down";
+/** The gap between the edges along the direction */
+function gap(from: Rect, to: Rect, direction: Direction) {
   const primary =
     direction === "up"
       ? from.top - to.bottom
@@ -43,25 +42,65 @@ function distance(from: Rect, to: Rect, direction: Direction) {
         : direction === "left"
           ? from.left - to.right
           : to.left - from.right;
+  return Math.max(0, primary);
+}
+
+/** The gap along the direction plus twice the centres' offset across it */
+function distance(from: Rect, to: Rect, direction: Direction) {
+  const vertical = direction === "up" || direction === "down";
   const cross = vertical
     ? Math.abs((to.left + to.right) / 2 - (from.left + from.right) / 2)
     : Math.abs((to.top + to.bottom) / 2 - (from.top + from.bottom) / 2);
-  return Math.max(0, primary) + 2 * cross;
+  return gap(from, to, direction) + 2 * cross;
+}
+
+/**
+ * Up and Down go row by row: only the candidates in the nearest row count,
+ * the one whose edge is nearest and every one that overlaps it vertically.
+ * Otherwise a wide screen's controls and pager, hundreds of pixels across
+ * from the first card, lose to a link several rows up that is level with it.
+ */
+function nearestRow<T>(
+  from: Rect,
+  beyond: ReadonlyArray<Candidate<T>>,
+  direction: "up" | "down"
+): ReadonlyArray<Candidate<T>> {
+  let nearest: Rect | null = null;
+  let nearestGap = Infinity;
+  for (const { rect } of beyond) {
+    const g = gap(from, rect, direction);
+    if (g < nearestGap) {
+      nearest = rect;
+      nearestGap = g;
+    }
+  }
+  if (!nearest) return beyond;
+  const row = nearest;
+  return beyond.filter(
+    ({ rect }) => rect.bottom > row.top && rect.top < row.bottom
+  );
 }
 
 /**
  * The candidate beyond `from` in `direction` with the least primary gap plus
- * twice the cross-axis offset of centres; null when none is beyond it.
+ * twice the cross-axis offset of centres, among the nearest row for Up and
+ * Down; null when none is beyond it.
  */
 export function pickNext<T>(
   from: Rect,
   candidates: ReadonlyArray<Candidate<T>>,
   direction: Direction
 ): T | null {
+  const beyond = candidates.filter(({ rect }) =>
+    isBeyond(from, rect, direction)
+  );
+  const pool =
+    direction === "up" || direction === "down"
+      ? nearestRow(from, beyond, direction)
+      : beyond;
   let best: T | null = null;
   let bestScore = Infinity;
-  for (const { el, rect } of candidates) {
-    if (!isBeyond(from, rect, direction)) continue;
+  for (const { el, rect } of pool) {
     const score = distance(from, rect, direction);
     if (score < bestScore) {
       best = el;
