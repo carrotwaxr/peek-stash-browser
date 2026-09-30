@@ -11,7 +11,9 @@ import type {
 import { apiGet, apiPost } from "./client";
 
 export const setupApi = {
-  getSetupStatus: () => apiGet<GetSetupStatusResponse>("/setup/status"),
+  /** Public. Read it through `useSetupStatus`, the one query for it. */
+  getSetupStatus: (signal?: AbortSignal) =>
+    apiGet<GetSetupStatusResponse>("/setup/status", signal),
 
   createFirstAdmin: (username: string, password: string) =>
     apiPost<CreateFirstAdminResponse>("/setup/create-admin", {

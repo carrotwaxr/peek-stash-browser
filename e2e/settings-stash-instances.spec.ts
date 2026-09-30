@@ -90,3 +90,42 @@ test.describe("Stash instances", () => {
     }
   });
 });
+
+test.describe("Server starting", () => {
+  // Only this page's requests are answered differently: safe on the dev
+  // stack too
+  test("while /api/setup/status fails, the app shows Peek is starting and opens once it answers", async ({
+    page,
+  }) => {
+    let failures = 0;
+    await page.route("**/api/setup/status", async (route) => {
+      if (failures < 2) {
+        failures += 1;
+        await route.fulfill({
+          status: 502,
+          contentType: "text/html",
+          body: "<html><body>502 Bad Gateway</body></html>",
+        });
+        return;
+      }
+      await route.continue();
+    });
+    const paths: string[] = [];
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) paths.push(new URL(frame.url()).pathname);
+    });
+
+    await page.goto("/");
+
+    await expect(
+      page.getByText("Peek is starting. Waiting for the server (HTTP 502)...")
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({
+      timeout: 20_000,
+    });
+    expect(failures).toBe(2);
+    await expect(page.getByText(/Peek is starting/)).toHaveCount(0);
+    expect(paths.filter((path) => path.startsWith("/setup"))).toEqual([]);
+    expect(new URL(page.url()).pathname).toBe("/");
+  });
+});

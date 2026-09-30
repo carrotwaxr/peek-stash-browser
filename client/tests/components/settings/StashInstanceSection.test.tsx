@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../src/api/client";
+import { queryKeys } from "../../../src/api/queryKeys";
 import StashInstanceSection from "../../../src/components/settings/StashInstanceSection";
 import { useAuth } from "../../../src/hooks/useAuth";
 import { showError, showInfo, showSuccess } from "../../../src/utils/toast";
@@ -30,6 +32,14 @@ vi.mock("../../../src/api", () => ({
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
 
+/** Renders the section under a query client, which it refreshes after a change */
+const renderSection = (client = new QueryClient()) =>
+  render(
+    <QueryClientProvider client={client}>
+      <StashInstanceSection />
+    </QueryClientProvider>
+  );
+
 describe("StashInstanceSection", () => {
   const mockInstance = {
     id: "test-instance-1",
@@ -57,7 +67,7 @@ describe("StashInstanceSection", () => {
     it("loads all instances for admin users", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith("/setup/stash-instances");
@@ -67,7 +77,7 @@ describe("StashInstanceSection", () => {
     it("displays instance list with admin controls", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Test Stash")).toBeInTheDocument();
@@ -82,7 +92,7 @@ describe("StashInstanceSection", () => {
     it("shows add form when clicking Add Instance", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Add Instance")).toBeInTheDocument();
@@ -102,7 +112,7 @@ describe("StashInstanceSection", () => {
     it("shows edit form when clicking Edit", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Edit")).toBeInTheDocument();
@@ -119,7 +129,7 @@ describe("StashInstanceSection", () => {
       mockApiPut.mockResolvedValue({});
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Disable")).toBeInTheDocument();
@@ -140,7 +150,7 @@ describe("StashInstanceSection", () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getByText("Disable")).toBeInTheDocument();
       });
@@ -161,7 +171,7 @@ describe("StashInstanceSection", () => {
       mockApiPut.mockResolvedValue({});
       const confirmSpy = vi.spyOn(window, "confirm");
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getByText("Enable")).toBeInTheDocument();
       });
@@ -186,7 +196,7 @@ describe("StashInstanceSection", () => {
       );
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getByText("Disable")).toBeInTheDocument();
       });
@@ -206,7 +216,7 @@ describe("StashInstanceSection", () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       mockApiPost.mockResolvedValue({});
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Add Instance")).toBeInTheDocument();
@@ -247,7 +257,7 @@ describe("StashInstanceSection", () => {
         sync: "queued",
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getByText("Add Instance")).toBeInTheDocument();
       });
@@ -276,7 +286,7 @@ describe("StashInstanceSection", () => {
         sync: "started",
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getByText("Add Instance")).toBeInTheDocument();
       });
@@ -304,7 +314,7 @@ describe("StashInstanceSection", () => {
         ],
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getAllByText("Delete")).toHaveLength(2);
@@ -320,7 +330,7 @@ describe("StashInstanceSection", () => {
       });
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getAllByText("Delete")).toHaveLength(2);
       });
@@ -349,7 +359,7 @@ describe("StashInstanceSection", () => {
       );
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
-      render(<StashInstanceSection />);
+      renderSection();
       await waitFor(() => {
         expect(screen.getAllByText("Delete")).toHaveLength(2);
       });
@@ -367,6 +377,108 @@ describe("StashInstanceSection", () => {
       confirmSpy.mockRestore();
     });
 
+    it("after an add, an edit, a disable or a delete, the setup status and the library queries are refetched", async () => {
+      const second = {
+        ...mockInstance,
+        id: "test-instance-2",
+        name: "Second Instance",
+        priority: 1,
+      };
+      mockApiGet.mockResolvedValue({ instances: [mockInstance, second] });
+      mockApiPost.mockResolvedValue({ success: true, sync: "started" });
+      mockApiPut.mockResolvedValue({ success: true });
+      mockApiDelete.mockResolvedValue({ success: true, message: "Deleted" });
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const client = new QueryClient();
+      const statusKey = queryKeys.setup.status();
+      const listKey = queryKeys.scenes.list(undefined, { page: 1 });
+      const statsKey = queryKeys.user.stats();
+      /** Fresh data: nothing invalidated */
+      const seed = () => {
+        client.setQueryData(statusKey, { stashInstanceCount: 2 });
+        client.setQueryData(listKey, { findScenes: { scenes: [] } });
+        client.setQueryData(statsKey, {});
+      };
+      const invalidated = (key: readonly unknown[]) =>
+        client.getQueryState(key)?.isInvalidated;
+      const expectRefreshed = async () => {
+        await waitFor(() => {
+          expect(invalidated(statusKey)).toBe(true);
+        });
+        expect(invalidated(listKey)).toBe(true);
+        // The user's own data is not the library's
+        expect(invalidated(statsKey)).toBe(false);
+      };
+
+      renderSection(client);
+      await waitFor(() => {
+        expect(screen.getAllByText("Delete")).toHaveLength(2);
+      });
+
+      // Add
+      seed();
+      fireEvent.click(screen.getByText("Add Instance"));
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Third" },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://third:9999/graphql" } }
+      );
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+      await expectRefreshed();
+      await waitFor(() => {
+        expect(screen.getAllByText("Edit")).toHaveLength(2);
+      });
+
+      // Edit
+      seed();
+      fireEvent.click(must(screen.getAllByText("Edit")[1], "second Edit"));
+      fireEvent.click(screen.getByText("Save Changes"));
+      await expectRefreshed();
+      await waitFor(() => {
+        expect(screen.getAllByText("Disable")).toHaveLength(2);
+      });
+
+      // Disable
+      seed();
+      fireEvent.click(
+        must(screen.getAllByText("Disable")[1], "second Disable")
+      );
+      await expectRefreshed();
+
+      // Delete
+      seed();
+      fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
+      await expectRefreshed();
+      expect(mockApiDelete).toHaveBeenCalledWith(
+        "/setup/stash-instance/test-instance-2"
+      );
+      confirmSpy.mockRestore();
+    });
+
+    it("a refused change refreshes nothing", async () => {
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+      mockApiPut.mockRejectedValue(new ApiError("refused", 400, {}));
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const client = new QueryClient();
+      client.setQueryData(queryKeys.setup.status(), { stashInstanceCount: 1 });
+
+      renderSection(client);
+      await waitFor(() => {
+        expect(screen.getByText("Disable")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Disable"));
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith("refused");
+      });
+      expect(
+        client.getQueryState(queryKeys.setup.status())?.isInvalidated
+      ).toBe(false);
+      confirmSpy.mockRestore();
+    });
+
     it("shows Primary badge on first instance when multiple exist", async () => {
       mockApiGet.mockResolvedValue({
         instances: [
@@ -380,7 +492,7 @@ describe("StashInstanceSection", () => {
         ],
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Primary")).toBeInTheDocument();
@@ -401,7 +513,7 @@ describe("StashInstanceSection", () => {
         ],
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       const badge = await screen.findByText(
         "First sync running, hidden from users"
@@ -428,7 +540,7 @@ describe("StashInstanceSection", () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance, syncing] });
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {
-        render(<StashInstanceSection />);
+        renderSection();
         await screen.findByText("First sync running, hidden from users");
 
         mockApiGet.mockResolvedValue({
@@ -456,7 +568,7 @@ describe("StashInstanceSection", () => {
         instances: [{ ...mockInstance, enabled: false, firstSyncedAt: null }],
       });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await screen.findByText("Disabled");
       expect(
@@ -475,7 +587,7 @@ describe("StashInstanceSection", () => {
     it("loads single instance for non-admin users", async () => {
       mockApiGet.mockResolvedValue({ instance: mockInstance });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith("/setup/stash-instance");
@@ -485,7 +597,7 @@ describe("StashInstanceSection", () => {
     it("does not show admin controls for non-admin", async () => {
       mockApiGet.mockResolvedValue({ instance: mockInstance });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Test Stash")).toBeInTheDocument();
@@ -507,7 +619,7 @@ describe("StashInstanceSection", () => {
     it("displays error message on API failure", async () => {
       mockApiGet.mockRejectedValue(new Error("Connection failed"));
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Connection failed")).toBeInTheDocument();
@@ -517,7 +629,7 @@ describe("StashInstanceSection", () => {
     it("displays 'No Stash Instance Configured' when no instances", async () => {
       mockApiGet.mockResolvedValue({ instances: [] });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(
@@ -538,7 +650,7 @@ describe("StashInstanceSection", () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       mockApiPost.mockResolvedValue({ version: "0.25.0" });
 
-      render(<StashInstanceSection />);
+      renderSection();
 
       await waitFor(() => {
         expect(screen.getByText("Add Instance")).toBeInTheDocument();
