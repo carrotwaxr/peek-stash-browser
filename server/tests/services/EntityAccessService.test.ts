@@ -180,7 +180,7 @@ describe("EntityAccessService", () => {
   });
 
   describe("resolveAccessibleInstanceId", () => {
-    it("uses the request's instance without guessing", async () => {
+    it("answers the request's instance and never guesses one", async () => {
       mockQuery.mockResolvedValueOnce([{ ok: 1 }]);
 
       await expect(
@@ -194,28 +194,11 @@ describe("EntityAccessService", () => {
       expect(params).toEqual(["42", "inst-a", 7, 7, 7, "scene"]);
     });
 
-    it("without a request instance, picks the first instance where the user can see the entity", async () => {
-      mockQuery.mockResolvedValueOnce([{ instanceId: "inst-b" }]);
-
-      await expect(
-        resolveAccessibleInstanceId(7, "scene", "42", undefined)
-      ).resolves.toBe("inst-b");
-
-      expect(mockQuery).toHaveBeenCalledTimes(1);
-      const { sql, params } = call();
-      expect(sql).not.toContain("x.stashInstanceId = ?");
-      expect(sql).toContain("ORDER BY si.priority, x.stashInstanceId");
-      expect(params).toEqual(["42", 7, 7, 7, "scene"]);
-    });
-
     it("returns null when the entity is not visible", async () => {
       await expect(
         resolveAccessibleInstanceId(7, "scene", "42", "inst-a")
       ).resolves.toBeNull();
-      await expect(
-        resolveAccessibleInstanceId(7, "scene", "42", undefined)
-      ).resolves.toBeNull();
-      expect(mockQuery).toHaveBeenCalledTimes(2);
+      expect(mockQuery).toHaveBeenCalledTimes(1);
     });
   });
 

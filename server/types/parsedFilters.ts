@@ -180,8 +180,8 @@ export interface ParsedSimilarScenesQuery {
   readonly sceneId: string;
   /** >= 1 */
   readonly page: number;
-  /** The seed's instance (`instanceId`), INSTANCE_ID_PATTERN */
-  readonly specificInstanceId: string | undefined;
+  /** The seed's instance (the required `instanceId`), INSTANCE_ID_PATTERN */
+  readonly instanceId: string;
 }
 
 /** `GET /api/library/scenes/recommended` */

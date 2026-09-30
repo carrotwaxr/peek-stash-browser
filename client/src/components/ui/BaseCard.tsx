@@ -33,7 +33,7 @@ export interface RatingControlsProps {
   entityType?: string;
   entityId: string;
   /** The entity's Stash instance: ratings, O presses and hides name it */
-  instanceId?: string;
+  instanceId: string;
   entityTitle?: string;
   initialRating?: number | null;
   initialFavorite?: boolean;
@@ -41,7 +41,7 @@ export interface RatingControlsProps {
   onHideSuccess?: (
     entityId: string,
     entityType: string,
-    instanceId?: string
+    instanceId: string
   ) => void;
   onHideClick?: (hideInfo: Record<string, unknown>) => void;
   onOCounterChange?: (entityId: string, count: number) => void;
@@ -267,6 +267,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                         entityType: string;
                         entityId: string;
                         entityName: string;
+                        instanceId: string;
                       }) => void)
                     | undefined
                 }

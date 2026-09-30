@@ -66,6 +66,7 @@ describe("CardComponents density", () => {
         <CardRatingRow
           entityType="scene"
           entityId="123"
+          instanceId="inst-1"
           initialRating={null}
           initialFavorite={false}
           initialOCounter={null}

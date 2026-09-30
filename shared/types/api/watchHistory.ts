@@ -25,7 +25,7 @@ export interface WatchHistoryData {
 export interface FullWatchHistoryRecord {
   id: number;
   userId: number;
-  instanceId: string | null;
+  instanceId: string;
   sceneId: string;
   playCount: number;
   playDuration: number;
@@ -108,8 +108,7 @@ export interface IncrementPlayCountResponse {
  * Increment O counter for a scene
  */
 export interface IncrementOCounterRequest {
-  /** Optional until every client sends it (cards send it from PR 5) */
-  instanceId?: string;
+  instanceId: string;
   sceneId: string;
 }
 

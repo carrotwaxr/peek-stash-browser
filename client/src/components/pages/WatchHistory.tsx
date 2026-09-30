@@ -16,8 +16,7 @@ import {
 
 interface WatchHistoryEntry {
   sceneId: string;
-  /** Null until the per-user instance columns are required (PR 5's B7). */
-  instanceId: string | null;
+  instanceId: string;
   resumeTime?: number;
   playCount?: number;
   playDuration?: number;

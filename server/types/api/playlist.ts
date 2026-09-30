@@ -18,7 +18,7 @@ import type { NormalizedScene } from "../index.js";
 export interface PlaylistItemWithScene {
   id: number;
   playlistId: number;
-  instanceId: string | null;
+  instanceId: string;
   sceneId: string;
   position: number;
   addedAt: Date;
@@ -206,7 +206,7 @@ export interface AddSceneToPlaylistResponse {
   item: {
     id: number;
     playlistId: number;
-    instanceId: string | null;
+    instanceId: string;
     sceneId: string;
     position: number;
     addedAt: Date;

@@ -866,7 +866,7 @@ Watch history tracking endpoints.
 
 **Controller:** `incrementOCounter` in `../controllers/watchHistory.ts`
 
-**Body:** `sceneId`; `instanceId` optional for now (with none, the server picks the first instance where the user can see the scene). A scene the user cannot see answers 404.
+**Body:** `sceneId`, `instanceId` (required). Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
 
 ---
 
@@ -904,6 +904,8 @@ Image view history tracking endpoints.
 
 **Authentication:** Required
 
+**Body:** `imageId`, `instanceId` (required). Image ids repeat across Stash servers, so the write names the image's instance; a missing or empty `instanceId` answers 400, and an image the user cannot see on that instance answers 404.
+
 **Controller:** `incrementImageOCounter` in `../controllers/imageViewHistory.ts`
 
 ---
@@ -911,6 +913,8 @@ Image view history tracking endpoints.
 ### POST /api/image-view-history/view
 
 **Authentication:** Required
+
+**Body:** `imageId`, `instanceId` (required). Image ids repeat across Stash servers, so the write names the image's instance; a missing or empty `instanceId` answers 400, and an image the user cannot see on that instance answers 404.
 
 **Controller:** `recordImageView` in `../controllers/imageViewHistory.ts`
 
@@ -934,6 +938,8 @@ Rating and favorite management endpoints.
 
 **Authentication:** Required
 
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
+
 **Controller:** `updateSceneRating` in `../controllers/ratings.ts`
 
 ---
@@ -941,6 +947,8 @@ Rating and favorite management endpoints.
 ### PUT /api/ratings/performer/:performerId
 
 **Authentication:** Required
+
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
 
 **Controller:** `updatePerformerRating` in `../controllers/ratings.ts`
 
@@ -950,6 +958,8 @@ Rating and favorite management endpoints.
 
 **Authentication:** Required
 
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
+
 **Controller:** `updateStudioRating` in `../controllers/ratings.ts`
 
 ---
@@ -957,6 +967,8 @@ Rating and favorite management endpoints.
 ### PUT /api/ratings/tag/:tagId
 
 **Authentication:** Required
+
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
 
 **Controller:** `updateTagRating` in `../controllers/ratings.ts`
 
@@ -966,6 +978,8 @@ Rating and favorite management endpoints.
 
 **Authentication:** Required
 
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
+
 **Controller:** `updateGalleryRating` in `../controllers/ratings.ts`
 
 ---
@@ -974,6 +988,8 @@ Rating and favorite management endpoints.
 
 **Authentication:** Required
 
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
+
 **Controller:** `updateGroupRating` in `../controllers/ratings.ts`
 
 ---
@@ -981,6 +997,8 @@ Rating and favorite management endpoints.
 ### PUT /api/ratings/image/:imageId
 
 **Authentication:** Required
+
+**Body:** `instanceId` (required) and `rating` and/or `favorite`. The write names the entity's instance, since ids repeat across Stash servers; a missing or empty `instanceId` answers 400, and an entity the user cannot see on that instance answers 404.
 
 **Controller:** `updateImageRating` in `../controllers/ratings.ts`
 
@@ -1245,6 +1263,8 @@ The tab counts of a performer page, as the viewer sees them: each is the total o
 ### GET /api/library/scenes/:id/similar
 
 **Authentication:** Required
+
+**Query:** `instanceId` (required): the seed scene's instance, since ids repeat across Stash servers; a missing or malformed value answers 400. `page` is optional; any other parameter answers 400. A seed the user cannot see answers 404.
 
 **Controller:** `findSimilarScenes` in `../../controllers/library/scenes.ts`
 

@@ -1702,10 +1702,10 @@ export const unhideEntity = async (
   // Without an instance, the legacy row stored for every instance ("") goes
   const unhideInstanceId = req.query.instanceId ?? "";
 
-  // Validate instanceId if provided
+  // Validate instanceId if provided, against the database as a hide does
   if (unhideInstanceId) {
-    const instance = stashInstanceManager.getConfig(unhideInstanceId);
-    if (!instance) {
+    const target = { entityType, entityId, instanceId: unhideInstanceId };
+    if ((await unknownHideInstance([target])) !== -1) {
       res.status(400).json({ error: "Invalid instanceId" });
       return;
     }

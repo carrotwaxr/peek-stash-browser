@@ -177,7 +177,7 @@ describe("useHiddenEntities", () => {
     expectInvalidated(true);
   });
 
-  it("hideEntity leaves instanceId out when none is known", async () => {
+  it("hideEntity sends the entity's instance", async () => {
     const { result } = renderHook(() => useHiddenEntities(), { wrapper });
 
     await act(async () => {
@@ -185,12 +185,14 @@ describe("useHiddenEntities", () => {
         entityType: "tag",
         entityId: "4",
         entityName: "Tag",
+        instanceId: "inst-1",
       });
     });
 
     expect(apiPost).toHaveBeenCalledWith("/user/hidden-entities", {
       entityType: "tag",
       entityId: "4",
+      instanceId: "inst-1",
     });
   });
 

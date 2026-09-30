@@ -47,7 +47,7 @@ describe("Image View History Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolve.mockImplementation((_userId, _type, _id, requested) =>
-      Promise.resolve(requested ?? "instance-1")
+      Promise.resolve(requested)
     );
   });
 
@@ -87,6 +87,26 @@ describe("Image View History Controller", () => {
     );
 
     it.each(writes)(
+      "%s returns 400 and writes nothing when the request has no instance",
+      async (_name, handler) => {
+        const req = reqFor(handler, {
+          body: malformed({ imageId: "img-1" }),
+          user: USER,
+        });
+        const res = resFor(handler);
+        await handler(req, res);
+
+        expect(res._getStatus()).toBe(400);
+        expect(res._getBody()).toEqual({
+          error: "Missing required field: instanceId",
+        });
+        expect(mockResolve).not.toHaveBeenCalled();
+        expect(mockPrisma.imageViewHistory.create).not.toHaveBeenCalled();
+        expect(mockPrisma.imageViewHistory.update).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(writes)(
       "%s returns 400 when instanceId is not a non-empty string",
       async (_name, handler) => {
         for (const instanceId of [5, ""]) {
@@ -114,7 +134,7 @@ describe("Image View History Controller", () => {
   describe("incrementImageOCounter", () => {
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
       });
       const res = resFor(incrementImageOCounter);
       await authenticated(incrementImageOCounter)(req, res, vi.fn());
@@ -135,7 +155,7 @@ describe("Image View History Controller", () => {
     it("returns 401 when user is not found in database", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -164,7 +184,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -214,7 +234,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -276,32 +296,6 @@ describe("Image View History Controller", () => {
       );
     });
 
-    it("lets the resolver pick the instance when instanceId is not in body", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          syncToStash: false,
-        })
-      );
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue(
-        partialRow({
-          id: 1,
-          oCount: 1,
-          oHistory: [],
-        })
-      );
-
-      const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
-        user: USER,
-      });
-      const res = resFor(incrementImageOCounter);
-      await incrementImageOCounter(req, res);
-
-      expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", undefined);
-    });
-
     it("logs warning when user has syncToStash enabled", async () => {
       const { logger } = await import("../../utils/logger.js");
       mockPrisma.user.findUnique.mockResolvedValue(
@@ -320,7 +314,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -356,7 +350,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -383,7 +377,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(incrementImageOCounter);
@@ -401,7 +395,9 @@ describe("Image View History Controller", () => {
 
   describe("recordImageView", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = reqFor(recordImageView, { body: { imageId: "img-1" } });
+      const req = reqFor(recordImageView, {
+        body: { imageId: "img-1", instanceId: "instance-1" },
+      });
       const res = resFor(recordImageView);
       await authenticated(recordImageView)(req, res, vi.fn());
       expect(res._getStatus()).toBe(401);
@@ -434,7 +430,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(recordImageView, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(recordImageView);
@@ -478,7 +474,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(recordImageView, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(recordImageView);
@@ -503,7 +499,7 @@ describe("Image View History Controller", () => {
       );
 
       const req = reqFor(recordImageView, {
-        body: { imageId: "img-1" },
+        body: { imageId: "img-1", instanceId: "instance-1" },
         user: USER,
       });
       const res = resFor(recordImageView);

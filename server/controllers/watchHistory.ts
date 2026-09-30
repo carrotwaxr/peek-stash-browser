@@ -27,6 +27,7 @@ import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { requireInstanceId } from "../utils/routeHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
@@ -40,26 +41,6 @@ function getSessionKey(
   sceneId: string
 ): string {
   return compositeKey(String(userId), instanceId, sceneId);
-}
-
-/**
- * A play, a resume point or a play count names its scene's instance; the
- * server never guesses one. Answers 400 and returns false when the body
- * names none.
- */
-function requireInstanceId(
-  instanceId: unknown,
-  res: TypedResponse<ApiErrorResponse>
-): instanceId is string {
-  if (instanceId === undefined) {
-    res.status(400).json({ error: "Missing required field: instanceId" });
-    return false;
-  }
-  if (typeof instanceId !== "string" || instanceId === "") {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return false;
-  }
-  return true;
 }
 
 /**
@@ -397,13 +378,7 @@ export async function incrementOCounter(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   // Get user settings for syncToStash, and the scene's instance if this
   // user can see it

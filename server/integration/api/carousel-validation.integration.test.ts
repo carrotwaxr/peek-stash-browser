@@ -443,6 +443,12 @@ describe("carousel, recommended and similar requests", () => {
       expectRefused(response, ["page"]);
     });
 
+    it("a request without an instanceId answers 400: the seed is never guessed", async () => {
+      const response = await adminClient.get(similarPath("page=1"));
+
+      expectRefused(response, ["instanceId"]);
+    });
+
     it("an instanceId that is not an instance id answers 400", async () => {
       const response = await adminClient.get(
         similarPath("instanceId=not%20an%20instance&page=1")

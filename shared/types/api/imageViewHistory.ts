@@ -14,7 +14,7 @@
  * Increment O counter for an image
  */
 export interface IncrementImageOCounterRequest {
-  instanceId?: string;
+  instanceId: string;
   imageId: string;
 }
 
@@ -33,7 +33,7 @@ export interface IncrementImageOCounterResponse {
  * Record image view when opened in Lightbox
  */
 export interface RecordImageViewRequest {
-  instanceId?: string;
+  instanceId: string;
   imageId: string;
 }
 

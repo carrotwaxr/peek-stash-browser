@@ -11,14 +11,14 @@ interface HidePayload {
   entityType: string;
   entityId: string;
   entityName: string;
-  instanceId?: string;
+  instanceId: string;
 }
 
 interface Props {
   entityType: string;
   entityId: string;
   entityName: string;
-  instanceId?: string;
+  instanceId: string;
   onHide?: (payload: HidePayload) => void;
 }
 
@@ -93,7 +93,7 @@ const EntityMenu = ({
       entityType,
       entityId,
       entityName,
-      ...(instanceId && { instanceId }),
+      instanceId,
     });
   };
 

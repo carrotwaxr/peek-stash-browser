@@ -141,10 +141,9 @@ vi.mock(
   })
 );
 
-// Mock StashInstanceManager (hide targets and unhide check the instance)
+// Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getConfig: vi.fn().mockReturnValue({ id: "inst-1" }),
     getAll: vi.fn().mockReturnValue([]),
   },
 }));
@@ -914,6 +913,40 @@ describe("User Controller — Features", () => {
       const res = resFor(unhideEntity);
       await unhideEntity(req, res);
       expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("unhides on the named instance when the database knows it", async () => {
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "scene", entityId: "42" },
+        query: { instanceId: "inst-1" },
+        user: USER,
+      });
+      const res = resFor(unhideEntity);
+      await unhideEntity(req, res);
+      expect(res._getOkBody().success).toBe(true);
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["inst-1"] } },
+        select: { id: true },
+      });
+      expect(userHiddenEntityService.unhideEntity).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "42",
+        "inst-1"
+      );
+    });
+
+    it("returns 400 for an instance the database does not hold, unhiding nothing", async () => {
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "scene", entityId: "42" },
+        query: { instanceId: "gone" },
+        user: USER,
+      });
+      const res = resFor(unhideEntity);
+      await unhideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe("Invalid instanceId");
+      expect(userHiddenEntityService.unhideEntity).not.toHaveBeenCalled();
     });
   });
 

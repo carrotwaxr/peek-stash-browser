@@ -45,6 +45,15 @@ const VIEW_MODES: { id: string; label: string }[] = [
   { id: "folder", label: "Folder view" },
 ];
 
+/** An image's "id:instanceId" key: two servers can hold the same id */
+const imageKey = (image: { id?: unknown; instanceId?: unknown }) =>
+  makeCompositeKey(String(image.id), image.instanceId as string | undefined);
+
+const sameImage = (
+  a: { id?: unknown; instanceId?: unknown },
+  b: { id?: unknown; instanceId?: unknown }
+) => imageKey(a) === imageKey(b);
+
 const Images = () => {
   usePageTitle("Images");
   const [searchParams] = useSearchParams();
@@ -182,17 +191,19 @@ const Images = () => {
   // Handle image click - open lightbox
   const handleImageClick = useCallback(
     (image: Record<string, unknown>) => {
-      const index = currentImages.findIndex(
-        (img: Record<string, unknown>) => img.id === image.id
+      const index = currentImages.findIndex((img: Record<string, unknown>) =>
+        sameImage(img, image)
       );
       openLightbox(index >= 0 ? index : 0);
     },
     [currentImages, openLightbox]
   );
 
-  // Helper to optimistically update image data in the query cache
+  // Helper to optimistically update image data in the query cache. The image
+  // is (id, instance): two servers can hold the same id.
   const updateImageInCache = useCallback(
-    (imageId: string, updates: Record<string, unknown>) => {
+    (imageId: string, instanceId: string, updates: Record<string, unknown>) => {
+      const target = makeCompositeKey(imageId, instanceId);
       if (!queryParams) return;
       const qk = queryKeys.images.list(
         undefined,
@@ -209,7 +220,7 @@ const Images = () => {
             ...fi,
             images: (fi.images as unknown[]).map((img: unknown) => {
               const i = img as Record<string, unknown>;
-              return i.id === imageId ? { ...i, ...updates } : i;
+              return imageKey(i) === target ? { ...i, ...updates } : i;
             }),
           },
         };
@@ -221,7 +232,7 @@ const Images = () => {
   // Handle a hide from a card - drop the image on that instance, not an
   // image with the same id on another server
   const handleHideSuccess = useCallback(
-    (imageId: string, _entityType: string, instanceId?: string) => {
+    (imageId: string, _entityType: string, instanceId: string) => {
       if (!queryParams) return;
       const hidden = makeCompositeKey(imageId, instanceId);
       const qk = queryKeys.images.list(
@@ -238,11 +249,7 @@ const Images = () => {
           findImages: {
             ...fi,
             images: (fi.images as Array<Record<string, unknown>>).filter(
-              (i) =>
-                makeCompositeKey(
-                  i.id as string,
-                  i.instanceId as string | undefined
-                ) !== hidden
+              (i) => imageKey(i) !== hidden
             ),
             count: Math.max(0, ((fi.count as number) || 0) - 1),
           },
@@ -254,24 +261,24 @@ const Images = () => {
 
   // Handle O counter change from card - update local state
   const handleOCounterChange = useCallback(
-    (imageId: string, newCount: number) => {
-      updateImageInCache(imageId, { oCounter: newCount });
+    (imageId: string, newCount: number, instanceId: string) => {
+      updateImageInCache(imageId, instanceId, { oCounter: newCount });
     },
     [updateImageInCache]
   );
 
   // Handle rating change from card - update local state
   const handleRatingChange = useCallback(
-    (imageId: string, newRating: number | null) => {
-      updateImageInCache(imageId, { rating100: newRating });
+    (imageId: string, newRating: number | null, instanceId: string) => {
+      updateImageInCache(imageId, instanceId, { rating100: newRating });
     },
     [updateImageInCache]
   );
 
   // Handle favorite change from card - update local state
   const handleFavoriteChange = useCallback(
-    (imageId: string, newFavorite: boolean) => {
-      updateImageInCache(imageId, { favorite: newFavorite });
+    (imageId: string, newFavorite: boolean, instanceId: string) => {
+      updateImageInCache(imageId, instanceId, { favorite: newFavorite });
     },
     [updateImageInCache]
   );
@@ -412,7 +419,7 @@ const Images = () => {
                     }: { onItemClick?: (item: Record<string, unknown>) => void }
                   ) => (
                     <ImageCard
-                      key={image.id as string}
+                      key={imageKey(image)}
                       image={image as unknown as NormalizedImage}
                       onClick={() => onItemClick?.(image)}
                       fromPageTitle="Images"
@@ -443,7 +450,7 @@ const Images = () => {
                   onFolderPathChange={setFolderTagFilter}
                   renderItem={(image: Record<string, unknown>) => (
                     <ImageCard
-                      key={image.id as string}
+                      key={imageKey(image)}
                       image={image as unknown as NormalizedImage}
                       onClick={() => handleImageClick(image)}
                       fromPageTitle="Images"
@@ -479,7 +486,7 @@ const Images = () => {
                         gridItemProps(index);
                       return (
                         <ImageCard
-                          key={image.id as string}
+                          key={imageKey(image)}
                           image={image as unknown as NormalizedImage}
                           onClick={() => handleImageClick(image)}
                           fromPageTitle="Images"
@@ -546,7 +553,9 @@ const Images = () => {
                     ...fi,
                     images: (fi.images as unknown[]).map((img: unknown) => {
                       const i = img as Record<string, unknown>;
-                      const updated = updatedImages.find((u) => u.id === i.id);
+                      const updated = updatedImages.find(
+                        (u) => imageKey(u) === imageKey(i)
+                      );
                       return updated ? { ...i, ...updated } : i;
                     }),
                   },

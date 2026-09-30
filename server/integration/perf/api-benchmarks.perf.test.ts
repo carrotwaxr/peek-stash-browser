@@ -19,6 +19,7 @@ import { assertBenchmark, measureEndpoint } from "./measureEndpoint.js";
  */
 
 // Discovered IDs for detail-page benchmarks
+let testInstanceId: string;
 let discoveredSceneId: string;
 let discoveredPerformerId: string;
 let discoveredStudioId: string;
@@ -26,7 +27,7 @@ let discoveredGalleryId: string;
 
 beforeAll(async () => {
   await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
-  await selectTestInstanceOnly();
+  testInstanceId = await selectTestInstanceOnly();
 
   // Auto-discover entity IDs from first page of each list
   const [scenes, performers, studios, galleries] = await Promise.all([
@@ -230,7 +231,7 @@ describe("Detail Page Benchmarks", () => {
   it("scene similar", async () => {
     const result = await measureEndpoint("scene-similar", async () => {
       const res = await adminClient.get(
-        `/api/library/scenes/${discoveredSceneId}/similar`
+        `/api/library/scenes/${discoveredSceneId}/similar?instanceId=${testInstanceId}`
       );
       expect(res.ok).toBe(true);
     });

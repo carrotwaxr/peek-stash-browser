@@ -117,10 +117,10 @@ const CLEARED: StashInput = { id: ENTITY_ID, rating100: null };
 
 /** The changes a request sends */
 const CHANGES = {
-  rating: { rating: 40 },
-  favorite: { favorite: true },
-  both: { rating: 40, favorite: true },
-  cleared: { rating: null },
+  rating: { rating: 40, instanceId: "instance-1" },
+  favorite: { favorite: true, instanceId: "instance-1" },
+  both: { rating: 40, favorite: true, instanceId: "instance-1" },
+  cleared: { rating: null, instanceId: "instance-1" },
 } satisfies Record<string, UpdateRatingRequest>;
 type ChangeName = keyof typeof CHANGES;
 const CHANGE_NAMES: ChangeName[] = ["rating", "favorite", "both", "cleared"];
@@ -241,7 +241,7 @@ describe("Ratings Controller", () => {
       partialRow({ syncToStash: false })
     );
     mockResolve.mockImplementation((_userId, _type, _id, requested) =>
-      Promise.resolve(requested ?? "instance-1")
+      Promise.resolve(requested)
     );
     for (const fn of Object.values(mockStash)) fn.mockResolvedValue({});
     mockInstanceManager.getForSync.mockReturnValue(partialRow(mockStash));
@@ -327,13 +327,13 @@ describe("Ratings Controller", () => {
       );
 
       it(`returns 400 when ${c.param} is missing`, async () => {
-        const res = await send({ rating: 50 }, {});
+        const res = await send({ rating: 50, instanceId: "instance-1" }, {});
         expect(res._getStatus()).toBe(400);
         expect(res._getErrorBody().error).toBe(`Missing ${c.param}`);
       });
 
       it.each([0, 100, null])("accepts a rating of %s", async (rating) => {
-        const res = await send({ rating });
+        const res = await send({ rating, instanceId: "instance-1" });
         expect(res._getOkBody().success).toBe(true);
         expect(model().upsert).toHaveBeenCalledWith(
           expect.objectContaining({ update: { rating } })
@@ -386,25 +386,16 @@ describe("Ratings Controller", () => {
         );
       });
 
-      it("lets the resolver pick the instance when the request has none", async () => {
-        await send({ rating: 50 });
-        expect(mockResolve).toHaveBeenCalledWith(
-          1,
-          c.type,
-          ENTITY_ID,
-          undefined
+      it("returns 400 and writes nothing when the request has no instance", async () => {
+        const res = await send(malformed({ rating: 50 }));
+
+        expect(res._getStatus()).toBe(400);
+        expect(res._getErrorBody().error).toBe(
+          "Missing required field: instanceId"
         );
-        expect(model().upsert).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: {
-              [`userId_instanceId_${c.param}`]: {
-                userId: 1,
-                instanceId: "instance-1",
-                [c.param]: ENTITY_ID,
-              },
-            },
-          })
-        );
+        expect(mockResolve).not.toHaveBeenCalled();
+        expect(model().upsert).not.toHaveBeenCalled();
+        expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
       });
     });
 
@@ -440,7 +431,7 @@ describe("Ratings Controller", () => {
       });
 
       it("creates an unrated favorite when only favorite is sent", async () => {
-        await send({ favorite: true });
+        await send({ favorite: true, instanceId: "instance-1" });
         expect(model().upsert).toHaveBeenCalledWith(
           expect.objectContaining({
             update: { favorite: true },
@@ -458,7 +449,7 @@ describe("Ratings Controller", () => {
       it("a database failure reaches the error handler", async () => {
         mockPrisma.user.findUnique.mockRejectedValue(new Error("DB down"));
         const req = reqFor(c.handler, {
-          body: { rating: 50 },
+          body: { rating: 50, instanceId: "instance-1" },
           params,
           user: USER,
         });

@@ -1152,25 +1152,28 @@ export function parseSimilarScenesRequest(
   const input = requireObject(query, "query");
   const problems = new Problems();
   let page: number | undefined;
-  let specificInstanceId: string | undefined;
+  let instanceId: string | undefined;
 
   const handlers = new Map<string, (raw: unknown, path: string) => void>([
     ["page", (raw, path) => (page = parseInteger(raw, path, problems))],
     [
       "instanceId",
       (raw, path) => {
-        specificInstanceId = parseInstanceId(raw, path, problems);
+        instanceId = parseInstanceId(raw, path, problems);
       },
     ],
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
+
+  if (!("instanceId" in input)) problems.add("instanceId", "Required");
 
   problems.finish();
 
   return {
     sceneId: id,
     page: clampPage(page),
-    specificInstanceId,
+    // finish() threw when the parameter was absent or invalid
+    instanceId: instanceId ?? "",
   };
 }
 

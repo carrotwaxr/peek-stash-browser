@@ -38,6 +38,7 @@ import type {
 } from "../types/api/index.js";
 import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
+import { requireInstanceId } from "../utils/routeHelpers.js";
 
 export type RatingEntityType = Exclude<AccessEntityType, "clip">;
 
@@ -239,13 +240,7 @@ function ratingHandler<T extends RatingEntityType>(target: RatingTarget<T>) {
       res.status(400).json({ error: "Favorite must be a boolean" });
       return;
     }
-    if (
-      requestInstanceId !== undefined &&
-      (typeof requestInstanceId !== "string" || requestInstanceId === "")
-    ) {
-      res.status(400).json({ error: "instanceId must be a non-empty string" });
-      return;
-    }
+    if (!requireInstanceId(requestInstanceId, res)) return;
 
     // The user's sync setting, and the entity's instance if they can see it
     const [user, instanceId] = await Promise.all([

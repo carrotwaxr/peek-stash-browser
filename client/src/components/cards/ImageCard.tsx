@@ -20,11 +20,24 @@ interface Props {
   onHideSuccess?: (
     entityId: string,
     entityType: string,
-    instanceId?: string
+    instanceId: string
   ) => void;
-  onOCounterChange?: (entityId: string, count: number) => void;
-  onRatingChange?: (entityId: string, rating: number) => void;
-  onFavoriteChange?: (entityId: string, value: boolean) => void;
+  /** The changes below also name the image's instance: two servers can hold one id */
+  onOCounterChange?: (
+    entityId: string,
+    count: number,
+    instanceId: string
+  ) => void;
+  onRatingChange?: (
+    entityId: string,
+    rating: number,
+    instanceId: string
+  ) => void;
+  onFavoriteChange?: (
+    entityId: string,
+    value: boolean,
+    instanceId: string
+  ) => void;
 }
 
 const formatResolution = (width: number | null, height: number | null) => {
@@ -218,9 +231,18 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
                 initialFavorite: image.favorite || false,
                 initialOCounter: image.oCounter ?? 0,
                 onHideSuccess,
-                onOCounterChange,
-                onRatingChange,
-                onFavoriteChange,
+                onOCounterChange:
+                  onOCounterChange &&
+                  ((id, count) =>
+                    onOCounterChange(id, count, image.instanceId)),
+                onRatingChange:
+                  onRatingChange &&
+                  ((id, rating) =>
+                    onRatingChange(id, rating, image.instanceId)),
+                onFavoriteChange:
+                  onFavoriteChange &&
+                  ((id, value) =>
+                    onFavoriteChange(id, value, image.instanceId)),
                 showRating: imageSettings.showRating as boolean | undefined,
                 showFavorite: imageSettings.showFavorite as boolean | undefined,
                 showOCounter: imageSettings.showOCounter as boolean | undefined,

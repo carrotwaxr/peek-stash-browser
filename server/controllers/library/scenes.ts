@@ -168,7 +168,7 @@ export const findSimilarScenes = async (
     userId,
     "scene",
     id,
-    request.specificInstanceId
+    request.instanceId
   );
   if (!instanceId) {
     res.status(404).json({ error: "Scene not found" });

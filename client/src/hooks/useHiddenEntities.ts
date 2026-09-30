@@ -70,7 +70,7 @@ export const useHiddenEntities = () => {
       entityType: string;
       entityId: string;
       entityName: string;
-      instanceId?: string;
+      instanceId: string;
       skipConfirmation?: boolean;
     }) => {
       setIsHiding(true);
@@ -78,7 +78,7 @@ export const useHiddenEntities = () => {
         await apiPost("/user/hidden-entities", {
           entityType,
           entityId,
-          ...(instanceId && { instanceId }),
+          instanceId,
         });
 
         void invalidateExclusionDependents(queryClient);
@@ -123,7 +123,7 @@ export const useHiddenEntities = () => {
       entities: Array<{
         entityType: string;
         entityId: string;
-        instanceId?: string;
+        instanceId: string;
       }>;
       skipConfirmation?: boolean;
     }) => {

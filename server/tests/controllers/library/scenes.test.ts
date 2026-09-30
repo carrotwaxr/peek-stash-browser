@@ -453,7 +453,7 @@ describe("findSimilarScenes", () => {
   it("returns 401 when user is not authenticated", async () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
-      query: { page: "1" },
+      query: { page: "1", instanceId: "inst-a" },
     });
     const res = resFor(findSimilarScenes);
 
@@ -490,7 +490,7 @@ describe("findSimilarScenes", () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
       user: testUser(),
-      query: { page: "1" },
+      query: { page: "1", instanceId: "inst-a" },
     });
     const res = resFor(findSimilarScenes);
 
@@ -561,7 +561,7 @@ describe("findSimilarScenes", () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
       user: testUser(),
-      query: { page: "1" },
+      query: { page: "1", instanceId: "inst-a" },
     });
     const res = resFor(findSimilarScenes);
 
@@ -578,10 +578,11 @@ describe("findSimilarScenes", () => {
   });
 
   it.each([
-    ["page", { id: "101" }, { page: "abc" }],
+    ["page", { id: "101" }, { page: "abc", instanceId: "inst-a" }],
     ["instanceId", { id: "101" }, { instanceId: "not an instance" }],
-    ["per_page", { id: "101" }, { per_page: "5" }],
-    ["id", { id: "s1" }, {}],
+    ["instanceId", { id: "101" }, { page: "1" }],
+    ["per_page", { id: "101" }, { per_page: "5", instanceId: "inst-a" }],
+    ["id", { id: "s1" }, { instanceId: "inst-a" }],
   ])(
     "a bad %s answers 400 before the seed is resolved",
     async (path, params: { id: string }, query: Record<string, string>) => {
@@ -608,7 +609,7 @@ describe("findSimilarScenes", () => {
     const req = reqFor(findSimilarScenes, {
       params: { id: "101" },
       user: testUser(),
-      query: { page: "1" },
+      query: { page: "1", instanceId: "inst-a" },
     });
     const res = resFor(findSimilarScenes);
 

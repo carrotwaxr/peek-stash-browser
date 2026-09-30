@@ -104,7 +104,7 @@ const EXCLUSION_PROBE = `SELECT 1 FROM UserExcludedEntity e
 
 /**
  * Rules 1 to 4 for the row aliased `x`, shared by every query here so the
- * single, batch and guess checks can't drift. Binds userId, userId, userId,
+ * single and batch checks can't drift. Binds userId, userId, userId,
  * entityType. Each probe hits an index: StashInstance's primary key,
  * UserStashInstance (userId, instanceId) and UserExcludedEntity (userId,
  * entityType, entityId, instanceId).
@@ -221,50 +221,24 @@ WHERE ${ACCESS_WHERE}
 }
 
 /**
- * For writes that may omit the instance: the request's instance if
- * canUserAccessEntity passes, else null. With no request instance, the legacy
- * guess: the first instance where this user can see the entity
- * (StashInstance.priority, then id), else null. Item 33 removes the guess.
+ * For per-user writes: the request's instance if canUserAccessEntity passes,
+ * else null. The instance is always the request's; the server never guesses
+ * one.
  */
 export async function resolveAccessibleInstanceId(
   userId: number,
   entityType: Exclude<AccessEntityType, "clip">,
   entityId: string,
-  requestInstanceId: string | undefined
+  requestInstanceId: string
 ): Promise<string | null> {
-  if (requestInstanceId !== undefined) {
-    return (await canUserAccessEntity(
-      userId,
-      entityType,
-      entityId,
-      requestInstanceId
-    ))
-      ? requestInstanceId
-      : null;
-  }
-
-  // Legacy guess (item 33 removes it): only copies this user can see, so a
-  // hidden or deselected same-id copy on another instance never turns a
-  // visible entity into a 404.
-  const source = sourceFor(entityType);
-  if (!entityId) return null;
-
-  const guessSql = `SELECT x.stashInstanceId AS instanceId
-FROM ${source.table} x
-JOIN StashInstance si ON si.id = x.stashInstanceId AND si.enabled = 1
-${source.join}
-WHERE x.id = ?
-  AND ${ACCESS_WHERE}
-  ${source.where}
-ORDER BY si.priority, x.stashInstanceId
-LIMIT 1`;
-
-  const rows = await prisma.$queryRawUnsafe<{ instanceId: string }[]>(
-    guessSql,
+  return (await canUserAccessEntity(
+    userId,
+    entityType,
     entityId,
-    ...accessParams(source, userId, entityType)
-  );
-  return rows[0]?.instanceId ?? null;
+    requestInstanceId
+  ))
+    ? requestInstanceId
+    : null;
 }
 
 /**
@@ -280,8 +254,7 @@ export type HideableEntityType = AccessEntityType;
  * instance (restricted for the user, empty for them, deleted, or on an
  * instance they do not use). A ref with instanceId '' (a hide stored for
  * every instance) resolves to the first qualifying instance by
- * StashInstance.priority, then id, the order resolveAccessibleInstanceId
- * guesses in. One SQL round trip, one bound JSON parameter for all refs.
+ * StashInstance.priority, then id. One SQL round trip, one bound JSON parameter for all refs.
  */
 export async function resolveVisibleApartFromOwnHides(
   userId: number,
