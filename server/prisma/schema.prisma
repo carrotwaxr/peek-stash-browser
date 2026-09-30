@@ -770,6 +770,9 @@ model StashScene {
   @@index([deletedAt, performerCount, id, stashInstanceId], map: "StashScene_browse_performerCount_idx")
   @@index([deletedAt, tagCount, id, stashInstanceId], map: "StashScene_browse_tagCount_idx")
   @@index([deletedAt, duration(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc)], map: "StashScene_browse_duration_idx")
+  // A clip's scene by its key with deletedAt, so the clip list checks that
+  // the scene is live from the index alone
+  @@index([id, stashInstanceId, deletedAt])
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }
@@ -1134,7 +1137,12 @@ model StashClip {
   @@index([sceneId])
   @@index([primaryTagId])
   @@index([isGenerated, deletedAt])
-  @@index([deletedAt, stashCreatedAt(sort: Desc)])
+  // The list's default sort (newest first) walks this index: the deletedAt
+  // filter, the sort column and the primary key (the whole ORDER BY), then
+  // the columns the list's filters read before the scene (the title for the
+  // search, generated, the scene's key), so a filter that holds few clips
+  // checks each from the index alone rather than reading its row
+  @@index([deletedAt, stashCreatedAt(sort: Desc), id(sort: Desc), stashInstanceId(sort: Desc), title, isGenerated, sceneId, sceneInstanceId], map: "StashClip_browse_idx")
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])
 }

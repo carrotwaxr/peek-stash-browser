@@ -14,6 +14,10 @@
  *   user hid; clip 7890106 of scene 7890001, which the user's exclusions
  *   cover itself (its tags cascade to it); clip 7890107, deleted
  * - cq-r: 60 clips of scene 7890004, for the paging case
+ * - cq-i, for the scene tags filter's inherited arm: clip 7890301 of scene
+ *   7890005, which inherits tag 7890001 (SceneInheritedTag) and holds tag
+ *   7890002 itself; clip 7890302 of scene 7890006, with no tags; clip
+ *   7890303 of scene 7890007, which holds tag 7890001 itself
  *
  * A clip shows only while its scene does: both live, neither excluded for
  * the viewer, on an allowed instance (an empty allowed list matches
@@ -31,6 +35,7 @@ import type {
   FilterRef,
   RefCriterion,
 } from "../../types/parsedFilters.js";
+import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -38,7 +43,8 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const A = "cq-a";
 const B = "cq-b";
 const R = "cq-r";
-const INSTANCES = [A, B, R];
+const I = "cq-i";
+const INSTANCES = [A, B, R, I];
 const TAG = "7890001";
 const OTHER_TAG = "7890002";
 const PERFORMER = "7890001";
@@ -59,6 +65,16 @@ const [PRIMARY, JUNCTION, OTHER, OF_DELETED, OF_HIDDEN, EXCLUDED, DELETED] = [
   "7890107",
 ];
 const PAGING_COUNT = 60;
+const [INHERITING_SCENE, UNTAGGED_SCENE, DIRECT_SCENE] = [
+  "7890005",
+  "7890006",
+  "7890007",
+];
+const [OF_INHERITING, OF_UNTAGGED, OF_DIRECT] = [
+  "7890301",
+  "7890302",
+  "7890303",
+];
 const USERNAME = "cq-clip-user";
 
 const key = (id: string, instanceId: string) => `${id}:${instanceId}`;
@@ -102,6 +118,8 @@ async function seed(): Promise<void> {
       named(TAG, A, "Tag A"),
       named(TAG, B, "Tag B"),
       named(OTHER_TAG, A, "Other tag A"),
+      named(TAG, I, "Tag I"),
+      named(OTHER_TAG, I, "Other tag I"),
     ],
   });
   await prisma.stashPerformer.createMany({
@@ -122,8 +140,17 @@ async function seed(): Promise<void> {
       },
       { id: HIDDEN_SCENE, stashInstanceId: A, title: "Hidden scene" },
       { id: PAGING_SCENE, stashInstanceId: R, title: "Paging scene" },
+      {
+        id: INHERITING_SCENE,
+        stashInstanceId: I,
+        title: "Inheriting scene",
+        inheritedTagIds: JSON.stringify([TAG]),
+      },
+      { id: UNTAGGED_SCENE, stashInstanceId: I, title: "Untagged scene" },
+      { id: DIRECT_SCENE, stashInstanceId: I, title: "Direct scene" },
     ],
   });
+  await mirrorInheritedTags([I]);
   await prisma.scenePerformer.createMany({
     data: [A, B].map((instance) => ({
       sceneId: SCENE,
@@ -133,12 +160,26 @@ async function seed(): Promise<void> {
     })),
   });
   await prisma.sceneTag.createMany({
-    data: [A, B].map((instance) => ({
-      sceneId: SCENE,
-      sceneInstanceId: instance,
-      tagId: TAG,
-      tagInstanceId: instance,
-    })),
+    data: [
+      ...[A, B].map((instance) => ({
+        sceneId: SCENE,
+        sceneInstanceId: instance,
+        tagId: TAG,
+        tagInstanceId: instance,
+      })),
+      {
+        sceneId: INHERITING_SCENE,
+        sceneInstanceId: I,
+        tagId: OTHER_TAG,
+        tagInstanceId: I,
+      },
+      {
+        sceneId: DIRECT_SCENE,
+        sceneInstanceId: I,
+        tagId: TAG,
+        tagInstanceId: I,
+      },
+    ],
   });
 
   const clip = (
@@ -184,6 +225,9 @@ async function seed(): Promise<void> {
       ...Array.from({ length: PAGING_COUNT }, (_, i) =>
         clip(String(7890200 + i), R, PAGING_SCENE, { seconds: i })
       ),
+      clip(OF_INHERITING, I, INHERITING_SCENE),
+      clip(OF_UNTAGGED, I, UNTAGGED_SCENE),
+      clip(OF_DIRECT, I, DIRECT_SCENE),
     ],
   });
   await prisma.clipTag.createMany({
@@ -332,6 +376,64 @@ describeWithDb("Clip builder on the base (integration)", () => {
       filter: { sceneId: includes({ id: SCENE, instanceId: A }) },
     });
     expect(scene.total).toBe(3);
+  });
+
+  it("the scene tags filter matches a clip whose scene inherits the tag (SceneInheritedTag) and not one whose scene lacks it", async () => {
+    const onI = (criterion: RefCriterion) =>
+      clips(
+        { filter: { sceneTagIds: criterion } },
+        { allowedInstanceIds: [I] }
+      );
+    const tag = { id: TAG, instanceId: I };
+
+    const matched = await onI(includes(tag));
+    expect(keys(matched.items)).toEqual(
+      [OF_INHERITING, OF_DIRECT].map((id) => key(id, I)).sort()
+    );
+    expect(matched.total).toBe(2);
+
+    // A bare ref matches the inherited tag on every allowed instance
+    const bare = await onI(includes({ id: TAG, instanceId: undefined }));
+    expect(bare.total).toBe(2);
+  });
+
+  it("the scene tags filter's Has NONE leaves out a clip whose scene inherits the tag", async () => {
+    const { items, total } = await clips(
+      {
+        filter: {
+          sceneTagIds: {
+            refs: [{ id: TAG, instanceId: I }],
+            modifier: "EXCLUDES",
+            depth: 0,
+          },
+        },
+      },
+      { allowedInstanceIds: [I] }
+    );
+
+    expect(keys(items)).toEqual([key(OF_UNTAGGED, I)]);
+    expect(total).toBe(1);
+  });
+
+  it("the scene tags filter's Has ALL matches an inherited tag and a direct one on one scene", async () => {
+    const { items, total } = await clips(
+      {
+        filter: {
+          sceneTagIds: {
+            refs: [
+              { id: TAG, instanceId: I },
+              { id: OTHER_TAG, instanceId: I },
+            ],
+            modifier: "INCLUDES_ALL",
+            depth: 0,
+          },
+        },
+      },
+      { allowedInstanceIds: [I] }
+    );
+
+    expect(keys(items)).toEqual([key(OF_INHERITING, I)]);
+    expect(total).toBe(1);
   });
 
   it("a scene's clips are the visible clips of that (id, instance), by time", async () => {

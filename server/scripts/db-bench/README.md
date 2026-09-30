@@ -5,7 +5,8 @@ library of about 200,000 scenes. They were used to measure the stored sort
 columns (`titleSort`, `performerCount`, `tagCount`, migration
 `20260925001100_scene_sort_columns`) and can re-take the numbers after a
 change to `SceneQueryBuilder` or the scene indexes. They touch no application
-code and never write to the database they read from.
+code and never write to the database they read from. A third file,
+`build-clips.sql`, adds clips to a built copy for the clip list.
 
 - `build-200k.sh <source.db> <target.db> [copies=7]` copies a Peek database
   and clones every live scene of one instance `copies` more times (ids offset
@@ -20,9 +21,17 @@ code and never write to the database they read from.
   query whose column the database lacks prints `n/a`: `title_*`,
   `performer_count_p1` and `tag_count_p1` are the sorts before the stored
   columns, `titleSort_*`, `performerCount_p1` and `tagCount_p1` after.
+- `sqlite3 <target.db> < build-clips.sql` gives a built copy clips for the
+  clip list (`ClipQueryBuilder`, migration
+  `20261001000300_clip_live_scene_index`): one per live scene (about 207k),
+  or with `sqlite3 -cmd ".parameter set @clips 300000"` a second clip on
+  enough scenes to reach that many. Each has its scene's lowest tag as its
+  primary tag and one more in `ClipTag`, and 90% are generated. Run
+  `ANALYZE` afterwards through Prisma: the sqlite3 shell's `ANALYZE`
+  deletes the STAT4 samples Prisma's SQLite plans with.
 
-Both take `INSTANCE=<id>` from the environment, the instance to clone and
-list; by default the one with the most live scenes. Only scene ids below
+The two shell scripts take `INSTANCE=<id>` from the environment, the
+instance to clone and list; by default the one with the most live scenes. Only scene ids below
 100,000 are cloned. They need the `sqlite3` command-line shell and bash.
 
 ## Running them
