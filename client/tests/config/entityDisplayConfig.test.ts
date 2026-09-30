@@ -1,5 +1,6 @@
 import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
+import { LIST_VIEW_MODES } from "../../src/components/list/listViewModes";
 import {
   ENTITY_DISPLAY_CONFIG,
   getAvailableSettings,
@@ -68,23 +69,41 @@ describe("entityDisplayConfig", () => {
       expect(modes).toEqual([{ id: "grid", label: "Grid" }]);
     });
 
-    it("returns clip view modes (grid only)", () => {
+    it("the clip modes are the ones the clip page renders", () => {
       const modes = getViewModes("clip") as ViewMode[];
-      expect(modes).toHaveLength(1);
-      expect(must(modes[0]).id).toBe("grid");
+      expect(modes.map((m) => m.id)).toEqual(["grid", "wall", "table"]);
+    });
+  });
+
+  describe("the default view offers only the views each page renders", () => {
+    it("the performer settings offer Grid and Table only", () => {
+      const modes = getViewModes("performer") as ViewMode[];
+      expect(modes).toEqual([
+        { id: "grid", label: "Grid" },
+        { id: "table", label: "Table" },
+      ]);
     });
 
-    it("returns group view modes", () => {
-      const modes = getViewModes("group") as ViewMode[];
-      expect(modes.length).toBeGreaterThanOrEqual(2);
-      expect(modes.find((m: ViewMode) => m.id === "grid")).toBeDefined();
-      expect(modes.find((m: ViewMode) => m.id === "wall")).toBeDefined();
+    it.each(["studio", "group"])(
+      "the %s settings offer Grid and Table only",
+      (entity) => {
+        const modes = getViewModes(entity) as ViewMode[];
+        expect(modes.map((m) => m.id)).toEqual(["grid", "table"]);
+      }
+    );
+
+    it("the tag settings offer Grid, Table and Hierarchy", () => {
+      const modes = getViewModes("tag") as ViewMode[];
+      expect(modes.map((m) => m.id)).toEqual(["grid", "table", "hierarchy"]);
     });
 
-    it("returns studio view modes", () => {
-      const modes = getViewModes("studio") as ViewMode[];
-      expect(modes.find((m: ViewMode) => m.id === "grid")).toBeDefined();
-      expect(modes.find((m: ViewMode) => m.id === "table")).toBeDefined();
+    it("each type's modes are its list page's", () => {
+      for (const entity of Object.keys(LIST_VIEW_MODES)) {
+        const modes = getViewModes(entity) as ViewMode[];
+        expect(modes.map((m) => m.id)).toEqual(
+          LIST_VIEW_MODES[entity as keyof typeof LIST_VIEW_MODES]
+        );
+      }
     });
   });
 

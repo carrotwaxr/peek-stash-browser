@@ -1,5 +1,7 @@
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { GroupGrid } from "../../../src/components/grids/index";
+import type { SearchableGridProps } from "../../../src/components/ui/SearchableGrid";
 
 describe("GroupGrid", () => {
   it("renders with default configuration", () => {
@@ -46,5 +48,21 @@ describe("GroupGrid", () => {
     expect(renderedCard.key).toBe("1");
     // The grid's one hide handler, not a new closure per card
     expect(renderedCard).toHaveProperty("props.onHideSuccess", onHideSuccess);
+  });
+
+  it("keys each card by id and instance: the same id on two servers is two cards", () => {
+    const element = GroupGrid({}) as ReactElement<SearchableGridProps>;
+    const helpers = { onHideSuccess: () => {} };
+    const keyOf = (instanceId: string, index: number) =>
+      (
+        element.props.renderItem(
+          { id: "1", instanceId, name: instanceId },
+          index,
+          helpers
+        ) as ReactElement
+      ).key;
+
+    expect(keyOf("inst-a", 0)).toBe("1:inst-a");
+    expect(keyOf("inst-b", 1)).toBe("1:inst-b");
   });
 });

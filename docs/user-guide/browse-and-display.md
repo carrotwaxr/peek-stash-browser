@@ -178,6 +178,10 @@ A detail page (performer, studio, tag, collection or gallery) counts its tabs th
 
 Each entity type (Scene, Performer, Studio, etc.) has independent settings. Configure each type separately in the Card Display settings accordion.
 
+**Default view mode** offers only the views that type's page has: Grid and Table for performers, studios and collections; Grid, Table and Hierarchy for tags; Grid, Wall, Table, Timeline and Folder for scenes, galleries and images. A default saved before a page lost a view (Wall on performers, say) opens that page in Grid.
+
+When nothing matches the search and filters, a list says so ("No performers found") instead of showing a blank page.
+
 ---
 
 ## Filters

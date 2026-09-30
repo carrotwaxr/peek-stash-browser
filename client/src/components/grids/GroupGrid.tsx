@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { GroupCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -29,7 +30,7 @@ const GroupGrid = ({
         const group = item as ComponentProps<typeof GroupCard>["group"];
         return (
           <GroupCard
-            key={group.id}
+            key={makeCompositeKey(group.id, group.instanceId)}
             group={group}
             onHideSuccess={onHideSuccess}
           />

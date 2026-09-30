@@ -5,11 +5,24 @@
  * Provides context providers and helper functions used across tests.
  */
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import {
+  MemoryRouter,
+  RouterProvider,
+  createMemoryRouter,
+} from "react-router-dom";
+import type { FilterPreset } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
 import { vi } from "vitest";
-import type { AuthContextValue } from "@/contexts/AuthContextProvider";
+import { queryKeys } from "@/api/queryKeys";
+import { getDefaultSettings } from "@/config/entityDisplayConfig";
+import {
+  AuthContext,
+  type AuthContextValue,
+} from "@/contexts/AuthContextProvider";
+import { CardDisplaySettingsContext } from "@/contexts/CardDisplaySettingsContext";
+import { TVModeProvider } from "@/contexts/TVModeProvider";
+import { userSettingsResponse } from "./helpers/userSettings";
 
 // ============================================================================
 // Query Client Wrapper
@@ -114,6 +127,80 @@ export const renderWithProviders = (
   return {
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
   };
+};
+
+// ============================================================================
+// List Page Render
+// ============================================================================
+
+interface ListPageOptions {
+  /** The router's history, the last entry current (default `["/"]`) */
+  initialEntries?: string[];
+  /** Saved presets by entity type, in the query cache */
+  presets?: Record<string, FilterPreset[]>;
+  /** Default preset ids by context, in the query cache */
+  defaultPresets?: Record<string, string>;
+  /** Card display settings by entity type, over the defaults */
+  cardSettings?: Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Renders a list page as the app does: a data router (so a test can step
+ * Back with `router.navigate(-1)`), a fresh QueryClient with the presets and
+ * user settings in its cache, a signed-in user, `TVModeProvider` and a card
+ * display settings stub. `ConfigContext`'s default is one Stash instance.
+ * Page tests mock the list hooks (`@/api/hooks`) or `@/api/library`, and
+ * render the real controls and pagination.
+ */
+export const renderListPage = (
+  ui: React.ReactElement,
+  {
+    initialEntries = ["/"],
+    presets = {},
+    defaultPresets = {},
+    cardSettings = {},
+  }: ListPageOptions = {}
+) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  // The preset queries' keys (`usePresets`), read here so importing this
+  // file evaluates no query options a test's mocks could break
+  queryClient.setQueryData(queryKeys.user.filterPresets(), { presets });
+  queryClient.setQueryData(queryKeys.user.defaultPresets(), {
+    defaults: defaultPresets,
+  });
+  queryClient.setQueryData(queryKeys.user.settings(), userSettingsResponse());
+
+  const cardDisplay = {
+    getSettings: (entityType: string) => ({
+      ...getDefaultSettings(entityType),
+      ...cardSettings[entityType],
+    }),
+    updateSettings: vi.fn(() => Promise.resolve()),
+    isLoading: false,
+  };
+  const auth = createAuthValue({
+    isAuthenticated: true,
+    user: { id: 1, username: "viewer", role: "USER" },
+  });
+  const router = createMemoryRouter([{ path: "*", element: ui }], {
+    initialEntries,
+    initialIndex: initialEntries.length - 1,
+  });
+
+  const result = render(
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={auth}>
+        <TVModeProvider>
+          <CardDisplaySettingsContext.Provider value={cardDisplay}>
+            <RouterProvider router={router} />
+          </CardDisplaySettingsContext.Provider>
+        </TVModeProvider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+  return { ...result, router, queryClient };
 };
 
 // ============================================================================

@@ -1,225 +1,133 @@
-import React from "react";
-import { render, screen } from "@testing-library/react";
+/**
+ * The Studios page on the list page shell: its title, its error and
+ * initializing states, its cards and its stale results. The list hook is
+ * mocked; the controls and pagination are the real ones.
+ */
+import { screen } from "@testing-library/react";
+import { renderListPage } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
+import type * as ApiHooks from "@/api/hooks";
 import Studios from "@/components/pages/Studios";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
-// Mock react-router-dom
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual("react-router-dom");
-  return {
-    ...actual,
-    useNavigate: vi.fn(() => vi.fn()),
-    useSearchParams: vi.fn(() => [new URLSearchParams(), vi.fn()]),
-  };
-});
-
-// Mock hooks
-vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/hooks/useTableColumns", () => ({
-  useTableColumns: vi.fn(() => ({
-    allColumns: [],
-    visibleColumns: [],
-    visibleColumnIds: [],
-    columnOrder: [],
-    toggleColumn: vi.fn(),
-    hideColumn: vi.fn(),
-    moveColumn: vi.fn(),
-    getColumnConfig: vi.fn(() => ({})),
-  })),
-}));
-vi.mock("@/contexts/ConfigContext", () => ({
-  useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
-}));
-vi.mock("@/constants/grids", () => ({
-  getGridClasses: vi.fn(() => "grid-classes"),
-}));
-vi.mock("@/utils/entityLinks", () => ({
-  getEntityPath: vi.fn(() => "/studios/1"),
-}));
-
-// Mock API
 interface MockListResult {
-  data: Record<string, unknown> | null;
-  isLoading: boolean;
+  data: Record<string, unknown> | undefined;
+  isPending: boolean;
   error: Error | null;
-  isPlaceholderData?: boolean;
+  isPlaceholderData: boolean;
+  refetch: () => void;
 }
-const mockUseStudioList = vi.fn(
-  (): MockListResult => ({ data: null, isLoading: false, error: null })
-);
-const mockSearchControlsProps = vi.fn();
-vi.mock("@/api/hooks", () => ({
-  useStudioList: (..._args: unknown[]) => mockUseStudioList(),
-}));
-vi.mock("@/api/client", () => ({
-  ApiError: class ApiError extends Error {
-    isInitializing = false;
-    status: number;
-    data: Record<string, unknown>;
-    constructor(
-      message: string,
-      status = 500,
-      data: Record<string, unknown> = {}
-    ) {
-      super(message);
-      this.status = status;
-      this.data = data;
-      this.isInitializing = status === 503 && data.ready === false;
-    }
-  },
-}));
-vi.mock("@/api", () => ({}));
 
-// Mock child components
-vi.mock("@/components/ui/index", () => ({
-  SearchControls: (props: Record<string, unknown>) => {
-    mockSearchControlsProps(props);
-    const { children, onQueryChange, ...rest } = props;
-    React.useEffect(() => {
-      if (typeof onQueryChange === "function") {
-        onQueryChange({ filter: {} });
-      }
-    }, [onQueryChange]);
-    return (
-      <div data-testid="search-controls" data-artifact-type={rest.artifactType}>
-        {typeof children === "function"
-          ? children({
-              viewMode: "grid",
-              gridDensity: "medium",
-              sortField: "name",
-              sortDirection: "ASC",
-              onSort: vi.fn(),
-            })
-          : children}
-      </div>
-    );
-  },
-  PageLayout: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="page-layout">{children}</div>
-  ),
-  PageHeader: ({ title, subtitle }: Record<string, unknown>) => (
-    <div data-testid="page-header">
-      {title as string}
-      {subtitle ? <span>{subtitle as string}</span> : null}
-    </div>
-  ),
-  ErrorMessage: ({ error }: Record<string, unknown>) => (
-    <div data-testid="error-message">
-      {(error as Error)?.message || "Error"}
-    </div>
-  ),
-  // Shows itself while the library is initializing (its own test covers when)
-  LibraryInitializingBanner: () => <div data-testid="sync-banner" />,
+const { mockList } = vi.hoisted(() => ({
+  mockList: vi.fn<(params: unknown) => MockListResult>(),
+}));
+
+vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
+vi.mock("@/api/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiHooks>()),
+  useStudioList: (params: unknown) => mockList(params),
+}));
+vi.mock("@/api", () => ({
+  apiGet: vi.fn().mockResolvedValue({}),
+  apiPost: vi.fn().mockResolvedValue({}),
+  libraryApi: {},
+}));
+// Shows itself while the library is initializing (its own test covers when)
+vi.mock("@/components/ui/LibraryInitializingBanner", () => ({
+  default: () => <div data-testid="sync-banner" />,
 }));
 vi.mock("@/components/cards/index", () => ({
-  StudioCard: (props: Record<string, unknown>) => (
-    <div data-testid="studio-card">
-      {(props.studio as Record<string, unknown>)?.name as string}
-    </div>
+  StudioCard: (props: { studio: { name: string } }) => (
+    <div data-testid="studio-card">{props.studio.name}</div>
   ),
 }));
-vi.mock("@/components/table/index", () => ({
-  TableView: () => <div data-testid="table-view" />,
-  ColumnConfigPopover: () => <div data-testid="column-config" />,
-}));
+
+const result = (fields: Partial<MockListResult> = {}): MockListResult => ({
+  data: undefined,
+  isPending: false,
+  error: null,
+  isPlaceholderData: false,
+  refetch: vi.fn(),
+  ...fields,
+});
+
+const renderPage = () =>
+  renderListPage(<Studios />, { initialEntries: ["/studios"] });
 
 describe("Studios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseStudioList.mockReturnValue({
-      data: null,
-      isLoading: false,
-      error: null,
-    });
+    mockList.mockReturnValue(
+      result({ data: { findStudios: { studios: [], count: 0 } } })
+    );
   });
 
   describe("Rendering", () => {
-    it("renders without crashing", () => {
-      render(<Studios />);
-      expect(screen.getByTestId("page-layout")).toBeInTheDocument();
-    });
-
     it("sets page title to 'Studios'", () => {
-      render(<Studios />);
+      renderPage();
       expect(usePageTitle).toHaveBeenCalledWith("Studios");
     });
 
-    it("shows PageHeader with title 'Studios'", () => {
-      render(<Studios />);
-      const header = screen.getByTestId("page-header");
-      expect(header).toHaveTextContent("Studios");
-    });
-
-    it("renders SearchControls with artifactType 'studio'", () => {
-      render(<Studios />);
-      const controls = screen.getByTestId("search-controls");
-      expect(controls).toHaveAttribute("data-artifact-type", "studio");
+    it("shows the heading 'Studios' and its controls", () => {
+      renderPage();
+      expect(
+        screen.getByRole("heading", { name: "Studios" })
+      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
     });
   });
 
   describe("Error State", () => {
     it("shows ErrorMessage when error is present and not initializing", () => {
-      const error = new ApiError("Something went wrong", 500);
-      mockUseStudioList.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error,
-      });
+      mockList.mockReturnValue(
+        result({ error: new ApiError("Something went wrong", 500) })
+      );
 
-      render(<Studios />);
-      expect(screen.getByTestId("error-message")).toHaveTextContent(
+      renderPage();
+      expect(screen.getByRole("alert")).toHaveTextContent(
         "Something went wrong"
       );
     });
 
     it("an initializing 503 shows the sync banner, not the error page", () => {
-      const error = new ApiError("init", 503, { ready: false });
-      mockUseStudioList.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error,
-      });
+      mockList.mockReturnValue(
+        result({ error: new ApiError("init", 503, { ready: false }) })
+      );
 
-      render(<Studios />);
+      renderPage();
       expect(screen.getByTestId("sync-banner")).toBeInTheDocument();
-      expect(screen.queryByTestId("error-message")).not.toBeInTheDocument();
-      expect(screen.getByTestId("search-controls")).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
     });
   });
 
   describe("Loading State", () => {
     it("renders loading skeletons when loading", () => {
-      mockUseStudioList.mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-      });
+      mockList.mockReturnValue(result({ isPending: true }));
 
-      const { container } = render(<Studios />);
-      const skeletons = container.querySelectorAll(".animate-pulse");
-      expect(skeletons.length).toBeGreaterThan(0);
+      renderPage();
+      expect(screen.getAllByTestId("list-skeleton").length).toBeGreaterThan(0);
     });
   });
 
   describe("Data State", () => {
     it("renders StudioCard when data is present", () => {
-      mockUseStudioList.mockReturnValue({
-        data: {
-          findStudios: {
-            studios: [
-              { id: "1", name: "Test Studio" },
-              { id: "2", name: "Another Studio" },
-            ],
-            count: 2,
+      mockList.mockReturnValue(
+        result({
+          data: {
+            findStudios: {
+              studios: [
+                { id: "1", instanceId: "a", name: "Test Studio" },
+                { id: "2", instanceId: "a", name: "Another Studio" },
+              ],
+              count: 2,
+            },
           },
-        },
-        isLoading: false,
-        error: null,
-      });
+        })
+      );
 
-      render(<Studios />);
+      renderPage();
       const cards = screen.getAllByTestId("studio-card");
       expect(cards).toHaveLength(2);
       expect(cards[0]).toHaveTextContent("Test Studio");
@@ -227,18 +135,19 @@ describe("Studios", () => {
   });
 
   describe("Stale results", () => {
-    it("passes the list's placeholder state to SearchControls as isRefreshing", () => {
-      mockUseStudioList.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: null,
-        isPlaceholderData: true,
-      });
+    it("dims the results while the list shows placeholder data", () => {
+      mockList.mockReturnValue(
+        result({
+          data: { findStudios: { studios: [], count: 0 } },
+          isPlaceholderData: true,
+        })
+      );
 
-      render(<Studios />);
-
-      const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
-      expect(props).toMatchObject({ isRefreshing: true });
+      renderPage();
+      expect(screen.getByTestId("search-results")).toHaveAttribute(
+        "aria-busy",
+        "true"
+      );
     });
   });
 });

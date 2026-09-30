@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { StudioCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -29,7 +30,7 @@ const StudioGrid = ({
         const studio = item as ComponentProps<typeof StudioCard>["studio"];
         return (
           <StudioCard
-            key={studio.id}
+            key={makeCompositeKey(studio.id, studio.instanceId)}
             studio={studio}
             onHideSuccess={onHideSuccess}
           />

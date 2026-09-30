@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { PerformerCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -31,7 +32,7 @@ const PerformerGrid = ({
         >["performer"];
         return (
           <PerformerCard
-            key={performer.id}
+            key={makeCompositeKey(performer.id, performer.instanceId)}
             performer={performer}
             onHideSuccess={onHideSuccess}
           />
