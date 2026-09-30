@@ -228,6 +228,7 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
         ratingControlsProps={{
           entityType: "clip",
           entityId: clip.id,
+          instanceId: clip.instanceId,
           entityTitle: title,
           onHideSuccess,
           showRating: clipSettings.showRating as boolean | undefined,

@@ -508,6 +508,7 @@ describe("Hidden items and content restrictions (integration)", () => {
       group: 0,
       gallery: 0,
       image: 0,
+      clip: 0,
     });
     // Newest first
     expect(must(first.items[0]).entityId).toBe("hidden-page-119");
@@ -592,12 +593,145 @@ describe("Hidden items and content restrictions (integration)", () => {
     }
   });
 
+  it("hiding a clip removes it from /api/clips and its scene's clips, and nothing else", async () => {
+    // The fixture has a second clip on the same scene; it must stay listed
+    await prisma.stashClip.create({
+      data: {
+        id: FX_ID.VISIBLE_A,
+        stashInstanceId: FX.A,
+        sceneId: FX_ID.SAME,
+        sceneInstanceId: FX.A,
+        seconds: 2,
+      },
+    });
+    const clipKeys = async () => {
+      const all = await hider.client.get<{
+        clips: Array<{ id: string; instanceId: string }>;
+      }>("/api/clips?isGenerated=false&perPage=250");
+      expect(all.status).toBe(200);
+      const ofScene = await hider.client.get<{
+        clips: Array<{ id: string; instanceId: string }>;
+      }>(
+        `/api/scenes/${FX_ID.SAME}/clips?includeUngenerated=true&instanceId=${FX.A}`
+      );
+      expect(ofScene.status).toBe(200);
+      const scene = await hider.client.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { ids: [`${FX_ID.SAME}:${FX.A}`] }
+      );
+      expect(scene.status).toBe(200);
+      const key = (c: { id: string; instanceId: string }) =>
+        `${c.id}@${c.instanceId}`;
+      return {
+        all: all.data.clips
+          .map(key)
+          .filter((k) =>
+            [FX_ID.SAME, FX_ID.VISIBLE_A].some((id) => k === `${id}@${FX.A}`)
+          )
+          .sort(),
+        ofScene: ofScene.data.clips.map(key).sort(),
+        scenes: scene.data.findScenes.count,
+      };
+    };
+    const both = [`${FX_ID.SAME}@${FX.A}`, `${FX_ID.VISIBLE_A}@${FX.A}`].sort();
+
+    try {
+      expect(await clipKeys()).toEqual({ all: both, ofScene: both, scenes: 1 });
+
+      const hide = await hider.client.post("/api/user/hidden-entities", {
+        entityType: "clip",
+        entityId: FX_ID.SAME,
+        instanceId: FX.A,
+      });
+      expect(hide.status).toBe(200);
+
+      const remaining = [`${FX_ID.VISIBLE_A}@${FX.A}`];
+      expect(await clipKeys()).toEqual({
+        all: remaining,
+        ofScene: remaining,
+        scenes: 1,
+      });
+      // Its own row only: no cascade to the scene or its other clip
+      expect(
+        await prisma.userExcludedEntity.findMany({
+          where: { userId: hider.id, reason: "hidden" },
+          select: { entityType: true, entityId: true, instanceId: true },
+        })
+      ).toEqual([
+        { entityType: "clip", entityId: FX_ID.SAME, instanceId: FX.A },
+      ]);
+    } finally {
+      await prisma.stashClip.delete({
+        where: {
+          id_stashInstanceId: { id: FX_ID.VISIBLE_A, stashInstanceId: FX.A },
+        },
+      });
+    }
+  });
+
+  it("Hidden Items lists and restores a clip", async () => {
+    await prisma.stashClip.update({
+      where: { id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.A } },
+      data: {
+        title: "A fixture clip",
+        screenshotPath: "/clip/same/screenshot",
+      },
+    });
+    try {
+      const hide = await hider.client.post("/api/user/hidden-entities", {
+        entityType: "clip",
+        entityId: FX_ID.SAME,
+        instanceId: FX.A,
+      });
+      expect(hide.status).toBe(200);
+
+      const page = await listPage("?entityType=clip");
+      expect(page.total).toBe(1);
+      expect(page.counts.clip).toBe(1);
+      const [item] = page.items;
+      expect(item).toMatchObject({
+        entityType: "clip",
+        entityId: FX_ID.SAME,
+        instanceId: FX.A,
+        restricted: false,
+        summary: {
+          id: FX_ID.SAME,
+          instanceId: FX.A,
+          name: "A fixture clip",
+          imageUrl: `/api/proxy/stash?path=${encodeURIComponent("/clip/same/screenshot")}&instanceId=${encodeURIComponent(FX.A)}`,
+        },
+      });
+
+      // The per-row DELETE checks the instance against the configured
+      // servers, which the fixture's A is not; restore the type instead
+      const restore = await hider.client.delete(
+        "/api/user/hidden-entities/all?entityType=clip"
+      );
+      expect(restore.status).toBe(200);
+      expect(await listPage("?entityType=clip")).toMatchObject({
+        items: [],
+        total: 0,
+      });
+      const clips = await hider.client.get<{ clips: Array<{ id: string }> }>(
+        "/api/clips?isGenerated=false&perPage=250"
+      );
+      expect(clips.data.clips.map((c) => c.id)).toContain(FX_ID.SAME);
+    } finally {
+      await prisma.stashClip.update({
+        where: {
+          id_stashInstanceId: { id: FX_ID.SAME, stashInstanceId: FX.A },
+        },
+        data: { title: null, screenshotPath: null },
+      });
+    }
+  });
+
   it("a hidden row of a type that cannot be hidden is left out", async () => {
     await hideFor(hider.id, "scene", visibleScene.id, testInstanceId);
     await prisma.userHiddenEntity.create({
       data: {
         userId: hider.id,
-        entityType: "clip",
+        entityType: "marker",
         entityId: "1",
         instanceId: testInstanceId,
       },
@@ -606,7 +740,7 @@ describe("Hidden items and content restrictions (integration)", () => {
     const page = await listPage();
     expect(page.items.map((i) => i.entityType)).toEqual(["scene"]);
     expect(page.total).toBe(1);
-    expect(page.counts).not.toHaveProperty("clip");
+    expect(page.counts).not.toHaveProperty("marker");
     expect(Object.values(page.counts).reduce((a, b) => a + b, 0)).toBe(1);
   });
 });

@@ -993,7 +993,7 @@ describe("User Controller — Features", () => {
   });
 
   describe("the hide handlers' entity types", () => {
-    const SEVEN_TYPES = [
+    const HIDEABLE_TYPES = [
       "scene",
       "performer",
       "studio",
@@ -1001,6 +1001,7 @@ describe("User Controller — Features", () => {
       "group",
       "gallery",
       "image",
+      "clip",
     ];
     const HANDLERS = [
       "hideEntity",
@@ -1073,18 +1074,18 @@ describe("User Controller — Features", () => {
       "%s answers 400 for a type outside HIDEABLE_ENTITY_TYPES",
       async (name) => {
         const handler = handlers[name];
-        expect(await handler.call("clip")).toBe(400);
+        expect(await handler.call("marker")).toBe(400);
         expect(await handler.call("Scene")).toBe(400);
         expect(handler.passed()).toEqual([]);
       }
     );
 
-    it.each(HANDLERS)("%s accepts each of the seven types", async (name) => {
+    it.each(HANDLERS)("%s accepts each hideable type", async (name) => {
       const handler = handlers[name];
-      for (const entityType of SEVEN_TYPES) {
+      for (const entityType of HIDEABLE_TYPES) {
         expect(await handler.call(entityType), entityType).toBe(200);
       }
-      expect(handler.passed()).toEqual(SEVEN_TYPES);
+      expect(handler.passed()).toEqual(HIDEABLE_TYPES);
     });
   });
 
