@@ -202,6 +202,24 @@ describe.each(PAGES)(
       expect(await screen.findAllByTestId("list-skeleton")).toHaveLength(24);
     });
 
+    it("an empty result stays out of view while the next query loads", async () => {
+      const { router } = renderListPage(<Page />, {
+        initialEntries: [`${path}?q=zzz`],
+      });
+      expect(await screen.findByText(empty)).toBeInTheDocument();
+
+      // The next list (no search) is in flight, the empty one its placeholder
+      api[find].mockReturnValue(new Promise(() => {}));
+      await act(() => router.navigate(path));
+
+      await waitFor(() =>
+        expect(screen.queryByText(empty)).not.toBeInTheDocument()
+      );
+      expect(
+        (await screen.findAllByTestId("list-skeleton")).length
+      ).toBeGreaterThan(0);
+    });
+
     it("Back to page 1 shows page 1's items", async () => {
       api[find].mockImplementation((params) =>
         Promise.resolve(response(find, items, rowsOf(`p${pageOf(params)}`), 48))

@@ -245,7 +245,11 @@ const EntityListPage = ({
   const { items, count } = pickPage(source, data);
   // The library is on its first sync: loading, not the error page
   const initializing = isLibraryInitializing(error);
-  const isLoading = isPending || initializing;
+  // An empty placeholder (the previous query's) is no answer to this one:
+  // loading, not "No scenes found" until the new query settles. A placeholder
+  // with rows stays on screen, dimmed
+  const isLoading =
+    isPending || initializing || (isPlaceholderData && items.length === 0);
   const totalPages = paged ? Math.ceil(count / perPage) : 0;
 
   // The page's own handlers and parts (the Images lightbox, a scene's queue)

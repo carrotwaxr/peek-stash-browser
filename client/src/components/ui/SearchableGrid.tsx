@@ -132,6 +132,9 @@ export const SearchableGrid = ({
   const totalPages = Math.ceil(totalCount / perPage);
   // The library is on its first sync: loading, not an error
   const initializing = isLibraryInitializing(error);
+  // An empty placeholder (the previous query's) is no answer to this one
+  const loading =
+    isPending || initializing || (isPlaceholderData && items.length === 0);
 
   const handleHideSuccess = useHideFromList(list, request);
   const helpers = useMemo(
@@ -154,7 +157,7 @@ export const SearchableGrid = ({
         density={density}
         items={items}
         renderItem={(item, index) => renderItem(item, index, helpers)}
-        loading={isPending || initializing}
+        loading={loading}
         error={initializing ? null : error}
         onRetry={() => void refetch()}
         emptyMessage={emptyMessage || `No ${entityType}s found`}
