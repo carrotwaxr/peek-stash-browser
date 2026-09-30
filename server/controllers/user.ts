@@ -1395,6 +1395,9 @@ export const updateUserRestrictions = async (
   const seenPairs = new Set<string>();
   const rows: RestrictionRowInput[] = [];
   const namedInstances = new Map<string, string>(); // instanceId -> an entry
+  // Entries without an instance, each with the list it came in
+  const bareEntries: Array<{ entityType: string; mode: string; id: string }> =
+    [];
   for (const r of restrictions) {
     if (!isRestrictableEntityType(r.entityType)) {
       res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
@@ -1428,7 +1431,9 @@ export const updateUserRestrictions = async (
         return;
       }
       const { instanceId } = parseEntityRef(id);
-      if (instanceId !== undefined && !namedInstances.has(instanceId)) {
+      if (instanceId === undefined) {
+        bareEntries.push({ entityType: r.entityType, mode, id });
+      } else if (!namedInstances.has(instanceId)) {
         namedInstances.set(instanceId, id);
       }
       entityIds.push(id);
@@ -1465,6 +1470,34 @@ export const updateUserRestrictions = async (
         });
         return;
       }
+    }
+  }
+
+  // A bare id matches that id on every instance, so a Show-only list would
+  // show another server's entity of that id. The editor sends "id:instanceId";
+  // a bare id passes only when a stored list of its type already holds it
+  // (a list saved before entries named their instance, saved again)
+  if (bareEntries.length > 0) {
+    const types = [...new Set(bareEntries.map((e) => e.entityType))];
+    const stored = await prisma.userContentRestriction.findMany({
+      where: { userId: targetUserId, entityType: { in: types } },
+      select: { entityType: true, entityIds: true },
+    });
+    const storedBare = new Set(
+      stored.flatMap((row) =>
+        (parseStoredRestrictionIds(row.entityIds) ?? []).map((id) =>
+          compositeKey(row.entityType, id)
+        )
+      )
+    );
+    const unnamed = bareEntries.find(
+      (e) => !storedBare.has(compositeKey(e.entityType, e.id))
+    );
+    if (unnamed) {
+      res.status(400).json({
+        error: `Entity id in ${unnamed.entityType} ${unnamed.mode} needs its instance: ${unnamed.id}`,
+      });
+      return;
     }
   }
 

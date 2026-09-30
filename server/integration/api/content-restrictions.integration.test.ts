@@ -174,7 +174,7 @@ describe("Content Restrictions Integration Tests", () => {
           {
             entityType: "tags",
             mode: "EXCLUDE",
-            entityIds: [TEST_ENTITIES.restrictableTag],
+            entityIds: [`${TEST_ENTITIES.restrictableTag}:${testInstanceId}`],
             restrictEmpty: false,
           },
         ];
@@ -195,7 +195,7 @@ describe("Content Restrictions Integration Tests", () => {
           {
             entityType: "tags",
             mode: "INCLUDE",
-            entityIds: [TEST_ENTITIES.tagWithEntities],
+            entityIds: [`${TEST_ENTITIES.tagWithEntities}:${testInstanceId}`],
             restrictEmpty: true,
           },
         ];
@@ -290,6 +290,54 @@ describe("Content Restrictions Integration Tests", () => {
         );
         expect(after.data.restrictions).toEqual(before.data.restrictions);
       });
+
+      it("a bare id answers 400 naming it, unless a stored list of its type already holds it", async () => {
+        const bare = TEST_ENTITIES.restrictableTag;
+        const list = (entityIds: string[]) => ({
+          restrictions: [
+            {
+              entityType: "tags",
+              mode: "EXCLUDE",
+              entityIds,
+              restrictEmpty: false,
+            },
+          ],
+        });
+        await adminClient.delete(`/api/user/${testUserId}/restrictions`);
+        try {
+          const refused = await adminClient.put<{ error: string }>(
+            `/api/user/${testUserId}/restrictions`,
+            list([bare])
+          );
+          expect(refused.status).toBe(400);
+          expect(refused.data.error).toBe(
+            `Entity id in tags EXCLUDE needs its instance: ${bare}`
+          );
+          expect(
+            await prisma.userContentRestriction.count({
+              where: { userId: testUserId },
+            })
+          ).toBe(0);
+
+          // A list stored before entries named their instance saves again
+          await prisma.userContentRestriction.create({
+            data: {
+              userId: testUserId,
+              entityType: "tags",
+              mode: "EXCLUDE",
+              entityIds: JSON.stringify([bare]),
+              restrictEmpty: false,
+            },
+          });
+          const kept = await adminClient.put(
+            `/api/user/${testUserId}/restrictions`,
+            list([bare, `${TEST_ENTITIES.tagWithEntities}:${testInstanceId}`])
+          );
+          expect(kept.status).toBe(200);
+        } finally {
+          await adminClient.delete(`/api/user/${testUserId}/restrictions`);
+        }
+      }, 30_000);
     });
 
     describe("DELETE /api/user/:userId/restrictions", () => {
@@ -317,7 +365,9 @@ describe("Content Restrictions Integration Tests", () => {
               {
                 entityType: "tags",
                 mode: "EXCLUDE",
-                entityIds: [TEST_ENTITIES.restrictableTag],
+                entityIds: [
+                  `${TEST_ENTITIES.restrictableTag}:${testInstanceId}`,
+                ],
                 restrictEmpty: false,
               },
             ],
@@ -359,7 +409,7 @@ describe("Content Restrictions Integration Tests", () => {
             {
               entityType: "tags",
               mode: "EXCLUDE",
-              entityIds: ["1"],
+              entityIds: [`${TEST_ENTITIES.restrictableTag}:${testInstanceId}`],
               restrictEmpty: false,
             },
           ],

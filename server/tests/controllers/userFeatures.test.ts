@@ -691,7 +691,11 @@ describe("User Controller — Features", () => {
       const req = reqFor(updateUserRestrictions, {
         body: {
           restrictions: [
-            { entityType: "tags", mode: "EXCLUDE", entityIds: ["1", "2"] },
+            {
+              entityType: "tags",
+              mode: "EXCLUDE",
+              entityIds: ["1:inst-1", "2:inst-1"],
+            },
           ],
         },
         params: { userId: "2" },
@@ -706,11 +710,74 @@ describe("User Controller — Features", () => {
         {
           entityType: "tags",
           mode: "EXCLUDE",
-          entityIds: ["1", "2"],
+          entityIds: ["1:inst-1", "2:inst-1"],
           restrictEmpty: false,
         },
       ]);
       expect(res._getOkBody().restrictions).toHaveLength(1);
+    });
+
+    /** A save of one tag list holding `entityIds`, for user 2 (a USER). */
+    async function saveTags(mode: "INCLUDE" | "EXCLUDE", entityIds: string[]) {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 2, role: "USER" })
+      );
+      mockExclusionService.saveRestrictions.mockResolvedValue(undefined);
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [{ entityType: "tags", mode, entityIds }] },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
+      await updateUserRestrictions(req, res);
+      return res;
+    }
+
+    it("refuses a bare id the user's stored lists do not hold, naming it and saving nothing", async () => {
+      // Stored: this type's lists hold "7" bare and "5" only with an instance
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        partialRow({
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: JSON.stringify(["7", "5:inst-1"]),
+        }),
+      ]);
+
+      const res = await saveTags("INCLUDE", ["4:inst-1", "5"]);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe(
+        "Entity id in tags INCLUDE needs its instance: 5"
+      );
+      expect(mockPrisma.userContentRestriction.findMany).toHaveBeenCalledWith({
+        where: { userId: 2, entityType: { in: ["tags"] } },
+        select: { entityType: true, entityIds: true },
+      });
+      expect(mockExclusionService.saveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it("keeps a bare id a stored list of the type already holds, so an old list can be saved again", async () => {
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        partialRow({
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: JSON.stringify(["7", "5:inst-1"]),
+        }),
+      ]);
+
+      const res = await saveTags("EXCLUDE", ["7", "8:inst-1"]);
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(
+        mockExclusionService.saveRestrictions
+      ).toHaveBeenCalledExactlyOnceWith(2, [
+        {
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: ["7", "8:inst-1"],
+          restrictEmpty: false,
+        },
+      ]);
     });
   });
 
