@@ -283,7 +283,7 @@ describe("Multi-Instance Isolation", () => {
       r: string;
     }
 
-    /** The rows addHiddenEntity merges (the _peek_result fills), as keys. */
+    /** The rows addHiddenEntities merges (the _peek_result fills), as keys. */
     function mergedKeys(): string[] {
       return mockPrisma.$executeRawUnsafe.mock.calls
         .filter((c) => /INSERT OR IGNORE INTO _peek_result/.test(c[0]))
@@ -313,12 +313,9 @@ describe("Multi-Instance Isolation", () => {
         ],
       ]);
 
-      await exclusionComputationService.addHiddenEntity(
-        1,
-        "performer",
-        "perf1",
-        INST_A
-      );
+      await exclusionComputationService.addHiddenEntities(1, [
+        { entityType: "performer", entityId: "perf1", instanceId: INST_A },
+      ]);
 
       // The resolve query binds the scoped ref, never a bare id
       const resolve = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
@@ -363,11 +360,9 @@ describe("Multi-Instance Isolation", () => {
         ],
       ]);
 
-      await exclusionComputationService.addHiddenEntity(
-        1,
-        "performer",
-        "perf1"
-      );
+      await exclusionComputationService.addHiddenEntities(1, [
+        { entityType: "performer", entityId: "perf1", instanceId: "" },
+      ]);
 
       const resolve = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
         /CROSS JOIN StashPerformer t ON/.test(c[0])
@@ -399,12 +394,9 @@ describe("Multi-Instance Isolation", () => {
         ],
       ]);
 
-      await exclusionComputationService.addHiddenEntity(
-        1,
-        "studio",
-        "studio1",
-        INST_A
-      );
+      await exclusionComputationService.addHiddenEntities(1, [
+        { entityType: "studio", entityId: "studio1", instanceId: INST_A },
+      ]);
 
       // The studio edge filters deleted scenes and the allowed instances
       const edge = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
@@ -433,12 +425,9 @@ describe("Multi-Instance Isolation", () => {
         [/FROM PerformerTag j/, [{ id: "perf1", instanceId: INST_A }]],
       ]);
 
-      await exclusionComputationService.addHiddenEntity(
-        1,
-        "tag",
-        "tag1",
-        INST_A
-      );
+      await exclusionComputationService.addHiddenEntities(1, [
+        { entityType: "tag", entityId: "tag1", instanceId: INST_A },
+      ]);
 
       // Every edge joins the A-scoped closure; the inherited-tag query binds
       // the allowed instances and the tag id never reaches SQL text

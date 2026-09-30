@@ -34,6 +34,8 @@ The same three-dot menu is available on:
 2. Select multiple scenes
 3. Click "Hide Selected" in the bulk action bar
 
+A bulk hide is all or nothing: either every selected item is hidden, or, if something goes wrong, none is and you can try again.
+
 ## Managing Hidden Items
 
 ### Viewing Hidden Items
@@ -45,7 +47,7 @@ The same three-dot menu is available on:
 ### Restoring Hidden Items
 
 From the Hidden Items page:
-- Click **Restore** on individual items to unhide them
+- Click **Restore** on individual items to unhide them. Restore finishes once the item shows again in your lists, so it can take a moment on a large library
 - Click **Restore All** to restore all hidden items at once
 - Use the tabs to filter by entity type (Scenes, Performers, Studios, etc.)
 

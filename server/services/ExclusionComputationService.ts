@@ -51,8 +51,8 @@
  * Rows 1 to 4 are exactly what a recompute with no hides would store for
  * these keys, so a row whose reason is 'hidden' marks an entity the user
  * would see if they had hidden nothing. EntityAccessService reads that for
- * the Hidden Items list. addHiddenEntity keeps it true between recomputes by
- * never overwriting an existing row.
+ * the Hidden Items list. addHiddenEntities keeps it true between recomputes
+ * by never overwriting an existing row.
  */
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { PrismaClient } from "@prisma/client";
@@ -209,6 +209,44 @@ const RESULT_CHUNK = 20_000;
  * DateTime in SQLite, epoch milliseconds.
  */
 const INSERT_FROM_RESULT_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId, entityType, entityId, instanceId, reason, computedAt) SELECT ?, entityType, entityId, instanceId, reason, ? FROM ${RESULT_TABLE}`;
+
+/**
+ * A merge above this many rows (a whole-library hide: about 460k at 200k
+ * scenes plus images) is written in several `exclusions.hide` units, so none
+ * holds the write lock past the writer rule's 1 s (measured on the 200k
+ * copy: 250k rows in one unit 0.55 s, 100k 0.66 s; commit time varies).
+ */
+const MERGE_CHUNK = 200_000;
+
+/** _peek_result's primary key, the order its merge chunks follow. */
+const RESULT_KEY = "(entityType, entityId, instanceId)";
+
+/**
+ * One merge chunk: the rows of _peek_result after one key, up to and
+ * including another. Binds userId, computedAt, then the two keys.
+ */
+const INSERT_RANGE_FROM_RESULT_SQL = `${INSERT_FROM_RESULT_SQL} WHERE ${RESULT_KEY} > (?, ?, ?) AND ${RESULT_KEY} <= (?, ?, ?)`;
+
+/**
+ * The last key of the next merge chunk: the `?`-th key after the given one,
+ * or the last key when fewer remain; no row when none does. A key range on
+ * the table's primary key, never OFFSET.
+ */
+const RESULT_CHUNK_END_SQL = `SELECT entityType, entityId, instanceId FROM (SELECT entityType, entityId, instanceId FROM ${RESULT_TABLE} WHERE ${RESULT_KEY} > (?, ?, ?) ORDER BY entityType, entityId, instanceId LIMIT ?) ORDER BY entityType DESC, entityId DESC, instanceId DESC LIMIT 1`;
+
+type ResultKey = [entityType: string, entityId: string, instanceId: string];
+
+/** Below every key: no entityType is empty. */
+const BEFORE_FIRST_KEY: ResultKey = ["", "", ""];
+
+/**
+ * A hide's UserHiddenEntity rows, written in the merge's last unit. The
+ * targets travel as one JSON parameter (t: entityType, id: entityId, iid:
+ * instanceId); hiddenAt is bound as Prisma stores DateTime, epoch
+ * milliseconds. OR IGNORE: a repeat hide writes nothing, and a row keeps its
+ * hiddenAt (and its place in the Hidden Items list).
+ */
+const INSERT_HIDDEN_SQL = `INSERT OR IGNORE INTO UserHiddenEntity (userId, entityType, entityId, instanceId, hiddenAt) SELECT ?, json_extract(value, '$.t'), json_extract(value, '$.id'), json_extract(value, '$.iid'), ? FROM json_each(?)`;
 
 /**
  * Remove the user's rows before the swap, except `pending` holds written
@@ -475,6 +513,8 @@ class ExclusionComputationService {
   private pendingRecomputes = new Map<number, Promise<void>>();
   // Track whether another recompute is needed after the current one finishes
   private recomputeQueued = new Set<number>();
+  // Rows per merge unit; a field so a test can lower it
+  private mergeChunk = MERGE_CHUNK;
 
   /**
    * Full recompute for a user.
@@ -1187,14 +1227,90 @@ class ExclusionComputationService {
   }
 
   /**
-   * The merge (hides): add the rows of _peek_result the user lacks, one
-   * statement, autocommit. An existing row keeps its reason.
+   * The merge (hides): add the rows of _peek_result the user lacks and the
+   * hide's own UserHiddenEntity rows (`hides`, INSERT_HIDDEN_SQL's JSON).
+   * `rowCount` is the rows filled (an upper bound: the fill dropped
+   * duplicates). Up to `mergeChunk` rows it is one `exclusions.hide` unit.
+   * Above it the exclusion rows go in key-range chunks, one unit each, and
+   * the hidden rows in the last: a failure between units leaves exclusion
+   * rows no hide stands behind, which the next recompute removes, and never
+   * a hidden row without its exclusions. An existing row keeps its reason.
    */
   private async mergeResult(
     db: TransactionClient,
-    userId: number
+    userId: number,
+    rowCount: number,
+    hides: string
   ): Promise<void> {
-    await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
+    const hiddenAt = Date.now();
+    if (rowCount <= this.mergeChunk) {
+      await dbWrite("exclusions.hide", () =>
+        this.mergeUnit(db, userId, { all: true }, hides, hiddenAt)
+      );
+      return;
+    }
+
+    let after = BEFORE_FIRST_KEY;
+    let end = await this.resultChunkEnd(db, after);
+    for (;;) {
+      const next = end ? await this.resultChunkEnd(db, end) : null;
+      const range = end ? { after, end } : null;
+      const last = next === null;
+      await dbWrite("exclusions.hide", () =>
+        this.mergeUnit(db, userId, range, last ? hides : null, hiddenAt)
+      );
+      if (last || !end) return;
+      after = end;
+      end = next;
+    }
+  }
+
+  /** The last key of the merge chunk after `after`; null when none is left. */
+  private async resultChunkEnd(
+    db: TransactionClient,
+    after: ResultKey
+  ): Promise<ResultKey | null> {
+    const rows = await db.$queryRawUnsafe<
+      Array<{ entityType: string; entityId: string; instanceId: string }>
+    >(RESULT_CHUNK_END_SQL, ...after, this.mergeChunk);
+    const row = rows[0];
+    return row ? [row.entityType, row.entityId, row.instanceId] : null;
+  }
+
+  /**
+   * One merge unit in a BEGIN IMMEDIATE on the compute connection: the
+   * exclusion rows of `range` (every row with `all`; none with null), then
+   * the hidden rows when `hides` is given. Rolled back on any failure, as
+   * the swap is, so a retried or failed unit leaves nothing of itself.
+   */
+  private async mergeUnit(
+    db: TransactionClient,
+    userId: number,
+    range: { all: true } | { after: ResultKey; end: ResultKey } | null,
+    hides: string | null,
+    hiddenAt: number
+  ): Promise<void> {
+    await db.$executeRawUnsafe("BEGIN IMMEDIATE");
+    try {
+      if (range && "all" in range) {
+        await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
+      } else if (range) {
+        await db.$executeRawUnsafe(
+          INSERT_RANGE_FROM_RESULT_SQL,
+          userId,
+          Date.now(),
+          ...range.after,
+          ...range.end
+        );
+      }
+      if (hides !== null) {
+        await db.$executeRawUnsafe(INSERT_HIDDEN_SQL, userId, hiddenAt, hides);
+      }
+      await db.$executeRawUnsafe("COMMIT");
+    } catch (error) {
+      await this.rollbackSwap(db);
+      throw error;
+    }
   }
 
   /**
@@ -1454,7 +1570,7 @@ class ExclusionComputationService {
 
   /**
    * The one definition of what a hide covers, shared by the full recompute
-   * and addHiddenEntity. Each stored hide becomes a `hidden` record exactly
+   * and addHiddenEntities. Each stored hide becomes a `hidden` record exactly
    * as stored (instance "" stays ""). The hides resolve on the allowed
    * instances, expanding tags and studios to their descendants; every
    * resolved ref other than a stored hide itself becomes another `hidden`
@@ -2257,103 +2373,99 @@ class ExclusionComputationService {
   }
 
   /**
-   * Incremental update when user hides an entity.
-   * Synchronous - user waits for completion.
-   * Writes the stored `hidden` row, the rows the hide expands to
-   * (descendants, per-instance copies) and the cascades, through the same
-   * expandHides and computeCascadeExclusions the full recompute uses, on the
-   * same path: a read snapshot on the compute connection, the rows filled
-   * into _peek_result, then one INSERT OR IGNORE ... SELECT as the
-   * `exclusions.hide` unit. Skips the empty phase and the stats update.
+   * Hide `targets` for the user: the hidden rows and their exclusions in one
+   * unit. The caller has checked each target (visible, not already hidden);
+   * an instance of "" hides the entity on every instance.
+   *
+   * The rows come from the same expandHides and computeCascadeExclusions the
+   * full recompute uses, in one read snapshot on the compute connection:
+   * each type's hides expanded once (descendants, per-instance copies), then
+   * the cascades of every resolved ref. They are filled into _peek_result
+   * and merged with INSERT OR IGNORE (mergeResult), the UserHiddenEntity
+   * rows in the same `exclusions.hide` unit, so a failure leaves neither.
+   * Skips the empty phase and the stats update.
    *
    * The merge only fills missing rows: an existing row keeps its reason, so
    * a restriction already stored for a key is never rewritten as `hidden`
    * (Reason precedence, file header). A hide that arrives during a recompute
    * waits for the compute connection and merges after the swap, so it is
-   * never lost under it.
+   * never lost under it; a recompute that starts after it reads its rows.
    */
-  async addHiddenEntity(
+  async addHiddenEntities(
     userId: number,
-    entityType: string,
-    entityId: string,
-    instanceId: string = ""
+    targets: ReadonlyArray<{
+      entityType: string;
+      entityId: string;
+      instanceId: string;
+    }>
   ): Promise<void> {
+    if (targets.length === 0) return;
     const startTime = Date.now();
-    logger.info("ExclusionComputationService.addHiddenEntity", {
+    logger.info("ExclusionComputationService.addHiddenEntities", {
       userId,
-      entityType,
-      entityId,
-      instanceId,
+      targets: targets.length,
     });
 
     // The scope, as the full recompute uses: an instance on its first sync
     // gets the hide's rows before it shows
     const allowedInstanceIds = await getUserInstanceScope(userId);
 
+    const byType = new Map<string, Ref[]>();
+    for (const { entityType, entityId, instanceId } of targets) {
+      const refs = byType.get(entityType) ?? [];
+      refs.push({ id: entityId, instanceId });
+      byType.set(entityType, refs);
+    }
+    const hides = JSON.stringify(
+      targets.map((t) => ({
+        t: t.entityType,
+        id: t.entityId,
+        iid: t.instanceId,
+      }))
+    );
+
+    let rows = 0;
     await withComputeConnection(async (db) => {
       try {
-        // The stored row, its descendants and per-instance copies, and the
-        // cascades of every resolved ref
+        // The stored rows, their descendants and per-instance copies, and
+        // the cascades of every resolved ref
         const records = await readSnapshot(db, async () => {
-          const { records: hiddenRecords, refs } = await this.expandHides(
-            userId,
-            entityType,
-            [{ id: entityId, instanceId }],
-            db,
-            allowedInstanceIds
-          );
+          const hidden: ExclusionRecord[] = [];
+          const sources: CascadeSource[] = [];
+          for (const [entityType, refs] of byType) {
+            const expanded = await this.expandHides(
+              userId,
+              entityType,
+              refs,
+              db,
+              allowedInstanceIds
+            );
+            hidden.push(...expanded.records);
+            if (expanded.refs.length > 0) {
+              sources.push({ entityType, refs: expanded.refs });
+            }
+          }
           const cascades = await this.computeCascadeExclusions(
             userId,
-            [{ entityType, refs }],
+            sources,
             db,
             allowedInstanceIds
           );
-          return [...hiddenRecords, ...cascades];
+          return [...hidden, ...cascades];
         });
+        rows = records.length;
         await this.fillResult(db, records);
-        await dbWrite("exclusions.hide", () => this.mergeResult(db, userId));
+        await this.mergeResult(db, userId, records.length, hides);
       } finally {
         await this.cleanupTempTables(db);
       }
     }, "exclusions.addHidden");
 
-    logger.info("ExclusionComputationService.addHiddenEntity complete", {
+    logger.info("ExclusionComputationService.addHiddenEntities complete", {
       userId,
-      entityType,
-      entityId,
-      instanceId,
+      targets: targets.length,
+      rows,
       durationMs: Date.now() - startTime,
-    });
-  }
-
-  /**
-   * Handle user unhiding an entity.
-   * Queues async recompute since cascades need recalculation.
-   */
-  removeHiddenEntity(
-    userId: number,
-    entityType: string,
-    entityId: string,
-    instanceId: string = ""
-  ): void {
-    logger.info("ExclusionComputationService.removeHiddenEntity", {
-      userId,
-      entityType,
-      entityId,
-      instanceId,
-    });
-
-    // Queue async recompute - the unhide might affect cascade exclusions
-    // that need to be recalculated based on remaining hidden entities
-    setImmediate(() => {
-      this.recomputeForUser(userId).catch((err: unknown) => {
-        logger.error("Failed to recompute exclusions after unhide", {
-          userId,
-          entityType,
-          entityId,
-          error: err,
-        });
-      });
     });
   }
 }

@@ -34,6 +34,10 @@ import {
   selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
+interface FindScenesResponse {
+  findScenes: { count: number; scenes: Array<{ id: string }> };
+}
+
 interface HiddenItem {
   id: number;
   entityType: string;
@@ -275,6 +279,33 @@ describe("Hidden items and content restrictions (integration)", () => {
     expect(titles).toEqual(
       [visibleScene.title, otherVisibleScene.title].sort()
     );
+  });
+
+  it("unhide answers once the entity lists again", async () => {
+    const ref = `${visibleScene.id}:${testInstanceId}`;
+    const listed = async () => {
+      const response = await hider.client.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { ids: [ref] }
+      );
+      expect(response.status).toBe(200);
+      return response.data.findScenes.count;
+    };
+
+    const hide = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: testInstanceId,
+    });
+    expect(hide.status).toBe(200);
+    expect(await listed()).toBe(0);
+
+    const unhide = await hider.client.delete(
+      `/api/user/hidden-entities/scene/${visibleScene.id}?instanceId=${testInstanceId}`
+    );
+    expect(unhide.status).toBe(200);
+    // The very next request, with no wait
+    expect(await listed()).toBe(1);
   });
 
   it("lists an existing hide of a restricted entity without its details", async () => {

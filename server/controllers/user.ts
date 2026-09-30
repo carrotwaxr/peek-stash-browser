@@ -1776,7 +1776,7 @@ export const getHiddenEntityIds = async (
 };
 
 /**
- * Hide multiple entities in a single request
+ * Hide multiple entities in a single request: all of them or none
  */
 export const hideEntities = async (
   req: TypedAuthRequest<HideEntitiesBody>,
@@ -1807,34 +1807,25 @@ export const hideEntities = async (
     res.status(404).json({ error: `entities[${notFound}]: Not found` });
     return;
   }
-  const toHide = targets.filter((_, i) => access[i] === "hide");
+  const toHide = targets
+    .filter((_, i) => access[i] === "hide")
+    .map(({ entityType, entityId, instanceId }) => ({
+      entityType,
+      entityId,
+      instanceId,
+    }));
 
-  // Hide all entities; the ones already hidden count as hidden
-  let successCount = targets.length - toHide.length;
-  let failCount = 0;
-
-  for (const target of toHide) {
-    try {
-      await userHiddenEntityService.hideEntity(
-        userId,
-        target.entityType,
-        target.entityId,
-        target.instanceId
-      );
-      successCount++;
-    } catch (error) {
-      failCount++;
-      logger.error(`Failed to hide ${target.entityType} ${target.entityId}`, {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+  // All or nothing, in one unit: a failure answers 500 with nothing
+  // written. The ones already hidden count as hidden
+  if (toHide.length > 0) {
+    await userHiddenEntityService.hideEntities(userId, toHide);
   }
 
   res.json({
     success: true,
-    message: `${successCount} entities hidden successfully`,
-    successCount,
-    failCount,
+    message: `${targets.length} entities hidden successfully`,
+    successCount: targets.length,
+    failCount: 0,
   });
 };
 

@@ -105,12 +105,9 @@ describe("dbWrite concurrency (integration)", () => {
   it("forty hides at once all land", async () => {
     const outcomes = await Promise.allSettled(
       userIds.map((userId) =>
-        exclusionComputationService.addHiddenEntity(
-          userId,
-          "scene",
-          SCENE_ID,
-          INSTANCE
-        )
+        exclusionComputationService.addHiddenEntities(userId, [
+          { entityType: "scene", entityId: SCENE_ID, instanceId: INSTANCE },
+        ])
       )
     );
     const rejected = outcomes.filter((o) => o.status === "rejected");

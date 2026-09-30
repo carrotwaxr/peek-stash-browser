@@ -73,7 +73,7 @@ class UserHiddenEntityService {
   private hiddenIdsCache: Map<number, HiddenEntityIds> = new Map();
 
   /**
-   * Hide an entity for a user
+   * Hide an entity for a user: its row and its exclusions in one unit.
    */
   async hideEntity(
     userId: number,
@@ -81,42 +81,32 @@ class UserHiddenEntityService {
     entityId: string,
     instanceId: string = ""
   ): Promise<void> {
-    await dbWrite("hide.add", () =>
-      prisma.userHiddenEntity.upsert({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId,
-            entityType,
-            entityId,
-            instanceId,
-          },
-        },
-        create: {
-          userId,
-          entityType,
-          entityId,
-          instanceId,
-        },
-        update: {
-          hiddenAt: new Date(), // Update timestamp if re-hiding
-        },
-      })
-    );
-
-    // Invalidate local cache for this user
-    this.hiddenIdsCache.delete(userId);
-
-    // Update pre-computed exclusions (pass instanceId so cascades are scoped)
-    await exclusionComputationService.addHiddenEntity(
-      userId,
-      entityType,
-      entityId,
-      instanceId
-    );
+    await this.hideEntities(userId, [{ entityType, entityId, instanceId }]);
   }
 
   /**
-   * Unhide (restore) an entity for a user
+   * Hide every target for a user, all or nothing: the hidden rows and their
+   * exclusions are written together, with one compute for the whole batch
+   * (`addHiddenEntities`). A failure writes no hidden row. The caller checks
+   * each target first (visible, not already hidden).
+   */
+  async hideEntities(
+    userId: number,
+    targets: ReadonlyArray<{
+      entityType: EntityType;
+      entityId: string;
+      instanceId: string;
+    }>
+  ): Promise<void> {
+    await exclusionComputationService.addHiddenEntities(userId, targets);
+
+    // Invalidate local cache for this user
+    this.hiddenIdsCache.delete(userId);
+  }
+
+  /**
+   * Unhide (restore) an entity for a user. Resolves once the user's
+   * exclusions are recomputed without it, so the next request lists it.
    */
   async unhideEntity(
     userId: number,
@@ -138,13 +128,10 @@ class UserHiddenEntityService {
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);
 
-    // Update pre-computed exclusions (async recompute)
-    exclusionComputationService.removeHiddenEntity(
-      userId,
-      entityType,
-      entityId,
-      instanceId
-    );
+    // A full recompute: the unhide can release cascades other hides do not
+    // cover. It reads after the delete committed (coalesced with any running
+    // recompute, as every recompute is)
+    await exclusionComputationService.recomputeForUser(userId);
   }
 
   /**
