@@ -69,7 +69,9 @@ In [TV Mode](#tv-mode) the arrow keys move focus to the nearest item in that dir
 - `←` from the leftmost cards reaches the sidebar, and `→` comes back to the page. `↑` and `↓` stay on the side they are on.
 - In a search box, `←` and `→` move the cursor and `Space` types a space; `↑` or `↓` leaves the box.
 - With the lightbox or a dialog open, the arrows stay inside it. In the lightbox, `←` and `→` still show the previous and next image.
-- Drop-down lists (sort, page, per page) and sliders are skipped, since they use the arrow keys themselves: reach them with `Tab`, and change pages with `Page Up` and `Page Down`.
+- Drop-down lists (sort, page, per page) are reached like anything else, and the arrow keys move on from them without changing their value; press `Enter` (or `Space`) to open one, then pick with the arrow keys and `Enter`.
+- On a slider, `←` and `→` change its value and `↑` or `↓` moves on.
+- An open menu keeps the arrow keys until you close it.
 - When a page opens, its first card takes focus.
 
 Outside TV Mode the arrow keys scroll the page, and `Tab` moves through the page's links and buttons and the sidebar.
@@ -228,7 +230,7 @@ Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in
 2. **Enable auto-hide cursor** in your OS settings
 3. **Increase font size** in browser settings (Ctrl +)
 4. **Use dark theme** for better viewing in dark rooms
-5. **Keep a mouse nearby** for drop-down lists and sliders, which the arrow keys skip
+5. **Keep a mouse nearby** for dragging, such as reordering a playlist
 
 ## Settings Navigation
 
@@ -317,7 +319,7 @@ Basic screen reader support:
 **Solution:**
 - Turn on TV Mode from the user menu: outside it, the arrow keys scroll the page
 - In a text field, `←` and `→` move the cursor; press `↑` or `↓` to leave it
-- A drop-down list or slider keeps the arrow keys while it has focus; press `Tab` to move on
+- Outside TV Mode, a drop-down list or slider keeps the arrow keys while it has focus; press `Tab` to move on
 
 ### Video player shortcuts not working
 

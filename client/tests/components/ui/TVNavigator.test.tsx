@@ -192,6 +192,83 @@ describe("TVNavigator", () => {
   });
 });
 
+describe("TVNavigator on selects and sliders", () => {
+  beforeEach(() => {
+    document.documentElement.classList.add("tv-mode");
+  });
+  afterEach(() => {
+    document.documentElement.classList.remove("tv-mode");
+  });
+
+  function renderControls() {
+    renderWithNavigator(
+      <main>
+        <button id="above">Above</button>
+        <select id="sort" defaultValue="b">
+          <option value="a">A</option>
+          <option value="b">B</option>
+          <option value="c">C</option>
+        </select>
+        <input id="range" type="range" defaultValue="50" />
+        <button id="below">Below</button>
+      </main>
+    );
+    placeById("above", { left: 0, top: 0, width: 100, height: 40 });
+    placeById("sort", { left: 0, top: 100, width: 100, height: 40 });
+    placeById("range", { left: 0, top: 200, width: 100, height: 40 });
+    placeById("below", { left: 0, top: 300, width: 100, height: 40 });
+  }
+
+  it("arrows on a focused select move focus and never change its value", () => {
+    renderControls();
+    const select = byId("sort");
+    act(() => select.focus());
+
+    // Prevented: the browser does not step the select's value
+    expect(fireEvent.keyDown(select, { key: "ArrowDown" })).toBe(false);
+    expect(document.activeElement?.id).toBe("range");
+    expect((select as HTMLSelectElement).value).toBe("b");
+
+    act(() => select.focus());
+    expect(fireEvent.keyDown(select, { key: "ArrowUp" })).toBe(false);
+    expect(document.activeElement?.id).toBe("above");
+  });
+
+  it("an arrow with nowhere to go still never changes a select", () => {
+    renderControls();
+    const select = byId("sort");
+    act(() => select.focus());
+
+    expect(fireEvent.keyDown(select, { key: "ArrowRight" })).toBe(false);
+    expect(document.activeElement).toBe(select);
+  });
+
+  it("Enter on a focused select opens its picker", () => {
+    renderControls();
+    const select = byId("sort") as HTMLSelectElement;
+    const showPicker = vi.fn();
+    select.showPicker = showPicker;
+    act(() => select.focus());
+
+    expect(fireEvent.keyDown(select, { key: "Enter" })).toBe(false);
+    expect(showPicker).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(select);
+  });
+
+  it("on a range input Left and Right are the input's; Up and Down move focus", () => {
+    renderControls();
+    const range = byId("range");
+    act(() => range.focus());
+
+    expect(fireEvent.keyDown(range, { key: "ArrowLeft" })).toBe(true);
+    expect(fireEvent.keyDown(range, { key: "ArrowRight" })).toBe(true);
+    expect(document.activeElement).toBe(range);
+
+    expect(fireEvent.keyDown(range, { key: "ArrowDown" })).toBe(false);
+    expect(document.activeElement?.id).toBe("below");
+  });
+});
+
 describe("GlobalLayout and TV mode", () => {
   beforeEach(() => {
     localStorage.clear();

@@ -105,10 +105,28 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 const ARROWS = new Set(["up", "down", "left", "right"]);
 const ACTIVATION_KEYS = new Set(["space", "enter"]);
 
+/** TV mode is on: `TVModeProvider` sets `html.tv-mode` */
+export function isTVModeOn(): boolean {
+  return document.documentElement.classList.contains("tv-mode");
+}
+
+/** A native range input or an ARIA slider */
+export function isSlider(el: HTMLElement): boolean {
+  return (
+    (el instanceof HTMLInputElement && el.type.toLowerCase() === "range") ||
+    el.closest('[role="slider"]') !== null
+  );
+}
+
 /**
  * Whether the focused control uses this key itself, so no shortcut may take
  * it: sliders, selects, menus and listboxes own the arrows; buttons and links
  * own Space and Enter (they activate).
+ *
+ * In TV mode (arrows move focus by position, `TVNavigator`) a closed select
+ * gives up its arrows and Enter (TV focus moves on, and Enter opens its
+ * picker), and a slider gives up Up and Down but keeps Left and Right to
+ * change its value. An open menu or listbox keeps its arrows in any mode.
  */
 export function targetOwnsKey(
   target: EventTarget | null,
@@ -118,19 +136,19 @@ export function targetOwnsKey(
   if (!el) return false;
 
   if (ARROWS.has(combo)) {
-    if (el instanceof HTMLSelectElement) return true;
-    if (el instanceof HTMLInputElement && el.type.toLowerCase() === "range") {
-      return true;
+    if (el instanceof HTMLSelectElement) return !isTVModeOn();
+    if (isSlider(el)) {
+      return !isTVModeOn() || combo === "left" || combo === "right";
     }
     return (
-      el.closest(
-        '[role="slider"], [role="menu"], [role="menubar"], [role="listbox"]'
-      ) !== null
+      el.closest('[role="menu"], [role="menubar"], [role="listbox"]') !== null
     );
   }
 
   if (ACTIVATION_KEYS.has(combo)) {
-    if (el instanceof HTMLSelectElement) return true;
+    if (el instanceof HTMLSelectElement) {
+      return !(isTVModeOn() && combo === "enter");
+    }
     return (
       el.closest(
         'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"], input[type="checkbox"], input[type="radio"]'

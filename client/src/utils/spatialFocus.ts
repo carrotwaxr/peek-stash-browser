@@ -1,5 +1,3 @@
-import { targetOwnsKey } from "./keyTargets";
-
 /**
  * TV-mode focus by position (item 50): an arrow moves DOM focus to the item
  * nearest in that direction, measured from the rendered layout, so it follows
@@ -87,14 +85,18 @@ const NATURAL_FOCUSABLE = [
   '[contenteditable]:not([contenteditable="false"])',
 ].join(", ");
 
+// An open menu or listbox: its items take the arrows
+const OPEN_LIST = '[role="menu"], [role="menubar"], [role="listbox"]';
+
 const hasSize = (r: Rect) => r.right - r.left > 0 && r.bottom - r.top > 0;
 
 /**
  * What TV focus can land on inside `root`: every `[data-tv-item]` (a card)
  * and every naturally focusable element not inside one, in document order.
  * Skipped: elements with no box (not rendered), under `inert` or
- * `aria-hidden`, and controls that use the arrows themselves (a select, a
- * slider, a menu), where focus would be stuck.
+ * `aria-hidden`, and the items of an open menu or listbox (they move among
+ * themselves). Selects and sliders are candidates: in TV mode they leave the
+ * arrows that move focus to TV focus (`targetOwnsKey`).
  */
 export function tvCandidates(root: Element): HTMLElement[] {
   const found: HTMLElement[] = [];
@@ -103,7 +105,7 @@ export function tvCandidates(root: Element): HTMLElement[] {
   )) {
     if (el.parentElement?.closest(TV_ITEM)) continue;
     if (el.closest('[inert], [aria-hidden="true"]')) continue;
-    if (targetOwnsKey(el, "up")) continue;
+    if (el.closest(OPEN_LIST)) continue;
     if (!hasSize(el.getBoundingClientRect())) continue;
     found.push(el);
   }
