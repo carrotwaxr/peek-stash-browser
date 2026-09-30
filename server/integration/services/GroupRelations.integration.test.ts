@@ -14,6 +14,9 @@
  * hierarchy in one request and writes only what differs. Here a smart sync
  * with a stub Stash that reports no changed entity of any type shows it.
  *
+ * The exclusion compute's empty-collection rule reads the hierarchy too: a
+ * collection holding only visible, non-empty sub-collections is not empty.
+ *
  * Made-up instances that real sync never touches; every row is deleted
  * before the file ends. The last case reads what the startup sync stored
  * from the replay's hierarchy.
@@ -31,6 +34,7 @@ import {
 import type { StashClient } from "../../graphql/StashClient.js";
 import type { FindGroupRelationsQuery } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   SYNC_ORDER,
@@ -569,4 +573,160 @@ describeWithDb("the test Stash's collection hierarchy", () => {
       ]);
     }
   );
+});
+
+describeWithDb("the empty-collection rule (integration)", () => {
+  // A restricted user (C22): a collection is empty when it holds no visible
+  // scene and no visible, non-empty sub-collection at any depth. The two
+  // made-up instances become real, enabled and synced instances here, so the
+  // user's compute covers them; gr-b holds the same ids with no scenes.
+  const USER_NAME = "gr_empty_user";
+  let userId = 0;
+
+  async function removeEmptyRuleRows(): Promise<void> {
+    await prisma.user.deleteMany({ where: { username: USER_NAME } });
+    await prisma.stashScene.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await removeRows();
+    await prisma.stashInstance.deleteMany({ where: { id: { in: [A, B] } } });
+  }
+
+  /** `containing>sub` on one instance */
+  async function relate(
+    instanceId: string,
+    ...edges: Array<[string, string]>
+  ): Promise<void> {
+    await prisma.groupRelation.createMany({
+      data: edges.map(([containingId, subId], orderIndex) => ({
+        containingId,
+        containingInstanceId: instanceId,
+        subId,
+        subInstanceId: instanceId,
+        orderIndex,
+      })),
+    });
+  }
+
+  /** A scene in `groupId` on gr-a */
+  async function sceneIn(sceneId: string, groupId: string): Promise<void> {
+    await prisma.stashScene.create({
+      data: { id: sceneId, stashInstanceId: A },
+    });
+    await prisma.sceneGroup.create({
+      data: {
+        sceneId,
+        sceneInstanceId: A,
+        groupId,
+        groupInstanceId: A,
+      },
+    });
+  }
+
+  /** The user's group rows on both instances, as `id@instance:reason` */
+  async function groupRows(): Promise<string[]> {
+    const found = await prisma.userExcludedEntity.findMany({
+      where: { userId, entityType: "group", instanceId: { in: [A, B] } },
+      select: { entityId: true, instanceId: true, reason: true },
+    });
+    return found.map((r) => `${r.entityId}@${r.instanceId}:${r.reason}`).sort();
+  }
+
+  beforeAll(async () => {
+    await removeEmptyRuleRows();
+    await prisma.stashInstance.createMany({
+      data: [A, B].map((id) => ({
+        id,
+        name: id,
+        url: `http://${id}.invalid/graphql`,
+        apiKey: "x",
+        enabled: true,
+        firstSyncedAt: new Date(),
+      })),
+    });
+    const user = await prisma.user.create({
+      data: { username: USER_NAME, password: "x", role: "USER" },
+    });
+    userId = user.id;
+    await prisma.userStashInstance.createMany({
+      data: [A, B].map((instanceId) => ({ userId, instanceId })),
+    });
+  });
+
+  beforeEach(async () => {
+    await prisma.userContentRestriction.deleteMany({ where: { userId } });
+    await prisma.stashScene.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await removeRows();
+  });
+
+  afterAll(removeEmptyRuleRows);
+
+  it("a collection holding only a visible sub-collection with a visible scene is not empty for a restricted user", async () => {
+    // 1 > 2 > 3, and only 3 holds a scene; the user is restricted from an
+    // unrelated collection. On gr-b the same ids hold no scene.
+    for (const id of ["1", "2", "3", "9"]) {
+      await createGroup(id, A);
+      await createGroup(id, B);
+    }
+    await relate(A, ["1", "2"], ["2", "3"]);
+    await relate(B, ["1", "2"], ["2", "3"]);
+    await sceneIn("s3", "3");
+    await sceneIn("s9", "9");
+    await prisma.userContentRestriction.create({
+      data: {
+        userId,
+        entityType: "groups",
+        mode: "EXCLUDE",
+        entityIds: JSON.stringify([`9:${A}`]),
+        restrictEmpty: false,
+      },
+    });
+
+    await exclusionComputationService.recomputeForUser(userId);
+
+    expect(await groupRows()).toEqual([
+      `1@${B}:empty`,
+      `2@${B}:empty`,
+      `3@${B}:empty`,
+      `9@${A}:restricted`,
+      `9@${B}:empty`,
+    ]);
+  }, 60_000);
+
+  it("a collection whose only sub-collection is empty or hidden is empty", async () => {
+    // 1 > 2, 2 holds nothing; 3 > 4, 4 holds a scene but is restricted
+    for (const id of ["1", "2", "3", "4"]) await createGroup(id, A);
+    await relate(A, ["1", "2"], ["3", "4"]);
+    await sceneIn("s4", "4");
+    await prisma.userContentRestriction.create({
+      data: {
+        userId,
+        entityType: "groups",
+        mode: "EXCLUDE",
+        entityIds: JSON.stringify([`4:${A}`]),
+        restrictEmpty: false,
+      },
+    });
+
+    await exclusionComputationService.recomputeForUser(userId);
+
+    expect(await groupRows()).toEqual([
+      `1@${A}:empty`,
+      `2@${A}:empty`,
+      `3@${A}:empty`,
+      `4@${A}:restricted`,
+    ]);
+  }, 60_000);
+
+  it("a containment cycle with no scenes leaves both collections empty and the compute terminates", async () => {
+    await createGroup("1", A);
+    await createGroup("2", A);
+    await relate(A, ["1", "2"], ["2", "1"]);
+
+    await exclusionComputationService.recomputeForUser(userId);
+
+    expect(await groupRows()).toEqual([`1@${A}:empty`, `2@${A}:empty`]);
+  }, 60_000);
 });
