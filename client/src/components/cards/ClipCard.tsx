@@ -16,7 +16,7 @@ export interface Clip {
   id: string;
   title?: string | null;
   sceneId: string;
-  instanceId?: string;
+  instanceId: string;
   seconds?: number | null;
   endSeconds?: number | null;
   isGenerated?: boolean;

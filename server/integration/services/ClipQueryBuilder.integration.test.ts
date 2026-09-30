@@ -380,16 +380,22 @@ describeWithDb("Clip builder on the base (integration)", () => {
   });
 
   it("a clip by id applies the viewer's exclusions and allowed instances", async () => {
-    const byId = (id: string, allowedInstanceIds: string[]) =>
-      clipQueryBuilder.getClipById({ userId, allowedInstanceIds, id });
+    const byId = async (id: string, allowedInstanceIds: string[]) =>
+      (
+        await clipQueryBuilder.getClipById({
+          userId,
+          allowedInstanceIds,
+          ref: { id, instanceId: undefined },
+        })
+      ).map((clip) => clip.instanceId);
 
-    expect((await byId(OTHER, [A, B]))?.instanceId).toBe(A);
-    expect((await byId(PRIMARY, [B]))?.instanceId).toBe(B);
-    expect(await byId(EXCLUDED, [A, B])).toBeNull();
-    expect(await byId(OF_HIDDEN, [A, B])).toBeNull();
-    expect(await byId(OF_DELETED, [A, B])).toBeNull();
-    expect(await byId(DELETED, [A, B])).toBeNull();
-    expect(await byId(OTHER, [B])).toBeNull();
-    expect(await byId(OTHER, [])).toBeNull();
+    expect(await byId(OTHER, [A, B])).toEqual([A]);
+    expect(await byId(PRIMARY, [B])).toEqual([B]);
+    expect(await byId(EXCLUDED, [A, B])).toEqual([]);
+    expect(await byId(OF_HIDDEN, [A, B])).toEqual([]);
+    expect(await byId(OF_DELETED, [A, B])).toEqual([]);
+    expect(await byId(DELETED, [A, B])).toEqual([]);
+    expect(await byId(OTHER, [B])).toEqual([]);
+    expect(await byId(OTHER, [])).toEqual([]);
   });
 });

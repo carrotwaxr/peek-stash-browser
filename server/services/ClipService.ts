@@ -78,14 +78,12 @@ export class ClipService {
   }
 
   /**
-   * Get a single clip by ID
+   * The clips a ref names: one for an id:instanceId, one per instance
+   * holding a bare id
    */
-  async getClipById(
-    options: ClipByIdOptions
-  ): Promise<ClipWithRelations | null> {
-    const clip = await clipQueryBuilder.getClipById(options);
-    if (!clip) return null;
-    return this.transformClip(clip);
+  async getClipById(options: ClipByIdOptions): Promise<ClipWithRelations[]> {
+    const clips = await clipQueryBuilder.getClipById(options);
+    return clips.map((clip) => this.transformClip(clip));
   }
 }
 

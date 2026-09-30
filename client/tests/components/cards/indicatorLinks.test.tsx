@@ -129,6 +129,7 @@ const scene = {
 const clip: Clip = {
   id: "c1",
   sceneId: "40",
+  instanceId: "inst-a",
   tags: one,
   scene: { instanceId: "inst-a" },
 };

@@ -1112,13 +1112,21 @@ describe("parseSceneClipsRequest", () => {
     ).toEqual({
       sceneId: "42",
       includeUngenerated: true,
-      specificInstanceId: "inst-1",
+      instanceId: "inst-1",
     });
-    expect(parseSceneClipsRequest("42", {}, opts())).toEqual({
+    expect(
+      parseSceneClipsRequest("42", { instanceId: "inst-1" }, opts())
+    ).toEqual({
       sceneId: "42",
       includeUngenerated: false,
-      specificInstanceId: undefined,
+      instanceId: "inst-1",
     });
+  });
+
+  it("the instanceId is required", () => {
+    expect(issuesOf(() => parseSceneClipsRequest("42", {}, opts()))).toEqual([
+      { path: "instanceId", message: "Required" },
+    ]);
   });
 
   it("a bad value and an unknown parameter are invalid", () => {
@@ -1138,7 +1146,9 @@ describe("parseSceneClipsRequest", () => {
 
   it("a scene id that is not a Stash id fails", () => {
     expect(
-      issuesOf(() => parseSceneClipsRequest("scene-1", {}, opts()))
+      issuesOf(() =>
+        parseSceneClipsRequest("scene-1", { instanceId: "inst-1" }, opts())
+      )
     ).toEqual([{ path: "id", message: "Expected an id" }]);
   });
 });

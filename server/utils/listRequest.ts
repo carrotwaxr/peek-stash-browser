@@ -1098,7 +1098,7 @@ export function parseStashId(raw: unknown, path: string): string {
   });
 }
 
-/** `GET /api/scenes/:id/clips`: the scene, its instance, and whether clips without a preview come too */
+/** `GET /api/scenes/:id/clips`: the scene on its instance (required), and whether clips without a preview come too */
 export function parseSceneClipsRequest(
   sceneId: unknown,
   query: unknown,
@@ -1108,7 +1108,7 @@ export function parseSceneClipsRequest(
   const input = requireObject(query, "query");
   const problems = new Problems();
   let includeUngenerated: boolean | undefined;
-  let specificInstanceId: string | undefined;
+  let instanceId: string | undefined;
 
   const handlers = new Map<string, (raw: unknown, path: string) => void>([
     [
@@ -1120,18 +1120,21 @@ export function parseSceneClipsRequest(
     [
       "instanceId",
       (raw, path) => {
-        specificInstanceId = parseInstanceId(raw, path, problems);
+        instanceId = parseInstanceId(raw, path, problems);
       },
     ],
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
+
+  if (!("instanceId" in input)) problems.add("instanceId", "Required");
 
   problems.finish();
 
   return {
     sceneId: id,
     includeUngenerated: includeUngenerated ?? false,
-    specificInstanceId,
+    // finish() threw when the parameter was absent or invalid
+    instanceId: instanceId ?? "",
   };
 }
 

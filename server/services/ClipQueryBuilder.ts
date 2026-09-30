@@ -81,11 +81,11 @@ export interface SceneClipsOptions {
   readonly includeUngenerated: boolean;
 }
 
-/** A clip by its Stash id, on any allowed instance */
+/** A clip by its ref: a bare id matches it on every allowed instance */
 export interface ClipByIdOptions {
   readonly userId: number;
   readonly allowedInstanceIds: readonly string[];
-  readonly id: string;
+  readonly ref: FilterRef;
 }
 
 const SELECT_COLUMNS = `c.id, c.stashInstanceId, c.sceneId, c.sceneInstanceId,
@@ -387,19 +387,17 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * A clip by its Stash id, with the viewer's exclusions and allowed
-   * instances applied (invariant 3); the newest when two instances share
-   * the id.
+   * The clips a ref names, with the viewer's exclusions and allowed
+   * instances applied (invariant 3): one when the ref names its instance,
+   * one per allowed instance holding the id when it is bare (the caller
+   * refuses that as ambiguous)
    */
-  async getClipById(
-    options: ClipByIdOptions
-  ): Promise<ClipWithRelations | null> {
-    const [clip] = await this.getByRefs({
+  async getClipById(options: ClipByIdOptions): Promise<ClipWithRelations[]> {
+    return this.getByRefs({
       userId: options.userId,
       allowedInstanceIds: options.allowedInstanceIds,
-      refs: [{ id: options.id, instanceId: undefined }],
+      refs: [options.ref],
     });
-    return clip ?? null;
   }
 }
 
