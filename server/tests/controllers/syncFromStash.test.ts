@@ -87,11 +87,14 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 }));
 
 // The per-entity stats are rebuilt after a history import; each history
-// unit that wrote bumps the user's stats write generation
+// unit that wrote bumps the user's stats write generation and writes its
+// stats deltas through the writes read before it
+const mockWriteStats = vi.hoisted(() => vi.fn());
 vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     rebuildAllStatsForUser: vi.fn().mockResolvedValue(undefined),
     bumpWriteGeneration: vi.fn(),
+    statsWritesForScenes: vi.fn(() => Promise.resolve(mockWriteStats)),
   },
 }));
 
@@ -940,6 +943,52 @@ describe("syncFromStash", () => {
             oHistory: [],
           }),
         })
+      );
+    });
+
+    it("writes each page's stats deltas in its unit, after its history rows, through writes read before it", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [
+          scene("1", { play_count: 2, play_history: [STASH_T, U] }),
+          scene("2", { o_counter: 1, o_history: [STASH_T] }),
+        ])
+      );
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        historyRow({
+          sceneId: "1",
+          playCount: 1,
+          playHistory: [T_PLUS_2S],
+          lastPlayedAt: new Date(T_PLUS_2S),
+        }),
+      ]);
+      await run(only(SCENE, { oCounter: true, playCount: true }));
+
+      expect(mockStats.statsWritesForScenes).toHaveBeenCalledWith(
+        TARGET_USER_ID,
+        INSTANCE,
+        ["1", "2"]
+      );
+      expect(mockWriteStats).toHaveBeenCalledTimes(1);
+      // Scene 1 gains a play (its Peek play and Stash's first are one);
+      // scene 2 is new, with Stash's O and no plays
+      expect(must(mockWriteStats.mock.calls[0])[1]).toEqual([
+        {
+          sceneId: "1",
+          oCount: 0,
+          playCount: 1,
+          lastPlayedAt: new Date(U),
+        },
+        {
+          sceneId: "2",
+          oCount: 1,
+          playCount: 0,
+          lastOAt: new Date(T),
+        },
+      ]);
+      const [lastUpsert] =
+        mockPrisma.watchHistory.upsert.mock.invocationCallOrder.slice(-1);
+      expect(must(mockWriteStats.mock.invocationCallOrder[0])).toBeGreaterThan(
+        must(lastUpsert)
       );
     });
 

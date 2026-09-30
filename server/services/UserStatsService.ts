@@ -18,7 +18,8 @@ import { stashEntityService } from "./StashEntityService.js";
  * Two writers keep them:
  * - A play or an O press adds its increments inside the history
  *   transaction (`statsWritesForScene`), so the history row and its stats
- *   commit together or not at all.
+ *   commit together or not at all; a Sync from Stash history page adds what
+ *   it merged the same way (`statsWritesForScenes`).
  * - A rebuild (`rebuildAllStatsForUser`) replaces a user's stats from their
  *   history. Every history unit that changes what the rebuild reads bumps
  *   the user's write generation after it commits (`bumpWriteGeneration`),
@@ -39,6 +40,80 @@ export interface StatsDeltas {
  * history unit: run them on the unit's transaction, after the history write.
  */
 export type StatsWrites = (tx: Prisma.TransactionClient) => Promise<void>;
+
+/** What one scene's history write adds to its entities' stats. */
+export interface SceneStatsDelta extends StatsDeltas {
+  sceneId: string;
+}
+
+/**
+ * The stats writes of a page of history writes, built from the scenes'
+ * relations read before the unit: run on the unit's transaction with the
+ * deltas it computed from the rows it read, after the history writes.
+ */
+export type PageStatsWrites = (
+  tx: Prisma.TransactionClient,
+  deltas: readonly SceneStatsDelta[]
+) => Promise<void>;
+
+/** One entity's summed deltas, as the page statements bind them. */
+interface EntityDelta {
+  oCounter: number;
+  playCount: number;
+  lastPlayedAt: number | null;
+  lastOAt: number | null;
+}
+
+/** The later of two epoch-ms times, either possibly null. */
+function later(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+
+/** The column's later value, the stored one or the page's (epoch ms). */
+function laterColumn(column: string): string {
+  return `"${column}" = CASE
+      WHEN excluded."${column}" IS NULL THEN "${column}"
+      WHEN "${column}" IS NULL OR excluded."${column}" > "${column}" THEN excluded."${column}"
+      ELSE "${column}" END`;
+}
+
+/**
+ * One statement per stats table for a page: its entities bound as one JSON
+ * parameter of [entityId, oCounter, playCount, lastPlayedAt, lastOAt]
+ * (times in epoch ms, as Prisma stores a DateTime), each inserted or
+ * incremented. `WHERE true` keeps SQLite from reading ON CONFLICT as a join
+ * constraint of the SELECT.
+ */
+function pageStatsSql(
+  table: string,
+  entityColumn: string,
+  withTimes: boolean
+): string {
+  const times = withTimes ? `, "lastPlayedAt", "lastOAt"` : "";
+  const timeValues = withTimes
+    ? `, json_extract(value, '$[3]'), json_extract(value, '$[4]')`
+    : "";
+  const timeUpdates = withTimes
+    ? `, ${laterColumn("lastPlayedAt")}, ${laterColumn("lastOAt")}`
+    : "";
+  return `INSERT INTO "${table}" ("userId", "instanceId", "${entityColumn}", "oCounter", "playCount"${times}, "updatedAt")
+    SELECT ?, ?, json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]')${timeValues}, ?
+    FROM json_each(?) WHERE true
+    ON CONFLICT ("userId", "instanceId", "${entityColumn}") DO UPDATE SET
+      "oCounter" = "oCounter" + excluded."oCounter",
+      "playCount" = "playCount" + excluded."playCount"${timeUpdates},
+      "updatedAt" = excluded."updatedAt"`;
+}
+
+const PERFORMER_PAGE_SQL = pageStatsSql(
+  "UserPerformerStats",
+  "performerId",
+  true
+);
+const STUDIO_PAGE_SQL = pageStatsSql("UserStudioStats", "studioId", false);
+const TAG_PAGE_SQL = pageStatsSql("UserTagStats", "tagId", false);
 
 /**
  * How often a rebuild reads the history: once, then again up to three times
@@ -151,6 +226,94 @@ class UserStatsService {
   }
 
   /**
+   * The stats writes for a page of history writes on one instance (Sync
+   * from Stash): the scenes' performers, studios and tags are read here,
+   * before the caller's unit; inside it, the returned function sums the
+   * deltas the unit computed per entity and writes each stats table in one
+   * statement on the unit's transaction (a play count and O count added, a
+   * performer's last play and last O kept at the later time). A scene
+   * missing from the cache adds nothing, as in the rebuild.
+   */
+  async statsWritesForScenes(
+    userId: number,
+    instanceId: string,
+    sceneIds: readonly string[]
+  ): Promise<PageStatsWrites> {
+    const scenes = await stashEntityService.getScenesByIdsWithRelations(
+      [...sceneIds],
+      instanceId
+    );
+    const relations = new Map(
+      scenes.map((scene) => [
+        scene.id,
+        {
+          performerIds: scene.performers.map((p) => p.id),
+          studioId: scene.studio?.id,
+          tagIds: scene.tags.map((t) => t.id),
+        },
+      ])
+    );
+
+    return async (tx, deltas) => {
+      const performers = new Map<string, EntityDelta>();
+      const studios = new Map<string, EntityDelta>();
+      const tags = new Map<string, EntityDelta>();
+      const add = (
+        into: Map<string, EntityDelta>,
+        id: string,
+        delta: SceneStatsDelta
+      ) => {
+        const sum = into.get(id) ?? {
+          oCounter: 0,
+          playCount: 0,
+          lastPlayedAt: null,
+          lastOAt: null,
+        };
+        sum.oCounter += Math.max(0, delta.oCount);
+        sum.playCount += Math.max(0, delta.playCount);
+        sum.lastPlayedAt = later(
+          sum.lastPlayedAt,
+          delta.lastPlayedAt?.getTime() ?? null
+        );
+        sum.lastOAt = later(sum.lastOAt, delta.lastOAt?.getTime() ?? null);
+        into.set(id, sum);
+      };
+      for (const delta of deltas) {
+        const scene = relations.get(delta.sceneId);
+        if (!scene) continue;
+        for (const id of scene.performerIds) add(performers, id, delta);
+        if (scene.studioId !== undefined) add(studios, scene.studioId, delta);
+        for (const id of scene.tagIds) add(tags, id, delta);
+      }
+
+      const now = Date.now();
+      const write = async (
+        sql: string,
+        rows: Map<string, EntityDelta>
+      ): Promise<void> => {
+        if (rows.size === 0) return;
+        const values = Array.from(rows, ([id, d]) => [
+          id,
+          d.oCounter,
+          d.playCount,
+          d.lastPlayedAt,
+          d.lastOAt,
+        ]);
+        await tx.$executeRawUnsafe(
+          sql,
+          userId,
+          instanceId,
+          now,
+          JSON.stringify(values)
+        );
+      };
+      await write(PERFORMER_PAGE_SQL, performers);
+      await write(STUDIO_PAGE_SQL, studios);
+      await write(TAG_PAGE_SQL, tags);
+    };
+  }
+
+  /**
    * Rebuild all stats for a user from watch history
    * Useful for:
    * - Initial population
@@ -163,8 +326,9 @@ class UserStatsService {
    * `stats.rebuild` batch, written only if no play or O press committed
    * since the read (the user's write generation is unchanged when the unit
    * starts). When one did, it reads again, up to REBUILD_ATTEMPTS reads in
-   * all; after that it keeps the stats as they are (every play unit kept
-   * them current) and logs a warning. A written rebuild forgets the user's
+   * all; after that it keeps the stats as they are (every play unit and
+   * every Sync from Stash history page wrote its stats with it) and logs a
+   * warning. A written rebuild forgets the user's
    * rankings inside its unit: they are computed from these stats, so a
    * ranking write queued behind it writes nothing.
    */
