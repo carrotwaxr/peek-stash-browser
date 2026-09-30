@@ -129,184 +129,202 @@ export async function pingWatchHistory(
   // can take it back
   let countedPlay = false;
 
-  // The read, the create, the delta and the update run in one transaction:
-  // an O press, a play count, an activity save or another ping on this
-  // scene waits for it to commit, then sees its row.
-  const { updated, playbackDelta, playCountIncremented, resumeTime } =
-    await dbWriteTransaction("history.ping", async (tx) => {
-      // An earlier attempt of this ping found the database busy and
-      // committed nothing: take back the flag it set
-      if (countedPlay) {
-        sessionPlayCountIncrements.delete(sessionKey);
-        countedPlay = false;
-      }
-
-      const watchHistory =
-        (await tx.watchHistory.findUnique({
-          where: {
-            userId_instanceId_sceneId: { userId, instanceId, sceneId },
-          },
-        })) ??
-        (await tx.watchHistory.create({
-          data: {
-            userId,
-            instanceId,
-            sceneId,
-            playCount: 0,
-            playDuration: 0,
-            resumeTime: currentTime,
-            lastPlayedAt: now,
-            oCount: 0,
-            oHistory: [],
-            playHistory: [],
-          },
-        }));
-
-      // Calculate actual playback duration delta
-      let playbackDelta = 0;
-
-      if (sessionStart) {
-        const sessionStartTime = new Date(sessionStart);
-
-        // Detect if this is a new session vs continuing an existing session
-        // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
-        const SESSION_BOUNDARY_SECONDS = 120;
-        let lastPingTime = sessionStartTime;
-
-        if (watchHistory.lastPlayedAt) {
-          const timeSinceLastPlayed =
-            (sessionStartTime.getTime() - watchHistory.lastPlayedAt.getTime()) /
-            1000;
-
-          if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
-            // Continuing recent session, use lastPlayedAt
-            lastPingTime = watchHistory.lastPlayedAt;
-          } else {
-            // New session after significant gap, use sessionStart
-            logger.debug("New viewing session detected", {
-              userId,
-              sceneId,
-              timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
-              usingSessionStart: true,
-            });
-          }
-        }
-
-        const timeSinceLastPing =
-          (now.getTime() - lastPingTime.getTime()) / 1000;
-
-        // Start with the time delta
-        playbackDelta = timeSinceLastPing;
-
-        // Subtract seek distances from the delta
-        if (seekEvents && Array.isArray(seekEvents) && seekEvents.length > 0) {
-          let totalSeekDistance = 0;
-          for (const seek of seekEvents) {
-            const distance = Math.abs(seek.to - seek.from);
-            totalSeekDistance += distance;
-          }
-
-          // Don't let seek distance exceed the time delta (prevent negative values)
-          playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
-
-          logger.debug("Adjusted playback delta for seeks", {
-            userId,
-            sceneId,
-            timeSinceLastPing: timeSinceLastPing.toFixed(2),
-            totalSeekDistance: totalSeekDistance.toFixed(2),
-            playbackDelta: playbackDelta.toFixed(2),
-          });
-        }
-
-        // Cap playback delta to reasonable maximum (60 seconds)
-        // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
-        const MAX_PING_DELTA = 60;
-        if (playbackDelta > MAX_PING_DELTA) {
-          logger.warn("Capping excessive playback delta", {
-            userId,
-            sceneId,
-            originalDelta: playbackDelta.toFixed(2),
-            cappedDelta: MAX_PING_DELTA,
-            timeSinceLastPing: timeSinceLastPing.toFixed(2),
-          });
-          playbackDelta = MAX_PING_DELTA;
-        }
-      }
-
-      // Total play duration after this ping
-      const newPlayDuration = watchHistory.playDuration + playbackDelta;
-
-      // Calculate percentages (Stash's pattern)
-      const percentPlayed =
-        sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
-      const percentCompleted =
-        sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
-
-      // Increment play count ONCE per session when threshold is met. The
-      // check and the set run while this transaction holds the write lock,
-      // so a second ping of the session queued behind it sees the flag.
-      const hasIncrementedThisSession =
-        sessionPlayCountIncrements.get(sessionKey) || false;
-      let playCountIncremented = false;
-      const playHistory = readHistory(watchHistory.playHistory);
-
-      if (
-        !hasIncrementedThisSession &&
-        percentPlayed >= user.minimumPlayPercent
-      ) {
-        playCountIncremented = true;
-        sessionPlayCountIncrements.set(sessionKey, true);
-        countedPlay = true;
-
-        // Append timestamp to play history (Stash's pattern)
-        playHistory.push(now.toISOString());
-
-        logger.debug("Play count incremented (percentage threshold met)", {
-          userId,
-          sceneId,
-          newPlayCount: watchHistory.playCount + 1,
-          percentPlayed: percentPlayed.toFixed(2),
-          threshold: user.minimumPlayPercent,
-        });
-      }
-
-      // Reset resume_time to 0 when video is 98%+ complete (Stash's pattern)
-      const resumeTime = percentCompleted >= 98 ? 0 : currentTime;
-
-      // Counts are incremented, never set from the values read above
-      const updated = await tx.watchHistory.update({
-        where: { id: watchHistory.id },
-        data: {
-          resumeTime,
-          lastPlayedAt: now,
-          playCount: { increment: playCountIncremented ? 1 : 0 },
-          playDuration: { increment: playbackDelta },
-          playHistory,
-        },
+  // Until the session has counted its play, a ping may count it: read the
+  // scene's performers, studio and tags now, before the unit, so the play's
+  // stats can be written inside it. A ping that did not read them counts no
+  // play (the next one does).
+  const statsWrites = sessionPlayCountIncrements.get(sessionKey)
+    ? undefined
+    : await userStatsService.statsWritesForScene(userId, sceneId, instanceId, {
+        oCount: 0,
+        playCount: 1,
+        lastPlayedAt: now,
       });
 
-      return { updated, playbackDelta, playCountIncremented, resumeTime };
-    }).catch((error: unknown) => {
+  // The read, the create, the delta, the update and a counted play's stats
+  // run in one transaction: an O press, a play count, an activity save or
+  // another ping on this scene waits for it to commit, then sees its row.
+  const { updated, playbackDelta, playCountIncremented, resumeTime } =
+    await dbWriteTransaction(
+      "history.ping",
+      async (tx) => {
+        // An earlier attempt of this ping found the database busy and
+        // committed nothing: take back the flag it set
+        if (countedPlay) {
+          sessionPlayCountIncrements.delete(sessionKey);
+          countedPlay = false;
+        }
+
+        const watchHistory =
+          (await tx.watchHistory.findUnique({
+            where: {
+              userId_instanceId_sceneId: { userId, instanceId, sceneId },
+            },
+          })) ??
+          (await tx.watchHistory.create({
+            data: {
+              userId,
+              instanceId,
+              sceneId,
+              playCount: 0,
+              playDuration: 0,
+              resumeTime: currentTime,
+              lastPlayedAt: now,
+              oCount: 0,
+              oHistory: [],
+              playHistory: [],
+            },
+          }));
+
+        // Calculate actual playback duration delta
+        let playbackDelta = 0;
+
+        if (sessionStart) {
+          const sessionStartTime = new Date(sessionStart);
+
+          // Detect if this is a new session vs continuing an existing session
+          // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
+          const SESSION_BOUNDARY_SECONDS = 120;
+          let lastPingTime = sessionStartTime;
+
+          if (watchHistory.lastPlayedAt) {
+            const timeSinceLastPlayed =
+              (sessionStartTime.getTime() -
+                watchHistory.lastPlayedAt.getTime()) /
+              1000;
+
+            if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
+              // Continuing recent session, use lastPlayedAt
+              lastPingTime = watchHistory.lastPlayedAt;
+            } else {
+              // New session after significant gap, use sessionStart
+              logger.debug("New viewing session detected", {
+                userId,
+                sceneId,
+                timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
+                usingSessionStart: true,
+              });
+            }
+          }
+
+          const timeSinceLastPing =
+            (now.getTime() - lastPingTime.getTime()) / 1000;
+
+          // Start with the time delta
+          playbackDelta = timeSinceLastPing;
+
+          // Subtract seek distances from the delta
+          if (
+            seekEvents &&
+            Array.isArray(seekEvents) &&
+            seekEvents.length > 0
+          ) {
+            let totalSeekDistance = 0;
+            for (const seek of seekEvents) {
+              const distance = Math.abs(seek.to - seek.from);
+              totalSeekDistance += distance;
+            }
+
+            // Don't let seek distance exceed the time delta (prevent negative values)
+            playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
+
+            logger.debug("Adjusted playback delta for seeks", {
+              userId,
+              sceneId,
+              timeSinceLastPing: timeSinceLastPing.toFixed(2),
+              totalSeekDistance: totalSeekDistance.toFixed(2),
+              playbackDelta: playbackDelta.toFixed(2),
+            });
+          }
+
+          // Cap playback delta to reasonable maximum (60 seconds)
+          // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
+          const MAX_PING_DELTA = 60;
+          if (playbackDelta > MAX_PING_DELTA) {
+            logger.warn("Capping excessive playback delta", {
+              userId,
+              sceneId,
+              originalDelta: playbackDelta.toFixed(2),
+              cappedDelta: MAX_PING_DELTA,
+              timeSinceLastPing: timeSinceLastPing.toFixed(2),
+            });
+            playbackDelta = MAX_PING_DELTA;
+          }
+        }
+
+        // Total play duration after this ping
+        const newPlayDuration = watchHistory.playDuration + playbackDelta;
+
+        // Calculate percentages (Stash's pattern)
+        const percentPlayed =
+          sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
+        const percentCompleted =
+          sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
+
+        // Increment play count ONCE per session when threshold is met. The
+        // check and the set run while this transaction holds the write lock,
+        // so a second ping of the session queued behind it sees the flag.
+        const hasIncrementedThisSession =
+          sessionPlayCountIncrements.get(sessionKey) || false;
+        let playCountIncremented = false;
+        const playHistory = readHistory(watchHistory.playHistory);
+
+        if (
+          !hasIncrementedThisSession &&
+          statsWrites &&
+          percentPlayed >= user.minimumPlayPercent
+        ) {
+          playCountIncremented = true;
+          sessionPlayCountIncrements.set(sessionKey, true);
+          countedPlay = true;
+
+          // Append timestamp to play history (Stash's pattern)
+          playHistory.push(now.toISOString());
+
+          logger.debug("Play count incremented (percentage threshold met)", {
+            userId,
+            sceneId,
+            newPlayCount: watchHistory.playCount + 1,
+            percentPlayed: percentPlayed.toFixed(2),
+            threshold: user.minimumPlayPercent,
+          });
+        }
+
+        // Reset resume_time to 0 when video is 98%+ complete (Stash's pattern)
+        const resumeTime = percentCompleted >= 98 ? 0 : currentTime;
+
+        // Counts are incremented, never set from the values read above
+        const updated = await tx.watchHistory.update({
+          where: { id: watchHistory.id },
+          data: {
+            resumeTime,
+            lastPlayedAt: now,
+            playCount: { increment: playCountIncremented ? 1 : 0 },
+            playDuration: { increment: playbackDelta },
+            playHistory,
+          },
+        });
+
+        // The play's performer, studio and tag stats commit with it
+        if (playCountIncremented && statsWrites) await statsWrites(tx);
+
+        return { updated, playbackDelta, playCountIncremented, resumeTime };
+      },
+      {
+        // A stats rebuild that read the history before this play reads again
+        afterCommit: (result) => {
+          if (result.playCountIncremented) {
+            userStatsService.bumpWriteGeneration(userId);
+          }
+        },
+      }
+    ).catch((error: unknown) => {
       // Nothing was stored, so a retry of this session can still count
       if (countedPlay) {
         sessionPlayCountIncrements.delete(sessionKey);
       }
       throw error;
     });
-
-  // Update pre-computed stats if playCount was incremented
-  if (playCountIncremented) {
-    // Increment playCount for all entities in this scene (performers, studio, tags)
-    await userStatsService.updateStatsForScene(
-      userId,
-      sceneId,
-      0, // oCountDelta (not changed in ping)
-      1, // playCountDelta (increased by 1)
-      now, // lastPlayedAt
-      undefined, // lastOAt (not changed)
-      instanceId
-    );
-  }
 
   // Sync to Stash if user has sync enabled
   if (user.syncToStash) {
@@ -408,46 +426,49 @@ export async function incrementOCounter(
   }
 
   const now = new Date();
-
-  // Read, then create or update, in one transaction: another write to this
-  // scene's history waits for it to commit, then sees its row.
-  const watchHistory = await dbWriteTransaction("history.o", async (tx) => {
-    const existing = await tx.watchHistory.findUnique({
-      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
-    });
-    if (!existing) {
-      return tx.watchHistory.create({
-        data: {
-          userId,
-          instanceId,
-          sceneId,
-          playCount: 0,
-          playDuration: 0,
-          oCount: 1,
-          oHistory: [now.toISOString()],
-          playHistory: [],
-          lastPlayedAt: now,
-        },
-      });
-    }
-    return tx.watchHistory.update({
-      where: { id: existing.id },
-      data: {
-        oCount: { increment: 1 },
-        oHistory: [...readHistory(existing.oHistory), now.toISOString()],
-      },
-    });
-  });
-
-  // Update pre-computed stats once, after the commit
-  await userStatsService.updateStatsForScene(
+  // The scene's performers, studio and tags, read before the unit
+  const statsWrites = await userStatsService.statsWritesForScene(
     userId,
     sceneId,
-    1, // oCountDelta
-    0, // playCountDelta
-    undefined, // lastPlayedAt (not changed)
-    now, // lastOAt
-    instanceId
+    instanceId,
+    { oCount: 1, playCount: 0, lastOAt: now }
+  );
+
+  // Read, then create or update, and the O's stats, in one transaction:
+  // another write to this scene's history waits for it to commit, then sees
+  // its row, and the O is stored with its stats or not at all.
+  const watchHistory = await dbWriteTransaction(
+    "history.o",
+    async (tx) => {
+      const existing = await tx.watchHistory.findUnique({
+        where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
+      });
+      const row = existing
+        ? await tx.watchHistory.update({
+            where: { id: existing.id },
+            data: {
+              oCount: { increment: 1 },
+              oHistory: [...readHistory(existing.oHistory), now.toISOString()],
+            },
+          })
+        : await tx.watchHistory.create({
+            data: {
+              userId,
+              instanceId,
+              sceneId,
+              playCount: 0,
+              playDuration: 0,
+              oCount: 1,
+              oHistory: [now.toISOString()],
+              playHistory: [],
+              lastPlayedAt: now,
+            },
+          });
+      await statsWrites(tx);
+      return row;
+    },
+    // A stats rebuild that read the history before this O reads again
+    { afterCommit: () => userStatsService.bumpWriteGeneration(userId) }
   );
 
   // Sync to Stash if user has sync enabled
@@ -604,10 +625,12 @@ export async function clearAllWatchHistory(
       // the rankings at once rather than within the hour, and a recompute
       // still running from before, its write queued behind this unit
       // included, stops without writing or marking the user fresh.
-      // Recommended rescores.
+      // Recommended rescores, and a stats rebuild that read the history
+      // before the clear reads it again rather than write it back.
       afterCommit: () => {
         rankingComputeService.forget(userId);
         recommendationService.forget(userId);
+        userStatsService.bumpWriteGeneration(userId);
       },
     }
   );
@@ -790,49 +813,55 @@ export async function incrementPlayCount(
   }
 
   const now = new Date();
-
-  // Read, then create or update, in one transaction: the play history
-  // append needs the row as it is when the write lands, and another write
-  // to this scene's history waits for it to commit.
-  const watchHistory = await dbWriteTransaction("history.play", async (tx) => {
-    const existing = await tx.watchHistory.findUnique({
-      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
-    });
-    if (!existing) {
-      return tx.watchHistory.create({
-        data: {
-          userId,
-          instanceId,
-          sceneId,
-          playCount: 1,
-          playDuration: 0,
-          resumeTime: 0,
-          lastPlayedAt: now,
-          oCount: 0,
-          oHistory: [],
-          playHistory: [now.toISOString()],
-        },
-      });
-    }
-    return tx.watchHistory.update({
-      where: { id: existing.id },
-      data: {
-        playCount: { increment: 1 },
-        playHistory: [...readHistory(existing.playHistory), now.toISOString()],
-        lastPlayedAt: now,
-      },
-    });
-  });
-
-  // Update pre-computed stats
-  await userStatsService.updateStatsForScene(
+  // The scene's performers, studio and tags, read before the unit
+  const statsWrites = await userStatsService.statsWritesForScene(
     userId,
     sceneId,
-    0, // oCountDelta
-    1, // playCountDelta
-    now, // lastPlayedAt
-    undefined, // lastOAt
-    instanceId
+    instanceId,
+    { oCount: 0, playCount: 1, lastPlayedAt: now }
+  );
+
+  // Read, then create or update, and the play's stats, in one transaction:
+  // the play history append needs the row as it is when the write lands,
+  // another write to this scene's history waits for it to commit, and the
+  // play is stored with its stats or not at all.
+  const watchHistory = await dbWriteTransaction(
+    "history.play",
+    async (tx) => {
+      const existing = await tx.watchHistory.findUnique({
+        where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
+      });
+      const row = existing
+        ? await tx.watchHistory.update({
+            where: { id: existing.id },
+            data: {
+              playCount: { increment: 1 },
+              playHistory: [
+                ...readHistory(existing.playHistory),
+                now.toISOString(),
+              ],
+              lastPlayedAt: now,
+            },
+          })
+        : await tx.watchHistory.create({
+            data: {
+              userId,
+              instanceId,
+              sceneId,
+              playCount: 1,
+              playDuration: 0,
+              resumeTime: 0,
+              lastPlayedAt: now,
+              oCount: 0,
+              oHistory: [],
+              playHistory: [now.toISOString()],
+            },
+          });
+      await statsWrites(tx);
+      return row;
+    },
+    // A stats rebuild that read the history before this play reads again
+    { afterCommit: () => userStatsService.bumpWriteGeneration(userId) }
   );
 
   // Sync to Stash if user has sync enabled

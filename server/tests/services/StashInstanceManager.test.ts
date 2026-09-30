@@ -112,9 +112,11 @@ describe("StashInstanceManager", () => {
 
       expect(manager.getInstanceCount()).toBe(2);
 
-      // Default should be the highest priority (lowest number)
-      const defaultConfig = manager.getDefaultConfig();
-      expect(defaultConfig.id).toBe(INSTANCE_A.id);
+      // Highest priority (lowest number) first
+      expect(manager.getAllConfigs().map((c) => c.id)).toEqual([
+        INSTANCE_A.id,
+        INSTANCE_B.id,
+      ]);
     });
 
     it("is idempotent - second initialize is a no-op", async () => {
@@ -139,27 +141,6 @@ describe("StashInstanceManager", () => {
         where: { enabled: true },
         orderBy: { priority: "asc" },
       });
-    });
-  });
-
-  describe("getDefaultConfig", () => {
-    it("returns the config object for the default instance", async () => {
-      const { manager } = await importFresh([INSTANCE_A, INSTANCE_B]);
-      await manager.initialize();
-
-      const config = manager.getDefaultConfig();
-      expect(config.id).toBe(INSTANCE_A.id);
-      expect(config.name).toBe("Primary Stash");
-      expect(config.url).toBe("http://stash-a:9999/graphql");
-    });
-
-    it("throws when no instances are configured", async () => {
-      const { manager } = await importFresh([]);
-      await manager.initialize();
-
-      expect(() => manager.getDefaultConfig()).toThrow(
-        "No Stash instance configured"
-      );
     });
   });
 
@@ -485,7 +466,7 @@ describe("StashInstanceManager", () => {
         apiKey: "key-default",
       };
       expect(manager.getCredentials("default")).toEqual(served);
-      expect(manager.getDefaultConfig().id).toBe("default");
+      expect(manager.getAllConfigs().map((c) => c.id)).toEqual(["default"]);
     });
   });
 });

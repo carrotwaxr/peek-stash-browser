@@ -86,10 +86,12 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-// The per-entity stats are rebuilt after a history import
+// The per-entity stats are rebuilt after a history import; each history
+// unit that wrote bumps the user's stats write generation
 vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     rebuildAllStatsForUser: vi.fn().mockResolvedValue(undefined),
+    bumpWriteGeneration: vi.fn(),
   },
 }));
 
@@ -1186,7 +1188,7 @@ describe("syncFromStash", () => {
   // ─── Rankings and Recommended ───
 
   describe("rankings and the Recommended list", () => {
-    it("forgets the imported user's rankings and Recommended list inside each unit that wrote, and again after the stats rebuild", async () => {
+    it("forgets the imported user's rankings and Recommended list inside each unit that wrote, before the stats rebuild (which forgets the rankings in its own unit)", async () => {
       const stash2 = stashStub();
       mockStashClient.findScenes.mockResolvedValue(
         page(SCENE, [scene("1", { o_counter: 1, o_history: [T] })])
@@ -1200,28 +1202,39 @@ describe("syncFromStash", () => {
       ]);
       await run(only(SCENE, { oCounter: true }));
 
-      // One history unit per instance, then the rebuild
-      expect(mockRankings.forget).toHaveBeenCalledTimes(3);
-      expect(mockRecommendations.forget).toHaveBeenCalledTimes(3);
+      // One history unit per instance; the rebuild (mocked here) forgets
+      // the rankings inside its own unit (UserStatsService.test.ts), so
+      // nothing forgets them after it
+      expect(mockRankings.forget).toHaveBeenCalledTimes(2);
+      expect(mockRecommendations.forget).toHaveBeenCalledTimes(2);
       const everyCall = [
         ...mockRankings.forget.mock.calls,
         ...mockRecommendations.forget.mock.calls,
       ];
-      expect(everyCall).toEqual(Array(6).fill([TARGET_USER_ID]));
+      expect(everyCall).toEqual(Array(4).fill([TARGET_USER_ID]));
       // Inside each unit: after its transaction, before the next one starts
       const [firstUnit, secondUnit] = mockPrisma.$transaction.mock
         .invocationCallOrder as [number, number];
-      const [inFirst, inSecond, last] = mockRankings.forget.mock
-        .invocationCallOrder as [number, number, number];
+      const [inFirst, inSecond] = mockRankings.forget.mock
+        .invocationCallOrder as [number, number];
       expect(inFirst).toBeGreaterThan(firstUnit);
       expect(inFirst).toBeLessThan(secondUnit);
       expect(inSecond).toBeGreaterThan(secondUnit);
-      // The rankings are computed from the rebuilt stats
       const rebuilt = must(
         mockStats.rebuildAllStatsForUser.mock.invocationCallOrder[0]
       );
       expect(inSecond).toBeLessThan(rebuilt);
-      expect(last).toBeGreaterThan(rebuilt);
+      // Each history unit that wrote also makes a stats rebuild that read
+      // the history before it read again
+      expect(mockStats.bumpWriteGeneration.mock.calls).toEqual([
+        [TARGET_USER_ID],
+        [TARGET_USER_ID],
+      ]);
+      const [bumpFirst, bumpSecond] = mockStats.bumpWriteGeneration.mock
+        .invocationCallOrder as [number, number];
+      expect(bumpFirst).toBeGreaterThan(firstUnit);
+      expect(bumpFirst).toBeLessThan(secondUnit);
+      expect(bumpSecond).toBeGreaterThan(secondUnit);
     });
 
     it("forgets the user's rankings and Recommended list after an import that wrote only ratings", async () => {

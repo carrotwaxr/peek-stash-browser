@@ -121,18 +121,6 @@ class StashInstanceManager {
   }
 
   /**
-   * The highest-priority enabled instance's config. Only UserStatsService's
-   * fallbacks for rows without an instance read it; media never does.
-   */
-  getDefaultConfig(): StashInstance {
-    const first = this.configs.values().next().value;
-    if (!first) {
-      throw new Error("No Stash instance configured");
-    }
-    return first;
-  }
-
-  /**
    * Get a Stash instance by ID.
    * Returns undefined if the instance doesn't exist or is disabled.
    */

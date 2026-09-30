@@ -14,6 +14,7 @@ import {
   isDatabaseBusy,
 } from "../../utils/dbWrite.js";
 import { logger } from "../../utils/logger.js";
+import { must } from "../helpers/must.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -360,5 +361,25 @@ describe("dbWrite", () => {
       dbWriteBatchIf("rankings", () => wanted, ops)
     ).resolves.toEqual([{ count: 1 }]);
     expect(mockPrisma.$transaction).toHaveBeenCalledWith(ops);
+  });
+
+  it("dbWriteBatchIf runs afterCommit only when the batch was written", async () => {
+    const ops = [mockPrisma.sceneRating.deleteMany({ where: { userId: 1 } })];
+    mockPrisma.$transaction.mockResolvedValue([{ count: 1 }]);
+    const afterCommit = vi.fn();
+
+    await expect(
+      dbWriteBatchIf("stats.rebuild", () => false, ops, { afterCommit })
+    ).resolves.toBeNull();
+    expect(afterCommit).not.toHaveBeenCalled();
+
+    await expect(
+      dbWriteBatchIf("stats.rebuild", () => true, ops, { afterCommit })
+    ).resolves.toEqual([{ count: 1 }]);
+    expect(afterCommit).toHaveBeenCalledTimes(1);
+    expect(afterCommit).toHaveBeenCalledWith([{ count: 1 }]);
+    expect(must(afterCommit.mock.invocationCallOrder[0])).toBeGreaterThan(
+      must(mockPrisma.$transaction.mock.invocationCallOrder[0])
+    );
   });
 });

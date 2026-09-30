@@ -40,7 +40,11 @@ import {
   resFor,
   testUser,
 } from "../helpers/controllerTestUtils.js";
-import { arrayContaining, objectContaining } from "../helpers/matchers.js";
+import {
+  anyOf,
+  arrayContaining,
+  objectContaining,
+} from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -85,9 +89,14 @@ vi.mock("../../services/RecommendationService.js", () => ({
   recommendationService: { forget: vi.fn() },
 }));
 
+// The stats writes a play or an O press runs inside its transaction
+const { mockStatsWrites } = vi.hoisted(() => ({
+  mockStatsWrites: vi.fn<(tx: Prisma.TransactionClient) => Promise<void>>(),
+}));
 vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
-    updateStatsForScene: vi.fn().mockResolvedValue(undefined),
+    statsWritesForScene: vi.fn(),
+    bumpWriteGeneration: vi.fn(),
   },
 }));
 
@@ -106,6 +115,7 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockLogger = vi.mocked(logger, true);
+const mockStats = vi.mocked(userStatsService, true);
 
 describe("Watch History Controller", () => {
   beforeEach(() => {
@@ -116,6 +126,8 @@ describe("Watch History Controller", () => {
     mockResolve.mockImplementation((_userId, _type, _id, requested) =>
       Promise.resolve(requested ?? "test-instance")
     );
+    mockStatsWrites.mockResolvedValue(undefined);
+    mockStats.statsWritesForScene.mockResolvedValue(mockStatsWrites);
   });
 
   afterEach(() => {
@@ -537,6 +549,69 @@ describe("Watch History Controller", () => {
         })
       );
     });
+
+    it("the play's stats run inside its transaction, after the history write, and bump the write generation once it commits", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({ id: 1, playCount: 1, playHistory: [] })
+      );
+      mockPrisma.watchHistory.update.mockResolvedValue(
+        partialRow({ id: 1, playCount: 2 })
+      );
+
+      await incrementPlayCount(
+        reqFor(incrementPlayCount, {
+          body: { sceneId: "123", instanceId: "test-instance" },
+          user: testUser({ id: 1 }),
+        }),
+        resFor(incrementPlayCount)
+      );
+
+      expect(mockStats.statsWritesForScene).toHaveBeenCalledWith(
+        1,
+        "123",
+        "test-instance",
+        { oCount: 0, playCount: 1, lastPlayedAt: anyOf(Date) }
+      );
+      // The transaction's client (the mock runs the callback on itself)
+      expect(mockStatsWrites).toHaveBeenCalledWith(mockPrisma);
+      const updated = must(
+        mockPrisma.watchHistory.update.mock.invocationCallOrder[0]
+      );
+      const wrote = must(mockStatsWrites.mock.invocationCallOrder[0]);
+      const bumped = must(
+        mockStats.bumpWriteGeneration.mock.invocationCallOrder[0]
+      );
+      expect(wrote).toBeGreaterThan(updated);
+      expect(bumped).toBeGreaterThan(wrote);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledWith(1);
+    });
+
+    it("a failed stats write fails the play: nothing answers and nothing bumps", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({ id: 1, playCount: 1 })
+      );
+      mockStatsWrites.mockRejectedValue(new Error("stats refused"));
+
+      const res = resFor(incrementPlayCount);
+      await expect(
+        incrementPlayCount(
+          reqFor(incrementPlayCount, {
+            body: { sceneId: "123", instanceId: "test-instance" },
+            user: testUser({ id: 1 }),
+          }),
+          res
+        )
+      ).rejects.toThrow("stats refused");
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+    });
   });
 
   // ============================================================================
@@ -610,7 +685,13 @@ describe("Watch History Controller", () => {
           oCount: 1,
         })
       );
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(mockStats.statsWritesForScene).toHaveBeenCalledWith(
+        1,
+        "123",
+        "test-instance",
+        { oCount: 1, playCount: 0, lastOAt: anyOf(Date) }
+      );
+      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
     });
 
     it("should increment existing oCount", async () => {
@@ -652,10 +733,65 @@ describe("Watch History Controller", () => {
           }),
         })
       );
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ success: true, oCount: 4 })
       );
+    });
+
+    it("the O's stats run inside its transaction, after the history write, and bump the write generation once it commits", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({ id: 1, oCount: 1 })
+      );
+
+      await incrementOCounter(
+        reqFor(incrementOCounter, {
+          body: { sceneId: "123", instanceId: "test-instance" },
+          user: testUser({ id: 1 }),
+        }),
+        resFor(incrementOCounter)
+      );
+
+      // The transaction's client (the mock runs the callback on itself)
+      expect(mockStatsWrites).toHaveBeenCalledWith(mockPrisma);
+      const created = must(
+        mockPrisma.watchHistory.create.mock.invocationCallOrder[0]
+      );
+      const wrote = must(mockStatsWrites.mock.invocationCallOrder[0]);
+      const bumped = must(
+        mockStats.bumpWriteGeneration.mock.invocationCallOrder[0]
+      );
+      expect(wrote).toBeGreaterThan(created);
+      expect(bumped).toBeGreaterThan(wrote);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledWith(1);
+    });
+
+    it("a failed stats write fails the O: nothing answers and nothing bumps", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({ id: 1, oCount: 1 })
+      );
+      mockStatsWrites.mockRejectedValue(new Error("stats refused"));
+
+      const res = resFor(incrementOCounter);
+      await expect(
+        incrementOCounter(
+          reqFor(incrementOCounter, {
+            body: { sceneId: "123", instanceId: "test-instance" },
+            user: testUser({ id: 1 }),
+          }),
+          res
+        )
+      ).rejects.toThrow("stats refused");
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
     });
   });
 
@@ -1119,6 +1255,8 @@ describe("Watch History Controller", () => {
       expect(rankings.forget).toHaveBeenCalledWith(1);
       expect(recommendations.forget).toHaveBeenCalledTimes(1);
       expect(recommendations.forget).toHaveBeenCalledWith(1);
+      // A stats rebuild that read the history before the clear reads again
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledWith(1);
       // Once the batch commits (inside its unit, rankingForgetOrder.test.ts):
       // a recompute started before it read the old history
       const batch = must(mockPrisma.$transaction.mock.invocationCallOrder[0]);
@@ -1357,14 +1495,58 @@ describe("Watch History Controller", () => {
       }
 
       expect(res.status).not.toHaveBeenCalled();
+      // Each instance's session reads its scene once, until it counts
       expect(
-        vi
-          .mocked(userStatsService.updateStatsForScene)
-          .mock.calls.map((call) => [call[1], call[6]])
+        mockStats.statsWritesForScene.mock.calls.map((call) => [
+          call[1],
+          call[2],
+        ])
       ).toEqual([
         ["session-two", "inst-a"],
         ["session-two", "inst-b"],
       ]);
+      expect(mockStatsWrites).toHaveBeenCalledTimes(2);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(2);
+    });
+
+    it("a ping under the threshold counts no play: no stats written, nothing bumped", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, minimumPlayPercent: 50, syncToStash: false })
+      );
+      // 100 of 600 seconds played
+      const record: WatchHistory = partialRow({
+        id: 1,
+        playCount: 0,
+        playDuration: 100,
+        resumeTime: 90,
+        lastPlayedAt: new Date(),
+        oHistory: [],
+        playHistory: [],
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
+
+      const res = resFor(pingWatchHistory);
+      await pingWatchHistory(
+        reqFor(pingWatchHistory, {
+          body: {
+            sceneId: "session-under",
+            instanceId: "test-instance",
+            currentTime: 100,
+          },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
+        objectContaining({
+          data: objectContaining({ playCount: { increment: 0 } }),
+        })
+      );
+      expect(mockStatsWrites).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
     });
 
     it("two pings of one session past the threshold count one play", async () => {
@@ -1411,16 +1593,16 @@ describe("Watch History Controller", () => {
 
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledTimes(2);
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledWith(
+      expect(mockStats.statsWritesForScene).toHaveBeenCalledWith(
         1,
         "session-guard",
-        0,
-        1,
-        expect.any(Date),
-        undefined,
-        "test-instance"
+        "test-instance",
+        { oCount: 0, playCount: 1, lastPlayedAt: anyOf(Date) }
       );
+      // One play, so its stats are written once, inside its transaction
+      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
+      expect(mockStatsWrites).toHaveBeenCalledWith(mockPrisma);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(1);
     });
 
     it("a ping whose first attempt found the database busy counts the play when tried again", async () => {
@@ -1481,7 +1663,9 @@ describe("Watch History Controller", () => {
           playCount: { increment: 1 },
         });
       }
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      // The failed attempt wrote nothing: its stats never ran
+      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(1);
     });
 
     it("a ping keeps the play sessions Peek 1.0 stored, as their start times", async () => {
@@ -1575,7 +1759,7 @@ describe("Watch History Controller", () => {
       );
 
       expect(res.status).not.toHaveBeenCalled();
-      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
       expect(mockLogger.info).not.toHaveBeenCalled();
       expect(mockLogger.debug).toHaveBeenCalledWith(
         "Watch history ping",

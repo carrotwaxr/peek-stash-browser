@@ -109,7 +109,8 @@ The rows are then written, taking the database's write lock once:
 
 - **Fill**: the deduplicated rows go into the TEMP table `_peek_result` on the same connection, still without the lock.
 - **Swap**: one short `BEGIN IMMEDIATE` on that connection, as one unit of the writer queue (`exclusions.swap`, see [Database writes](#database-writes)), deletes the user's rows and copies `_peek_result` in with one `INSERT OR IGNORE ... SELECT`. The delete keeps the `pending` rows a sync wrote after the snapshot began, so those holds survive. For a user with 180,000 rows the swap holds the lock about 0.7 s, where the old single transaction (delete, insert, stats) held it 3.3 s.
-- **Stats**: `UserEntityStats` is updated afterwards, in its own short batch.
+
+The Library counts on the stats page are not stored: `UserStatsAggregationService.getLibraryStats` counts each type per request from what the user can see (live entities on their allowed instances with no exclusion row for them, the same anti-join the lists use), so a recompute, a hide or an unhide shows in them at once.
 
 Hiding an entity (`addHiddenEntity`) computes its rows the same way and merges them in (`INSERT OR IGNORE`), never overwriting a row already there.
 
@@ -198,20 +199,9 @@ model UserExcludedEntity {
   @@index([userId, entityType])      // Primary query index
   @@index([entityType, entityId])    // For cascade lookups ("what users exclude this?")
 }
-
-// Pre-computed visible counts per entity type (avoids expensive COUNT queries)
-model UserEntityStats {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  entityType   String   // 'scene', 'performer', etc.
-  visibleCount Int      // total entities - excluded entities
-  updatedAt    DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, entityType])
-}
 ```
+
+Visible counts per type are not stored: they are counted per request (see [Processing Order](#processing-order)). A `UserEntityStats` table once held them; 3.4 dropped it.
 
 ### Key Design Decisions
 
@@ -294,7 +284,7 @@ Some Stash users have 100TB+ collections with millions of images and scenes. The
 | Concern | Mitigation |
 |---------|------------|
 | Full recomputation time | Never do full recompute except initial setup; use incremental updates |
-| COUNT queries | Pre-compute visible counts in `UserEntityStats` table |
+| COUNT queries | Count per request in SQL with the exclusion anti-join (`getLibraryStats`); nothing stored to keep current |
 | Index memory | ~250MB for 5M rows is acceptable for modern servers |
 | Cascade complexity | Track `sourceType`/`sourceId` to enable targeted updates |
 
@@ -304,13 +294,11 @@ Some Stash users have 100TB+ collections with millions of images and scenes. The
 1. Insert exclusion with `reason='hidden'`
 2. Find cascading entities via junction tables
 3. Insert cascade exclusions with `sourceType`/`sourceId`
-4. Decrement `visibleCount` in `UserEntityStats`
 
 **Unhide entity (medium, may need partial recompute):**
 1. Delete exclusion where `reason='hidden'` AND entity matches
 2. Delete cascade exclusions where `sourceId` matches
 3. Re-check if any cascades should remain (other hidden entities may still exclude them)
-4. Update `visibleCount` in `UserEntityStats`
 
 **Stash sync (diff-based):**
 1. Compare new entity list with cached list
@@ -346,7 +334,7 @@ Pre-computed exclusions need updating when:
 ## Migration Strategy
 
 1. Keep existing `UserContentRestriction` and `UserHiddenEntity` tables as source of truth
-2. Add new `UserExcludedEntity` and `UserEntityStats` tables
+2. Add new `UserExcludedEntity` table (a `UserEntityStats` table of visible counts came with it; 3.4 dropped it for counts per request)
 3. Implement `ExclusionComputationService` with incremental update logic
 4. Add trigger points for recomputation (sync complete, restriction change, hide/unhide)
 5. Migrate query patterns to use exclusion JOINs
