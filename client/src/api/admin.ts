@@ -2,11 +2,16 @@
  * Admin API — groups, permissions, recovery keys, password reset.
  */
 import type {
+  CreateUserGroupBody,
+  CreateUserGroupResponse,
   GetAllUserGroupsResponse,
   GetCurrentUserGroupsResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsResponse,
+  GetUserGroupResponse,
   RegenerateRecoveryKeyResponse,
+  UpdateUserGroupBody,
+  UpdateUserGroupResponse,
 } from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
@@ -15,13 +20,13 @@ import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 export const getGroups = () => apiGet<GetAllUserGroupsResponse>("/groups");
 
 export const getGroup = (groupId: string) =>
-  apiGet<{ group: unknown }>(`/groups/${groupId}`);
+  apiGet<GetUserGroupResponse>(`/groups/${groupId}`);
 
-export const createGroup = (data: Record<string, unknown>) =>
-  apiPost<{ group: unknown }>("/groups", data);
+export const createGroup = (data: CreateUserGroupBody) =>
+  apiPost<CreateUserGroupResponse>("/groups", data);
 
-export const updateGroup = (groupId: string, data: Record<string, unknown>) =>
-  apiPut<{ group: unknown }>(`/groups/${groupId}`, data);
+export const updateGroup = (groupId: string, data: UpdateUserGroupBody) =>
+  apiPut<UpdateUserGroupResponse>(`/groups/${groupId}`, data);
 
 export const deleteGroup = (groupId: string) =>
   apiDelete<{ success: boolean; message: string }>(`/groups/${groupId}`);

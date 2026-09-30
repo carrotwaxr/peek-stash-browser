@@ -42,6 +42,22 @@ export const USER_GROUP_SUMMARY_SELECT = {
   canDownloadPlaylists: true,
 } as const satisfies Prisma.UserGroupSelect;
 
+/** A group row as the create and update responses send it: dates as ISO strings */
+function toGroupResponse(
+  group: Prisma.UserGroupGetPayload<Record<string, never>>
+): CreateUserGroupResponse["group"] {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    canShare: group.canShare,
+    canDownloadFiles: group.canDownloadFiles,
+    canDownloadPlaylists: group.canDownloadPlaylists,
+    createdAt: group.createdAt.toISOString(),
+    updatedAt: group.updatedAt.toISOString(),
+  };
+}
+
 /**
  * Get all groups with member counts (admin only)
  */
@@ -67,8 +83,8 @@ export const getAllGroups = async (
       canDownloadFiles: group.canDownloadFiles,
       canDownloadPlaylists: group.canDownloadPlaylists,
       memberCount: group._count.members,
-      createdAt: group.createdAt,
-      updatedAt: group.updatedAt,
+      createdAt: group.createdAt.toISOString(),
+      updatedAt: group.updatedAt.toISOString(),
     })),
   });
 };
@@ -114,8 +130,8 @@ export const getGroup = async (
       canShare: group.canShare,
       canDownloadFiles: group.canDownloadFiles,
       canDownloadPlaylists: group.canDownloadPlaylists,
-      createdAt: group.createdAt,
-      updatedAt: group.updatedAt,
+      createdAt: group.createdAt.toISOString(),
+      updatedAt: group.updatedAt.toISOString(),
       members: group.members.map((m) => ({
         id: m.id,
         user: {
@@ -123,7 +139,7 @@ export const getGroup = async (
           username: m.user.username,
           role: m.user.role,
         },
-        joinedAt: m.createdAt,
+        joinedAt: m.createdAt.toISOString(),
       })),
     },
   });
@@ -169,7 +185,7 @@ export const createGroup = async (
     },
   });
 
-  return res.status(201).json({ group });
+  return res.status(201).json({ group: toGroupResponse(group) });
 };
 
 /**
@@ -221,7 +237,7 @@ export const updateGroup = async (
   }
 
   if (description !== undefined) {
-    updateData.description = description || null;
+    updateData.description = emptyToNull(description);
   }
 
   if (canShare !== undefined) {
@@ -241,7 +257,7 @@ export const updateGroup = async (
     data: updateData,
   });
 
-  return res.json({ group });
+  return res.json({ group: toGroupResponse(group) });
 };
 
 /**
@@ -319,7 +335,12 @@ export const addMember = async (
     },
   });
 
-  return res.status(201).json({ membership });
+  return res.status(201).json({
+    membership: {
+      ...membership,
+      createdAt: membership.createdAt.toISOString(),
+    },
+  });
 };
 
 /**

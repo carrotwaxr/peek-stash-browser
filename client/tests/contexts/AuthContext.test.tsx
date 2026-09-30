@@ -2,7 +2,9 @@ import React from "react";
 import { act, waitFor } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { REDIRECT_STORAGE_KEY } from "../../src/api";
+import { queryClient } from "../../src/api/queryClient";
 import { AuthProvider } from "../../src/contexts/AuthContext";
 import { useAuth } from "../../src/hooks/useAuth";
 import { actAsync, must } from "../testUtils";
@@ -316,6 +318,55 @@ describe("login() refused for a while", () => {
 });
 
 describe("logout()", () => {
+  const assign = vi.fn();
+
+  beforeEach(() => {
+    assign.mockReset();
+    vi.stubGlobal("location", { assign });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sessionStorage.clear();
+    queryClient.clear();
+  });
+
+  it("sign-out clears the post-login redirect and the query cache, then loads /login", async () => {
+    const { result } = renderWithAuth();
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    sessionStorage.setItem(REDIRECT_STORAGE_KEY, "/scenes?q=private");
+    queryClient.setQueryData(["scenes", "a", "list", {}], { scenes: [1, 2] });
+    globalThis.fetch = vi.fn().mockImplementation(() => okResponse({}));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBeNull();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
+  });
+
+  it("sign-out forgets the page and the cache even when the request fails", async () => {
+    const { result } = renderWithAuth();
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    sessionStorage.setItem(REDIRECT_STORAGE_KEY, "/scenes");
+    queryClient.setQueryData(["user", "stats"], { stats: true });
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(sessionStorage.getItem(REDIRECT_STORAGE_KEY)).toBeNull();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
+  });
+
   // 8. Successful logout
   it("calls /api/auth/logout and clears user and isAuthenticated", async () => {
     // Start authenticated

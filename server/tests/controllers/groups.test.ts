@@ -158,7 +158,7 @@ describe("Groups Controller", () => {
             expect.objectContaining({
               id: 1,
               user: { id: 2, username: "user1", role: "USER" },
-              joinedAt: createdAt,
+              joinedAt: createdAt.toISOString(),
             }),
           ],
         }),
@@ -246,8 +246,8 @@ describe("Groups Controller", () => {
         canShare: true,
         canDownloadFiles: true,
         canDownloadPlaylists: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date("2026-09-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-09-02T00:00:00.000Z"),
       });
 
       const res = resFor(createGroup);
@@ -272,6 +272,12 @@ describe("Groups Controller", () => {
         }),
       });
       expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        group: objectContaining({
+          createdAt: "2026-09-01T00:00:00.000Z",
+          updatedAt: "2026-09-02T00:00:00.000Z",
+        }),
+      });
     });
   });
 
@@ -465,6 +471,7 @@ describe("Groups Controller", () => {
           id: 1,
           userId: 2,
           groupId: 1,
+          createdAt: new Date("2026-09-01T00:00:00.000Z"),
         })
       );
 
@@ -482,6 +489,9 @@ describe("Groups Controller", () => {
         data: { userId: 2, groupId: 1 },
       });
       expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        membership: objectContaining({ createdAt: "2026-09-01T00:00:00.000Z" }),
+      });
     });
 
     it("should return 409 if user already in group", async () => {

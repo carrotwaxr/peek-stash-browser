@@ -102,9 +102,6 @@ const AppRoutes = ({
   setupStatus: GetSetupStatusResponse;
   onSetupComplete: () => void;
 }) => {
-  // The gate renders the routes only once the status has loaded
-  const checkingSetup = false;
-
   return (
     <Router>
       <Suspense fallback={<PageLoader />}>
@@ -113,10 +110,7 @@ const AppRoutes = ({
           <Route
             path={PUBLIC_ROUTES.setup}
             element={
-              <SetupGuard
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <SetupGuard setupStatus={setupStatus}>
                 <SetupWizard
                   setupStatus={setupStatus}
                   onSetupComplete={onSetupComplete}
@@ -129,10 +123,7 @@ const AppRoutes = ({
           <Route
             path={PUBLIC_ROUTES.login}
             element={
-              <LoginGuard
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <LoginGuard setupStatus={setupStatus}>
                 <Login />
               </LoginGuard>
             }
@@ -148,10 +139,7 @@ const AppRoutes = ({
           <Route
             path="/"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Home />
                 </GlobalLayout>
@@ -161,10 +149,7 @@ const AppRoutes = ({
           <Route
             path="/scenes"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Scenes />
                 </GlobalLayout>
@@ -174,10 +159,7 @@ const AppRoutes = ({
           <Route
             path="/recommended"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Recommended />
                 </GlobalLayout>
@@ -187,10 +169,7 @@ const AppRoutes = ({
           <Route
             path="/performers"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Performers />
                 </GlobalLayout>
@@ -200,10 +179,7 @@ const AppRoutes = ({
           <Route
             path="/studios"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Studios />
                 </GlobalLayout>
@@ -213,10 +189,7 @@ const AppRoutes = ({
           <Route
             path="/tags"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Tags />
                 </GlobalLayout>
@@ -226,10 +199,7 @@ const AppRoutes = ({
           <Route
             path="/collections"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Groups />
                 </GlobalLayout>
@@ -239,10 +209,7 @@ const AppRoutes = ({
           <Route
             path="/galleries"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Galleries />
                 </GlobalLayout>
@@ -252,10 +219,7 @@ const AppRoutes = ({
           <Route
             path="/images"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Images />
                 </GlobalLayout>
@@ -265,10 +229,7 @@ const AppRoutes = ({
           <Route
             path="/gallery/:galleryId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <GalleryDetail />
                 </GlobalLayout>
@@ -278,10 +239,7 @@ const AppRoutes = ({
           <Route
             path="/performer/:performerId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <PerformerDetail />
                 </GlobalLayout>
@@ -291,10 +249,7 @@ const AppRoutes = ({
           <Route
             path="/studio/:studioId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <StudioDetail />
                 </GlobalLayout>
@@ -304,10 +259,7 @@ const AppRoutes = ({
           <Route
             path="/tag/:tagId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <TagDetail />
                 </GlobalLayout>
@@ -317,10 +269,7 @@ const AppRoutes = ({
           <Route
             path="/collection/:groupId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <GroupDetail />
                 </GlobalLayout>
@@ -330,10 +279,7 @@ const AppRoutes = ({
           <Route
             path="/watch-history"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <WatchHistory />
                 </GlobalLayout>
@@ -343,10 +289,7 @@ const AppRoutes = ({
           <Route
             path="/user-stats"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <UserStats />
                 </GlobalLayout>
@@ -356,10 +299,7 @@ const AppRoutes = ({
           <Route
             path="/hidden-items"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <HiddenItemsPage />
                 </GlobalLayout>
@@ -369,10 +309,7 @@ const AppRoutes = ({
           <Route
             path="/downloads"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Downloads />
                 </GlobalLayout>
@@ -382,10 +319,7 @@ const AppRoutes = ({
           <Route
             path="/settings"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <SettingsPage />
                 </GlobalLayout>
@@ -409,10 +343,7 @@ const AppRoutes = ({
           <Route
             path="/playlists"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Playlists />
                 </GlobalLayout>
@@ -422,10 +353,7 @@ const AppRoutes = ({
           <Route
             path="/clips"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Clips />
                 </GlobalLayout>
@@ -435,10 +363,7 @@ const AppRoutes = ({
           <Route
             path="/playlist/:playlistId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <PlaylistDetail />
                 </GlobalLayout>
@@ -448,10 +373,7 @@ const AppRoutes = ({
           <Route
             path="/scene/:sceneId"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <Scene />
                 </GlobalLayout>
@@ -461,10 +383,7 @@ const AppRoutes = ({
           <Route
             path="/settings/carousels/new"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <CarouselBuilder />
                 </GlobalLayout>
@@ -474,10 +393,7 @@ const AppRoutes = ({
           <Route
             path="/settings/carousels/:id/edit"
             element={
-              <ProtectedRoute
-                setupStatus={setupStatus}
-                checkingSetup={checkingSetup}
-              >
+              <ProtectedRoute setupStatus={setupStatus}>
                 <GlobalLayout>
                   <CarouselBuilder />
                 </GlobalLayout>

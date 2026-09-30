@@ -406,8 +406,8 @@ describe("StashInstanceSection", () => {
           expect(invalidated(statusKey)).toBe(true);
         });
         expect(invalidated(listKey)).toBe(true);
-        // The user's own data is not the library's
-        expect(invalidated(statsKey)).toBe(false);
+        // What the visible set feeds is refreshed with the library
+        expect(invalidated(statsKey)).toBe(true);
       };
 
       renderSection(client);
