@@ -21,6 +21,7 @@ paths:
 - A card's `onHideSuccess(entityId, entityType, instanceId?)` carries the entity's instance, and list handlers remove the hidden item by `makeCompositeKey(id, instanceId)`, never by bare id. `useHideBulkAction` never sends a selection entry without an instance; it counts that entry as failed.
 - After a hide, bulk hide, restore or Restore All, `useHiddenEntities` calls `invalidateExclusionDependents` (library queries, Recommended, stats; Hidden Items marked stale, not refetched). `invalidateInstanceQueries` calls it too. A new query that shows the user's visible set belongs under a root the library predicate matches, or in that helper.
 - `logout` removes the post-login redirect, clears the query cache and does a full load of /login.
+- Detail pages take their tab counts from `useRelationCounts` (the tabs show `TAB_COUNT_LOADING` and none opens until it answers) and filter, read and count on the loaded entity's `instanceId`, never the URL's `instance` param (a bare-id link has none).
 
 ## useFilterState
 
