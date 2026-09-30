@@ -3,9 +3,10 @@
  * `filter`, the panel's filters with the page's permanent filters in the
  * entity's `<entity>_filter`. Also the sort rules a list reads its state by.
  */
-import { DEFAULT_SORT } from "@peek/shared-types";
+import { DEFAULT_SORT, UI_KEYS, type UiKey } from "@peek/shared-types";
 import {
   CLIP_SORT_OPTIONS,
+  type FilterOption,
   GALLERY_SORT_OPTIONS,
   GROUP_SORT_OPTIONS,
   IMAGE_SORT_OPTIONS,
@@ -210,4 +211,78 @@ export const listKeyWithoutPageOf = (query: ListQuery | null): string => {
   if (!query) return "";
   const { page: _page, ...filter } = query.filter;
   return JSON.stringify({ ...query, filter });
+};
+
+/**
+ * The contract fields a page fixes, named by its permanent filters: the top
+ * level keys (`performers`, `tags`, `date`), and the keys inside the entity's
+ * own `<entity>_filter` a detail tab's locked filters carry. Sorted, so equal
+ * sets are equal arrays.
+ */
+export const lockedFieldsOf = (
+  entity: ListEntity,
+  permanentFilters: Filters
+): string[] => {
+  const inner = permanentFilters[`${entity}_filter`];
+  const fields = new Set([
+    ...Object.keys(permanentFilters),
+    ...(typeof inner === "object" && inner !== null && !Array.isArray(inner)
+      ? Object.keys(inner)
+      : []),
+  ]);
+  return [...fields].sort();
+};
+
+/** The panel keys, companions included, that fill a locked contract field */
+const lockedPanelKeys = (
+  entity: ListEntity,
+  lockedFields: readonly string[]
+): Set<string> => {
+  const keys = new Set<string>();
+  if (lockedFields.length === 0) return keys;
+  const uiKeys: readonly UiKey[] = UI_KEYS[entity];
+  for (const uiKey of uiKeys) {
+    if (!lockedFields.includes(uiKey.field)) continue;
+    keys.add(uiKey.key);
+    if (uiKey.modifierKey) keys.add(uiKey.modifierKey);
+    if (uiKey.hierarchyKey) keys.add(uiKey.hierarchyKey);
+  }
+  return keys;
+};
+
+/**
+ * The filters without those on a field the page fixes (a performer's Scenes
+ * tab has its performer, so the URL's or a preset's `performerIds` and its
+ * modifier go). Returns the same object when nothing goes.
+ */
+export const withoutLockedFilters = (
+  entity: ListEntity,
+  filters: Filters,
+  lockedFields: readonly string[]
+): Record<string, unknown> => {
+  const locked = lockedPanelKeys(entity, lockedFields);
+  const kept = Object.entries(filters).filter(([key]) => !locked.has(key));
+  return kept.length === Object.keys(filters).length
+    ? (filters as Record<string, unknown>)
+    : Object.fromEntries(kept);
+};
+
+/**
+ * The panel's options without those on a field the page fixes, and without a
+ * section left with none
+ */
+export const withoutLockedOptions = (
+  entity: ListEntity,
+  options: FilterOption[],
+  lockedFields: readonly string[]
+): FilterOption[] => {
+  const locked = lockedPanelKeys(entity, lockedFields);
+  if (locked.size === 0) return options;
+  const offered = options.filter((option) => !locked.has(option.key));
+  return offered.filter(
+    (option, index) =>
+      option.type !== "section-header" ||
+      (offered[index + 1] !== undefined &&
+        offered[index + 1]?.type !== "section-header")
+  );
 };

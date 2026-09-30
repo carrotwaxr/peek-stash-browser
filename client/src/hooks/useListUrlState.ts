@@ -33,6 +33,7 @@ import {
   listKeyWithoutPageOf,
   parseSortValue,
   sortValue,
+  withoutLockedFilters,
 } from "../utils/listQuery";
 import {
   type ListEntity,
@@ -78,6 +79,12 @@ export interface UseListUrlStateOptions {
   defaults: ListDefaults;
   /** The page's fixed filters: never in the URL, merged last into the request */
   permanentFilters?: Record<string, unknown>;
+  /**
+   * The contract fields the page fixes (`performers`, `tags`, `date`): the
+   * URL's and the default preset's filters on them are dropped, companions
+   * included, so the panel cannot turn the page's own criterion inside out
+   */
+  lockedFields?: readonly string[];
 }
 
 export interface ListUrlState {
@@ -116,6 +123,7 @@ export interface ListUrlState {
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
+const NO_LOCKS: readonly string[] = [];
 
 const isDirection = (value: unknown): value is Direction =>
   value === "ASC" || value === "DESC";
@@ -141,11 +149,19 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     viewModes,
     defaults,
     permanentFilters = NO_FILTERS,
+    lockedFields: lockedFieldsOption = NO_LOCKS,
   } = options;
   const [searchParams, setSearchParams] = useSearchParams();
   const presetsQuery = useFilterPresets();
   const defaultPresetsQuery = useDefaultPresets();
   const { unitPreference } = useUnitPreference();
+
+  // Equal sets are one dependency, whichever array carries them
+  const lockedKey = lockedFieldsOption.join(",");
+  const lockedFields = useMemo(
+    () => (lockedKey === "" ? NO_LOCKS : lockedKey.split(",")),
+    [lockedKey]
+  );
 
   const presetContext = context ?? entityType;
   const presetsResolved =
@@ -181,9 +197,11 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   }, [activePreset, defaults, viewModes]);
 
   const derived = useMemo(() => {
-    const filters = url.hasFilters
-      ? url.filters
-      : (activePreset?.filters ?? NO_FILTERS);
+    const filters = withoutLockedFilters(
+      entityType,
+      url.hasFilters ? url.filters : (activePreset?.filters ?? NO_FILTERS),
+      lockedFields
+    );
 
     const offered =
       typeof sortOptions === "function"
@@ -227,6 +245,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     permanentFilters,
     defaults,
     entityType,
+    lockedFields,
     viewModes,
     shown,
   ]);
