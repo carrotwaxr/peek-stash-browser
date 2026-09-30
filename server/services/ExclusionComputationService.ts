@@ -27,12 +27,11 @@
  * go into the TEMP table _peek_result (bound as JSON, 20,000 rows per
  * statement, no main-database lock), then one short BEGIN IMMEDIATE deletes
  * the user's rows and inserts the new ones with INSERT ... SELECT (the
- * `exclusions.swap` writer unit), and the stats follow in one batch on the
- * main client. On a 180k-row user the lock is held for well under a second,
- * where a createMany of the same rows held it for over three. A restriction
- * save (saveRestrictions) computes from the proposed rows and writes them in
- * that same BEGIN IMMEDIATE, ahead of the exclusions, so a failure anywhere
- * leaves both tables as they were.
+ * `exclusions.swap` writer unit). On a 180k-row user the lock is held for
+ * well under a second, where a createMany of the same rows held it for over
+ * three. A restriction save (saveRestrictions) computes from the proposed
+ * rows and writes them in that same BEGIN IMMEDIATE, ahead of the
+ * exclusions, so a failure anywhere leaves both tables as they were.
  *
  * Who exclusions apply to lives in exclusionPolicy.ts: an admin's rows hold
  * only their own hides and cascades, so no read path needs a role check.
@@ -63,7 +62,7 @@ import {
 } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
 import type { SyncEntityType } from "../types/api/sync.js";
-import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { compositeKey, entityKey, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
@@ -295,17 +294,6 @@ const HELD_SOURCES: ReadonlySet<SyncEntityType> = new Set([
   "group",
   "gallery",
 ]);
-
-const STATS_ENTITY_TYPES = [
-  "scene",
-  "performer",
-  "studio",
-  "tag",
-  "group",
-  "gallery",
-  "image",
-  "clip",
-] as const;
 
 /**
  * Cascade edges (Rule 3), first order only: a performer excluded through a
@@ -630,8 +618,7 @@ class ExclusionComputationService {
    * - The deduplicated rows are filled into _peek_result on the same
    *   connection (fillResult), still without the lock.
    * - Only the swap (swapResult: DELETE + INSERT ... SELECT) holds the write
-   *   lock, as the `exclusions.swap` unit of the writer queue, and the stats
-   *   batch follows outside it.
+   *   lock, as the `exclusions.swap` unit of the writer queue.
    */
   private async doRecomputeForUser(
     userId: number,
@@ -835,10 +822,7 @@ class ExclusionComputationService {
       };
     }, "exclusions.recompute");
 
-    // Phase 5: entity stats, outside the swap
-    const t7 = Date.now();
-    await this.updateEntityStats(userId, allowedInstanceIds);
-    const t8 = Date.now();
+    const done = Date.now();
 
     logger.info("ExclusionComputationService.recomputeForUser completed", {
       userId,
@@ -848,8 +832,7 @@ class ExclusionComputationService {
       phaseCounts: written.phaseCounts,
       timing: {
         ...written.timing,
-        statsMs: t8 - t7,
-        totalMs: t8 - t0,
+        totalMs: done - t0,
       },
     });
   }
@@ -2324,75 +2307,6 @@ class ExclusionComputationService {
   }
 
   /**
-   * Update visible entity counts for the user, after the swap has committed:
-   * the 8 entity counts and 8 excluded counts are read on the main client
-   * outside any unit, then the 8 upserts go in as one batch.
-   */
-  private async updateEntityStats(
-    userId: number,
-    allowedInstanceIds: string[]
-  ): Promise<void> {
-    const visible: Array<{ entityType: string; visibleCount: number }> = [];
-    for (const entityType of STATS_ENTITY_TYPES) {
-      const total = await this.getEntityCount(entityType, allowedInstanceIds);
-      const excluded = await prisma.userExcludedEntity.count({
-        where: { userId, entityType },
-      });
-      visible.push({ entityType, visibleCount: total - excluded });
-    }
-
-    await dbWriteBatch(
-      "exclusions.stats",
-      visible.map(({ entityType, visibleCount }) =>
-        prisma.userEntityStats.upsert({
-          where: {
-            userId_entityType_instanceId: {
-              userId,
-              entityType,
-              instanceId: "",
-            },
-          },
-          create: { userId, entityType, instanceId: "", visibleCount },
-          update: { visibleCount },
-        })
-      )
-    );
-
-    logger.debug("updateEntityStats complete", { userId });
-  }
-
-  /**
-   * Get total count of entities of a given type.
-   */
-  private async getEntityCount(
-    entityType: (typeof STATS_ENTITY_TYPES)[number],
-    allowedInstanceIds: string[]
-  ): Promise<number> {
-    const where = {
-      deletedAt: null,
-      stashInstanceId: { in: allowedInstanceIds },
-    };
-    switch (entityType) {
-      case "scene":
-        return prisma.stashScene.count({ where });
-      case "performer":
-        return prisma.stashPerformer.count({ where });
-      case "studio":
-        return prisma.stashStudio.count({ where });
-      case "tag":
-        return prisma.stashTag.count({ where });
-      case "group":
-        return prisma.stashGroup.count({ where });
-      case "gallery":
-        return prisma.stashGallery.count({ where });
-      case "image":
-        return prisma.stashImage.count({ where });
-      case "clip":
-        return prisma.stashClip.count({ where });
-    }
-  }
-
-  /**
    * Hide `targets` for the user: the hidden rows and their exclusions in one
    * unit. The caller has checked each target (visible, not already hidden);
    * an instance of "" hides the entity on every instance.
@@ -2403,7 +2317,7 @@ class ExclusionComputationService {
    * the cascades of every resolved ref. They are filled into _peek_result
    * and merged with INSERT OR IGNORE (mergeResult), the UserHiddenEntity
    * rows in the same `exclusions.hide` unit, so a failure leaves neither.
-   * Skips the empty phase and the stats update.
+   * Skips the empty phase.
    *
    * The merge only fills missing rows: an existing row keeps its reason, so
    * a restriction already stored for a key is never rewritten as `hidden`

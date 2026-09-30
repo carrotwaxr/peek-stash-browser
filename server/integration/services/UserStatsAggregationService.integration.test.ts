@@ -14,11 +14,31 @@
  *
  * User U hid scene 5 and performer 12 on A only, and has history, stats and
  * rankings on both. Every seeded row is deleted before the file ends.
+ *
+ * The Library counts (item 36) are checked over HTTP against the test
+ * library: each equals the list total the same user gets.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import { must } from "../../tests/helpers/must.js";
+import type {
+  FindGalleriesResponse,
+  FindImagesResponse,
+  FindPerformersResponse,
+  FindScenesResponse,
+  FindStudiosResponse,
+  FindTagsResponse,
+  GetClipsResponse,
+  UserStatsResponse,
+} from "../../types/api/index.js";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { createApiUser, hideFor } from "../helpers/accessFixture.js";
+import {
+  type TestClient,
+  adminClient,
+  findTestInstanceId,
+} from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -303,4 +323,141 @@ describeWithDb("User Stats by (id, instance) (integration)", () => {
     expect(none.topPerformers).toEqual([]);
     expect(none.mostOdPerformer).toBeNull();
   });
+});
+
+/** An enabled instance still on its first sync, holding one scene */
+const FIRST = "stats-it-first";
+const FIRST_SCENE = "7710001";
+const LIBRARY_USER = "stats-it-library";
+
+async function removeLibraryRows(): Promise<void> {
+  await prisma.stashScene.deleteMany({ where: { stashInstanceId: FIRST } });
+  await prisma.stashInstance.deleteMany({ where: { id: FIRST } });
+}
+
+describe("Library counts on the stats page (integration)", () => {
+  let viewer: { id: number; client: TestClient } | undefined;
+  let testInstance: string;
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    testInstance = await findTestInstanceId();
+    await removeLibraryRows();
+    await prisma.stashInstance.create({
+      data: {
+        id: FIRST,
+        name: FIRST,
+        url: "http://127.0.0.1:9/graphql",
+        apiKey: "fixture-key",
+        enabled: true,
+        priority: 950,
+        firstSyncedAt: null,
+      },
+    });
+    await prisma.stashScene.create({
+      data: { id: FIRST_SCENE, stashInstanceId: FIRST, title: "first sync" },
+    });
+
+    const user = await createApiUser(LIBRARY_USER, "stats_it_password_123");
+    viewer = user;
+    // The test library and the first-syncing instance: the compute's scope
+    // holds both, the lists only the synced one
+    await prisma.userStashInstance.deleteMany({ where: { userId: user.id } });
+    await prisma.userStashInstance.createMany({
+      data: [
+        { userId: user.id, instanceId: testInstance },
+        { userId: user.id, instanceId: FIRST },
+      ],
+    });
+
+    // A legacy global hide: the recompute adds its per-instance copy
+    await hideFor(user.id, "scene", TEST_ENTITIES.sceneWithRelations, "");
+
+    // A restriction save recomputes the viewer's exclusions
+    const saved = await adminClient.put(`/api/user/${user.id}/restrictions`, {
+      restrictions: [
+        {
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: [`${TEST_ENTITIES.restrictableTag}:${testInstance}`],
+          restrictEmpty: false,
+        },
+      ],
+    });
+    expect(saved.status).toBe(200);
+
+    // A hide after the recompute
+    const hidden = await user.client.post("/api/user/hidden-entities", {
+      entityType: "performer",
+      entityId: TEST_ENTITIES.performerWithScenes,
+      instanceId: testInstance,
+    });
+    expect(hidden.status).toBe(200);
+
+    // A sync batch's hold on a scene the viewer still sees
+    const first = await user.client.post<FindScenesResponse>(
+      "/api/library/scenes",
+      { filter: { per_page: 1 } }
+    );
+    const held = must(first.data.findScenes.scenes[0], "a visible scene");
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: user.id,
+        entityType: "scene",
+        entityId: held.id,
+        instanceId: held.instanceId,
+        reason: "pending",
+      },
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    if (viewer) await adminClient.delete(`/api/user/${viewer.id}`);
+    await removeLibraryRows();
+  }, 60_000);
+
+  it("each Library count equals the list total the user gets", async () => {
+    const { client } = must(viewer, "the viewer");
+    const list = { filter: { per_page: 1 } };
+    const stats = await client.get<UserStatsResponse>("/api/user-stats");
+    expect(stats.status).toBe(200);
+
+    const scenes = await client.post<FindScenesResponse>(
+      "/api/library/scenes",
+      list
+    );
+    const performers = await client.post<FindPerformersResponse>(
+      "/api/library/performers",
+      list
+    );
+    const studios = await client.post<FindStudiosResponse>(
+      "/api/library/studios",
+      list
+    );
+    const tags = await client.post<FindTagsResponse>("/api/library/tags", list);
+    const galleries = await client.post<FindGalleriesResponse>(
+      "/api/library/galleries",
+      list
+    );
+    const images = await client.post<FindImagesResponse>(
+      "/api/library/images",
+      list
+    );
+    // The Clips page's default request: clips with a preview
+    const clips = await client.get<GetClipsResponse>(
+      "/api/clips?isGenerated=true&perPage=1"
+    );
+
+    expect(stats.data.library).toEqual({
+      sceneCount: scenes.data.findScenes.count,
+      performerCount: performers.data.findPerformers.count,
+      studioCount: studios.data.findStudios.count,
+      tagCount: tags.data.findTags.count,
+      galleryCount: galleries.data.findGalleries.count,
+      imageCount: images.data.findImages.count,
+      clipCount: clips.data.total,
+    });
+    // The fixture holds something of each, so equal is not 0 = 0
+    expect(scenes.data.findScenes.count).toBeGreaterThan(0);
+  }, 60_000);
 });

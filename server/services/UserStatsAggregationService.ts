@@ -19,6 +19,7 @@
  *   scenes for a user with 17k watched scenes, where storing them cost each
  *   recompute 0.5 s of writes.
  * - Totals and highlights read the history and per-user stats directly.
+ * - The Library counts are counted per request, as the lists count.
  */
 import prisma from "../prisma/singleton.js";
 import type {
@@ -35,6 +36,7 @@ import type {
 } from "../types/api/index.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
+  type SqlFragment,
   type SqlParam,
   exclusionJoin,
   instanceClause,
@@ -215,6 +217,58 @@ function visibleEntity(
   };
 }
 
+/** The types the Library panel counts, each with the table its list reads */
+const LIBRARY_TABLES = {
+  scene: "StashScene",
+  performer: "StashPerformer",
+  studio: "StashStudio",
+  tag: "StashTag",
+  gallery: "StashGallery",
+  image: "StashImage",
+  clip: "StashClip",
+} as const;
+
+type LibraryCountType = keyof typeof LIBRARY_TABLES;
+
+const LIBRARY_COUNT_TYPES = Object.keys(LIBRARY_TABLES) as LibraryCountType[];
+
+interface CountRow {
+  n: bigint | number;
+}
+
+/**
+ * One type's Library count, as its list counts with no filter: the lists'
+ * exclusion anti-join on the entity's instance, `deletedAt` and the allowed
+ * instances. A clip also needs its live scene with no exclusion row (a clip
+ * hides with its scene) and a preview (`isGenerated`), as `ClipQueryBuilder`
+ * and the Clips page's default filter have it.
+ */
+function libraryCountQuery(
+  type: LibraryCountType,
+  userId: number,
+  allowedInstanceIds: readonly string[]
+): SqlFragment {
+  const instances = instanceClause("x", allowedInstanceIds);
+  const own = exclusionJoin("e", type, "x.id", "x.stashInstanceId");
+  if (type === "clip") {
+    return {
+      sql: `SELECT COUNT(*) AS n FROM StashClip x
+        ${own}
+        INNER JOIN StashScene s ON s.id = x.sceneId AND s.stashInstanceId = x.sceneInstanceId
+        ${exclusionJoin("es", "scene", "x.sceneId", "x.sceneInstanceId")}
+        WHERE x.deletedAt IS NULL AND e.id IS NULL AND ${instances.sql}
+          AND s.deletedAt IS NULL AND es.id IS NULL AND x.isGenerated = 1`,
+      params: [userId, userId, ...instances.params],
+    };
+  }
+  return {
+    sql: `SELECT COUNT(*) AS n FROM ${LIBRARY_TABLES[type]} x
+      ${own}
+      WHERE x.deletedAt IS NULL AND e.id IS NULL AND ${instances.sql}`,
+    params: [userId, ...instances.params],
+  };
+}
+
 class UserStatsAggregationService {
   /**
    * Get all user stats in a single call
@@ -230,7 +284,7 @@ class UserStatsAggregationService {
     // One statement after another: sent together, they contend for the
     // pool's connections and the disk (at 200k scenes, for a user with 17k
     // watched scenes, 0.28 s together against 0.12 s in turn)
-    const library = await this.getLibraryStats(userId);
+    const library = await this.getLibraryStats(userId, allowedInstanceIds);
     const engagement = await this.getEngagementStats(
       userId,
       allowedInstanceIds
@@ -292,24 +346,45 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get library counts from pre-computed UserEntityStats
+   * The Library counts: for each type, the live entities on the viewer's
+   * allowed instances with no exclusion row for the viewer on the entity's
+   * instance, which is the total the type's list shows with no filter. Clips
+   * count as the Clips page's default request lists them: on a live scene
+   * the viewer sees, with a preview. One statement per type, in turn
+   * (through Prisma: 44 ms in all on the production snapshot, images 31; at
+   * 200k scenes, for a user with 71k scene and 258k image exclusions, 0.26 s,
+   * scenes 145 and images 96).
    */
-  private async getLibraryStats(userId: number): Promise<LibraryStats> {
-    const stats = await prisma.userEntityStats.findMany({
-      where: { userId },
-      select: { entityType: true, visibleCount: true },
-    });
-
-    const statsMap = new Map(stats.map((s) => [s.entityType, s.visibleCount]));
-
+  private async getLibraryStats(
+    userId: number,
+    allowedInstanceIds: readonly string[]
+  ): Promise<LibraryStats> {
+    const counts: Record<LibraryCountType, number> = {
+      scene: 0,
+      performer: 0,
+      studio: 0,
+      tag: 0,
+      gallery: 0,
+      image: 0,
+      clip: 0,
+    };
+    for (const type of LIBRARY_COUNT_TYPES) {
+      const { sql, params } = libraryCountQuery(
+        type,
+        userId,
+        allowedInstanceIds
+      );
+      const rows = await prisma.$queryRawUnsafe<CountRow[]>(sql, ...params);
+      counts[type] = Number(rows[0]?.n ?? 0);
+    }
     return {
-      sceneCount: statsMap.get("scene") ?? 0,
-      performerCount: statsMap.get("performer") ?? 0,
-      studioCount: statsMap.get("studio") ?? 0,
-      tagCount: statsMap.get("tag") ?? 0,
-      galleryCount: statsMap.get("gallery") ?? 0,
-      imageCount: statsMap.get("image") ?? 0,
-      clipCount: statsMap.get("clip") ?? 0,
+      sceneCount: counts.scene,
+      performerCount: counts.performer,
+      studioCount: counts.studio,
+      tagCount: counts.tag,
+      galleryCount: counts.gallery,
+      imageCount: counts.image,
+      clipCount: counts.clip,
     };
   }
 

@@ -4877,7 +4877,6 @@ class StashSyncService extends EventEmitter {
         });
         // Derived rows; UserExcludedEntity has no instanceId index, so the
         // purge removes its rows in chunks instead
-        await tx.userEntityStats.deleteMany({ where: own });
         await tx.userPerformerStats.deleteMany({ where: own });
         await tx.userStudioStats.deleteMany({ where: own });
         await tx.userTagStats.deleteMany({ where: own });
