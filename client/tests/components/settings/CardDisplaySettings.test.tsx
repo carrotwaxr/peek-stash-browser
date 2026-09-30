@@ -287,7 +287,6 @@ describe("CardDisplaySettings", () => {
         screen.getByLabelText(/Show studio code on cards/)
       ).toBeInTheDocument();
 
-      // Tag has fewer settings (no showRating, showFavorite, showOCounter)
       await user.click(screen.getByRole("button", { name: /Tag/i }));
 
       // Tag should have description and relationship indicators
@@ -298,10 +297,10 @@ describe("CardDisplaySettings", () => {
         screen.getByLabelText(/Show relationship indicators/)
       ).toBeInTheDocument();
 
-      // Tag should NOT have rating, favorite, o counter
-      expect(screen.queryByLabelText(/Show rating/)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/Show favorite/)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/Show O counter/)).not.toBeInTheDocument();
+      // A tag card carries rating, favorite and O counter like a studio's
+      expect(screen.getByLabelText(/Show rating/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Show favorite/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Show O counter/)).toBeInTheDocument();
     });
 
     it("renders performer settings correctly", async () => {
