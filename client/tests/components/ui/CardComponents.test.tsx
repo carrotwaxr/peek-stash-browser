@@ -1,7 +1,8 @@
 import type { MouseEvent, ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CardDescription,
   CardImage,
@@ -10,15 +11,17 @@ import {
   CardRatingRow,
   CardTitle,
 } from "../../../src/components/ui/CardComponents";
+import SceneCard from "../../../src/components/ui/SceneCard";
 
-// Hides go through without the confirmation dialog
+// Hides go through without the confirmation dialog, unless a test turns it on
+let mockHideConfirmationDisabled = true;
 const mockHideEntity = vi.fn((_hide: Record<string, unknown>) =>
   Promise.resolve(true)
 );
 vi.mock("../../../src/hooks/useHiddenEntities", () => ({
   useHiddenEntities: () => ({
     hideEntity: mockHideEntity,
-    hideConfirmationDisabled: true,
+    hideConfirmationDisabled: mockHideConfirmationDisabled,
   }),
 }));
 const mockIncrement = vi.fn((_vars: Record<string, unknown>) =>
@@ -29,6 +32,20 @@ vi.mock("../../../src/api/hooks", () => ({
     mutateAsync: mockIncrement,
     isPending: false,
   }),
+}));
+
+vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
+  useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
+}));
+vi.mock("../../../src/contexts/ConfigContext", () => ({
+  useConfig: () => ({ hasMultipleInstances: false }),
+}));
+vi.mock("../../../src/hooks/useTVMode", () => ({
+  useTVMode: () => ({ isTVMode: false }),
+}));
+vi.mock("../../../src/components/ui/index", () => ({
+  SceneCardPreview: () => null,
+  TooltipEntityGrid: () => null,
 }));
 
 /** The props of the overlay's root element */
@@ -258,5 +275,53 @@ describe("the card's instance", () => {
     await vi.waitFor(() =>
       expect(onHideSuccess).toHaveBeenCalledWith("12", "scene", "A")
     );
+  });
+});
+
+describe("a card's hide dialog", () => {
+  afterEach(() => {
+    mockHideConfirmationDisabled = true;
+  });
+
+  it("cancelling a card's hide by clicking outside the dialog does not open the scene", () => {
+    mockHideConfirmationDisabled = false;
+    const onClick = vi.fn();
+    // Whatever wraps the card (a link, a selectable row) must not see it either
+    const onWrapperClick = vi.fn();
+    const onWrapperMouseDown = vi.fn();
+    const scene = {
+      id: "1",
+      instanceId: "inst-1",
+      title: "Test Scene",
+      paths: { screenshot: "/screenshot.jpg" },
+      files: [{ duration: 3600 }],
+      performers: [],
+      groups: [],
+      galleries: [],
+      tags: [],
+      inheritedTags: [],
+    } as unknown as NormalizedScene;
+    render(
+      <MemoryRouter>
+        <div onClick={onWrapperClick} onMouseDown={onWrapperMouseDown}>
+          <SceneCard scene={scene} onClick={onClick} />
+        </div>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getAllByLabelText("More options").at(-1) as HTMLElement
+    );
+    fireEvent.click(screen.getByText("Hide Scene"));
+    const backdrop = screen.getByRole("dialog").parentElement as HTMLElement;
+    onWrapperClick.mockClear();
+    onWrapperMouseDown.mockClear();
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClick).not.toHaveBeenCalled();
+    expect(onWrapperClick).not.toHaveBeenCalled();
+    expect(onWrapperMouseDown).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import Button from "./Button";
 
@@ -42,10 +43,16 @@ const ConfirmDialog = ({
 
   const confirmVariant = confirmStyle === "danger" ? "destructive" : "primary";
 
-  return (
+  // A portal keeps the dialog out of a card's scaled, clipped box; React still
+  // bubbles its events to the card, so the backdrop and the dialog stop them
+  return createPortal(
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <div
         ref={dialogRef as React.Ref<HTMLDivElement>}
@@ -55,6 +62,7 @@ const ConfirmDialog = ({
           border: "1px solid var(--border-color)",
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
@@ -91,7 +99,8 @@ const ConfirmDialog = ({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
