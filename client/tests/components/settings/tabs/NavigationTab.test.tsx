@@ -12,6 +12,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
+import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../../src/api";
 import NavigationTab from "../../../../src/components/settings/tabs/NavigationTab";
@@ -48,7 +50,9 @@ vi.mock("../../../../src/components/icons/index", () => ({
 const renderTab = () =>
   render(
     <MemoryRouter>
-      <NavigationTab />
+      <SignedInWithQuery>
+        <NavigationTab />
+      </SignedInWithQuery>
     </MemoryRouter>
   );
 
@@ -61,7 +65,7 @@ async function section(heading: string): Promise<HTMLElement> {
 describe("NavigationTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockApiGet.mockResolvedValue({ settings: {} });
+    mockApiGet.mockResolvedValue(userSettingsResponse());
     mockGetCarousels.mockResolvedValue({ carousels: [] });
     mockApiPut.mockRejectedValue(new api.ApiError("Database busy", 503));
   });
@@ -170,11 +174,11 @@ describe("NavigationTab", () => {
   it("a failed navigation settings load offers Retry and no editor", async () => {
     mockApiGet
       .mockRejectedValueOnce(new api.ApiError("Database busy", 503))
-      .mockResolvedValueOnce({
-        settings: {
+      .mockResolvedValueOnce(
+        userSettingsResponse({
           landingPagePreference: { pages: ["tags"], randomize: false },
-        },
-      });
+        })
+      );
     renderTab();
 
     expect(await screen.findByText("Database busy")).toBeInTheDocument();

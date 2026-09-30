@@ -329,7 +329,6 @@ const Images = () => {
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
-          wallPlayback={wallPlayback}
           viewModes={VIEW_MODES}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
@@ -402,7 +401,7 @@ const Images = () => {
                   zoomLevel={
                     zoomLevel as unknown as "small" | "medium" | "large"
                   }
-                  playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
+                  playbackMode={wallPlayback}
                   onItemClick={handleImageClick}
                   loading={isLoading}
                   emptyMessage="No images found"

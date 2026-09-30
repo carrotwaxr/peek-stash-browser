@@ -1,36 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
-import { apiGet } from "../api";
+import { useUserSettings } from "../api/hooks/useUserSettings";
+
+export type WallPlayback = "autoplay" | "hover" | "static";
+
+const WALL_PLAYBACK_MODES: readonly string[] = ["autoplay", "hover", "static"];
 
 /**
- * Hook to get the user's wallPlayback preference.
- * Returns "autoplay" | "hover" | "static" and a setter to update local state
+ * The wall cog's Preview Behavior setting, offered by list pages in wall
+ * view. `ContextSettings` saves it through the user-settings query.
+ */
+export const WALL_VIEW_SETTINGS = [
+  {
+    key: "wallPlayback" as const,
+    label: "Preview Behavior",
+    type: "select" as const,
+    options: [
+      { value: "autoplay", label: "Autoplay All" },
+      { value: "hover", label: "Play on Hover" },
+      { value: "static", label: "Static Thumbnails" },
+    ],
+  },
+];
+
+/**
+ * The user's wall playback preference, read from the user-settings query:
+ * a save anywhere (the wall cog, Settings) reaches every wall at once.
  */
 export const useWallPlayback = () => {
-  const [wallPlayback, setWallPlayback] = useState("autoplay");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadSetting = async () => {
-      try {
-        const response = await apiGet<{ settings?: { wallPlayback?: string } }>(
-          "/user/settings"
-        );
-        setWallPlayback(response.settings?.wallPlayback || "autoplay");
-      } catch {
-        // Default to autoplay on error
-        setWallPlayback("autoplay");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSetting();
-  }, []);
-
-  // Update local state (called after API save succeeds in ContextSettings)
-  const updateWallPlayback = useCallback((value: string) => {
-    setWallPlayback(value);
-  }, []);
-
-  return { wallPlayback, loading, updateWallPlayback };
+  const { data, isPending } = useUserSettings();
+  const stored = data?.settings.wallPlayback;
+  const wallPlayback: WallPlayback =
+    stored && WALL_PLAYBACK_MODES.includes(stored)
+      ? (stored as WallPlayback)
+      : "autoplay";
+  return { wallPlayback, loading: isPending };
 };

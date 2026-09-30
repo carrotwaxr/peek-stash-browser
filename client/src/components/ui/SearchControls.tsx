@@ -52,12 +52,9 @@ interface ViewModeConfig {
   icon?: LucideIcon;
 }
 
-interface SettingConfig {
-  key: string;
-  label: string;
-  type: "select" | "toggle";
-  options?: Array<{ value: string; label: string }>;
-}
+type SettingConfig = NonNullable<
+  React.ComponentProps<typeof ContextSettings>["settings"]
+>[number];
 
 interface SearchControlsProps {
   artifactType?: string;
@@ -75,8 +72,6 @@ interface SearchControlsProps {
   supportsWallView?: boolean;
   viewModes?: ViewModeConfig[];
   onViewModeChange?: (mode: string) => void;
-  wallPlayback?: string;
-  onWallPlaybackChange?: (key: string, value: string) => void;
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
   contextSettings?: SettingConfig[];
@@ -104,8 +99,6 @@ const SearchControls = ({
   supportsWallView = false,
   viewModes,
   onViewModeChange,
-  wallPlayback = "autoplay",
-  onWallPlaybackChange,
   currentTableColumns = null,
   tableColumnsPopover = null,
   contextSettings = [],
@@ -1138,12 +1131,6 @@ const SearchControls = ({
                 <ContextSettings
                   entityType={artifactType}
                   settings={contextSettings}
-                  currentValues={{ wallPlayback }}
-                  onSettingChange={(key: string, value: string | boolean) => {
-                    if (key === "wallPlayback" && onWallPlaybackChange) {
-                      onWallPlaybackChange(key, value as string);
-                    }
-                  }}
                 />
               </div>
             </div>
@@ -1355,7 +1342,6 @@ const SearchControls = ({
               viewMode,
               zoomLevel,
               gridDensity,
-              wallPlayback,
               sortField,
               sortDirection,
               onSort: handleSortChange,

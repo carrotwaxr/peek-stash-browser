@@ -1,16 +1,28 @@
 import type { NormalizedScene } from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { userSettingsResponse } from "@tests/helpers/userSettings";
+import { createAuthValue, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/api/queryKeys";
 import SceneCardPreview from "@/components/ui/SceneCardPreview";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 
-const auth = vi.hoisted(() => ({ preferredPreviewQuality: "mp4" }));
-
-vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { preferredPreviewQuality: auth.preferredPreviewQuality },
-  }),
-}));
+/** A preview whose user's settings (already loaded) prefer `quality`. */
+const renderPreview = (quality: string, scene: NormalizedScene) => {
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(
+    queryKeys.user.settings(),
+    userSettingsResponse({ preferredPreviewQuality: quality })
+  );
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={createAuthValue({ isAuthenticated: true })}>
+        <SceneCardPreview scene={scene} active />
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+};
 
 /** SceneCardPreview renders from these fields; the rest are left out */
 const scene = (instanceId: string) =>
@@ -50,11 +62,8 @@ describe("SceneCardPreview", () => {
     const heads: string[] = [];
     const srcs: (string | null)[] = [];
     for (const { quality, instanceId, selector } of cases) {
-      auth.preferredPreviewQuality = quality;
       fetchMock.mockClear();
-      const { container, unmount } = render(
-        <SceneCardPreview scene={scene(instanceId)} active />
-      );
+      const { container, unmount } = renderPreview(quality, scene(instanceId));
       const overlay = await waitFor(() => {
         const el = container.querySelector(selector);
         expect(el).not.toBeNull();

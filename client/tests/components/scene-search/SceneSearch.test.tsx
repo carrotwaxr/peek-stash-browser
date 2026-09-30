@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import SceneSearch from "@/components/scene-search/SceneSearch";
 import { useFolderViewTags } from "@/hooks/useFolderViewTags";
+import type * as wallPlayback from "@/hooks/useWallPlayback";
 
 // The view the page is on (the URL's `view`, as the controls report it)
 let mockView = "grid";
@@ -49,11 +50,9 @@ vi.mock("@/hooks/useTableColumns", () => ({
     getColumnConfig: vi.fn(() => ({})),
   })),
 }));
-vi.mock("@/hooks/useWallPlayback", () => ({
-  useWallPlayback: vi.fn(() => ({
-    wallPlayback: "static",
-    updateWallPlayback: vi.fn(),
-  })),
+vi.mock("@/hooks/useWallPlayback", async (importOriginal) => ({
+  ...(await importOriginal<typeof wallPlayback>()),
+  useWallPlayback: vi.fn(() => ({ wallPlayback: "static", loading: false })),
 }));
 vi.mock("@/hooks/useFolderViewTags", () => ({
   useFolderViewTags: vi.fn(() => ({

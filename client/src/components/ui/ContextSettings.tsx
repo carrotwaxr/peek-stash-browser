@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { UpdateUserSettingsBody } from "@peek/shared-types";
 import { LucideSettings } from "lucide-react";
-import { apiPut, getErrorMessage } from "../../api";
+import { getErrorMessage } from "../../api";
+import {
+  type UserSettings,
+  useUpdateUserSettings,
+  useUserSettings,
+} from "../../api/hooks/useUserSettings";
 import {
   SETTING_LABELS,
   getAvailableSettings,
@@ -14,23 +20,25 @@ import ZoomSlider from "./ZoomSlider";
  * Context-aware settings cog for the toolbar.
  * Shows a popover with settings relevant to the current page/view.
  *
- * @param {Array} settings - Array of setting configs:
+ * @param {Array} settings - Array of user settings to offer, each read from
+ *   and saved to the user-settings query (so every reader updates at once):
  *   [{
  *     key: "wallPlayback",
  *     label: "Preview Behavior",
  *     type: "select",
  *     options: [{ value: "autoplay", label: "Autoplay All" }, ...]
  *   }]
- * @param {Object} currentValues - Current values for each setting key
- * @param {Function} onSettingChange - Called with (key, value) when setting changes
  */
 interface SettingOption {
   value: string;
   label: string;
 }
 
+/** A user setting the cog can read and save. */
+type UserSettingKey = keyof UserSettings & keyof UpdateUserSettingsBody;
+
 interface SettingConfig {
-  key: string;
+  key: UserSettingKey;
   label: string;
   type: "select" | "toggle";
   options?: SettingOption[];
@@ -39,8 +47,6 @@ interface SettingConfig {
 
 interface Props {
   settings?: SettingConfig[];
-  currentValues?: Record<string, string | boolean>;
-  onSettingChange?: (key: string, value: string | boolean) => void;
   className?: string;
   entityType?: string | null;
 }
@@ -49,15 +55,106 @@ interface Props {
 const settingText = (value: unknown, fallback: string) =>
   typeof value === "string" && value ? value : fallback;
 
+/**
+ * The popover's user settings. Rendered only while the popover is open, so a
+ * closed cog asks nothing of the settings query.
+ */
+const UserSettingFields = ({ settings }: { settings: SettingConfig[] }) => {
+  const { data } = useUserSettings();
+  const save = useUpdateUserSettings();
+
+  const handleSettingChange = useCallback(
+    async (key: UserSettingKey, value: string | boolean) => {
+      try {
+        await save.mutateAsync({ [key]: value } as UpdateUserSettingsBody);
+        showSuccess("Setting saved");
+      } catch (err) {
+        showError(getErrorMessage(err, "Failed to save setting"));
+      }
+    },
+    [save]
+  );
+
+  const current = (key: UserSettingKey): unknown => data?.settings[key];
+
+  return (
+    <>
+      {settings.map((setting) => (
+        <div key={setting.key}>
+          {setting.type === "select" && (
+            <>
+              <label
+                htmlFor={`context-${setting.key}`}
+                className="block text-xs font-medium mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {setting.label}
+              </label>
+              <select
+                id={`context-${setting.key}`}
+                value={settingText(current(setting.key), "")}
+                onChange={(e) =>
+                  void handleSettingChange(setting.key, e.target.value)
+                }
+                disabled={save.isPending || !data}
+                className="w-full px-2 py-1.5 rounded text-sm"
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {setting.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {setting.type === "toggle" && (
+            <label
+              htmlFor={`context-${setting.key}`}
+              className="flex items-center cursor-pointer"
+            >
+              <input
+                id={`context-${setting.key}`}
+                type="checkbox"
+                checked={current(setting.key) === true}
+                onChange={(e) =>
+                  void handleSettingChange(setting.key, e.target.checked)
+                }
+                disabled={save.isPending || !data}
+                className="w-4 h-4"
+                style={{ accentColor: "var(--accent-primary)" }}
+              />
+              <span
+                className="ml-2 text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {setting.label}
+                {setting.toggleLabel && (
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {" "}
+                    ({setting.toggleLabel})
+                  </span>
+                )}
+              </span>
+            </label>
+          )}
+        </div>
+      ))}
+    </>
+  );
+};
+
 const ContextSettings = ({
   settings = [],
-  currentValues = {},
-  onSettingChange,
   className = "",
   entityType = null,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Card display settings
@@ -100,24 +197,6 @@ const ContextSettings = ({
     }
     return undefined;
   }, [isOpen]);
-
-  const handleSettingChange = useCallback(
-    async (key: string, value: string | boolean) => {
-      setSaving(true);
-      try {
-        await apiPut("/user/settings", { [key]: value });
-        if (onSettingChange) {
-          onSettingChange(key, value);
-        }
-        showSuccess("Setting saved");
-      } catch (err) {
-        showError(getErrorMessage(err, "Failed to save setting"));
-      } finally {
-        setSaving(false);
-      }
-    },
-    [onSettingChange]
-  );
 
   const handleCardSettingChange = useCallback(
     async (key: string, value: string | boolean) => {
@@ -196,72 +275,7 @@ const ContextSettings = ({
 
           {/* Settings */}
           <div className="p-3 space-y-3">
-            {settings.map((setting) => (
-              <div key={setting.key}>
-                {setting.type === "select" && (
-                  <>
-                    <label
-                      htmlFor={`context-${setting.key}`}
-                      className="block text-xs font-medium mb-1"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      {setting.label}
-                    </label>
-                    <select
-                      id={`context-${setting.key}`}
-                      value={String(currentValues[setting.key] || "")}
-                      onChange={(e) =>
-                        void handleSettingChange(setting.key, e.target.value)
-                      }
-                      disabled={saving}
-                      className="w-full px-2 py-1.5 rounded text-sm"
-                      style={{
-                        backgroundColor: "var(--bg-secondary)",
-                        border: "1px solid var(--border-color)",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {setting.options?.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
-
-                {setting.type === "toggle" && (
-                  <label
-                    htmlFor={`context-${setting.key}`}
-                    className="flex items-center cursor-pointer"
-                  >
-                    <input
-                      id={`context-${setting.key}`}
-                      type="checkbox"
-                      checked={!!currentValues[setting.key]}
-                      onChange={(e) =>
-                        void handleSettingChange(setting.key, e.target.checked)
-                      }
-                      disabled={saving}
-                      className="w-4 h-4"
-                      style={{ accentColor: "var(--accent-primary)" }}
-                    />
-                    <span
-                      className="ml-2 text-sm"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {setting.label}
-                      {setting.toggleLabel && (
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {" "}
-                          ({setting.toggleLabel})
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                )}
-              </div>
-            ))}
+            <UserSettingFields settings={settings} />
 
             {/* Card Display Section - shown when entityType is provided */}
             {entityType && (

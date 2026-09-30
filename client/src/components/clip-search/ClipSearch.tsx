@@ -6,7 +6,10 @@ import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { useWallPlayback } from "../../hooks/useWallPlayback";
+import {
+  WALL_VIEW_SETTINGS,
+  useWallPlayback,
+} from "../../hooks/useWallPlayback";
 import { getScenePathWithTime } from "../../utils/entityLinks";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import {
@@ -73,8 +76,9 @@ const ClipSearch = ({
   const initializing = isLibraryInitializing(error);
   const isLoading = clipQueryParams === null || queryLoading || initializing;
 
-  // Wall playback preference
-  const { wallPlayback, updateWallPlayback } = useWallPlayback();
+  // Wall playback preference; the wall cog offers it in wall view
+  const { wallPlayback } = useWallPlayback();
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
 
   // Table columns for table view
   const {
@@ -178,8 +182,8 @@ const ClipSearch = ({
         viewModes={
           VIEW_MODES as React.ComponentProps<typeof SearchControls>["viewModes"]
         }
-        wallPlayback={wallPlayback}
-        onWallPlaybackChange={updateWallPlayback}
+        onViewModeChange={setCurrentViewMode}
+        contextSettings={currentViewMode === "wall" ? WALL_VIEW_SETTINGS : []}
         currentTableColumns={getColumnConfig()}
         tableColumnsPopover={
           <ColumnConfigPopover
@@ -224,7 +228,7 @@ const ClipSearch = ({
                 items={currentClips as Record<string, unknown>[]}
                 entityType="clip"
                 zoomLevel={zoomLevel as "small" | "medium" | "large"}
-                playbackMode={wallPlayback as "autoplay" | "hover" | "static"}
+                playbackMode={wallPlayback}
                 onItemClick={handleClipClick}
                 loading={isLoading}
                 emptyMessage="No clips found"

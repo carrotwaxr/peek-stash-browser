@@ -20,3 +20,4 @@ export {
   defaultPresetsQueryOptions,
   invalidatePresets,
 } from "./usePresets";
+export { useUserSettings, useUpdateUserSettings } from "./useUserSettings";

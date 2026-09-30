@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
-import { useAuth } from "../../hooks/useAuth";
+import { useUserSettings } from "../../api/hooks/useUserSettings";
 import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
@@ -40,7 +40,8 @@ const SceneCardPreview = ({
   active,
   disableHover = false,
 }: Props) => {
-  const { user } = useAuth();
+  const { data: userSettings } = useUserSettings();
+  const previewQuality = userSettings?.settings.preferredPreviewQuality;
   type SpriteData = ReturnType<typeof getEvenlySpacedSprites>[number];
 
   const [sprites, setSprites] = useState<SpriteData[]>([]);
@@ -69,7 +70,7 @@ const SceneCardPreview = ({
   // Determine preview type based on user preference
   // Note: We don't check if paths exist yet - that happens in the lazy-load effect
   const preferredPreviewType = useMemo(() => {
-    const userPref = user?.preferredPreviewQuality || "sprite";
+    const userPref = previewQuality || "sprite";
 
     // For sprite preference, check if VTT/sprite are available
     if (userPref === "sprite") {
@@ -78,7 +79,18 @@ const SceneCardPreview = ({
 
     // For high quality preferences, we'll try the preference and fallback to sprite if needed
     return userPref; // 'webp' or 'mp4'
-  }, [user?.preferredPreviewQuality, scene?.paths?.vtt, scene?.paths?.sprite]);
+  }, [previewQuality, scene?.paths?.vtt, scene?.paths?.sprite]);
+
+  // A preview quality changed in Settings applies at once: drop the preview
+  // loaded for the previous one, so the next activation loads the new kind
+  const [loadedFor, setLoadedFor] = useState(preferredPreviewType);
+  if (loadedFor !== preferredPreviewType) {
+    setLoadedFor(preferredPreviewType);
+    setPreviewDataLoaded(false);
+    setActivePreviewType(null);
+    setSprites([]);
+    setCurrentSpriteIndex(0);
+  }
 
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {

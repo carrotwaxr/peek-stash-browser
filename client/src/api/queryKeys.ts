@@ -113,6 +113,8 @@ export const queryKeys = {
 
   // ── User data ────────────────────────────────────────────────────────
   user: {
+    /** The user's settings (GET /user/settings), read by useUserSettings */
+    settings: () => ["user", "settings"] as const,
     stats: () => ["user", "stats"] as const,
     permissions: () => ["user", "permissions"] as const,
     filterPresets: () => ["user", "filterPresets"] as const,
