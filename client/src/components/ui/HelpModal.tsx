@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "./index";
 
 interface Props {
@@ -36,6 +37,10 @@ const HelpModal = ({ onClose }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const currentPage = getCurrentPage(location);
+
+  // A modal overlay scope while open: page, player and global keys wait, and
+  // Escape closes the dialog. Focus moves into it and returns on close.
+  const dialogRef = useFocusTrap(true, onClose);
 
   // Keyboard shortcuts organized by page
   const shortcuts = {
@@ -334,6 +339,10 @@ const HelpModal = ({ onClose }: Props) => {
           border: "1px solid var(--border-color)",
         }}
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef as React.Ref<HTMLDivElement>}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Help"
       >
         {/* Close button (X) in top right - desktop only */}
         <button
