@@ -55,6 +55,7 @@ import {
   optionSamples,
 } from "../helpers/clientFilterConfig.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
+import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -618,16 +619,12 @@ describeWithDb(
         where: { username: TEST_ADMIN.username },
         select: { id: true },
       });
-      // The test instance: the first by priority, as selectTestInstanceOnly picks it
-      const instance = await prisma.stashInstance.findFirstOrThrow({
-        where: { enabled: true },
-        orderBy: { priority: "asc" },
-        select: { id: true },
-      });
+      await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+      const instanceId = await findTestInstanceId();
       walk = {
         userId: admin.id,
-        allowedInstanceIds: [instance.id],
-        refs: await refPool(instance.id),
+        allowedInstanceIds: [instanceId],
+        refs: await refPool(instanceId),
       };
     });
 
