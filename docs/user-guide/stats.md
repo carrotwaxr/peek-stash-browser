@@ -13,6 +13,10 @@ The stats page shows your personal engagement data organized into four sections:
 - **Top lists** — Your most-engaged performers, studios, tags, and scenes
 - **Highlights** — Your single most-watched scene, most-viewed image, and top O'd scene/performer
 
+## Library Totals
+
+Each total is the number of items you can browse: the same number the matching page shows with no filter (the Clips total counts clips with a preview, as the Clips page does by default). Items you hid, content restricted for you, anything deleted from Stash and Stash servers you have not selected are left out, and the totals change as soon as you hide or unhide something.
+
 ## Engagement Totals
 
 The hero section at the top displays your cumulative activity:
@@ -56,7 +60,7 @@ Engagement scores combine multiple signals to reflect your actual preferences:
 
 Scores are then normalized by how many scenes feature each entity. A performer who appears in 5 scenes but has high engagement ranks higher than one in 500 scenes with moderate engagement. This prevents entities that simply appear frequently from dominating the rankings.
 
-Percentile ranks show where each entity falls relative to all others — "Top 92%" means that entity is in your 92nd percentile of engagement.
+Percentile ranks show where each entity falls relative to all others — "Top 92%" means that entity is in your 92nd percentile of engagement. The ranking compares an entity with everything you have engaged with on every Stash server in your scope, including servers you have deselected, although the lists only show what you can see.
 
 ## Highlights
 
@@ -73,7 +77,7 @@ Performer, studio and tag rankings are recalculated at most once an hour. When y
 
 Stats update in real-time as you watch scenes and interact with content. The performer, studio and tag rankings are the only part that recalculates periodically.
 
-Everything on this page counts only what you can see. Items you hid, content restricted for you, anything deleted from Stash and Stash servers you have not selected are left out of the engagement totals, top lists and highlights as soon as they change. When two Stash servers use the same ids, each entry shows and links to the one on its own server. Deleted scenes also no longer count toward how many scenes feature an entity or toward the average scene length.
+Everything on this page counts only what you can see. Items you hid, content restricted for you, anything deleted from Stash and Stash servers you have not selected are left out of the library totals, engagement totals, top lists and highlights as soon as they change. When two Stash servers use the same ids, each entry shows and links to the one on its own server. Deleted scenes also no longer count toward how many scenes feature an entity or toward the average scene length.
 
 ## Related
 

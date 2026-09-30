@@ -120,7 +120,6 @@ const USER_TABLES = [
   "PlaylistItem",
   "UserHiddenEntity",
   "UserExcludedEntity",
-  "UserEntityStats",
   "UserPerformerStats",
   "UserStudioStats",
   "UserTagStats",
@@ -297,9 +296,6 @@ async function seedUserRows(userId: number, instanceId: string): Promise<void> {
   });
   await prisma.userExcludedEntity.create({
     data: { ...own, entityType: "scene", entityId: ID, reason: "hidden" },
-  });
-  await prisma.userEntityStats.create({
-    data: { ...own, entityType: "scene", visibleCount: 1 },
   });
   await prisma.userPerformerStats.create({ data: { ...own, performerId: ID } });
   await prisma.userStudioStats.create({ data: { ...own, studioId: ID } });

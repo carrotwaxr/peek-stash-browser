@@ -39,6 +39,8 @@ interface Answers {
   mostOdScene?: unknown[];
   mostViewedImage?: unknown[];
   mostOdPerformer?: unknown[];
+  /** The Library counts, by the table each statement counts */
+  library?: Partial<Record<string, number | bigint>>;
 }
 
 const flat = (sql: string) => sql.replace(/\s+/g, " ").trim();
@@ -47,6 +49,10 @@ function answer(answers: Answers): void {
   mockPrisma.$queryRawUnsafe.mockImplementation(
     prismaImpl((sql: string, ...params: unknown[]) => {
       const text = flat(sql);
+      const counted = /^SELECT COUNT\(\*\) AS n FROM (\w+) x/.exec(text);
+      if (counted) {
+        return [{ n: answers.library?.[must(counted[1])] ?? 0n }];
+      }
       if (text.includes("FROM UserEntityRanking r")) {
         const type = params.find(
           (p) => p === "performer" || p === "studio" || p === "tag"
@@ -77,6 +83,13 @@ function statements(): Array<[string, ...unknown[]]> {
   );
 }
 
+/** The statements that look entities up from the viewer's own rows */
+function lookups(): Array<[string, ...unknown[]]> {
+  return statements().filter(
+    ([sql]) => !sql.startsWith("SELECT COUNT(*) AS n FROM")
+  );
+}
+
 function statementFor(part: string): [string, ...unknown[]] {
   return must(
     statements().find(([sql]) => sql.includes(part)),
@@ -99,7 +112,6 @@ describe("UserStatsAggregationService", () => {
     answer({});
     // The average scene duration, read by RankingComputeService
     mockPrisma.$queryRaw.mockResolvedValue([{ avgDuration: AVERAGE_DURATION }]);
-    mockPrisma.userEntityStats.findMany.mockResolvedValue([]);
   });
 
   describe("lookups", () => {
@@ -153,8 +165,8 @@ describe("UserStatsAggregationService", () => {
       await stats();
 
       // Two totals, top scenes, three top lists, four highlights
-      expect(statements()).toHaveLength(10);
-      for (const [sql, ...params] of statements()) {
+      expect(lookups()).toHaveLength(10);
+      for (const [sql, ...params] of lookups()) {
         expect(sql).toMatch(
           /CROSS JOIN Stash\w+ x ON x\.id = \w+\.\w+ AND x\.stashInstanceId = \w+\.instanceId AND x\.deletedAt IS NULL/
         );
@@ -169,8 +181,9 @@ describe("UserStatsAggregationService", () => {
     it("with no allowed instance every statement matches nothing", async () => {
       await stats("engagement", []);
 
+      expect(statements()).toHaveLength(17);
       for (const [sql] of statements()) {
-        expect(sql).toContain("e.id IS NULL AND 1 = 0");
+        expect(sql).toMatch(/e\.id IS NULL AND 1 = 0/);
       }
     });
   });
@@ -440,23 +453,102 @@ describe("UserStatsAggregationService", () => {
   });
 
   describe("library", () => {
-    it("reads the precomputed visible counts, 0 for a type with none", async () => {
-      mockPrisma.userEntityStats.findMany.mockResolvedValue([
-        { entityType: "scene", visibleCount: 40 },
-        { entityType: "tag", visibleCount: 3 },
-      ] as never);
+    it("counts each type as its list does: live, not excluded on the entity's instance, on an allowed instance", async () => {
+      await stats();
+
+      for (const table of [
+        "StashScene",
+        "StashPerformer",
+        "StashStudio",
+        "StashTag",
+        "StashGallery",
+        "StashImage",
+      ]) {
+        const [sql, ...params] = statementFor(
+          `SELECT COUNT(*) AS n FROM ${table} x`
+        );
+        expect(sql).toMatch(
+          /LEFT JOIN UserExcludedEntity e ON e\.userId = \? AND e\.entityType = '\w+' AND e\.entityId = x\.id AND \(e\.instanceId = '' OR e\.instanceId = x\.stashInstanceId\)/
+        );
+        expect(sql).toContain(
+          "WHERE x.deletedAt IS NULL AND e.id IS NULL AND x.stashInstanceId IN (?, ?)"
+        );
+        expect(params).toEqual([USER, ...ALLOWED]);
+      }
+    });
+
+    it("counts a clip only on a live scene the viewer sees, and only with a preview", async () => {
+      await stats();
+
+      const [sql, ...params] = statementFor(
+        "SELECT COUNT(*) AS n FROM StashClip x"
+      );
+      expect(sql).toContain(
+        "INNER JOIN StashScene s ON s.id = x.sceneId AND s.stashInstanceId = x.sceneInstanceId"
+      );
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedEntity es ON es.userId = ? AND es.entityType = 'scene' AND es.entityId = x.sceneId AND (es.instanceId = '' OR es.instanceId = x.sceneInstanceId)"
+      );
+      expect(sql).toContain(
+        "AND s.deletedAt IS NULL AND es.id IS NULL AND x.isGenerated = 1"
+      );
+      expect(params).toEqual([USER, USER, ...ALLOWED]);
+    });
+
+    it("maps each count, a bigint included, to its field", async () => {
+      answer({
+        library: {
+          StashScene: 40n,
+          StashPerformer: 5,
+          StashStudio: 2,
+          StashTag: 3n,
+          StashGallery: 1,
+          StashImage: 70n,
+          StashClip: 4,
+        },
+      });
 
       const { library } = await stats();
 
       expect(library).toEqual({
         sceneCount: 40,
-        performerCount: 0,
-        studioCount: 0,
+        performerCount: 5,
+        studioCount: 2,
         tagCount: 3,
-        galleryCount: 0,
-        imageCount: 0,
-        clipCount: 0,
+        galleryCount: 1,
+        imageCount: 70,
+        clipCount: 4,
       });
+    });
+
+    it("counts nothing with no allowed instance", async () => {
+      await stats("engagement", []);
+
+      const [sql, ...params] = statementFor(
+        "SELECT COUNT(*) AS n FROM StashScene x"
+      );
+      expect(sql).toContain("AND 1 = 0");
+      expect(params).toEqual([USER]);
+    });
+
+    it("sends the counts one after another, not together", async () => {
+      let running = 0;
+      let most = 0;
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl(async (sql: string) => {
+          running += 1;
+          most = Math.max(most, running);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          running -= 1;
+          return flat(sql).startsWith("SELECT COUNT(*) AS n FROM")
+            ? [{ n: 0n }]
+            : [];
+        })
+      );
+
+      await stats();
+
+      expect(most).toBe(1);
     });
   });
 });

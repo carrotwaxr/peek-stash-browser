@@ -8,10 +8,10 @@
  * tests route $queryRawUnsafe by table name (never by call order) and assert
  * on the rows the write phase receives.
  *
- * The compute and the swap run on the single-connection compute client and
- * the stats batch on the main client; both are the one mocked prisma here,
- * so fakeRaw routes the compute's queries whichever client issues them. The
- * rows the write phase stores are read from the _peek_result fills.
+ * The compute and the swap run on the single-connection compute client,
+ * which is the one mocked prisma here, so fakeRaw routes the compute's
+ * queries whichever client issues them. The rows the write phase stores are
+ * read from the _peek_result fills.
  */
 import type { UserContentRestriction } from "@prisma/client";
 import {
@@ -44,8 +44,7 @@ vi.mock("../../services/UserInstanceService.js", () => ({
   getUserInstanceScope: vi.fn().mockResolvedValue(["A"]),
 }));
 
-// Mock prisma before importing service. Only the stats phase uses Prisma
-// delegates on entity tables (counts); resolution, cascades, content rules,
+// Mock prisma before importing service. Resolution, cascades, content rules,
 // the empty phase and the write phase are raw SQL.
 vi.mock(
   "../../prisma/singleton.js",
@@ -163,30 +162,21 @@ function setupPipeline(allowed: string[] = ["A"]) {
   mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
   mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
   mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-  mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-  mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
   mockPrisma.$queryRaw.mockResolvedValue([]);
   mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   mockPrisma.$executeRaw.mockResolvedValue(0);
   mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
-  for (const model of [
-    "stashScene",
-    "stashPerformer",
-    "stashStudio",
-    "stashTag",
-    "stashGroup",
-    "stashGallery",
-    "stashImage",
-    "stashClip",
-  ] as const) {
-    mockPrisma[model].count.mockResolvedValue(0);
-  }
+}
+
+/** How many recomputes reached their swap's INSERT (one each) */
+function swapsDone(): number {
+  return execCalls().filter(([sql]) => SWAP_INSERT.test(sql)).length;
 }
 
 /**
  * Park the first recompute at its first read until `release()`; later ones
- * run through. A recompute ends with its one stats batch, so
- * `mockPrisma.$transaction` counts the recomputes that finished.
+ * run through. A recompute ends with its swap, so `swapsDone()` counts the
+ * recomputes that finished.
  */
 function parkFirstRecompute() {
   let release!: () => void;
@@ -291,9 +281,7 @@ describe("ExclusionComputationService", () => {
       await Promise.all([first, second]);
 
       expect(parked.started()).toBeGreaterThanOrEqual(2);
-      expect(mockPrisma.$transaction.mock.calls.length).toBeGreaterThanOrEqual(
-        2
-      );
+      expect(swapsDone()).toBeGreaterThanOrEqual(2);
     });
 
     it("should coalesce 3+ concurrent callers to at most 2 recomputes", async () => {
@@ -313,8 +301,8 @@ describe("ExclusionComputationService", () => {
       await Promise.all([first, ...rest]);
 
       expect(parked.started()).toBe(2);
-      // Each recompute ends with its one stats batch
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      // Each recompute ends with its one swap
+      expect(swapsDone()).toBe(2);
     });
 
     it("should ensure the second recompute runs after the first completes", async () => {
@@ -335,14 +323,11 @@ describe("ExclusionComputationService", () => {
           return partialRow({ role: "USER" });
         })
       );
-      // The clip upsert is the last statement a recompute builds, right
-      // before its stats batch
-      mockPrisma.userEntityStats.upsert.mockImplementation(
-        prismaImpl((args) => {
-          if (args.where.userId_entityType_instanceId?.entityType === "clip") {
-            executionOrder.push(`end-${started}`);
-          }
-          return partialRow({});
+      // The swap's INSERT is the last statement a recompute writes
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) => {
+          if (SWAP_INSERT.test(sql)) executionOrder.push(`end-${started}`);
+          return 0;
         })
       );
 
@@ -376,10 +361,10 @@ describe("ExclusionComputationService", () => {
 
       expect(user1Count).toBe(1);
       expect(user2Count).toBe(1);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(swapsDone()).toBe(2);
     });
 
-    it("computes in a deferred BEGIN, swaps inside BEGIN IMMEDIATE on the compute client, then updates the stats in one batch on the main client", async () => {
+    it("computes in a deferred BEGIN, then swaps inside BEGIN IMMEDIATE on the compute client, and writes nothing after the swap", async () => {
       setupPipeline();
 
       await exclusionComputationService.recomputeForUser(1);
@@ -399,15 +384,13 @@ describe("ExclusionComputationService", () => {
           (o) => o > must(execOrder[0]) && o < must(execOrder[snapshotEnd])
         )
       ).toBe(true);
-      // The swap follows the snapshot, and the stats batch the swap's COMMIT
+      // The swap follows the snapshot and ends the recompute: no stats
+      // batch follows it (the Library counts are read per request)
       const swapStart = sqls.indexOf("BEGIN IMMEDIATE");
       expect(swapStart).toBeGreaterThan(snapshotEnd);
       const swapEnd = sqls.indexOf("COMMIT", swapStart);
       expect(swapEnd).toBeGreaterThan(swapStart);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(
-        must(mockPrisma.$transaction.mock.invocationCallOrder[0])
-      ).toBeGreaterThan(must(execOrder[swapEnd]));
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(sqls).not.toContain("ROLLBACK");
     });
 
@@ -489,75 +472,6 @@ describe("ExclusionComputationService", () => {
       expect(must(must(chunks[1])[0]).id).toBe("s20000");
     });
 
-    it("updateEntityStats runs after the swap's COMMIT as one dbWriteBatch of eight upserts, with the 16 counts read outside it", async () => {
-      setupPipeline();
-      const models = [
-        "stashScene",
-        "stashPerformer",
-        "stashStudio",
-        "stashTag",
-        "stashGroup",
-        "stashGallery",
-        "stashImage",
-        "stashClip",
-      ] as const;
-      for (const model of models) mockPrisma[model].count.mockResolvedValue(10);
-      mockPrisma.userExcludedEntity.count.mockResolvedValue(3);
-
-      await exclusionComputationService.recomputeForUser(1);
-
-      const sqls = execCalls().map(([sql]) => sql);
-      const swapCommit = must(
-        mockPrisma.$executeRawUnsafe.mock.invocationCallOrder[
-          sqls.lastIndexOf("COMMIT")
-        ]
-      );
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      const batch = must(mockPrisma.$transaction.mock.invocationCallOrder[0]);
-      expect(batch).toBeGreaterThan(swapCommit);
-      // The 8 entity counts, the 8 excluded counts and the 8 upsert
-      // statements are built between the swap's COMMIT and the batch
-      const between = (orders: number[]) =>
-        orders.length > 0 && orders.every((o) => o > swapCommit && o < batch);
-      const totals = models.map((m) =>
-        must(mockPrisma[m].count.mock.invocationCallOrder[0])
-      );
-      expect(
-        models.every((m) => mockPrisma[m].count.mock.calls.length === 1)
-      ).toBe(true);
-      expect(between(totals)).toBe(true);
-      const excluded =
-        mockPrisma.userExcludedEntity.count.mock.invocationCallOrder;
-      expect(excluded).toHaveLength(8);
-      expect(between(excluded)).toBe(true);
-      const upserts =
-        mockPrisma.userEntityStats.upsert.mock.invocationCallOrder;
-      expect(upserts).toHaveLength(8);
-      expect(between(upserts)).toBe(true);
-      // The batch is exactly those eight upserts
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
-        mockPrisma.userEntityStats.upsert.mock.results.map(
-          (r): unknown => r.value
-        )
-      );
-      expect(mockPrisma.userEntityStats.upsert).toHaveBeenCalledWith({
-        where: {
-          userId_entityType_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            instanceId: "",
-          },
-        },
-        create: {
-          userId: 1,
-          entityType: "scene",
-          instanceId: "",
-          visibleCount: 7,
-        },
-        update: { visibleCount: 7 },
-      });
-    });
-
     it("a failing INSERT rolls the swap back and the user's old rows stay", async () => {
       setupPipeline();
       mockPrisma.$executeRawUnsafe.mockImplementation(
@@ -578,8 +492,7 @@ describe("ExclusionComputationService", () => {
       expect(swap[2]).toMatch(SWAP_INSERT);
       expect(swap[3]).toBe("ROLLBACK");
       expect(swap).not.toContain("COMMIT");
-      // No stats after a failed swap, and the connection stays
-      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      // The connection stays
       expect(disconnectComputeClient).not.toHaveBeenCalled();
     });
 
@@ -606,7 +519,7 @@ describe("ExclusionComputationService", () => {
 
       // The next recompute gets the connection
       await exclusionComputationService.recomputeForUser(31);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(swapsDone()).toBe(1);
     });
   });
 
@@ -717,7 +630,7 @@ describe("ExclusionComputationService", () => {
       await Promise.all([running, saving]);
 
       expect(parked.started()).toBe(2);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(swapsDone()).toBe(2);
       // The rows went in with the second compute's swap, after the first's
       const starts = swapStarts();
       expect(starts).toHaveLength(2);
@@ -741,7 +654,7 @@ describe("ExclusionComputationService", () => {
       await Promise.all([saving, requested]);
 
       expect(parked.started()).toBe(2);
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(swapsDone()).toBe(2);
       const starts = swapStarts();
       expect(starts).toHaveLength(2);
       const rowsDelete = execCalls().findIndex(([sql]) =>
@@ -2009,8 +1922,6 @@ describe("addHiddenEntities", () => {
     expect(mockPrisma.userExcludedEntity.upsert).not.toHaveBeenCalled();
     expect(mockDbWrite).toHaveBeenCalledTimes(1);
     expect(must(mockDbWrite.mock.calls[0])[0]).toBe("exclusions.hide");
-    // No stats update on a hide
-    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("hiding a tag writes hidden rows for its descendants", async () => {
@@ -2194,19 +2105,9 @@ describe("recomputeAllUsers", () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.stashClip.count.mockResolvedValue(0);
   });
 
   it("should iterate all users and recompute exclusions for each", async () => {
@@ -2221,11 +2122,9 @@ describe("recomputeAllUsers", () => {
     expect(result.success).toBe(3);
     expect(result.failed).toBe(0);
     expect(result.errors).toEqual([]);
-    // One transaction per user, the write swap (the compute runs on the
-    // compute client, outside any Prisma transaction)
-    // One compute and one stats batch per user
+    // One compute and one swap per user, on the compute client
     expect(mockWithComputeConnection).toHaveBeenCalledTimes(3);
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(swapsDone()).toBe(3);
   });
 
   it("should continue processing other users when one fails", async () => {
@@ -2364,14 +2263,6 @@ describe("recomputeUsersForInstances", () => {
 
 describe("error handling", () => {
   beforeEach(() => setupPipeline());
-
-  it("should propagate errors from the stats batch", async () => {
-    mockPrisma.$transaction.mockRejectedValueOnce(new Error("SQLITE_BUSY"));
-
-    await expect(
-      exclusionComputationService.recomputeForUser(1)
-    ).rejects.toThrow("SQLITE_BUSY");
-  });
 
   it("should propagate errors from computeDirectExclusions phase", async () => {
     mockPrisma.userContentRestriction.findMany.mockRejectedValue(
