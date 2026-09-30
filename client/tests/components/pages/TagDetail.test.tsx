@@ -20,6 +20,8 @@ interface SceneSearchProps {
 
 interface CountsQuery {
   data: { counts: Record<string, number> } | undefined;
+  error?: Error | null;
+  refetch?: () => void;
 }
 
 const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
@@ -260,6 +262,33 @@ describe("TagDetail: counts", () => {
     expect(sceneSearch).not.toHaveBeenCalled();
     expect(grids.GalleryGrid).not.toHaveBeenCalled();
     expect(screen.queryByText("This tag has no content in Peek")).toBeNull();
+  });
+
+  it("when the counts fail, the tabs stay with the error and a Retry that asks again", () => {
+    const refetch = vi.fn();
+    relationCounts.mockReturnValue({
+      data: undefined,
+      error: new Error("Counts are down"),
+      refetch,
+    });
+    renderPage("");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Counts are down");
+    expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/);
+    expect(sceneSearch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("a counts failure after the counts were shown leaves the page as it is", () => {
+    relationCounts.mockReturnValue({
+      data: { counts: ALL_COUNTS },
+      error: new Error("Refresh failed"),
+    });
+    renderPage("");
+
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("a tag with nothing to show says so once the counts answer", () => {

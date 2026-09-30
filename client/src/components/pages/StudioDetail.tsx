@@ -24,6 +24,7 @@ import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import RelationCountsError from "../ui/RelationCountsError";
 import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
@@ -103,12 +104,13 @@ const StudioDetail = () => {
 
   // Each tab's count is the total of its list, as the viewer sees it; the
   // tabs show no badge and none opens until the counts answer
-  const { data: countsData } = useRelationCounts(
-    "studio",
-    studioId,
-    studioInstanceId,
-    { includeSubStudios }
-  );
+  const {
+    data: countsData,
+    error: countsError,
+    refetch: refetchCounts,
+  } = useRelationCounts("studio", studioId, studioInstanceId, {
+    includeSubStudios,
+  });
   const counts = countsData?.counts;
   const contentTabs = [
     { id: "scenes", label: "Scenes", count: counts?.scenes },
@@ -363,6 +365,10 @@ const StudioDetail = () => {
               <TabNavigation
                 tabs={contentTabs}
                 defaultTab={effectiveDefaultTab}
+              />
+              <RelationCountsError
+                error={counts ? null : countsError}
+                onRetry={() => void refetchCounts()}
               />
 
               {/* Tab Content */}
