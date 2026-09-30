@@ -986,7 +986,9 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const recursive = queriesMatching(/WITH RECURSIVE/);
+    const recursive = queriesMatching(RESOLVE_TAG).filter(([sql]) =>
+      /WITH RECURSIVE/.test(sql)
+    );
     expect(recursive).toHaveLength(1);
     const [sql, ...params] = must(recursive[0]);
     expect(sql).toContain("json_each(COALESCE(c.parentIds, '[]'))");
@@ -1030,7 +1032,9 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const recursive = queriesMatching(/WITH RECURSIVE/);
+    const recursive = queriesMatching(RESOLVE_STUDIO).filter(([sql]) =>
+      /WITH RECURSIVE/.test(sql)
+    );
     expect(recursive).toHaveLength(1);
     expect(must(recursive[0])[0]).toContain(
       "c.parentId = p.id AND c.stashInstanceId = p.inst"
@@ -1052,7 +1056,12 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    expect(queriesMatching(/WITH RECURSIVE/)).toHaveLength(0);
+    // Other statements may recurse (the empty-group check); these do not
+    for (const re of [RESOLVE_GROUP, RESOLVE_GALLERY]) {
+      expect(
+        queriesMatching(re).filter(([sql]) => /WITH RECURSIVE/.test(sql))
+      ).toHaveLength(0);
+    }
     expect(queriesMatching(RESOLVE_GROUP)).toHaveLength(1);
     expect(queriesMatching(RESOLVE_GALLERY)).toHaveLength(1);
     expect(rowKeys(createdRows())).toEqual(
