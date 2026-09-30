@@ -1,8 +1,13 @@
 import { ENTITY_KINDS } from "@peek/shared-types/filters/index.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
-import { AppError, NotFoundError } from "../middleware/errorHandler.js";
+import {
+  AppError,
+  NotFoundError,
+  ValidationError,
+} from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import {
   getIdsVisibleOnAnyInstance,
@@ -99,7 +104,7 @@ import type {
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
 } from "../types/api/user.js";
-import { dbWriteBatch } from "../utils/dbWrite.js";
+import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { type EntityRef, compositeKey, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
@@ -109,6 +114,7 @@ import {
   hashRecoveryKey,
 } from "../utils/recoveryKey.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
+import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 import { USER_GROUP_SUMMARY_SELECT } from "./groups.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
@@ -2074,6 +2080,36 @@ export const getUserStashInstances = async (
   });
 };
 
+const instanceSelectionSchema = z
+  .array(z.string().regex(INSTANCE_ID_PATTERN))
+  .max(100);
+
+/** The body's instance ids, each once; a value that is not an id list is a 400 naming its path */
+function parseInstanceSelection(value: unknown, field: string): string[] {
+  const parsed = instanceSelectionSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new ValidationError("Invalid request", {
+      issues: parsed.error.issues.map((issue) => ({
+        path: [field, ...issue.path].map(String).join("."),
+        message: issue.message,
+      })),
+    });
+  }
+  return [...new Set(parsed.data)];
+}
+
+/** Replaces the user's selection in one unit: no reader sees the deleted rows without the created ones */
+function replaceInstanceSelection(userId: number, instanceIds: string[]) {
+  return dbWriteTransaction("user.instances", async (tx) => {
+    await tx.userStashInstance.deleteMany({ where: { userId } });
+    if (instanceIds.length > 0) {
+      await tx.userStashInstance.createMany({
+        data: instanceIds.map((instanceId) => ({ userId, instanceId })),
+      });
+    }
+  });
+}
+
 /**
  * Update user's Stash instance selection
  * PUT /api/user/stash-instances
@@ -2089,11 +2125,10 @@ export const updateUserStashInstances = async (
   >
 ) => {
   const userId = req.user.id;
-  const { instanceIds } = req.body;
-  if (!Array.isArray(instanceIds)) {
-    res.status(400).json({ error: "instanceIds must be an array" });
-    return;
-  }
+  const instanceIds = parseInstanceSelection(
+    req.body.instanceIds,
+    "instanceIds"
+  );
 
   // Validate that all instance IDs exist and are enabled
   if (instanceIds.length > 0) {
@@ -2117,20 +2152,7 @@ export const updateUserStashInstances = async (
     }
   }
 
-  // Delete existing selections
-  await prisma.userStashInstance.deleteMany({
-    where: { userId },
-  });
-
-  // Create new selections (if any)
-  if (instanceIds.length > 0) {
-    await prisma.userStashInstance.createMany({
-      data: instanceIds.map((instanceId) => ({
-        userId,
-        instanceId,
-      })),
-    });
-  }
+  await replaceInstanceSelection(userId, instanceIds);
 
   // The user's scope changed: their exclusion rows must cover it before
   // anything on the added instances is listed to them
@@ -2199,7 +2221,7 @@ export const completeSetup = async (
   res: TypedResponse<CompleteSetupResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
-  const { selectedInstanceIds } = req.body;
+  const { selectedInstanceIds: requestedIds } = req.body;
 
   // Check if multi-instance - require at least one selection
   const instanceCount = await prisma.stashInstance.count({
@@ -2207,15 +2229,16 @@ export const completeSetup = async (
   });
 
   if (instanceCount >= 2) {
-    if (
-      !Array.isArray(selectedInstanceIds) ||
-      selectedInstanceIds.length === 0
-    ) {
+    if (!Array.isArray(requestedIds) || requestedIds.length === 0) {
       res.status(400).json({
         error: "At least one Stash instance must be selected",
       });
       return;
     }
+    const selectedInstanceIds = parseInstanceSelection(
+      requestedIds,
+      "selectedInstanceIds"
+    );
 
     // Validate instance IDs
     const validInstances = await prisma.stashInstance.findMany({
@@ -2227,9 +2250,7 @@ export const completeSetup = async (
     });
 
     const validIds = new Set(validInstances.map((i) => i.id));
-    const invalidIds = selectedInstanceIds.filter(
-      (id: string) => !validIds.has(id)
-    );
+    const invalidIds = selectedInstanceIds.filter((id) => !validIds.has(id));
 
     if (invalidIds.length > 0) {
       res.status(400).json({
@@ -2239,17 +2260,7 @@ export const completeSetup = async (
       return;
     }
 
-    // Delete existing selections and create new ones
-    await prisma.userStashInstance.deleteMany({
-      where: { userId },
-    });
-
-    await prisma.userStashInstance.createMany({
-      data: selectedInstanceIds.map((instanceId: string) => ({
-        userId,
-        instanceId,
-      })),
-    });
+    await replaceInstanceSelection(userId, selectedInstanceIds);
 
     // The user's scope changed with the selection (see
     // updateUserStashInstances)

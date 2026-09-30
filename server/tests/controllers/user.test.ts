@@ -1260,6 +1260,51 @@ describe("User Controller", () => {
       expect(must(written)).toBeLessThan(must(recomputed));
     });
 
+    it("the selection is replaced in one dbWriteTransaction, then the user is recomputed", async () => {
+      const req = reqFor(updateUserStashInstances, {
+        user: USER,
+        body: { instanceIds: ["A", "B", "A"] },
+      });
+      const res = resFor(updateUserStashInstances);
+      await updateUserStashInstances(req, res);
+
+      // One transaction holds both statements, each id once
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(
+        mockPrisma.userStashInstance.createMany
+      ).toHaveBeenCalledExactlyOnceWith({
+        data: [
+          { userId: USER.id, instanceId: "A" },
+          { userId: USER.id, instanceId: "B" },
+        ],
+      });
+      const [transaction] = mockPrisma.$transaction.mock.invocationCallOrder;
+      const [deleted] =
+        mockPrisma.userStashInstance.deleteMany.mock.invocationCallOrder;
+      const [created] =
+        mockPrisma.userStashInstance.createMany.mock.invocationCallOrder;
+      const [recomputed] =
+        mockExclusions.recomputeForUser.mock.invocationCallOrder;
+      expect(must(transaction)).toBeLessThan(must(deleted));
+      expect(must(deleted)).toBeLessThan(must(created));
+      expect(must(created)).toBeLessThan(must(recomputed));
+      expect(res._getOkBody().selectedInstanceIds).toEqual(["A", "B"]);
+    });
+
+    it("a non-string id throws a ValidationError naming instanceIds and writes nothing", async () => {
+      const req = reqFor(updateUserStashInstances, {
+        user: USER,
+        body: { instanceIds: ["A", 7] } as never,
+      });
+      const res = resFor(updateUserStashInstances);
+      await expect(updateUserStashInstances(req, res)).rejects.toMatchObject({
+        statusCode: 400,
+        issues: [expect.objectContaining({ path: "instanceIds.1" })],
+      });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
+    });
+
     it("an empty selection (every enabled instance) recomputes too", async () => {
       const req = reqFor(updateUserStashInstances, {
         user: USER,
