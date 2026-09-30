@@ -5,8 +5,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Keyboard Navigation Focus Styles - TV-friendly indicators */
-.keyboard-focus {
+/* TV mode focus (html.tv-mode, set by TVModeProvider): the arrow keys move
+   DOM focus (TVNavigator), so the focused card or control carries a large,
+   TV-friendly indicator */
+html.tv-mode [data-tv-item]:focus-visible {
   outline: none !important;
   box-shadow:
     var(--focus-ring-shadow),
@@ -15,10 +17,9 @@
   z-index: 10 !important;
   transition: all 0.2s ease-in-out !important;
   border: 3px solid var(--focus-ring-color) !important;
-  border-opacity: 0.8;
 }
 
-.keyboard-focus::before {
+html.tv-mode [data-tv-item]:focus-visible::before {
   content: "";
   position: absolute;
   inset: -8px;
@@ -26,6 +27,12 @@
   background: linear-gradient(135deg, var(--selection-bg), var(--selection-bg));
   pointer-events: none;
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+html.tv-mode :focus-visible:not([data-tv-item]) {
+  outline: 3px solid var(--focus-ring-color) !important;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring-shadow);
 }
 
 @keyframes pulse-glow {
@@ -49,8 +56,7 @@ a:focus-visible,
   box-shadow: var(--focus-ring-shadow);
 }
 
-/* Skip navigation on mouse interaction */
-.keyboard-focus:hover {
+html.tv-mode [data-tv-item]:focus-visible:hover {
   box-shadow:
     var(--focus-ring-shadow),
     0 12px 32px rgba(0, 0, 0, 0.5) !important;

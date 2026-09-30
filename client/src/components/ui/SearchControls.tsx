@@ -9,7 +9,7 @@ import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useFilterState } from "../../hooks/useFilterState";
-import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
+import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
 import {
   CLIP_FILTER_OPTIONS,
@@ -76,9 +76,6 @@ interface SearchControlsProps {
   tableColumnsPopover?: React.ReactNode;
   contextSettings?: SettingConfig[];
   deferInitialQueryUntilFiltersReady?: boolean;
-  tvSearchZoneActive?: boolean;
-  tvTopPaginationZoneActive?: boolean;
-  tvBottomPaginationZoneActive?: boolean;
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
 }
@@ -103,9 +100,6 @@ const SearchControls = ({
   tableColumnsPopover = null,
   contextSettings = [],
   deferInitialQueryUntilFiltersReady = false,
-  tvSearchZoneActive = false,
-  tvTopPaginationZoneActive = false,
-  tvBottomPaginationZoneActive = false,
   isRefreshing = false,
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
@@ -131,52 +125,6 @@ const SearchControls = ({
   const defaultViewMode = entitySettings.defaultViewMode || "grid";
   const defaultGridDensity = entitySettings.defaultGridDensity || "medium";
   const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
-
-  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
-  const searchZoneItems = useMemo<{ id: string; name: string }[]>(
-    () => [
-      { id: "search-input", name: "Search" },
-      { id: "sort-control", name: "Sort" },
-      { id: "sort-direction", name: "Direction" },
-      { id: "filters-button", name: "Filters" },
-      { id: "filter-presets", name: "Presets" },
-      { id: "view-mode", name: "View" },
-      { id: "zoom-level", name: "Zoom" },
-      { id: "context-settings", name: "Settings" },
-    ],
-    []
-  );
-
-  // Horizontal navigation for search zone
-  const searchZoneNav = useHorizontalNavigation({
-    items: searchZoneItems,
-    enabled: isTVMode && tvSearchZoneActive,
-    onSelect: (item: { id: string; name: string }) => {
-      // Trigger click on the focused element
-      const element = document.querySelector(
-        `[data-tv-search-item="${item.id}"]`
-      );
-      if (element) {
-        (element as HTMLElement).click();
-        // For search input, focus it
-        if (item.id === "search-input") {
-          const input = element.querySelector("input");
-          if (input) input.focus();
-        }
-      }
-    },
-    onEscapeUp: () => {
-      // Let parent handle zone transition
-      window.dispatchEvent(
-        new CustomEvent("tvSearchZoneEscape", { detail: { direction: "up" } })
-      );
-    },
-    onEscapeDown: () => {
-      window.dispatchEvent(
-        new CustomEvent("tvSearchZoneEscape", { detail: { direction: "down" } })
-      );
-    },
-  });
 
   // Get filter options for this artifact type
   const filterOptions: FilterOption[] = useMemo(() => {
@@ -690,12 +638,31 @@ const SearchControls = ({
     ]
   );
 
-  // Expose pagination handler to parent via ref (for TV mode PageUp/PageDown)
+  // Expose the pagination handler to the parent (the Images lightbox pages
+  // across the list with it)
   useEffect(() => {
     if (paginationHandlerRef) {
       paginationHandlerRef.current = handlePageChange;
     }
   }, [paginationHandlerRef, handlePageChange]);
+
+  // TV mode: PageUp and PageDown change the page (a desktop PageDown scrolls)
+  useShortcutScope({
+    layer: "page",
+    enabled: isTVMode,
+    keys: {
+      pageup: () => {
+        if (currentPage <= 1) return false;
+        handlePageChange(currentPage - 1);
+        return true;
+      },
+      pagedown: () => {
+        if (currentPage >= totalPages) return false;
+        handlePageChange(currentPage + 1);
+        return true;
+      },
+    },
+  });
 
   const handleChangeSearchText = useCallback(
     (searchStr: string) => {
@@ -946,10 +913,7 @@ const SearchControls = ({
               {/* Search Input - Flexible width with min-width */}
               <div
                 data-tv-search-item="search-input"
-                ref={(el) => searchZoneNav.setItemRef(0, el)}
-                className={`w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm ${
-                  searchZoneNav.isFocused(0) ? "keyboard-focus" : ""
-                }`}
+                className="w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
               >
                 <SearchInput
                   placeholder="Search..."
@@ -963,26 +927,14 @@ const SearchControls = ({
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
                 {/* Sort Control - No label, just dropdown + direction button */}
                 <div className="flex items-center gap-1">
-                  <div
-                    data-tv-search-item="sort-control"
-                    ref={(el) => searchZoneNav.setItemRef(1, el)}
-                    className={
-                      searchZoneNav.isFocused(1) ? "keyboard-focus" : ""
-                    }
-                  >
+                  <div data-tv-search-item="sort-control">
                     <SortControl
                       options={sortOptions}
                       value={sortField}
                       onChange={handleSortChange}
                     />
                   </div>
-                  <div
-                    data-tv-search-item="sort-direction"
-                    ref={(el) => searchZoneNav.setItemRef(2, el)}
-                    className={
-                      searchZoneNav.isFocused(2) ? "keyboard-focus" : ""
-                    }
-                  >
+                  <div data-tv-search-item="sort-direction">
                     <Button
                       onClick={() => handleSortChange(sortField)}
                       variant="secondary"
@@ -1000,11 +952,7 @@ const SearchControls = ({
                 </div>
 
                 {/* Filters Toggle Button */}
-                <div
-                  data-tv-search-item="filters-button"
-                  ref={(el) => searchZoneNav.setItemRef(3, el)}
-                  className={searchZoneNav.isFocused(3) ? "keyboard-focus" : ""}
-                >
+                <div data-tv-search-item="filters-button">
                   <Button
                     onClick={handleToggleFilterPanel}
                     variant={isFilterPanelOpen ? "primary" : "secondary"}
@@ -1054,11 +1002,7 @@ const SearchControls = ({
             {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
               {/* Filter Presets */}
-              <div
-                data-tv-search-item="filter-presets"
-                ref={(el) => searchZoneNav.setItemRef(4, el)}
-                className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
-              >
+              <div data-tv-search-item="filter-presets">
                 <FilterPresets
                   artifactType={artifactType}
                   context={effectiveContext}
@@ -1077,11 +1021,7 @@ const SearchControls = ({
 
               {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
               {(supportsWallView || viewModes) && (
-                <div
-                  data-tv-search-item="view-mode"
-                  ref={(el) => searchZoneNav.setItemRef(5, el)}
-                  className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
-                >
+                <div data-tv-search-item="view-mode">
                   <ViewModeToggle
                     modes={viewModes}
                     value={viewMode}
@@ -1098,13 +1038,7 @@ const SearchControls = ({
               {/* Zoom Slider - Only shown in wall mode */}
               {(supportsWallView || viewModes?.some((m) => m.id === "wall")) &&
                 viewMode === "wall" && (
-                  <div
-                    data-tv-search-item="zoom-level"
-                    ref={(el) => searchZoneNav.setItemRef(6, el)}
-                    className={
-                      searchZoneNav.isFocused(6) ? "keyboard-focus" : ""
-                    }
-                  >
+                  <div data-tv-search-item="zoom-level">
                     <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
                   </div>
                 )}
@@ -1113,21 +1047,13 @@ const SearchControls = ({
               {(viewMode === "grid" ||
                 viewMode === "folder" ||
                 viewMode === "timeline") && (
-                <div
-                  data-tv-search-item="grid-density"
-                  ref={(el) => searchZoneNav.setItemRef(6, el)}
-                  className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
-                >
+                <div data-tv-search-item="grid-density">
                   <ZoomSlider value={gridDensity} onChange={setGridDensity} />
                 </div>
               )}
 
               {/* Context Settings Cog */}
-              <div
-                data-tv-search-item="context-settings"
-                ref={(el) => searchZoneNav.setItemRef(7, el)}
-                className={searchZoneNav.isFocused(7) ? "keyboard-focus" : ""}
-              >
+              <div data-tv-search-item="context-settings">
                 <ContextSettings
                   entityType={artifactType}
                   settings={contextSettings}
@@ -1159,21 +1085,6 @@ const SearchControls = ({
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
-            tvActive={isTVMode && tvTopPaginationZoneActive}
-            onEscapeUp={() => {
-              window.dispatchEvent(
-                new CustomEvent("tvPaginationEscape", {
-                  detail: { zone: "top", direction: "up" },
-                })
-              );
-            }}
-            onEscapeDown={() => {
-              window.dispatchEvent(
-                new CustomEvent("tvPaginationEscape", {
-                  detail: { zone: "top", direction: "down" },
-                })
-              );
-            }}
           />
         </div>
       )}
@@ -1361,21 +1272,6 @@ const SearchControls = ({
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
-            tvActive={isTVMode && tvBottomPaginationZoneActive}
-            onEscapeUp={() => {
-              window.dispatchEvent(
-                new CustomEvent("tvPaginationEscape", {
-                  detail: { zone: "bottom", direction: "up" },
-                })
-              );
-            }}
-            onEscapeDown={() => {
-              window.dispatchEvent(
-                new CustomEvent("tvPaginationEscape", {
-                  detail: { zone: "bottom", direction: "down" },
-                })
-              );
-            }}
           />
         </div>
       )}

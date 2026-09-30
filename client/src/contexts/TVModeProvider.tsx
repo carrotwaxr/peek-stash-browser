@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TVModeContext } from "./TVModeContext";
 
 export const TVModeProvider = ({ children }: { children: React.ReactNode }) => {
@@ -7,6 +7,11 @@ export const TVModeProvider = ({ children }: { children: React.ReactNode }) => {
     const saved = localStorage.getItem("peek-tv-mode");
     return saved === "true";
   });
+
+  // `html.tv-mode` scopes the TV focus styles (index.css)
+  useEffect(() => {
+    document.documentElement.classList.toggle("tv-mode", isTVMode);
+  }, [isTVMode]);
 
   const toggleTVMode = () => {
     setIsTVMode((prev) => {

@@ -22,7 +22,6 @@ import {
 } from "../../helpers/stubApi";
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/hooks/useFocusTrap", () => ({ useInitialFocus: vi.fn() }));
 vi.mock("@/hooks/useTVMode", () => ({
   useTVMode: vi.fn(() => ({ isTVMode: false })),
 }));

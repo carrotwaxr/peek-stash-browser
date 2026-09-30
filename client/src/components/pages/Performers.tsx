@@ -1,17 +1,12 @@
-import React, { useCallback, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { NormalizedPerformer } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { usePerformerList } from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
-import { useConfig } from "../../contexts/ConfigContext";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { getEntityPath } from "../../utils/entityLinks";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import {
   ErrorMessage,
@@ -30,12 +25,7 @@ const VIEW_MODES: { id: string; label: string }[] = [
 
 const Performers = () => {
   usePageTitle("Performers");
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("performers");
 
   // Table columns hook for table view
   const {
@@ -81,28 +71,6 @@ const Performers = () => {
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
-  // TV Navigation - use shared hook for all grid pages
-  const { isTVMode, searchControlsProps, gridItemProps } =
-    useGridPageTVNavigation({
-      items: currentPerformers,
-      columns,
-      totalPages,
-      onItemSelect: (performer) =>
-        void navigate(
-          getEntityPath("performer", performer, hasMultipleInstances),
-          {
-            state: { fromPageTitle: "Performers" },
-          }
-        ),
-    });
-
-  // Initial focus
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !isLoading && currentPerformers.length > 0 && isTVMode
-  );
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -114,7 +82,7 @@ const Performers = () => {
 
   return (
     <PageLayout>
-      <div ref={pageRef}>
+      <div>
         <PageHeader
           title="Performers"
           subtitle="Browse performers in your library"
@@ -142,7 +110,6 @@ const Performers = () => {
               onMoveColumn={moveColumn}
             />
           }
-          {...searchControlsProps}
         >
           {
             (({
@@ -234,25 +201,15 @@ const Performers = () => {
                   }
                 />
               ) : (
-                <div
-                  ref={gridRef}
-                  className={getGridClasses("standard", gridDensity)}
-                >
+                <div className={getGridClasses("standard", gridDensity)}>
                   {currentPerformers.map(
-                    (performer: Record<string, unknown>, index: number) => {
-                      const itemProps = gridItemProps(index);
-                      return (
-                        <PerformerCard
-                          key={performer.id as string}
-                          performer={
-                            performer as unknown as NormalizedPerformer
-                          }
-                          isTVMode={isTVMode}
-                          fromPageTitle="Performers"
-                          {...itemProps}
-                        />
-                      );
-                    }
+                    (performer: Record<string, unknown>) => (
+                      <PerformerCard
+                        key={performer.id as string}
+                        performer={performer as unknown as NormalizedPerformer}
+                        fromPageTitle="Performers"
+                      />
+                    )
                   )}
                 </div>
               )) as unknown as React.ReactNode

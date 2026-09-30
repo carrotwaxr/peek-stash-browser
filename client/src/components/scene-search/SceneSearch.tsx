@@ -8,8 +8,6 @@ import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import {
   WALL_VIEW_SETTINGS,
@@ -74,7 +72,6 @@ const SceneSearch = ({
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
 
-  const columns = useGridColumns("scenes");
   const { wallPlayback } = useWallPlayback();
 
   // Table columns hook for table view
@@ -277,20 +274,6 @@ const SceneSearch = ({
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
-  // TV Navigation - use shared hook for all grid pages
-  const {
-    isTVMode,
-    tvNavigation,
-    gridNavigation,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentScenes,
-    columns,
-    totalPages,
-    onItemSelect: handleSceneClick,
-  });
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -337,7 +320,6 @@ const SceneSearch = ({
         }
         contextSettings={contextSettings}
         onViewModeChange={setCurrentViewMode}
-        {...searchControlsProps}
       >
         {
           (({
@@ -478,10 +460,6 @@ const SceneSearch = ({
                 emptyMessage="No scenes found"
                 emptyDescription="Try adjusting your search filters"
                 enableKeyboard={true}
-                isTVMode={isTVMode}
-                tvGridZoneActive={isTVMode && tvNavigation.isZoneActive("grid")}
-                gridNavigation={gridNavigation}
-                gridItemProps={gridItemProps}
               />
             )) as unknown as React.ReactNode
         }

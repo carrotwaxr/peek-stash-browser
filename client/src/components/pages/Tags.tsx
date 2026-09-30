@@ -1,17 +1,12 @@
-import React, { useCallback, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { NormalizedTag } from "@peek/shared-types";
 import type { LibrarySearchParams } from "../../api";
 import { useTagList, useTagTree } from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
-import { useConfig } from "../../contexts/ConfigContext";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { getEntityPath } from "../../utils/entityLinks";
 import { TagCard } from "../cards/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import { TagHierarchyView } from "../tags/index";
@@ -32,12 +27,7 @@ const VIEW_MODES: { id: string; label: string }[] = [
 
 const Tags = () => {
   usePageTitle("Tags");
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("tags");
 
   // Table columns hook for table view
   const {
@@ -96,25 +86,6 @@ const Tags = () => {
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
-  // TV Navigation - use shared hook for all grid pages
-  const { isTVMode, searchControlsProps, gridItemProps } =
-    useGridPageTVNavigation({
-      items: currentTags,
-      columns,
-      totalPages,
-      onItemSelect: (tag) =>
-        void navigate(getEntityPath("tag", tag, hasMultipleInstances), {
-          state: { fromPageTitle: "Tags" },
-        }),
-    });
-
-  // Initial focus
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !isLoading && currentTags.length > 0 && isTVMode
-  );
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -126,7 +97,7 @@ const Tags = () => {
 
   return (
     <PageLayout>
-      <div ref={pageRef}>
+      <div>
         <PageHeader title="Tags" subtitle="Browse tags in your library" />
 
         <LibraryInitializingBanner />
@@ -152,7 +123,6 @@ const Tags = () => {
               onMoveColumn={moveColumn}
             />
           }
-          {...searchControlsProps}
         >
           {
             (({
@@ -245,29 +215,18 @@ const Tags = () => {
               }
 
               return (
-                <div
-                  ref={gridRef}
-                  className={getGridClasses("standard", gridDensity)}
-                >
-                  {currentTags.map(
-                    (tag: Record<string, unknown>, index: number) => {
-                      const { tabIndex: _tabIndex, ...restItemProps } =
-                        gridItemProps(index);
-                      return (
-                        <TagCard
-                          key={tag.id as string}
-                          tag={
-                            tag as unknown as NormalizedTag & {
-                              child_count?: number;
-                            }
-                          }
-                          fromPageTitle="Tags"
-                          tabIndex={isTVMode ? _tabIndex : -1}
-                          {...restItemProps}
-                        />
-                      );
-                    }
-                  )}
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {currentTags.map((tag: Record<string, unknown>) => (
+                    <TagCard
+                      key={tag.id as string}
+                      tag={
+                        tag as unknown as NormalizedTag & {
+                          child_count?: number;
+                        }
+                      }
+                      fromPageTitle="Tags"
+                    />
+                  ))}
                 </div>
               );
             }) as unknown as React.ReactNode

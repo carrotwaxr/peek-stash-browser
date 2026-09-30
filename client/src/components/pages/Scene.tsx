@@ -64,16 +64,6 @@ const SceneContent = () => {
   const [similarScenesCount, setSimilarScenesCount] =
     useState(TAB_COUNT_LOADING);
 
-  // Dispatch zone change event to disable TV navigation on this page
-  useEffect(() => {
-    // Dispatch event to inform global listeners (Sidebar) that we're on a page without TV navigation zones
-    window.dispatchEvent(
-      new CustomEvent("tvZoneChange", {
-        detail: { zone: null }, // null zone means no TV navigation active
-      })
-    );
-  }, []); // Run once on mount
-
   // Reset similar scenes count when scene changes (back to loading state)
   useEffect(() => {
     setSimilarScenesCount(TAB_COUNT_LOADING);

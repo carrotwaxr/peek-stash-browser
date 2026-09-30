@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { NormalizedGallery } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
@@ -6,10 +6,7 @@ import { useGalleryList } from "../../api/hooks";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useConfig } from "../../contexts/ConfigContext";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
-import { useGridColumns } from "../../hooks/useGridColumns";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
@@ -41,9 +38,6 @@ const Galleries = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumns("galleries");
   const { wallPlayback } = useWallPlayback();
 
   // Table columns hook for table view
@@ -140,21 +134,6 @@ const Galleries = () => {
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
-  // TV Navigation - use shared hook for all grid pages
-  const { isTVMode, searchControlsProps, gridItemProps } =
-    useGridPageTVNavigation({
-      items: currentGalleries,
-      columns,
-      totalPages,
-      onItemSelect: handleGalleryClick,
-    });
-
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !isLoading && currentGalleries.length > 0 && isTVMode
-  );
-
   if (error && !initializing) {
     return (
       <PageLayout>
@@ -166,7 +145,7 @@ const Galleries = () => {
 
   return (
     <PageLayout>
-      <div ref={pageRef}>
+      <div>
         <PageHeader
           title="Galleries"
           subtitle="Browse image galleries in your library"
@@ -197,7 +176,6 @@ const Galleries = () => {
               onMoveColumn={moveColumn}
             />
           }
-          {...searchControlsProps}
         >
           {
             (({
@@ -313,25 +291,14 @@ const Galleries = () => {
                   ))}
                 </div>
               ) : (
-                <div
-                  ref={gridRef}
-                  className={getGridClasses("standard", gridDensity)}
-                >
-                  {currentGalleries.map(
-                    (gallery: Record<string, unknown>, index: number) => {
-                      const { tabIndex: _tabIndex, ...restItemProps } =
-                        gridItemProps(index);
-                      return (
-                        <GalleryCard
-                          key={gallery.id as string}
-                          gallery={gallery as unknown as NormalizedGallery}
-                          fromPageTitle="Galleries"
-                          tabIndex={isTVMode ? _tabIndex : -1}
-                          {...restItemProps}
-                        />
-                      );
-                    }
-                  )}
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {currentGalleries.map((gallery: Record<string, unknown>) => (
+                    <GalleryCard
+                      key={gallery.id as string}
+                      gallery={gallery as unknown as NormalizedGallery}
+                      fromPageTitle="Galleries"
+                    />
+                  ))}
                 </div>
               )) as unknown as React.ReactNode
           }

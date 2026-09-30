@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import {
   LucideCheckSquare,
@@ -41,10 +41,6 @@ interface Props {
   emptyMessage?: string;
   emptyDescription?: string;
   enableKeyboard?: boolean;
-  isTVMode?: boolean;
-  tvGridZoneActive?: boolean;
-  gridNavigation?: unknown;
-  gridItemProps?: ((index: number) => Record<string, unknown>) | null;
 }
 
 const SceneGrid = ({
@@ -61,10 +57,6 @@ const SceneGrid = ({
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
   enableKeyboard = true, // eslint-disable-line @typescript-eslint/no-unused-vars
-  isTVMode = false, // eslint-disable-line @typescript-eslint/no-unused-vars
-  tvGridZoneActive = false,
-  gridNavigation = null, // eslint-disable-line @typescript-eslint/no-unused-vars
-  gridItemProps = null,
 }: Props) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("scenes");
@@ -114,18 +106,6 @@ const SceneGrid = ({
       | ((id: string | number, entityType: string) => void)
       | undefined,
   });
-
-  // Set initial focus when grid loads and zone is active (only in TV mode)
-  useEffect(() => {
-    if (tvGridZoneActive && scenes?.length > 0 && gridRef.current) {
-      // Focus the grid container to enable keyboard navigation
-      const firstFocusable =
-        gridRef.current.querySelector<HTMLElement>('[tabindex="0"]');
-      if (firstFocusable) {
-        firstFocusable.focus();
-      }
-    }
-  }, [tvGridZoneActive, scenes]);
 
   // Clear selections when page changes - wrapped in handler instead of effect
   const handlePageChange = (page: number) => {
@@ -192,30 +172,25 @@ const SceneGrid = ({
 
       {/* Grid */}
       <div ref={gridRef} className={gridClasses}>
-        {scenes.map((scene: NormalizedScene, index: number) => {
-          // Use gridItemProps if provided (TV mode with zone navigation), otherwise use defaults
-          const itemProps = gridItemProps ? gridItemProps(index) : {};
-          return (
-            <SceneCard
-              key={makeCompositeKey(scene.id, scene.instanceId)}
-              scene={scene}
-              onClick={
-                selectedScenes.length === 0 && onSceneClick
-                  ? () => onSceneClick(scene)
-                  : undefined
-              }
-              onHideSuccess={onHideSuccess}
-              fromPageTitle={fromPageTitle}
-              isSelected={selectedScenes.some(
-                (s) => s.id === scene.id && s.instanceId === scene.instanceId
-              )}
-              onToggleSelect={handleToggleSelect}
-              selectionMode={selectedScenes.length > 0}
-              autoplayOnScroll={columns === 1}
-              {...itemProps}
-            />
-          );
-        })}
+        {scenes.map((scene: NormalizedScene) => (
+          <SceneCard
+            key={makeCompositeKey(scene.id, scene.instanceId)}
+            scene={scene}
+            onClick={
+              selectedScenes.length === 0 && onSceneClick
+                ? () => onSceneClick(scene)
+                : undefined
+            }
+            onHideSuccess={onHideSuccess}
+            fromPageTitle={fromPageTitle}
+            isSelected={selectedScenes.some(
+              (s) => s.id === scene.id && s.instanceId === scene.instanceId
+            )}
+            onToggleSelect={handleToggleSelect}
+            selectionMode={selectedScenes.length > 0}
+            autoplayOnScroll={columns === 1}
+          />
+        ))}
       </div>
 
       {/* Pagination */}

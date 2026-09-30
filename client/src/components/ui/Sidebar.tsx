@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { getOrderedNavItems } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTVMode } from "../../hooks/useTVMode";
@@ -17,26 +17,13 @@ import Tooltip from "./Tooltip";
  * - lg - xl: Collapsed (64px wide, icons only with tooltips)
  * - xl+: Expanded (240px wide, icons + text labels)
  *
- * TV Mode Navigation:
- * - Listens for custom 'tvZoneChange' events from page components
- * - When mainNav zone is active: Up/Down navigate through items, Enter selects
+ * Its links and buttons are in the Tab order; in TV mode the arrow keys reach
+ * them by position (`TVNavigator`).
  */
 interface NavPreference {
   id: string;
   enabled: boolean;
   order: number;
-}
-
-interface NavItem {
-  name: string;
-  path: string | null;
-  icon: string;
-  key?: string;
-  description?: string;
-  isButton?: boolean;
-  isUserMenu?: boolean;
-  isSubItem?: boolean;
-  isToggle?: boolean;
 }
 
 interface Props {
@@ -45,14 +32,10 @@ interface Props {
 
 const Sidebar = ({ navPreferences = [] }: Props) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isTVMode, toggleTVMode } = useTVMode();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [isMainNavActive, setIsMainNavActive] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState(0);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
-  const itemRefs = useRef<Array<HTMLElement | null>>([]);
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
@@ -98,30 +81,6 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
     []
   );
 
-  // Build complete list of all navigable items (nav items + bottom items)
-  // When user menu is expanded, include sub-items in the navigation list
-  const allNavItems = useMemo((): NavItem[] => {
-    const bottomItems: NavItem[] = [
-      { name: "Help", path: null, isButton: true, icon: "questionCircle" },
-      { name: "Settings", path: "/settings", icon: "settings" },
-    ];
-
-    // User menu parent item
-    bottomItems.push({
-      name: "User Menu",
-      path: null,
-      isUserMenu: true,
-      icon: "circle-user-round",
-    });
-
-    // If user menu is expanded, add sub-items to navigation list
-    if (isUserMenuExpanded) {
-      bottomItems.push(...userMenuSubItems);
-    }
-
-    return [...(navItems as NavItem[]), ...bottomItems];
-  }, [navItems, isUserMenuExpanded, userMenuSubItems]);
-
   // Get current page from React Router location
   const getCurrentPage = () => {
     const path = location.pathname;
@@ -144,103 +103,6 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
   };
 
   const currentPage = getCurrentPage();
-
-  // Listen for zone change events from page components
-  useEffect(() => {
-    const handleZoneChange = (e: WindowEventMap["tvZoneChange"]) => {
-      const zone = e.detail.zone;
-      // zone === null means page doesn't support TV navigation (e.g., Scene player page)
-      // In this case, deactivate mainNav so keyboard events don't get intercepted
-      setIsMainNavActive(zone === "mainNav");
-    };
-
-    window.addEventListener("tvZoneChange", handleZoneChange);
-    return () => window.removeEventListener("tvZoneChange", handleZoneChange);
-  }, []);
-
-  // Keyboard navigation when mainNav is active
-  useEffect(() => {
-    if (!isTVMode || !isMainNavActive) {
-      return;
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowUp": {
-          e.preventDefault();
-          let newIndex = focusedIndex - 1;
-          // Skip over the current page
-          while (newIndex >= 0 && allNavItems[newIndex]?.name === currentPage) {
-            newIndex--;
-          }
-          if (newIndex >= 0) {
-            setFocusedIndex(newIndex);
-          }
-          break;
-        }
-
-        case "ArrowDown": {
-          e.preventDefault();
-          let newIndex = focusedIndex + 1;
-          // Skip over the current page
-          while (
-            newIndex < allNavItems.length &&
-            allNavItems[newIndex]?.name === currentPage
-          ) {
-            newIndex++;
-          }
-          if (newIndex < allNavItems.length) {
-            setFocusedIndex(newIndex);
-          }
-          break;
-        }
-
-        case "Enter":
-        case " ": {
-          e.preventDefault();
-          e.stopPropagation();
-          const item = allNavItems[focusedIndex];
-          if (item) {
-            if (item.name === "Help") {
-              setIsHelpModalOpen(true);
-            } else if (item.isUserMenu) {
-              setIsUserMenuExpanded(!isUserMenuExpanded);
-            } else if (item.name === "TV Mode") {
-              toggleTVMode();
-            } else if (item.name === "Sign Out") {
-              void logout();
-            } else if (item.path) {
-              void navigate(item.path);
-            }
-          }
-          break;
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    isTVMode,
-    isMainNavActive,
-    focusedIndex,
-    allNavItems,
-    navigate,
-    currentPage,
-    isUserMenuExpanded,
-    toggleTVMode,
-    logout,
-  ]);
-
-  // Scroll focused item into view
-  useEffect(() => {
-    if (isTVMode && isMainNavActive && itemRefs.current[focusedIndex]) {
-      itemRefs.current[focusedIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }
-  }, [focusedIndex, isTVMode, isMainNavActive]);
 
   return (
     <>
@@ -265,10 +127,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
             <ul className="flex flex-col gap-1 px-2">
               {navItems
                 .filter((i): i is NonNullable<typeof i> => Boolean(i))
-                .map((item, index) => {
+                .map((item) => {
                   const isActive = currentPage === item.name;
-                  const isFocused =
-                    isTVMode && isMainNavActive && focusedIndex === index;
 
                   return (
                     <li key={item.name}>
@@ -276,19 +136,11 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       <div className="xl:hidden">
                         <Tooltip content={item.name} position="right">
                           <Link
-                            ref={(el: HTMLElement | null) => {
-                              itemRefs.current[index] = el;
-                            }}
                             to={item.path}
                             className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
-                              isActive
-                                ? "nav-link-active"
-                                : isFocused
-                                  ? "keyboard-focus"
-                                  : "nav-link"
+                              isActive ? "nav-link-active" : "nav-link"
                             }`}
                             aria-label={item.name}
-                            tabIndex={isFocused ? 0 : -1}
                           >
                             <ThemedIcon name={item.icon} size={20} />
                           </Link>
@@ -297,18 +149,10 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                       {/* Expanded view (xl+): Icon + text */}
                       <Link
-                        ref={(el: HTMLElement | null) => {
-                          itemRefs.current[index] = el;
-                        }}
                         to={item.path}
                         className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                          isActive
-                            ? "nav-link-active"
-                            : isFocused
-                              ? "keyboard-focus"
-                              : "nav-link"
+                          isActive ? "nav-link-active" : "nav-link"
                         }`}
-                        tabIndex={isFocused ? 0 : -1}
                       >
                         <ThemedIcon name={item.icon} size={20} />
                         <span className="text-sm font-medium">{item.name}</span>
@@ -327,33 +171,22 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
             <div className="flex flex-col gap-1">
               {/* Help button */}
               {(() => {
-                const itemIndex = navItems.length;
-                const isFocused =
-                  isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
                     <div className="xl:hidden">
                       <Tooltip content="Help" position="right">
                         <button
-                          ref={(el: HTMLElement | null) => {
-                            itemRefs.current[itemIndex] = el;
-                          }}
                           onClick={() => setIsHelpModalOpen(true)}
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
+                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
                           aria-label="Help"
-                          tabIndex={isFocused ? 0 : -1}
                         >
                           <ThemedIcon name="questionCircle" size={20} />
                         </button>
                       </Tooltip>
                     </div>
                     <button
-                      ref={(el: HTMLElement | null) => {
-                        itemRefs.current[itemIndex] = el;
-                      }}
                       onClick={() => setIsHelpModalOpen(true)}
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isFocused ? 0 : -1}
+                      className="hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
                     >
                       <ThemedIcon name="questionCircle" size={20} />
                       <span className="text-sm font-medium">Help</span>
@@ -364,33 +197,22 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
               {/* Settings (universal) */}
               {(() => {
-                const itemIndex = navItems.length + 1;
-                const isFocused =
-                  isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
                     <div className="xl:hidden">
                       <Tooltip content="Settings" position="right">
                         <Link
-                          ref={(el: HTMLElement | null) => {
-                            itemRefs.current[itemIndex] = el;
-                          }}
                           to="/settings"
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
+                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
                           aria-label="Settings"
-                          tabIndex={isFocused ? 0 : -1}
                         >
                           <ThemedIcon name="settings" size={20} />
                         </Link>
                       </Tooltip>
                     </div>
                     <Link
-                      ref={(el: HTMLElement | null) => {
-                        itemRefs.current[itemIndex] = el;
-                      }}
                       to="/settings"
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isFocused ? 0 : -1}
+                      className="hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
                     >
                       <ThemedIcon name="settings" size={20} />
                       <span className="text-sm font-medium">Settings</span>
@@ -401,12 +223,6 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
               {/* User Menu */}
               {(() => {
-                const userMenuItemIndex = navItems.length + 2;
-                const isUserMenuFocused =
-                  isTVMode &&
-                  isMainNavActive &&
-                  focusedIndex === userMenuItemIndex;
-
                 return (
                   <div>
                     {/* User menu toggle - collapsed view with flyout */}
@@ -461,12 +277,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                         }
                       >
                         <button
-                          ref={(el: HTMLElement | null) => {
-                            itemRefs.current[userMenuItemIndex] = el;
-                          }}
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
+                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
                           aria-label="User menu"
-                          tabIndex={isUserMenuFocused ? 0 : -1}
                         >
                           <ThemedIcon name="circle-user-round" size={20} />
                         </button>
@@ -475,12 +287,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                     {/* User menu toggle - expanded view */}
                     <button
-                      ref={(el: HTMLElement | null) => {
-                        itemRefs.current[userMenuItemIndex] = el;
-                      }}
                       onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
-                      className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isUserMenuFocused ? 0 : -1}
+                      className="hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
                     >
                       <div className="flex items-center gap-3">
                         <ThemedIcon name="circle-user-round" size={20} />
@@ -502,25 +310,15 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                         className="hidden xl:block mt-1 ml-4 pl-4 border-l"
                         style={{ borderColor: "var(--border-color)" }}
                       >
-                        {userMenuSubItems.map((subItem, subIndex) => {
-                          const subItemIndex = userMenuItemIndex + 1 + subIndex;
-                          const isSubItemFocused =
-                            isTVMode &&
-                            isMainNavActive &&
-                            focusedIndex === subItemIndex;
-
+                        {userMenuSubItems.map((subItem) => {
                           if (subItem.name === "TV Mode") {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => {
-                                  itemRefs.current[subItemIndex] = el;
-                                }}
                                 onClick={() => {
                                   toggleTVMode();
                                 }}
-                                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
-                                tabIndex={isSubItemFocused ? 0 : -1}
+                                className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
                               >
                                 <div className="flex items-center gap-3">
                                   <ThemedIcon name="tv" size={16} />
@@ -533,12 +331,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => {
-                                  itemRefs.current[subItemIndex] = el;
-                                }}
                                 onClick={() => void logout()}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
-                                tabIndex={isSubItemFocused ? 0 : -1}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 text-red-600 hover:bg-red-50"
                               >
                                 <ThemedIcon
                                   name="logout"
@@ -552,12 +346,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <Link
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => {
-                                  itemRefs.current[subItemIndex] = el;
-                                }}
                                 to={subItem.path}
-                                className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
-                                tabIndex={isSubItemFocused ? 0 : -1}
+                                className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
                               >
                                 <ThemedIcon name={subItem.icon} size={16} />
                                 <span>{subItem.name}</span>

@@ -10,9 +10,7 @@ import {
   useLibraryReady,
 } from "../../api/hooks/useLibraryReady";
 import { queryKeys } from "../../api/queryKeys";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { useTVMode } from "../../hooks/useTVMode";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import SceneGrid from "../scene-search/SceneGrid";
 import {
@@ -76,7 +74,6 @@ const Recommended = () => {
   usePageTitle("Recommended");
   const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef<HTMLDivElement>(null);
-  const { isTVMode } = useTVMode();
 
   // Get pagination params from URL
   const page = parseInt(searchParams.get("page") ?? "1") || 1;
@@ -184,13 +181,6 @@ const Recommended = () => {
         : old
     );
   };
-
-  // Initial focus for TV mode
-  useInitialFocus(
-    pageRef,
-    '[tabindex="0"]',
-    !loading && scenes.length > 0 && isTVMode
-  );
 
   // Render criteria feedback for empty state
   const renderCriteriaFeedback = () => {

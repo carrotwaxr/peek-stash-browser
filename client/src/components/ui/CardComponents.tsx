@@ -34,7 +34,9 @@ interface CardContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * Card container - base wrapper for all cards
+ * Card container - base wrapper for all cards. A TV item (`data-tv-item`),
+ * focusable by script and click but not in the Tab order unless a caller
+ * passes a `tabIndex`: TV mode's arrows move focus to it by position.
  */
 export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
   (
@@ -44,6 +46,7 @@ export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
       entityType = "card",
       onClick,
       style = {},
+      tabIndex,
       ...others
     },
     ref
@@ -62,6 +65,8 @@ export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
           ...style,
         }}
         onClick={onClick}
+        data-tv-item=""
+        tabIndex={tabIndex ?? -1}
         {...others}
       >
         {children}
