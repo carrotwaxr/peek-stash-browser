@@ -317,7 +317,7 @@ describe("ClipQueryBuilder", () => {
           "(((c.primaryTagId = ? AND c.primaryTagInstanceId = ?)) OR EXISTS (SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId AND ((ct.tagId = ? AND ct.tagInstanceId = ?))))"
         );
         expect(sql).toContain(
-          "(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?))))"
+          "(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = c.sceneId AND sit.sceneInstanceId = c.sceneInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?))))"
         );
         expect(sql).toContain(
           "EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND ((sp.performerId = ? AND sp.performerInstanceId = ?)))"
@@ -395,19 +395,19 @@ describe("ClipQueryBuilder", () => {
 
       const { sql } = statement(0);
       expect(sql).toContain(
-        "NOT (EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = s.id AND sit.sceneInstanceId = s.stashInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?))))"
+        "NOT (EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?))) OR EXISTS (SELECT 1 FROM SceneInheritedTag sit WHERE sit.sceneId = c.sceneId AND sit.sceneInstanceId = c.sceneInstanceId AND ((sit.tagId = ? AND sit.tagInstanceId = ?))))"
       );
       const performer =
         "(s.id, s.stashInstanceId) IN (SELECT sp.sceneId, sp.sceneInstanceId FROM ScenePerformer sp WHERE ((sp.performerId = ? AND sp.performerInstanceId = ?)))";
       expect(sql).toContain(`(${performer} AND ${performer})`);
     });
 
-    it("scene tags match the clip's scene's own and inherited tags by (id, instance), read as one list by each junction's tag index", async () => {
+    it("scene tags match the clip's scene's own and inherited tags by (id, instance), read as one list by each junction's tag index and matched on the clip's own scene columns", async () => {
       await run({ filter: { sceneTagIds: criterion([ref("20", "inst-b")]) } });
 
       const { sql, params } = statement(0);
       expect(sql).toContain(
-        "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))"
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))"
       );
       expect(sql).not.toContain("json_each");
       expect(params.slice(4, 8)).toEqual(["20", "inst-b", "20", "inst-b"]);
@@ -421,7 +421,7 @@ describe("ClipQueryBuilder", () => {
       });
 
       const tag =
-        "(s.id, s.stashInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))";
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT st.sceneId, st.sceneInstanceId FROM SceneTag st WHERE ((st.tagId = ? AND st.tagInstanceId = ?)) UNION ALL SELECT sit.sceneId, sit.sceneInstanceId FROM SceneInheritedTag sit WHERE ((sit.tagId = ? AND sit.tagInstanceId = ?)))";
       expect(statement(0).sql).toContain(`(${tag} AND ${tag})`);
     });
 
@@ -438,7 +438,7 @@ describe("ClipQueryBuilder", () => {
         "WITH scene_tags_refs(id, inst) AS MATERIALIZED",
         "scene_tags_matched(id, inst) AS MATERIALIZED (SELECT st.sceneId, st.sceneInstanceId FROM scene_tags_refs r CROSS JOIN SceneTag st ON st.tagId = r.id AND st.tagInstanceId = r.inst UNION SELECT sit.sceneId, sit.sceneInstanceId FROM scene_tags_refs r CROSS JOIN SceneInheritedTag sit ON sit.tagId = r.id AND sit.tagInstanceId = r.inst)",
         "FROM StashClip c",
-        "(s.id, s.stashInstanceId) IN (SELECT id, inst FROM scene_tags_matched)",
+        "(c.sceneId, c.sceneInstanceId) IN (SELECT id, inst FROM scene_tags_matched)",
       ]);
     });
 

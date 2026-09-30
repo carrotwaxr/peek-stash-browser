@@ -143,20 +143,20 @@ function refsCte(
  * (5.3 s). The key's separator cannot occur in an id or an instance id.
  */
 function matchedSetClause(
-  alias: string,
+  key: ParentKey,
   setName: string,
   modifier: "INCLUDES" | "EXCLUDES",
   ctes: Cte[]
 ): FilterClause {
   if (modifier === "INCLUDES") {
     return {
-      sql: `(${alias}.id, ${alias}.stashInstanceId) IN (SELECT id, inst FROM ${setName})`,
+      sql: `(${key[0]}, ${key[1]}) IN (SELECT id, inst FROM ${setName})`,
       params: [],
       ctes,
     };
   }
   return {
-    sql: `(${alias}.id || ':' || ${alias}.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM ${setName})`,
+    sql: `(${key[0]} || ':' || ${key[1]}) NOT IN (SELECT id || ':' || inst FROM ${setName})`,
     params: [],
     ctes,
   };
@@ -179,6 +179,27 @@ export interface JunctionTarget {
   /** The junction's columns holding the ref's id and instance */
   readonly refIdCol: string;
   readonly refInstanceCol: string;
+  /**
+   * The listed entity's key as the outer query holds it, when it is not
+   * `<parentAlias>.id, <parentAlias>.stashInstanceId`: a clip's scene is
+   * `c.sceneId, c.sceneInstanceId`, so every shape matches the junction on
+   * the clip's own row before the scene is read (a rare scene tag's deep
+   * clip page at 207k clips: 115 ms through the scene, 37 through the clip)
+   */
+  readonly parentKey?: ParentKey;
+}
+
+/** A listed row's key as two SQL expressions, its id and its instance */
+export type ParentKey = readonly [id: string, instance: string];
+
+/** The key a junction target's rows are matched on */
+function parentKeyOf(target: JunctionTarget): ParentKey {
+  return (
+    target.parentKey ?? [
+      `${target.parentAlias}.id`,
+      `${target.parentAlias}.stashInstanceId`,
+    ]
+  );
 }
 
 /** Refs matched on a column of the listed entity's own row (a scene's studio) */
@@ -243,9 +264,10 @@ function junctionIncludes(
 ): FilterClause {
   const exists = (t: JunctionTarget): SqlFragment => {
     const p = refPairs(t, refs);
-    const { alias: j, parentAlias: x } = t;
+    const j = t.alias;
+    const [id, instance] = parentKeyOf(t);
     return {
-      sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} WHERE ${j}.${t.parentIdCol} = ${x}.id AND ${j}.${t.parentInstanceCol} = ${x}.stashInstanceId AND (${p.sql}))`,
+      sql: `EXISTS (SELECT 1 FROM ${t.table} ${j} WHERE ${j}.${t.parentIdCol} = ${id} AND ${j}.${t.parentInstanceCol} = ${instance} AND (${p.sql}))`,
       params: p.params,
     };
   };
@@ -289,9 +311,9 @@ function junctionInList(
   const arms = [target, ...(inheritedJunction ? [inheritedJunction] : [])].map(
     rows
   );
-  const x = target.parentAlias;
+  const [id, instance] = parentKeyOf(target);
   return {
-    sql: `(${x}.id, ${x}.stashInstanceId) IN (${arms.map((a) => a.sql).join(" UNION ALL ")})`,
+    sql: `(${id}, ${instance}) IN (${arms.map((a) => a.sql).join(" UNION ALL ")})`,
     params: arms.flatMap((a) => a.params),
   };
 }
@@ -315,8 +337,8 @@ function junctionRefsList(
   const arms = [target, ...(inheritedJunction ? [inheritedJunction] : [])]
     .map((t) => refsRows(t, refsName))
     .join(" UNION ALL ");
-  const x = target.parentAlias;
-  return `(${x}.id, ${x}.stashInstanceId) IN (${arms})`;
+  const [id, instance] = parentKeyOf(target);
+  return `(${id}, ${instance}) IN (${arms})`;
 }
 
 /** A junction's rows of the refs list, driven from the refs by its ref index */
@@ -431,7 +453,11 @@ export function refClause(
       };
     }
     const setName = `${opts.name}_matched`;
-    return matchedSetClause(target.parentAlias, setName, modifier, [
+    const key: ParentKey =
+      target.kind === "junction"
+        ? parentKeyOf(target)
+        : [`${target.parentAlias}.id`, `${target.parentAlias}.stashInstanceId`];
+    return matchedSetClause(key, setName, modifier, [
       refsCte(refsName, refs, opts.allowedInstanceIds),
       matchedCte(target, setName, refsName, opts.inheritedJunction),
     ]);
@@ -483,9 +509,12 @@ export function idClause(
   const limit = opts.inlineLimit ?? PAIR_INLINE_LIMIT;
   if (refs.length > limit) {
     const refsName = `${opts.name ?? "ids"}_refs`;
-    return matchedSetClause(alias, refsName, modifier, [
-      refsCte(refsName, refs, opts.allowedInstanceIds),
-    ]);
+    return matchedSetClause(
+      [`${alias}.id`, `${alias}.stashInstanceId`],
+      refsName,
+      modifier,
+      [refsCte(refsName, refs, opts.allowedInstanceIds)]
+    );
   }
   const p = pairs(`${alias}.id`, `${alias}.stashInstanceId`, refs);
   return modifier === "INCLUDES"
