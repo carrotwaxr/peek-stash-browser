@@ -9,6 +9,7 @@ export { useTagList, useTagDetail, useTagTree } from "./useTags";
 export { useGalleryList, useGalleryDetail } from "./useGalleries";
 export { useGroupList, useGroupDetail } from "./useGroups";
 export { useImageList } from "./useImages";
+export { useClipList } from "./useClips";
 export { useRelationCounts } from "./useRelationCounts";
 export { useUpdateRating } from "./useRatingMutation";
 export { useUpdateFavorite } from "./useFavoriteMutation";

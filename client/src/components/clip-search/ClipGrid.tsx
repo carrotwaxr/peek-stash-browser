@@ -1,6 +1,7 @@
 import { getGridClasses } from "../../constants/grids";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import ClipCard, { type Clip } from "../cards/ClipCard";
-import { SkeletonSceneCard } from "../ui/index";
+import { EmptyState, SkeletonSceneCard } from "../ui/index";
 
 /**
  * ClipGrid - Grid display for clip entities
@@ -39,29 +40,15 @@ const ClipGrid = ({
   }
 
   if (!clips || clips.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-center">
-          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-            🎬
-          </div>
-          <h3
-            className="text-xl font-medium mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {emptyMessage}
-          </h3>
-          <p style={{ color: "var(--text-secondary)" }}>{emptyDescription}</p>
-        </div>
-      </div>
-    );
+    return <EmptyState title={emptyMessage} description={emptyDescription} />;
   }
 
   return (
     <div className={gridClasses}>
       {clips.map((clip: Clip | Record<string, unknown>) => (
         <ClipCard
-          key={(clip as Clip).id}
+          // Two servers can hold the same clip id
+          key={makeCompositeKey((clip as Clip).id, (clip as Clip).instanceId)}
           clip={clip as Clip}
           onClick={onClipClick as ((clip: Clip) => void) | undefined}
           fromPageTitle={fromPageTitle}

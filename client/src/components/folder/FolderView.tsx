@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -32,24 +31,21 @@ interface Props {
   gridDensity?: string;
   loading?: boolean;
   emptyMessage?: string;
-  /** The open folder's tag as "id:instanceId" (its `tagTreeKey`), null at the root */
-  onFolderPathChange?: (tagKey: string | null) => void;
   /**
-   * The open folders' tag keys, held by the owner (the list's URL state);
-   * a folder or breadcrumb click is reported through `onPathChange`, which
-   * writes it. Left out, the view reads and writes the URL's `folderPath`.
+   * The open folders' tag keys ("id:instanceId"), held by the owner (the
+   * list's URL state); a folder or breadcrumb click is reported through
+   * `onPathChange`, which writes it
    */
-  path?: readonly string[];
-  onPathChange?: (path: string[]) => void;
-  filters?: Record<string, unknown> | null;
+  path: readonly string[];
+  onPathChange: (path: string[]) => void;
 }
 
 /**
  * Folder view for browsing content by tag hierarchy.
  * Desktop: Split-pane with tree sidebar + content grid
  * Mobile: Stacked with breadcrumb + content grid
- * The `folderPath` URL parameter lists tag keys ("id:instanceId"); a path
- * bookmarked with bare ids is rewritten to them in place.
+ * The path lists tag keys ("id:instanceId"); a path bookmarked with bare ids
+ * is rewritten to them in the URL's `folderPath` in place.
  */
 const FolderView = ({
   items,
@@ -58,20 +54,11 @@ const FolderView = ({
   gridDensity = "medium",
   loading = false,
   emptyMessage = "No items found",
-  onFolderPathChange,
   path,
   onPathChange,
-  filters: _filters = null,
 }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // The owner's path, else the URL's
-  const pathParam = searchParams.get("folderPath");
-  const urlPath = useMemo(
-    () =>
-      path ? [...path] : pathParam ? pathParam.split(",").filter(Boolean) : [],
-    [path, pathParam]
-  );
+  const urlPath = useMemo(() => [...path], [path]);
   const pageInstanceId = searchParams.get("instance");
 
   // A path bookmarked with bare ids resolves to the tags' keys once they load
@@ -94,44 +81,6 @@ const FolderView = ({
     );
   }, [currentPath, urlPath, setSearchParams]);
 
-  // Track last notified tag to avoid duplicate notifications
-  const lastNotifiedTagRef = useRef<string | null | undefined>(undefined);
-
-  // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
-  useEffect(() => {
-    const currentTagId = currentPath[currentPath.length - 1] ?? null;
-    if (currentTagId !== lastNotifiedTagRef.current) {
-      lastNotifiedTagRef.current = currentTagId;
-      onFolderPathChange?.(currentTagId);
-    }
-  }, [currentPath, onFolderPathChange]);
-
-  // Update URL when path changes - also reset page to 1
-  const setCurrentPath = useCallback(
-    (newPath: string[]) => {
-      if (onPathChange) {
-        onPathChange(newPath);
-      } else {
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev);
-          if (newPath.length > 0) {
-            next.set("folderPath", newPath.join(","));
-          } else {
-            next.delete("folderPath");
-          }
-          // Reset to page 1 when navigating folders to avoid stale pagination state
-          next.delete("page");
-          return next;
-        });
-      }
-      // Eagerly notify parent (effect will deduplicate via ref)
-      const currentTagId = newPath[newPath.length - 1] ?? null;
-      lastNotifiedTagRef.current = currentTagId;
-      onFolderPathChange?.(currentTagId);
-    },
-    [setSearchParams, onFolderPathChange, onPathChange]
-  );
-
   // Build folder tree from items and tags
   const {
     folders,
@@ -149,17 +98,17 @@ const FolderView = ({
         // Can't navigate into untagged
         return;
       }
-      setCurrentPath([...currentPath, folder.id]);
+      onPathChange([...currentPath, folder.id]);
     },
-    [currentPath, setCurrentPath]
+    [currentPath, onPathChange]
   );
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback(
     (path: string[]) => {
-      setCurrentPath(path);
+      onPathChange(path);
     },
-    [setCurrentPath]
+    [onPathChange]
   );
 
   // Sidebar collapsed state (desktop only)
@@ -244,7 +193,7 @@ const FolderView = ({
         <FolderTreeSidebar
           tags={tags}
           currentPath={currentPath}
-          onNavigate={setCurrentPath}
+          onNavigate={onPathChange}
           className="w-64 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4 ml-4 rounded-lg"
         />
       )}

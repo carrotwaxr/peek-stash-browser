@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SceneGrid from "../../../src/components/scene-search/SceneGrid";
@@ -24,6 +24,21 @@ vi.mock("../../../src/components/ui/index", async (importOriginal) => {
     },
   };
 });
+// The shared empty state, as a stub naming what it was given
+vi.mock("../../../src/components/ui/EmptyState", () => ({
+  default: ({
+    title,
+    description,
+  }: {
+    title: string;
+    description?: string;
+  }) => (
+    <div data-testid="empty-state">
+      {title}
+      {description ? ` | ${description}` : ""}
+    </div>
+  ),
+}));
 vi.mock("../../../src/hooks/useHideBulkAction", () => ({
   useHideBulkAction: () => ({
     hideDialogOpen: false,
@@ -64,5 +79,23 @@ describe("SceneGrid autoplay on scroll", () => {
 
   it("does not when it renders several columns", () => {
     expect(renderWithTracks("200px 200px 200px").autoplayOnScroll).toBe(false);
+  });
+});
+
+describe("SceneGrid empty list", () => {
+  it("an empty list shows EmptyState with the page's message", () => {
+    render(
+      <MemoryRouter>
+        <SceneGrid
+          scenes={[]}
+          emptyMessage="No scenes found"
+          emptyDescription="Try adjusting your search filters"
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId("empty-state")).toHaveTextContent(
+      "No scenes found | Try adjusting your search filters"
+    );
   });
 });

@@ -11,7 +11,7 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "@peek/shared-types";
-import type { ListUrlState } from "../../hooks/useListUrlState";
+import type { ListUrlState, ListView } from "../../hooks/useListUrlState";
 import {
   GalleryCard,
   GroupCard,
@@ -55,7 +55,8 @@ export interface CardHandlers {
 /** What every card on a page gets: stable across renders, so memoised cards stay put */
 export interface CardContext extends CardHandlers {
   onHideSuccess: CardHideHandler;
-  fromPageTitle: string;
+  /** Where a card's page says the user came from; none inside a detail tab that names none */
+  fromPageTitle?: string;
 }
 
 /** The list a page's own hook reads */
@@ -69,6 +70,10 @@ export interface ListPageData {
   request: ListRequest;
   /** The list request's error, if it failed */
   error: unknown;
+  /** The heading over the list ("" for none) */
+  title: string;
+  /** Where a card's page says the user came from */
+  fromPageTitle?: string;
 }
 
 /** What a page's own hook adds to the list page */
@@ -81,6 +86,18 @@ export interface ListPageExtras {
 
 export interface ViewContext {
   listState: ListUrlState;
+}
+
+/** What a page's own grid gets (`ListPageConfig.renderGrid`) */
+export interface GridContext {
+  /** The page's rows as shown */
+  items: ListRow[];
+  /** Nothing to show yet: the grid shows its own placeholders */
+  loading: boolean;
+  gridDensity: string;
+  ctx: CardContext;
+  /** "No scenes found" */
+  emptyMessage: string;
 }
 
 /** A view beyond grid and table (the Tags hierarchy) */
@@ -110,6 +127,21 @@ export interface ListPageConfig {
   skeleton: { aspect: SkeletonAspect; heightRem: number };
   /** The table's columns entity, when not the entity type */
   tableEntity?: string;
+  /** The table's headers sort the list (true unless set false) */
+  tableSorts?: boolean;
+  /**
+   * The grid view, when the page draws its own (the scenes' selection grid,
+   * the clips' grid): it shows its loading placeholders and empty state
+   * itself
+   */
+  renderGrid?: (grid: GridContext) => ReactNode;
+  /** The wall's cog offers the wall's preview playback (video walls) */
+  wallPlaybackSetting?: boolean;
+  /**
+   * The filters the timeline's period and the open folder add
+   * (`timelineAndFolderFilters` unless named)
+   */
+  viewFilters?: (view: ListView) => Record<string, unknown>;
   extraViews?: Partial<Record<ViewModeId, ExtraView>>;
   /** "No performers found" */
   emptyMessage: string;

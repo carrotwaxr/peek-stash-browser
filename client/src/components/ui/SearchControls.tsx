@@ -7,25 +7,11 @@ import React, {
 } from "react";
 import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
-import {
-  useFilterOptions,
-  useListDefaults,
-  useLockedFields,
-} from "../../hooks/useListOptions";
-import {
-  type ListUrlState,
-  type PresetToLoad,
-  useListUrlState,
-} from "../../hooks/useListUrlState";
+import { useFilterOptions, useLockedFields } from "../../hooks/useListOptions";
+import type { ListUrlState, PresetToLoad } from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
-import {
-  type ListQuery,
-  buildListQuery,
-  sortOptionsFor,
-  withoutLockedOptions,
-} from "../../utils/listQuery";
+import { sortOptionsFor, withoutLockedOptions } from "../../utils/listQuery";
 import type { ListEntity } from "../../utils/urlParams";
 import {
   ActiveFilterChips,
@@ -54,37 +40,18 @@ type SettingConfig = NonNullable<
 interface SearchControlsProps {
   artifactType?: string;
   context?: string;
+  /** The results: the page's grid, table or other view */
   children: React.ReactNode;
-  /**
-   * The list's state from the page's `useListUrlState`. Without it the
-   * controls derive it themselves and report it through the callbacks below
-   * (until every page passes it).
-   */
-  listState?: ListUrlState;
-  /** The entity's default sort (without `listState`) */
-  initialSort?: string;
-  /**
-   * Called with the list's request (`ListQuery`) whenever it changes
-   * (without `listState`)
-   */
-  onQueryChange?: (query: Record<string, unknown>) => void;
-  /** Called with the per page whenever it changes (without `listState`) */
-  onPerPageStateChange?: (perPage: number) => void;
-  /** Filled with a page setter: the Images lightbox pages across the list with it */
-  paginationHandlerRef?: React.RefObject<((page: number) => void) | null>;
+  /** The list's state from the page's `useListUrlState` */
+  listState: ListUrlState;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: Record<string, unknown>;
   totalPages: number;
   totalCount: number;
-  supportsWallView?: boolean;
   viewModes?: ViewModeConfig[];
-  /** Called with the view whenever it changes (without `listState`) */
-  onViewModeChange?: (mode: string) => void;
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
   contextSettings?: SettingConfig[];
-  /** No request while the permanent filters are still empty (the timeline's first period) */
-  deferInitialQueryUntilFiltersReady?: boolean;
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
 }
@@ -101,131 +68,25 @@ const isActiveFilter = (value: unknown) =>
 const NO_SETTINGS: SettingConfig[] = [];
 
 /**
- * A page that does not pass `listState` yet: the controls derive the list
- * state from the URL themselves and keep the old outward contract, through
- * effects over derived values only, so the page's copies follow Back too.
- */
-const SearchControlsOnUrl = (props: SearchControlsProps) => {
-  const {
-    artifactType = "scene",
-    context,
-    initialSort = "o_counter",
-    onQueryChange,
-    onPerPageStateChange,
-    onViewModeChange,
-    permanentFilters = NO_FILTERS,
-    supportsWallView = false,
-    viewModes,
-    deferInitialQueryUntilFiltersReady = false,
-  } = props;
-  const entity = artifactType as ListEntity;
-  const filterOptions = useFilterOptions(artifactType);
-  const lockedFields = useLockedFields(artifactType, permanentFilters);
-  const { unitPreference } = useUnitPreference();
-
-  const defaults = useListDefaults(artifactType, initialSort);
-
-  const viewModeIds = useMemo(
-    () =>
-      viewModes
-        ? viewModes.map((mode) => mode.id)
-        : supportsWallView
-          ? ["grid", "wall"]
-          : ["grid"],
-    [viewModes, supportsWallView]
-  );
-
-  const sortOptions = useCallback(
-    (filters: Record<string, unknown>) => sortOptionsFor(artifactType, filters),
-    [artifactType]
-  );
-
-  const listState = useListUrlState({
-    entityType: entity,
-    ...(context ? { context } : {}),
-    filterOptions,
-    sortOptions,
-    viewModes: viewModeIds,
-    defaults,
-    permanentFilters,
-    lockedFields,
-  });
-
-  const { ready, filters, sort, page, perPage, q, viewMode } = listState;
-  const query = useMemo(
-    () =>
-      buildListQuery(
-        entity,
-        { ready, filters, sort, page, perPage, q },
-        permanentFilters,
-        unitPreference
-      ),
-    [
-      entity,
-      ready,
-      filters,
-      sort,
-      page,
-      perPage,
-      q,
-      permanentFilters,
-      unitPreference,
-    ]
-  );
-
-  // The page's request follows the URL: sent whenever it changes, not while
-  // the timeline's first period is still to come
-  const deferred =
-    deferInitialQueryUntilFiltersReady &&
-    Object.keys(permanentFilters).length === 0;
-  const lastSentRef = useRef<ListQuery | null>(null);
-  useEffect(() => {
-    if (!query || deferred || !onQueryChange) return;
-    if (lastSentRef.current && deepEqual(lastSentRef.current, query)) return;
-    lastSentRef.current = query;
-    onQueryChange(query);
-  }, [query, deferred, onQueryChange]);
-
-  // The page's copies of the view and per page follow the URL too
-  useEffect(() => {
-    onViewModeChange?.(viewMode);
-  }, [viewMode, onViewModeChange]);
-  useEffect(() => {
-    onPerPageStateChange?.(perPage);
-  }, [perPage, onPerPageStateChange]);
-
-  return <SearchControlsView {...props} listState={listState} />;
-};
-
-/**
  * The list's controls: search, sort, filters, presets, view and paging. Every
  * control writes the URL through the list state; nothing here holds a copy
  * of it (the filter panel keeps only the draft being edited).
  */
-const SearchControls = (props: SearchControlsProps) =>
-  props.listState ? (
-    <SearchControlsView {...props} listState={props.listState} />
-  ) : (
-    <SearchControlsOnUrl {...props} />
-  );
-
-const SearchControlsView = ({
+const SearchControls = ({
   artifactType = "scene",
   context,
   children,
   listState,
-  paginationHandlerRef,
   permanentFilters = NO_FILTERS,
   permanentFiltersMetadata = NO_FILTERS,
   totalPages,
   totalCount,
-  supportsWallView = false,
   viewModes,
   currentTableColumns = null,
   tableColumnsPopover = null,
   contextSettings = NO_SETTINGS,
   isRefreshing = false,
-}: SearchControlsProps & { listState: ListUrlState }) => {
+}: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -259,7 +120,6 @@ const SearchControlsView = ({
     viewMode,
     zoomLevel,
     gridDensity,
-    timelinePeriod,
     ready,
     applyFilters,
     removeFilter,
@@ -271,7 +131,6 @@ const SearchControlsView = ({
     setViewMode,
     setZoomLevel,
     setGridDensity,
-    setTimelinePeriod,
     loadPreset,
   } = listState;
   const sortField = sort.field;
@@ -396,15 +255,6 @@ const SearchControlsView = ({
     },
     [setPage]
   );
-
-  // The Images lightbox pages across the list with it; paging from the
-  // lightbox replaces the entry
-  useEffect(() => {
-    if (paginationHandlerRef) {
-      paginationHandlerRef.current = (page: number) =>
-        setPage(page, { history: "replace" });
-    }
-  }, [paginationHandlerRef, setPage]);
 
   // TV mode: PageUp and PageDown change the page (a desktop PageDown scrolls)
   useShortcutScope({
@@ -585,8 +435,8 @@ const SearchControlsView = ({
                 />
               </div>
 
-              {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
-              {(supportsWallView || viewModes) && (
+              {/* View Mode Toggle - Show if the page has views */}
+              {viewModes && (
                 <div data-tv-search-item="view-mode">
                   <ViewModeToggle
                     modes={viewModes}
@@ -602,7 +452,7 @@ const SearchControlsView = ({
               )}
 
               {/* Zoom Slider - Only shown in wall mode */}
-              {(supportsWallView || viewModes?.some((m) => m.id === "wall")) &&
+              {viewModes?.some((m) => m.id === "wall") &&
                 viewMode === "wall" && (
                   <div data-tv-search-item="zoom-level">
                     <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
@@ -801,9 +651,9 @@ const SearchControlsView = ({
           );
         })}
       </FilterPanel>
-      {/* Children: render prop or direct children. Stale results stay
-          clickable but dim while the next ones load. The important flag lets
-          reduced motion override the inline transition. */}
+      {/* The results. Stale results stay clickable but dim while the next
+          ones load. The important flag lets reduced motion override the
+          inline transition. */}
       <div
         data-testid="search-results"
         aria-busy={isRefreshing || undefined}
@@ -813,24 +663,7 @@ const SearchControlsView = ({
           transition: "opacity 0.2s ease",
         }}
       >
-        {!ready
-          ? null
-          : typeof children === "function"
-            ? (
-                children as (
-                  renderProps: Record<string, unknown>
-                ) => React.ReactNode
-              )({
-                viewMode,
-                zoomLevel,
-                gridDensity,
-                sortField,
-                sortDirection,
-                onSort: handleSortChange,
-                timelinePeriod,
-                setTimelinePeriod,
-              })
-            : children}
+        {ready ? children : null}
       </div>
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
