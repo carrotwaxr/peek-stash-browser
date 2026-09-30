@@ -8,7 +8,7 @@ import {
   useListDefaults,
   useLockedFields,
 } from "../../hooks/useListOptions";
-import { useListUrlState } from "../../hooks/useListUrlState";
+import { type ListView, useListUrlState } from "../../hooks/useListUrlState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import {
@@ -178,6 +178,16 @@ const EntityListPage = ({
     [entityType]
   );
 
+  // The folder view's Untagged lists the page's type in no tag's folder
+  const untaggedKind = config.folder
+    ? UNTAGGED_KIND[config.folder.countField]
+    : undefined;
+  const viewFilters = useCallback(
+    (view: ListView, pageFilters: Record<string, unknown>) =>
+      timelineAndFolderFilters(view, pageFilters, untaggedKind),
+    [untaggedKind]
+  );
+
   const listState = useListUrlState({
     entityType,
     ...(context ? { context } : {}),
@@ -187,7 +197,7 @@ const EntityListPage = ({
     defaults,
     permanentFilters: pagePermanentFilters,
     lockedFields,
-    viewFilters: timelineAndFolderFilters,
+    viewFilters,
   });
   const {
     ready,
@@ -210,11 +220,7 @@ const EntityListPage = ({
     isLoading: tagsLoading,
     error: folderTagsError,
     refetch: refetchFolderTags,
-  } = useFolderViewTags(
-    viewMode === "folder",
-    scope,
-    config.folder ? UNTAGGED_KIND[config.folder.countField] : undefined
-  );
+  } = useFolderViewTags(viewMode === "folder", scope, untaggedKind);
   // A failed tree shows its error; the library's first sync is loading
   const folderTagsInitializing = isLibraryInitializing(folderTagsError);
   const folderTagsFailed = !!folderTagsError && !folderTagsInitializing;

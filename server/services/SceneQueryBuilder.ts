@@ -44,6 +44,7 @@ import {
   buildTextFilter,
   noClause,
   refClause,
+  sceneUntaggedSql,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
@@ -347,6 +348,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       push(buildNumericFilter(filter.duration, "COALESCE(s.duration, 0)"));
     }
     if (filter.resolution) push(this.resolutionClause(filter.resolution));
+    // No tag, own or inherited (the folder view's Untagged), or some tag
+    if (filter.tagged !== undefined) {
+      const untagged = sceneUntaggedSql("s");
+      push({ sql: filter.tagged ? `NOT ${untagged}` : untagged, params: [] });
+    }
     if (filter.organized !== undefined) {
       push({ sql: "s.organized = ?", params: [filter.organized ? 1 : 0] });
     }

@@ -27,7 +27,8 @@
  * - scenes on A: SCENE (performer P, studio ST, collection G; GRAND,
  *   UNDER_HIDDEN, UNDER_RESTRICTED), SCENE2 (P; GRAND), MULTI_SCENE (MULTI),
  *   HIDDEN_SCENE (P; ON_HIDDEN_SCENE), DELETED_SCENE (P; ON_DELETED_SCENE),
- *   UNTAGGED_SCENE (P; no tag)
+ *   UNTAGGED_SCENE (P and Q; no tag), INHERITING_SCENE (Q; no tag of its own,
+ *   GRAND inherited)
  * - SCENE on B (P, ST and G on B; CHILD) and on OFF (P on OFF; ROOT)
  *
  * The user hides HIDDEN and HIDDEN_SCENE, and RESTRICTED is restricted for
@@ -77,9 +78,12 @@ const S = {
   DELETED_SCENE: "7740104",
   MULTI_SCENE: "7740105",
   UNTAGGED_SCENE: "7740106",
+  INHERITING_SCENE: "7740107",
 } as const;
 
 const P = "7740201";
+/** Performer of UNTAGGED_SCENE and INHERITING_SCENE only */
+const Q = "7740202";
 const ST = "7740301";
 const G = "7740401";
 
@@ -183,7 +187,7 @@ async function seedFixture(): Promise<void> {
     name: `${stashInstanceId}-${id}`,
   });
   await prisma.stashPerformer.createMany({
-    data: INSTANCES.map((inst) => named(P, inst)),
+    data: [...INSTANCES.map((inst) => named(P, inst)), named(Q, A)],
   });
   await prisma.stashStudio.createMany({
     data: [A, B].map((inst) => named(ST, inst)),
@@ -198,6 +202,7 @@ async function seedFixture(): Promise<void> {
       { id: S.SCENE2, stashInstanceId: A },
       { id: S.MULTI_SCENE, stashInstanceId: A },
       { id: S.UNTAGGED_SCENE, stashInstanceId: A },
+      { id: S.INHERITING_SCENE, stashInstanceId: A },
       { id: S.HIDDEN_SCENE, stashInstanceId: A },
       { id: S.DELETED_SCENE, stashInstanceId: A, deletedAt: new Date() },
       { id: S.SCENE, stashInstanceId: B, studioId: ST },
@@ -224,6 +229,15 @@ async function seedFixture(): Promise<void> {
       sceneTag(S.SCENE, OFF, T.ROOT),
     ],
   });
+  // A tag the scene inherits (from a performer or studio), as sync stores it
+  await prisma.sceneInheritedTag.create({
+    data: {
+      sceneId: S.INHERITING_SCENE,
+      sceneInstanceId: A,
+      tagId: T.GRAND,
+      tagInstanceId: A,
+    },
+  });
   // Each scene's stored count of its tags, as sync writes it
   await prisma.$executeRawUnsafe(
     `UPDATE StashScene SET tagCount = (SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = StashScene.id AND st.sceneInstanceId = StashScene.stashInstanceId)
@@ -242,6 +256,8 @@ async function seedFixture(): Promise<void> {
       scenePerformer(S.SCENE, A),
       scenePerformer(S.SCENE2, A),
       scenePerformer(S.UNTAGGED_SCENE, A),
+      { ...scenePerformer(S.UNTAGGED_SCENE, A), performerId: Q },
+      { ...scenePerformer(S.INHERITING_SCENE, A), performerId: Q },
       scenePerformer(S.HIDDEN_SCENE, A),
       scenePerformer(S.DELETED_SCENE, A),
       scenePerformer(S.SCENE, B),
@@ -507,10 +523,11 @@ describeWithDb("Tag tree (integration)", () => {
       [key(T.CHILD, B), key(T.ROOT, B)].sort()
     );
 
-    // Scenes tagged GRAND directly: SCENE and SCENE2
+    // Scenes with GRAND: SCENE and SCENE2 directly, INHERITING_SCENE by
+    // inheritance
     const byTag = await tree({ scope: { tag: key(T.GRAND, A) } });
     expect([...byTag.rows.keys()].sort()).toEqual(onScene);
-    expect(byTag.rows.get(key(T.GRAND, A))).toMatchObject({ scene_count: 2 });
+    expect(byTag.rows.get(key(T.GRAND, A))).toMatchObject({ scene_count: 3 });
   });
 
   it("scope parts combine: performer P and studio ST on A leave only SCENE", async () => {
@@ -535,27 +552,60 @@ describeWithDb("Tag tree (integration)", () => {
 
   describe("untagged counts", () => {
     const LISTS = {
-      scene: ["/api/library/scenes", "scene_filter", "findScenes"],
-      gallery: ["/api/library/galleries", "gallery_filter", "findGalleries"],
-      image: ["/api/library/images", "image_filter", "findImages"],
+      scene: ["/api/library/scenes", "scene_filter", "findScenes", "scenes"],
+      gallery: [
+        "/api/library/galleries",
+        "gallery_filter",
+        "findGalleries",
+        "galleries",
+      ],
+      image: ["/api/library/images", "image_filter", "findImages", "images"],
     } as const;
     type Kind = keyof typeof LISTS;
     const KINDS = Object.keys(LISTS) as Kind[];
 
-    /** The total of a list's tag_count EQUALS 0, the folder view's Untagged */
+    /**
+     * The folder view's Untagged list: scenes with no tag, their own or
+     * inherited (`tagged: false`); galleries and images with no tag rows
+     * (`tag_count` EQUALS 0)
+     */
+    const UNTAGGED_FILTER = {
+      scene: { tagged: false },
+      gallery: { tag_count: { value: 0, modifier: "EQUALS" } },
+      image: { tag_count: { value: 0, modifier: "EQUALS" } },
+    } as const;
+
+    /** A list's page of 250 and its total */
+    async function list(
+      kind: Kind,
+      filter: Record<string, unknown>
+    ): Promise<{ status: number; count: number; ids: string[] }> {
+      const [path, filterKey, resultKey, rowsKey] = LISTS[kind];
+      const res = await user.client.post<
+        Record<
+          string,
+          | ({ count: number } & Record<string, { id: string }[] | number>)
+          | undefined
+        >
+      >(path, { filter: { page: 1, per_page: 250 }, [filterKey]: filter });
+      const answer = res.data[resultKey];
+      const found = answer?.[rowsKey];
+      const rows = Array.isArray(found) ? found : [];
+      return {
+        status: res.status,
+        count: answer?.count ?? -1,
+        ids: rows.map((row) => row.id),
+      };
+    }
+
+    /** The total of the Untagged list */
     async function untaggedTotal(
       kind: Kind,
       filter: Record<string, unknown> = {}
     ): Promise<number> {
-      const [path, filterKey, resultKey] = LISTS[kind];
-      const res = await user.client.post<
-        Record<string, { count: number } | undefined>
-      >(path, {
-        filter: { page: 1, per_page: 1 },
-        [filterKey]: { ...filter, tag_count: { value: 0, modifier: "EQUALS" } },
-      });
+      const res = await list(kind, { ...filter, ...UNTAGGED_FILTER[kind] });
       expect(res.status).toBe(200);
-      return must(res.data[resultKey], resultKey).count;
+      return res.count;
     }
 
     /** The tree's Untagged count of a type; none without `untagged` */
@@ -576,7 +626,7 @@ describeWithDb("Tag tree (integration)", () => {
       };
     }
 
-    it("each is its list's total of tag_count EQUALS 0, and an excluded item leaves both (invariant 3)", async () => {
+    it("each is its Untagged list's total, and an excluded item leaves both (invariant 3)", async () => {
       const plain = await user.client.post<FindTagTreeResponse>(
         "/api/library/tags/tree",
         {}
@@ -595,7 +645,8 @@ describeWithDb("Tag tree (integration)", () => {
       const [scene] = await prisma.$queryRawUnsafe<
         { id: string; stashInstanceId: string }[]
       >(
-        `SELECT id, stashInstanceId FROM StashScene WHERE deletedAt IS NULL AND tagCount = 0 AND stashInstanceId NOT IN (?, ?, ?) LIMIT 1`,
+        `SELECT s.id, s.stashInstanceId FROM StashScene s WHERE s.deletedAt IS NULL AND s.tagCount = 0 AND s.stashInstanceId NOT IN (?, ?, ?)
+         AND NOT EXISTS (SELECT 1 FROM SceneInheritedTag it WHERE it.sceneId = s.id AND it.sceneInstanceId = s.stashInstanceId) LIMIT 1`,
         ...INSTANCES
       );
       const [image] = await prisma.$queryRawUnsafe<
@@ -638,7 +689,48 @@ describeWithDb("Tag tree (integration)", () => {
       }
     });
 
-    it("with a scope, the scope's scenes only: the total of its list's tag_count EQUALS 0", async () => {
+    it("a scene that only inherits a tag is not Untagged but in its tag's folder; a scene with no tag is Untagged", async () => {
+      const scope = { performer: key(Q, A) };
+      const byQ = { performers: { value: [key(Q, A)], modifier: "INCLUDES" } };
+
+      // Q's scenes: UNTAGGED_SCENE (no tag) and INHERITING_SCENE (GRAND,
+      // inherited only)
+      expect(await untagged("scene", { scope })).toBe(1);
+      const untaggedList = await list("scene", {
+        ...byQ,
+        ...UNTAGGED_FILTER.scene,
+      });
+      expect(untaggedList).toEqual({
+        status: 200,
+        count: 1,
+        ids: [S.UNTAGGED_SCENE],
+      });
+
+      // GRAND's folder on Q's page holds the inheriting scene, and its badge
+      // counts it
+      const { rows } = await tree({ scope });
+      expect(rows.get(key(T.GRAND, A))?.scene_count).toBe(1);
+      const folder = await list("scene", {
+        ...byQ,
+        tags: { value: [key(T.GRAND, A)], modifier: "INCLUDES", depth: 0 },
+      });
+      expect(folder).toEqual({
+        status: 200,
+        count: 1,
+        ids: [S.INHERITING_SCENE],
+      });
+
+      // The contract's tag_count still counts a scene's own tags only
+      const direct = await list("scene", {
+        ...byQ,
+        tag_count: { value: 0, modifier: "EQUALS" },
+      });
+      expect(direct.ids.sort()).toEqual(
+        [S.UNTAGGED_SCENE, S.INHERITING_SCENE].sort()
+      );
+    });
+
+    it("with a scope, the scope's scenes only: the total of its Untagged list", async () => {
       const scope = { scope: { performer: key(P, A) } };
       const scenes = await untagged("scene", scope);
 

@@ -83,7 +83,14 @@ export const SCENE_FIELDS = {
   bitrate: num(),
   framerate: num(),
   performer_count: count(),
+  /** The scene's own tags (`SceneTag`), inherited ones not counted */
   tag_count: count(),
+  /**
+   * Scenes with (true) or without (false) any tag, their own or inherited
+   * (`SceneInheritedTag`): false is the folder view's Untagged, the scenes
+   * in no tag's folder
+   */
+  tagged: bool(),
   /** The oldest performer's age on the scene's date */
   performer_age: count(),
   resolution: enumOf(RESOLUTIONS, { modifiers: COMPARISON_MODIFIERS }),
