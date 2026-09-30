@@ -641,7 +641,12 @@ interface HideInfo {
   skipConfirmation?: boolean;
 }
 
-export const CardMenuRow = ({
+/**
+ * The card's ellipsis menu with its hide flow: the confirmation dialog (unless
+ * the user turned it off), the hide with the entity's instance, then
+ * `onHideSuccess`. Every place a card shows its menu renders this.
+ */
+export const CardHideMenu = ({
   entityType,
   entityId,
   instanceId,
@@ -682,18 +687,13 @@ export const CardMenuRow = ({
 
   return (
     <>
-      <div
-        className="flex justify-end items-center w-full my-1"
-        style={{ height: "1.5rem" }}
-      >
-        <EntityMenu
-          entityType={entityType}
-          entityId={entityId}
-          entityName={entityTitle || ""}
-          instanceId={instanceId}
-          onHide={(hideInfo) => void handleHideClick(hideInfo)}
-        />
-      </div>
+      <EntityMenu
+        entityType={entityType}
+        entityId={entityId}
+        entityName={entityTitle || ""}
+        instanceId={instanceId}
+        onHide={(hideInfo) => void handleHideClick(hideInfo)}
+      />
       <HideConfirmationDialog
         isOpen={hideDialogOpen}
         onClose={() => {
@@ -707,6 +707,15 @@ export const CardMenuRow = ({
     </>
   );
 };
+
+export const CardMenuRow = (props: CardMenuRowProps) => (
+  <div
+    className="flex justify-end items-center w-full my-1"
+    style={{ height: "1.5rem" }}
+  >
+    <CardHideMenu {...props} />
+  </div>
+);
 
 /**
  * Card rating and favorite row - uses compact height when only menu is visible

@@ -550,7 +550,7 @@
   },
   "src/components/ui/BaseCard.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 4
     }
   },
   "src/components/ui/CardComponents.tsx": {
