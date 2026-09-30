@@ -1,0 +1,143 @@
+/**
+ * Key names and the rules for which element owns a key, shared by the
+ * shortcut dispatcher (`contexts/shortcutDispatcher.ts`) and the player's
+ * `useKeyboardShortcuts`.
+ */
+
+const KEY_NAMES: Readonly<Record<string, string>> = {
+  " ": "space",
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  Escape: "esc",
+  Enter: "enter",
+  Tab: "tab",
+  Backspace: "backspace",
+  Delete: "del",
+  Home: "home",
+  End: "end",
+  PageUp: "pageup",
+  PageDown: "pagedown",
+};
+
+/** A key's short name: `ArrowUp` is "up", " " is "space", `K` is "k". */
+export function normalizeKey(key: string): string {
+  return KEY_NAMES[key] ?? key.toLowerCase();
+}
+
+/**
+ * The combination a shortcut map names: modifiers in a fixed order, then the
+ * key ("ctrl+left", "shift+?", "space"). Meta counts as ctrl. Letters ignore
+ * shift (K and k are both "k"); a shifted symbol keeps its character ("shift+>").
+ */
+export function buildKeyCombo(event: KeyboardEvent): string {
+  const parts: string[] = [];
+  let key = normalizeKey(event.key);
+
+  if (event.ctrlKey || event.metaKey) parts.push("ctrl");
+  if (event.altKey) parts.push("alt");
+
+  const isLetter = /^[a-z]$/i.test(event.key);
+  if (event.shiftKey && !isLetter) {
+    parts.push("shift");
+    if (event.key.length === 1) {
+      key = event.key;
+    }
+  }
+
+  parts.push(key);
+  return parts.join("+");
+}
+
+/** Keys that only modify another key; they never start or end a shortcut. */
+export function isModifierKey(key: string): boolean {
+  return (
+    key === "Shift" ||
+    key === "Control" ||
+    key === "Alt" ||
+    key === "Meta" ||
+    key === "CapsLock" ||
+    key === "AltGraph"
+  );
+}
+
+// Input types that take no typed text
+const NON_TEXT_INPUT_TYPES = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
+
+function asElement(target: EventTarget | null): HTMLElement | null {
+  return target instanceof HTMLElement ? target : null;
+}
+
+/** An `input` that takes a single line of text (text, search, email, ...). */
+export function isSingleLineTextInput(target: EventTarget | null): boolean {
+  const el = asElement(target);
+  return (
+    el instanceof HTMLInputElement &&
+    !NON_TEXT_INPUT_TYPES.has(el.type.toLowerCase())
+  );
+}
+
+/** A field the user types into: a text input, a textarea or contenteditable. */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  const el = asElement(target);
+  if (!el) return false;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (isSingleLineTextInput(el)) return true;
+  // happy-dom leaves isContentEditable undefined; read the attribute too
+  const editable = el.closest("[contenteditable]");
+  return (
+    el.isContentEditable ||
+    (editable !== null && editable.getAttribute("contenteditable") !== "false")
+  );
+}
+
+const ARROWS = new Set(["up", "down", "left", "right"]);
+const ACTIVATION_KEYS = new Set(["space", "enter"]);
+
+/**
+ * Whether the focused control uses this key itself, so no shortcut may take
+ * it: sliders, selects, menus and listboxes own the arrows; buttons and links
+ * own Space and Enter (they activate).
+ */
+export function targetOwnsKey(
+  target: EventTarget | null,
+  combo: string
+): boolean {
+  const el = asElement(target);
+  if (!el) return false;
+
+  if (ARROWS.has(combo)) {
+    if (el instanceof HTMLSelectElement) return true;
+    if (el instanceof HTMLInputElement && el.type.toLowerCase() === "range") {
+      return true;
+    }
+    return (
+      el.closest(
+        '[role="slider"], [role="menu"], [role="menubar"], [role="listbox"]'
+      ) !== null
+    );
+  }
+
+  if (ACTIVATION_KEYS.has(combo)) {
+    if (el instanceof HTMLSelectElement) return true;
+    return (
+      el.closest(
+        'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="option"], [role="tab"], [role="checkbox"], [role="switch"], input[type="checkbox"], input[type="radio"]'
+      ) !== null
+    );
+  }
+
+  return false;
+}

@@ -1,10 +1,14 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
+import type { ReactNode } from "react";
+import type { NormalizedImage } from "@peek/shared-types";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { libraryApi } from "@/api";
 import Lightbox from "../../../src/components/ui/Lightbox";
+import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
 
 // Mock the API
-vi.mock("../../../api", () => ({
+vi.mock("@/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ settings: {} }),
   libraryApi: {
     updateRating: vi.fn().mockResolvedValue({}),
@@ -23,11 +27,6 @@ vi.mock("../../../hooks/useFullscreen", () => ({
     toggleFullscreen: vi.fn(),
     supportsFullscreen: true,
   }),
-}));
-
-// Mock useRatingHotkeys hook
-vi.mock("../../../hooks/useRatingHotkeys", () => ({
-  useRatingHotkeys: vi.fn(),
 }));
 
 // Mock react-swipeable
@@ -552,6 +551,100 @@ describe("Lightbox", () => {
 
       expect(exitFullscreen).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("keyboard", () => {
+    const image: NormalizedImage = {
+      id: "img-1",
+      instanceId: "inst-1",
+      title: "Image one",
+      code: null,
+      details: null,
+      photographer: null,
+      urls: [],
+      date: null,
+      studio: null,
+      studioId: null,
+      rating100: null,
+      o_counter: 0,
+      organized: false,
+      filePath: null,
+      width: null,
+      height: null,
+      fileSize: null,
+      files: [],
+      paths: { thumbnail: "/t.jpg", preview: "/p.jpg", image: "/i.jpg" },
+      performers: [],
+      tags: [],
+      galleries: [],
+      created_at: null,
+      updated_at: null,
+    };
+
+    /** A performer page: its own r-then-number rating hotkeys. */
+    const PerformerPage = ({ children }: { children: ReactNode }) => {
+      useRatingHotkeys({
+        setRating: (rating) =>
+          void libraryApi.updateRating("performer", "p-1", rating, "inst-1"),
+      });
+      return <>{children}</>;
+    };
+
+    const press = (key: string) => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key });
+    };
+
+    it("r then 4 with the lightbox open over a performer page rates the image once and the performer never", async () => {
+      render(
+        <PerformerPage>
+          <Lightbox images={[image]} isOpen={true} onClose={vi.fn()} />
+        </PerformerPage>
+      );
+
+      press("r");
+      press("4");
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(libraryApi.updateRating).toHaveBeenCalledTimes(1);
+      expect(libraryApi.updateRating).toHaveBeenCalledWith(
+        "image",
+        "img-1",
+        80,
+        "inst-1"
+      );
+    });
+
+    it("is a modal dialog that holds focus while open", () => {
+      render(<Lightbox images={[image]} isOpen={true} onClose={vi.fn()} />);
+
+      const dialog = screen.getByRole("dialog", { name: "Image viewer" });
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it("Escape closes it and the arrows page through its images", () => {
+      const onClose = vi.fn();
+      const second: NormalizedImage = {
+        ...image,
+        id: "img-2",
+        paths: { thumbnail: "/t2.jpg", preview: "/p2.jpg", image: "/i2.jpg" },
+      };
+      render(
+        <Lightbox images={[image, second]} isOpen={true} onClose={onClose} />
+      );
+      const src = () =>
+        screen.getByRole("img", { name: "Image one" }).getAttribute("src");
+
+      press("ArrowRight");
+      expect(src()).toBe("/i2.jpg");
+      press("ArrowLeft");
+      expect(src()).toBe("/i.jpg");
+
+      press("Escape");
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -630,7 +630,7 @@
   },
   "src/components/ui/Lightbox.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 10
+      "count": 8
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -1249,11 +1249,6 @@
     }
   },
   "src/hooks/useImagesPagination.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
-  "src/hooks/useKeyboardShortcuts.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }

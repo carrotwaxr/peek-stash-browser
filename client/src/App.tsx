@@ -25,6 +25,7 @@ import { PUBLIC_ROUTES } from "./constants/navigation";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
 import { ConfigProvider } from "./contexts/ConfigContext";
+import { ShortcutScopeProvider } from "./contexts/ShortcutScopeContext";
 import { TVModeProvider } from "./contexts/TVModeProvider";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider";
 import { ThemeProvider } from "./themes/ThemeProvider";
@@ -411,18 +412,20 @@ function App() {
           <ConfigProvider>
             <UnitPreferenceProvider>
               <TVModeProvider>
-                <CardDisplaySettingsProvider>
-                  <AppContent />
-                  <Toaster
-                    position="top-right"
-                    toastOptions={{
-                      duration: 3000,
-                      style: {
-                        padding: "0",
-                      },
-                    }}
-                  />
-                </CardDisplaySettingsProvider>
+                <ShortcutScopeProvider>
+                  <CardDisplaySettingsProvider>
+                    <AppContent />
+                    <Toaster
+                      position="top-right"
+                      toastOptions={{
+                        duration: 3000,
+                        style: {
+                          padding: "0",
+                        },
+                      }}
+                    />
+                  </CardDisplaySettingsProvider>
+                </ShortcutScopeProvider>
               </TVModeProvider>
             </UnitPreferenceProvider>
           </ConfigProvider>
