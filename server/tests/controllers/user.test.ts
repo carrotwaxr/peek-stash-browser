@@ -1695,11 +1695,16 @@ describe("User Controller", () => {
       expect(mockPrisma.userContentRestriction.findMany).not.toHaveBeenCalled();
     });
 
-    it("answers the user's rows", async () => {
-      const stored: UserContentRestriction[] = [
-        partialRow({ id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" }),
-      ];
-      mockPrisma.userContentRestriction.findMany.mockResolvedValue(stored);
+    it("answers the user's rows with the stored lists parsed", async () => {
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        partialRow({
+          id: 10,
+          entityType: "tags",
+          mode: "INCLUDE",
+          entityIds: '["5:a","6:a"]',
+          restrictEmpty: false,
+        }),
+      ]);
       const req = reqFor(getUserRestrictions, {
         params: { userId: "3" },
         user: ADMIN,
@@ -1708,8 +1713,24 @@ describe("User Controller", () => {
       await getUserRestrictions(req, res);
       expect(mockPrisma.userContentRestriction.findMany).toHaveBeenCalledWith({
         where: { userId: 3 },
+        select: {
+          id: true,
+          entityType: true,
+          mode: true,
+          entityIds: true,
+          restrictEmpty: true,
+        },
       });
-      expect(res._getOkBody().restrictions).toEqual(stored);
+      expect(res._getOkBody().restrictions).toEqual([
+        {
+          id: 10,
+          entityType: "tags",
+          mode: "INCLUDE",
+          entityIds: ["5:a", "6:a"],
+          restrictEmpty: false,
+          unreadable: false,
+        },
+      ]);
     });
   });
 });
