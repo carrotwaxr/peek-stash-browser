@@ -25,9 +25,9 @@ paths:
 - Detail pages take their tab counts from `useRelationCounts` (the tabs show `TAB_COUNT_LOADING` and none opens until it answers) and filter, read and count on the loaded entity's `instanceId`, never the URL's `instance` param (a bare-id link has none).
 - Every write component and API call takes the entity's `instanceId` as a required string (`hideEntity`, `EntityMenu`, `libraryApi.updateRating`/`updateFavorite`, `useHideBulkAction`). A cache update for a list row matches by `makeCompositeKey(id, instanceId)`, never the bare id.
 
-## useFilterState
+## List state
 
-It reads the URL once on mount and afterwards only writes it; reading it back again loops. The debounced search reads current state through `stateRef` to avoid stale closures. Precedence between a saved preset and the URL has caused bugs: URL filters win only when the URL has params other than `page` and `per_page`; sort and direction still come from the preset unless the URL names them; a URL `per_page` always wins.
+List state lives in the URL: `useListUrlState` (`hooks/useListUrlState.ts`) derives it on every render from `useSearchParams` and the cached presets, per field: the URL, else the default preset, else the entity default. "The URL has filters" is decided by the entity's `UI_KEYS`, `q` and `filters=none` only (`instance`, `tab` and presentation keys never disable the preset). Clearing the filters (Clear All, the last chip, a preset without filters) writes `filters=none`, which is list-owned and never sent. Setters rewrite only the list's own keys (`listOwnedKeys`) and keep the page's (`tab`, `instance`, `includeSub*`, `image`). Push for filters, sort, page, folder and presets; replace for search text, per page, view, zoom, density, timeline period and lightbox paging. A random sort keeps its seed in the URL. The request is `buildListQuery(entity, state, permanentFilters)`, permanent filters last. Never copy list state into `useState`.
 
 ## Structure
 
