@@ -7,7 +7,10 @@ import { useNavigate } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "../../contexts/ConfigContext";
-import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
+import {
+  type PageChangeOptions,
+  usePaginatedLightbox,
+} from "../../hooks/usePaginatedLightbox";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import Lightbox from "../ui/Lightbox";
@@ -55,10 +58,11 @@ type ImagesResponse = {
 } & Record<string, unknown>;
 
 /**
- * Images: a card or wall tile opens the lightbox, which pages across the
- * list by the list's own page and page size (a page turned from the
- * lightbox replaces the history entry); a card's O, rating and favorite
- * change the image on its instance in the cached page.
+ * Images: a card or wall tile opens the lightbox (a history entry naming
+ * the image, so Back closes it), which pages across the list by the list's
+ * own page and page size (a page turned from the lightbox replaces the
+ * entry); a card's O, rating and favorite change the image on its instance
+ * in the cached page.
  */
 export function useImageListPage({
   listState,
@@ -70,14 +74,17 @@ export function useImageListPage({
   const { page, perPage, setPage } = listState;
 
   const turnPage = useCallback(
-    (next: number) => setPage(next, { history: "replace" }),
+    (next: number, options?: PageChangeOptions) =>
+      setPage(next, { history: options?.replace ? "replace" : "push" }),
     [setPage]
   );
+  // The open image is in the URL (`image`, which the list's setters keep)
   const lightbox = usePaginatedLightbox({
     perPage,
     totalCount: count,
     externalPage: page,
     onExternalPageChange: turnPage,
+    images: items,
   });
   const { openLightbox, consumePendingLightboxIndex } = lightbox;
 

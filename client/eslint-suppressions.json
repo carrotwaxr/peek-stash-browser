@@ -1153,14 +1153,6 @@
       "count": 1
     }
   },
-  "src/hooks/usePaginatedLightbox.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
   "src/hooks/useTableColumns.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
@@ -1430,14 +1422,6 @@
     },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 123
-    }
-  },
-  "tests/hooks/usePaginatedLightbox.test.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 20
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 20
     }
   },
   "tests/utils/urlParams.test.ts": {

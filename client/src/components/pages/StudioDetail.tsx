@@ -20,6 +20,7 @@ import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import type { PageChangeOptions } from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -847,16 +848,17 @@ const ImagesTab = ({
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get("page") || "1") || 1;
 
+  // Keeps the tab and the open image; a page turned from the lightbox
+  // replaces the entry
   const handleImagePageChange = useCallback(
-    (newPage: number) => {
+    (newPage: number, options?: PageChangeOptions) => {
       const params = new URLSearchParams(searchParams);
       if (newPage === 1) {
         params.delete("page");
       } else {
         params.set("page", String(newPage));
       }
-      // Preserve tab param
-      setSearchParams(params);
+      setSearchParams(params, { replace: options?.replace === true });
     },
     [searchParams, setSearchParams]
   );
