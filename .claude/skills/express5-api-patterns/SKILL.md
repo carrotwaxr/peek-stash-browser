@@ -73,7 +73,7 @@ A handler does not try/catch to log and answer 500: the rejection reaches the ce
 
 Only an `AppError`'s message reaches the client, so write it for them and never pass a caught error's message into one. The handler logs 5xx at ERROR ("Request failed") and the rest at WARN ("Request refused"), with the method, the path (no query string), the user id and the whole error (`{ error }`, which the logger expands to name, message, stack, code and cause); a refused request body is logged by its `type` only, since its message quotes the body. After headers are sent it destroys the response and writes nothing. Use an explicit try/catch only for cleanup or a custom response shape, and check `res.headersSent` before responding from a catch block or a stream event handler.
 
-A list, clip, picker, carousel, similar-scenes or recommended request goes through the parser in `utils/listRequest.ts` before the handler's `try`, so its `ValidationError` reaches the central handler (a `catch` that answers 500 would swallow it); `logDropped(route, request.dropped)` records what drop mode ignored.
+A list, clip, picker, carousel, similar-scenes or recommended request goes through the parser in `utils/listRequest.ts` before the handler's `try`, so its `ValidationError` reaches the central handler (a `catch` that answers 500 would swallow it). Only a stored carousel rule parses leniently (`parseStoredSceneQuery`); log its `ignored` with `logIgnoredStoredRule(carouselId, ignored)`.
 
 ## 3. Typed handlers
 
