@@ -7,20 +7,24 @@ interface FolderData {
   id: string;
   name: string;
   thumbnail?: string | null;
+  /** The items of the page's type that carry the folder's tag itself */
+  count?: number;
 }
 
 interface Props {
   folder: FolderData;
   onClick: (folder: FolderData) => void;
+  /** The count in words ("3 galleries"); no badge without it */
+  countLabel?: (count: number) => string;
   className?: string;
 }
 
 /**
  * Card component for displaying a folder (tag) in folder view.
- * Shows thumbnail and folder name.
+ * Shows thumbnail, folder name and its item count.
  */
-const FolderCard = ({ folder, onClick, className = "" }: Props) => {
-  const { name, thumbnail, id } = folder;
+const FolderCard = ({ folder, onClick, countLabel, className = "" }: Props) => {
+  const { name, thumbnail, id, count } = folder;
   const isUntagged = id === UNTAGGED_FOLDER_ID;
 
   return (
@@ -65,13 +69,26 @@ const FolderCard = ({ folder, onClick, className = "" }: Props) => {
       </div>
 
       {/* Label area */}
-      <div className="p-3">
+      <div className="p-3 flex items-center gap-2">
         <h3
-          className="font-medium truncate text-left"
+          className="font-medium truncate text-left flex-1 min-w-0"
           style={{ color: "var(--text-primary)" }}
         >
           {name}
         </h3>
+        {countLabel !== undefined && count !== undefined && (
+          <span
+            aria-label={countLabel(count)}
+            title={`${countLabel(count)} directly in this folder`}
+            className="flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {count}
+          </span>
+        )}
       </div>
     </button>
   );

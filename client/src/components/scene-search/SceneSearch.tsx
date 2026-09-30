@@ -13,7 +13,6 @@ import type {
 } from "../list/listPageConfigs";
 import { LIST_SOURCES } from "../list/listSources";
 import { viewModeOptions } from "../list/listViewModes";
-import { sceneTimelineAndFolderFilters } from "../list/viewFilters";
 import { SceneCard } from "../ui/index";
 import SceneGrid from "./SceneGrid";
 
@@ -110,7 +109,10 @@ const SCENE_LIST: ListPageConfig = {
   ),
   skeleton: { aspect: "landscape", heightRem: 5 },
   wallPlaybackSetting: true,
-  viewFilters: sceneTimelineAndFolderFilters,
+  folder: {
+    countField: "scene_count",
+    label: { one: "scene", many: "scenes" },
+  },
   emptyMessage: "No scenes found",
   usePage: useSceneListPage,
 };
@@ -126,6 +128,12 @@ interface SceneSearchProps {
   subtitle?: string;
   title?: string;
   fromPageTitle?: string;
+  /**
+   * The folder view is offered (true unless set false: a tag page's Scenes
+   * tab with Include sub-tags on, where a folder cannot join the page's
+   * tag at depth 0)
+   */
+  folderView?: boolean;
 }
 
 /**
@@ -142,6 +150,7 @@ const SceneSearch = ({
   subtitle,
   title,
   fromPageTitle,
+  folderView = true,
 }: SceneSearchProps) => (
   <EntityListPage
     config={SCENE_LIST}
@@ -153,6 +162,7 @@ const SceneSearch = ({
       title,
       subtitle,
       fromPageTitle,
+      folderView,
     }}
   />
 );

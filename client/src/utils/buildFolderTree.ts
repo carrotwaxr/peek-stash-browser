@@ -1,23 +1,17 @@
 // client/src/utils/buildFolderTree.ts
 import { indexTagHierarchy, tagTreeKey } from "./buildTagTree";
-import { makeCompositeKey, parseCompositeKey } from "./compositeKey";
+import { parseCompositeKey } from "./compositeKey";
 
+/** The Untagged folder's id (A10b brings the folder back as a real filter) */
 export const UNTAGGED_FOLDER_ID = "__untagged__";
 
-/**
- * The fields the folder tree reads from a scene, gallery or image. Its tags
- * are on its own instance.
- */
-export interface FolderTreeItem {
-  instanceId?: string | null;
-  tags?: readonly { id: string }[] | null;
-  paths?: { screenshot?: string | null; thumbnail?: string | null } | null;
-  cover?: { paths?: { thumbnail?: string | null } | null } | null;
-}
+/** A tag tree row's count of the page's type: what a folder counts */
+export type FolderCountField = "scene_count" | "gallery_count" | "image_count";
 
 /**
  * The fields the folder view reads from a tag (a row of the tag tree). Its
- * parents are on its own instance; children are derived from them.
+ * parents are on its own instance; children are derived from them. The
+ * counts are the viewer's (the tree subtracts their exclusions).
  */
 export interface FolderTreeTag {
   id: string;
@@ -30,35 +24,22 @@ export interface FolderTreeTag {
   image_path?: string | null;
 }
 
-/** A folder at the current level: a tag, or the Untagged folder (tag null) */
+/** A folder at the current level: a tag */
 export interface FolderNode<T extends FolderTreeTag> {
-  /** The tag's `tagTreeKey` ("id:instanceId"), or UNTAGGED_FOLDER_ID */
+  /** The tag's `tagTreeKey` ("id:instanceId") */
   id: string;
-  tag: T | null;
+  tag: T;
   name: string;
   thumbnail: string | null;
-  totalCount: number;
+  /** The items of the page's type that carry the tag itself */
+  count: number;
   isFolder: true;
 }
 
-export interface FolderTree<I extends FolderTreeItem, T extends FolderTreeTag> {
+export interface FolderTree<T extends FolderTreeTag> {
   folders: FolderNode<T>[];
-  items: I[];
   breadcrumbs: { id: string; name: string }[];
 }
-
-/**
- * Get thumbnail from an item (scene, gallery, or image)
- */
-const getItemThumbnail = (item: FolderTreeItem): string | null => {
-  // Scene
-  if (item.paths?.screenshot) return item.paths.screenshot;
-  // Gallery
-  if (item.cover?.paths?.thumbnail) return item.cover.paths.thumbnail;
-  // Image
-  if (item.paths?.thumbnail) return item.paths.thumbnail;
-  return null;
-};
 
 /**
  * A folder path with its bare segments resolved to tag keys. A folder-view
@@ -92,195 +73,66 @@ export function resolveFolderPath(
 }
 
 /**
- * Build a folder tree structure from items and tag hierarchy.
- *
- * Items only appear at a level if they have that exact tag AND don't have any
- * child tags that would place them deeper in the hierarchy.
+ * The folders at a path: the current tag's children, or the roots, each
+ * shown while its subtree (the tag or a descendant) holds a tag with items
+ * of the page's type (`countField` above 0). A folder's `count` is its tag's
+ * own. Items are not placed here: the list pages the folder's own items.
  *
  * Tags go by `tagTreeKey` ("id:instanceId"), paths too, so two instances'
- * same-numbered tags are two folders. Each tag's ancestors are computed once
- * per call; an item is placed by the union of its tags' ancestors, not by
- * walking every folder's subtree per item.
- *
- * @param {Array} items - Content items (scenes, galleries, images) with tags array
- * @param {Array} tags - All tags with their parents
- * @param {Array} currentPath - Array of tag keys representing current navigation path
- * @returns {Object} { folders: FolderNode[], items: Item[], breadcrumbs: Breadcrumb[] }
+ * same-numbered tags are two folders. Each tag's parents are read once; the
+ * tags with content mark their ancestors in one walk each, stopping at a
+ * tag already marked, so a parent loop ends.
  */
-export function buildFolderTree<
-  I extends FolderTreeItem,
-  T extends FolderTreeTag,
->(
-  items: readonly I[],
+export function buildFolderTree<T extends FolderTreeTag>(
   tags: readonly T[],
-  currentPath: string[] = []
-): FolderTree<I, T> {
-  if (!items || !tags) {
-    return { folders: [], items: [], breadcrumbs: [] };
-  }
-
+  currentPath: readonly string[],
+  countField: FolderCountField
+): FolderTree<T> {
   const { byKey, parentKeys, childKeys, rootKeys } = indexTagHierarchy(tags);
 
-  // Build breadcrumbs from path
-  const breadcrumbs = currentPath.map((key) => {
-    const tag = byKey.get(key);
-    return { id: key, name: tag?.name || "Unknown" };
-  });
+  const breadcrumbs = currentPath.map((key) => ({
+    id: key,
+    name: byKey.get(key)?.name || "Unknown",
+  }));
 
-  // Determine current location
-  const currentTagKey = currentPath[currentPath.length - 1] ?? null;
-  const currentTag = currentTagKey ? byKey.get(currentTagKey) : undefined;
+  const countOf = (tag: T) => tag[countField] ?? 0;
 
-  // The folders at this level: the current tag's children, or the roots
-  const childTagKeys = new Set(
-    currentTag && currentTagKey
-      ? (childKeys.get(currentTagKey) ?? [])
-      : rootKeys
-  );
-
-  // Each tag with its ancestors, computed once per tag
-  const reachMemo = new Map<string, ReadonlySet<string>>();
-  const ancestorsOrSelf = (
-    key: string,
-    visiting = new Set<string>()
-  ): ReadonlySet<string> => {
-    const known = reachMemo.get(key);
-    if (known) return known;
-    const reach = new Set<string>([key]);
-    // A circular parent ends the walk without caching a partial answer
-    if (visiting.has(key)) return reach;
-    visiting.add(key);
-    for (const parentKey of parentKeys.get(key) ?? []) {
-      for (const ancestor of ancestorsOrSelf(parentKey, visiting)) {
-        reach.add(ancestor);
-      }
-    }
-    visiting.delete(key);
-    reachMemo.set(key, reach);
-    return reach;
-  };
-
-  // Group items by which folder they belong to at this level
-  const folderContents = new Map<string, I[]>(); // tag key -> items[] (for recursive counts)
-  const leafItems: I[] = []; // Items that appear directly at this level
-  const untaggedItems: I[] = [];
-
-  const addToFolder = (tagKey: string, item: I) => {
-    const contents = folderContents.get(tagKey);
-    if (contents) {
-      contents.push(item);
-    } else {
-      folderContents.set(tagKey, [item]);
+  // Every tag whose subtree holds content: the tags with a count and their
+  // ancestors
+  const withContent = new Set<string>();
+  const mark = (key: string) => {
+    const stack = [key];
+    while (stack.length > 0) {
+      const next = stack.pop();
+      if (next === undefined || withContent.has(next)) continue;
+      withContent.add(next);
+      stack.push(...(parentKeys.get(next) ?? []));
     }
   };
+  for (const [key, tag] of byKey) {
+    if (countOf(tag) > 0) mark(key);
+  }
 
-  items.forEach((item) => {
-    const itemTagKeys = new Set(
-      (item.tags || []).map((t) => makeCompositeKey(t.id, item.instanceId))
-    );
+  const currentTagKey = currentPath.at(-1);
+  const levelKeys =
+    currentTagKey === undefined
+      ? rootKeys
+      : (childKeys.get(currentTagKey) ?? []);
 
-    // Check if item has no tags
-    if (itemTagKeys.size === 0) {
-      if (currentPath.length === 0) {
-        // Only show untagged at root
-        untaggedItems.push(item);
-      }
-      return;
-    }
-
-    // Every tag the item reaches: its own and their ancestors
-    const reach = new Set<string>();
-    for (const key of itemTagKeys) {
-      for (const ancestor of ancestorsOrSelf(key)) reach.add(ancestor);
-    }
-
-    // The folders at this level that hold the item (it has the folder's tag
-    // or a descendant of it)
-    let inChildFolder = false;
-    for (const childKey of childTagKeys) {
-      if (reach.has(childKey)) {
-        addToFolder(childKey, item);
-        inChildFolder = true;
-      }
-    }
-
-    // At ROOT level items never appear as loose items, only inside folders
-    // (or in Untagged). Inside a folder, an item is a leaf when it has the
-    // current tag directly and no child folder holds it.
-    if (
-      currentPath.length > 0 &&
-      currentTagKey !== null &&
-      itemTagKeys.has(currentTagKey) &&
-      !inChildFolder
-    ) {
-      leafItems.push(item);
-    }
-  });
-
-  // Build folder nodes
-  // Show ALL folders from tag hierarchy that have content (pre-computed count > 0)
-  // This ensures folders appear even when current page has no items for them
   const folders: FolderNode<T>[] = [];
-
-  childTagKeys.forEach((tagKey) => {
-    const tag = byKey.get(tagKey);
-    if (!tag) return;
-
-    const folderItems = folderContents.get(tagKey) ?? [];
-
-    // Get pre-computed count from tag (image_count, scene_count, or gallery_count)
-    // These are set by the backend during sync and represent the total items with this tag
-    const preComputedCount =
-      tag.image_count || tag.scene_count || tag.gallery_count || 0;
-
-    // Check if tag has children (it's a container/organizational tag)
-    const hasChildren = (childKeys.get(tagKey)?.length ?? 0) > 0;
-
-    // If no items on current page AND no pre-computed count AND no children, this folder is truly empty
-    // Container tags (with children) should always show even if they have no direct content
-    if (folderItems.length === 0 && preComputedCount === 0 && !hasChildren) {
-      return;
-    }
-
-    // Use items count if available (more accurate for current page context)
-    // Fall back to pre-computed count when no items on current page
-    const totalCount =
-      folderItems.length > 0 ? folderItems.length : preComputedCount;
-
-    // Get thumbnail - prefer tag image, then first item, then null
-    const thumbnail =
-      tag.image_path ||
-      (folderItems[0] ? getItemThumbnail(folderItems[0]) : null);
-
+  for (const key of new Set(levelKeys)) {
+    const tag = byKey.get(key);
+    if (!tag || !withContent.has(key)) continue;
     folders.push({
-      id: tagKey,
+      id: key,
       tag,
       name: tag.name,
-      thumbnail,
-      totalCount,
-      isFolder: true,
-    });
-  });
-
-  // Add untagged folder if at root and has items
-  const firstUntagged = untaggedItems[0];
-  if (currentPath.length === 0 && firstUntagged) {
-    folders.push({
-      id: UNTAGGED_FOLDER_ID,
-      tag: null,
-      name: "Untagged",
-      thumbnail: getItemThumbnail(firstUntagged),
-      totalCount: untaggedItems.length,
+      thumbnail: tag.image_path || null,
+      count: countOf(tag),
       isFolder: true,
     });
   }
-
-  // Sort folders alphabetically
   folders.sort((a, b) => a.name.localeCompare(b.name));
 
-  return {
-    folders,
-    items: leafItems,
-    breadcrumbs,
-  };
+  return { folders, breadcrumbs };
 }

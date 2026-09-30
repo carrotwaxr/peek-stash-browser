@@ -9,7 +9,11 @@
  * cannot see is left out of a tag's parents, so the tag becomes a root.
  *
  * With a scope (a performer, tag, studio and collection, all that are given),
- * a recursive CTE starts from the tags on the scope's visible scenes and walks
+ * a recursive CTE starts from the tags on the scope's visible scenes (their
+ * own and their inherited ones, from `SceneTag` and `SceneInheritedTag`, as
+ * the scene list's tag filter matches them; a tag scope's scenes too), each
+ * counted once per scene, so a folder's badge on a detail page is its list's
+ * total (the folder at depth 0 with the page's entity), and walks
  * `json_each(parentIds)` up to their ancestors. Each step applies the same
  * three conditions, so the walk stops at a hidden or restricted ancestor:
  * the child it would have led to becomes a root, and the ancestor's own
@@ -138,7 +142,17 @@ function scopeScenes(scope: TagTreeScopeRefs): Fragment | null {
     "performerId",
     "performerInstanceId"
   );
-  junction(scope.tag, "SceneTag", "tagId", "tagInstanceId");
+  if (scope.tag) {
+    // A tag's scenes carry it directly or by inheritance, as the scene
+    // list's tag filter matches them; one part of the intersection
+    const direct = refMatch(scope.tag, "j.tagId", "j.tagInstanceId");
+    parts.push({
+      sql: `SELECT u.sceneId, u.sceneInstanceId FROM (SELECT j.sceneId, j.sceneInstanceId FROM SceneTag j WHERE ${direct.sql}
+UNION
+SELECT j.sceneId, j.sceneInstanceId FROM SceneInheritedTag j WHERE ${direct.sql}) u`,
+      params: [...direct.params, ...direct.params],
+    });
+  }
   junction(scope.group, "SceneGroup", "groupId", "groupInstanceId");
   if (scope.studio) {
     // A scene's studio is on the scene's own instance
@@ -185,14 +199,27 @@ function scopedQuery(
 scope_scene(id, inst) AS (
 ${scenes.sql}
 ),
-seed(tagId, tagInstanceId, n) AS (
-  SELECT st.tagId, st.tagInstanceId, COUNT(*)
+visible_scene(id, inst) AS MATERIALIZED (
+  SELECT s.id, s.stashInstanceId
   FROM scope_scene x
   CROSS JOIN StashScene s ON s.id = x.id AND s.stashInstanceId = x.inst
   ${scene.join.sql}
-  CROSS JOIN SceneTag st ON st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId
   WHERE ${scene.where.sql}
-  GROUP BY st.tagId, st.tagInstanceId
+),
+seed(tagId, tagInstanceId, n) AS (
+  SELECT tagId, tagInstanceId, SUM(n) FROM (
+    SELECT st.tagId AS tagId, st.tagInstanceId AS tagInstanceId, COUNT(*) AS n
+    FROM visible_scene v
+    CROSS JOIN SceneTag st ON st.sceneId = v.id AND st.sceneInstanceId = v.inst
+    GROUP BY st.tagId, st.tagInstanceId
+    UNION ALL
+    SELECT it.tagId, it.tagInstanceId, COUNT(*)
+    FROM visible_scene v
+    CROSS JOIN SceneInheritedTag it ON it.sceneId = v.id AND it.sceneInstanceId = v.inst
+    WHERE NOT EXISTS (SELECT 1 FROM SceneTag d WHERE d.sceneId = it.sceneId AND d.sceneInstanceId = it.sceneInstanceId AND d.tagId = it.tagId AND d.tagInstanceId = it.tagInstanceId)
+    GROUP BY it.tagId, it.tagInstanceId
+  )
+  GROUP BY tagId, tagInstanceId
 ),
 tree(id, inst, parentIds) AS (
   SELECT t.id, t.stashInstanceId, t.parentIds

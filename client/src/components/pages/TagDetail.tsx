@@ -379,6 +379,8 @@ const TagDetail = () => {
                   }}
                   title={`Scenes tagged with ${(tag?.name as string) || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
                   fromPageTitle={(tag?.name as string) || "Tag"}
+                  // A folder joins this tag at depth 0: none with sub-tags
+                  folderView={!includeSubTags}
                 />
               )}
 

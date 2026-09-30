@@ -114,6 +114,19 @@ describe("loadTagTree", () => {
     }
     expect(sql).toContain("se.entityType = 'scene'");
     expect(sql).toContain("pe.entityType = 'tag'");
+    // A scene's tags are its own and its inherited ones, read by the
+    // junctions, never the inherited JSON
+    expect(sql).toContain(
+      "FROM visible_scene v\n    CROSS JOIN SceneTag st ON st.sceneId = v.id AND st.sceneInstanceId = v.inst"
+    );
+    expect(sql).toContain(
+      "FROM visible_scene v\n    CROSS JOIN SceneInheritedTag it ON it.sceneId = v.id AND it.sceneInstanceId = v.inst"
+    );
+    // An inherited row that is also direct counts once
+    expect(sql).toContain(
+      "WHERE NOT EXISTS (SELECT 1 FROM SceneTag d WHERE d.sceneId = it.sceneId AND d.sceneInstanceId = it.sceneInstanceId AND d.tagId = it.tagId AND d.tagInstanceId = it.tagInstanceId)"
+    );
+    expect(sql).not.toContain("inheritedTagIds");
     expect(sql).toContain("CROSS JOIN json_each(c.parentIds) jp");
     expect(sql).toContain(
       "CROSS JOIN StashTag p ON p.id = jp.value AND p.stashInstanceId = c.inst"
@@ -138,14 +151,24 @@ describe("loadTagTree", () => {
     expect(sql).toContain(
       "FROM ScenePerformer j WHERE j.performerId = ?\nINTERSECT\n"
     );
+    // A tag's scenes carry it directly or by inheritance
     expect(sql).toContain(
-      "FROM SceneTag j WHERE j.tagId = ? AND j.tagInstanceId = ?"
+      "FROM SceneTag j WHERE j.tagId = ? AND j.tagInstanceId = ?\nUNION\nSELECT j.sceneId, j.sceneInstanceId FROM SceneInheritedTag j WHERE j.tagId = ? AND j.tagInstanceId = ?"
     );
     expect(sql).toContain("FROM SceneGroup j WHERE j.groupId = ?\nINTERSECT\n");
     expect(sql).toContain(
       "FROM StashScene s WHERE s.studioId = ? AND s.stashInstanceId = ?"
     );
-    expect(params.slice(0, 6)).toEqual(["1", "2", "a", "4", "3", "a"]);
+    expect(params.slice(0, 8)).toEqual([
+      "1",
+      "2",
+      "a",
+      "2",
+      "a",
+      "4",
+      "3",
+      "a",
+    ]);
     expect(placeholders(sql)).toBe(params.length);
   });
 

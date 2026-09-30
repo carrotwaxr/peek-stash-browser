@@ -1,9 +1,54 @@
-// client/tests/components/folder/FolderView.test.jsx
+/**
+ * The folder view (item 57, #398): folders from the tag tree above the
+ * list's page, which inside a folder holds the folder's own items, paged by
+ * the list; at the root, folders only and no list request. The page cases
+ * render Galleries with the library API mocked.
+ */
 import { MemoryRouter, useSearchParams } from "react-router-dom";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { must } from "@tests/testUtils";
-import { describe, expect, it, vi } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { must, renderListPage } from "@tests/testUtils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import Galleries from "@/components/pages/Galleries";
 import FolderView from "../../../src/components/folder/FolderView";
+
+type Find = (params: Record<string, unknown>) => Promise<unknown>;
+
+const { api } = vi.hoisted(() => ({
+  api: {
+    findGalleries: vi.fn<Find>(),
+    findTagTree: vi.fn<() => Promise<unknown>>(),
+  },
+}));
+
+vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
+vi.mock("@/api/library", () => ({ libraryApi: api }));
+vi.mock("@/api", () => ({
+  apiGet: vi.fn().mockResolvedValue({ distribution: [] }),
+  apiPost: vi.fn().mockResolvedValue({}),
+  apiPut: vi.fn().mockResolvedValue({}),
+  apiDelete: vi.fn().mockResolvedValue({}),
+  libraryApi: {
+    ...api,
+    findPerformersMinimal: vi.fn().mockResolvedValue([]),
+    findStudiosMinimal: vi.fn().mockResolvedValue([]),
+    findTagsMinimal: vi.fn().mockResolvedValue([]),
+    findGroupsMinimal: vi.fn().mockResolvedValue([]),
+  },
+}));
+vi.mock("@/components/ui/LibraryInitializingBanner", () => ({
+  default: () => null,
+}));
+vi.mock("@/components/cards/index", () => ({
+  GalleryCard: (props: { gallery: { title: string } }) => (
+    <div data-testid="gallery-card">{props.gallery.title}</div>
+  ),
+}));
 
 // Helper to capture URL search params
 let capturedSearchParams: URLSearchParams | null = null;
@@ -22,16 +67,15 @@ const createWrapper = (initialEntries = ["/"]) => {
   );
 };
 
+const IMAGES = { one: "image", many: "images" };
+
 // Sample data for tests
 const sampleTags = [
-  { id: "tag1", name: "Photo", parents: [], children: [{ id: "tag2" }] },
-  { id: "tag2", name: "Color", parents: [{ id: "tag1" }], children: [] },
+  { id: "tag1", name: "Photo", parents: [], image_count: 2 },
+  { id: "tag2", name: "Color", parents: [{ id: "tag1" }], image_count: 1 },
 ];
 
-const sampleItems = [
-  { id: "img1", tags: [{ id: "tag1" }, { id: "tag2" }] },
-  { id: "img2", tags: [{ id: "tag1" }] },
-];
+const sampleItems = [{ id: "img1" }, { id: "img2" }];
 
 /** Renders the view at `url` with the owner's `path`, reporting clicks to `onPathChange` */
 const renderFolder = ({
@@ -50,7 +94,10 @@ const renderFolder = ({
   render(
     <FolderView
       items={items}
+      itemCount={items.length}
       tags={tags}
+      countField="image_count"
+      entityLabel={IMAGES}
       path={path}
       onPathChange={onPathChange}
       renderItem={(item) => (
@@ -104,7 +151,7 @@ describe("FolderView", () => {
       const onPathChange = vi.fn<(path: string[]) => void>();
       renderFolder({
         path: ["tag1"],
-        items: [{ id: "img1", tags: [{ id: "tag1" }, { id: "tag2" }] }],
+        items: [{ id: "img1" }],
         onPathChange,
       });
 
@@ -119,13 +166,22 @@ describe("FolderView", () => {
       const onPathChange = vi.fn<(path: string[]) => void>();
       renderFolder({
         tags: [
-          { id: "5", instanceId: "a", name: "Five A", parents: [] },
-          { id: "5", instanceId: "b", name: "Five B", parents: [] },
+          {
+            id: "5",
+            instanceId: "a",
+            name: "Five A",
+            parents: [],
+            image_count: 1,
+          },
+          {
+            id: "5",
+            instanceId: "b",
+            name: "Five B",
+            parents: [],
+            image_count: 1,
+          },
         ],
-        items: [
-          { id: "s1", instanceId: "a", tags: [{ id: "5" }] },
-          { id: "s2", instanceId: "b", tags: [{ id: "5" }] },
-        ],
+        items: [],
         onPathChange,
       });
 
@@ -142,7 +198,7 @@ describe("FolderView", () => {
         instanceId: "a",
         name: "Six A",
         parents: [{ id: "5" }],
-        scene_count: 1,
+        image_count: 1,
       },
       { id: "5", instanceId: "b", name: "Five B", parents: [] },
       {
@@ -150,7 +206,7 @@ describe("FolderView", () => {
         instanceId: "b",
         name: "Seven B",
         parents: [{ id: "5" }],
-        scene_count: 1,
+        image_count: 1,
       },
     ];
     const renderAt = (url: string, tags: typeof bookmarkTags) =>
@@ -201,18 +257,19 @@ describe("FolderView", () => {
           instanceId: "a",
           name: "Grandchild",
           parents: [{ id: "2" }],
+          image_count: 1,
         },
       ];
-      const items = [
-        { id: "img1", instanceId: "a", tags: [{ id: "3" }] },
-        { id: "img2", instanceId: "a", tags: [{ id: "1" }] },
-      ];
+      const items = [{ id: "img2", instanceId: "a" }];
 
       // The URL names no folder: the path prop is the one shown
       render(
         <FolderView
           items={items}
+          itemCount={items.length}
           tags={tags}
+          countField="image_count"
+          entityLabel={IMAGES}
           path={["1:a"]}
           onPathChange={onPathChange}
           renderItem={(item) => (
@@ -243,7 +300,10 @@ describe("FolderView", () => {
       render(
         <FolderView
           items={[]}
+          itemCount={0}
           tags={[{ id: "5", instanceId: "a", name: "Five", parents: [] }]}
+          countField="image_count"
+          entityLabel={IMAGES}
           path={["5"]}
           onPathChange={onPathChange}
           renderItem={() => null}
@@ -253,6 +313,119 @@ describe("FolderView", () => {
 
       expect(must(capturedSearchParams).get("folderPath")).toBe("5:a");
       expect(onPathChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("folders and items", () => {
+    it("a folder card shows its own count for the page's type", () => {
+      renderFolder();
+
+      expect(
+        within(folderCard("Photo")).getByLabelText("2 images")
+      ).toHaveTextContent("2");
+    });
+
+    it("inside a folder, its sub-folders come first, then the page's items with their count", () => {
+      renderFolder({ path: ["tag1"] });
+
+      expect(folderNames()).toEqual(["Color"]);
+      expect(screen.getByTestId("item-img1")).toBeInTheDocument();
+      expect(screen.getByText("2 images in this folder")).toBeInTheDocument();
+    });
+
+    it("an empty folder says nothing is directly in it", () => {
+      renderFolder({ path: ["tag1"], items: [] });
+
+      expect(
+        screen.getByText("No images directly in Photo")
+      ).toBeInTheDocument();
+    });
+
+    it("at the root the view lists folders only", () => {
+      renderFolder();
+
+      expect(folderNames()).toEqual(["Photo"]);
+      expect(screen.queryByTestId("item-img1")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("on a list page", () => {
+    const TREE = {
+      tags: [
+        {
+          id: "5",
+          instanceId: "a",
+          name: "Five",
+          parents: [],
+          gallery_count: 30,
+        },
+        {
+          id: "6",
+          instanceId: "a",
+          name: "Six",
+          parents: [{ id: "5" }],
+          gallery_count: 4,
+        },
+      ],
+    };
+    const galleryRows = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: String(i + 1),
+        instanceId: "a",
+        title: `Gallery ${i + 1}`,
+        tags: [],
+      }));
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      api.findTagTree.mockResolvedValue(TREE);
+      api.findGalleries.mockResolvedValue({
+        findGalleries: { count: 30, galleries: galleryRows(24) },
+      });
+    });
+
+    it("inside a folder, 24 items per page are the folder's own items and the pagination counts them only", async () => {
+      renderListPage(<Galleries />, {
+        initialEntries: ["/galleries?view=folder&folderPath=5:a"],
+      });
+
+      expect(await screen.findAllByTestId("gallery-card")).toHaveLength(24);
+      // The folder's own galleries: its tag, not its sub-tags
+      const params = must(api.findGalleries.mock.calls.at(-1))[0] as {
+        filter: { per_page?: number };
+        gallery_filter: Record<string, unknown>;
+      };
+      expect(params.gallery_filter.tags).toEqual({
+        value: ["5:a"],
+        modifier: "INCLUDES",
+        depth: 0,
+      });
+      expect(params.filter.per_page).toBe(24);
+      // The sub-folder above them, with its own count
+      expect(folderNames()).toEqual(["Six"]);
+      expect(
+        within(folderCard("Six")).getByLabelText("4 galleries")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("30 galleries in this folder")
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByText("Showing 1-24 of 30 records").length
+      ).toBeGreaterThan(0);
+    });
+
+    it("at the root no list request is made", async () => {
+      renderListPage(<Galleries />, {
+        initialEntries: ["/galleries?view=folder"],
+      });
+
+      await waitFor(() => expect(folderNames()).toEqual(["Five"]));
+      expect(
+        within(folderCard("Five")).getByLabelText("30 galleries")
+      ).toBeInTheDocument();
+      expect(api.findGalleries).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Showing \d/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("gallery-card")).not.toBeInTheDocument();
     });
   });
 });

@@ -1132,11 +1132,8 @@
     }
   },
   "src/utils/buildFolderTree.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
+      "count": 2
     }
   },
   "src/utils/buildTagTree.ts": {
