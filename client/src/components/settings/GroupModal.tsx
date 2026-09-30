@@ -74,17 +74,15 @@ const GroupModal = ({
       setError(null);
 
       const response = await getGroup(String(groupId));
-      const groupData = response.group as Record<string, unknown>;
+      const groupData = response.group;
 
       // Populate form fields
-      setName((groupData.name as string) || "");
-      setDescription((groupData.description as string) || "");
-      setCanShare((groupData.canShare as boolean) ?? false);
-      setCanDownloadFiles((groupData.canDownloadFiles as boolean) ?? false);
-      setCanDownloadPlaylists(
-        (groupData.canDownloadPlaylists as boolean) ?? false
-      );
-      setMembers((groupData.members as Array<{ user: UserItem }>) || []);
+      setName(groupData.name);
+      setDescription(groupData.description ?? "");
+      setCanShare(groupData.canShare);
+      setCanDownloadFiles(groupData.canDownloadFiles);
+      setCanDownloadPlaylists(groupData.canDownloadPlaylists);
+      setMembers(groupData.members);
     } catch (err) {
       setError((err as Error).message || "Failed to load group details");
     } finally {

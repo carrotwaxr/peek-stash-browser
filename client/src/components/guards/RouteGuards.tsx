@@ -14,7 +14,6 @@ const LoadingSpinner = () => (
 interface GuardProps {
   children: ReactNode;
   setupStatus: GetSetupStatusResponse;
-  checkingSetup: boolean;
 }
 
 /**
@@ -23,14 +22,10 @@ interface GuardProps {
  * - If setup is complete AND user is NOT authenticated → redirect to "/login"
  * - Otherwise → render children (show setup wizard)
  */
-export const SetupGuard = ({
-  children,
-  setupStatus,
-  checkingSetup,
-}: GuardProps) => {
+export const SetupGuard = ({ children, setupStatus }: GuardProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading || checkingSetup) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -50,14 +45,10 @@ export const SetupGuard = ({
  * - If user is authenticated → redirect to "/"
  * - Otherwise → render children (show login)
  */
-export const LoginGuard = ({
-  children,
-  setupStatus,
-  checkingSetup,
-}: GuardProps) => {
+export const LoginGuard = ({ children, setupStatus }: GuardProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading || checkingSetup) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -79,16 +70,12 @@ export const LoginGuard = ({
  * - If user hasn't completed first-login setup → show UserSetupModal
  * - Otherwise → render children
  */
-export const ProtectedRoute = ({
-  children,
-  setupStatus,
-  checkingSetup,
-}: GuardProps) => {
+export const ProtectedRoute = ({ children, setupStatus }: GuardProps) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
   const [setupComplete, setSetupComplete] = useState(false);
 
-  if (isLoading || checkingSetup) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
   ApiError,
+  REDIRECT_STORAGE_KEY,
   getErrorMessage,
   readRetryAfterSeconds,
 } from "../api/client";
+import { queryClient } from "../api/queryClient";
 import { AuthContext } from "./AuthContextProvider";
 import type { AuthUser } from "./AuthContextProvider";
 
@@ -88,6 +90,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setIsAuthenticated(false);
       setUser(null);
+      // The next person to sign in on this browser gets neither this user's
+      // page nor this user's cached data. A full load also drops what
+      // components and contexts hold in memory.
+      sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+      queryClient.clear();
+      window.location.assign("/login");
     }
   };
 

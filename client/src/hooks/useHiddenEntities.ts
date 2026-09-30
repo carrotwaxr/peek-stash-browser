@@ -3,8 +3,13 @@ import type {
   GetHiddenEntitiesResponse,
   HiddenEntityType,
 } from "@peek/shared-types";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../api";
+import { invalidateExclusionDependents } from "../api/invalidateExclusionDependents";
 import { queryKeys } from "../api/queryKeys";
 import { showError, showSuccess } from "../utils/toast";
 import { useAuth } from "./useAuth";
@@ -42,6 +47,7 @@ export const useHiddenItems = (type: HiddenEntityType | "all", page: number) =>
  */
 export const useHiddenEntities = () => {
   const { user, updateUser } = useAuth();
+  const queryClient = useQueryClient();
   const [isHiding, setIsHiding] = useState(false);
 
   /**
@@ -75,6 +81,7 @@ export const useHiddenEntities = () => {
           ...(instanceId && { instanceId }),
         });
 
+        void invalidateExclusionDependents(queryClient);
         showSuccess(`${entityName} has been hidden`);
 
         // If "don't ask again" was checked, update user preference
@@ -98,7 +105,7 @@ export const useHiddenEntities = () => {
         setIsHiding(false);
       }
     },
-    [user, updateUser]
+    [user, updateUser, queryClient]
   );
 
   /**
@@ -128,6 +135,9 @@ export const useHiddenEntities = () => {
         }>("/user/hidden-entities/bulk", {
           entities,
         });
+        if (response.successCount > 0) {
+          void invalidateExclusionDependents(queryClient);
+        }
 
         // If "don't ask again" was checked, update user preference
         if (skipConfirmation && !user?.hideConfirmationDisabled) {
@@ -153,7 +163,7 @@ export const useHiddenEntities = () => {
         setIsHiding(false);
       }
     },
-    [user, updateUser]
+    [user, updateUser, queryClient]
   );
 
   /**
@@ -179,6 +189,7 @@ export const useHiddenEntities = () => {
         await apiDelete(
           `/user/hidden-entities/${entityType}/${entityId}${query}`
         );
+        void invalidateExclusionDependents(queryClient);
         showSuccess(`${entityName} has been restored`);
         return true;
       } catch (error) {
@@ -190,30 +201,34 @@ export const useHiddenEntities = () => {
         return false;
       }
     },
-    []
+    [queryClient]
   );
 
   /**
    * Unhide all entities (optionally filtered by type)
    */
-  const unhideAll = useCallback(async (entityType?: string) => {
-    try {
-      const endpoint = entityType
-        ? `/user/hidden-entities/all?entityType=${entityType}`
-        : "/user/hidden-entities/all";
-      await apiDelete(endpoint);
-      const typeLabel = entityType ? `${entityType}s` : "items";
-      showSuccess(`All hidden ${typeLabel} have been restored`);
-      return true;
-    } catch (error) {
-      console.error("Failed to unhide all entities:", error);
-      showError(
-        (error as ApiErrorBody).data?.error ||
-          "Failed to restore all items. Please try again."
-      );
-      return false;
-    }
-  }, []);
+  const unhideAll = useCallback(
+    async (entityType?: string) => {
+      try {
+        const endpoint = entityType
+          ? `/user/hidden-entities/all?entityType=${entityType}`
+          : "/user/hidden-entities/all";
+        await apiDelete(endpoint);
+        void invalidateExclusionDependents(queryClient);
+        const typeLabel = entityType ? `${entityType}s` : "items";
+        showSuccess(`All hidden ${typeLabel} have been restored`);
+        return true;
+      } catch (error) {
+        console.error("Failed to unhide all entities:", error);
+        showError(
+          (error as ApiErrorBody).data?.error ||
+            "Failed to restore all items. Please try again."
+        );
+        return false;
+      }
+    },
+    [queryClient]
+  );
 
   /**
    * Update hide confirmation preference

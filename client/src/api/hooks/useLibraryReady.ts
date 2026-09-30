@@ -16,6 +16,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ApiError, apiGet } from "../client";
+import { invalidateExclusionDependents } from "../invalidateExclusionDependents";
 import { queryKeys } from "../queryKeys";
 
 /**
@@ -72,12 +73,14 @@ export function invalidateLibraryQueries(client: QueryClient): Promise<void> {
 /**
  * After a Stash instance is added, edited, enabled, disabled or deleted, or
  * a user's Content Sources change: the setup status (its instance count
- * decides whether cards name their server) and the library queries.
+ * decides whether cards name their server) and everything the user's
+ * visible set feeds (`invalidateExclusionDependents`: the library queries,
+ * Recommended, stats and Hidden Items).
  */
 export function invalidateInstanceQueries(client: QueryClient): Promise<void> {
   return Promise.all([
     client.invalidateQueries({ queryKey: queryKeys.setup.status() }),
-    invalidateLibraryQueries(client),
+    invalidateExclusionDependents(client),
   ]).then(() => undefined);
 }
 
