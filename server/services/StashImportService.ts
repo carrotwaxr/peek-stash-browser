@@ -27,9 +27,11 @@
  * merged away.
  *
  * An import that wrote anything makes the user's rankings and Recommended
- * list stale: both are forgotten once the import (and the stats rebuild
- * after its history) is written, so the next stats page or Recommended
- * page computes them from the imported data.
+ * list stale: every unit that wrote forgets both inside itself
+ * (`afterCommit`), so a ranking write queued behind it writes nothing, and
+ * after a history import they are forgotten once more when the stats
+ * rebuild (which the rankings are computed from) is written. The next
+ * stats page or Recommended page computes them from the imported data.
  *
  * The stats per type count entities once: read from Stash (`checked`),
  * given a row (`created`) or a changed one (`updated`).
@@ -63,6 +65,17 @@ import { userStatsService } from "./UserStatsService.js";
 
 /** Entities per Stash page, and rows per writer-queue unit. */
 export const IMPORT_PAGE_SIZE = 500;
+
+/**
+ * Forgets what is computed from the user's ratings and history: their
+ * rankings and Recommended list. Called inside each unit that wrote
+ * (`afterCommit`): a recompute that read the rows from before stops, its
+ * write still queued behind the unit included.
+ */
+function forgetComputed(userId: number): void {
+  rankingComputeService.forget(userId);
+  recommendationService.forget(userId);
+}
 
 type OptionsKey = keyof SyncFromStashOptions;
 
@@ -391,7 +404,10 @@ function ratingDiffers(row: ExistingRating, change: RatingChange): boolean {
   );
 }
 
-/** Imports the type's ratings and favorites from one instance; true when a row was written. */
+/**
+ * Imports the type's ratings and favorites from one instance. Each page
+ * that writes forgets the user's rankings and Recommended list in its unit.
+ */
 async function importRatings(
   target: RatingTarget,
   source: ImportSource,
@@ -399,8 +415,7 @@ async function importRatings(
   key: RowKey,
   options: { rating?: boolean; favorite?: boolean },
   counter: TypeCounter
-): Promise<boolean> {
-  let wrote = false;
+): Promise<void> {
   for (const pass of ratingPasses(target, options)) {
     const fetch = (filter: FindFilterType) =>
       source.list(stash, filter, pass.criteria);
@@ -429,12 +444,14 @@ async function importRatings(
         ops.push(target.upsert({ ...key, entityId: item.id }, change));
       }
       if (ops.length > 0) {
-        await dbWriteBatch(`syncFromStash.${target.type}`, ops);
-        wrote = true;
+        await dbWriteBatch(`syncFromStash.${target.type}`, ops, {
+          afterCommit: () => {
+            forgetComputed(key.userId);
+          },
+        });
       }
     }
   }
-  return wrote;
 }
 
 type HistoryRow = Pick<
@@ -597,6 +614,11 @@ async function importSceneHistory(
             count++;
           }
           return count;
+        },
+        {
+          afterCommit: (count) => {
+            if (count > 0) forgetComputed(userId);
+          },
         }
       );
       if (passes.length > 1) for (const scene of scenes) done.add(scene.id);
@@ -624,9 +646,10 @@ export interface ImportResult {
  * Imports `userId`'s data from every instance given, one type at a time
  * per instance. An instance whose import fails is logged, skipped and named
  * in `failedInstances`; the others still run. After a history import that wrote something, the
- * user's per-entity stats are rebuilt from their history. After an import
- * that wrote anything, the user's rankings and Recommended list are
- * forgotten, so the next stats and Recommended pages compute them again.
+ * user's per-entity stats are rebuilt from their history. Each unit that
+ * wrote forgets the user's rankings and Recommended list inside itself, and
+ * the stats rebuild forgets them again once it is written, so the next
+ * stats and Recommended pages compute them again.
  */
 export async function importFromStash(
   userId: number,
@@ -636,7 +659,6 @@ export async function importFromStash(
   const stats = emptyStats();
   const failedInstances: string[] = [];
   let historyWrote = false;
-  let ratingsWrote = false;
 
   for (const [instanceId, stash] of instances) {
     const key: RowKey = { userId, instanceId };
@@ -646,15 +668,14 @@ export async function importFromStash(
         const source = IMPORT_SOURCES[target.type];
         const counter = new TypeCounter();
         try {
-          ratingsWrote =
-            (await importRatings(
-              target,
-              source,
-              stash,
-              key,
-              options[source.key],
-              counter
-            )) || ratingsWrote;
+          await importRatings(
+            target,
+            source,
+            stash,
+            key,
+            options[source.key],
+            counter
+          );
           if (target.type === "scene") {
             historyWrote =
               (await importSceneHistory(stash, key, options.scenes, counter)) ||
@@ -683,11 +704,12 @@ export async function importFromStash(
     }
   }
 
-  if (historyWrote || ratingsWrote) {
-    // Last, once everything is written: a recompute started before this
-    // read the data from before the import
-    rankingComputeService.forget(userId);
-    recommendationService.forget(userId);
+  if (historyWrote) {
+    // The rankings are computed from the rebuilt stats: a recompute started
+    // between the last history unit and the rebuild read the old ones.
+    // The rebuild's own unit is UserStatsService's, so this runs after it
+    // rather than inside it.
+    forgetComputed(userId);
   }
 
   return { stats, failedInstances };

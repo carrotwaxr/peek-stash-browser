@@ -1119,7 +1119,8 @@ describe("Watch History Controller", () => {
       expect(rankings.forget).toHaveBeenCalledWith(1);
       expect(recommendations.forget).toHaveBeenCalledTimes(1);
       expect(recommendations.forget).toHaveBeenCalledWith(1);
-      // After the unit: a recompute started before it read the old history
+      // Once the batch commits (inside its unit, rankingForgetOrder.test.ts):
+      // a recompute started before it read the old history
       const batch = must(mockPrisma.$transaction.mock.invocationCallOrder[0]);
       expect(must(rankings.forget.mock.invocationCallOrder[0])).toBeGreaterThan(
         batch

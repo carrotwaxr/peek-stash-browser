@@ -81,6 +81,40 @@ export type DbWriteTxOptions = Partial<{
 }>;
 
 /**
+ * `afterCommit` runs inside the unit, once its transaction has committed,
+ * with what the transaction resolved to: before the next unit starts, and
+ * never for an attempt that failed. It forgets in-memory state the write
+ * made obsolete (a user's rankings after a history clear), so no unit
+ * queued behind this one still trusts that state when it starts. It runs
+ * under the write lock: keep it synchronous and cheap. It must not throw;
+ * if it does, the error is logged and the committed result still returned.
+ */
+export interface DbWriteUnitOptions<R> {
+  afterCommit?: (result: R) => void;
+}
+
+/** What a batch transaction resolves to: each statement's result, in order. */
+export type DbWriteBatchResult<T extends Prisma.PrismaPromise<unknown>[]> = {
+  [K in keyof T]: Awaited<T[K]>;
+};
+
+function runAfterCommit<R>(
+  label: string,
+  result: R,
+  afterCommit: ((result: R) => void) | undefined
+): R {
+  if (afterCommit) {
+    try {
+      afterCommit(result);
+    } catch (error) {
+      // The transaction committed: report its result, not a failure
+      logger.error("Database write afterCommit failed", { label, error });
+    }
+  }
+  return result;
+}
+
+/**
  * SQLite reported the database busy. Prisma surfaces the engine's own
  * timeout as P1008, and a raw statement that hit SQLITE_BUSY (code 5) after
  * busy_timeout as P2010. P2028, the transaction's own timeout, is not the
@@ -148,30 +182,45 @@ export function dbWrite<T>(label: string, fn: () => Promise<T>): Promise<T> {
 
 /**
  * An interactive transaction as one unit: `dbWrite(label, () =>
- * prisma.$transaction(fn, DB_WRITE_TX))`. `options` override DB_WRITE_TX;
- * no caller passes any (a sync batch holds the lock about 0.1 s on a
- * 200k-scene library), and new code passes none. Write through `tx` inside
- * `fn`, never through `dbWrite`.
+ * prisma.$transaction(fn, DB_WRITE_TX))`. The transaction options override
+ * DB_WRITE_TX; no caller passes any (a sync batch holds the lock about
+ * 0.1 s on a 200k-scene library), and new code passes none. `afterCommit`:
+ * see DbWriteUnitOptions. Write through `tx` inside `fn`, never through
+ * `dbWrite`.
  */
 export function dbWriteTransaction<T>(
   label: string,
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  options?: DbWriteTxOptions
+  options?: DbWriteTxOptions & DbWriteUnitOptions<T>
 ): Promise<T> {
-  const txOptions = options ? { ...DB_WRITE_TX, ...options } : DB_WRITE_TX;
-  return dbWrite(label, () => prisma.$transaction(fn, txOptions));
+  const { afterCommit, ...overrides } = options ?? {};
+  const txOptions =
+    Object.keys(overrides).length > 0
+      ? { ...DB_WRITE_TX, ...overrides }
+      : DB_WRITE_TX;
+  return dbWrite(label, async () =>
+    runAfterCommit(label, await prisma.$transaction(fn, txOptions), afterCommit)
+  );
 }
 
 /**
  * A batch transaction as one unit: `dbWrite(label, () =>
  * prisma.$transaction(ops))`. The statements are built before the unit
  * starts, so it makes no Node round trip while it holds the lock.
+ * `afterCommit`: see DbWriteUnitOptions.
  */
 export function dbWriteBatch<T extends Prisma.PrismaPromise<unknown>[]>(
   label: string,
-  ops: [...T]
-) {
-  return dbWrite(label, () => prisma.$transaction(ops));
+  ops: [...T],
+  options?: DbWriteUnitOptions<DbWriteBatchResult<T>>
+): Promise<DbWriteBatchResult<T>> {
+  return dbWrite(label, async () =>
+    runAfterCommit(
+      label,
+      (await prisma.$transaction(ops)) as DbWriteBatchResult<T>,
+      options?.afterCommit
+    )
+  );
 }
 
 /**
