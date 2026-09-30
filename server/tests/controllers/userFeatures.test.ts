@@ -600,7 +600,15 @@ describe("User Controller — Features", () => {
       });
       const res = resFor(getUserRestrictions);
       await getUserRestrictions(req, res);
-      expect(res._getOkBody().restrictions).toEqual(restrictions);
+      expect(res._getOkBody().restrictions).toEqual([
+        {
+          id: 1,
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: [],
+          unreadable: false,
+        },
+      ]);
     });
   });
 
