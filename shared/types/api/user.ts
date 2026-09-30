@@ -6,6 +6,7 @@
  * Previously duplicated across controllers/user.ts, controllers/carousel.ts,
  * and controllers/setup.ts.
  */
+import { ENTITY_KINDS } from "../filters/criteria.js";
 
 /**
  * Carousel preference configuration for user home page
@@ -15,6 +16,13 @@ export interface CarouselPreference {
   enabled: boolean;
   order: number;
 }
+
+/**
+ * The lists with a table view, whose columns a user's settings keep
+ * (`tableColumnDefaults`): the filterable lists plus clips.
+ */
+export const TABLE_COLUMN_KINDS = [...ENTITY_KINDS, "clip"] as const;
+export type TableColumnKind = (typeof TABLE_COLUMN_KINDS)[number];
 
 /**
  * Table column configuration for a preset

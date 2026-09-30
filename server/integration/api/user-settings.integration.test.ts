@@ -267,6 +267,40 @@ describe("User Settings API - cardDisplaySettings", () => {
   });
 });
 
+describe("User Settings API - tableColumnDefaults", () => {
+  /** The shared admin's table columns before this file, put back after it */
+  let savedTableColumns:
+    | UserSettings["settings"]["tableColumnDefaults"]
+    | null = null;
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    const current = await adminClient.get<UserSettings>("/api/user/settings");
+    expect(current.ok).toBe(true);
+    savedTableColumns = current.data.settings.tableColumnDefaults;
+  });
+
+  afterAll(async () => {
+    const restored = await adminClient.put("/api/user/settings", {
+      tableColumnDefaults: savedTableColumns,
+    });
+    expect(restored.ok).toBe(true);
+  });
+
+  it("a clip table columns save round-trips and keeps the scene entry", async () => {
+    const scene = { visible: ["title", "date"], order: ["date", "title"] };
+    const clip = { visible: ["title", "scene"], order: ["scene", "title"] };
+
+    const saved = await adminClient.put<UserSettings>("/api/user/settings", {
+      tableColumnDefaults: { scene, clip },
+    });
+
+    expect(saved.status).toBe(200);
+    const read = await adminClient.get<UserSettings>("/api/user/settings");
+    expect(read.data.settings.tableColumnDefaults).toEqual({ scene, clip });
+  });
+});
+
 describe("User Settings API - PUT /api/user/stash-instances", () => {
   let instanceId: string;
 

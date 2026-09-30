@@ -230,6 +230,41 @@ describe("FilterPresets", () => {
       });
     });
 
+    it("loading a preset saved in table view hands over its columns", async () => {
+      const user = userEvent.setup();
+      const onLoadPreset = vi.fn();
+      const tableColumns = { visible: ["title", "rating"], order: ["rating"] };
+      mockApiGet.mockImplementation((url) =>
+        Promise.resolve(
+          url === "/user/filter-presets"
+            ? {
+                presets: {
+                  scene: [
+                    {
+                      id: "preset-3",
+                      name: "Ratings table",
+                      filters: {},
+                      sort: "rating",
+                      direction: "DESC",
+                      viewMode: "table",
+                      tableColumns,
+                    },
+                  ],
+                },
+              }
+            : { defaults: {} }
+        )
+      );
+      render(<FilterPresets {...defaultProps} onLoadPreset={onLoadPreset} />);
+
+      await user.click(must(screen.getByText("Load Preset").closest("button")));
+      await user.click(await screen.findByText("Ratings table"));
+
+      expect(onLoadPreset).toHaveBeenCalledWith(
+        expect.objectContaining({ viewMode: "table", tableColumns })
+      );
+    });
+
     it("closes dropdown when preset is loaded", async () => {
       const user = userEvent.setup();
       render(<FilterPresets {...defaultProps} />);

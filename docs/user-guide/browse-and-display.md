@@ -53,6 +53,8 @@ A high-density tabular layout for scanning metadata across many items.
 3. Use arrows to reorder columns
 4. Or right-click any column header → **Hide column**
 
+A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A preset saved in table view shows its own columns while it is loaded; your next column change saves the columns then shown as yours.
+
 ### Timeline View
 
 Browse content chronologically, organized by date.
@@ -240,7 +242,7 @@ Save your current view configuration for quick access later.
 - View mode (Grid/Wall/Table/Hierarchy)
 - Grid density (for Grid view)
 - Zoom level (for Wall view)
-- Table column configuration
+- Table column configuration (in table view; loading the preset shows its columns)
 
 ### Creating a Preset
 

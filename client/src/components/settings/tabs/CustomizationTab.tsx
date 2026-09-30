@@ -15,7 +15,7 @@ type ViewPreferenceKey = keyof Pick<
   "preferredPreviewQuality" | "wallPlayback" | "lightboxDoubleTapAction"
 >;
 
-/** A stable empty set of column defaults, so the editor keeps its edits. */
+/** A stable empty set of table columns, so the editor keeps its edits. */
 const NO_TABLE_DEFAULTS = {};
 
 const CustomizationTab = () => {
@@ -49,9 +49,9 @@ const CustomizationTab = () => {
   ) => {
     try {
       await save.mutateAsync({ tableColumnDefaults: newDefaults });
-      showSuccess("Table column defaults saved!");
+      showSuccess("Table columns saved!");
     } catch (err) {
-      showError(getErrorMessage(err, "Failed to save table column defaults"));
+      showError(getErrorMessage(err, "Failed to save the table columns"));
       throw err;
     }
   };
@@ -241,7 +241,7 @@ const CustomizationTab = () => {
         <CardDisplaySettings />
       </div>
 
-      {/* Table Column Defaults */}
+      {/* Table columns (the ones each table saves) */}
       <div
         className="p-6 rounded-lg border"
         style={{

@@ -696,3 +696,23 @@ export function getColumnSortField(columnId: string, entityType: string) {
 
   return columnId;
 }
+
+/** A table's columns as a preset carries them: either list may be missing */
+export interface ColumnConfig {
+  visible?: string[];
+  order?: string[];
+}
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((id) => typeof id === "string");
+
+/** A preset's stored `tableColumns` as columns, or null when it holds none */
+export function presetColumnsOf(value: unknown): ColumnConfig | null {
+  if (!value || typeof value !== "object") return null;
+  const { visible, order } = value as Record<string, unknown>;
+  const columns: ColumnConfig = {
+    ...(isStringArray(visible) && visible.length > 0 && { visible }),
+    ...(isStringArray(order) && order.length > 0 && { order }),
+  };
+  return columns.visible || columns.order ? columns : null;
+}
