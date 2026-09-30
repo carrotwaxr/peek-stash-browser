@@ -80,7 +80,10 @@ interface FillRow {
 
 const FILL_RESULT = /INSERT OR IGNORE INTO _peek_result/;
 const SWAP_DELETE =
-  /^DELETE FROM UserExcludedEntity WHERE userId = \? AND NOT \(reason = 'pending' AND computedAt >= \?\)$/;
+  /^DELETE FROM UserExcludedEntity WHERE userId = \? AND NOT \(reason = 'pending' AND id > \?\)$/;
+/** The snapshot's highest row id, above which the swap keeps holds */
+const ROW_ID_HIGH_WATER =
+  /^SELECT COALESCE\(MAX\(id\), 0\) AS maxId FROM UserExcludedEntity$/;
 const SWAP_INSERT =
   /^INSERT OR IGNORE INTO UserExcludedEntity \(userId, entityType, entityId, instanceId, reason, computedAt\) SELECT \?, entityType, entityId, instanceId, reason, \? FROM _peek_result$/;
 /** The swap's rewrite of the excluded counts per entity (B13b) */
@@ -412,10 +415,15 @@ describe("ExclusionComputationService", () => {
           instanceId: "A",
         }),
       ]);
-      fakeRaw([[RESOLVE_SCENE, [{ id: "s1", instanceId: "A" }]]]);
-      const before = Date.now();
+      fakeRaw([
+        [RESOLVE_SCENE, [{ id: "s1", instanceId: "A" }]],
+        [ROW_ID_HIGH_WATER, [{ maxId: 41n }]],
+      ]);
 
       await exclusionComputationService.recomputeForUser(7);
+
+      // The high-water id is the snapshot's first read, so it opens it
+      expect(must(rawCalls()[0])[0]).toMatch(ROW_ID_HIGH_WATER);
 
       const swapStart = execCalls().findIndex(
         ([sql]) => sql === "BEGIN IMMEDIATE"
@@ -427,13 +435,11 @@ describe("ExclusionComputationService", () => {
       // ... then the excluded counts per entity, rewritten (B13b)
       expect(swap.map(([sql]) => sql)).toHaveLength(6);
       expect(must(swap[0])[0]).toBe("BEGIN IMMEDIATE");
-      const [deleteSql, deleteUser, deleteSince] = must(swap[1]);
+      const [deleteSql, deleteUser, holdsAfterId] = must(swap[1]);
       expect(deleteSql).toMatch(SWAP_DELETE);
       expect(deleteUser).toBe(7);
-      // The snapshot's start, as Prisma stores DateTime: epoch milliseconds
-      expect(typeof deleteSince).toBe("number");
-      expect(Number(deleteSince)).toBeGreaterThanOrEqual(before);
-      expect(Number(deleteSince)).toBeLessThanOrEqual(Date.now());
+      // Holds above the snapshot's highest row id stay
+      expect(holdsAfterId).toBe(41);
       const [insertSql, insertUser, computedAt] = must(swap[2]);
       expect(insertSql).toMatch(SWAP_INSERT);
       expect(insertUser).toBe(7);

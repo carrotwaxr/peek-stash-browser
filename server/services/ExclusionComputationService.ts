@@ -456,12 +456,25 @@ const INCREMENT_COUNTS_SQL = `${INSERT_COUNTS_SQL} WHERE true ON CONFLICT (userI
 const INSERT_HIDDEN_SQL = `INSERT OR IGNORE INTO UserHiddenEntity (userId, entityType, entityId, instanceId, hiddenAt) SELECT ?, json_extract(value, '$.t'), json_extract(value, '$.id'), json_extract(value, '$.iid'), ? FROM json_each(?)`;
 
 /**
- * Remove the user's rows before the swap, except `pending` holds written
- * since the snapshot began: a sync batch wrote them for changes this
- * snapshot may not have seen, and the end-of-sync recompute, whose snapshot
- * starts after every batch, is the one that clears them.
+ * Remove the user's rows before the swap, except `pending` holds the
+ * recompute's snapshot did not hold: a sync batch wrote them for changes
+ * the snapshot has not seen, and the end-of-sync recompute, whose snapshot
+ * starts after every batch, is the one that clears them. Told apart by row
+ * id (ROW_ID_HIGH_WATER_SQL, read inside the snapshot), not by time: a
+ * batch stamps its holds' computedAt before its own statements and commits
+ * later, so a hold stamped before the snapshot began can still be missing
+ * from it. Binds userId, the high-water id.
  */
-const DELETE_BEFORE_SWAP_SQL = `DELETE FROM UserExcludedEntity WHERE userId = ? AND NOT (reason = 'pending' AND computedAt >= ?)`;
+const DELETE_BEFORE_SWAP_SQL = `DELETE FROM UserExcludedEntity WHERE userId = ? AND NOT (reason = 'pending' AND id > ?)`;
+
+/**
+ * The highest UserExcludedEntity id in the snapshot (0 for an empty table).
+ * The ids are AUTOINCREMENT and every insert commits in turn under the
+ * write lock, so a row committed after the snapshot opened has a larger id
+ * than every row in it. The whole table's MAX is one seek at the end of the
+ * primary key, where the user's pending rows' MAX walks all their rows.
+ */
+const ROW_ID_HIGH_WATER_SQL = `SELECT COALESCE(MAX(id), 0) AS maxId FROM UserExcludedEntity`;
 
 /**
  * A save's rows, replaced inside the swap ahead of the exclusions. The rows
@@ -477,7 +490,7 @@ const INSERT_RESTRICTIONS_SQL = `INSERT INTO UserContentRestriction (userId, ent
  * id of the JSON list `j`, of one entity type on one instance, written by a
  * sync batch on its own transaction. OR IGNORE keeps an existing row's
  * reason. Binds entityType, instanceId, computedAt (epoch milliseconds, as
- * Prisma stores DateTime and DELETE_BEFORE_SWAP_SQL compares), ids, users.
+ * Prisma stores DateTime), ids, users.
  */
 const HOLD_IDS_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId, entityType, entityId, instanceId, reason, computedAt)
   SELECT CAST(u.value AS INTEGER), ?, j.value, ?, 'pending', ?
@@ -860,13 +873,11 @@ class ExclusionComputationService {
     const allowedInstanceIds = await getUserInstanceScope(userId);
 
     const written = await withComputeConnection(async (db) => {
-      // The swap keeps `pending` holds written from here on. Taken before the
-      // BEGIN, so no hold for a change the snapshot cannot see slips in
-      // between.
-      const snapshotStartedAt = Date.now();
-
       // === COMPUTATION PHASE (read snapshot, no write lock) ===
       const computed = await readSnapshot(db, async () => {
+        // The snapshot's first read, so it opens the snapshot: the swap keeps
+        // the `pending` holds committed after it, which have larger ids
+        const holdsAfterId = await this.readRowIdHighWater(db);
         const rules = applyRestrictions
           ? await this.loadRules(userId, db, allowedInstanceIds, restrictions)
           : [];
@@ -940,6 +951,7 @@ class ExclusionComputationService {
         const t4 = Date.now();
 
         return {
+          holdsAfterId,
           direct,
           restrictionCascade,
           hideCascade,
@@ -953,6 +965,7 @@ class ExclusionComputationService {
         };
       });
       const {
+        holdsAfterId,
         direct,
         restrictionCascade,
         hideCascade,
@@ -1003,7 +1016,7 @@ class ExclusionComputationService {
         countsMs = t5 - filled;
         await dbWrite("exclusions.swap", async () => {
           const started = Date.now();
-          await this.swapResult(db, userId, snapshotStartedAt, restrictions);
+          await this.swapResult(db, userId, holdsAfterId, restrictions);
           swapMs = Date.now() - started;
         });
       } finally {
@@ -1167,7 +1180,7 @@ class ExclusionComputationService {
    * which inherit its tags. Written on the batch's transaction, so a hold
    * rolls back with its batch and costs no lock of its own. A `pending` row
    * excludes like any other until the recompute's swap replaces it
-   * (DELETE_BEFORE_SWAP_SQL keeps only holds newer than its snapshot).
+   * (DELETE_BEFORE_SWAP_SQL keeps only holds its snapshot did not hold).
    *
    * Residual: content reached only through the closure of a changed
    * hierarchy (a grandchild tag's scenes) shows until the same sync's
@@ -1396,11 +1409,19 @@ class ExclusionComputationService {
     }
   }
 
+  /** ROW_ID_HIGH_WATER_SQL on the snapshot's connection. */
+  private async readRowIdHighWater(db: TransactionClient): Promise<number> {
+    const rows = await db.$queryRawUnsafe<Array<{ maxId: number | bigint }>>(
+      ROW_ID_HIGH_WATER_SQL
+    );
+    return Number(rows[0]?.maxId ?? 0);
+  }
+
   /**
    * The swap: replace the user's rows with _peek_result inside one short
    * BEGIN IMMEDIATE on the compute connection (the TEMP table lives there).
-   * `pending` holds written since `snapshotStartedAt` survive the DELETE and
-   * win the INSERT OR IGNORE. A save's `restrictions` replace the user's
+   * `pending` holds with an id above `holdsAfterId` (committed after the
+   * snapshot opened) survive the DELETE and win the INSERT OR IGNORE. A save's `restrictions` replace the user's
    * UserContentRestriction rows first, in the same transaction (both tables
    * are in the main database). On any failure after the BEGIN the
    * transaction is rolled back, so the user's old rows stay in both tables,
@@ -1411,7 +1432,7 @@ class ExclusionComputationService {
   private async swapResult(
     db: TransactionClient,
     userId: number,
-    snapshotStartedAt: number,
+    holdsAfterId: number,
     restrictions?: readonly RestrictionRowInput[]
   ): Promise<void> {
     await db.$executeRawUnsafe("BEGIN IMMEDIATE");
@@ -1436,11 +1457,7 @@ class ExclusionComputationService {
           );
         }
       }
-      await db.$executeRawUnsafe(
-        DELETE_BEFORE_SWAP_SQL,
-        userId,
-        snapshotStartedAt
-      );
+      await db.$executeRawUnsafe(DELETE_BEFORE_SWAP_SQL, userId, holdsAfterId);
       await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
       // The excluded links per entity, exact for this snapshot
       await db.$executeRawUnsafe(DELETE_COUNTS_SQL, userId);
