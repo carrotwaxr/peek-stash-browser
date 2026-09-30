@@ -105,17 +105,21 @@ describe("loadTooltipRelations", () => {
   it("capped relations bind TOOLTIP_LIMIT; own tags are listed whole and a studio's performers counted", async () => {
     await loadTooltipRelations("studio", [A], 7);
 
+    // Params: the page's pairs; the viewer again for a path through scenes
+    // (their exclusions); the viewer for the related entity's exclusions; the
+    // related type; TOOLTIP_LIMIT when capped
+    const userId = 7;
     const json = pairsJson([A]);
     const [tagSql, ...tagParams] = statementFor("StashTag");
-    expect(tagParams).toEqual([json, 7, "tag"]);
+    expect(tagParams).toEqual([json, userId, "tag"]);
     expect(tagSql).not.toContain("rn <= ?");
 
     const [performerSql, ...performerParams] = statementFor("StashPerformer");
-    expect(performerParams).toEqual([json, 7, "performer"]);
+    expect(performerParams).toEqual([json, userId, userId, "performer"]);
     expect(performerSql).toContain("SELECT r.pid, r.pinst, COUNT(*) AS total");
 
     const [groupSql, ...groupParams] = statementFor("StashGroup");
-    expect(groupParams).toEqual([json, 7, "group", TOOLTIP_LIMIT]);
+    expect(groupParams).toEqual([json, userId, userId, "group", TOOLTIP_LIMIT]);
     expect(groupSql).toContain("WHERE rn <= ?");
     expect(groupSql).toContain("ORDER BY r.weight DESC, x.name COLLATE NOCASE");
   });
