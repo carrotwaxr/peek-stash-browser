@@ -266,6 +266,30 @@ describe("SearchableGrid results", () => {
     expect(screen.queryByText("p2-0")).not.toBeInTheDocument();
   });
 
+  it("an empty result stays out of view while the next query loads", async () => {
+    api.findPerformers.mockResolvedValueOnce(performers([], 0));
+    const tab = (lock: string) => (
+      <MemoryRouter initialEntries={["/tab"]}>
+        <SearchableGrid
+          entityType="performer"
+          lockedFilters={{ performer_filter: { tags: { value: [lock] } } }}
+          hideLockedFilters
+          renderItem={() => <div />}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(tab("a"));
+    expect(await screen.findByText("No performers found")).toBeInTheDocument();
+
+    // The lock changes: the new list is in flight, the empty one its placeholder
+    api.findPerformers.mockReturnValue(new Promise(() => {}));
+    rerender(tab("b"));
+
+    await waitFor(() =>
+      expect(screen.queryByText("No performers found")).not.toBeInTheDocument()
+    );
+  });
+
   it("renders one pagination bar above and one below the grid, both working", async () => {
     api.findPerformers.mockImplementation((params) =>
       Promise.resolve(
