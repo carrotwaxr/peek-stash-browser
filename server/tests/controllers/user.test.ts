@@ -1473,7 +1473,14 @@ describe("User Controller", () => {
       expect(mockExclusions.saveRestrictions).not.toHaveBeenCalled();
     });
 
-    it("bare ids need no instance lookup", async () => {
+    it("bare ids a stored list of the type already holds need no instance lookup", async () => {
+      // A list saved before entries named their instance, saved again
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        partialRow({
+          entityType: "tags",
+          entityIds: JSON.stringify(["1", "2"]),
+        }),
+      ]);
       const req = reqFor(updateUserRestrictions, {
         body: { restrictions: [tagRule("EXCLUDE", ["1", "2"])] },
         params: { userId: "3" },

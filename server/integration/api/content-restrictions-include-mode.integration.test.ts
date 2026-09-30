@@ -36,13 +36,16 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
   let tag1Id: string;
   let tag2Id: string;
   let tag3Id: string;
+  // The restriction entries: each tag with the test instance it is on
+  let tag1Ref: string;
+  let tag2Ref: string;
 
   beforeAll(async () => {
     // Ensure admin client is logged in
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
 
     // Scope to test instance only — avoids scanning production data during recompute
-    await selectTestInstanceOnly();
+    const instanceId = await selectTestInstanceOnly();
 
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
@@ -98,6 +101,8 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     tag1Id = must(tagsResponse.data.findTags.tags[0]).id;
     tag2Id = must(tagsResponse.data.findTags.tags[1]).id;
     tag3Id = must(tagsResponse.data.findTags.tags[2]).id;
+    tag1Ref = `${tag1Id}:${instanceId}`;
+    tag2Ref = `${tag2Id}:${instanceId}`;
 
     // Clean up any existing restrictions for this user
     await adminClient.delete(`/api/user/${testUserId}/restrictions`);
@@ -125,7 +130,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
           {
             entityType: "tags",
             mode: "INCLUDE",
-            entityIds: [tag1Id, tag2Id],
+            entityIds: [tag1Ref, tag2Ref],
             restrictEmpty: false,
           },
         ];
@@ -230,8 +235,8 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       { timeout: 30_000 },
       async () => {
         const restrictions = [
-          { entityType: "tags", mode: "INCLUDE", entityIds: [tag1Id] },
-          { entityType: "tags", mode: "EXCLUDE", entityIds: [tag2Id] },
+          { entityType: "tags", mode: "INCLUDE", entityIds: [tag1Ref] },
+          { entityType: "tags", mode: "EXCLUDE", entityIds: [tag2Ref] },
         ];
 
         const setResponse = await adminClient.put<{
@@ -276,7 +281,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
         `/api/user/${must(admin).id}/restrictions`,
         {
           restrictions: [
-            { entityType: "tags", mode: "EXCLUDE", entityIds: [tag1Id] },
+            { entityType: "tags", mode: "EXCLUDE", entityIds: [tag1Ref] },
           ],
         }
       );
