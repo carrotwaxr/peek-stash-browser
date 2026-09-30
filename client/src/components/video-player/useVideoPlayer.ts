@@ -7,6 +7,7 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
 import { apiPost, redirectToLogin } from "../../api";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { buildPlayerSources } from "./playerSources";
 import {
@@ -30,23 +31,21 @@ airplay(videojs);
 chromecast(videojs);
 
 /**
- * Build video stream URL with optional instanceId for multi-instance support
+ * Build a scene's stream URL on the scene's own instance
  * @param {string} sceneId - Scene ID
  * @param {string} path - Stream path (e.g., "stream", "stream.m3u8", "proxy-stream/stream.m3u8")
- * @param {string|null} instanceId - Optional instance ID for disambiguation
+ * @param {string} instanceId - The scene's instance; the server refuses a stream without one
  * @param {Object} params - Additional query parameters
- * @returns {string} Full URL with instanceId if provided
+ * @returns {string} The URL's path and query
  */
 function buildStreamUrl(
   sceneId: string,
   path: string,
-  instanceId: string | null | undefined,
+  instanceId: string,
   params: Record<string, string | undefined | null> = {}
 ) {
   const url = new URL(`/api/scene/${sceneId}/${path}`, window.location.origin);
-  if (instanceId) {
-    url.searchParams.set("instanceId", instanceId);
-  }
+  url.searchParams.set("instanceId", instanceId);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
       url.searchParams.set(key, value);
@@ -181,8 +180,19 @@ export function useVideoPlayer({
   enableCast?: boolean;
   minimumPlayPercent?: number;
 }) {
+  // The scene's id with its instance: two servers reuse small ids, so
+  // A:123 and B:123 are different scenes and moving between them is a
+  // scene change for every effect below
+  const { id: sceneId, instanceId: sceneInstanceId } = (scene ?? {}) as {
+    id?: string;
+    instanceId?: string;
+  };
+  const sceneKey = sceneId
+    ? makeCompositeKey(sceneId, sceneInstanceId)
+    : undefined;
+
   // Track previous scene for detecting changes
-  const prevSceneIdRef = useRef(null);
+  const prevSceneKeyRef = useRef<string | null>(null);
 
   // ============================================================================
   // PLAYER INITIALIZATION (from useVideoPlayerLifecycle)
@@ -318,7 +328,7 @@ export function useVideoPlayer({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps list all accessed scene properties individually; adding `scene` object would cause re-runs on every render
   }, [
-    scene?.id,
+    sceneKey,
     scene?.title,
     scene?.performers,
     scene?.paths?.screenshot,
@@ -331,12 +341,10 @@ export function useVideoPlayer({
 
   useEffect(() => {
     const player = playerRef.current;
-    if (!player || !scene?.id) return;
+    if (!player || !sceneId) return;
 
     const trackActivityPlugin = player.trackActivity();
     if (!trackActivityPlugin) return;
-
-    const sceneId = scene.id;
 
     // Enable tracking
     trackActivityPlugin.setEnabled(true);
@@ -352,6 +360,7 @@ export function useVideoPlayer({
         await retryWithBackoff(() =>
           apiPost("/watch-history/save-activity", {
             sceneId,
+            instanceId: sceneInstanceId,
             resumeTime,
             playDuration,
           })
@@ -365,7 +374,10 @@ export function useVideoPlayer({
     trackActivityPlugin.incrementPlayCount = async () => {
       try {
         await retryWithBackoff(() =>
-          apiPost("/watch-history/increment-play-count", { sceneId })
+          apiPost("/watch-history/increment-play-count", {
+            sceneId,
+            instanceId: sceneInstanceId,
+          })
         );
       } catch (error) {
         console.error(
@@ -379,7 +391,9 @@ export function useVideoPlayer({
       trackActivityPlugin.setEnabled(false);
       trackActivityPlugin.reset();
     };
-  }, [scene?.id, playerRef, minimumPlayPercent]);
+    // Keyed on the scene's id and instance together: A:123 and B:123 are
+    // different scenes
+  }, [sceneId, sceneInstanceId, playerRef, minimumPlayPercent]);
 
   // ============================================================================
   // ASPECT RATIO UPDATES (fix layout when switching scenes)
@@ -396,8 +410,8 @@ export function useVideoPlayer({
     // This ensures proper layout before metadata loads
     const aspectRatio = `${firstFile.width}:${firstFile.height}`;
     player.aspectRatio(aspectRatio);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- scene?.id captures scene changes; adding `scene` object would re-run aspect ratio setup on every render
-  }, [scene?.id, playerRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sceneKey captures scene changes; adding `scene` object would re-run aspect ratio setup on every render
+  }, [sceneKey, playerRef]);
 
   // ============================================================================
   // RESUME PLAYBACK CAPTURE (from useResumePlayback)
@@ -407,7 +421,7 @@ export function useVideoPlayer({
   useEffect(() => {
     hasResumedRef.current = false;
     initialResumeTimeRef.current = null;
-  }, [scene?.id, hasResumedRef, initialResumeTimeRef]);
+  }, [sceneKey, hasResumedRef, initialResumeTimeRef]);
 
   // Capture resume time and set autoplay flag when watch history loads
   useEffect(() => {
@@ -541,8 +555,8 @@ export function useVideoPlayer({
     return () => {
       player.off("error", handleError);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- scene?.id captures scene changes; playerRef is a stable ref; adding `scene` object would re-initialize error handler on every render
-  }, [scene?.id, playerRef, dispatch]); // Only re-run when scene changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sceneKey captures scene changes; playerRef is a stable ref; adding `scene` object would re-initialize error handler on every render
+  }, [sceneKey, playerRef, dispatch]); // Only re-run when scene changes
 
   // ============================================================================
   // VIDEO SOURCES LOADING (using sourceSelector plugin - Stash pattern)
@@ -557,12 +571,12 @@ export function useVideoPlayer({
     }
 
     // Don't re-initialize unless scene has changed (Stash line 568)
-    if (scene.id === prevSceneIdRef.current) {
+    if (sceneKey === prevSceneKeyRef.current) {
       return;
     }
 
     // Mark this scene as loaded
-    prevSceneIdRef.current = scene.id;
+    prevSceneKeyRef.current = sceneKey ?? null;
 
     // Set ready=false at START of scene loading (Stash line 572)
     dispatch({ type: "SET_READY", payload: false });
@@ -611,7 +625,7 @@ export function useVideoPlayer({
     dispatch({ type: "SET_INITIALIZING", payload: false });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene?.id, quality]); // Stateless: only scene and quality matter
+  }, [sceneKey, quality]); // Stateless: only scene and quality matter
 
   // ============================================================================
   // QUALITY SWITCHING (from useVideoPlayerSources)

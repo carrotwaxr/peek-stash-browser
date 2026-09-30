@@ -23,18 +23,43 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../types/api/index.js";
-import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
-// Keyed by user and scene id
+// Keyed by user and scene (id and instance: two servers reuse small ids, so
+// one session on each instance's scene counts a play on each)
 const sessionPlayCountIncrements = new Map<string, boolean>();
 
-function getSessionKey(userId: number, sceneId: string): string {
-  return compositeKey(String(userId), sceneId);
+function getSessionKey(
+  userId: number,
+  instanceId: string,
+  sceneId: string
+): string {
+  return compositeKey(String(userId), instanceId, sceneId);
+}
+
+/**
+ * A play, a resume point or a play count names its scene's instance; the
+ * server never guesses one. Answers 400 and returns false when the body
+ * names none.
+ */
+function requireInstanceId(
+  instanceId: unknown,
+  res: TypedResponse<ApiErrorResponse>
+): instanceId is string {
+  if (instanceId === undefined) {
+    res.status(400).json({ error: "Missing required field: instanceId" });
+    return false;
+  }
+  if (typeof instanceId !== "string" || instanceId === "") {
+    res.status(400).json({ error: "instanceId must be a non-empty string" });
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -62,13 +87,7 @@ export async function pingWatchHistory(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   logger.debug("Watch history ping", {
     userId,
@@ -105,7 +124,7 @@ export async function pingWatchHistory(
   const sceneDuration = scene?.duration || 0;
 
   const now = new Date();
-  const sessionKey = getSessionKey(userId, sceneId);
+  const sessionKey = getSessionKey(userId, instanceId, sceneId);
   // Set when this ping counted the session's play, so a failed transaction
   // can take it back
   let countedPlay = false;
@@ -627,13 +646,7 @@ export async function saveActivity(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   logger.debug("Save activity", {
     userId,
@@ -665,27 +678,30 @@ export async function saveActivity(
   const now = new Date();
 
   // One INSERT ... ON CONFLICT DO UPDATE with the increment in it, so it is
-  // atomic on its own; the history transactions above see its row.
-  const watchHistory = await prisma.watchHistory.upsert({
-    where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
-    create: {
-      userId,
-      instanceId,
-      sceneId,
-      playCount: 0,
-      playDuration: playDuration || 0,
-      resumeTime: resumeTime || 0,
-      lastPlayedAt: now,
-      oCount: 0,
-      oHistory: [],
-      playHistory: [],
-    },
-    update: {
-      ...(resumeTime !== undefined ? { resumeTime } : {}),
-      playDuration: { increment: playDuration || 0 },
-      lastPlayedAt: now,
-    },
-  });
+  // atomic on its own; the history transactions above see its row. A
+  // user-path write, so a unit of the writer queue.
+  const watchHistory = await dbWrite("history.activity", () =>
+    prisma.watchHistory.upsert({
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
+      create: {
+        userId,
+        instanceId,
+        sceneId,
+        playCount: 0,
+        playDuration: playDuration || 0,
+        resumeTime: resumeTime || 0,
+        lastPlayedAt: now,
+        oCount: 0,
+        oHistory: [],
+        playHistory: [],
+      },
+      update: {
+        ...(resumeTime !== undefined ? { resumeTime } : {}),
+        playDuration: { increment: playDuration || 0 },
+        lastPlayedAt: now,
+      },
+    })
+  );
 
   // Sync to Stash if user has sync enabled
   if (user.syncToStash && playDuration) {
@@ -740,13 +756,7 @@ export async function incrementPlayCount(
     return;
   }
 
-  if (
-    requestInstanceId !== undefined &&
-    (typeof requestInstanceId !== "string" || requestInstanceId === "")
-  ) {
-    res.status(400).json({ error: "instanceId must be a non-empty string" });
-    return;
-  }
+  if (!requireInstanceId(requestInstanceId, res)) return;
 
   logger.debug("Increment play count", { userId, sceneId });
 

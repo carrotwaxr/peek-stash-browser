@@ -159,6 +159,7 @@ const MetadataDrawer = ({
               </div>
               <OCounterButton
                 imageId={image.id}
+                instanceId={image.instanceId}
                 initialCount={oCounter}
                 onChange={onOCounterChange}
                 size="medium"

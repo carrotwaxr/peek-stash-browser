@@ -45,7 +45,8 @@ export interface FullWatchHistoryRecord {
  * Periodic ping from video player to track playback progress
  */
 export interface PingWatchHistoryRequest {
-  instanceId?: string;
+  /** The scene's instance: required, the server never guesses one */
+  instanceId: string;
   sceneId: string;
   currentTime: number;
   quality?: string;
@@ -67,7 +68,8 @@ export interface PingWatchHistoryResponse {
  * Save resume time and play duration delta (called by track-activity plugin)
  */
 export interface SaveActivityRequest {
-  instanceId?: string;
+  /** The scene's instance: required, the server never guesses one */
+  instanceId: string;
   sceneId: string;
   resumeTime?: number;
   playDuration?: number;
@@ -87,7 +89,8 @@ export interface SaveActivityResponse {
  * Increment play count when minimum play percentage is reached
  */
 export interface IncrementPlayCountRequest {
-  instanceId?: string;
+  /** The scene's instance: required, the server never guesses one */
+  instanceId: string;
   sceneId: string;
 }
 
@@ -105,6 +108,7 @@ export interface IncrementPlayCountResponse {
  * Increment O counter for a scene
  */
 export interface IncrementOCounterRequest {
+  /** Optional until every client sends it (cards send it from PR 5) */
   instanceId?: string;
   sceneId: string;
 }

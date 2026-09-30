@@ -90,10 +90,14 @@ describe("History access (integration)", () => {
     async (route, extra) => {
       const bodies: Record<string, unknown>[] = [
         { sceneId: FX_ID.SAME, instanceId: FX.B },
-        // No instance: GLOBAL is hidden on every instance, so the guess
-        // finds nothing.
-        { sceneId: FX_ID.GLOBAL },
+        // GLOBAL is hidden on every instance
+        { sceneId: FX_ID.GLOBAL, instanceId: FX.A },
       ];
+      if (route === "increment-o") {
+        // The O press keeps its optional instance until every client sends
+        // it: with none, the guess finds nothing either.
+        bodies.push({ sceneId: FX_ID.GLOBAL });
+      }
       if (route === "save-activity") {
         bodies.push({ sceneId: FX_ID.DELETED, instanceId: FX.A });
       }
@@ -366,6 +370,98 @@ describe("History access (integration)", () => {
         playCount: BURST,
         playHistory: BURST,
       });
+    });
+  });
+
+  /**
+   * The fixture's SAME scene is a different scene on A and on B. A play,
+   * resume point or play count names its instance; the server never guesses.
+   */
+  describe("writes name their instance", () => {
+    let writer: { id: number; client: TestClient };
+
+    const rowsOf = (userId: number) =>
+      prisma.watchHistory.findMany({
+        where: { userId },
+        orderBy: { instanceId: "asc" },
+        select: { instanceId: true, sceneId: true, playCount: true },
+      });
+
+    beforeAll(async () => {
+      writer = await createApiUser("history_it_writer", "history_it_pass_1");
+    }, 60000);
+
+    afterAll(async () => {
+      const created = writer as typeof writer | undefined;
+      if (created) {
+        await prisma.watchHistory.deleteMany({ where: { userId: created.id } });
+        await adminClient.delete(`/api/user/${created.id}`);
+      }
+    }, 60000);
+
+    it.each(WATCH_WRITES.filter(([route]) => route !== "increment-o"))(
+      "a ping, activity save or play count without an instance answers 400 and writes nothing (%s)",
+      async (route, extra) => {
+        // SAME is visible to the writer on both instances, so a guess would
+        // find one and store the write there.
+        const res = await writer.client.post(`/api/watch-history/${route}`, {
+          sceneId: FX_ID.SAME,
+          ...extra,
+        });
+
+        expect(res.status).toBe(400);
+        expect(await rowsOf(writer.id)).toEqual([]);
+      }
+    );
+
+    it("a play on B's SAME lands on B's row and leaves A's untouched", async () => {
+      await prisma.watchHistory.deleteMany({ where: { userId: writer.id } });
+      const play = (instanceId: string) =>
+        writer.client.post("/api/watch-history/increment-play-count", {
+          sceneId: FX_ID.SAME,
+          instanceId,
+        });
+
+      const onA = await play(FX.A);
+      const onB = await play(FX.B);
+      const againOnB = await play(FX.B);
+
+      expect([onA.status, onB.status, againOnB.status]).toEqual([
+        200, 200, 200,
+      ]);
+      expect(await rowsOf(writer.id)).toEqual([
+        { instanceId: FX.A, sceneId: FX_ID.SAME, playCount: 1 },
+        { instanceId: FX.B, sceneId: FX_ID.SAME, playCount: 2 },
+      ]);
+    });
+
+    it("one session counts one play on each of two instances' same scene id", async () => {
+      await prisma.watchHistory.deleteMany({ where: { userId: writer.id } });
+      // The fixture scene has no duration, so a ping counts its session's
+      // play only when the threshold is 0.
+      await prisma.user.update({
+        where: { id: writer.id },
+        data: { minimumPlayPercent: 0 },
+      });
+      const sessionStart = new Date().toISOString();
+      const ping = (instanceId: string) =>
+        writer.client.post("/api/watch-history/ping", {
+          sceneId: FX_ID.SAME,
+          instanceId,
+          currentTime: 1,
+          sessionStart,
+        });
+
+      const statuses = [];
+      for (const instanceId of [FX.A, FX.B, FX.A, FX.B]) {
+        statuses.push((await ping(instanceId)).status);
+      }
+
+      expect(statuses).toEqual([200, 200, 200, 200]);
+      expect(await rowsOf(writer.id)).toEqual([
+        { instanceId: FX.A, sceneId: FX_ID.SAME, playCount: 1 },
+        { instanceId: FX.B, sceneId: FX_ID.SAME, playCount: 1 },
+      ]);
     });
   });
 

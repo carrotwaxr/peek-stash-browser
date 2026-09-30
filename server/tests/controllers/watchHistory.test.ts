@@ -131,7 +131,12 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await authenticated(saveActivity)(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          body: {
+            sceneId: "123",
+            instanceId: "test-instance",
+            resumeTime: 60,
+            playDuration: 10,
+          },
           user: undefined,
         }),
         res,
@@ -183,7 +188,12 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await saveActivity(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          body: {
+            sceneId: "123",
+            instanceId: "test-instance",
+            resumeTime: 60,
+            playDuration: 10,
+          },
           user: testUser({ id: 1 }),
         }),
         res
@@ -248,7 +258,12 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await saveActivity(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 120, playDuration: 10 },
+          body: {
+            sceneId: "123",
+            instanceId: "test-instance",
+            resumeTime: 120,
+            playDuration: 10,
+          },
           user: testUser({ id: 1 }),
         }),
         res
@@ -287,7 +302,12 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await saveActivity(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 60, playDuration: 0 },
+          body: {
+            sceneId: "123",
+            instanceId: "test-instance",
+            resumeTime: 60,
+            playDuration: 0,
+          },
           user: testUser({ id: 1 }),
         }),
         res
@@ -323,7 +343,7 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await saveActivity(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 60 },
+          body: { sceneId: "123", instanceId: "test-instance", resumeTime: 60 },
           user: testUser({ id: 1 }),
         }),
         res
@@ -348,7 +368,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementPlayCount);
       await authenticated(incrementPlayCount)(
         reqFor(incrementPlayCount, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: undefined,
         }),
         res,
@@ -397,7 +417,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementPlayCount);
       await incrementPlayCount(
         reqFor(incrementPlayCount, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -456,7 +476,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementPlayCount);
       await incrementPlayCount(
         reqFor(incrementPlayCount, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -502,7 +522,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementPlayCount);
       await incrementPlayCount(
         reqFor(incrementPlayCount, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res
@@ -1160,6 +1180,29 @@ describe("Watch History Controller", () => {
       }
     );
 
+    it.each(writes.filter(([name]) => name !== "incrementOCounter"))(
+      "%s answers 400 without an instance and writes nothing",
+      async (_name, handler, extra) => {
+        const res = resFor(handler);
+        await handler(
+          reqFor(handler, {
+            body: { sceneId: "123", ...extra },
+            user: testUser({ id: 1 }),
+          }),
+          res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          error: "Missing required field: instanceId",
+        });
+        expect(mockResolve).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+      }
+    );
+
     it("passes the request's instanceId through", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
@@ -1225,7 +1268,7 @@ describe("Watch History Controller", () => {
       }
     );
 
-    it("ping reads the duration from the resolved instance", async () => {
+    it("ping reads the duration from the requested instance", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
           id: 1,
@@ -1253,25 +1296,20 @@ describe("Watch History Controller", () => {
       const res = resFor(pingWatchHistory);
       await pingWatchHistory(
         reqFor(pingWatchHistory, {
-          body: { sceneId: "scene-1", currentTime: 1 },
+          body: { sceneId: "scene-1", instanceId: "inst-b", currentTime: 1 },
           user: testUser({ id: 1 }),
         }),
         res
       );
 
-      expect(mockResolve).toHaveBeenCalledWith(
-        1,
-        "scene",
-        "scene-1",
-        undefined
-      );
+      expect(mockResolve).toHaveBeenCalledWith(1, "scene", "scene-1", "inst-b");
       expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "scene-1", stashInstanceId: "test-instance" },
+        where: { id: "scene-1", stashInstanceId: "inst-b" },
         select: { duration: true },
       });
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: objectContaining({ instanceId: "test-instance" }),
+          data: objectContaining({ instanceId: "inst-b" }),
         })
       );
     });
@@ -1282,6 +1320,52 @@ describe("Watch History Controller", () => {
   // ============================================================================
 
   describe("pingWatchHistory", () => {
+    it("one session counts one play on each of two instances' same scene id", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          minimumPlayPercent: 50,
+          syncToStash: false,
+        })
+      );
+      // 400 of 600 seconds played: past the 50% threshold
+      const record: WatchHistory = partialRow({
+        id: 1,
+        playCount: 0,
+        playDuration: 400,
+        resumeTime: 390,
+        lastPlayedAt: new Date(),
+        oHistory: [],
+        playHistory: [],
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
+
+      // A scene id no other test pings, so the sessions start clean
+      const res = resFor(pingWatchHistory);
+      const ping = (instanceId: string) =>
+        pingWatchHistory(
+          reqFor(pingWatchHistory, {
+            body: { sceneId: "session-two", instanceId, currentTime: 400 },
+            user: testUser({ id: 1 }),
+          }),
+          res
+        );
+      for (const instanceId of ["inst-a", "inst-b", "inst-a", "inst-b"]) {
+        await ping(instanceId);
+      }
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(
+        vi
+          .mocked(userStatsService.updateStatsForScene)
+          .mock.calls.map((call) => [call[1], call[6]])
+      ).toEqual([
+        ["session-two", "inst-a"],
+        ["session-two", "inst-b"],
+      ]);
+    });
+
     it("two pings of one session past the threshold count one play", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
@@ -1313,7 +1397,11 @@ describe("Watch History Controller", () => {
       const ping = () =>
         pingWatchHistory(
           {
-            body: { sceneId: "session-guard", currentTime: 400 },
+            body: {
+              sceneId: "session-guard",
+              instanceId: "test-instance",
+              currentTime: 400,
+            },
             user: { id: 1 },
           } as never,
           res
@@ -1372,7 +1460,11 @@ describe("Watch History Controller", () => {
       const res = resFor(pingWatchHistory);
       await pingWatchHistory(
         {
-          body: { sceneId: "session-busy-retry", currentTime: 400 },
+          body: {
+            sceneId: "session-busy-retry",
+            instanceId: "test-instance",
+            currentTime: 400,
+          },
           user: { id: 1 },
         } as never,
         res
@@ -1431,7 +1523,11 @@ describe("Watch History Controller", () => {
       const res = resFor(pingWatchHistory);
       await pingWatchHistory(
         reqFor(pingWatchHistory, {
-          body: { sceneId: "session-v1-history", currentTime: 100 },
+          body: {
+            sceneId: "session-v1-history",
+            instanceId: "test-instance",
+            currentTime: 100,
+          },
           user: testUser({ id: 1 }),
         }),
         res
@@ -1465,6 +1561,7 @@ describe("Watch History Controller", () => {
       await pingWatchHistory(
         reqFor(pingWatchHistory, {
           body: {
+            instanceId: "test-instance",
             sceneId: "session-log-level",
             currentTime: 400,
             quality: "1080p",
@@ -1514,7 +1611,12 @@ describe("Watch History Controller", () => {
       const res = resFor(saveActivity);
       await saveActivity(
         reqFor(saveActivity, {
-          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          body: {
+            sceneId: "123",
+            instanceId: "test-instance",
+            resumeTime: 60,
+            playDuration: 10,
+          },
           user: testUser({ id: 1 }),
         }),
         res
@@ -1551,7 +1653,7 @@ describe("Watch History Controller", () => {
       const res = resFor(incrementPlayCount);
       await incrementPlayCount(
         reqFor(incrementPlayCount, {
-          body: { sceneId: "123" },
+          body: { sceneId: "123", instanceId: "test-instance" },
           user: testUser({ id: 1 }),
         }),
         res

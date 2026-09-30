@@ -175,7 +175,8 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id}
+                sceneId={scene.id}
+                instanceId={scene.instanceId}
                 initialCount={oCounter}
                 onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
@@ -234,7 +235,8 @@ const PlaybackControls = () => {
             >
               {sceneSettings.showOCounter && (
                 <OCounterButton
-                  sceneId={scene?.id}
+                  sceneId={scene.id}
+                  instanceId={scene.instanceId}
                   initialCount={oCounter}
                   onChange={(newCount: number) =>
                     dispatch({ type: "SET_O_COUNTER", payload: newCount })
@@ -283,7 +285,8 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id}
+                sceneId={scene.id}
+                instanceId={scene.instanceId}
                 initialCount={oCounter}
                 onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
