@@ -3,8 +3,8 @@ import {
   type CSSProperties,
   type ReactNode,
   forwardRef,
+  memo,
   useCallback,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -142,12 +142,15 @@ export const CardImage = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
 
-  // Reset state when src changes
-  useEffect(() => {
+  // A new src starts over. Adjusted while rendering, not in an effect: an
+  // effect's reset leaves React a second render of the card to do
+  const [stateFor, setStateFor] = useState(src);
+  if (stateFor !== src) {
+    setStateFor(src);
     setHasError(false);
     setIsLoaded(false);
     setIsVideo(false);
-  }, [src]);
+  }
 
   const showPlaceholder = !src || hasError;
 
@@ -736,7 +739,25 @@ interface CardRatingRowProps {
   showMenu?: boolean;
 }
 
-export const CardRatingRow = ({
+/**
+ * A value the user just set, shown over the prop it was set against until
+ * that prop moves on (the list caught up, or the server sent another value).
+ * Read from props rather than copied into state by an effect, so a value
+ * from the server renders the card once.
+ */
+function useLocalOverride<T>(prop: T) {
+  const [override, setOverride] = useState<{ value: T; over: T } | null>(null);
+  if (override && !Object.is(override.over, prop)) setOverride(null);
+  const value =
+    override && Object.is(override.over, prop) ? override.value : prop;
+  return [
+    value,
+    (next: T) => setOverride({ value: next, over: prop }),
+    () => setOverride(null),
+  ] as const;
+}
+
+export const CardRatingRow = memo(function CardRatingRow({
   entityType,
   entityId,
   instanceId,
@@ -752,28 +773,15 @@ export const CardRatingRow = ({
   showFavorite = true,
   showOCounter = true,
   showMenu = true,
-}: CardRatingRowProps) => {
-  const [rating, setRating] = useState(initialRating);
-  const [isFavorite, setIsFavorite] = useState(initialFavorite);
-  const [oCounter, setOCounter] = useState(initialOCounter);
+}: CardRatingRowProps) {
+  const [rating, setRating, revertRating] = useLocalOverride(initialRating);
+  const [isFavorite, setIsFavorite, revertFavorite] =
+    useLocalOverride(initialFavorite);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
   const [pendingHide, setPendingHide] = useState<HideInfo | null>(null);
   const badgeRef = useRef(null);
   const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
-
-  // Sync state when initial values change (e.g., on data refresh)
-  useEffect(() => {
-    setRating(initialRating);
-  }, [initialRating]);
-
-  useEffect(() => {
-    setIsFavorite(initialFavorite);
-  }, [initialFavorite]);
-
-  useEffect(() => {
-    setOCounter(initialOCounter);
-  }, [initialOCounter]);
 
   const handleRatingSave = async (newRating: number | null) => {
     setRating(newRating);
@@ -788,7 +796,7 @@ export const CardRatingRow = ({
       onRatingChange?.(entityId, newRating);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(initialRating); // Revert on error
+      revertRating();
     }
   };
 
@@ -805,13 +813,12 @@ export const CardRatingRow = ({
       onFavoriteChange?.(entityId, newValue);
     } catch (error) {
       console.error("Failed to update favorite:", error);
-      setIsFavorite(initialFavorite); // Revert on error
+      revertFavorite();
     }
   };
 
+  // The O button shows its own presses; the parent hears of each
   const handleOCounterChange = (newCount: number) => {
-    setOCounter(newCount);
-    // Notify parent of the change
     onOCounterChange?.(entityId, newCount);
   };
 
@@ -910,7 +917,7 @@ export const CardRatingRow = ({
               sceneId={entityType === "scene" ? entityId : undefined}
               imageId={entityType === "image" ? entityId : undefined}
               instanceId={instanceId}
-              initialCount={oCounter ?? 0}
+              initialCount={initialOCounter ?? 0}
               onChange={handleOCounterChange}
               size="small"
               variant="card"
@@ -956,4 +963,4 @@ export const CardRatingRow = ({
       />
     </>
   );
-};
+});

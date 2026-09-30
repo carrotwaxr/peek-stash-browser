@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type * as api from "../../../src/api";
 import {
   CardDescription,
   CardImage,
@@ -33,6 +34,18 @@ vi.mock("../../../src/api/hooks", () => ({
     isPending: false,
   }),
 }));
+
+const mockUpdateFavorite = vi.fn((..._args: unknown[]) => Promise.resolve());
+vi.mock("../../../src/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof api>();
+  return {
+    ...actual,
+    libraryApi: {
+      ...actual.libraryApi,
+      updateFavorite: (...args: unknown[]) => mockUpdateFavorite(...args),
+    },
+  };
+});
 
 vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
@@ -323,5 +336,76 @@ describe("a card's hide dialog", () => {
     expect(onClick).not.toHaveBeenCalled();
     expect(onWrapperClick).not.toHaveBeenCalled();
     expect(onWrapperMouseDown).not.toHaveBeenCalled();
+  });
+});
+
+describe("a card's rating row reads its props", () => {
+  const row = (props: {
+    initialRating?: number | null;
+    initialFavorite?: boolean;
+  }) => (
+    <CardRatingRow
+      entityType="scene"
+      entityId="12"
+      instanceId="A"
+      initialRating={props.initialRating ?? null}
+      initialFavorite={props.initialFavorite ?? false}
+      initialOCounter={0}
+      showMenu={false}
+    />
+  );
+
+  afterEach(() => {
+    mockUpdateFavorite.mockReset();
+    mockUpdateFavorite.mockImplementation(() => Promise.resolve());
+  });
+
+  it("a rating from the server shows at once", () => {
+    const { rerender } = render(row({ initialRating: 60 }));
+    expect(screen.getByLabelText("Rating: 6.0")).toBeTruthy();
+
+    rerender(row({ initialRating: 40 }));
+
+    expect(screen.getByLabelText("Rating: 4.0")).toBeTruthy();
+  });
+
+  it("a favorite the user sets shows until the list sends it back, and a later change from the server replaces it", async () => {
+    const { rerender } = render(row({ initialFavorite: false }));
+
+    fireEvent.click(screen.getByLabelText("Add to favorites"));
+    await vi.waitFor(() =>
+      expect(mockUpdateFavorite).toHaveBeenCalledWith("scene", "12", true, "A")
+    );
+    expect(screen.getByLabelText("Remove from favorites")).toBeTruthy();
+
+    // The list has not caught up yet
+    rerender(row({ initialFavorite: false }));
+    expect(screen.getByLabelText("Remove from favorites")).toBeTruthy();
+
+    // It has
+    rerender(row({ initialFavorite: true }));
+    expect(screen.getByLabelText("Remove from favorites")).toBeTruthy();
+
+    // Changed elsewhere since
+    rerender(row({ initialFavorite: false }));
+    expect(screen.getByLabelText("Add to favorites")).toBeTruthy();
+  });
+
+  it("a favorite that fails to save shows the list's value again", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockUpdateFavorite.mockImplementation(() =>
+      Promise.reject(new Error("offline"))
+    );
+    render(row({ initialFavorite: false }));
+
+    fireEvent.click(screen.getByLabelText("Add to favorites"));
+
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText("Add to favorites")).toBeTruthy()
+    );
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

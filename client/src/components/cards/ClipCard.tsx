@@ -1,16 +1,12 @@
-import { type FocusEvent, forwardRef, useMemo } from "react";
+import { type FocusEvent, forwardRef, memo, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import {
-  getFilteredListPath,
-  getScenePathWithTime,
-} from "../../utils/entityLinks";
+import { getScenePathWithTime } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import ClipCardPreview from "./ClipCardPreview";
+import { useCardIndicators } from "./cardIndicators";
 
 export interface Clip {
   id: string;
@@ -40,212 +36,140 @@ interface Props {
   onHideSuccess?: (entityId: string, entityType: string) => void;
 }
 
-const ClipCard = forwardRef<HTMLDivElement, Props>(
-  (
-    {
-      clip,
-      onClick,
-      onFocus,
-      tabIndex = -1,
-      className = "",
-      fromPageTitle,
-      onHideSuccess,
-    },
-    ref
-  ) => {
-    const navigate = useNavigate();
-    const { getSettings } = useCardDisplaySettings();
-    const clipSettings = getSettings("clip");
-    const { hasMultipleInstances } = useConfig();
+// Memoised: a grid that renders again with the same row skips this card
+const ClipCard = memo(
+  forwardRef<HTMLDivElement, Props>(
+    (
+      {
+        clip,
+        onClick,
+        onFocus,
+        tabIndex = -1,
+        className = "",
+        fromPageTitle,
+        onHideSuccess,
+      },
+      ref
+    ) => {
+      const navigate = useNavigate();
+      const { getSettings } = useCardDisplaySettings();
+      const clipSettings = getSettings("clip");
+      const { hasMultipleInstances } = useConfig();
 
-    // Title is the clip title
-    const title = clip.title || "Untitled";
+      // Title is the clip title
+      const title = clip.title || "Untitled";
 
-    // Build subtitle from scene title, studio, date (respecting settings)
-    const subtitle = useMemo(() => {
-      const parts = [];
+      // Build subtitle from scene title, studio, date (respecting settings)
+      const subtitle = useMemo(() => {
+        const parts = [];
 
-      if (clipSettings.showSceneTitle && clip.scene?.title) {
-        parts.push(clip.scene.title);
-      }
+        if (clipSettings.showSceneTitle && clip.scene?.title) {
+          parts.push(clip.scene.title);
+        }
 
-      // Studio would need to be fetched from scene - currently not in API response
-      // if (clipSettings.showStudio && clip.scene?.studio?.name) {
-      //   parts.push(clip.scene.studio.name);
-      // }
+        // Studio would need to be fetched from scene - currently not in API response
+        // if (clipSettings.showStudio && clip.scene?.studio?.name) {
+        //   parts.push(clip.scene.studio.name);
+        // }
 
-      // Date would need to be from scene - currently not in API response
-      // if (clipSettings.showDate && clip.scene?.date) {
-      //   parts.push(formatRelativeTime(clip.scene.date));
-      // }
+        // Date would need to be from scene - currently not in API response
+        // if (clipSettings.showDate && clip.scene?.date) {
+        //   parts.push(formatRelativeTime(clip.scene.date));
+        // }
 
-      return parts.length > 0 ? parts.join(" • ") : null;
-    }, [clip.scene, clipSettings]);
+        return parts.length > 0 ? parts.join(" • ") : null;
+      }, [clip.scene, clipSettings]);
 
-    // Combine primary tag with additional tags for indicators
-    const allTags = useMemo(() => {
-      const tagMap = new Map();
+      // The counts, from the clip card's table
+      const indicators = useCardIndicators("clip", clip);
 
-      if (clip.primaryTag) {
-        tagMap.set(clip.primaryTag.id, clip.primaryTag);
-      }
+      // Only show indicators if setting is enabled
+      const indicatorsToShow = clipSettings.showRelationshipIndicators
+        ? indicators
+        : [];
 
-      if (clip.tags) {
-        clip.tags.forEach((tag) => tagMap.set(tag.id, tag));
-      }
+      // Format clip duration for overlay
+      const formattedDuration = useMemo(() => {
+        if (clip.endSeconds != null && clip.seconds != null) {
+          return formatDuration(clip.endSeconds - clip.seconds);
+        }
+        return null;
+      }, [clip.seconds, clip.endSeconds]);
 
-      return Array.from(tagMap.values());
-    }, [clip.primaryTag, clip.tags]);
+      // Render slot: Animated preview + overlays (duration, tag dot, etc.)
+      const renderImageContent = () => (
+        <>
+          {/* Animated clip preview (handles its own image/video) */}
+          <ClipCardPreview clip={clip} />
 
-    // Build indicators
-    const indicators = useMemo(() => {
-      const tagsTooltip = getIndicatorBehavior("clip", "tags") === "rich" &&
-        allTags?.length > 0 && (
-          <TooltipEntityGrid
-            entityType="tag"
-            entities={allTags}
-            title="Tags"
-            parentInstanceId={clip.scene?.instanceId}
-          />
-        );
+          {/* Duration badge */}
+          {formattedDuration && (
+            <div className="absolute bottom-2 right-2 bg-black/75 px-2 py-0.5 rounded text-xs font-medium z-10">
+              {formattedDuration}
+            </div>
+          )}
 
-      // Performers would come from scene - need API enhancement
-      // const performersTooltip = getIndicatorBehavior("clip", "performers") === "rich" &&
-      //   clip.scene?.performers?.length > 0 && (
-      //     <TooltipEntityGrid
-      //       entityType="performer"
-      //       entities={clip.scene.performers}
-      //       title="Performers"
-      //     />
-      //   );
-
-      // The tags count opens the Tags list through its scene filter, on the
-      // clip's scene and its instance, where the page has one
-      const tagsLink = getFilteredListPath(
-        "/tags",
-        "scenes",
-        { id: clip.sceneId, instanceId: clip.scene?.instanceId },
-        hasMultipleInstances
+          {/* Ungenerated indicator */}
+          {!clip.isGenerated && (
+            <div className="absolute top-2 right-2 bg-yellow-500/80 px-1.5 py-0.5 rounded text-xs z-10">
+              No preview
+            </div>
+          )}
+        </>
       );
 
-      return [
-        // Performers indicator - needs API enhancement to include scene.performers
-        // {
-        //   type: "PERFORMERS",
-        //   count: clip.scene?.performers?.length || 0,
-        //   tooltipContent: performersTooltip,
-        //   onClick:
-        //     getIndicatorBehavior("clip", "performers") === "nav" &&
-        //     clip.scene?.performers?.length > 0
-        //       ? () => navigate(`/performers?sceneId=${clip.sceneId}`)
-        //       : undefined,
-        // },
-        {
-          type: "TAGS",
-          count: allTags?.length || 0,
-          tooltipContent: tagsTooltip,
-          onClick:
-            getIndicatorBehavior("clip", "tags") === "nav" &&
-            allTags?.length > 0 &&
-            tagsLink
-              ? () => navigate(tagsLink)
-              : undefined,
-        },
-      ];
-    }, [
-      allTags,
-      clip.sceneId,
-      clip.scene?.instanceId,
-      navigate,
-      hasMultipleInstances,
-    ]);
+      // Handle navigation - navigate with autoplay state
+      const clipUrl = getScenePathWithTime(
+        { id: clip.sceneId, instanceId: clip.instanceId },
+        clip.seconds ?? 0,
+        hasMultipleInstances
+      );
+      const handleNavigate = () => {
+        if (onClick) {
+          onClick(clip);
+        } else {
+          void navigate(clipUrl, {
+            state: { fromPageTitle, shouldAutoplay: true },
+          });
+        }
+      };
 
-    // Only show indicators if setting is enabled
-    const indicatorsToShow = clipSettings.showRelationshipIndicators
-      ? indicators
-      : [];
-
-    // Format clip duration for overlay
-    const formattedDuration = useMemo(() => {
-      if (clip.endSeconds != null && clip.seconds != null) {
-        return formatDuration(clip.endSeconds - clip.seconds);
-      }
-      return null;
-    }, [clip.seconds, clip.endSeconds]);
-
-    // Render slot: Animated preview + overlays (duration, tag dot, etc.)
-    const renderImageContent = () => (
-      <>
-        {/* Animated clip preview (handles its own image/video) */}
-        <ClipCardPreview clip={clip} />
-
-        {/* Duration badge */}
-        {formattedDuration && (
-          <div className="absolute bottom-2 right-2 bg-black/75 px-2 py-0.5 rounded text-xs font-medium z-10">
-            {formattedDuration}
-          </div>
-        )}
-
-        {/* Ungenerated indicator */}
-        {!clip.isGenerated && (
-          <div className="absolute top-2 right-2 bg-yellow-500/80 px-1.5 py-0.5 rounded text-xs z-10">
-            No preview
-          </div>
-        )}
-      </>
-    );
-
-    // Handle navigation - navigate with autoplay state
-    const clipUrl = getScenePathWithTime(
-      { id: clip.sceneId, instanceId: clip.instanceId },
-      clip.seconds ?? 0,
-      hasMultipleInstances
-    );
-    const handleNavigate = () => {
-      if (onClick) {
-        onClick(clip);
-      } else {
-        void navigate(clipUrl, {
-          state: { fromPageTitle, shouldAutoplay: true },
-        });
-      }
-    };
-
-    return (
-      <BaseCard
-        ref={ref}
-        entityType="clip"
-        entity={clip as unknown as Record<string, unknown>}
-        linkTo={clipUrl}
-        fromPageTitle={fromPageTitle}
-        // Content (imagePath not needed - ClipCardPreview handles image/video)
-        title={title}
-        subtitle={subtitle}
-        indicators={indicatorsToShow}
-        // Clips don't have descriptions
-        displayPreferences={{ showDescription: false }}
-        // Rating controls - clips could have their own ratings in future
-        ratingControlsProps={{
-          entityType: "clip",
-          entityId: clip.id,
-          instanceId: clip.instanceId,
-          entityTitle: title,
-          onHideSuccess,
-          showRating: clipSettings.showRating as boolean | undefined,
-          showFavorite: clipSettings.showFavorite as boolean | undefined,
-          showOCounter: clipSettings.showOCounter as boolean | undefined,
-          showMenu: clipSettings.showMenu as boolean | undefined,
-        }}
-        // Render slots
-        renderImageContent={renderImageContent}
-        // Standard props
-        className={className}
-        onNavigate={handleNavigate}
-        onFocus={onFocus}
-        tabIndex={tabIndex}
-      />
-    );
-  }
+      return (
+        <BaseCard
+          ref={ref}
+          entityType="clip"
+          entity={clip as unknown as Record<string, unknown>}
+          linkTo={clipUrl}
+          fromPageTitle={fromPageTitle}
+          // Content (imagePath not needed - ClipCardPreview handles image/video)
+          title={title}
+          subtitle={subtitle}
+          indicators={indicatorsToShow}
+          // Clips don't have descriptions
+          displayPreferences={{ showDescription: false }}
+          // Rating controls - clips could have their own ratings in future
+          ratingControlsProps={{
+            entityType: "clip",
+            entityId: clip.id,
+            instanceId: clip.instanceId,
+            entityTitle: title,
+            onHideSuccess,
+            showRating: clipSettings.showRating as boolean | undefined,
+            showFavorite: clipSettings.showFavorite as boolean | undefined,
+            showOCounter: clipSettings.showOCounter as boolean | undefined,
+            showMenu: clipSettings.showMenu as boolean | undefined,
+          }}
+          // Render slots
+          renderImageContent={renderImageContent}
+          // Standard props
+          className={className}
+          onNavigate={handleNavigate}
+          onFocus={onFocus}
+          tabIndex={tabIndex}
+        />
+      );
+    }
+  )
 );
 
 ClipCard.displayName = "ClipCard";
