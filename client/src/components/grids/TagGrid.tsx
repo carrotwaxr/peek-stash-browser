@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { TagCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -24,13 +25,16 @@ const TagGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(tag: any, _index: number, { onHideSuccess }: any) => (
-        <TagCard
-          key={tag.id}
-          tag={tag}
-          onHideSuccess={() => onHideSuccess(tag.id)}
-        />
-      )}
+      renderItem={(item, _index, { onHideSuccess }) => {
+        const tag = item as ComponentProps<typeof TagCard>["tag"];
+        return (
+          <TagCard
+            key={tag.id}
+            tag={tag}
+            onHideSuccess={() => onHideSuccess(tag.id, tag.instanceId)}
+          />
+        );
+      }}
       {...rest}
     />
   );

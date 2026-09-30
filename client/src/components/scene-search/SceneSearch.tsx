@@ -11,6 +11,7 @@ import { useGridColumns } from "../../hooks/useGridColumns";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
@@ -197,9 +198,14 @@ const SceneSearch = ({
     return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
   }, [currentViewMode]);
 
-  // Handle successful hide - remove scene from cache
-  const handleHideSuccess = (sceneId: string) => {
+  // Handle successful hide - remove the scene on that instance from cache
+  const handleHideSuccess = (
+    sceneId: string,
+    _entityType: string,
+    instanceId?: string
+  ) => {
     if (!queryParams) return;
+    const hidden = makeCompositeKey(sceneId, instanceId);
     const qk = queryKeys.scenes.list(
       undefined,
       (queryParams ?? {}) as Record<string, unknown>
@@ -213,8 +219,12 @@ const SceneSearch = ({
         ...oldData,
         findScenes: {
           ...fs,
-          scenes: (fs.scenes as unknown[]).filter(
-            (s: unknown) => (s as Record<string, unknown>).id !== sceneId
+          scenes: (fs.scenes as Array<Record<string, unknown>>).filter(
+            (s) =>
+              makeCompositeKey(
+                s.id as string,
+                s.instanceId as string | undefined
+              ) !== hidden
           ),
           count: Math.max(0, ((fs.count as number) || 0) - 1),
         },

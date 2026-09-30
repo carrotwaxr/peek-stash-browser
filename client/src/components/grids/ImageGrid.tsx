@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { ImageCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -24,13 +25,16 @@ const ImageGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="date"
       density={density}
-      renderItem={(image: any, _index: number, { onHideSuccess }: any) => (
-        <ImageCard
-          key={image.id}
-          image={image}
-          onHideSuccess={() => onHideSuccess(image.id)}
-        />
-      )}
+      renderItem={(item, _index, { onHideSuccess }) => {
+        const image = item as ComponentProps<typeof ImageCard>["image"];
+        return (
+          <ImageCard
+            key={image.id}
+            image={image}
+            onHideSuccess={() => onHideSuccess(image.id, image.instanceId)}
+          />
+        );
+      }}
       {...rest}
     />
   );

@@ -41,13 +41,9 @@ import {
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
-import {
-  getIdsVisibleOnAnyInstance,
-  getVisibleEntityKeys,
-} from "../../services/EntityAccessService.js";
+import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import type * as userHiddenEntityModule from "../../services/UserHiddenEntityService.js";
 import { entityKey } from "../../utils/entityRef.js";
@@ -116,7 +112,6 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 // Mock EntityAccessService (hiding requires visibility)
 vi.mock("../../services/EntityAccessService.js", () => ({
   getVisibleEntityKeys: vi.fn(),
-  getIdsVisibleOnAnyInstance: vi.fn(),
 }));
 
 // Mock UserHiddenEntityService; its list of hideable types stays real
@@ -154,14 +149,10 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockVisibleKeys = vi.mocked(getVisibleEntityKeys);
-const mockVisibleIds = vi.mocked(getIdsVisibleOnAnyInstance);
 const mockAlreadyHidden = vi.mocked(userHiddenEntityService.findAlreadyHidden);
 
-/** Only these ids are visible, on any instance and on a named one. */
+/** Only these ids are visible, on the instance each target names. */
 function visibleIds(...ids: string[]) {
-  mockVisibleIds.mockImplementation((_userId, _type, requested) =>
-    Promise.resolve(new Set(requested.filter((id) => ids.includes(id))))
-  );
   mockVisibleKeys.mockImplementation((_userId, _type, refs) =>
     Promise.resolve(
       new Set(
@@ -185,9 +176,10 @@ describe("User Controller — Features", () => {
     mockAlreadyHidden.mockImplementation((_userId, targets) =>
       Promise.resolve(targets.map(() => false))
     );
-    mockVisibleIds.mockImplementation((_userId, _type, ids) =>
-      Promise.resolve(new Set(ids))
-    );
+    // The one configured instance the hide targets name
+    mockPrisma.stashInstance.findMany.mockResolvedValue([
+      partialRow({ id: "inst-1" }),
+    ]);
     mockVisibleKeys.mockImplementation((_userId, _type, refs) =>
       Promise.resolve(new Set(refs.map((r) => entityKey(r.id, r.instanceId))))
     );
@@ -747,7 +739,7 @@ describe("User Controller — Features", () => {
   describe("hideEntity", () => {
     it("returns 401 when user has no id", async () => {
       const req = reqFor(hideEntity, {
-        body: { entityType: "scene", entityId: "1" },
+        body: { entityType: "scene", entityId: "1", instanceId: "inst-1" },
         user: malformed({}),
       });
       const res = resFor(hideEntity);
@@ -764,7 +756,7 @@ describe("User Controller — Features", () => {
 
     it("returns 400 for invalid entity type", async () => {
       const req = reqFor(hideEntity, {
-        body: { entityType: "user", entityId: "1" },
+        body: { entityType: "user", entityId: "1", instanceId: "inst-1" },
         user: USER,
       });
       const res = resFor(hideEntity);
@@ -772,28 +764,64 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(400);
     });
 
-    it("hides entity successfully", async () => {
+    it("hides entity successfully, on its instance", async () => {
       const req = reqFor(hideEntity, {
-        body: { entityType: "scene", entityId: "42" },
+        body: { entityType: "scene", entityId: "42", instanceId: "inst-1" },
         user: USER,
       });
       const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getOkBody().success).toBe(true);
-      // No instance: visible on some instance, stored for every instance
-      expect(mockVisibleIds).toHaveBeenCalledWith(USER.id, "scene", ["42"]);
+      expect(mockVisibleKeys).toHaveBeenCalledWith(USER.id, "scene", [
+        { id: "42", instanceId: "inst-1" },
+      ]);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
         USER.id,
         "scene",
         "42",
-        ""
+        "inst-1"
       );
+    });
+
+    it.each([
+      ["no instanceId", {}, "instanceId is required"],
+      ["an empty instanceId", { instanceId: "" }, "instanceId is required"],
+      ["a null instanceId", { instanceId: null }, "instanceId is required"],
+      ["a non-string instanceId", { instanceId: 5 }, "Invalid instanceId"],
+    ])("returns 400 for %s and writes nothing", async (_, extra, error) => {
+      const req = reqFor(hideEntity, {
+        body: malformed({ entityType: "scene", entityId: "42", ...extra }),
+        user: USER,
+      });
+      const res = resFor(hideEntity);
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({ error });
+      expect(mockVisibleKeys).not.toHaveBeenCalled();
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for an instance that is not configured", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValueOnce([]);
+      const req = reqFor(hideEntity, {
+        body: { entityType: "scene", entityId: "42", instanceId: "gone" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({ error: "Invalid instanceId" });
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["gone"] } },
+        select: { id: true },
+      });
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
 
     it("returns 404 and writes nothing for an entity the user cannot see", async () => {
       visibleIds();
       const req = reqFor(hideEntity, {
-        body: { entityType: "tag", entityId: "7" },
+        body: { entityType: "tag", entityId: "7", instanceId: "inst-1" },
         user: USER,
       });
       const res = resFor(hideEntity);
@@ -803,7 +831,9 @@ describe("User Controller — Features", () => {
       expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
 
-    it("checks the given instance when the request names one", async () => {
+    it("a repeat hide succeeds without writing", async () => {
+      mockAlreadyHidden.mockResolvedValueOnce([true]);
+      // Hidden entities are excluded for their owner, so access says no
       visibleIds();
       const req = reqFor(hideEntity, {
         body: { entityType: "scene", entityId: "42", instanceId: "inst-1" },
@@ -811,35 +841,21 @@ describe("User Controller — Features", () => {
       });
       const res = resFor(hideEntity);
       await hideEntity(req, res);
-      expect(mockVisibleKeys).toHaveBeenCalledWith(USER.id, "scene", [
-        { id: "42", instanceId: "inst-1" },
-      ]);
-      expect(mockVisibleIds).not.toHaveBeenCalled();
-      expect(res._getStatus()).toBe(404);
-      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
-    });
-
-    it("a repeat hide succeeds without writing", async () => {
-      mockAlreadyHidden.mockResolvedValueOnce([true]);
-      // Hidden entities are excluded for their owner, so access says no
-      visibleIds();
-      const req = reqFor(hideEntity, {
-        body: { entityType: "scene", entityId: "42" },
-        user: USER,
-      });
-      const res = resFor(hideEntity);
-      await hideEntity(req, res);
       expect(res._getStatus()).toBe(200);
       expect(res._getOkBody().success).toBe(true);
       expect(mockAlreadyHidden).toHaveBeenCalledWith(USER.id, [
-        { entityType: "scene", entityId: "42", instanceId: "" },
+        { entityType: "scene", entityId: "42", instanceId: "inst-1" },
       ]);
       expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
 
     it("returns 400 when entityId is not a numeric Stash id", async () => {
       const req = reqFor(hideEntity, {
-        body: { entityType: "tag", entityId: "x') OR 1=1 --" },
+        body: {
+          entityType: "tag",
+          entityId: "x') OR 1=1 --",
+          instanceId: "inst-1",
+        },
         user: USER,
       });
       const res = resFor(hideEntity);
@@ -956,7 +972,7 @@ describe("User Controller — Features", () => {
       hideEntity: {
         call: async (entityType) => {
           const req = reqFor(hideEntity, {
-            body: { entityType, entityId: "42" },
+            body: { entityType, entityId: "42", instanceId: "inst-1" },
             user: USER,
           });
           const res = resFor(hideEntity);
@@ -1064,7 +1080,11 @@ describe("User Controller — Features", () => {
 
     it("returns 400 for invalid entity type in bulk", async () => {
       const req = reqFor(hideEntities, {
-        body: { entities: [{ entityType: "invalid", entityId: "1" }] },
+        body: {
+          entities: [
+            { entityType: "invalid", entityId: "1", instanceId: "inst-1" },
+          ],
+        },
         user: USER,
       });
       const res = resFor(hideEntities);
@@ -1076,8 +1096,8 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "performer", entityId: "2" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "performer", entityId: "2", instanceId: "inst-1" },
           ],
         },
         user: USER,
@@ -1091,8 +1111,8 @@ describe("User Controller — Features", () => {
       expect(
         userHiddenEntityService.hideEntities
       ).toHaveBeenCalledExactlyOnceWith(USER.id, [
-        { entityType: "scene", entityId: "1", instanceId: "" },
-        { entityType: "performer", entityId: "2", instanceId: "" },
+        { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+        { entityType: "performer", entityId: "2", instanceId: "inst-1" },
       ]);
       expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
@@ -1104,8 +1124,8 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "performer", entityId: "2" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "performer", entityId: "2", instanceId: "inst-1" },
           ],
         },
         user: USER,
@@ -1120,9 +1140,9 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "tag", entityId: "2" },
-            { entityType: "performer", entityId: "3" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "tag", entityId: "2", instanceId: "inst-1" },
+            { entityType: "performer", entityId: "3", instanceId: "inst-1" },
           ],
         },
         user: USER,
@@ -1140,8 +1160,8 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "scene", entityId: "2" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "scene", entityId: "2", instanceId: "inst-1" },
           ],
         },
         user: USER,
@@ -1153,7 +1173,7 @@ describe("User Controller — Features", () => {
       expect(
         userHiddenEntityService.hideEntities
       ).toHaveBeenCalledExactlyOnceWith(USER.id, [
-        { entityType: "scene", entityId: "2", instanceId: "" },
+        { entityType: "scene", entityId: "2", instanceId: "inst-1" },
       ]);
     });
 
@@ -1163,8 +1183,8 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "scene", entityId: "2" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "scene", entityId: "2", instanceId: "inst-1" },
           ],
         },
         user: USER,
@@ -1176,22 +1196,23 @@ describe("User Controller — Features", () => {
     });
 
     it("checks a 200-target bulk hide in a bounded number of queries", async () => {
-      const entities = Array.from({ length: 200 }, (_, i) =>
-        i % 2 === 0
-          ? { entityType: "scene", entityId: String(i), instanceId: "inst-1" }
-          : { entityType: "performer", entityId: String(i) }
-      );
+      const entities = Array.from({ length: 200 }, (_, i) => ({
+        entityType: i % 2 === 0 ? "scene" : "performer",
+        entityId: String(i),
+        instanceId: "inst-1",
+      }));
       const req = reqFor(hideEntities, { body: { entities }, user: USER });
       const res = resFor(hideEntities);
       await hideEntities(req, res);
 
       expect(res._getOkBody().successCount).toBe(200);
-      // One read of the user's hides, one visibility query per type and form
+      // One instance read, one read of the user's hides, one visibility
+      // query per type
+      expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledTimes(1);
       expect(mockAlreadyHidden).toHaveBeenCalledTimes(1);
-      expect(mockVisibleKeys).toHaveBeenCalledTimes(1);
+      expect(mockVisibleKeys).toHaveBeenCalledTimes(2);
       expect(must(mockVisibleKeys.mock.calls[0])[2]).toHaveLength(100);
-      expect(mockVisibleIds).toHaveBeenCalledTimes(1);
-      expect(must(mockVisibleIds.mock.calls[0])[2]).toHaveLength(100);
+      expect(must(mockVisibleKeys.mock.calls[1])[2]).toHaveLength(100);
       expect(userHiddenEntityService.hideEntities).toHaveBeenCalledTimes(1);
       expect(
         must(vi.mocked(userHiddenEntityService.hideEntities).mock.calls[0])[1]
@@ -1202,8 +1223,12 @@ describe("User Controller — Features", () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
-            { entityType: "scene", entityId: "1" },
-            { entityType: "tag", entityId: "1' OR '1'='1" },
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            {
+              entityType: "tag",
+              entityId: "1' OR '1'='1",
+              instanceId: "inst-1",
+            },
           ],
         },
         user: USER,
@@ -1214,11 +1239,11 @@ describe("User Controller — Features", () => {
       expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
     });
 
-    it("returns 400 for an unknown instanceId in bulk", async () => {
-      vi.mocked(stashInstanceManager.getConfig).mockReturnValueOnce(undefined);
+    it("returns 400 naming a target on an unknown instance, and hides nothing", async () => {
       const req = reqFor(hideEntities, {
         body: {
           entities: [
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
             { entityType: "scene", entityId: "1", instanceId: "nope" },
           ],
         },
@@ -1227,6 +1252,30 @@ describe("User Controller — Features", () => {
       const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
+        error: "entities[1]: Invalid instanceId",
+      });
+      expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 naming a target without an instance, and hides nothing", async () => {
+      const req = reqFor(hideEntities, {
+        body: malformed({
+          entities: [
+            { entityType: "scene", entityId: "1", instanceId: "inst-1" },
+            { entityType: "scene", entityId: "2" },
+          ],
+        }),
+        user: USER,
+      });
+      const res = resFor(hideEntities);
+      await hideEntities(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
+        error: "entities[1]: instanceId is required",
+      });
+      expect(mockVisibleKeys).not.toHaveBeenCalled();
+      expect(userHiddenEntityService.hideEntities).not.toHaveBeenCalled();
     });
   });
 

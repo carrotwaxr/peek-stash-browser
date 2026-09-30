@@ -13,6 +13,7 @@ import { queryKeys } from "../../api/queryKeys";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTVMode } from "../../hooks/useTVMode";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import SceneGrid from "../scene-search/SceneGrid";
 import {
   LibraryInitializingBanner,
@@ -159,13 +160,25 @@ const Recommended = () => {
     }, 50);
   };
 
-  // Handle successful hide - remove scene from this page's results
-  const handleHideSuccess = (sceneId: string) => {
+  // Handle successful hide - remove the scene on that instance from this
+  // page's results
+  const handleHideSuccess = (
+    sceneId: string,
+    _entityType: string,
+    instanceId?: string
+  ) => {
+    const hidden = makeCompositeKey(sceneId, instanceId);
     queryClient.setQueryData<RecommendedScenesResponse>(queryKey, (old) =>
       old
         ? {
             ...old,
-            scenes: old.scenes.filter((s) => s.id !== sceneId),
+            scenes: old.scenes.filter(
+              (s) =>
+                makeCompositeKey(
+                  s.id as string,
+                  s.instanceId as string | undefined
+                ) !== hidden
+            ),
             count: Math.max(0, old.count - 1),
           }
         : old
@@ -286,9 +299,7 @@ const Recommended = () => {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
-          onHideSuccess={
-            handleHideSuccess as (sceneId: string, entityType: string) => void
-          }
+          onHideSuccess={handleHideSuccess}
           emptyMessage={message ?? "No Recommendations Yet"}
           emptyDescription={
             (criteria

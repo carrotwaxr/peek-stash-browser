@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
 import { libraryApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import SearchControls from "./SearchControls";
 import SearchResults from "./SearchResults";
 
@@ -21,7 +22,10 @@ export interface SearchableGridProps {
   renderItem: (
     item: unknown,
     index: number,
-    helpers: { onHideSuccess: (entityId: string) => void }
+    helpers: {
+      /** Drops the hidden item: the id on that instance, not its namesakes */
+      onHideSuccess: (entityId: string, instanceId?: string) => void;
+    }
   ) => ReactNode;
   defaultSort?: string;
   defaultFilters?: Record<string, unknown>;
@@ -178,10 +182,22 @@ export const SearchableGrid = ({
   );
 
   // Handle successful hide - remove item from local state
-  const handleHideSuccess = useCallback((entityId: string) => {
-    setData((prevData) => prevData.filter((item) => item.id !== entityId));
-    setTotalCount((prevCount) => Math.max(0, prevCount - 1));
-  }, []);
+  const handleHideSuccess = useCallback(
+    (entityId: string, instanceId?: string) => {
+      const hidden = makeCompositeKey(entityId, instanceId);
+      setData((prevData) =>
+        prevData.filter(
+          (item) =>
+            makeCompositeKey(
+              item.id as string,
+              item.instanceId as string | undefined
+            ) !== hidden
+        )
+      );
+      setTotalCount((prevCount) => Math.max(0, prevCount - 1));
+    },
+    []
+  );
 
   // Calculate pagination
   const currentPerPage =

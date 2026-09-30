@@ -420,7 +420,8 @@ export interface DeleteUserRestrictionsResponse {
 export interface HideEntityBody {
   entityType: string;
   entityId: string;
-  instanceId?: string;
+  /** The entity's Stash instance; a hide without one answers 400 */
+  instanceId: string;
 }
 
 export interface HideEntityResponse {
@@ -488,7 +489,8 @@ export interface HideEntitiesBody {
   entities: Array<{
     entityType: string;
     entityId: string;
-    instanceId?: string;
+    /** The entity's Stash instance; a target without one answers 400 */
+    instanceId: string;
   }>;
 }
 

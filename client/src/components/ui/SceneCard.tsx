@@ -27,7 +27,12 @@ interface Props {
   selectionMode?: boolean;
   autoplayOnScroll?: boolean;
   hideRatingControls?: boolean;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  /** Called once the card's entity is hidden, with its instance */
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
   fromPageTitle?: string;
   enableKeyboard?: boolean;
   showProgress?: boolean;

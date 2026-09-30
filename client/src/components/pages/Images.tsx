@@ -21,6 +21,7 @@ import { usePageTitle } from "../../hooks/usePageTitle";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { ImageCard } from "../cards/index";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
@@ -217,6 +218,40 @@ const Images = () => {
     [queryClient, queryParams]
   );
 
+  // Handle a hide from a card - drop the image on that instance, not an
+  // image with the same id on another server
+  const handleHideSuccess = useCallback(
+    (imageId: string, _entityType: string, instanceId?: string) => {
+      if (!queryParams) return;
+      const hidden = makeCompositeKey(imageId, instanceId);
+      const qk = queryKeys.images.list(
+        undefined,
+        queryParams as Record<string, unknown>
+      );
+      queryClient.setQueryData(qk, (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const oldData = old as Record<string, unknown>;
+        const fi = oldData.findImages as Record<string, unknown> | undefined;
+        if (!fi?.images) return old;
+        return {
+          ...oldData,
+          findImages: {
+            ...fi,
+            images: (fi.images as Array<Record<string, unknown>>).filter(
+              (i) =>
+                makeCompositeKey(
+                  i.id as string,
+                  i.instanceId as string | undefined
+                ) !== hidden
+            ),
+            count: Math.max(0, ((fi.count as number) || 0) - 1),
+          },
+        };
+      });
+    },
+    [queryClient, queryParams]
+  );
+
   // Handle O counter change from card - update local state
   const handleOCounterChange = useCallback(
     (imageId: string, newCount: number) => {
@@ -385,6 +420,7 @@ const Images = () => {
                       onOCounterChange={handleOCounterChange}
                       onRatingChange={handleRatingChange}
                       onFavoriteChange={handleFavoriteChange}
+                      onHideSuccess={handleHideSuccess}
                     />
                   )}
                   onItemClick={handleImageClick}
@@ -415,6 +451,7 @@ const Images = () => {
                       onOCounterChange={handleOCounterChange}
                       onRatingChange={handleRatingChange}
                       onFavoriteChange={handleFavoriteChange}
+                      onHideSuccess={handleHideSuccess}
                     />
                   )}
                 />
@@ -450,6 +487,7 @@ const Images = () => {
                           onOCounterChange={handleOCounterChange}
                           onRatingChange={handleRatingChange}
                           onFavoriteChange={handleFavoriteChange}
+                          onHideSuccess={handleHideSuccess}
                           {...restItemProps}
                         />
                       );

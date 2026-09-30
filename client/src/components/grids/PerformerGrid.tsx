@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { PerformerCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -24,13 +25,20 @@ const PerformerGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="o_counter"
       density={density}
-      renderItem={(performer: any, _index: number, { onHideSuccess }: any) => (
-        <PerformerCard
-          key={performer.id}
-          performer={performer}
-          onHideSuccess={() => onHideSuccess(performer.id)}
-        />
-      )}
+      renderItem={(item, _index, { onHideSuccess }) => {
+        const performer = item as ComponentProps<
+          typeof PerformerCard
+        >["performer"];
+        return (
+          <PerformerCard
+            key={performer.id}
+            performer={performer}
+            onHideSuccess={() =>
+              onHideSuccess(performer.id, performer.instanceId)
+            }
+          />
+        );
+      }}
       {...rest}
     />
   );

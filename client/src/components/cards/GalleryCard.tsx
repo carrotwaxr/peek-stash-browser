@@ -13,7 +13,12 @@ interface Props {
   gallery: NormalizedGallery;
   fromPageTitle?: string;
   tabIndex?: number;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  /** Called once the card's entity is hidden, with its instance */
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
 }
 
 const GalleryCard = forwardRef<HTMLDivElement, Props>(

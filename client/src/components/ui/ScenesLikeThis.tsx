@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useSimilarScenes } from "../../api/hooks/useScenes";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import SceneGrid from "../scene-search/SceneGrid";
 import Pagination from "./Pagination";
 
@@ -22,7 +23,7 @@ const ScenesLikeThis = ({ sceneId, instanceId, onCountChange }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
   // The scene the URL's page belongs to: another scene starts on page 1
   const [pageScene, setPageScene] = useState(sceneId);
-  // Scenes hidden from this list since it loaded
+  // Scenes hidden from this list since it loaded, by "id:instanceId"
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -67,14 +68,22 @@ const ScenesLikeThis = ({ sceneId, instanceId, onCountChange }: Props) => {
   );
 
   // Handle successful hide - drop the scene from this list
-  const handleHideSuccess = (hiddenSceneId: string) => {
-    setHiddenIds((prev) => new Set(prev).add(hiddenSceneId));
+  const handleHideSuccess = (
+    hiddenSceneId: string,
+    _entityType: string,
+    hiddenInstanceId?: string
+  ) => {
+    setHiddenIds((prev) =>
+      new Set(prev).add(makeCompositeKey(hiddenSceneId, hiddenInstanceId))
+    );
   };
 
   // The library's first sync is running: loading, not failed
   const initializing = isLibraryInitializing(error);
   const loading = isPending || isPlaceholderData || initializing;
-  const scenes = (data?.scenes ?? []).filter((s) => !hiddenIds.has(s.id));
+  const scenes = (data?.scenes ?? []).filter(
+    (s) => !hiddenIds.has(makeCompositeKey(s.id, s.instanceId))
+  );
   const totalCount = data?.count ?? 0;
 
   // Show loading/error states, but don't completely hide if empty

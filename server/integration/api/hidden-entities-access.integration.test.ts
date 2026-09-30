@@ -35,7 +35,17 @@ import {
 } from "../helpers/testClient.js";
 
 interface FindScenesResponse {
-  findScenes: { count: number; scenes: Array<{ id: string }> };
+  findScenes: {
+    count: number;
+    scenes: Array<{ id: string; instanceId: string }>;
+  };
+}
+
+interface FindPerformersResponse {
+  findPerformers: {
+    count: number;
+    performers: Array<{ id: string; instanceId: string }>;
+  };
 }
 
 interface HiddenItem {
@@ -170,10 +180,101 @@ describe("Hidden items and content restrictions (integration)", () => {
     await restoreInstanceSelection();
   }, 60000);
 
+  it("a hide without an instance answers 400 and writes nothing", async () => {
+    for (const instanceId of [undefined, ""]) {
+      const response = await hider.client.post("/api/user/hidden-entities", {
+        entityType: "scene",
+        entityId: visibleScene.id,
+        ...(instanceId !== undefined && { instanceId }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.data).toEqual({ error: "instanceId is required" });
+    }
+    expect(await hiddenRowCount()).toBe(0);
+  });
+
+  it("a hide naming an unknown instance answers 400 and writes nothing", async () => {
+    const response = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: "no-such-instance",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.data).toEqual({ error: "Invalid instanceId" });
+    expect(await hiddenRowCount()).toBe(0);
+  });
+
+  it("hiding performer SAME on A leaves performer SAME on B listed, with its scenes", async () => {
+    // SAME on A and on B: one ref names each copy
+    const refs = [`${FX_ID.SAME}:${FX.A}`, `${FX_ID.SAME}:${FX.B}`];
+    await prisma.scenePerformer.createMany({
+      data: [FX.A, FX.B].map((instanceId) => ({
+        sceneId: FX_ID.SAME,
+        sceneInstanceId: instanceId,
+        performerId: FX_ID.SAME,
+        performerInstanceId: instanceId,
+      })),
+    });
+    // Linked, neither performer is empty for the hider
+    await exclusionComputationService.recomputeForUser(hider.id);
+    const listed = async () => {
+      const performers = await hider.client.post<FindPerformersResponse>(
+        "/api/library/performers",
+        { ids: refs }
+      );
+      expect(performers.status).toBe(200);
+      const scenes = await hider.client.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { ids: refs }
+      );
+      expect(scenes.status).toBe(200);
+      return {
+        performers: performers.data.findPerformers.performers
+          .map((p) => p.instanceId)
+          .sort(),
+        scenes: scenes.data.findScenes.scenes.map((s) => s.instanceId).sort(),
+      };
+    };
+
+    try {
+      expect(await listed()).toEqual({
+        performers: [FX.A, FX.B],
+        scenes: [FX.A, FX.B],
+      });
+
+      const hide = await hider.client.post("/api/user/hidden-entities", {
+        entityType: "performer",
+        entityId: FX_ID.SAME,
+        instanceId: FX.A,
+      });
+      expect(hide.status).toBe(200);
+
+      expect(
+        await prisma.userHiddenEntity.findMany({
+          where: { userId: hider.id },
+          select: { entityType: true, entityId: true, instanceId: true },
+        })
+      ).toEqual([
+        { entityType: "performer", entityId: FX_ID.SAME, instanceId: FX.A },
+      ]);
+      expect(await listed()).toEqual({ performers: [FX.B], scenes: [FX.B] });
+    } finally {
+      await prisma.scenePerformer.deleteMany({
+        where: {
+          performerId: FX_ID.SAME,
+          performerInstanceId: { in: [FX.A, FX.B] },
+        },
+      });
+    }
+  });
+
   it("refuses to hide a restricted entity and writes nothing", async () => {
     const response = await hider.client.post("/api/user/hidden-entities", {
       entityType: "tag",
       entityId: restrictedTagId,
+      instanceId: testInstanceId,
     });
 
     expect(response.status).toBe(404);
@@ -185,21 +286,11 @@ describe("Hidden items and content restrictions (integration)", () => {
     expect(JSON.stringify(items)).not.toContain(restrictedTagName);
   });
 
-  it("refuses a restricted entity named with its instance", async () => {
-    const response = await hider.client.post("/api/user/hidden-entities", {
-      entityType: "tag",
-      entityId: restrictedTagId,
-      instanceId: testInstanceId,
-    });
-
-    expect(response.status).toBe(404);
-    expect(await hiddenRowCount()).toBe(0);
-  });
-
   it("refuses to hide an entity restricted through a cascade", async () => {
     const response = await hider.client.post("/api/user/hidden-entities", {
       entityType: "scene",
       entityId: restrictedScene.id,
+      instanceId: testInstanceId,
     });
 
     expect(response.status).toBe(404);
@@ -208,7 +299,11 @@ describe("Hidden items and content restrictions (integration)", () => {
   });
 
   it("hides a visible entity, lists its details, and a repeat hide writes nothing new", async () => {
-    const body = { entityType: "scene", entityId: visibleScene.id };
+    const body = {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: testInstanceId,
+    };
 
     const first = await hider.client.post("/api/user/hidden-entities", body);
     expect(first.status).toBe(200);
@@ -226,27 +321,19 @@ describe("Hidden items and content restrictions (integration)", () => {
     expect(must(items[0]).entity?.title).toBe(visibleScene.title);
   });
 
-  it("a repeat hide without an instance finds a hide stored for one instance", async () => {
-    const first = await hider.client.post("/api/user/hidden-entities", {
-      entityType: "scene",
-      entityId: visibleScene.id,
-      instanceId: testInstanceId,
-    });
-    expect(first.status).toBe(200);
-
-    const second = await hider.client.post("/api/user/hidden-entities", {
-      entityType: "scene",
-      entityId: visibleScene.id,
-    });
-    expect(second.status).toBe(200);
-    expect(await hiddenRowCount()).toBe(1);
-  });
-
   it("a bulk hide with one restricted target writes nothing and names it", async () => {
     const response = await hider.client.post("/api/user/hidden-entities/bulk", {
       entities: [
-        { entityType: "scene", entityId: visibleScene.id },
-        { entityType: "tag", entityId: restrictedTagId },
+        {
+          entityType: "scene",
+          entityId: visibleScene.id,
+          instanceId: testInstanceId,
+        },
+        {
+          entityType: "tag",
+          entityId: restrictedTagId,
+          instanceId: testInstanceId,
+        },
       ],
     });
 
@@ -255,15 +342,14 @@ describe("Hidden items and content restrictions (integration)", () => {
     expect(await hiddenRowCount()).toBe(0);
   });
 
-  it("a bulk hide takes targets with and without an instance, and repeats cleanly", async () => {
-    const entities = [
-      {
+  it("a bulk hide stores each target on its instance, and repeats cleanly", async () => {
+    const entities = [visibleScene.id, otherVisibleScene.id].map(
+      (entityId) => ({
         entityType: "scene",
-        entityId: visibleScene.id,
+        entityId,
         instanceId: testInstanceId,
-      },
-      { entityType: "scene", entityId: otherVisibleScene.id },
-    ];
+      })
+    );
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await hider.client.post<{
