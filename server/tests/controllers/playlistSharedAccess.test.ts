@@ -24,10 +24,9 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
   getUserGroups: vi.fn(),
 }));
 
-// Mock entityInstanceId
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(() => Promise.resolve("instance-1")),
-  getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
+// The scene is visible to the user
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn(() => Promise.resolve(true)),
 }));
 
 // Mock PlaylistQueryService (the playlist reads, not under test here)
@@ -89,7 +88,7 @@ describe("addSceneToPlaylist - shared access", () => {
 
     const req = reqFor(addSceneToPlaylist, {
       params: { id: "1" },
-      body: { sceneId: "scene-123" },
+      body: { sceneId: "scene-123", instanceId: "instance-1" },
       user: { id: 2, username: "shareduser", role: "USER" },
     });
     const res = resFor(addSceneToPlaylist);
@@ -106,7 +105,7 @@ describe("addSceneToPlaylist - shared access", () => {
 
     const req = reqFor(addSceneToPlaylist, {
       params: { id: "1" },
-      body: { sceneId: "scene-123" },
+      body: { sceneId: "scene-123", instanceId: "instance-1" },
       user: { id: 3, username: "stranger", role: "USER" },
     });
     const res = resFor(addSceneToPlaylist);

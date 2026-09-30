@@ -453,6 +453,46 @@ describe("ScenePlayerContext", () => {
   // =========================================================================
 
   describe("navigation helpers", () => {
+    it("advancing to an entry on another server loads it from that server", async () => {
+      // Scene 7 on A, then scene 7 on B. The entries name their instance
+      // only through their scene, as a playlist saved before entries
+      // carried one does; the player started on A's scene.
+      const playlist = {
+        scenes: [
+          { sceneId: "7", scene: { id: "7", instanceId: "inst-a" } },
+          { sceneId: "7", scene: { id: "7", instanceId: "inst-b" } },
+        ],
+        currentIndex: 0,
+      };
+
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: createWrapper({
+          sceneId: "7",
+          instanceId: "inst-a",
+          playlist,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(result.current.sceneLoading).toBe(false);
+      });
+      expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
+        ids: ["7"],
+        scene_filter: { instance_id: "inst-a" },
+      });
+
+      act(() => {
+        result.current.nextScene();
+      });
+
+      await waitFor(() => {
+        expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
+          ids: ["7"],
+          scene_filter: { instance_id: "inst-b" },
+        });
+      });
+    });
+
     it("nextScene dispatches NEXT_SCENE", async () => {
       const playlist = {
         scenes: [

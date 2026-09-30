@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";
 import SceneCard from "./SceneCard";
 import SkeletonSceneCard from "./SkeletonSceneCard";
@@ -190,12 +191,17 @@ const SceneCarousel = ({
           onScroll={checkScrollButtons}
         >
           {scenes.map((scene) => (
-            <div key={scene.id} className="h-full">
+            <div
+              key={makeCompositeKey(scene.id, scene.instanceId)}
+              className="h-full"
+            >
               <SceneCard
                 scene={scene}
                 onClick={onSceneClick}
                 enableKeyboard={false}
-                isSelected={selectedScenes.some((s) => s.id === scene.id)}
+                isSelected={selectedScenes.some(
+                  (s) => s.id === scene.id && s.instanceId === scene.instanceId
+                )}
                 onToggleSelect={onToggleSelect}
                 selectionMode={selectedScenes.length > 0}
                 className="h-full"

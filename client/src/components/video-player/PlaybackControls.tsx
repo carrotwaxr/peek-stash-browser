@@ -22,6 +22,10 @@ const PlaybackControls = () => {
     dispatch,
   } = useScenePlayer();
   const scene = rawScene;
+  // The playing scene on its own server, for Add to Playlist
+  const playlistScenes = scene
+    ? [{ id: scene.id, instanceId: scene.instanceId }]
+    : [];
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene") as Record<string, boolean>;
 
@@ -194,7 +198,7 @@ const PlaybackControls = () => {
               />
             )}
             <AddToPlaylistButton
-              sceneId={scene?.id}
+              scenes={playlistScenes}
               disabled={isLoading}
               compact
             />
@@ -259,7 +263,7 @@ const PlaybackControls = () => {
           {/* Row 2: Add to Playlist + Download */}
           <div className="flex items-center justify-end gap-4">
             <AddToPlaylistButton
-              sceneId={scene?.id}
+              scenes={playlistScenes}
               disabled={isLoading}
               compact
             />
@@ -304,7 +308,7 @@ const PlaybackControls = () => {
               />
             )}
             <AddToPlaylistButton
-              sceneId={scene?.id}
+              scenes={playlistScenes}
               disabled={isLoading}
               compact
             />

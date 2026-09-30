@@ -32,6 +32,7 @@ import {
 import { useConfig } from "../../contexts/ConfigContext";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneTitle } from "../../utils/format";
 import { showError, showSuccess } from "../../utils/toast";
@@ -48,10 +49,40 @@ import {
   SceneListItem,
 } from "../ui/index";
 
+/**
+ * A playlist item as the server answers it: its scene on the item's own
+ * server, or null when the viewer cannot see it. Two servers can hold the
+ * same scene id, so an item is its scene id on its instance.
+ */
+interface PlaylistItemResponse {
+  sceneId: string;
+  /** The column holds no nulls; B7 makes it NOT NULL */
+  instanceId: string;
+  scene: NormalizedScene | null;
+}
+
+interface PlaylistEntry extends PlaylistItemResponse {
+  exists: boolean;
+}
+
 interface PlaylistResponse {
   playlist: Record<string, unknown>;
   isOwner?: boolean;
 }
+
+const isSameScene = (a: NormalizedScene, b: NormalizedScene) =>
+  a.id === b.id && a.instanceId === b.instanceId;
+
+const isItemOf = (item: PlaylistItemResponse, scene: NormalizedScene) =>
+  item.sceneId === scene.id && item.instanceId === scene.instanceId;
+
+/** An entry of the player's queue: the scene on its own server */
+const toQueueEntry = (item: PlaylistEntry, position: number) => ({
+  sceneId: item.sceneId,
+  instanceId: item.instanceId,
+  scene: item.scene,
+  position,
+});
 
 interface ApiError {
   data?: { error?: string; totalSizeMB?: number; maxSizeMB?: number };
@@ -65,17 +96,16 @@ const PlaylistDetail = () => {
   const [playlist, setPlaylist] = useState<Record<string, unknown> | null>(
     null
   );
-  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
+  const [scenes, setScenes] = useState<PlaylistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
-  const [sceneToRemove, setSceneToRemove] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [sceneToRemove, setSceneToRemove] = useState<PlaylistEntry | null>(
+    null
+  );
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
@@ -90,26 +120,20 @@ const PlaylistDetail = () => {
   const [duplicating, setDuplicating] = useState(false);
 
   // Selection state for multi-select (view mode only)
-  const [selectedScenes, setSelectedScenes] = useState<
-    Record<string, unknown>[]
-  >([]);
+  const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
   const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
 
-  const handleToggleSelect = useCallback((scene: Record<string, unknown>) => {
+  const handleToggleSelect = useCallback((scene: NormalizedScene) => {
     setSelectedScenes((prev) => {
-      const isSelected = prev.some((s) => s.id === scene.id);
+      const isSelected = prev.some((s) => isSameScene(s, scene));
       return isSelected
-        ? prev.filter((s) => s.id !== scene.id)
+        ? prev.filter((s) => !isSameScene(s, scene))
         : [...prev, scene];
     });
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    setSelectedScenes(
-      scenes
-        .filter((s) => s.exists && s.scene)
-        .map((s) => s.scene as Record<string, unknown>)
-    );
+    setSelectedScenes(scenes.flatMap((s) => (s.scene ? [s.scene] : [])));
   }, [scenes]);
 
   const handleDeselectAll = useCallback(() => {
@@ -163,19 +187,11 @@ const PlaylistDetail = () => {
         );
       }
 
-      // Backend now returns items with scene data attached
-      const items = playlistData.items as Record<string, unknown>[] | undefined;
-      if (items && items.length > 0) {
-        const scenesWithDetails = items.map(
-          (item: Record<string, unknown>) => ({
-            ...item,
-            exists: item.scene !== null && item.scene !== undefined,
-          })
-        );
-        setScenes(scenesWithDetails);
-      } else {
-        setScenes([]);
-      }
+      // Backend returns items with scene data attached
+      const items = playlistData.items as PlaylistItemResponse[] | undefined;
+      setScenes(
+        (items ?? []).map((item) => ({ ...item, exists: item.scene !== null }))
+      );
     } catch {
       setError("Failed to load playlist");
     } finally {
@@ -198,7 +214,7 @@ const PlaylistDetail = () => {
     }
   };
 
-  const handleRemoveClick = (scene: Record<string, unknown>) => {
+  const handleRemoveClick = (scene: PlaylistEntry) => {
     setSceneToRemove(scene);
     setRemoveConfirmOpen(true);
   };
@@ -208,11 +224,15 @@ const PlaylistDetail = () => {
 
     try {
       await apiDelete(
-        `/playlists/${playlistId}/items/${String(sceneToRemove.sceneId)}`
+        `/playlists/${playlistId}/items/${encodeURIComponent(sceneToRemove.sceneId)}?instanceId=${encodeURIComponent(sceneToRemove.instanceId)}`
       );
       // Optimistically update local state instead of refetching
       setScenes((prev) =>
-        prev.filter((item) => item.sceneId !== sceneToRemove.sceneId)
+        prev.filter(
+          (item) =>
+            item.sceneId !== sceneToRemove.sceneId ||
+            item.instanceId !== sceneToRemove.instanceId
+        )
       );
       showSuccess("Scene removed from playlist");
     } catch {
@@ -285,6 +305,7 @@ const PlaylistDetail = () => {
       // Prepare items array with new positions
       const items = scenes.map((scene, index) => ({
         sceneId: scene.sceneId,
+        instanceId: scene.instanceId,
         position: index,
       }));
 
@@ -346,14 +367,10 @@ const PlaylistDetail = () => {
         ? Math.floor(Math.random() * validScenes.length)
         : 0;
       const startScene = validScenes[startIndex];
-      if (!startScene) return;
+      if (!startScene?.scene) return;
 
       void navigate(
-        getEntityPath(
-          "scene",
-          startScene.scene as Record<string, unknown>,
-          hasMultipleInstances
-        ),
+        getEntityPath("scene", startScene.scene, hasMultipleInstances),
         {
           state: {
             scene: startScene.scene,
@@ -365,11 +382,7 @@ const PlaylistDetail = () => {
               shuffle,
               repeat,
               shuffleHistory: [], // Initialize empty history
-              scenes: validScenes.map((s, idx) => ({
-                sceneId: s.sceneId,
-                scene: s.scene,
-                position: idx,
-              })),
+              scenes: validScenes.map(toQueueEntry),
               currentIndex: startIndex,
             },
           },
@@ -421,26 +434,23 @@ const PlaylistDetail = () => {
   const confirmBulkRemove = async () => {
     setBulkRemoveConfirmOpen(false);
 
-    let successCount = 0;
     let failCount = 0;
+    const removed: NormalizedScene[] = [];
 
     for (const scene of selectedScenes) {
       try {
-        await apiDelete(`/playlists/${playlistId}/items/${String(scene.id)}`);
-        successCount++;
+        await apiDelete(
+          `/playlists/${playlistId}/items/${encodeURIComponent(scene.id)}?instanceId=${encodeURIComponent(scene.instanceId)}`
+        );
+        removed.push(scene);
       } catch {
         failCount++;
       }
     }
+    const successCount = removed.length;
 
-    const removedIds = new Set(selectedScenes.map((s) => s.id));
     setScenes((prev) =>
-      prev.filter(
-        (item) =>
-          !removedIds.has(
-            (item.scene as Record<string, unknown> | undefined)?.id
-          )
-      )
+      prev.filter((item) => !removed.some((scene) => isItemOf(item, scene)))
     );
     setSelectedScenes([]);
 
@@ -813,25 +823,17 @@ const PlaylistDetail = () => {
             )}
             {scenes.map((item, index) => (
               <SceneListItem
-                key={item.sceneId as string}
-                scene={item.scene as NormalizedScene | null}
-                exists={item.exists as boolean | undefined}
-                sceneId={item.sceneId as string | undefined}
+                key={makeCompositeKey(item.sceneId, item.instanceId)}
+                scene={item.scene}
+                exists={item.exists}
+                sceneId={item.sceneId}
                 isSelected={
                   !isEditing &&
                   !reorderMode &&
-                  selectedScenes.some(
-                    (s) =>
-                      s.id ===
-                      (item.scene as Record<string, unknown> | undefined)?.id
-                  )
+                  selectedScenes.some((s) => isItemOf(item, s))
                 }
                 onToggleSelect={
-                  !isEditing && !reorderMode
-                    ? (handleToggleSelect as unknown as (
-                        scene: NormalizedScene
-                      ) => void)
-                    : undefined
+                  !isEditing && !reorderMode ? handleToggleSelect : undefined
                 }
                 selectionMode={
                   !isEditing && !reorderMode && selectedScenes.length > 0
@@ -845,14 +847,14 @@ const PlaylistDetail = () => {
                     repeat,
                     scenes: scenes
                       .filter((s) => s.exists && s.scene)
-                      .map((s, idx) => ({
-                        sceneId: s.sceneId,
-                        scene: s.scene,
-                        position: idx,
-                      })),
+                      .map(toQueueEntry),
                     currentIndex: scenes
                       .filter((s) => s.exists && s.scene)
-                      .findIndex((s) => s.sceneId === item.sceneId),
+                      .findIndex(
+                        (s) =>
+                          s.sceneId === item.sceneId &&
+                          s.instanceId === item.instanceId
+                      ),
                   },
                 }}
                 dragHandle={
@@ -944,9 +946,11 @@ const PlaylistDetail = () => {
                         Remove
                       </Button>
                     )}
-                    {!!item.exists && !!item.scene && (
+                    {item.exists && item.scene && (
                       <AddToPlaylistButton
-                        sceneId={item.sceneId as string | undefined}
+                        scenes={[
+                          { id: item.sceneId, instanceId: item.instanceId },
+                        ]}
                         compact
                         buttonText=""
                         icon={<MoreVertical size={16} />}
@@ -963,12 +967,12 @@ const PlaylistDetail = () => {
 
         {selectedScenes.length > 0 && !isEditing && !reorderMode && (
           <BulkActionBar
-            selectedScenes={selectedScenes as unknown as NormalizedScene[]}
+            selectedScenes={selectedScenes}
             onClearSelection={handleDeselectAll}
             actions={
               <>
                 <AddToPlaylistButton
-                  sceneIds={selectedScenes.map((s) => s.id) as string[]}
+                  scenes={selectedScenes}
                   buttonText={
                     (
                       <span>
@@ -1012,7 +1016,7 @@ const PlaylistDetail = () => {
         title="Remove Scene"
         message={`Remove "${
           sceneToRemove?.scene
-            ? getSceneTitle(sceneToRemove.scene as Record<string, unknown>)
+            ? getSceneTitle(sceneToRemove.scene)
             : "this scene"
         }" from the playlist?`}
         confirmText="Remove"

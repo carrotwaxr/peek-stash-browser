@@ -9,6 +9,7 @@ import {
 import { getGridClasses } from "../../constants/grids";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -31,7 +32,11 @@ interface Props {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   onSceneClick?: (scene: NormalizedScene) => void;
-  onHideSuccess?: (sceneId: string, entityType: string) => void;
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
   fromPageTitle?: string;
   emptyMessage?: string;
   emptyDescription?: string;
@@ -70,10 +75,13 @@ const SceneGrid = ({
 
   // Selection handlers
   const handleToggleSelect = (scene: NormalizedScene) => {
+    // Two servers can hold the same scene id: a scene is its id on its server
+    const isThis = (s: NormalizedScene) =>
+      s.id === scene.id && s.instanceId === scene.instanceId;
     setSelectedScenes((prev) => {
-      const isSelected = prev.some((s) => s.id === scene.id);
+      const isSelected = prev.some(isThis);
       if (isSelected) {
-        return prev.filter((s) => s.id !== scene.id);
+        return prev.filter((s) => !isThis(s));
       } else {
         return [...prev, scene];
       }
@@ -189,7 +197,7 @@ const SceneGrid = ({
           const itemProps = gridItemProps ? gridItemProps(index) : {};
           return (
             <SceneCard
-              key={scene.id}
+              key={makeCompositeKey(scene.id, scene.instanceId)}
               scene={scene}
               onClick={
                 selectedScenes.length === 0 && onSceneClick
@@ -198,7 +206,9 @@ const SceneGrid = ({
               }
               onHideSuccess={onHideSuccess}
               fromPageTitle={fromPageTitle}
-              isSelected={selectedScenes.some((s) => s.id === scene.id)}
+              isSelected={selectedScenes.some(
+                (s) => s.id === scene.id && s.instanceId === scene.instanceId
+              )}
               onToggleSelect={handleToggleSelect}
               selectionMode={selectedScenes.length > 0}
               autoplayOnScroll={columns === 1}
@@ -238,7 +248,7 @@ const SceneGrid = ({
                   </span>
                 </Button>
                 <AddToPlaylistButton
-                  sceneIds={selectedScenes.map((s) => s.id)}
+                  scenes={selectedScenes}
                   buttonText={`Add ${selectedScenes.length} to Playlist`}
                   icon={<LucidePlus className="w-4 h-4" />}
                   dropdownPosition="above"

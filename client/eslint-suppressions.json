@@ -165,7 +165,7 @@
       "count": 9
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
+      "count": 6
     }
   },
   "src/components/pages/Images.tsx": {
@@ -235,16 +235,16 @@
   },
   "src/components/pages/Scene.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 12
+      "count": 10
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 8
+      "count": 5
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
@@ -806,9 +806,6 @@
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
     },
@@ -1190,7 +1187,7 @@
       "count": 3
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "src/contexts/UnitPreferenceProvider.tsx": {

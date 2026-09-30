@@ -112,7 +112,7 @@ test.describe("Playlist CRUD", () => {
       "POST /api/library/scenes"
     );
     const { findScenes } = (await found.json()) as {
-      findScenes: { scenes: { id: string }[] };
+      findScenes: { scenes: { id: string; instanceId: string }[] };
     };
     const scene = requireData(findScenes.scenes[0], "a scene");
 
@@ -124,7 +124,7 @@ test.describe("Playlist CRUD", () => {
     const { playlist } = (await created.json()) as { playlist: PlaylistRow };
     await mustOk(
       await page.request.post(`/api/playlists/${playlist.id}/items`, {
-        data: { sceneId: scene.id },
+        data: { sceneId: scene.id, instanceId: scene.instanceId },
       }),
       `POST /api/playlists/${playlist.id}/items`
     );
@@ -157,7 +157,7 @@ test.describe("Playlist CRUD", () => {
     const { playlist } = (await created.json()) as { playlist: PlaylistRow };
     await mustOk(
       await page.request.post(`/api/playlists/${playlist.id}/items`, {
-        data: { sceneId: scene.id },
+        data: { sceneId: scene.id, instanceId: scene.instanceId },
       }),
       `POST /api/playlists/${playlist.id}/items`
     );

@@ -8,10 +8,8 @@ import Button from "./Button";
 import Paper from "./Paper";
 
 interface Props {
-  sceneId?: string;
-  sceneIds?: string[];
-  /** Scenes with their instances; takes precedence over `sceneId`/`sceneIds` */
-  scenes?: ReadonlyArray<{ id: string; instanceId: string }>;
+  /** The scenes to add, each with its instance: a bare id names no scene */
+  scenes: ReadonlyArray<{ id: string; instanceId: string }>;
   compact?: boolean;
   buttonText?: string;
   icon?: ReactNode;
@@ -23,8 +21,6 @@ interface Props {
 }
 
 const AddToPlaylistButton = ({
-  sceneId,
-  sceneIds,
   scenes,
   compact = false,
   buttonText,
@@ -53,11 +49,7 @@ const AddToPlaylistButton = ({
   const [computedPosition, setComputedPosition] = useState("below");
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Support both single sceneId and multiple sceneIds
-  const scenesToAdd: Array<{ id: string; instanceId?: string }> =
-    scenes?.map((s) => ({ ...s })) ??
-    (sceneIds ?? (sceneId ? [sceneId] : [])).map((id) => ({ id }));
-  const isMultiple = scenesToAdd.length > 1;
+  const isMultiple = scenes.length > 1;
 
   // Auto-detect menu position when opening
   const dropdownPosition = dropdownPositionProp || computedPosition;
@@ -136,15 +128,15 @@ const AddToPlaylistButton = ({
       let addedCount = 0;
       let skippedCount = 0;
 
-      for (const scene of scenesToAdd) {
+      for (const scene of scenes) {
         try {
           await apiPost(`/playlists/${playlistId}/items`, {
             sceneId: scene.id,
-            ...(scene.instanceId && { instanceId: scene.instanceId }),
+            instanceId: scene.instanceId,
           });
           addedCount++;
         } catch (err) {
-          if (err instanceof ApiError && err.status === 400) {
+          if (err instanceof ApiError && err.status === 409) {
             skippedCount++; // Already in playlist
           } else {
             throw err; // Re-throw for outer catch
@@ -258,7 +250,7 @@ const AddToPlaylistButton = ({
               style={{ color: "var(--text-primary)" }}
             >
               {isMultiple
-                ? `Add ${scenesToAdd.length} Scenes to Playlist`
+                ? `Add ${scenes.length} Scenes to Playlist`
                 : "Add to Playlist"}
             </h3>
           </div>

@@ -20,7 +20,6 @@ import {
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
-import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -32,12 +31,6 @@ vi.mock(
 vi.mock("../../services/PlaylistAccessService.js", () => ({
   getPlaylistAccess: vi.fn(),
   getUserGroups: vi.fn(),
-}));
-
-// Mock entityInstanceId
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(() => Promise.resolve("instance-1")),
-  getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
 }));
 
 // Mock PlaylistQueryService (the playlist reads, not under test here)
@@ -98,6 +91,7 @@ describe("Shared playlist authorization boundaries", () => {
     it("returns 404 when shared user tries to remove a scene", async () => {
       const req = reqFor(removeSceneFromPlaylist, {
         params: { id: "1", sceneId: "scene-123" },
+        query: { instanceId: "instance-1" },
         user: SHARED_USER,
       });
       const res = resFor(removeSceneFromPlaylist);
@@ -113,22 +107,24 @@ describe("Shared playlist authorization boundaries", () => {
     it("does not delete any playlist item", async () => {
       const req = reqFor(removeSceneFromPlaylist, {
         params: { id: "1", sceneId: "scene-123" },
+        query: { instanceId: "instance-1" },
         user: SHARED_USER,
       });
       const res = resFor(removeSceneFromPlaylist);
 
       await removeSceneFromPlaylist(req, res);
 
-      expect(mockPrisma.playlistItem.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
     });
 
     it("allows owner to remove a scene (control test)", async () => {
       // Owner's findFirst returns the playlist
       mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
-      mockPrisma.playlistItem.delete.mockResolvedValue(partialRow({}));
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
 
       const req = reqFor(removeSceneFromPlaylist, {
         params: { id: "1", sceneId: "scene-123" },
+        query: { instanceId: "instance-1" },
         user: { id: OWNER_ID, username: "owner", role: "USER" },
       });
       const res = resFor(removeSceneFromPlaylist);
@@ -137,7 +133,13 @@ describe("Shared playlist authorization boundaries", () => {
 
       // Owner should succeed — should NOT get 404
       expect(res.status).not.toHaveBeenCalledWith(404);
-      expect(mockPrisma.playlistItem.delete).toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where: {
+          playlistId: 1,
+          instanceId: "instance-1",
+          sceneId: "scene-123",
+        },
+      });
     });
   });
 
@@ -147,8 +149,8 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1" },
         body: {
           items: [
-            { sceneId: "scene-1", position: 1 },
-            { sceneId: "scene-2", position: 0 },
+            { sceneId: "scene-1", instanceId: "instance-1", position: 1 },
+            { sceneId: "scene-2", instanceId: "instance-1", position: 0 },
           ],
         },
         user: SHARED_USER,
@@ -168,8 +170,8 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1" },
         body: {
           items: [
-            { sceneId: "scene-1", position: 1 },
-            { sceneId: "scene-2", position: 0 },
+            { sceneId: "scene-1", instanceId: "instance-1", position: 1 },
+            { sceneId: "scene-2", instanceId: "instance-1", position: 0 },
           ],
         },
         user: SHARED_USER,

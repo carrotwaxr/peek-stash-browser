@@ -27,7 +27,6 @@ import libraryScenesRoutes from "../../../routes/library/scenes.js";
 import libraryStudiosRoutes from "../../../routes/library/studios.js";
 import libraryTagsRoutes from "../../../routes/library/tags.js";
 import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
-import type * as entityInstanceIdModule from "../../../utils/entityInstanceId.js";
 import { partialRow } from "../../helpers/prismaMock.js";
 
 vi.mock("../../../middleware/auth.js", () => ({
@@ -46,14 +45,6 @@ vi.mock("../../../middleware/auth.js", () => ({
     (_req: Request, _res: Response, next: NextFunction) => next()
   ),
 }));
-
-vi.mock("../../../utils/entityInstanceId.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof entityInstanceIdModule>();
-  return {
-    ...actual,
-    getEntityInstanceId: vi.fn().mockResolvedValue("inst-1"),
-  };
-});
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: {

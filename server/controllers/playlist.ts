@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import {
   getPlaylistAccess,
@@ -25,6 +26,7 @@ import type {
   GetSharedPlaylistsResponse,
   GetUserPlaylistsResponse,
   RemoveSceneFromPlaylistParams,
+  RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
   ReorderPlaylistParams,
   ReorderPlaylistRequest,
@@ -39,12 +41,32 @@ import type {
   UpdatePlaylistSharesResponse,
 } from "../types/api/index.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
-import {
-  getEntityInstanceId,
-  getEntityInstanceIds,
-} from "../utils/entityInstanceId.js";
+import { entityKey } from "../utils/entityRef.js";
 import { parsePlaylistItemsRequest } from "../utils/listRequest.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
+import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
+
+/**
+ * A scene reference from a request: a playlist item names its scene and the
+ * scene's instance, and the server never guesses the instance. `where`
+ * names the field in the refusal.
+ */
+function parseSceneRef(
+  sceneId: unknown,
+  instanceId: unknown,
+  where = ""
+): { sceneId: string; instanceId: string } | { error: string } {
+  if (typeof sceneId !== "string" || sceneId === "") {
+    return { error: `${where}sceneId is required` };
+  }
+  if (instanceId === undefined) {
+    return { error: `${where}instanceId is required` };
+  }
+  if (typeof instanceId !== "string" || !INSTANCE_ID_PATTERN.test(instanceId)) {
+    return { error: `${where}instanceId must be an instance id` };
+  }
+  return { sceneId, instanceId };
+}
 
 /**
  * Get all playlists for current user, each with the first four items and
@@ -355,12 +377,12 @@ export const addSceneToPlaylist = async (
     return;
   }
 
-  const { sceneId } = req.body;
-
-  if (!sceneId) {
-    res.status(400).json({ error: "Scene ID is required" });
+  const ref = parseSceneRef(req.body.sceneId, req.body.instanceId);
+  if ("error" in ref) {
+    res.status(400).json({ error: ref.error });
     return;
   }
+  const { sceneId, instanceId } = ref;
 
   // Check access — owners and shared users can add scenes
   // Note: remove/reorder/rename remain owner-only (intentional asymmetry)
@@ -387,8 +409,12 @@ export const addSceneToPlaylist = async (
     return;
   }
 
-  // Get scene instanceId
-  const instanceId = await getEntityInstanceId("scene", sceneId);
+  // Only a scene this user can see: missing, hidden, restricted or on an
+  // instance they do not use alike
+  if (!(await canUserAccessEntity(userId, "scene", sceneId, instanceId))) {
+    res.status(404).json({ error: "Scene not found" });
+    return;
+  }
 
   // Check if scene already in playlist
   const existing = await prisma.playlistItem.findUnique({
@@ -402,7 +428,7 @@ export const addSceneToPlaylist = async (
   });
 
   if (existing) {
-    res.status(400).json({ error: "Scene already in playlist" });
+    res.status(409).json({ error: "Scene already in playlist" });
     return;
   }
 
@@ -412,6 +438,8 @@ export const addSceneToPlaylist = async (
       ? (playlist.items[0] as (typeof playlist.items)[number]).position + 1
       : 0;
 
+  // Two adds of the same scene at once: the second one's unique-key clash
+  // answers 409 through the error handler
   const item = await dbWrite("playlist.addItem", () =>
     prisma.playlistItem.create({
       data: {
@@ -430,17 +458,27 @@ export const addSceneToPlaylist = async (
  * Remove scene from playlist
  */
 export const removeSceneFromPlaylist = async (
-  req: TypedAuthRequest<unknown, RemoveSceneFromPlaylistParams>,
+  req: TypedAuthRequest<
+    unknown,
+    RemoveSceneFromPlaylistParams,
+    RemoveSceneFromPlaylistQuery
+  >,
   res: TypedResponse<RemoveSceneFromPlaylistResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
   const playlistId = parseInt(req.params.id);
-  const { sceneId } = req.params;
 
   if (isNaN(playlistId)) {
     res.status(400).json({ error: "Invalid playlist ID" });
     return;
   }
+
+  const ref = parseSceneRef(req.params.sceneId, req.query.instanceId);
+  if ("error" in ref) {
+    res.status(400).json({ error: ref.error });
+    return;
+  }
+  const { sceneId, instanceId } = ref;
 
   // Check ownership
   const playlist = await prisma.playlist.findFirst({
@@ -455,21 +493,18 @@ export const removeSceneFromPlaylist = async (
     return;
   }
 
-  // Get scene instanceId
-  const instanceId = await getEntityInstanceId("scene", sceneId);
-
-  // Delete the item
-  await dbWrite("playlist.removeItem", () =>
-    prisma.playlistItem.delete({
-      where: {
-        playlistId_instanceId_sceneId: {
-          playlistId,
-          instanceId,
-          sceneId,
-        },
-      },
+  // Delete the item of that scene on that instance only; the same id on
+  // another instance is another item
+  const { count } = await dbWrite("playlist.removeItem", () =>
+    prisma.playlistItem.deleteMany({
+      where: { playlistId, instanceId, sceneId },
     })
   );
+
+  if (count === 0) {
+    res.status(404).json({ error: "Scene not in playlist" });
+    return;
+  }
 
   res.json({ success: true, message: "Scene removed from playlist" });
 };
@@ -489,11 +524,39 @@ export const reorderPlaylist = async (
     return;
   }
 
-  const { items } = req.body; // Array of { sceneId, position }
+  const { items } = req.body; // Array of { sceneId, instanceId, position }
 
   if (!Array.isArray(items)) {
     res.status(400).json({ error: "Items must be an array" });
     return;
+  }
+
+  // Every item names its scene, the scene's instance and a position
+  const moves: { sceneId: string; instanceId: string; position: number }[] = [];
+  for (const [index, item] of (items as unknown[]).entries()) {
+    const where = `items[${index}].`;
+    if (typeof item !== "object" || item === null) {
+      res.status(400).json({ error: `items[${index}] must be an object` });
+      return;
+    }
+    const fields = item as Record<string, unknown>;
+    const ref = parseSceneRef(fields.sceneId, fields.instanceId, where);
+    if ("error" in ref) {
+      res.status(400).json({ error: ref.error });
+      return;
+    }
+    const { position } = fields;
+    if (
+      typeof position !== "number" ||
+      !Number.isInteger(position) ||
+      position < 0
+    ) {
+      res
+        .status(400)
+        .json({ error: `${where}position must be a non-negative integer` });
+      return;
+    }
+    moves.push({ ...ref, position });
   }
 
   // Check ownership
@@ -509,31 +572,41 @@ export const reorderPlaylist = async (
     return;
   }
 
-  // Get instanceIds for all scenes
-  const sceneIds = items.map((item) => item.sceneId);
-  const instanceIdMap = await getEntityInstanceIds("scene", sceneIds);
+  // Every item must be in this playlist, on the instance it names
+  const stored = await prisma.playlistItem.findMany({
+    where: { playlistId },
+    select: { sceneId: true, instanceId: true },
+  });
+  const inPlaylist = new Set(
+    stored.map((row) => entityKey(row.sceneId, row.instanceId ?? ""))
+  );
+  const missing = moves.findIndex(
+    (item) => !inPlaylist.has(entityKey(item.sceneId, item.instanceId))
+  );
+  if (missing !== -1) {
+    res
+      .status(400)
+      .json({ error: `items[${missing}] is not in this playlist` });
+    return;
+  }
 
   // Update every position in one batch
   await dbWriteBatch(
     "playlist.reorder",
-    items.map((item) => {
-      const instanceId = instanceIdMap.get(item.sceneId);
-      if (!instanceId) {
-        throw new Error(`Missing instanceId for scene ${item.sceneId}`);
-      }
-      return prisma.playlistItem.update({
+    moves.map((item) =>
+      prisma.playlistItem.update({
         where: {
           playlistId_instanceId_sceneId: {
             playlistId,
-            instanceId,
+            instanceId: item.instanceId,
             sceneId: item.sceneId,
           },
         },
         data: {
           position: item.position,
         },
-      });
-    })
+      })
+    )
   );
 
   res.json({ success: true, message: "Playlist reordered" });
