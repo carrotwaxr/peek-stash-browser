@@ -4,6 +4,7 @@
  */
 import { formatDistanceToNow } from "date-fns";
 import { getClipPreviewUrl } from "../../api";
+import type { Clip } from "../cards/ClipCard";
 
 const formatDate = (dateStr: any) => {
   if (!dateStr) return null;
@@ -18,6 +19,16 @@ const formatResolution = (width: any, height: any) => {
   if (!width || !height) return null;
   return `${width}×${height}`;
 };
+
+// A clip row as the wall reads it: the card's clip plus its scene's video file.
+type WallClip = Clip & {
+  scene?: {
+    files?: Array<{ width?: number; height?: number } | undefined>;
+  } | null;
+};
+
+// The wall hands every config a plain row; the clip entry reads it as a clip.
+const asClip = (row: Record<string, unknown>) => row as unknown as WallClip;
 
 export const wallConfig = {
   scene: {
@@ -72,25 +83,30 @@ export const wallConfig = {
   },
 
   clip: {
-    getImageUrl: (item: any) => {
-      // Use dedicated clip preview proxy endpoint - it handles the URL properly
-      if (item.id) {
-        return getClipPreviewUrl(item.id, item.instanceId);
-      }
-      return null;
+    // The still image is the clip's screenshot, else its scene's, as
+    // ClipCardPreview does. The preview endpoint serves the mp4, not an image.
+    getImageUrl: (row: Record<string, unknown>): string | null => {
+      const item = asClip(row);
+      return item.screenshotUrl ?? item.scene?.pathScreenshot ?? null;
     },
-    getPreviewUrl: (item: any) =>
-      item.isGenerated ? getClipPreviewUrl(item.id, item.instanceId) : null,
-    getAspectRatio: (item: any) => {
+    getPreviewUrl: (row: Record<string, unknown>): string | null => {
+      const item = asClip(row);
+      return item.isGenerated
+        ? getClipPreviewUrl(item.id, item.instanceId)
+        : null;
+    },
+    getAspectRatio: (row: Record<string, unknown>) => {
+      const item = asClip(row);
       // Use parent scene's video dimensions
       const file = item.scene?.files?.[0];
-      if (file?.width && file?.height) {
+      if (file?.width && file.height) {
         return file.width / file.height;
       }
       return 16 / 9; // Default for video clips
     },
-    getTitle: (item: any) => item.title || "Untitled",
-    getSubtitle: (item: any) => {
+    getTitle: (row: Record<string, unknown>) => asClip(row).title || "Untitled",
+    getSubtitle: (row: Record<string, unknown>) => {
+      const item = asClip(row);
       const parts: string[] = [];
       if (item.scene?.title) parts.push(item.scene.title);
       if (item.primaryTag?.name) parts.push(item.primaryTag.name);

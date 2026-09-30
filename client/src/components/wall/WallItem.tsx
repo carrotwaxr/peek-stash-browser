@@ -40,6 +40,7 @@ const WallItem = ({
   const [isInView, setIsInView] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const imageUrl = config.getImageUrl(item);
@@ -137,7 +138,7 @@ const WallItem = ({
       onMouseLeave={() => setIsHovering(false)}
     >
       {/* Loading spinner */}
-      {!imageLoaded && (
+      {!imageLoaded && !imageFailed && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             className="animate-spin rounded-full border-2 border-t-transparent"
@@ -152,7 +153,7 @@ const WallItem = ({
       )}
 
       {/* Background image */}
-      {imageUrl && (
+      {imageUrl && !imageFailed && (
         <img
           src={imageUrl}
           alt={title}
@@ -160,6 +161,7 @@ const WallItem = ({
           style={{ opacity: imageLoaded ? 1 : 0 }}
           loading="lazy"
           onLoad={() => setImageLoaded(true)}
+          onError={() => setImageFailed(true)}
         />
       )}
 
