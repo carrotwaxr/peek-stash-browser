@@ -86,6 +86,7 @@ const mockUseImageList = vi.fn(
   (): MockListResult => ({ data: null, isLoading: false, error: null })
 );
 const mockSearchControlsProps = vi.fn();
+let mockViewMode = "grid";
 vi.mock("@/api/hooks", () => ({
   useImageList: (..._args: unknown[]) => mockUseImageList(),
 }));
@@ -125,7 +126,11 @@ vi.mock("@/components/cards/index", () => ({
 }));
 vi.mock("@/components/ui/Lightbox", () => ({
   default: (props: Record<string, unknown>) => (
-    <div data-testid="lightbox" data-is-open={String(props.isOpen)} />
+    <div
+      data-testid="lightbox"
+      data-is-open={String(props.isOpen)}
+      data-images={JSON.stringify(props.images)}
+    />
   ),
 }));
 vi.mock("@/components/ui/index", () => ({
@@ -150,7 +155,7 @@ vi.mock("@/components/ui/index", () => ({
       >
         {typeof children === "function"
           ? children({
-              viewMode: "grid",
+              viewMode: mockViewMode,
               gridDensity: "medium",
               zoomLevel: "medium",
               sortField: "name",
@@ -181,22 +186,50 @@ vi.mock("@/components/ui/index", () => ({
   LibraryInitializingBanner: () => <div data-testid="sync-banner" />,
 }));
 vi.mock("@/components/wall/WallView", () => ({
-  default: () => <div data-testid="wall-view" />,
+  default: (props: Record<string, unknown>) => (
+    <div
+      data-testid="wall-view"
+      data-count={(props.items as unknown[]).length}
+      data-playback={props.playbackMode as string}
+    />
+  ),
 }));
 vi.mock("@/components/timeline/TimelineView", () => ({
-  default: () => <div data-testid="timeline-view" />,
+  default: (props: {
+    items: Record<string, unknown>[];
+    renderItem: (
+      item: Record<string, unknown>,
+      index: number,
+      helpers: object
+    ) => React.ReactNode;
+  }) => (
+    <div data-testid="timeline-view">
+      {props.items.map((item, i) => props.renderItem(item, i, {}))}
+    </div>
+  ),
 }));
 vi.mock("@/components/folder/index", () => ({
-  FolderView: () => <div data-testid="folder-view" />,
+  FolderView: (props: {
+    items: Record<string, unknown>[];
+    loading: boolean;
+    renderItem: (item: Record<string, unknown>) => React.ReactNode;
+  }) => (
+    <div data-testid="folder-view" data-loading={String(props.loading)}>
+      {props.items.map((item) => props.renderItem(item))}
+    </div>
+  ),
 }));
 vi.mock("@/components/table/index", () => ({
-  TableView: () => <div data-testid="table-view" />,
+  TableView: (props: { items: unknown[] }) => (
+    <div data-testid="table-view" data-count={props.items.length} />
+  ),
   ColumnConfigPopover: () => <div data-testid="column-config" />,
 }));
 
 describe("Images", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockViewMode = "grid";
     mockUseImageList.mockReturnValue({
       data: null,
       isLoading: false,
@@ -357,6 +390,126 @@ describe("Images", () => {
 
       const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
       expect(props).toMatchObject({ isRefreshing: true });
+    });
+  });
+
+  describe("Views and lightbox sources", () => {
+    const twoImages = () =>
+      mockUseImageList.mockReturnValue({
+        data: {
+          findImages: {
+            images: [
+              { id: "1", title: "First", paths: {} },
+              { id: "2", title: "Second", paths: {} },
+            ],
+            count: 2,
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+
+    it("table view lists the page's images", async () => {
+      mockViewMode = "table";
+      twoImages();
+      await actAsync(() => {
+        render(<Images />);
+      });
+      expect(screen.getByTestId("table-view")).toHaveAttribute(
+        "data-count",
+        "2"
+      );
+      expect(screen.queryByTestId("image-card")).not.toBeInTheDocument();
+    });
+
+    it("wall view gets the images and the wall playback mode", async () => {
+      mockViewMode = "wall";
+      twoImages();
+      await actAsync(() => {
+        render(<Images />);
+      });
+      const wall = screen.getByTestId("wall-view");
+      expect(wall).toHaveAttribute("data-count", "2");
+      expect(wall).toHaveAttribute("data-playback", "static");
+    });
+
+    it("timeline view renders a card per image", async () => {
+      mockViewMode = "timeline";
+      twoImages();
+      await actAsync(() => {
+        render(<Images />);
+      });
+      expect(screen.getByTestId("timeline-view")).toBeInTheDocument();
+      expect(screen.getAllByTestId("image-card")).toHaveLength(2);
+    });
+
+    it("folder view renders a card per image and waits for the tags", async () => {
+      mockViewMode = "folder";
+      twoImages();
+      await actAsync(() => {
+        render(<Images />);
+      });
+      expect(screen.getByTestId("folder-view")).toHaveAttribute(
+        "data-loading",
+        "false"
+      );
+      expect(screen.getAllByTestId("image-card")).toHaveLength(2);
+    });
+
+    it("grid view shows skeletons, not cards, while loading", async () => {
+      mockUseImageList.mockReturnValue({
+        data: null,
+        isLoading: true,
+        error: null,
+      });
+      await actAsync(() => {
+        render(<Images />);
+      });
+      expect(screen.queryByTestId("image-card")).not.toBeInTheDocument();
+      expect(document.querySelectorAll(".animate-pulse")).toHaveLength(24);
+    });
+
+    it("the lightbox asks for an image from the instance it lives on", async () => {
+      mockUseImageList.mockReturnValue({
+        data: {
+          findImages: {
+            images: [
+              { id: "7", instanceId: "inst a", oCounter: 3 },
+              { id: "8" },
+              {
+                id: "9",
+                instanceId: "b",
+                paths: { image: "/full", preview: "/pv", thumbnail: "/th" },
+              },
+            ],
+            count: 3,
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+      await actAsync(() => {
+        render(<Images />);
+      });
+      const images = JSON.parse(
+        screen.getByTestId("lightbox").getAttribute("data-images") ?? "[]"
+      ) as { paths: Record<string, string | undefined>; oCounter: number }[];
+      expect(images[0]?.paths).toEqual({
+        image: "/api/proxy/image/7/image?instanceId=inst%20a",
+        thumbnail: "/api/proxy/image/7/thumbnail?instanceId=inst%20a",
+      });
+      expect(images[0]?.oCounter).toBe(3);
+      // No instance known: the request still names an (empty) one
+      expect(images[1]?.paths.image).toBe(
+        "/api/proxy/image/8/image?instanceId="
+      );
+      expect(images[1]?.oCounter).toBe(0);
+      // Paths the server sent are kept as they are
+      expect(images[2]?.paths).toEqual({
+        image: "/full",
+        preview: "/pv",
+        thumbnail: "/th",
+      });
     });
   });
 });
