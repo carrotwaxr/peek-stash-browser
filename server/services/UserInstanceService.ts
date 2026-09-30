@@ -16,7 +16,6 @@
  *   compute itself already covers it (the scope)
  */
 import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
 
 /** An instance in a user's scope, and whether its first sync is done. */
 interface ScopedInstance {
@@ -103,9 +102,10 @@ export async function getUsersSelecting(instanceId: string): Promise<number[]> {
 /**
  * Get the list of Stash instance IDs that a user should see content from:
  * the user's scope (getUserInstanceScope) without the instances still on
- * their first sync, or none when it cannot be read. Everything that lists,
- * counts or serves content filters by it; EntityAccessService's
- * LIVE_AND_ALLOWED_WHERE applies the same rules in SQL.
+ * their first sync. Everything that lists, counts or serves content filters
+ * by it; EntityAccessService's LIVE_AND_ALLOWED_WHERE applies the same rules
+ * in SQL. Throws on a database error: a caller must not read a failed lookup
+ * as "no instances" (the routes would answer "initializing" for an outage).
  *
  * @param userId - The user ID
  * @returns Array of instance IDs the user should see content from
@@ -113,16 +113,7 @@ export async function getUsersSelecting(instanceId: string): Promise<number[]> {
 export async function getUserAllowedInstanceIds(
   userId: number
 ): Promise<string[]> {
-  try {
-    return (await readScope(userId)).filter((i) => i.ready).map((i) => i.id);
-  } catch (error) {
-    logger.error("Failed to get user allowed instance IDs", {
-      userId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // On error, fallback to empty array (no content) rather than showing everything
-    return [];
-  }
+  return (await readScope(userId)).filter((i) => i.ready).map((i) => i.id);
 }
 
 /**
@@ -139,30 +130,4 @@ export async function getEnabledSyncedInstanceIds(): Promise<string[]> {
     select: { id: true },
   });
   return instances.map((i) => i.id);
-}
-
-/**
- * Build a SQL filter condition for instance IDs.
- *
- * Returns a WHERE clause fragment and parameter array for filtering by instance.
- *
- * @param allowedInstanceIds - Array of allowed instance IDs
- * @param columnName - The column name to filter on (e.g., "s.stashInstanceId")
- * @returns Object with sql fragment and params array
- */
-export function buildInstanceFilterClause(
-  allowedInstanceIds: string[],
-  columnName: string = "s.stashInstanceId"
-): { sql: string; params: string[] } {
-  if (allowedInstanceIds.length === 0) {
-    // No allowed instances = filter out everything
-    return { sql: "1 = 0", params: [] };
-  }
-
-  // Build IN clause with placeholders
-  const placeholders = allowedInstanceIds.map(() => "?").join(", ");
-  return {
-    sql: `${columnName} IN (${placeholders})`,
-    params: allowedInstanceIds,
-  };
 }

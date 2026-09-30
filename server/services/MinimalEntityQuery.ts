@@ -27,11 +27,10 @@ import type {
   ParsedMinimalRequest,
 } from "../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../utils/entityInstanceId.js";
-import { pairs } from "../utils/sqlClauses.js";
+import { instanceColumnClause, pairs } from "../utils/sqlClauses.js";
 import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import {
-  buildInstanceFilterClause,
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
 } from "./UserInstanceService.js";
@@ -162,7 +161,7 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
     params.push(excludedFor, config.entityType);
   }
 
-  const instances = buildInstanceFilterClause(instanceIds, "x.stashInstanceId");
+  const instances = instanceColumnClause("x.stashInstanceId", instanceIds);
   where.push(instances.sql);
   params.push(...instances.params);
 

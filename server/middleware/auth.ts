@@ -303,9 +303,11 @@ export const isLibraryReady = async (userId: number): Promise<boolean> =>
 /**
  * Library routes answer 503 `ready: false` while the user's library is not
  * ready (`isLibraryReady`). The client shows its sync notice and re-checks
- * `GET /api/library/ready` every 5 seconds instead of retrying. It also
- * keeps the routes behind it from reading an empty instance list, which the
- * query builders take as no instance filter. Runs after authenticate.
+ * `GET /api/library/ready` every 5 seconds instead of retrying. An empty
+ * instance list matches nothing in every reader, so the routes behind it
+ * would answer an empty library; this answers 503 first. A failed lookup is
+ * an error, not a 503: the rejection reaches the central handler (500).
+ * Runs after authenticate.
  */
 export const requireCacheReady = async (
   req: Request,

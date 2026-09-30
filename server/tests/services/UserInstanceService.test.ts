@@ -8,7 +8,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import {
-  buildInstanceFilterClause,
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
   getUserInstanceScope,
@@ -113,18 +112,13 @@ describe("UserInstanceService", () => {
       expect(result).toEqual([]);
     });
 
-    it("returns empty array on database error (fail-safe)", async () => {
+    it("getUserAllowedInstanceIds throws on a database error", async () => {
       mockPrisma.stashInstance.findMany.mockRejectedValue(
         new Error("DB connection lost")
       );
 
-      const { logger } = await import("../../utils/logger.js");
-      const result = await getUserAllowedInstanceIds(1);
-
-      expect(result).toEqual([]);
-      expect(logger.error).toHaveBeenCalledWith(
-        "Failed to get user allowed instance IDs",
-        expect.objectContaining({ userId: 1 })
+      await expect(getUserAllowedInstanceIds(1)).rejects.toThrow(
+        "DB connection lost"
       );
     });
 
@@ -239,13 +233,12 @@ describe("UserInstanceService", () => {
       expect(await getUserAllowedInstanceIds(1)).toEqual([]);
     });
 
-    it("throws on a database error, where getUserAllowedInstanceIds answers none", async () => {
+    it("throws on a database error", async () => {
       mockPrisma.stashInstance.findMany.mockRejectedValue(
         new Error("SQLITE_BUSY")
       );
 
       await expect(getUserInstanceScope(1)).rejects.toThrow("SQLITE_BUSY");
-      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
     });
   });
 
@@ -304,48 +297,6 @@ describe("UserInstanceService", () => {
       await expect(getEnabledSyncedInstanceIds()).rejects.toThrow(
         "SQLITE_BUSY"
       );
-    });
-  });
-
-  describe("buildInstanceFilterClause", () => {
-    it("returns false condition for empty array (blocks all content)", () => {
-      const result = buildInstanceFilterClause([]);
-
-      expect(result.sql).toBe("1 = 0");
-      expect(result.params).toEqual([]);
-    });
-
-    it("builds IN clause for single instance", () => {
-      const result = buildInstanceFilterClause(["instance-a"]);
-
-      expect(result.sql).toBe("s.stashInstanceId IN (?)");
-      expect(result.params).toEqual(["instance-a"]);
-    });
-
-    it("builds IN clause for multiple instances", () => {
-      const result = buildInstanceFilterClause([
-        "instance-a",
-        "instance-b",
-        "instance-c",
-      ]);
-
-      expect(result.sql).toBe("s.stashInstanceId IN (?, ?, ?)");
-      expect(result.params).toEqual(["instance-a", "instance-b", "instance-c"]);
-    });
-
-    it("uses custom column name", () => {
-      const result = buildInstanceFilterClause(
-        ["instance-a"],
-        "p.stashInstanceId"
-      );
-
-      expect(result.sql).toBe("p.stashInstanceId IN (?)");
-    });
-
-    it("defaults to s.stashInstanceId column name", () => {
-      const result = buildInstanceFilterClause(["instance-a"]);
-
-      expect(result.sql).toContain("s.stashInstanceId");
     });
   });
 });

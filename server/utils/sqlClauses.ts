@@ -496,11 +496,23 @@ export function instanceClause(
   alias: string,
   allowedInstanceIds: readonly string[]
 ): FilterClause {
+  return instanceColumnClause(`${alias}.stashInstanceId`, allowedInstanceIds);
+}
+
+/**
+ * The same rule for a column that is not `<alias>.stashInstanceId` (a
+ * per-user table's `instanceId`, a raw statement's own name). An empty list
+ * matches nothing.
+ */
+export function instanceColumnClause(
+  column: string,
+  allowedInstanceIds: readonly string[]
+): SqlFragment & { readonly params: string[] } {
   if (allowedInstanceIds.length === 0) {
     return { sql: "1 = 0", params: [] };
   }
   return {
-    sql: `${alias}.stashInstanceId IN (${allowedInstanceIds.map(() => "?").join(", ")})`,
+    sql: `${column} IN (${allowedInstanceIds.map(() => "?").join(", ")})`,
     params: [...allowedInstanceIds],
   };
 }

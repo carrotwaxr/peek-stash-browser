@@ -35,13 +35,6 @@ vi.mock(
 // user's instance scope
 vi.mock("../../services/UserInstanceService.js", () => ({
   getUserInstanceScope: vi.fn().mockResolvedValue(["inst-a", "inst-b"]),
-  buildInstanceFilterClause: vi
-    .fn()
-    .mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
-      if (ids.length === 0) return { sql: "1 = 0", params: [] };
-      const placeholders = ids.map(() => "?").join(", ");
-      return { sql: `${col} IN (${placeholders})`, params: ids };
-    }),
 }));
 
 // Mock StashInstanceManager

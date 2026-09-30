@@ -63,9 +63,9 @@ import type { SyncEntityType } from "../types/api/sync.js";
 import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { compositeKey, entityKey, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
+import { instanceColumnClause } from "../utils/sqlClauses.js";
 import type { BatchChanges } from "./SyncChangeSet.js";
 import {
-  buildInstanceFilterClause,
   getUserInstanceScope,
   getUsersSelecting,
 } from "./UserInstanceService.js";
@@ -1192,10 +1192,7 @@ class ExclusionComputationService {
     const table = RESOLVE_TABLE[entityType];
     const bare = refs.filter((r) => !r.instanceId).map((r) => r.id);
     const scoped = refs.filter((r) => r.instanceId);
-    const inst = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "t.stashInstanceId"
-    );
+    const inst = instanceColumnClause("t.stashInstanceId", allowedInstanceIds);
 
     const anchor = `
       SELECT t.id, t.stashInstanceId FROM json_each(?) g
@@ -1430,9 +1427,9 @@ class ExclusionComputationService {
 
       if (rule.include !== null) {
         const table = RESOLVE_TABLE[singular];
-        const inst = buildInstanceFilterClause(
-          allowedInstanceIds,
-          "t.stashInstanceId"
+        const inst = instanceColumnClause(
+          "t.stashInstanceId",
+          allowedInstanceIds
         );
         await this.fillRefs(tx, rule.include);
         const inverted = await tx.$queryRawUnsafe<ResolvedRef[]>(
@@ -1486,9 +1483,9 @@ class ExclusionComputationService {
   ): { sql: string; params: string[] } {
     switch (edge.kind) {
       case "junction": {
-        const inst = buildInstanceFilterClause(
-          allowedInstanceIds,
-          `j.${edge.targetInst}`
+        const inst = instanceColumnClause(
+          `j.${edge.targetInst}`,
+          allowedInstanceIds
         );
         return {
           sql: `SELECT DISTINCT j.${edge.targetId} AS id, j.${edge.targetInst} AS instanceId
@@ -1499,9 +1496,9 @@ class ExclusionComputationService {
         };
       }
       case "column": {
-        const inst = buildInstanceFilterClause(
-          allowedInstanceIds,
-          "x.stashInstanceId"
+        const inst = instanceColumnClause(
+          "x.stashInstanceId",
+          allowedInstanceIds
         );
         return {
           sql: `SELECT x.id, x.stashInstanceId AS instanceId
@@ -1512,9 +1509,9 @@ class ExclusionComputationService {
         };
       }
       case "inherited": {
-        const inst = buildInstanceFilterClause(
-          allowedInstanceIds,
-          "s.stashInstanceId"
+        const inst = instanceColumnClause(
+          "s.stashInstanceId",
+          allowedInstanceIds
         );
         return {
           sql: `SELECT s.id, s.stashInstanceId AS instanceId
@@ -1604,9 +1601,9 @@ class ExclusionComputationService {
     const flag = restrictEmpty ? 1 : 0;
 
     if (rule.kind === "tagScene") {
-      const inst = buildInstanceFilterClause(
-        allowedInstanceIds,
-        "s.stashInstanceId"
+      const inst = instanceColumnClause(
+        "s.stashInstanceId",
+        allowedInstanceIds
       );
       const head = `SELECT s.id, s.stashInstanceId AS instanceId
         FROM StashScene s
@@ -1634,10 +1631,7 @@ class ExclusionComputationService {
       };
     }
 
-    const inst = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "x.stashInstanceId"
-    );
+    const inst = instanceColumnClause("x.stashInstanceId", allowedInstanceIds);
     const head = `SELECT x.id, x.stashInstanceId AS instanceId
       FROM ${rule.table} x
       WHERE x.deletedAt IS NULL AND ${inst.sql}`;
@@ -1827,9 +1821,9 @@ class ExclusionComputationService {
     };
 
     // 1. Empty galleries - galleries with 0 visible images
-    const galFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "g.stashInstanceId"
+    const galFilter = instanceColumnClause(
+      "g.stashInstanceId",
+      allowedInstanceIds
     );
     const galFrom = await fromFor("gallery", "StashGallery", "g");
     const emptyGalleries = !galFrom
@@ -1864,9 +1858,9 @@ class ExclusionComputationService {
     }
 
     // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
-    const perfFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "p.stashInstanceId"
+    const perfFilter = instanceColumnClause(
+      "p.stashInstanceId",
+      allowedInstanceIds
     );
     const perfFrom = await fromFor("performer", "StashPerformer", "p");
     const emptyPerformers = !perfFrom
@@ -1912,9 +1906,9 @@ class ExclusionComputationService {
     // The unary + on the instance equality keeps the planner off the
     // stashInstanceId indexes (a scan of every scene and image per studio)
     // and on the studioId indexes.
-    const stuFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "st.stashInstanceId"
+    const stuFilter = instanceColumnClause(
+      "st.stashInstanceId",
+      allowedInstanceIds
     );
     const stuFrom = await fromFor("studio", "StashStudio", "st");
     const emptyStudios = !stuFrom
@@ -1957,9 +1951,9 @@ class ExclusionComputationService {
     }
 
     // 4. Empty groups - groups with 0 visible scenes
-    const grpFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "g.stashInstanceId"
+    const grpFilter = instanceColumnClause(
+      "g.stashInstanceId",
+      allowedInstanceIds
     );
     const grpFrom = await fromFor("group", "StashGroup", "g");
     const emptyGroups = !grpFrom
@@ -1998,9 +1992,9 @@ class ExclusionComputationService {
     // studio, group, gallery or image (Q8). Parent tags are exempt through a
     // live child on the tag's own instance (a child on another instance is
     // a different tag that happens to share the id).
-    const tagFilter = buildInstanceFilterClause(
-      allowedInstanceIds,
-      "t.stashInstanceId"
+    const tagFilter = instanceColumnClause(
+      "t.stashInstanceId",
+      allowedInstanceIds
     );
     const tagFrom = await fromFor("tag", "StashTag", "t");
     const emptyTags = !tagFrom
