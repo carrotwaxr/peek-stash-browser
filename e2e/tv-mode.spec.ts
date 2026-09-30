@@ -126,7 +126,7 @@ test.describe("TV mode", () => {
     page,
   }) => {
     const list = new ListPage(page);
-    await list.goto("/performers?sort=scene_count&dir=DESC");
+    await list.goto("/performers?sort=scenes_count&dir=DESC");
     requireData(await list.waitForResults("Performer"), "performers");
     await list.cards("Performer").first().locator("a:has(.card-title)").click();
     await expect(page).toHaveURL(/\/performer\//);
