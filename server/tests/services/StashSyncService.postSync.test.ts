@@ -56,6 +56,19 @@ vi.mock("../../services/EntityImageCountService.js", () => ({
       .mockResolvedValue({ performers: [], studios: [], tags: [] }),
   },
 }));
+vi.mock("../../services/LinkCountService.js", () => ({
+  linkCountService: {
+    rebuildLinkCounts: vi.fn().mockResolvedValue({}),
+    linkedThrough: vi.fn().mockResolvedValue({
+      performers: [],
+      studios: [],
+      tags: [],
+      groups: [],
+      galleries: [],
+    }),
+    inheritedTagsOf: vi.fn().mockResolvedValue([]),
+  },
+}));
 vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: { rebuildAllStats: vi.fn().mockResolvedValue(undefined) },
 }));

@@ -69,6 +69,7 @@ import {
   exclusionComputationService,
 } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
+import { type LinkCountScope, linkCountService } from "./LinkCountService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import {
@@ -169,6 +170,12 @@ interface RunEntityTypeOptions {
  * ("smart", the startup path).
  */
 type SyncMode = "full" | "incremental" | "smart";
+
+/** What the post-sync count steps recount: every row ("all") or a scope */
+interface CountScope {
+  images: ImageCountScope | "all";
+  links: LinkCountScope | "all";
+}
 
 /** Each mode's name in the logs. */
 const SYNC_MODE_NAMES: Record<SyncMode, { name: string; title: string }> = {
@@ -1738,9 +1745,10 @@ async function processPerformersBatch(
     })
     .join(",\n");
 
-  // imageCount is set on insert only: it holds the count with gallery
-  // inheritance (EntityImageCountService), which the post-sync steps rebuild
-  // for what changed, and an update keeps it over Stash's direct count
+  // The counts are set on insert only: the post-sync steps rebuild them for
+  // what changed as Peek's own counts (imageCount with gallery inheritance,
+  // EntityImageCountService; the others its live links, LinkCountService),
+  // and an update keeps them over Stash's numbers
   const upsertPerformers = `
   INSERT INTO StashPerformer (
     id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
@@ -1777,9 +1785,6 @@ async function processPerformersBatch(
     deathDate = excluded.deathDate,
     url = excluded.url,
     imagePath = excluded.imagePath,
-    sceneCount = excluded.sceneCount,
-    galleryCount = excluded.galleryCount,
-    groupCount = excluded.groupCount,
     stashCreatedAt = excluded.stashCreatedAt,
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
@@ -1886,9 +1891,7 @@ async function processStudiosBatch(
     })
     .join(",\n");
 
-  // imageCount is set on insert only: it holds the count with gallery
-  // inheritance (EntityImageCountService), which the post-sync steps rebuild
-  // for what changed, and an update keeps it over Stash's direct count
+  // The counts are set on insert only, as for performers
   const upsertStudios = `
   INSERT INTO StashStudio (
     id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
@@ -1902,10 +1905,6 @@ async function processStudiosBatch(
     parentId = excluded.parentId,
     favorite = excluded.favorite,
     rating100 = excluded.rating100,
-    sceneCount = excluded.sceneCount,
-    galleryCount = excluded.galleryCount,
-    performerCount = excluded.performerCount,
-    groupCount = excluded.groupCount,
     details = excluded.details,
     url = excluded.url,
     imagePath = excluded.imagePath,
@@ -2014,9 +2013,8 @@ async function processTagsBatch(
     })
     .join(",\n");
 
-  // imageCount is set on insert only: it holds the count with gallery
-  // inheritance (EntityImageCountService), which the post-sync steps rebuild
-  // for what changed, and an update keeps it over Stash's direct count
+  // The counts are set on insert only, as for performers, but for the
+  // marker count: markers are not synced, so it stays Stash's
   const upsertTags = `
   INSERT INTO StashTag (
     id, stashInstanceId, stashIds, name, favorite,
@@ -2027,11 +2025,6 @@ async function processTagsBatch(
     stashIds = excluded.stashIds,
     name = excluded.name,
     favorite = excluded.favorite,
-    sceneCount = excluded.sceneCount,
-    galleryCount = excluded.galleryCount,
-    performerCount = excluded.performerCount,
-    studioCount = excluded.studioCount,
-    groupCount = excluded.groupCount,
     sceneMarkerCount = excluded.sceneMarkerCount,
     description = excluded.description,
     aliases = excluded.aliases,
@@ -2112,6 +2105,7 @@ async function processGroupsBatch(
     })
     .join(",\n");
 
+  // The counts are set on insert only, as for performers
   const upsertGroups = `
   INSERT INTO StashGroup (
     id, stashInstanceId, name, date, studioId, rating100, duration,
@@ -2125,8 +2119,6 @@ async function processGroupsBatch(
     studioId = excluded.studioId,
     rating100 = excluded.rating100,
     duration = excluded.duration,
-    sceneCount = excluded.sceneCount,
-    performerCount = excluded.performerCount,
     director = excluded.director,
     synopsis = excluded.synopsis,
     urls = excluded.urls,
@@ -2152,6 +2144,9 @@ async function processGroupsBatch(
     incoming.push({
       id: group.id,
       updatedAt: group.updated_at,
+      // Its old and new studio join the change set's studios, whose
+      // collection counts it moves (a studio change moves updated_at)
+      studioId: group.studio?.id ?? null,
       links: { GroupTag: tagIds },
     });
   }
@@ -2162,7 +2157,7 @@ async function processGroupsBatch(
     instanceId,
     ids: groupIds,
     readStored: (tx) =>
-      readStored(tx, "StashGroup", instanceId, groupIds, false),
+      readStored(tx, "StashGroup", instanceId, groupIds, true),
     upsert: (tx) => tx.$executeRawUnsafe(upsertGroups),
     junctions: [["GroupTag", tagRows]],
     holdFrom: await usersToHold(run, instanceId),
@@ -2227,6 +2222,7 @@ async function processGalleriesBatch(
     })
     .join(",\n");
 
+  // imageCount is set on insert only, as the performer counts are
   const upsertGalleries = `
   INSERT INTO StashGallery (
     id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
@@ -2240,7 +2236,6 @@ async function processGalleriesBatch(
     studioInstanceId = excluded.studioInstanceId,
     rating100 = excluded.rating100,
     coverImageId = excluded.coverImageId,
-    imageCount = excluded.imageCount,
     details = excluded.details,
     url = excluded.url,
     code = excluded.code,
@@ -3116,8 +3111,8 @@ class StashSyncService extends EventEmitter {
    * - nothing changed and no user holds `pending` rows: no other step runs;
    * - scene tag inheritance for the scenes the changes reach
    *   (`sceneTagInheritanceScope`), when there are any;
-   * - any change: the image counts of the performers, studios and tags the
-   *   changes reach (`imageCountScope`), user stats and tag counts, then
+   * - any change: the image counts and the link counts of the entities the
+   *   changes reach (`countScope`), user stats and tag counts, then
    *   the exclusion recompute of the users who can see a changed instance,
    *   plus those with pending holds.
    * User stats and tag counts stay whole library (1.3 s and 0.04 s on the
@@ -3147,7 +3142,7 @@ class StashSyncService extends EventEmitter {
       logger.info("Full sync: running every post-sync step");
       await this.computeSceneTagInheritance();
       await this.applyGalleryInheritance("all");
-      await this.rebuildCounts("all");
+      await this.rebuildCounts({ images: "all", links: "all" });
       logger.info("Sync complete, recomputing user exclusions...");
       recomputed = await exclusionComputationService.recomputeAllUsers();
       logger.info("User exclusions recomputed");
@@ -3192,10 +3187,21 @@ class StashSyncService extends EventEmitter {
         }
       } else {
         const scope = await this.sceneTagInheritanceScope(changes);
-        if (scope === "all" || scope.length > 0) {
+        let inheritedTags: EntityRef[] | "all" = [];
+        if (scope === "all") {
           await this.computeSceneTagInheritance(scope);
+          inheritedTags = "all";
+        } else if (scope.length > 0) {
+          // A tag the scenes' lists hold before or after the rewrite may
+          // have gained or lost a scene: its card count reads the lists
+          const before = await linkCountService.inheritedTagsOf(scope);
+          await this.computeSceneTagInheritance(scope);
+          inheritedTags = distinctRefs([
+            ...before,
+            ...(await linkCountService.inheritedTagsOf(scope)),
+          ]);
         }
-        await this.rebuildCounts(await this.imageCountScope(changes));
+        await this.rebuildCounts(await this.countScope(changes, inheritedTags));
         const instances = [...new Set([...changes.instances(), ...firstSyncs])];
         logger.info(
           "Sync complete, recomputing the exclusions of the users on the changed instances...",
@@ -3373,6 +3379,21 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * The rows whose counts a run's changes reach: the image counts
+   * (`imageCountScope`) and the link counts (`linkCountScope`).
+   * `inheritedTags`: the tags scene tag inheritance gave or took scenes.
+   */
+  private async countScope(
+    changes: SyncChangeSet,
+    inheritedTags: readonly EntityRef[] | "all"
+  ): Promise<CountScope> {
+    return {
+      images: await this.imageCountScope(changes),
+      links: await this.linkCountScope(changes, inheritedTags),
+    };
+  }
+
+  /**
    * The performers, studios and tags whose inherited image counts a run's
    * changes reach:
    * - performers: the old and new far sides of changed images'
@@ -3430,6 +3451,94 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * The performers, studios, tags, collections and galleries whose link
+   * counts (LinkCountService) a run's changes reach:
+   * - the old and new far sides of every changed entity's junction rows
+   *   (a changed scene's performers, tags and collections, a gallery's
+   *   performers and tags, an image's galleries, the tags of performers,
+   *   studios and collections), and the old and new studios of changed
+   *   scenes, galleries, images and collections (`changes.studios()`);
+   * - every changed performer, studio, tag, collection and gallery itself:
+   *   the upsert wrote Stash's numbers into a new row, and a returning one
+   *   holds the counts it had when deleted;
+   * - what every scene, gallery, image, performer, studio and collection
+   *   the run soft-deleted counted toward, and what every changed
+   *   performer and collection counts toward through their scenes (the
+   *   distinct counts read their liveness), from their stored links
+   *   (`linkedThrough`);
+   * - `inheritedTags`: the tags whose inherited scenes moved.
+   * "all" when one of those kinds is past the change set's limit, or scene
+   * tag inheritance ran for the whole library.
+   */
+  private async linkCountScope(
+    changes: SyncChangeSet,
+    inheritedTags: readonly EntityRef[] | "all"
+  ): Promise<LinkCountScope | "all"> {
+    const direct: Record<keyof LinkCountScope, RefScope[]> = {
+      performers: [
+        changes.farSides("ScenePerformer"),
+        changes.farSides("GalleryPerformer"),
+        changes.changed("performer"),
+      ],
+      studios: [changes.studios(), changes.changed("studio")],
+      tags: [
+        changes.farSides("SceneTag"),
+        changes.farSides("GalleryTag"),
+        changes.farSides("PerformerTag"),
+        changes.farSides("StudioTag"),
+        changes.farSides("GroupTag"),
+        changes.changed("tag"),
+      ],
+      groups: [changes.farSides("SceneGroup"), changes.changed("group")],
+      galleries: [changes.farSides("ImageGallery"), changes.changed("gallery")],
+    };
+    const through = {
+      scenes: [changes.deleted("scene")],
+      galleries: [changes.deleted("gallery")],
+      images: [changes.deleted("image")],
+      performers: [changes.deleted("performer"), changes.changed("performer")],
+      studios: [changes.deleted("studio")],
+      groups: [changes.deleted("group"), changes.changed("group")],
+    };
+    if (
+      inheritedTags === "all" ||
+      [...Object.values(direct), ...Object.values(through)].some((scopes) =>
+        scopes.some((scope) => scope.whole)
+      )
+    ) {
+      return "all";
+    }
+
+    const refsOf = (scopes: RefScope[]) =>
+      scopes.flatMap((scope) => scope.refs);
+    const linked = await linkCountService.linkedThrough({
+      scenes: refsOf(through.scenes),
+      galleries: refsOf(through.galleries),
+      images: refsOf(through.images),
+      performers: refsOf(through.performers),
+      studios: refsOf(through.studios),
+      groups: refsOf(through.groups),
+    });
+    return {
+      performers: distinctRefs([
+        ...refsOf(direct.performers),
+        ...linked.performers,
+      ]),
+      studios: distinctRefs([...refsOf(direct.studios), ...linked.studios]),
+      tags: distinctRefs([
+        ...refsOf(direct.tags),
+        ...linked.tags,
+        ...inheritedTags,
+      ]),
+      groups: distinctRefs([...refsOf(direct.groups), ...linked.groups]),
+      galleries: distinctRefs([
+        ...refsOf(direct.galleries),
+        ...linked.galleries,
+      ]),
+    };
+  }
+
+  /**
    * Gallery inheritance for every image or the given ones (after images
    * and galleries). The service logs how many.
    */
@@ -3441,14 +3550,14 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * The image counts for `imageCounts` (after gallery inheritance), user
-   * stats and tag counts.
+   * The image counts (after gallery inheritance) and the link counts (after
+   * scene tag inheritance) for `scope`, user stats and tag counts.
    */
-  private async rebuildCounts(
-    imageCounts: ImageCountScope | "all"
-  ): Promise<void> {
-    await entityImageCountService.rebuildAllImageCounts(imageCounts);
+  private async rebuildCounts(scope: CountScope): Promise<void> {
+    await entityImageCountService.rebuildAllImageCounts(scope.images);
     logger.info("Inherited image counts rebuild complete");
+
+    await linkCountService.rebuildLinkCounts(scope.links);
 
     logger.info("Rebuilding user stats after sync...");
     await userStatsService.rebuildAllStats();

@@ -119,6 +119,8 @@ function tagRow(overrides: Partial<TagQueryRow> = {}): TagQueryRow {
     groupCount: null,
     sceneMarkerCount: 0,
     sceneCountViaPerformers: 7,
+    // Direct or inherited, each scene once: more than either part
+    sceneCountAll: 9,
     description: "",
     aliases: '["Shore"]',
     parentIds: '["10","11"]',
@@ -195,7 +197,7 @@ describe("TagQueryBuilder", () => {
         .filter((sql) => sql.includes("ORDER BY"));
       // The larger of the direct and via-performer counts, as the card shows
       expect(byCount).toContain(
-        "ORDER BY MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0)) DESC, t.name COLLATE NOCASE ASC"
+        "ORDER BY t.sceneCountAll DESC, t.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
         "ORDER BY t.name COLLATE NOCASE ASC, t.id ASC, t.stashInstanceId ASC"
@@ -366,7 +368,7 @@ describe("TagQueryBuilder", () => {
         "COALESCE(r.rating, 0) < ?",
         "COALESCE(us.oCounter, 0) > ?",
         "COALESCE(us.playCount, 0) = ?",
-        "MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0)) > ?",
+        "t.sceneCountAll > ?",
         "(t.name IS NULL OR LOWER(t.name) != LOWER(?))",
         "(t.description IS NOT NULL AND t.description != '')",
         "date(t.stashCreatedAt) = date(?)",
@@ -388,7 +390,7 @@ describe("TagQueryBuilder", () => {
   });
 
   describe("rows", () => {
-    it("a row reads as the viewer's tag, with the larger scene count", async () => {
+    it("a row reads as the viewer's tag, with its direct-or-inherited scene count", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
         .mockResolvedValueOnce([tagRow()])
@@ -402,7 +404,7 @@ describe("TagQueryBuilder", () => {
         instanceId: "inst-a",
         description: null,
         aliases: ["Shore"],
-        scene_count: 7,
+        scene_count: 9,
         scene_count_direct: 3,
         scene_count_via_performers: 7,
         image_count: 0,
