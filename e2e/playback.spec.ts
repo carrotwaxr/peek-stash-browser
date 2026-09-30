@@ -79,3 +79,43 @@ test("a scene below 720p gets proxied stream paths without HD tiers and its firs
   await page.locator(".vjs-big-play-button").click();
   await streamResponse;
 });
+
+test("player keys reach the real player: m mutes with focus in the player, and not with focus on a button outside it", async ({
+  page,
+}) => {
+  const found = await page.request.post("/api/library/scenes", {
+    data: { filter: { per_page: 1 } },
+  });
+  expect(found.ok(), await found.text()).toBeTruthy();
+  const first = ((await found.json()) as FindScenesBody).findScenes.scenes[0];
+  const scene = requireData(first, "a scene to open");
+
+  await page.goto(
+    `/scene/${scene.id}?instance=${encodeURIComponent(scene.instanceId)}`
+  );
+
+  // The keys act through the real video.js element; the replay's H.264
+  // stream cannot decode here, so the check reads `muted`, which needs none.
+  const player = page.locator(".video-js").first();
+  const video = player.locator("video").first();
+  await expect(video).toBeAttached();
+  await expect(video).toHaveJSProperty("muted", false);
+
+  // Focus on a control inside the player, as a keyboard user has it.
+  const inside = player.locator("button").first();
+  await inside.focus();
+  await expect(inside).toBeFocused();
+  await page.keyboard.press("m");
+  await expect(video).toHaveJSProperty("muted", true);
+  await page.keyboard.press("m");
+  await expect(video).toHaveJSProperty("muted", false);
+
+  // A button outside the player keeps the key to itself: `m` does not reach it.
+  const outside = page.locator("button:visible:not(.video-js *)").first();
+  await outside.focus();
+  await expect(outside).toBeFocused();
+  await page.keyboard.press("m");
+  // Give a wrongly delivered key time to land before asserting it did not.
+  await page.waitForTimeout(500);
+  await expect(video).toHaveJSProperty("muted", false);
+});

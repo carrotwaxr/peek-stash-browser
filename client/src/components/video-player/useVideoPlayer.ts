@@ -7,6 +7,7 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
 import { apiPost, redirectToLogin } from "../../api";
+import { usePlayerHotkeys } from "../../hooks/useMediaKeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { buildPlayerSources } from "./playerSources";
@@ -194,6 +195,9 @@ export function useVideoPlayer({
   // Track previous scene for detecting changes
   const prevSceneKeyRef = useRef<string | null>(null);
 
+  // Keys video.js's controls stop go to the shortcut dispatcher (stable)
+  const hotkeys = usePlayerHotkeys();
+
   // ============================================================================
   // PLAYER INITIALIZATION (from useVideoPlayerLifecycle)
   // ============================================================================
@@ -231,6 +235,7 @@ export function useVideoPlayer({
       playsinline: true,
       playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
       inactivityTimeout: 2000,
+      userActions: { hotkeys },
       techOrder: enableCast ? ["chromecast", "html5"] : ["html5"],
       html5: {
         vhs: {

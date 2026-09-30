@@ -1,8 +1,9 @@
 import { type ReactNode, createElement } from "react";
 import { act, renderHook } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
-import { usePlaylistMediaKeys } from "@/hooks/useMediaKeys";
+import { usePlayerHotkeys, usePlaylistMediaKeys } from "@/hooks/useMediaKeys";
 import { useRatingHotkeys } from "@/hooks/useRatingHotkeys";
 
 type MediaKeysOptions = Parameters<typeof usePlaylistMediaKeys>[0];
@@ -213,6 +214,132 @@ describe("usePlaylistMediaKeys", () => {
     );
 
     expect(() => press("k")).not.toThrow();
+  });
+
+  // ─── Focus on video.js's own controls ───────────────────────────────────
+
+  describe("with focus on a video.js control, which stops the key from bubbling", () => {
+    type Hotkeys = (event: KeyboardEvent) => void;
+
+    /**
+     * video.js 7's copy of a DOM event (`fixEvent`): the fields are copied,
+     * and preventDefault and stopPropagation forward to the native event.
+     */
+    function videoJsEvent(native: KeyboardEvent): KeyboardEvent {
+      let stopped = false;
+      const event = {
+        key: native.key,
+        ctrlKey: native.ctrlKey,
+        metaKey: native.metaKey,
+        altKey: native.altKey,
+        shiftKey: native.shiftKey,
+        isComposing: native.isComposing,
+        target: native.target,
+        defaultPrevented: false,
+        preventDefault() {
+          native.preventDefault();
+          event.defaultPrevented = true;
+        },
+        stopPropagation() {
+          native.stopPropagation();
+          stopped = true;
+        },
+        isPropagationStopped: () => stopped,
+      };
+      return untrusted(event);
+    }
+
+    /**
+     * The player's element and a button in it, wired as video.js 7 wires
+     * them: the button (`ClickableComponent`) clicks itself on Space and
+     * Enter; for any other key but Tab it stops the event and hands it to
+     * the player's `userActions.hotkeys` (`Component#handleKeyDown`). The
+     * player's own element hands every key that bubbles to it to the same
+     * function (`Player#handleKeyDown`).
+     */
+    function setupVideoJs(
+      playerOverrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
+    ) {
+      const player = createMockPlayer(playerOverrides);
+      const playerRef = { current: player };
+      const playerEl = addElement("div", { tabindex: "-1" });
+      const control = addElement("button", { class: "vjs-control" }, playerEl);
+      const onClick = vi.fn();
+      control.addEventListener("click", onClick);
+
+      const rendered = renderHook(
+        () => {
+          usePlaylistMediaKeys({
+            playerRef,
+            playlist: null,
+            playNext: null,
+            playPrevious: null,
+            root: () => playerEl,
+          });
+          return usePlayerHotkeys();
+        },
+        { wrapper }
+      );
+      const hotkeys: Hotkeys = (event) => rendered.result.current(event);
+
+      control.addEventListener("keydown", (native) => {
+        const event = videoJsEvent(native);
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          control.click();
+          return;
+        }
+        if (event.key !== "Tab") event.stopPropagation();
+        hotkeys(event);
+      });
+      playerEl.addEventListener("keydown", (native) => {
+        hotkeys(videoJsEvent(native));
+      });
+
+      return { player, playerEl, control, onClick };
+    }
+
+    it("m on the control mutes once", () => {
+      const { player, control } = setupVideoJs();
+      control.focus();
+
+      const event = press("m", control);
+
+      expect(player.muted).toHaveBeenCalledTimes(2); // read, then set
+      expect(player.muted).toHaveBeenLastCalledWith(true);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("k on the control toggles playback once", () => {
+      const { player, control } = setupVideoJs({ paused: vi.fn(() => true) });
+      control.focus();
+
+      press("k", control);
+
+      expect(player.play).toHaveBeenCalledTimes(1);
+    });
+
+    it("m on the player's own element, which bubbles to the page, mutes once", () => {
+      const { player, playerEl } = setupVideoJs();
+      playerEl.focus();
+
+      press("m", playerEl);
+
+      expect(player.muted).toHaveBeenCalledTimes(2);
+      expect(player.muted).toHaveBeenLastCalledWith(true);
+    });
+
+    it("Space on the control is the control's click, and no shortcut toggles playback as well", () => {
+      const { player, control, onClick } = setupVideoJs();
+      control.focus();
+
+      press(" ", control);
+
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(player.play).not.toHaveBeenCalled();
+      expect(player.pause).not.toHaveBeenCalled();
+    });
   });
 
   // ─── Play/pause ─────────────────────────────────────────────────────────
