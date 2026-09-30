@@ -171,7 +171,11 @@ describe("GalleryQueryBuilder", () => {
       );
       expect(sql).toContain("entityType = 'gallery'");
       // Rating and exclusion user ids, the instances, the page
-      expect(params).toEqual([1, 1, "inst-a", "inst-b", 10, 20]);
+      // The viewer's excluded links per gallery, for the image count (B13b)
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'gallery' AND d.entityId = g.id AND d.instanceId = g.stashInstanceId"
+      );
+      expect(params).toEqual([1, 1, 1, "inst-a", "inst-b", 10, 20]);
     });
 
     it("filters to the allowed instances, with no NULL arm", async () => {
@@ -211,7 +215,9 @@ describe("GalleryQueryBuilder", () => {
       const [byCount, byTitle] = mockPrisma.$queryRawUnsafe.mock.calls
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
-      expect(byCount).toContain(`ORDER BY g.imageCount DESC, ${TITLE} ASC`);
+      expect(byCount).toContain(
+        `ORDER BY MAX(g.imageCount - COALESCE(d.images, 0), 0) DESC, ${TITLE} ASC`
+      );
       expect(byTitle).toContain(
         `ORDER BY ${TITLE} DESC, g.id DESC, g.stashInstanceId DESC`
       );
@@ -261,8 +267,12 @@ describe("GalleryQueryBuilder", () => {
         expect(sql).toContain("LEFT JOIN GalleryRating r");
       }
       expect(withExclusions.sql).toContain("LEFT JOIN UserExcludedEntity e");
-      expect(withExclusions.params).toEqual([1, 1, "inst-a", "inst-b"]);
+      expect(withExclusions.sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d"
+      );
+      expect(withExclusions.params).toEqual([1, 1, 1, "inst-a", "inst-b"]);
       expect(without.sql).not.toContain("UserExcludedEntity");
+      expect(without.sql).not.toContain("UserExcludedContentCount");
     });
   });
 
@@ -366,9 +376,10 @@ describe("GalleryQueryBuilder", () => {
       expect(withFilter.sql).toContain(
         "AND ir.favorite = 1 AND si.deletedAt IS NULL AND ie.id IS NULL"
       );
-      // Rating and exclusion user ids, the instances, the favorite's and
-      // the image exclusion's user
-      expect(withFilter.params.slice(0, 6)).toEqual([
+      // Rating, exclusion and count user ids, the instances, the
+      // favorite's and the image exclusion's user
+      expect(withFilter.params.slice(0, 7)).toEqual([
+        1,
         1,
         1,
         "inst-a",
@@ -408,7 +419,7 @@ describe("GalleryQueryBuilder", () => {
       for (const fragment of [
         "r.favorite = 1",
         "COALESCE(r.rating, 0) > ?",
-        "COALESCE(g.imageCount, 0) BETWEEN ? AND ?",
+        "MAX(g.imageCount - COALESCE(d.images, 0), 0) BETWEEN ? AND ?",
         "(LOWER(g.title) LIKE LOWER(?))",
         "g.date < ?",
         "g.stashCreatedAt > ?",

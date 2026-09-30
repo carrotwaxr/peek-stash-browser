@@ -157,7 +157,14 @@ describe("TagQueryBuilder", () => {
       );
       expect(sql).toContain("entityType = 'tag'");
       // Rating, stats and exclusion user ids, the instances, the page
-      expect(params).toEqual([1, 1, 1, "inst-a", "inst-b", 10, 0]);
+      // The viewer's excluded links per tag, for the counts (B13b)
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'tag' AND d.entityId = t.id AND d.instanceId = t.stashInstanceId"
+      );
+      expect(sql).toContain(
+        "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) AS sceneCountAll"
+      );
+      expect(params).toEqual([1, 1, 1, 1, "inst-a", "inst-b", 10, 0]);
     });
 
     it("filters to the allowed instances, with no NULL arm", async () => {
@@ -197,7 +204,7 @@ describe("TagQueryBuilder", () => {
         .filter((sql) => sql.includes("ORDER BY"));
       // The larger of the direct and via-performer counts, as the card shows
       expect(byCount).toContain(
-        "ORDER BY t.sceneCountAll DESC, t.name COLLATE NOCASE ASC"
+        "ORDER BY MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) DESC, t.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
         "ORDER BY t.name COLLATE NOCASE ASC, t.id ASC, t.stashInstanceId ASC"
@@ -230,6 +237,7 @@ describe("TagQueryBuilder", () => {
         expect(sql).toContain("LEFT JOIN UserTagStats us");
       }
       expect(withExclusions).toContain("LEFT JOIN UserExcludedEntity e");
+      expect(withExclusions).toContain("LEFT JOIN UserExcludedContentCount d");
       expect(without).not.toContain("UserExcludedEntity");
     });
   });
@@ -368,7 +376,7 @@ describe("TagQueryBuilder", () => {
         "COALESCE(r.rating, 0) < ?",
         "COALESCE(us.oCounter, 0) > ?",
         "COALESCE(us.playCount, 0) = ?",
-        "t.sceneCountAll > ?",
+        "MAX(t.sceneCountAll - COALESCE(d.scenes, 0), 0) > ?",
         "(t.name IS NULL OR LOWER(t.name) != LOWER(?))",
         "(t.description IS NOT NULL AND t.description != '')",
         "date(t.stashCreatedAt) = date(?)",

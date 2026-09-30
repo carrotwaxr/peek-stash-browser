@@ -158,7 +158,11 @@ describe("StudioQueryBuilder", () => {
       );
       expect(sql).toContain("entityType = 'studio'");
       // Rating, stats and exclusion user ids, the instances, the page
-      expect(params).toEqual([1, 1, 1, "inst-a", "inst-b", 10, 20]);
+      // The viewer's excluded links per studio, for the counts (B13b)
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'studio' AND d.entityId = s.id AND d.instanceId = s.stashInstanceId"
+      );
+      expect(params).toEqual([1, 1, 1, 1, "inst-a", "inst-b", 10, 20]);
     });
 
     it("filters to the allowed instances, with no NULL arm", async () => {
@@ -199,7 +203,7 @@ describe("StudioQueryBuilder", () => {
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
       expect(byCount).toContain(
-        "ORDER BY s.performerCount ASC, s.name COLLATE NOCASE ASC"
+        "ORDER BY MAX(s.performerCount - COALESCE(d.performers, 0), 0) ASC, s.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
         "ORDER BY s.name COLLATE NOCASE DESC, s.id DESC, s.stashInstanceId DESC"
@@ -242,6 +246,7 @@ describe("StudioQueryBuilder", () => {
         expect(sql).toContain("LEFT JOIN UserStudioStats us");
       }
       expect(withExclusions).toContain("LEFT JOIN UserExcludedEntity e");
+      expect(withExclusions).toContain("LEFT JOIN UserExcludedContentCount d");
       expect(without).not.toContain("UserExcludedEntity");
     });
   });
@@ -304,7 +309,7 @@ describe("StudioQueryBuilder", () => {
         "COALESCE(r.rating, 0) BETWEEN ? AND ?",
         "COALESCE(us.oCounter, 0) > ?",
         "COALESCE(us.playCount, 0) = ?",
-        "COALESCE(s.sceneCount, 0) != ?",
+        "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) != ?",
         "LOWER(s.name) = LOWER(?)",
         "(LOWER(s.details) LIKE LOWER(?))",
         "s.stashCreatedAt BETWEEN ? AND ?",

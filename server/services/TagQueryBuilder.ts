@@ -44,6 +44,7 @@ import {
   type QueryContext,
   type SortExpr,
 } from "./query/EntityQueryBuilder.js";
+import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import {
   TAG_REF,
   byName,
@@ -51,11 +52,19 @@ import {
   loadTagChildren,
 } from "./query/nestedRefs.js";
 
-// Column list for SELECT - all StashTag fields plus user data
-const SELECT_COLUMNS = `
+// Column list for SELECT - all StashTag fields plus user data; the card's
+// counts as the viewer sees them (query/excludedCounts.ts). The direct and
+// via-performer scene counts and the marker count stay as stored.
+const selectColumns = (ctx: QueryContext) =>
+  `
     t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
-    t.sceneCount, t.imageCount, t.galleryCount, t.performerCount, t.studioCount, t.groupCount, t.sceneMarkerCount,
-    t.sceneCountViaPerformers, t.sceneCountAll,
+    t.sceneCount, t.sceneMarkerCount, t.sceneCountViaPerformers,
+    ${visibleCount(ctx, "t.sceneCountAll", "scenes")} AS sceneCountAll,
+    ${visibleCount(ctx, "t.imageCount", "images")} AS imageCount,
+    ${visibleCount(ctx, "t.galleryCount", "galleries")} AS galleryCount,
+    ${visibleCount(ctx, "t.performerCount", "performers")} AS performerCount,
+    ${visibleCount(ctx, "t.studioCount", "studios")} AS studioCount,
+    ${visibleCount(ctx, "t.groupCount", "groups")} AS groupCount,
     t.description, t.aliases, t.parentIds, t.imagePath,
     t.stashCreatedAt, t.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -70,7 +79,9 @@ const TAG_SPEC: EntitySpec = {
     { table: "TagRating", alias: "r", entityIdCol: "tagId" },
     { table: "UserTagStats", alias: "us", entityIdCol: "tagId" },
   ],
-  selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
+  // The viewer's excluded links per tag, for the counts
+  extraJoins: (ctx) => excludedCountsJoin(ctx, "tag", "t"),
+  selectColumns: (ctx) => ({ sql: selectColumns(ctx), params: [] }),
   defaultSort: "name",
   // Equal values list by name, then by the base's key
   tiebreak: (field) =>
@@ -80,9 +91,10 @@ const TAG_SPEC: EntitySpec = {
 /**
  * The scene count the card shows: the live scenes tagged directly or
  * inheriting the tag, each once, as the scene list's tag filter matches them
- * (LinkCountService)
+ * (LinkCountService), minus the ones the viewer cannot see
  */
-const SCENE_COUNT = "t.sceneCountAll";
+const sceneCount = (ctx: QueryContext) =>
+  visibleCount(ctx, "t.sceneCountAll", "scenes");
 
 /** A junction holding the tag and another entity (a performer's tags) */
 const tagJunction = (
@@ -163,7 +175,11 @@ class TagQueryBuilder extends EntityQueryBuilder<
 > {
   protected readonly spec = TAG_SPEC;
 
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    _filter: ParsedFilter<"tag">,
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -174,14 +190,16 @@ class TagQueryBuilder extends EntityQueryBuilder<
       created_at: column("t.stashCreatedAt"),
       updated_at: column("t.stashUpdatedAt"),
 
-      // Counts
-      scene_count: column(SCENE_COUNT),
-      scenes_count: column(SCENE_COUNT),
-      image_count: column("t.imageCount"),
-      gallery_count: column("t.galleryCount"),
-      performer_count: column("t.performerCount"),
-      studio_count: column("t.studioCount"),
-      group_count: column("t.groupCount"),
+      // Counts, as the viewer sees them; the marker count is Stash's
+      scene_count: column(sceneCount(ctx)),
+      scenes_count: column(sceneCount(ctx)),
+      image_count: column(visibleCount(ctx, "t.imageCount", "images")),
+      gallery_count: column(visibleCount(ctx, "t.galleryCount", "galleries")),
+      performer_count: column(
+        visibleCount(ctx, "t.performerCount", "performers")
+      ),
+      studio_count: column(visibleCount(ctx, "t.studioCount", "studios")),
+      group_count: column(visibleCount(ctx, "t.groupCount", "groups")),
       scene_marker_count: column("t.sceneMarkerCount"),
 
       // The viewer's rating (TagRating)
@@ -239,9 +257,9 @@ class TagQueryBuilder extends EntityQueryBuilder<
     if (filter.scenes) push(via(TAGS_BY_SCENE, filter.scenes));
     if (filter.groups) push(via(TAGS_BY_GROUP, filter.groups));
 
-    // Counts
+    // Counts, as the viewer sees them
     if (filter.scene_count) {
-      push(buildNumericFilter(filter.scene_count, SCENE_COUNT));
+      push(buildNumericFilter(filter.scene_count, sceneCount(ctx)));
     }
 
     // Text
@@ -352,14 +370,14 @@ class TagQueryBuilder extends EntityQueryBuilder<
 
       // Counts: the card's scene count is the tag's Scenes tab (direct or
       // inherited, each scene once), beside its two parts
-      scene_count: row.sceneCountAll,
+      scene_count: Number(row.sceneCountAll),
       scene_count_direct: directSceneCount,
       scene_count_via_performers: performerSceneCount,
-      image_count: row.imageCount ?? 0,
-      gallery_count: row.galleryCount ?? 0,
-      performer_count: row.performerCount ?? 0,
-      studio_count: row.studioCount ?? 0,
-      group_count: row.groupCount ?? 0,
+      image_count: Number(row.imageCount ?? 0),
+      gallery_count: Number(row.galleryCount ?? 0),
+      performer_count: Number(row.performerCount ?? 0),
+      studio_count: Number(row.studioCount ?? 0),
+      group_count: Number(row.groupCount ?? 0),
       scene_marker_count: row.sceneMarkerCount ?? 0,
 
       // Timestamps

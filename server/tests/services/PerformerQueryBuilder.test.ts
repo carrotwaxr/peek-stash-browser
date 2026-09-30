@@ -148,8 +148,15 @@ describe("PerformerQueryBuilder", () => {
         "LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND p.stashInstanceId = s.instanceId AND s.userId = ?"
       );
       expect(sql).toContain("entityType = 'performer'");
-      // Rating, stats and exclusion user ids, the instances, the page
-      expect(params).toEqual([1, 1, 1, "inst-a", "inst-b", 25, 25]);
+      // The viewer's excluded links per performer, for the counts (B13b)
+      expect(sql).toContain(
+        "LEFT JOIN UserExcludedContentCount d ON d.userId = ? AND d.entityType = 'performer' AND d.entityId = p.id AND d.instanceId = p.stashInstanceId"
+      );
+      expect(sql).toContain(
+        "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) AS sceneCount"
+      );
+      // Rating, stats, exclusion and count user ids, the instances, the page
+      expect(params).toEqual([1, 1, 1, 1, "inst-a", "inst-b", 25, 25]);
     });
 
     it("filters to the allowed instances, with no NULL arm", async () => {
@@ -188,7 +195,7 @@ describe("PerformerQueryBuilder", () => {
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
       expect(byCount).toContain(
-        "ORDER BY p.sceneCount DESC, p.name COLLATE NOCASE ASC"
+        "ORDER BY MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) DESC, p.name COLLATE NOCASE ASC"
       );
       expect(byName).toContain(
         "ORDER BY p.name COLLATE NOCASE ASC, p.id ASC, p.stashInstanceId ASC"
@@ -253,7 +260,10 @@ describe("PerformerQueryBuilder", () => {
       }
       expect(withExclusions).toContain("LEFT JOIN UserExcludedEntity e");
       expect(withExclusions).toContain("e.id IS NULL");
+      expect(withExclusions).toContain("LEFT JOIN UserExcludedContentCount d");
       expect(without).not.toContain("UserExcludedEntity");
+      // Without the viewer's exclusions the counts are the live columns
+      expect(without).not.toContain("UserExcludedContentCount");
     });
   });
 
@@ -396,7 +406,7 @@ describe("PerformerQueryBuilder", () => {
         "COALESCE(r.rating, 0) > ?",
         "COALESCE(s.oCounter, 0) = ?",
         "COALESCE(s.playCount, 0) < ?",
-        "COALESCE(p.sceneCount, 0) BETWEEN ? AND ?",
+        "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) BETWEEN ? AND ?",
         "COALESCE(p.heightCm, 0) > ?",
         "COALESCE(p.weightKg, 0) < ?",
         "(LOWER(p.name) LIKE LOWER(?) OR LOWER(p.aliasList) LIKE LOWER(?))",

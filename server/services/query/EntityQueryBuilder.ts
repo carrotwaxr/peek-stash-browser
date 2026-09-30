@@ -276,10 +276,15 @@ interface Paging {
 export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   protected abstract readonly spec: EntitySpec;
 
-  /** The sort expressions by key; `random` is the base's */
+  /**
+   * The sort expressions by key; `random` is the base's. The context tells
+   * a count sort whether the viewer's excluded links apply (B13b); its
+   * keys never depend on it.
+   */
   protected abstract sortMap(
     direction: SortDirection,
-    filter: ListFilterOf<K>
+    filter: ListFilterOf<K>,
+    ctx: QueryContext
   ): Record<string, SortExpr>;
 
   /** The entity's own filter clauses; `ids` is the base's */
@@ -406,13 +411,16 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     },
     request: ListRequests[K]
   ): QueryContext {
-    return {
+    // The sort map's keys do not depend on the sort field, so the key is
+    // settled with the default in its place
+    const ctx: QueryContext = {
       userId: options.userId,
       applyExclusions: options.applyExclusions ?? true,
       allowedInstanceIds: options.allowedInstanceIds,
       specificInstanceId: request.specificInstanceId,
-      sortField: this.sortKey(request),
+      sortField: this.spec.defaultSort,
     };
+    return { ...ctx, sortField: this.sortKey(request, ctx) };
   }
 
   /**
@@ -421,12 +429,13 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    * through the prototype: the parser whitelists the key, this is defence
    * in depth).
    */
-  private sortKey(request: ListRequests[K]): string {
+  private sortKey(request: ListRequests[K], ctx: QueryContext): string {
     const { field, direction } = request.sort;
     if (field === "random") return field;
     const map = this.sortMap(
       direction === "ASC" ? "ASC" : "DESC",
-      request.filter
+      request.filter,
+      ctx
     );
     return Object.prototype.hasOwnProperty.call(map, field)
       ? field
@@ -500,7 +509,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     // anything else never reaches ORDER BY (item 3)
     const direction: SortDirection =
       request.sort.direction === "ASC" ? "ASC" : "DESC";
-    const sortExpr = this.sortExpr(field, direction, seed, request.filter);
+    const sortExpr = this.sortExpr(field, direction, seed, request.filter, ctx);
     // The primary key last makes the order total: rows equal on every other
     // term (one name twice, one id on two servers, one random value, NULLs)
     // keep one order in every page's statement, so paging never repeats or
@@ -559,7 +568,8 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     field: string,
     direction: SortDirection,
     seed: number | undefined,
-    filter: ListFilterOf<K>
+    filter: ListFilterOf<K>,
+    ctx: QueryContext
   ): SortExpr {
     if (field === "random") {
       const bound = Number.isSafeInteger(seed)
@@ -568,7 +578,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       const random = randomOrder(this.spec.alias, bound);
       return { sql: `${random.sql} ${direction}`, params: random.params };
     }
-    const map = this.sortMap(direction, filter);
+    const map = this.sortMap(direction, filter, ctx);
     // Defence in depth: the parser whitelists the key, and the map is looked
     // up as own data, never through the prototype
     const own = Object.prototype.hasOwnProperty.call(map, field)

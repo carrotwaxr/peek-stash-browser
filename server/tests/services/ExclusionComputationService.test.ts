@@ -83,6 +83,14 @@ const SWAP_DELETE =
   /^DELETE FROM UserExcludedEntity WHERE userId = \? AND NOT \(reason = 'pending' AND computedAt >= \?\)$/;
 const SWAP_INSERT =
   /^INSERT OR IGNORE INTO UserExcludedEntity \(userId, entityType, entityId, instanceId, reason, computedAt\) SELECT \?, entityType, entityId, instanceId, reason, \? FROM _peek_result$/;
+/** The swap's rewrite of the excluded counts per entity (B13b) */
+const COUNTS_DELETE_SQL =
+  "DELETE FROM UserExcludedContentCount WHERE userId = ?";
+const COUNTS_INSERT =
+  /^INSERT INTO UserExcludedContentCount \(userId, entityType, entityId, instanceId, scenes, images, galleries, groups, performers, studios\) SELECT \?, entityType, entityId, instanceId, scenes, images, galleries, groups, performers, studios FROM _peek_counts$/;
+/** A hide's increment of them */
+const COUNTS_INCREMENT =
+  /^INSERT INTO UserExcludedContentCount .* FROM _peek_counts WHERE true ON CONFLICT \(userId, entityType, entityId, instanceId\) DO UPDATE SET scenes = scenes \+ excluded\.scenes, .*studios = studios \+ excluded\.studios$/;
 const HIDDEN_INSERT =
   /^INSERT OR IGNORE INTO UserHiddenEntity \(userId, entityType, entityId, instanceId, hiddenAt\) SELECT \?, json_extract\(value, '\$\.t'\), json_extract\(value, '\$\.id'\), json_extract\(value, '\$\.iid'\), \? FROM json_each\(\?\)$/;
 
@@ -416,7 +424,8 @@ describe("ExclusionComputationService", () => {
         ([sql], i) => i > swapStart && sql === "COMMIT"
       );
       const swap = execCalls().slice(swapStart, swapEnd + 1);
-      expect(swap.map(([sql]) => sql)).toHaveLength(4);
+      // ... then the excluded counts per entity, rewritten (B13b)
+      expect(swap.map(([sql]) => sql)).toHaveLength(6);
       expect(must(swap[0])[0]).toBe("BEGIN IMMEDIATE");
       const [deleteSql, deleteUser, deleteSince] = must(swap[1]);
       expect(deleteSql).toMatch(SWAP_DELETE);
@@ -429,7 +438,10 @@ describe("ExclusionComputationService", () => {
       expect(insertSql).toMatch(SWAP_INSERT);
       expect(insertUser).toBe(7);
       expect(typeof computedAt).toBe("number");
-      expect(must(swap[3])[0]).toBe("COMMIT");
+      expect(must(swap[3])).toEqual([COUNTS_DELETE_SQL, 7]);
+      expect(must(swap[4])[0]).toMatch(COUNTS_INSERT);
+      expect(must(swap[4])[1]).toBe(7);
+      expect(must(swap[5])[0]).toBe("COMMIT");
       // The rows went through the TEMP table, not a Prisma createMany
       expect(rowKeys(createdRows())).toEqual(new Set(["scene:s1@A:hidden"]));
       expect(mockPrisma.userExcludedEntity.createMany).not.toHaveBeenCalled();
@@ -564,7 +576,7 @@ describe("ExclusionComputationService", () => {
         ([sql], i) => i > must(swapStart) && sql === "COMMIT"
       );
       const swap = execCalls().slice(swapStart, swapEnd + 1);
-      expect(swap.map(([sql]) => sql)).toHaveLength(6);
+      expect(swap.map(([sql]) => sql)).toHaveLength(8);
       const [deleteRowsSql, deleteRowsUser] = must(swap[1]);
       expect(deleteRowsSql).toMatch(ROWS_DELETE);
       expect(deleteRowsUser).toBe(1);
@@ -580,7 +592,9 @@ describe("ExclusionComputationService", () => {
       ]);
       expect(must(swap[3])[0]).toMatch(SWAP_DELETE);
       expect(must(swap[4])[0]).toMatch(SWAP_INSERT);
-      expect(must(swap[5])[0]).toBe("COMMIT");
+      expect(must(swap[5])).toEqual([COUNTS_DELETE_SQL, 1]);
+      expect(must(swap[6])[0]).toMatch(COUNTS_INSERT);
+      expect(must(swap[7])[0]).toBe("COMMIT");
       // The one unit; the controller's batch is gone
       expect(mockDbWrite).toHaveBeenCalledTimes(1);
       expect(must(mockDbWrite.mock.calls[0])[0]).toBe("exclusions.swap");
@@ -606,11 +620,13 @@ describe("ExclusionComputationService", () => {
       const [swapStart] = swapStarts();
       const swap = sqlFrom(/^BEGIN IMMEDIATE$/);
       expect(swapStart).toBeGreaterThan(-1);
-      expect(swap.slice(0, 5)).toEqual([
+      expect(swap.slice(0, 7)).toEqual([
         "BEGIN IMMEDIATE",
         expect.stringMatching(ROWS_DELETE) as string,
         expect.stringMatching(SWAP_DELETE) as string,
         expect.stringMatching(SWAP_INSERT) as string,
+        COUNTS_DELETE_SQL,
+        expect.stringMatching(COUNTS_INSERT) as string,
         "COMMIT",
       ]);
       expect(swap.some((sql) => ROWS_INSERT.test(sql))).toBe(false);
@@ -835,7 +851,10 @@ describe("computeDirectExclusions", () => {
     const swap = sqlFrom(/^BEGIN IMMEDIATE$/);
     expect(swap.findIndex((sql) => SWAP_DELETE.test(sql))).toBe(1);
     expect(swap.findIndex((sql) => SWAP_INSERT.test(sql))).toBe(2);
-    expect(swap[3]).toBe("COMMIT");
+    // The excluded counts per entity follow, in the same unit (B13b)
+    expect(swap[3]).toBe(COUNTS_DELETE_SQL);
+    expect(swap[4]).toMatch(COUNTS_INSERT);
+    expect(swap[5]).toBe("COMMIT");
   });
 
   it("an empty result still swaps the user's rows away and fills nothing", async () => {
@@ -1903,11 +1922,13 @@ describe("addHiddenEntities", () => {
     const unit = sqlFrom(/^BEGIN IMMEDIATE$/).filter(
       (sql) => !/^DROP TABLE/.test(sql)
     );
-    expect(unit).toHaveLength(4);
+    // ... and adds the new keys' links to the excluded counts (B13b)
+    expect(unit).toHaveLength(5);
     expect(unit[0]).toBe("BEGIN IMMEDIATE");
     expect(unit[1]).toMatch(SWAP_INSERT);
     expect(unit[2]).toMatch(HIDDEN_INSERT);
-    expect(unit[3]).toBe("COMMIT");
+    expect(unit[3]).toMatch(COUNTS_INCREMENT);
+    expect(unit[4]).toBe("COMMIT");
     const merges = execCalls().filter(([sql]) => SWAP_INSERT.test(sql));
     expect(merges).toHaveLength(1);
     expect(must(merges[0])[1]).toBe(1);

@@ -88,6 +88,7 @@ const MIGRATIONS = [
   "008_delete_orphaned_user_rows",
   "009_clean_stored_filters",
   "010_rebuild_link_counts",
+  "011_recompute_exclusions_content_counts",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -181,6 +182,11 @@ describe("DataMigrationService", () => {
           name: "010_rebuild_link_counts",
           appliedAt: new Date(),
         },
+        {
+          id: 11,
+          name: "011_recompute_exclusions_content_counts",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -215,7 +221,7 @@ describe("DataMigrationService", () => {
       await service.runPendingMigrations();
 
       // All ten migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(10);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(11);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -246,10 +252,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "010_rebuild_link_counts" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "011_recompute_exclusions_content_counts" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 010 pending
+      // 001 already applied, 002 to 011 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -268,8 +277,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 010 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(9);
+      // 001 is skipped; 002 to 011 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(10);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -395,6 +404,27 @@ describe("DataMigrationService", () => {
       );
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
         data: { name: "010_rebuild_link_counts" },
+      });
+    });
+
+    it("recomputes every user's exclusions in migration 011, so the excluded counts per entity exist", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("011_recompute_exclusions_content_counts")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      mockExclusionService.recomputeAllUsers.mockResolvedValue({
+        success: 3,
+        failed: 0,
+        errors: [],
+      });
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      expect(mockExclusionService.recomputeAllUsers).toHaveBeenCalledTimes(1);
+      expect(mockLinkCounts.rebuildLinkCounts).not.toHaveBeenCalled();
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
+        data: { name: "011_recompute_exclusions_content_counts" },
       });
     });
 

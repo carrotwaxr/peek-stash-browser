@@ -282,6 +282,9 @@ async function seedUserRows(userId: number, instanceId: string): Promise<void> {
   await prisma.userExcludedEntity.create({
     data: { ...own, entityType: "scene", entityId: ID, reason: "hidden" },
   });
+  await prisma.userExcludedContentCount.create({
+    data: { ...own, entityType: "performer", entityId: ID, scenes: 1 },
+  });
   await prisma.userPerformerStats.create({ data: { ...own, performerId: ID } });
   await prisma.userStudioStats.create({ data: { ...own, studioId: ID } });
   await prisma.userTagStats.create({ data: { ...own, tagId: ID } });
@@ -445,6 +448,27 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
     ).toBe(1);
     // The playlist stays; only its entry for A goes
     expect(await prisma.playlist.count({ where: { userId } })).toBe(2);
+  });
+
+  it("deleting an instance removes its excluded-count rows and keeps the other instance's", async () => {
+    // The transaction's delete, apart from the recompute that follows the
+    // purge (it rewrites the user's derived rows from what is left)
+    vi.spyOn(exclusionComputationService, "recomputeForUser").mockResolvedValue(
+      undefined
+    );
+    const { purged } = await stashSyncService.deleteInstance(A);
+    await purged;
+
+    expect(
+      await prisma.userExcludedContentCount.count({
+        where: { userId, instanceId: A },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.userExcludedContentCount.count({
+        where: { userId, instanceId: B },
+      })
+    ).toBe(1);
   });
 
   it("deleting an instance removes its entries from restriction lists; an emptied Always-hide list goes, an emptied Show-only list stays empty", async () => {

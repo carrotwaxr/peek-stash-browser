@@ -49,6 +49,7 @@ import {
   type SortExpr,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
+import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import {
   PERFORMER_REF,
   STUDIO_REF,
@@ -57,10 +58,12 @@ import {
   loadRefsByKey,
 } from "./query/nestedRefs.js";
 
-// Column list for SELECT - all StashGallery fields plus user data
-const SELECT_COLUMNS = `
+// Column list for SELECT - all StashGallery fields plus user data; the
+// image count as the viewer sees it (query/excludedCounts.ts)
+const selectColumns = (ctx: QueryContext) =>
+  `
     g.id, g.stashInstanceId, g.title, g.date, g.studioId, g.rating100 AS stashRating100,
-    g.imageCount, g.coverImageId,
+    ${visibleCount(ctx, "g.imageCount", "images")} AS imageCount, g.coverImageId,
     g.details, g.url, g.code, g.photographer, g.urls,
     g.folderPath, g.fileBasename, g.coverPath,
     g.stashCreatedAt, g.stashUpdatedAt,
@@ -86,7 +89,9 @@ const GALLERY_SPEC: EntitySpec = {
   joins: [
     "LEFT JOIN StashImage ci ON g.coverImageId = ci.id AND g.stashInstanceId = ci.stashInstanceId",
   ],
-  selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
+  // The viewer's excluded links per gallery, for the count
+  extraJoins: (ctx) => excludedCountsJoin(ctx, "gallery", "g"),
+  selectColumns: (ctx) => ({ sql: selectColumns(ctx), params: [] }),
   defaultSort: "title",
   // Equal values list by title, then by the base's key
   tiebreak: (field) => (field === "title" ? undefined : `${TITLE} ASC`),
@@ -149,7 +154,11 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 > {
   protected readonly spec = GALLERY_SPEC;
 
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    _filter: ParsedFilter<"gallery">,
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -162,8 +171,8 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
       updated_at: column("g.stashUpdatedAt"),
       path: column("g.folderPath COLLATE NOCASE"),
 
-      // Counts
-      image_count: column("g.imageCount"),
+      // The count, as the viewer sees it
+      image_count: column(visibleCount(ctx, "g.imageCount", "images")),
 
       // The viewer's rating (GalleryRating)
       rating: column("COALESCE(r.rating, 0)"),
@@ -216,7 +225,12 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
       push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
     }
     if (filter.image_count) {
-      push(buildNumericFilter(filter.image_count, "COALESCE(g.imageCount, 0)"));
+      push(
+        buildNumericFilter(
+          filter.image_count,
+          visibleCount(ctx, "g.imageCount", "images")
+        )
+      );
     }
 
     // Text
@@ -308,7 +322,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
       urls: parseJsonArray(row.urls),
 
       // Counts
-      image_count: row.imageCount ?? 0,
+      image_count: Number(row.imageCount ?? 0),
 
       // File paths
       folder: row.folderPath ? { path: row.folderPath } : null,

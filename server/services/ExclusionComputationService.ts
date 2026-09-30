@@ -31,7 +31,11 @@
  * well under a second, where a createMany of the same rows held it for over
  * three. A restriction save (saveRestrictions) computes from the proposed
  * rows and writes them in that same BEGIN IMMEDIATE, ahead of the
- * exclusions, so a failure anywhere leaves both tables as they were.
+ * exclusions, so a failure anywhere leaves both tables as they were. The
+ * swap also rewrites UserExcludedContentCount, the viewer's excluded links
+ * per entity (from _peek_counts), and a hide's unit increments it for the
+ * rows it adds; the builders subtract it from the live count columns, so a
+ * card equals the tab's total (B13b).
  *
  * Who exclusions apply to lives in exclusionPolicy.ts: an admin's rows hold
  * only their own hides and cascades, so no read path needs a role check.
@@ -192,10 +196,13 @@ const EXCLUSION_SET_TABLES = {
 } as const;
 type ExclusionSetType = keyof typeof EXCLUSION_SET_TABLES;
 const RESULT_TABLE = "_peek_result";
+/** The viewer's excluded links per entity, counted from _peek_result (B13b) */
+const COUNTS_TABLE = "_peek_counts";
 const TEMP_TABLES = [
   REFS_TABLE,
   ...Object.values(EXCLUSION_SET_TABLES),
   RESULT_TABLE,
+  COUNTS_TABLE,
 ];
 
 /** Rows per _peek_result fill statement (about 1.5 MB of JSON each). */
@@ -237,6 +244,207 @@ type ResultKey = [entityType: string, entityId: string, instanceId: string];
 
 /** Below every key: no entityType is empty. */
 const BEFORE_FIRST_KEY: ResultKey = ["", "", ""];
+
+/**
+ * The viewer's excluded links per entity (UserExcludedContentCount, B13b):
+ * for each performer, studio, tag, collection and gallery, how many of the
+ * live entities its count columns count (LinkCountService's definitions,
+ * the tab's filter) are excluded for the user, so a card shows the column
+ * minus this and equals the tab's total. Counted into _peek_counts from
+ * _peek_result outside the lock: one statement per relation, each driven
+ * from the excluded content of the relation's type (live only) through the
+ * junction or column the relation reads, grouped by the entity; the
+ * derived counts (a performer's collections, a studio's and a collection's
+ * performers) from the excluded far side through the live scenes, each
+ * far side once. The swap replaces the user's rows with it; a hide's merge
+ * adds it to them, so _peek_result is first trimmed to the keys the user
+ * has no row for (the keys the merge's INSERT OR IGNORE adds).
+ */
+const COUNT_COLUMNS = "scenes, images, galleries, groups, performers, studios";
+
+/** The excluded content of one type in _peek_result, as `c`: the joins */
+const excludedFrom = (table: string): string =>
+  `FROM ${RESULT_TABLE} r CROSS JOIN ${table} c ON c.id = r.entityId AND c.stashInstanceId = r.instanceId`;
+/** ... and the WHERE keeping the type's live rows */
+const excludedWhere = (type: string): string =>
+  `WHERE r.entityType = '${type}' AND c.deletedAt IS NULL`;
+
+/** `INSERT ... ON CONFLICT` of one relation's column into _peek_counts */
+const countInto = (column: string, select: string): string =>
+  `INSERT INTO ${COUNTS_TABLE} (entityType, entityId, instanceId, ${column}) ${select} ON CONFLICT (entityType, entityId, instanceId) DO UPDATE SET ${column} = excluded.${column}`;
+
+type Content = { type: string; table: string };
+const SCENE: Content = { type: "scene", table: "StashScene" };
+const IMAGE: Content = { type: "image", table: "StashImage" };
+const GALLERY: Content = { type: "gallery", table: "StashGallery" };
+const PERFORMER: Content = { type: "performer", table: "StashPerformer" };
+const STUDIO: Content = { type: "studio", table: "StashStudio" };
+const GROUP: Content = { type: "group", table: "StashGroup" };
+
+/**
+ * The excluded content's junction rows, counted per far side (the junction
+ * by the content's key: its primary key starts with the content side).
+ */
+const junctionDelta = (
+  target: { type: string; column: string },
+  content: Content,
+  j: { table: string; contentSide: string; targetSide: string }
+): string =>
+  countInto(
+    target.column,
+    `SELECT '${target.type}', j.${j.targetSide}Id, j.${j.targetSide}InstanceId, COUNT(*)
+     ${excludedFrom(content.table)}
+     CROSS JOIN ${j.table} j ON j.${j.contentSide}Id = c.id AND j.${j.contentSide}InstanceId = c.stashInstanceId
+     ${excludedWhere(content.type)}
+     GROUP BY j.${j.targetSide}Id, j.${j.targetSide}InstanceId`
+  );
+
+/** A studio's excluded content: the rows whose `studioId` names it, on its instance */
+const studioDelta = (column: string, content: Content): string =>
+  countInto(
+    column,
+    `SELECT 'studio', c.studioId, c.stashInstanceId, COUNT(*)
+     ${excludedFrom(content.table)}
+     ${excludedWhere(content.type)} AND c.studioId IS NOT NULL
+     GROUP BY c.studioId, c.stashInstanceId`
+  );
+
+/** A distinct count per entity over a SELECT DISTINCT of (id, instanceId, far side) */
+const distinctDelta = (
+  target: { type: string; column: string },
+  distinct: string
+): string =>
+  countInto(
+    target.column,
+    `SELECT '${target.type}', id, instanceId, COUNT(*) FROM (${distinct}) WHERE true GROUP BY id, instanceId`
+  );
+
+/**
+ * A tag's excluded scenes: the direct ones (SceneTag) and the ones that
+ * only inherit it, each once, as LinkCountService counts sceneCountAll.
+ */
+const TAG_SCENES_DELTA = countInto(
+  "scenes",
+  `SELECT 'tag', id, instanceId, SUM(n) FROM (
+     SELECT j.tagId AS id, j.tagInstanceId AS instanceId, COUNT(*) AS n
+     ${excludedFrom("StashScene")}
+     CROSS JOIN SceneTag j ON j.sceneId = c.id AND j.sceneInstanceId = c.stashInstanceId
+     ${excludedWhere("scene")}
+     GROUP BY j.tagId, j.tagInstanceId
+     UNION ALL
+     SELECT je.value AS id, c.stashInstanceId AS instanceId, COUNT(DISTINCT c.id) AS n
+     ${excludedFrom("StashScene")}
+     CROSS JOIN json_each(c.inheritedTagIds) je
+     ${excludedWhere("scene")}
+     AND NOT EXISTS (SELECT 1 FROM SceneTag j WHERE j.sceneId = c.id AND j.sceneInstanceId = c.stashInstanceId AND j.tagId = je.value AND j.tagInstanceId = c.stashInstanceId)
+     GROUP BY je.value, c.stashInstanceId
+   ) WHERE true GROUP BY id, instanceId`
+);
+
+/** Every relation's statement, in the order they run */
+const COUNT_DELTAS: readonly string[] = [
+  // Scenes, by the junctions and the studio column
+  junctionDelta({ type: "performer", column: "scenes" }, SCENE, {
+    table: "ScenePerformer",
+    contentSide: "scene",
+    targetSide: "performer",
+  }),
+  TAG_SCENES_DELTA,
+  junctionDelta({ type: "group", column: "scenes" }, SCENE, {
+    table: "SceneGroup",
+    contentSide: "scene",
+    targetSide: "group",
+  }),
+  studioDelta("scenes", SCENE),
+  // Images
+  junctionDelta({ type: "performer", column: "images" }, IMAGE, {
+    table: "ImagePerformer",
+    contentSide: "image",
+    targetSide: "performer",
+  }),
+  junctionDelta({ type: "tag", column: "images" }, IMAGE, {
+    table: "ImageTag",
+    contentSide: "image",
+    targetSide: "tag",
+  }),
+  junctionDelta({ type: "gallery", column: "images" }, IMAGE, {
+    table: "ImageGallery",
+    contentSide: "image",
+    targetSide: "gallery",
+  }),
+  studioDelta("images", IMAGE),
+  // Galleries
+  junctionDelta({ type: "performer", column: "galleries" }, GALLERY, {
+    table: "GalleryPerformer",
+    contentSide: "gallery",
+    targetSide: "performer",
+  }),
+  junctionDelta({ type: "tag", column: "galleries" }, GALLERY, {
+    table: "GalleryTag",
+    contentSide: "gallery",
+    targetSide: "tag",
+  }),
+  studioDelta("galleries", GALLERY),
+  // A tag's performers, studios and collections
+  junctionDelta({ type: "tag", column: "performers" }, PERFORMER, {
+    table: "PerformerTag",
+    contentSide: "performer",
+    targetSide: "tag",
+  }),
+  junctionDelta({ type: "tag", column: "studios" }, STUDIO, {
+    table: "StudioTag",
+    contentSide: "studio",
+    targetSide: "tag",
+  }),
+  junctionDelta({ type: "tag", column: "groups" }, GROUP, {
+    table: "GroupTag",
+    contentSide: "group",
+    targetSide: "tag",
+  }),
+  studioDelta("groups", GROUP),
+  // Derived, through the live scenes: a performer's excluded collections
+  // (each holding a live scene of the performer), a studio's and a
+  // collection's excluded performers (each with a live scene of theirs)
+  distinctDelta(
+    { type: "performer", column: "groups" },
+    `SELECT DISTINCT sp.performerId AS id, sp.performerInstanceId AS instanceId, c.id AS farId, c.stashInstanceId AS farInstanceId
+     ${excludedFrom("StashGroup")}
+     CROSS JOIN SceneGroup sg ON sg.groupId = c.id AND sg.groupInstanceId = c.stashInstanceId
+     CROSS JOIN StashScene s ON s.id = sg.sceneId AND s.stashInstanceId = sg.sceneInstanceId
+     CROSS JOIN ScenePerformer sp ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
+     ${excludedWhere("group")} AND s.deletedAt IS NULL`
+  ),
+  distinctDelta(
+    { type: "studio", column: "performers" },
+    `SELECT DISTINCT s.studioId AS id, s.stashInstanceId AS instanceId, c.id AS farId, c.stashInstanceId AS farInstanceId
+     ${excludedFrom("StashPerformer")}
+     CROSS JOIN ScenePerformer sp ON sp.performerId = c.id AND sp.performerInstanceId = c.stashInstanceId
+     CROSS JOIN StashScene s ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId
+     ${excludedWhere("performer")} AND s.deletedAt IS NULL AND s.studioId IS NOT NULL`
+  ),
+  distinctDelta(
+    { type: "group", column: "performers" },
+    `SELECT DISTINCT sg.groupId AS id, sg.groupInstanceId AS instanceId, c.id AS farId, c.stashInstanceId AS farInstanceId
+     ${excludedFrom("StashPerformer")}
+     CROSS JOIN ScenePerformer sp ON sp.performerId = c.id AND sp.performerInstanceId = c.stashInstanceId
+     CROSS JOIN StashScene s ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId
+     CROSS JOIN SceneGroup sg ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
+     ${excludedWhere("performer")} AND s.deletedAt IS NULL`
+  ),
+];
+
+/**
+ * A hide's merge adds only the keys the user has no row for (INSERT OR
+ * IGNORE), so its counts come from those keys alone: the others leave
+ * _peek_result before the count. Binds userId.
+ */
+const TRIM_STORED_SQL = `DELETE FROM ${RESULT_TABLE} WHERE EXISTS (SELECT 1 FROM UserExcludedEntity e WHERE e.userId = ? AND e.entityType = ${RESULT_TABLE}.entityType AND e.entityId = ${RESULT_TABLE}.entityId AND e.instanceId = ${RESULT_TABLE}.instanceId)`;
+
+/** The swap's rewrite of the user's rows from _peek_counts. Binds userId. */
+const DELETE_COUNTS_SQL = `DELETE FROM UserExcludedContentCount WHERE userId = ?`;
+const INSERT_COUNTS_SQL = `INSERT INTO UserExcludedContentCount (userId, entityType, entityId, instanceId, ${COUNT_COLUMNS}) SELECT ?, entityType, entityId, instanceId, ${COUNT_COLUMNS} FROM ${COUNTS_TABLE}`;
+/** A hide's increment: a stored row grows by the new keys' links. Binds userId. */
+const INCREMENT_COUNTS_SQL = `${INSERT_COUNTS_SQL} WHERE true ON CONFLICT (userId, entityType, entityId, instanceId) DO UPDATE SET scenes = scenes + excluded.scenes, images = images + excluded.images, galleries = galleries + excluded.galleries, groups = groups + excluded.groups, performers = performers + excluded.performers, studios = studios + excluded.studios`;
 
 /**
  * A hide's UserHiddenEntity rows, written in the merge's last unit. The
@@ -785,10 +993,14 @@ class ExclusionComputationService {
 
       // === WRITE PHASE (fill without the lock, then one short swap) ===
       let swapMs = 0;
+      let countsMs = 0;
       let t5 = t4;
       try {
         await this.fillResult(db, allExclusions);
+        const filled = Date.now();
+        await this.fillCounts(db, userId, { onlyNew: false });
         t5 = Date.now();
+        countsMs = t5 - filled;
         await dbWrite("exclusions.swap", async () => {
           const started = Date.now();
           await this.swapResult(db, userId, snapshotStartedAt, restrictions);
@@ -815,7 +1027,8 @@ class ExclusionComputationService {
           cascadeMs: t2 - t1,
           contentMs: t3 - t2,
           emptyMs: t4 - t3,
-          fillMs: t5 - t4,
+          fillMs: t5 - t4 - countsMs,
+          countsMs,
           swapMs,
           swapQueuedMs: t6 - t5 - swapMs,
         },
@@ -1157,6 +1370,33 @@ class ExclusionComputationService {
   }
 
   /**
+   * Count the viewer's excluded links per entity into _peek_counts from
+   * _peek_result (COUNT_DELTAS), on the compute connection outside any
+   * transaction, after fillResult. With `onlyNew` (a hide), _peek_result
+   * is first trimmed to the keys the user has no row for, the ones the
+   * merge's INSERT OR IGNORE will add, so the counts are what the merge
+   * adds to the stored rows; a `pending` hold stored for one of them keeps
+   * the key excluded either way, and the next recompute makes the rows
+   * exact again.
+   */
+  private async fillCounts(
+    db: TransactionClient,
+    userId: number,
+    { onlyNew }: { onlyNew: boolean }
+  ): Promise<void> {
+    if (onlyNew) {
+      await db.$executeRawUnsafe(TRIM_STORED_SQL, userId);
+    }
+    await db.$executeRawUnsafe(
+      `CREATE TEMP TABLE IF NOT EXISTS ${COUNTS_TABLE} (entityType TEXT NOT NULL, entityId TEXT NOT NULL, instanceId TEXT NOT NULL, scenes INTEGER NOT NULL DEFAULT 0, images INTEGER NOT NULL DEFAULT 0, galleries INTEGER NOT NULL DEFAULT 0, groups INTEGER NOT NULL DEFAULT 0, performers INTEGER NOT NULL DEFAULT 0, studios INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (entityType, entityId, instanceId)) WITHOUT ROWID`
+    );
+    await db.$executeRawUnsafe(`DELETE FROM ${COUNTS_TABLE}`);
+    for (const statement of COUNT_DELTAS) {
+      await db.$executeRawUnsafe(statement);
+    }
+  }
+
+  /**
    * The swap: replace the user's rows with _peek_result inside one short
    * BEGIN IMMEDIATE on the compute connection (the TEMP table lives there).
    * `pending` holds written since `snapshotStartedAt` survive the DELETE and
@@ -1202,6 +1442,9 @@ class ExclusionComputationService {
         snapshotStartedAt
       );
       await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
+      // The excluded links per entity, exact for this snapshot
+      await db.$executeRawUnsafe(DELETE_COUNTS_SQL, userId);
+      await db.$executeRawUnsafe(INSERT_COUNTS_SQL, userId);
       await db.$executeRawUnsafe("COMMIT");
     } catch (error) {
       await this.rollbackSwap(db);
@@ -1288,6 +1531,8 @@ class ExclusionComputationService {
       }
       if (hides !== null) {
         await db.$executeRawUnsafe(INSERT_HIDDEN_SQL, userId, hiddenAt, hides);
+        // The new keys' links join the user's excluded counts
+        await db.$executeRawUnsafe(INCREMENT_COUNTS_SQL, userId);
       }
       await db.$executeRawUnsafe("COMMIT");
     } catch (error) {
@@ -2389,6 +2634,7 @@ class ExclusionComputationService {
         });
         rows = records.length;
         await this.fillResult(db, records);
+        await this.fillCounts(db, userId, { onlyNew: true });
         await this.mergeResult(db, userId, records.length, hides);
       } finally {
         await this.cleanupTempTables(db);

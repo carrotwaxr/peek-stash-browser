@@ -22,6 +22,10 @@ import type { FilterRef } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
+import {
+  excludedCountsJoinSql,
+  visibleCountSql,
+} from "./query/excludedCounts.js";
 
 /** The scope's refs, parsed; a bare ref (no instance) matches every allowed instance */
 export interface TagTreeScopeRefs {
@@ -45,17 +49,29 @@ interface Fragment {
   readonly params: SqlParam[];
 }
 
+/**
+ * The row's columns; the counts as the user sees them, the card's numbers
+ * (the live link count minus the user's excluded links, joined as `d` by
+ * excludedCountsJoin)
+ */
 const TREE_COLUMNS = `t.id, t.stashInstanceId, t.name, t.imagePath, t.parentIds,
-  t.sceneCount, t.sceneCountViaPerformers, t.imageCount, t.galleryCount, t.performerCount,
+  ${visibleCountSql("t.sceneCountAll", "scenes")} AS sceneCountAll,
+  ${visibleCountSql("t.imageCount", "images")} AS imageCount,
+  ${visibleCountSql("t.galleryCount", "galleries")} AS galleryCount,
+  ${visibleCountSql("t.performerCount", "performers")} AS performerCount,
   t.stashCreatedAt, t.stashUpdatedAt,
   r.rating AS userRating, r.favorite AS userFavorite, us.oCounter AS userOCounter`;
 
-/** The user's own rating, favorite and O count for tag `t` (unique per user, instance and tag) */
+/**
+ * The user's own rating, favorite and O count for tag `t` (unique per
+ * user, instance and tag), and their excluded links per tag for the counts
+ */
 function userDataJoins(userId: number): Fragment {
   return {
     sql: `LEFT JOIN TagRating r ON r.userId = ? AND r.instanceId = t.stashInstanceId AND r.tagId = t.id
-LEFT JOIN UserTagStats us ON us.userId = ? AND us.instanceId = t.stashInstanceId AND us.tagId = t.id`,
-    params: [userId, userId],
+LEFT JOIN UserTagStats us ON us.userId = ? AND us.instanceId = t.stashInstanceId AND us.tagId = t.id
+${excludedCountsJoinSql("tag", "t")}`,
+    params: [userId, userId, userId],
   };
 }
 
@@ -226,10 +242,10 @@ function toTreeRow(
     parents,
     scene_count: scoped
       ? Number(row.scopeSceneCount ?? 0)
-      : Math.max(row.sceneCount, row.sceneCountViaPerformers),
-    image_count: scoped ? 0 : row.imageCount,
-    gallery_count: scoped ? 0 : row.galleryCount,
-    performer_count: scoped ? 0 : row.performerCount,
+      : Number(row.sceneCountAll),
+    image_count: scoped ? 0 : Number(row.imageCount),
+    gallery_count: scoped ? 0 : Number(row.galleryCount),
+    performer_count: scoped ? 0 : Number(row.performerCount),
     created_at: row.stashCreatedAt?.toISOString() ?? null,
     updated_at: row.stashUpdatedAt?.toISOString() ?? null,
     rating100: row.userRating,

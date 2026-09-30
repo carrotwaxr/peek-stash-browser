@@ -49,6 +49,7 @@ import {
   type SortExpr,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
+import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
 import { STUDIO_REF, loadRefsByKey } from "./query/nestedRefs.js";
 
 /** A group's place in the collection hierarchy, as its detail page shows it */
@@ -57,10 +58,14 @@ export interface GroupHierarchy {
   sub_groups: GroupRelationRef[];
 }
 
-// Column list for SELECT - all StashGroup fields plus user data
-const SELECT_COLUMNS = `
+// Column list for SELECT - all StashGroup fields plus user data; the
+// counts as the viewer sees them (query/excludedCounts.ts)
+const selectColumns = (ctx: QueryContext) =>
+  `
     g.id, g.stashInstanceId, g.name, g.date, g.studioId, g.rating100 AS stashRating100,
-    g.duration, g.sceneCount, g.performerCount,
+    g.duration,
+    ${visibleCount(ctx, "g.sceneCount", "scenes")} AS sceneCount,
+    ${visibleCount(ctx, "g.performerCount", "performers")} AS performerCount,
     g.director, g.synopsis, g.urls,
     g.frontImagePath, g.backImagePath,
     g.stashCreatedAt, g.stashUpdatedAt,
@@ -92,10 +97,12 @@ const GROUP_SPEC: EntitySpec = {
   alias: "g",
   entityType: "group",
   userJoins: [{ table: "GroupRating", alias: "r", entityIdCol: "groupId" }],
+  // The viewer's excluded links per collection, for the counts
+  extraJoins: (ctx) => excludedCountsJoin(ctx, "group", "g"),
   selectColumns: (ctx) => {
     const subGroupCount = subGroupCountColumn(ctx);
     return {
-      sql: `${SELECT_COLUMNS},\n    ${subGroupCount.sql}`,
+      sql: `${selectColumns(ctx)},\n    ${subGroupCount.sql}`,
       params: subGroupCount.params,
     };
   },
@@ -175,7 +182,11 @@ class GroupQueryBuilder extends EntityQueryBuilder<
 > {
   protected readonly spec = GROUP_SPEC;
 
-  protected sortMap(dir: SortDirection): Record<string, SortExpr> {
+  protected sortMap(
+    dir: SortDirection,
+    _filter: ParsedFilter<"group">,
+    ctx: QueryContext
+  ): Record<string, SortExpr> {
     const column = (sql: string): SortExpr => ({
       sql: `${sql} ${dir}`,
       params: [],
@@ -187,9 +198,11 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       created_at: column("g.stashCreatedAt"),
       updated_at: column("g.stashUpdatedAt"),
 
-      // Counts
-      scene_count: column("g.sceneCount"),
-      performer_count: column("g.performerCount"),
+      // Counts, as the viewer sees them
+      scene_count: column(visibleCount(ctx, "g.sceneCount", "scenes")),
+      performer_count: column(
+        visibleCount(ctx, "g.performerCount", "performers")
+      ),
       duration: column("g.duration"),
 
       // The viewer's rating (GroupRating)
@@ -238,7 +251,12 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
     }
     if (filter.scene_count) {
-      push(buildNumericFilter(filter.scene_count, "COALESCE(g.sceneCount, 0)"));
+      push(
+        buildNumericFilter(
+          filter.scene_count,
+          visibleCount(ctx, "g.sceneCount", "scenes")
+        )
+      );
     }
     if (filter.duration) {
       push(buildNumericFilter(filter.duration, "COALESCE(g.duration, 0)"));
@@ -310,8 +328,8 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       urls: parseJsonArray(row.urls),
 
       // Counts
-      scene_count: row.sceneCount ?? 0,
-      performer_count: row.performerCount ?? 0,
+      scene_count: Number(row.sceneCount ?? 0),
+      performer_count: Number(row.performerCount ?? 0),
       sub_group_count: Number(row.subGroupCount),
       duration: row.duration ?? 0,
 
