@@ -161,6 +161,66 @@ test.describe("TV mode", () => {
     expect(reachedCards, "Down reaches the tab's cards").toBe(true);
   });
 
+  test("on a performer page, Up from the first card passes the tab's controls before the tab bar", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    await list.goto("/performers?sort=scenes_count&dir=DESC");
+    requireData(await list.waitForResults("Performer"), "performers");
+    await list.cards("Performer").first().locator("a:has(.card-title)").click();
+    await expect(page).toHaveURL(/\/performer\//);
+
+    const sceneCards = page.locator('main [aria-label="Scene"]');
+    requireData(
+      (await sceneCards
+        .first()
+        .waitFor({ timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false)) || null,
+      "a performer with scenes"
+    );
+    const tabBar = page.locator('button[aria-current="page"]').locator("..");
+    requireData(
+      (await tabBar.locator("button").count()) >= 2 || null,
+      "a performer with two tabs"
+    );
+
+    await sceneCards.first().focus();
+    // Each Up stops on the tab's controls or pager (between the tab bar and
+    // the cards) until it reaches the tab bar, never above it first. Boxes
+    // are measured together at each stop, since focus scrolls the page.
+    const stops: string[] = [];
+    let reachedTabs = false;
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press("ArrowUp");
+      reachedTabs = (await tabBar.locator(":focus").count()) === 1;
+      if (reachedTabs) break;
+      const [bar, stop, card] = await Promise.all([
+        tabBar.boundingBox(),
+        focused(page).boundingBox(),
+        sceneCards.first().boundingBox(),
+      ]);
+      if (!bar || !stop || !card) throw new Error("an element has no box");
+      const label = await focused(page).evaluate(
+        (el) => el.getAttribute("aria-label") ?? el.textContent ?? el.tagName
+      );
+      stops.push(label);
+      expect(
+        stop.y,
+        `stop ${i + 1} (${label}) lies below the tab bar`
+      ).toBeGreaterThanOrEqual(bar.y + bar.height);
+      expect(
+        stop.y + stop.height,
+        `stop ${i + 1} (${label}) lies above the cards`
+      ).toBeLessThanOrEqual(card.y);
+    }
+    expect(reachedTabs, "Up reaches the tab bar").toBe(true);
+    expect(
+      stops.length,
+      "the controls come before the tab bar"
+    ).toBeGreaterThan(0);
+  });
+
   test("on Galleries, arrows move between gallery cards", async ({ page }) => {
     const list = new ListPage(page);
     await list.goto("/galleries");
