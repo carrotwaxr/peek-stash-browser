@@ -83,6 +83,7 @@ export interface BaseCardProps {
   tabIndex?: number;
   style?: CSSProperties;
   onFocus?: (e: FocusEvent<HTMLDivElement>) => void;
+  onBlur?: (e: FocusEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -133,6 +134,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
       tabIndex,
       style,
       onFocus,
+      onBlur,
       ...rest
     },
     ref
@@ -202,6 +204,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
         style={{ ...style, ...selectionStyle }}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
+        onBlur={onBlur}
         {...selectionHandlers}
         {...rest}
       >

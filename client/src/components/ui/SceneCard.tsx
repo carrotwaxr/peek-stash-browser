@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
@@ -36,11 +36,6 @@ interface Props {
   fromPageTitle?: string;
   enableKeyboard?: boolean;
   showProgress?: boolean;
-  /**
-   * TV mode: the card is the highlighted item, so its preview plays. No grid
-   * passes it since TV focus became DOM focus.
-   */
-  tvPreviewActive?: boolean;
 }
 
 /**
@@ -115,11 +110,12 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
       hideRatingControls = false,
       onHideSuccess,
       fromPageTitle,
-      tvPreviewActive = false,
     },
     ref
   ) => {
     const { isTVMode } = useTVMode();
+    // TV mode: the card that has focus previews (hover is off), wherever it is
+    const [hasFocus, setHasFocus] = useState(false);
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const sceneSettings = getSettings("scene");
@@ -339,9 +335,8 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           <SceneCardPreview
             scene={scene}
             autoplayOnScroll={autoplayOnScroll}
-            // In TV mode, previews should play when the card is navigated to (highlighted)
-            // rather than on mouse hover.
-            active={isTVMode ? tvPreviewActive : undefined}
+            // In TV mode a preview plays while the card has focus, not on hover
+            active={isTVMode ? hasFocus : undefined}
             disableHover={isTVMode}
             cycleInterval={600}
             spriteCount={10}
@@ -425,7 +420,14 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
               }
             : undefined
         }
-        onFocus={onFocus}
+        onFocus={(e) => {
+          if (isTVMode) setHasFocus(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          // Focus moving to one of the card's own controls keeps it previewing
+          if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
+        }}
         tabIndex={isTVMode ? tabIndex : -1}
       />
     );

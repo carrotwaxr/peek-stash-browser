@@ -2,20 +2,30 @@ import { createElement } from "react";
 import type * as routerModule from "react-router-dom";
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedPerformer, StudioRef } from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PerformerCard from "../../../src/components/cards/PerformerCard";
+import type * as uiModule from "../../../src/components/ui/BaseCard";
 import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
 
-const { baseCardProps } = vi.hoisted(() => ({
+const { baseCardProps, real } = vi.hoisted(() => ({
   baseCardProps: vi.fn<(props: BaseCardProps) => void>(),
+  // Set for the cases that render the real BaseCard into the DOM
+  real: { on: false },
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof routerModule>();
   return { ...actual, useNavigate: () => vi.fn() };
 });
+vi.mock("../../../src/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { hideConfirmationDisabled: false },
+    updateUser: vi.fn(),
+  }),
+}));
 vi.mock("../../../src/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: false }),
 }));
@@ -25,12 +35,15 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   }),
 }));
 // Captures the indicators the card hands to BaseCard
-vi.mock("../../../src/components/ui/BaseCard", () => ({
-  BaseCard: (props: BaseCardProps) => {
-    baseCardProps(props);
-    return null;
-  },
-}));
+vi.mock("../../../src/components/ui/BaseCard", async (importOriginal) => {
+  const actual = await importOriginal<typeof uiModule>();
+  return {
+    BaseCard: (props: BaseCardProps) => {
+      baseCardProps(props);
+      return real.on ? <actual.BaseCard {...props} /> : null;
+    },
+  };
+});
 
 /** The indicator of one type from the card's last render */
 const indicator = (type: string) => {
@@ -189,5 +202,37 @@ describe("PerformerCard indicators", () => {
     expect(indicator("STUDIOS").count).toBe(20);
     renderTooltip("STUDIOS");
     expect(screen.getByText("and 8 more")).toBeInTheDocument();
+  });
+});
+
+describe("PerformerCard DOM", () => {
+  it("renders no unknown DOM attributes", () => {
+    real.on = true;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter>
+            <PerformerCard
+              performer={partialPerformer({
+                id: "7",
+                instanceId: "inst-a",
+                name: "Jane Doe",
+                tags: [],
+              })}
+              tabIndex={0}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      const complaints = error.mock.calls.filter((call) =>
+        String(call[0]).includes("does not recognize")
+      );
+      expect(complaints).toEqual([]);
+    } finally {
+      real.on = false;
+      error.mockRestore();
+    }
   });
 });
