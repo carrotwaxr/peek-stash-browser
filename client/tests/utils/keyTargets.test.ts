@@ -120,3 +120,57 @@ describe("targetOwnsKey", () => {
     expect(targetOwnsKey(document.body, "space")).toBe(false);
   });
 });
+
+describe("targetOwnsKey in TV mode (html.tv-mode)", () => {
+  afterEach(() => {
+    document.documentElement.classList.remove("tv-mode");
+  });
+
+  const tvMode = () => document.documentElement.classList.add("tv-mode");
+
+  it("a closed select leaves all four arrows to TV focus", () => {
+    const select = mount("select");
+    tvMode();
+    for (const arrow of ["up", "down", "left", "right"]) {
+      expect(targetOwnsKey(select, arrow)).toBe(false);
+    }
+  });
+
+  it("outside TV mode a select keeps its arrows", () => {
+    const select = mount("select");
+    for (const arrow of ["up", "down", "left", "right"]) {
+      expect(targetOwnsKey(select, arrow)).toBe(true);
+    }
+  });
+
+  it("Enter on a select is left to TV focus (it opens the picker); Space stays the select's", () => {
+    const select = mount("select");
+    tvMode();
+    expect(targetOwnsKey(select, "enter")).toBe(false);
+    expect(targetOwnsKey(select, "space")).toBe(true);
+  });
+
+  it("a range input or slider keeps Left and Right; Up and Down move focus", () => {
+    const range = mount("input", { type: "range" });
+    const slider = mount("div", { role: "slider", tabindex: "0" });
+    tvMode();
+    for (const el of [range, slider]) {
+      expect(targetOwnsKey(el, "left")).toBe(true);
+      expect(targetOwnsKey(el, "right")).toBe(true);
+      expect(targetOwnsKey(el, "up")).toBe(false);
+      expect(targetOwnsKey(el, "down")).toBe(false);
+    }
+  });
+
+  it("an open menu or listbox keeps its arrows", () => {
+    const menu = mount("div", { role: "menu" });
+    const item = mount("button", { role: "menuitem" }, menu);
+    const listbox = mount("div", { role: "listbox" });
+    const option = mount("div", { role: "option", tabindex: "-1" }, listbox);
+    tvMode();
+    for (const el of [item, option]) {
+      expect(targetOwnsKey(el, "up")).toBe(true);
+      expect(targetOwnsKey(el, "down")).toBe(true);
+    }
+  });
+});

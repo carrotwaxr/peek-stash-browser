@@ -4,6 +4,7 @@ import {
   useShortcutScope,
   useShortcutScopeContext,
 } from "../../hooks/useShortcutScope";
+import { isSlider } from "../../utils/keyTargets";
 import { type Direction, moveFocus } from "../../utils/spatialFocus";
 
 /** How long after a route change the first item may still take focus */
@@ -14,7 +15,10 @@ const ROUTE_FOCUS_WAIT_MS = 5000;
  * on. A `tv` scope: an arrow moves focus to the nearest item in that
  * direction by position (`utils/spatialFocus.ts`), inside the top modal when
  * one is open (the dispatcher hands a modal's unused arrows here), else the
- * whole page. PageUp and PageDown are left to the page's own scope.
+ * whole page. PageUp and PageDown are left to the page's own scope. On a
+ * closed select the arrows move focus too and Enter opens it; on a slider Up
+ * and Down move focus while Left and Right change its value (the rules are
+ * `targetOwnsKey`'s in TV mode).
  *
  * After a route change it focuses the first `[data-tv-item]` in `<main>`
  * once one renders, unless focus is still inside `<main>` (a list keeps it in
@@ -25,8 +29,16 @@ const TVNavigator = () => {
   const { topModalRoot } = useShortcutScopeContext();
   const location = useLocation();
 
-  const move = (direction: Direction) => () =>
-    moveFocus(direction, topModalRoot() ?? document.body);
+  const move = (direction: Direction) => (event: KeyboardEvent) => {
+    if (moveFocus(direction, topModalRoot() ?? document.body)) return true;
+    // Nowhere to go: a select or slider that handed the arrow over still
+    // takes it (handled), so the browser does not step its value
+    const target = event.target;
+    return (
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && isSlider(target))
+    );
+  };
 
   useShortcutScope({
     layer: "tv",
@@ -35,6 +47,18 @@ const TVNavigator = () => {
       down: move("down"),
       left: move("left"),
       right: move("right"),
+      // A closed select hands Enter over: open its picker, whose keys are
+      // then the browser's
+      enter: (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) return false;
+        try {
+          target.showPicker();
+        } catch {
+          // Refused (no user activation): Space still opens it
+        }
+        return true;
+      },
     },
   });
 

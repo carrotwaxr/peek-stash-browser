@@ -200,6 +200,50 @@ test.describe("TV mode", () => {
     await expect(page).toHaveURL(/[?&]page=2(&|$)/);
   });
 
+  test("arrows reach the sort select and leave it without changing its value", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes");
+    const select = list.sortControl.locator("select");
+    const before = await select.inputValue();
+    const url = page.url();
+
+    // The sort direction button sits right of the select
+    await list.sortDirection.locator("button").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(select).toBeFocused();
+
+    await page.keyboard.press("ArrowDown");
+    await expect(select).not.toBeFocused();
+    await expect(select).toHaveValue(before);
+    expect(page.url()).toBe(url);
+  });
+
+  test("Up and Down leave a range slider; Left and Right change it", async ({
+    page,
+  }) => {
+    // Minimum Play Percent: a range input, saved only by the tab's Save
+    await page.goto("/settings?section=user&tab=playback");
+    const range = page.locator("#minimumPlayPercent");
+    await expect(range).toBeVisible({ timeout: 10_000 });
+    const before = Number(await range.inputValue());
+
+    await range.focus();
+    await page.keyboard.press(before >= 100 ? "ArrowLeft" : "ArrowRight");
+    const changed = Number(await range.inputValue());
+    expect(changed).not.toBe(before);
+    await expect(range).toBeFocused();
+
+    await page.keyboard.press("ArrowDown");
+    await expect(range).not.toBeFocused();
+    await expect(range).toHaveValue(String(changed));
+
+    await range.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(range).not.toBeFocused();
+    await expect(range).toHaveValue(String(changed));
+  });
+
   test("an arrow press costs under a frame with 120 cards", async ({
     page,
   }) => {

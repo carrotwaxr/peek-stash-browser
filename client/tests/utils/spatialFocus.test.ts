@@ -164,11 +164,14 @@ describe("tvCandidates", () => {
     expect(ids).toEqual(["card", "plain", "link", "search"]);
   });
 
-  it("skips controls that take the arrows themselves (a select, a range)", () => {
+  it("selects and sliders are candidates; the items of an open menu or listbox are not", () => {
     document.body.innerHTML = `
       <div id="root">
         <select id="page"><option>1</option></select>
         <input id="zoom" type="range" />
+        <div id="slider" role="slider" tabindex="0"></div>
+        <div role="menu"><button id="menu-item" role="menuitem">Hide</button></div>
+        <div role="listbox"><div id="option" role="option" tabindex="0">A</div></div>
         <button id="next">Next</button>
       </div>`;
     for (const el of document.querySelectorAll("#root *")) {
@@ -177,7 +180,7 @@ describe("tvCandidates", () => {
     const ids = tvCandidates(must(document.getElementById("root"), "root")).map(
       (el) => el.id
     );
-    expect(ids).toEqual(["next"]);
+    expect(ids).toEqual(["page", "zoom", "slider", "next"]);
   });
 });
 
