@@ -9,6 +9,19 @@
  * tag and tag list load with the page's relations, only the tags the viewer
  * may see. A clip has no per-user data, so no user joins. The instance
  * filter, the random sort and the count are the base's.
+ *
+ * How it plans (S5, measured at 207k and 300k clips): the default page
+ * (newest first) walks `StashClip_browse_idx` and stops after its rows,
+ * each clip's scene read by its key (`deletedAt` never drives it, see the
+ * spec); the count checks each scene live on
+ * `StashScene_id_stashInstanceId_deletedAt_idx` from the index alone. A
+ * filter on the clip's tags, its scene's tags or its scene's performers
+ * matches a list of the parents the junction's ref index names
+ * (`sortedByIndex: false`): SQLite drives from it when it is short, and
+ * builds it once and probes it per clip when it is long (beside a studio or
+ * a scene, which drive, each probes per clip). The scene is an INNER JOIN
+ * the planner may reorder, so a studio drives from its own scenes; forcing
+ * the clip first (`CROSS JOIN`) made a studio's page 13 times slower.
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ClipRow, ClipTagRefRow } from "../types/internal/queryRows.js";
@@ -159,6 +172,13 @@ const SCENE_TAGS: JunctionTarget = {
   refInstanceCol: "tagInstanceId",
 };
 
+/** A tag the clip's scene inherits (from its performers, studio, groups) */
+const SCENE_INHERITED_TAGS: JunctionTarget = {
+  ...SCENE_TAGS,
+  table: "SceneInheritedTag",
+  alias: "sit",
+};
+
 /** A performer in the clip's scene */
 const SCENE_PERFORMERS: JunctionTarget = {
   kind: "junction",
@@ -238,7 +258,13 @@ class ClipQueryBuilder extends EntityQueryBuilder<
           ]
         : [],
     extraBaseWhere: (ctx) => [
-      { sql: "s.deletedAt IS NULL", params: [] },
+      // `+` keeps deletedAt from driving the scene: with sqlite_stat1 alone
+      // (no STAT4 samples) SQLite averages deletedAt over its distinct
+      // values, takes the live scenes for a few thousand and lists the clips
+      // from every live scene, then sorts them (325 ms a page at 207k clips,
+      // against 0.4 with the hint). The scene is still read by its key, the
+      // check done on StashScene_id_stashInstanceId_deletedAt_idx.
+      { sql: "+s.deletedAt IS NULL", params: [] },
       ...(ctx.applyExclusions ? [{ sql: "es.id IS NULL", params: [] }] : []),
     ],
     selectColumns: () => ({ sql: SELECT_COLUMNS, params: [] }),
@@ -263,16 +289,32 @@ class ClipQueryBuilder extends EntityQueryBuilder<
   /**
    * The search and the filter parameters. The clip's tags, its scene's tags
    * and its scene's performers take Has ANY, Has ALL and Has NONE; the scene
-   * and the studio are single-valued (INCLUDES only).
+   * and the studio are single-valued (INCLUDES only). A scene tag is one the
+   * scene holds (SceneTag) or inherits (SceneInheritedTag), in every
+   * modifier, as on the scene list.
+   *
+   * Has ANY and Has ALL on a junction (the clip's tag list, its scene's tags
+   * and performers) match the list of parents the junction's ref index
+   * names (`sortedByIndex: false`), which SQLite drives from when it is
+   * short (the primary tag's index beside it: MULTI-INDEX OR) and builds
+   * once and probes when it is long, where a correlated EXISTS probed the
+   * junction for every clip (a clip tag: 50 ms to 0.7 at 207k clips). A
+   * studio or a scene names few clips and drives the statement itself;
+   * beside one each other filter probes those clips (EXISTS), which is
+   * cheaper than reading a common tag's whole list first (a studio and a
+   * clip tag: 10 ms, against 13 with the list). Has NONE keeps its NOT
+   * EXISTS per clip.
    */
   protected filterClauses(
     filter: ClipListRequest["filter"],
     q: string | undefined,
     ctx: QueryContext
   ): Promise<FilterClause[]> {
+    const lists = filter.studioId === undefined && filter.sceneId === undefined;
     const opts = (name: string): RefClauseOptions => ({
       name,
       allowedInstanceIds: ctx.allowedInstanceIds,
+      ...(lists ? { sortedByIndex: false } : {}),
     });
     const clauses: FilterClause[] = [];
     if (q !== undefined) {
@@ -295,7 +337,12 @@ class ClipQueryBuilder extends EntityQueryBuilder<
     if (filter.tagIds) clauses.push(clipTagClause(filter.tagIds, opts));
     if (filter.sceneTagIds) {
       const { refs, modifier } = filter.sceneTagIds;
-      clauses.push(refClause(SCENE_TAGS, refs, modifier, opts("scene_tags")));
+      clauses.push(
+        refClause(SCENE_TAGS, refs, modifier, {
+          ...opts("scene_tags"),
+          inheritedJunction: SCENE_INHERITED_TAGS,
+        })
+      );
     }
     if (filter.performerIds) {
       const { refs, modifier } = filter.performerIds;
