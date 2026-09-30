@@ -96,7 +96,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** What every per-user rating row holds */
 interface RatingRow {
-  instanceId: string | null;
+  instanceId: string;
   favorite: boolean;
   rating: number | null;
 }
@@ -223,12 +223,12 @@ export class RecommendationService {
       favorites: new Set(
         rows
           .filter((r) => r.favorite)
-          .map((r) => entityKey(id(r), r.instanceId ?? ""))
+          .map((r) => entityKey(id(r), r.instanceId))
       ),
       highlyRated: new Set(
         rows
           .filter((r) => r.rating !== null && r.rating >= HIGHLY_RATED)
-          .map((r) => entityKey(id(r), r.instanceId ?? ""))
+          .map((r) => entityKey(id(r), r.instanceId))
       ),
     });
     const performers = sets(performerRatings, (r) => r.performerId);
@@ -238,7 +238,7 @@ export class RecommendationService {
     const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map(
       (r) => ({
         sceneId: r.sceneId,
-        instanceId: r.instanceId ?? "",
+        instanceId: r.instanceId,
         rating: r.rating,
         favorite: r.favorite,
       })

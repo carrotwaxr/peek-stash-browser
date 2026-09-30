@@ -156,16 +156,11 @@ export class DownloadService {
     userId: number,
     playlistId: number
   ): Promise<Array<{ sceneId: string; instanceId: string }>> {
-    // An item with no instance has none to match, so it is skipped.
-    const rows = await prisma.playlistItem.findMany({
-      where: { playlistId, instanceId: { not: null } },
+    const items = await prisma.playlistItem.findMany({
+      where: { playlistId },
       orderBy: { position: "asc" },
       select: { sceneId: true, instanceId: true },
     });
-    const items = rows.map((row) => ({
-      sceneId: row.sceneId,
-      instanceId: row.instanceId ?? "",
-    }));
 
     const visible = await getVisibleEntityKeys(
       userId,

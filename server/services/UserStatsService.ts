@@ -366,11 +366,11 @@ class UserStatsService {
       );
 
       for (const wh of watchHistory) {
-        const scene = sceneMap.get(entityKey(wh.sceneId, wh.instanceId ?? ""));
+        const scene = sceneMap.get(entityKey(wh.sceneId, wh.instanceId));
         if (!scene) continue;
 
         // Get instanceId from the watch history record
-        const whInstanceId = wh.instanceId ?? "";
+        const whInstanceId = wh.instanceId;
 
         // Parse O history for timestamps
         const oHistory = readHistory(wh.oHistory);

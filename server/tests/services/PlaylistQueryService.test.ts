@@ -206,7 +206,7 @@ describe("loadPlaylistItems without paging", () => {
     mockGetByRefs.mockResolvedValue([]);
   });
 
-  it("every item in position order, each with its own instance's scene; an item on no instance gets none", async () => {
+  it("every item in position order, each with its own instance's scene; an item with an empty instance gets none", async () => {
     mockPrisma.playlistItem.findMany.mockResolvedValue([
       partialRow({
         id: 1,
@@ -226,7 +226,7 @@ describe("loadPlaylistItems without paging", () => {
         id: 3,
         playlistId: 9,
         sceneId: "43",
-        instanceId: null,
+        instanceId: "",
         position: 2,
       }),
       partialRow({

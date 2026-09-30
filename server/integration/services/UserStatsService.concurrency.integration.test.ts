@@ -7,15 +7,17 @@
  * that true, and check that a failed write is logged with enough context to
  * find it while the other writes still land.
  *
- * Rows live under a made-up instance and user id: the stats tables have no
- * foreign key, and the real sync never touches the instance. The scene comes
- * from a spied stashEntityService.getScene.
+ * Rows live under a made-up instance, which the real sync never touches, and
+ * a user of the file's own: the stats tables have a foreign key to User, and
+ * deleting the user at the end deletes its rows. The scene comes from a
+ * spied stashEntityService.getScene.
  */
 import { Prisma } from "@prisma/client";
 import {
   type MockInstance,
   afterAll,
   afterEach,
+  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -30,8 +32,10 @@ import type { NormalizedScene } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 const INSTANCE = "stats-it";
-const USER_ID = 990_001;
+const USERNAME = "stats_concurrency_it";
 const SCENE_ID = "s1";
+/** The file's user, created in beforeAll */
+let userId = 0;
 
 /** Only the fields the stats update reads */
 const SCENE = partialRow<NormalizedScene>({
@@ -52,7 +56,7 @@ async function clearStats(): Promise<void> {
 async function readCounts(): Promise<
   Record<string, { oCounter: number; playCount: number }>
 > {
-  const where = { userId: USER_ID, instanceId: INSTANCE };
+  const where = { userId, instanceId: INSTANCE };
   const select = { oCounter: true, playCount: true };
   const [performers, studios, tags] = await Promise.all([
     prisma.userPerformerStats.findMany({
@@ -87,6 +91,16 @@ async function readCounts(): Promise<
 describe("UserStatsService.updateStatsForScene concurrency (integration)", () => {
   let errorSpy: MockInstance<typeof logger.error>;
 
+  beforeAll(async () => {
+    await prisma.user.deleteMany({ where: { username: USERNAME } });
+    userId = (
+      await prisma.user.create({
+        data: { username: USERNAME, password: "x" },
+        select: { id: true },
+      })
+    ).id;
+  });
+
   beforeEach(async () => {
     await clearStats();
     vi.spyOn(stashEntityService, "getScene").mockResolvedValue(SCENE);
@@ -99,6 +113,8 @@ describe("UserStatsService.updateStatsForScene concurrency (integration)", () =>
 
   afterAll(async () => {
     await clearStats();
+    // Its stats rows, if any are left, cascade
+    await prisma.user.deleteMany({ where: { username: USERNAME } });
   });
 
   it("ten stats updates at once all count", async () => {
@@ -106,7 +122,7 @@ describe("UserStatsService.updateStatsForScene concurrency (integration)", () =>
     await Promise.all(
       Array.from({ length: 10 }, () =>
         userStatsService.updateStatsForScene(
-          USER_ID,
+          userId,
           SCENE_ID,
           1,
           1,
@@ -144,7 +160,7 @@ describe("UserStatsService.updateStatsForScene concurrency (integration)", () =>
 
     const now = new Date();
     await userStatsService.updateStatsForScene(
-      USER_ID,
+      userId,
       SCENE_ID,
       1,
       1,
@@ -156,7 +172,7 @@ describe("UserStatsService.updateStatsForScene concurrency (integration)", () =>
     expect(errorSpy).toHaveBeenCalledWith(
       "Error updating stats for scene",
       expect.objectContaining({
-        userId: USER_ID,
+        userId,
         sceneId: SCENE_ID,
         instanceId: INSTANCE,
         entityType: "tag",

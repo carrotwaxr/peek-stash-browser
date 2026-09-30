@@ -1070,29 +1070,21 @@ describe("User Controller", () => {
       expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: 3 } });
     });
 
-    it("deletes the user's rows in the four tables with no relation to User, with the user, in one unit", async () => {
+    it("deletes only the user, in one unit: every per-user table cascades from it", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
       mockPrisma.user.delete.mockResolvedValue(partialRow({}));
       const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
       const res = resFor(deleteUser);
       await deleteUser(req, res);
 
-      const byUser = { where: { userId: 3 } };
-      expect(mockPrisma.userPerformerStats.deleteMany).toHaveBeenCalledWith(
-        byUser
-      );
-      expect(mockPrisma.userStudioStats.deleteMany).toHaveBeenCalledWith(
-        byUser
-      );
-      expect(mockPrisma.userTagStats.deleteMany).toHaveBeenCalledWith(byUser);
-      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith(
-        byUser
-      );
-      // One batch: the four deletes and the user's (whose cascades take
-      // every other per-user table)
+      // The stats and ranking tables cascade from User like the rest
+      expect(mockPrisma.userPerformerStats.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.userStudioStats.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.userTagStats.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.userEntityRanking.deleteMany).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       const [ops] = must(mockPrisma.$transaction.mock.calls[0]);
-      expect(Array.isArray(ops) ? ops.length : 0).toBe(5);
+      expect(Array.isArray(ops) ? ops.length : 0).toBe(1);
     });
 
     it("drops the deleted user from the ranking and Recommended caches, after the delete", async () => {

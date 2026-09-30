@@ -510,38 +510,6 @@ describe("UserStatsService", () => {
       expect(must(performerData[0]).playCount).toBe(13); // 3 + 10
     });
 
-    it("uses empty string as instanceId when watch history has no instanceId", async () => {
-      // Legacy watch history without instanceId
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        partialRow({
-          sceneId: "scene-1",
-          instanceId: null,
-          oCount: 1,
-          playCount: 2,
-          oHistory: "[]",
-          playHistory: "[]",
-        }),
-      ]);
-
-      mockGetScenesByIdsWithRelations.mockResolvedValue([
-        {
-          id: "scene-1",
-          instanceId: "",
-          performers: [{ id: "perf-1", name: "Jane" }],
-          studio: null,
-          tags: [],
-        },
-      ]);
-
-      await userStatsService.rebuildAllStatsForUser(1);
-
-      const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
-      const performerData = [must(performerCall).data].flat();
-
-      expect(must(performerData[0]).instanceId).toBe("");
-    });
-
     it("creates no stats when user has no watch history", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([]);
       mockGetScenesByIdsWithRelations.mockResolvedValue([]);
