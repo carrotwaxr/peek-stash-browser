@@ -1,37 +1,28 @@
 /**
- * The Clips page sends what its filter panel builds: every parameter of
- * `buildClipFilter`, the tag, scene tag and performer modifiers included,
- * reaches `getClips` (item 38; the server's contract test maps the same
- * parameters, so a parameter the page dropped would pass there unseen).
- * The wall cog's Preview Behavior saves the user's wall playback and the
- * wall plays by it at once (LG-10, item 52).
+ * The Clips page on the list page shell: it sends what its filter panel
+ * builds, every parameter of `buildClipFilter` with the modifiers, as
+ * `getClips` takes it (item 38; the server's contract test maps the same
+ * parameters, so a parameter the page dropped would pass there unseen); a
+ * page change keeps the current clips on screen, dimmed, until the next
+ * page arrives; the wall cog's Preview Behavior saves the user's wall
+ * playback and the wall plays by it at once (LG-10, item 52).
  */
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
-import { userSettingsResponse } from "@tests/helpers/userSettings";
-import { must } from "@tests/testUtils";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { must, renderListPage } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as api from "@/api";
 import ClipSearch from "@/components/clip-search/ClipSearch";
-import type * as ui from "@/components/ui/index";
-import { buildClipFilter } from "@/utils/filterConfig";
 
-const { mockGetClips, mockApiGet, mockApiPut, panelQuery, realControls } =
-  vi.hoisted(() => ({
-    mockGetClips: vi.fn(),
-    mockApiGet: vi.fn(),
-    mockApiPut: vi.fn(),
-    panelQuery: { current: {} as Record<string, unknown> },
-    // The wall-playback case renders the real SearchControls
-    realControls: { current: false },
-  }));
+const { mockGetClips, mockApiPut } = vi.hoisted(() => ({
+  mockGetClips: vi.fn<(options: unknown) => Promise<unknown>>(),
+  mockApiPut: vi.fn<(url: string, body: unknown) => Promise<unknown>>(),
+}));
 
 vi.mock("@/api", async (importOriginal) => ({
   ...(await importOriginal<typeof api>()),
   getClips: mockGetClips,
-  apiGet: mockApiGet,
+  apiGet: vi.fn(() => Promise.resolve({})),
   apiPut: mockApiPut,
 }));
 
@@ -60,23 +51,6 @@ vi.mock("react-photo-album", () => ({
   ),
 }));
 
-// The real SearchControls' toolbar reads these
-vi.mock("@/hooks/useTVMode", () => ({
-  useTVMode: () => ({ isTVMode: false }),
-}));
-
-vi.mock("@/contexts/CardDisplaySettingsContext", () => ({
-  useCardDisplaySettings: () => ({
-    getSettings: () => ({}),
-    updateSettings: vi.fn(),
-    isLoading: false,
-  }),
-}));
-
-vi.mock("@/contexts/ConfigContext", () => ({
-  useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
-}));
-
 vi.mock("@/hooks/useTableColumns", () => ({
   useTableColumns: vi.fn(() => ({
     allColumns: [],
@@ -90,77 +64,38 @@ vi.mock("@/hooks/useTableColumns", () => ({
   })),
 }));
 
-// The panel, as SearchControls sends it: one query on mount (the page's
-// handler changes identity every render, so the stub fires once)
-vi.mock("@/components/ui/index", async (importOriginal) => {
-  const actual = await importOriginal<typeof ui>();
-  const PanelStub = ({
-    onQueryChange,
-  }: {
-    onQueryChange?: ((query: Record<string, unknown>) => void) | undefined;
-  }) => {
-    const fired = React.useRef(false);
-    React.useEffect(() => {
-      if (fired.current) return;
-      fired.current = true;
-      onQueryChange?.(panelQuery.current);
-    }, [onQueryChange]);
-    return null;
-  };
-  return {
-    ...actual,
-    SearchControls: (
-      props: React.ComponentProps<typeof actual.SearchControls>
-    ) =>
-      realControls.current ? (
-        <actual.SearchControls {...props} />
-      ) : (
-        <PanelStub onQueryChange={props.onQueryChange} />
-      ),
-  };
+/** A clip row as the list answers it */
+const clip = (id: string, title: string) => ({
+  id,
+  instanceId: "server-a",
+  sceneId: "3",
+  seconds: 12,
+  title,
+  isGenerated: true,
+  scene: { title: "A scene", files: [{ width: 1920, height: 1080 }] },
 });
+
+const renderClips = (url = "/clips", element = <ClipSearch />) =>
+  renderListPage(element, { initialEntries: [url] });
 
 describe("ClipSearch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    realControls.current = false;
     mockGetClips.mockResolvedValue({ clips: [], total: 0 });
-    mockApiGet.mockImplementation((path: string) =>
-      Promise.resolve(
-        path === "/user/settings"
-          ? userSettingsResponse({ wallPlayback: "static" })
-          : { presets: {}, defaults: {} }
-      )
-    );
     mockApiPut.mockResolvedValue({ success: true });
   });
 
   it("forwards every clip filter parameter, the modifiers included, to getClips", async () => {
-    panelQuery.current = {
-      filter: {
-        direction: "ASC",
-        page: 2,
-        per_page: 48,
-        q: "kiss",
-        sort: "title",
-      },
-      clip_filter: buildClipFilter({
-        tagIds: ["1:server-a"],
-        tagIdsModifier: "INCLUDES_ALL",
-        sceneTagIds: ["2:server-a"],
-        sceneTagIdsModifier: "EXCLUDES",
-        performerIds: ["3:server-a"],
-        performerIdsModifier: "EXCLUDES",
-        studioId: "4:server-a",
-        isGenerated: "false",
-      }),
-    };
+    const url =
+      "/clips?page=2&per_page=48&q=kiss&sort=title&dir=ASC" +
+      "&tagIds=1:server-a&tagIdsModifier=INCLUDES_ALL" +
+      "&sceneTagIds=2:server-a&sceneTagIdsModifier=EXCLUDES" +
+      "&performerIds=3:server-a&performerIdsModifier=EXCLUDES" +
+      "&studioId=4:server-a&isGenerated=false";
 
-    render(
-      <MemoryRouter>
-        <ClipSearch permanentFilters={{ sceneId: "9:server-a" }} />
-      </MemoryRouter>,
-      { wrapper: SignedInWithQuery }
+    renderClips(
+      url,
+      <ClipSearch permanentFilters={{ sceneId: "9:server-a" }} />
     );
 
     await waitFor(() => {
@@ -185,17 +120,7 @@ describe("ClipSearch", () => {
   });
 
   it("asks for every clip when the panel picks All clips", async () => {
-    panelQuery.current = {
-      filter: { direction: "DESC", page: 1, per_page: 24, q: "" },
-      clip_filter: buildClipFilter({ isGenerated: "all" }),
-    };
-
-    render(
-      <MemoryRouter>
-        <ClipSearch />
-      </MemoryRouter>,
-      { wrapper: SignedInWithQuery }
-    );
+    renderClips("/clips?isGenerated=all");
 
     await waitFor(() => {
       expect(mockGetClips).toHaveBeenCalled();
@@ -208,27 +133,58 @@ describe("ClipSearch", () => {
     });
   });
 
+  it("page 2 keeps page 1's clips on screen, dimmed, until it loads", async () => {
+    let answerPage2: (value: unknown) => void = () => {};
+    mockGetClips.mockImplementation((options) =>
+      (options as { page: number }).page === 2
+        ? new Promise((resolve) => {
+            answerPage2 = resolve;
+          })
+        : Promise.resolve({ clips: [clip("1", "First page clip")], total: 48 })
+    );
+
+    renderClips();
+    expect(await screen.findByText("First page clip")).toBeInTheDocument();
+
+    fireEvent.click(
+      must(screen.getAllByRole("button", { name: "Next Page" })[0])
+    );
+
+    // Page 2 is on its way: page 1's clips stay, dimmed and busy
+    await waitFor(() =>
+      expect(screen.getByTestId("search-results")).toHaveAttribute(
+        "aria-busy",
+        "true"
+      )
+    );
+    expect(screen.getByText("First page clip")).toBeInTheDocument();
+
+    await act(async () => {
+      answerPage2({ clips: [clip("2", "Second page clip")], total: 48 });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText("Second page clip")).toBeInTheDocument();
+    expect(screen.queryByText("First page clip")).not.toBeInTheDocument();
+    expect(screen.getByTestId("search-results")).not.toHaveAttribute(
+      "aria-busy"
+    );
+  });
+
+  it("shows 'No clips found' when nothing matches", async () => {
+    renderClips("/clips?q=zzz");
+    expect(await screen.findByText("No clips found")).toBeInTheDocument();
+  });
+
   describe("wall playback", () => {
     const play = vi.fn(() => Promise.resolve());
 
     beforeEach(() => {
-      realControls.current = true;
       vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(play);
       vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
         () => {}
       );
       mockGetClips.mockResolvedValue({
-        clips: [
-          {
-            id: "7",
-            instanceId: "server-a",
-            sceneId: "3",
-            seconds: 12,
-            title: "A clip",
-            isGenerated: true,
-            scene: { title: "A scene", files: [{ width: 1920, height: 1080 }] },
-          },
-        ],
+        clips: [clip("7", "A clip")],
         total: 1,
       });
     });
@@ -238,12 +194,10 @@ describe("ClipSearch", () => {
     });
 
     it("choosing Play on Hover in the wall cog makes wall items play on hover", async () => {
-      render(
-        <MemoryRouter initialEntries={["/clips?view=wall"]}>
-          <ClipSearch />
-        </MemoryRouter>,
-        { wrapper: SignedInWithQuery }
-      );
+      renderListPage(<ClipSearch />, {
+        initialEntries: ["/clips?view=wall"],
+        userSettings: { wallPlayback: "static" },
+      });
       // Static: the wall shows no preview video
       await screen.findByText("A clip");
       expect(document.querySelector(".wall-item video")).toBeNull();

@@ -3,11 +3,18 @@ import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
-import { useFilterOptions, useListDefaults } from "../../hooks/useListOptions";
+import {
+  useFilterOptions,
+  useListDefaults,
+  useLockedFields,
+} from "../../hooks/useListOptions";
 import { useListUrlState } from "../../hooks/useListUrlState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { useWallPlayback } from "../../hooks/useWallPlayback";
+import {
+  WALL_VIEW_SETTINGS,
+  useWallPlayback,
+} from "../../hooks/useWallPlayback";
 import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
@@ -33,8 +40,81 @@ import { timelineAndFolderFilters } from "./viewFilters";
 
 const NO_EXTRAS: ListPageExtras = {};
 const useNoExtras = (): ListPageExtras => NO_EXTRAS;
+const NO_FILTERS: Record<string, unknown> = {};
+const NO_SETTINGS: typeof WALL_VIEW_SETTINGS = [];
 
 type WallZoom = React.ComponentProps<typeof WallView>["zoomLevel"];
+type WallEntity = React.ComponentProps<typeof WallView>["entityType"];
+
+/**
+ * A list inside another page (the scene list on Scenes and on a detail
+ * page's Scenes tab): its heading, the page's own fixed filters and the
+ * preset context. The page sets the document title.
+ */
+export interface ListEmbed {
+  /** The preset context ("scene_performer"); the entity type by default */
+  context?: string;
+  /** The entity's default sort, over the config's */
+  defaultSort?: string;
+  /**
+   * The page's own filters (a performer's Scenes tab has its performer):
+   * never in the URL, not offered in the panel, merged last into the request
+   */
+  permanentFilters?: Record<string, unknown>;
+  /** Names for the fixed filters' chips */
+  permanentFiltersMetadata?: Record<string, unknown>;
+  /** The heading over the list; none unless named */
+  title?: string;
+  subtitle?: string;
+  /** Where a card's page says the user came from */
+  fromPageTitle?: string;
+}
+
+/** The detail page a timeline or folder view sits on: its counts and folders are that page's */
+interface PageScope {
+  performerId?: string;
+  tagId?: string;
+  studioId?: string;
+  groupId?: string;
+}
+
+const SCOPE_FIELDS = [
+  ["performers", "performerId"],
+  ["tags", "tagId"],
+  ["studios", "studioId"],
+  ["groups", "groupId"],
+] as const;
+
+/** The page's entity from its fixed filters (a performer's Scenes tab: its performer) */
+function scopeOf(permanentFilters: Record<string, unknown>): PageScope | null {
+  const scope: PageScope = {};
+  for (const [field, param] of SCOPE_FIELDS) {
+    const criterion = permanentFilters[field] as
+      | { value?: unknown[] }
+      | undefined;
+    const first = criterion?.value?.[0];
+    if (typeof first === "string" && first !== "") scope[param] = first;
+  }
+  return Object.keys(scope).length > 0 ? scope : null;
+}
+
+/** Filters equal by content are one object, whatever object the page passed */
+function useFiltersByContent(
+  filters: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  const key = filters ? JSON.stringify(filters) : "";
+  return useMemo(
+    () =>
+      key === "" ? NO_FILTERS : (JSON.parse(key) as Record<string, unknown>),
+    [key]
+  );
+}
+
+/** Sets the document title (a list page does; a list inside a page leaves it to the page) */
+const DocumentTitle = ({ title }: { title: string }) => {
+  usePageTitle(title);
+  return null;
+};
 
 type TableColumns = {
   id: string;
@@ -45,19 +125,39 @@ type TableColumns = {
 }[];
 
 /**
- * A library list page (Performers, Studios, Collections, Tags, Galleries,
- * Images): its state in the URL (`useListUrlState`), its page through the
- * entity's list hook, and the grid, table, wall, timeline, folder or the
- * config's own views, with loading placeholders of the card's shape and an
- * empty state. The timeline's period and the open folder live in the URL
- * too, and filter the list only in their view.
+ * A library list (Scenes, Performers, Studios, Collections, Tags, Galleries,
+ * Images, Clips, and the scene list on a detail page's tab): its state in
+ * the URL (`useListUrlState`), its page through the entity's list hook, and
+ * the grid, table, wall, timeline, folder or the config's own views, with
+ * loading placeholders of the card's shape and an empty state. The
+ * timeline's period and the open folder live in the URL too, and filter the
+ * list only in their view.
  */
-const EntityListPage = ({ config }: { config: ListPageConfig }) => {
-  const { entityType, source, title } = config;
-  usePageTitle(title);
+const EntityListPage = ({
+  config,
+  embed,
+}: {
+  config: ListPageConfig;
+  /** Set for a list inside another page; left out, the list is the page */
+  embed?: ListEmbed;
+}) => {
+  const { entityType, source } = config;
+  const title = embed ? (embed.title ?? "") : config.title;
+  const subtitle = embed ? embed.subtitle : config.subtitle;
+  const fromPageTitle = embed ? embed.fromPageTitle : config.title;
+  const context = embed?.context;
+  const pagePermanentFilters = useFiltersByContent(embed?.permanentFilters);
+  const lockedFields = useLockedFields(entityType, pagePermanentFilters);
+  const scope = useMemo(
+    () => scopeOf(pagePermanentFilters),
+    [pagePermanentFilters]
+  );
   const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
-  const defaults = useListDefaults(entityType, config.defaultSort);
+  const defaults = useListDefaults(
+    entityType,
+    embed?.defaultSort ?? config.defaultSort
+  );
   const viewModeIds = useMemo(
     () => config.viewModes.map((mode) => mode.id),
     [config.viewModes]
@@ -69,11 +169,14 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
 
   const listState = useListUrlState({
     entityType,
+    ...(context ? { context } : {}),
     filterOptions,
     sortOptions,
     viewModes: viewModeIds,
     defaults,
-    viewFilters: timelineAndFolderFilters,
+    permanentFilters: pagePermanentFilters,
+    lockedFields,
+    viewFilters: config.viewFilters ?? timelineAndFolderFilters,
   });
   const {
     ready,
@@ -90,9 +193,15 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
     permanentFilters,
   } = listState;
   const { wallPlayback } = useWallPlayback();
-  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
-    viewMode === "folder"
-  );
+  const {
+    tags: folderTags,
+    isLoading: tagsLoading,
+    error: folderTagsError,
+    refetch: refetchFolderTags,
+  } = useFolderViewTags(viewMode === "folder", scope);
+  // A failed tree shows its error; the library's first sync is loading
+  const folderTagsInitializing = isLibraryInitializing(folderTagsError);
+  const folderTagsFailed = !!folderTagsError && !folderTagsInitializing;
 
   // A view with its own data (the tag tree) asks for no page and shows no pager
   const extraView =
@@ -103,8 +212,8 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
   const awaitingPeriod =
     viewMode === "timeline" && periodDateRange(timelinePeriod) === null;
 
-  const request = useMemo(
-    () =>
+  const request = useMemo(() => {
+    const query =
       paged && !awaitingPeriod
         ? buildListQuery(
             entityType,
@@ -112,21 +221,25 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
             permanentFilters,
             unitPreference
           )
-        : null,
-    [
-      paged,
-      awaitingPeriod,
-      entityType,
-      ready,
-      filters,
-      sort,
-      page,
-      perPage,
-      q,
-      permanentFilters,
-      unitPreference,
-    ]
-  );
+        : null;
+    // The list hook's own request shape (the clips' flat options)
+    return query && source.toRequest
+      ? source.toRequest(query, permanentFilters)
+      : query;
+  }, [
+    paged,
+    awaitingPeriod,
+    source,
+    entityType,
+    ready,
+    filters,
+    sort,
+    page,
+    perPage,
+    q,
+    permanentFilters,
+    unitPreference,
+  ]);
 
   const { data, error, isPending, isPlaceholderData } = source.useList(request);
   const { items, count } = pickPage(source, data);
@@ -135,7 +248,7 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
   const isLoading = isPending || initializing;
   const totalPages = paged ? Math.ceil(count / perPage) : 0;
 
-  // The page's own handlers and parts (the Images lightbox)
+  // The page's own handlers and parts (the Images lightbox, a scene's queue)
   const usePage = config.usePage ?? useNoExtras;
   const { cardHandlers, after } = usePage({
     listState,
@@ -143,13 +256,15 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
     count,
     request,
     error,
+    title,
+    fromPageTitle,
   });
 
   // One hide handler and one context for every card, so memoised cards keep
   const onHideSuccess = useHideFromList(source, request);
   const cardContext = useMemo<CardContext>(
-    () => ({ ...cardHandlers, onHideSuccess, fromPageTitle: title }),
-    [cardHandlers, onHideSuccess, title]
+    () => ({ ...cardHandlers, onHideSuccess, fromPageTitle }),
+    [cardHandlers, onHideSuccess, fromPageTitle]
   );
   const { renderCard } = config;
   const renderKeyedCard = useCallback(
@@ -170,10 +285,13 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
     getColumnConfig,
   } = useTableColumns(config.tableEntity ?? entityType);
 
+  const documentTitle = embed ? null : <DocumentTitle title={title} />;
+
   if (error && !initializing && paged) {
     return (
       <PageLayout>
-        <PageHeader title={title} />
+        {documentTitle}
+        <PageHeader title={title} subtitle={subtitle} />
         <ErrorMessage error={error} />
       </PageLayout>
     );
@@ -198,7 +316,9 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
           items={isLoading ? [] : items}
           columns={visibleColumns as TableColumns}
           sort={{ field: sort.field, direction: sort.direction }}
-          onSort={listState.setSort}
+          {...(config.tableSorts === false
+            ? {}
+            : { onSort: listState.setSort })}
           onHideColumn={hideColumn}
           entityType={config.tableEntity ?? entityType}
           isLoading={isLoading}
@@ -211,7 +331,7 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
       return (
         <WallView
           items={isLoading ? [] : items}
-          entityType={entityType as "gallery" | "image"}
+          entityType={entityType as WallEntity}
           zoomLevel={zoomLevel as WallZoom}
           playbackMode={wallPlayback}
           onItemClick={cardContext.onItemClick}
@@ -232,11 +352,20 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
           loading={!awaitingPeriod && isLoading}
           emptyMessage={`${config.emptyMessage} for this time period`}
           gridDensity={gridDensity}
+          filters={scope}
         />
       );
     }
 
     if (viewMode === "folder") {
+      if (folderTagsFailed) {
+        return (
+          <ErrorMessage
+            error={folderTagsError}
+            onRetry={() => void refetchFolderTags()}
+          />
+        );
+      }
       return (
         <FolderView
           items={isLoading ? [] : items}
@@ -244,11 +373,21 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
           path={folderPath}
           onPathChange={listState.setFolderPath}
           gridDensity={gridDensity}
-          loading={isLoading || tagsLoading}
+          loading={isLoading || tagsLoading || folderTagsInitializing}
           emptyMessage={config.emptyMessage}
           renderItem={renderKeyedCard}
         />
       );
+    }
+
+    if (config.renderGrid) {
+      return config.renderGrid({
+        items,
+        loading: isLoading,
+        gridDensity,
+        ctx: cardContext,
+        emptyMessage: config.emptyMessage,
+      });
     }
 
     if (isLoading) {
@@ -280,19 +419,27 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
 
   return (
     <PageLayout>
+      {documentTitle}
       <div>
-        <PageHeader title={title} subtitle={config.subtitle} />
+        <PageHeader title={title} subtitle={subtitle} />
 
         <LibraryInitializingBanner />
 
         <SearchControls
           artifactType={entityType}
+          {...(context ? { context } : {})}
           listState={listState}
           isRefreshing={isPlaceholderData}
           totalPages={totalPages}
           totalCount={paged ? count : 0}
           permanentFilters={permanentFilters}
+          permanentFiltersMetadata={embed?.permanentFiltersMetadata}
           viewModes={config.viewModes}
+          contextSettings={
+            config.wallPlaybackSetting && viewMode === "wall"
+              ? WALL_VIEW_SETTINGS
+              : NO_SETTINGS
+          }
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={columnsPopover}
         >

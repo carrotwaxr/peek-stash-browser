@@ -1,8 +1,9 @@
 /**
  * SearchControls on the URL state: every control writes the URL through
  * `useListUrlState`, and the page's query is derived from it, so Back and
- * Forward step through the list. Seeded by URL, with the presets in the
- * query cache; each test asserts what the page is asked for and the URL.
+ * Forward step through the list. The controls render as a list page holds
+ * them (`ListControls`), seeded by URL, with the presets in the query cache;
+ * each test asserts what the page is asked for and the URL.
  */
 import { type ComponentType, useState } from "react";
 import {
@@ -21,6 +22,10 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import {
+  ListControls,
+  type ListControlsProps,
+} from "@tests/helpers/ListControls";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
@@ -30,7 +35,6 @@ import {
   defaultPresetsQueryOptions,
   presetsQueryOptions,
 } from "../../../src/api/hooks/usePresets";
-import SearchControls from "../../../src/components/ui/SearchControls";
 import {
   WALL_VIEW_SETTINGS,
   useWallPlayback,
@@ -99,7 +103,7 @@ interface SentQuery {
 
 type OnQueryChange = (query: Record<string, unknown>) => void;
 
-type Props = Partial<React.ComponentProps<typeof SearchControls>>;
+type Props = Partial<ListControlsProps>;
 
 /** A default preset for a context, or "pending" for presets still loading */
 type Presets =
@@ -121,8 +125,8 @@ const preset = (fields: Partial<FilterPreset> = {}): FilterPreset => ({
 });
 
 /**
- * Renders SearchControls (or `element(props)`, a page around it) at `url`,
- * recording each navigation's history action
+ * Renders the list's controls (or `element(props)`, a page around them) at
+ * `url`, recording each navigation's history action
  */
 function renderSearchControls(
   props: Props = {},
@@ -133,7 +137,7 @@ function renderSearchControls(
   }: {
     url?: string;
     presets?: Presets;
-    element?: ComponentType<React.ComponentProps<typeof SearchControls>>;
+    element?: ComponentType<ListControlsProps>;
   } = {}
 ) {
   const queryClient = new QueryClient({
@@ -148,7 +152,7 @@ function renderSearchControls(
     });
   }
   const onQueryChange = vi.fn<OnQueryChange>();
-  const merged: React.ComponentProps<typeof SearchControls> = {
+  const merged: ListControlsProps = {
     artifactType: "scene",
     totalPages: 10,
     totalCount: 240,
@@ -163,7 +167,7 @@ function renderSearchControls(
         element: Element ? (
           <Element {...merged} />
         ) : (
-          <SearchControls {...merged} />
+          <ListControls {...merged} />
         ),
       },
     ],
@@ -282,33 +286,6 @@ describe("SearchControls", () => {
 
       await act(() => list.router.navigate(-1));
       await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
-    });
-
-    it("onViewModeChange and onPerPageStateChange follow the URL", async () => {
-      const onViewModeChange = vi.fn<(mode: string) => void>();
-      const onPerPageStateChange = vi.fn<(perPage: number) => void>();
-      const list = renderSearchControls(
-        {
-          onViewModeChange,
-          onPerPageStateChange,
-          supportsWallView: true,
-          viewModes: [
-            { id: "grid", label: "Grid view" },
-            { id: "wall", label: "Wall view" },
-          ],
-        },
-        { url: "/scenes?view=wall&per_page=48" }
-      );
-      await waitFor(() =>
-        expect(onViewModeChange).toHaveBeenLastCalledWith("wall")
-      );
-      expect(onPerPageStateChange).toHaveBeenLastCalledWith(48);
-
-      await act(() => list.router.navigate("/scenes"));
-      await waitFor(() =>
-        expect(onViewModeChange).toHaveBeenLastCalledWith("grid")
-      );
-      expect(onPerPageStateChange).toHaveBeenLastCalledWith(24);
     });
   });
 
@@ -524,14 +501,14 @@ describe("SearchControls", () => {
       const user = userEvent.setup();
       const FOLDER_TAG = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
       /** A folder page: the folder opens after the list mounted */
-      function FolderPage(props: React.ComponentProps<typeof SearchControls>) {
+      function FolderPage(props: ListControlsProps) {
         const [permanent, setPermanent] = useState<Record<string, unknown>>({});
         return (
           <>
             <button onClick={() => setPermanent({ tags: FOLDER_TAG })}>
               Open folder
             </button>
-            <SearchControls {...props} permanentFilters={permanent} />
+            <ListControls {...props} permanentFilters={permanent} />
           </>
         );
       }
@@ -627,20 +604,14 @@ describe("SearchControls", () => {
       const user = userEvent.setup();
       const MARCH = { start: "2024-03-01", end: "2024-03-31" };
       /** A timeline page: the period's date filter arrives after the list mounted */
-      function TimelinePage(
-        props: React.ComponentProps<typeof SearchControls>
-      ) {
+      function TimelinePage(props: ListControlsProps) {
         const [permanent, setPermanent] = useState<Record<string, unknown>>({});
         return (
           <>
             <button onClick={() => setPermanent({ date: MARCH })}>
               Pick March
             </button>
-            <SearchControls
-              {...props}
-              permanentFilters={permanent}
-              deferInitialQueryUntilFiltersReady
-            />
+            <ListControls {...props} permanentFilters={permanent} />
           </>
         );
       }
@@ -652,9 +623,10 @@ describe("SearchControls", () => {
         }
       );
 
+      await firstQuery(list.onQueryChange);
       await user.click(screen.getByRole("button", { name: "Pick March" }));
-      expect(await firstQuery(list.onQueryChange)).toHaveProperty(
-        "scene_filter.date"
+      await waitFor(() =>
+        expect(list.lastQuery()).toHaveProperty("scene_filter.date")
       );
 
       await user.selectOptions(sortSelect(), "rating");
@@ -775,19 +747,6 @@ describe("SearchControls", () => {
       expect(screen.getAllByText(/of 240/).length).toBeGreaterThanOrEqual(1);
     });
 
-    it("paginationHandlerRef pages the list without a history entry", async () => {
-      const paginationHandlerRef: {
-        current: ((page: number) => void) | null;
-      } = { current: null };
-      const list = renderSearchControls({ paginationHandlerRef });
-      await firstQuery(list.onQueryChange);
-
-      act(() => must(paginationHandlerRef.current, "the page handler")(3));
-
-      await waitFor(() => expect(list.lastQuery().filter.page).toBe(3));
-      expect(list.actions).toEqual(["REPLACE"]);
-    });
-
     it("changing per page adds no history entry", async () => {
       const user = userEvent.setup();
       const list = renderSearchControls({}, { url: "/scenes?page=2" });
@@ -861,50 +820,6 @@ describe("SearchControls", () => {
     });
   });
 
-  describe("Timeline View Deferred Query", () => {
-    it("defers initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters empty", async () => {
-      const { onQueryChange } = renderSearchControls({
-        artifactType: "gallery",
-        totalPages: 1,
-        totalCount: 0,
-        deferInitialQueryUntilFiltersReady: true,
-        permanentFilters: {},
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(onQueryChange).not.toHaveBeenCalled();
-    });
-
-    it("fires initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters has values", async () => {
-      const { onQueryChange } = renderSearchControls({
-        artifactType: "gallery",
-        totalPages: 1,
-        totalCount: 10,
-        deferInitialQueryUntilFiltersReady: true,
-        permanentFilters: {
-          date: { start: "2024-01-01", end: "2024-01-31" },
-        },
-      });
-
-      expect(await firstQuery(onQueryChange)).toMatchObject({
-        gallery_filter: { date: { value: "2024-01-01" } },
-      });
-    });
-
-    it("fires initial query immediately when deferInitialQueryUntilFiltersReady is false", async () => {
-      const { onQueryChange } = renderSearchControls({
-        artifactType: "gallery",
-        totalPages: 1,
-        totalCount: 10,
-        deferInitialQueryUntilFiltersReady: false,
-        permanentFilters: {},
-      });
-
-      await firstQuery(onQueryChange);
-    });
-  });
-
   describe("Stale results", () => {
     it("dims the results and marks them busy while isRefreshing", () => {
       renderSearchControls({
@@ -945,16 +860,18 @@ describe("SearchControls", () => {
       render(
         <SignedInWithQuery>
           <PlainMemoryRouter initialEntries={["/scenes?view=wall"]}>
-            <SearchControls
+            <ListControls
               artifactType="scene"
-              onQueryChange={vi.fn()}
               totalPages={1}
               totalCount={1}
-              supportsWallView
+              viewModes={[
+                { id: "grid", label: "Grid view" },
+                { id: "wall", label: "Wall view" },
+              ]}
               contextSettings={WALL_VIEW_SETTINGS}
             >
               <WallPlaybackProbe />
-            </SearchControls>
+            </ListControls>
           </PlainMemoryRouter>
         </SignedInWithQuery>
       );

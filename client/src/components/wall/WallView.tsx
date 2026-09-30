@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { RowsPhotoAlbum } from "react-photo-album";
 import "react-photo-album/rows.css";
+import { makeCompositeKey } from "../../utils/compositeKey";
+import EmptyState from "../ui/EmptyState";
 import WallItem from "./WallItem";
 import { DEFAULT_ZOOM, ZOOM_LEVELS, wallConfig } from "./wallConfig";
 
@@ -45,7 +47,11 @@ const WallView = ({
         src: config.getImageUrl(item) || "",
         width: baseWidth,
         height: baseHeight,
-        key: item.id as string,
+        // Two servers can hold the same id
+        key: makeCompositeKey(
+          item.id as string,
+          item.instanceId as string | undefined
+        ),
         // Pass original item for rendering
         _item: item,
       };
@@ -64,25 +70,7 @@ const WallView = ({
   }
 
   if (!items || items.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-center">
-          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-            {entityType === "scene"
-              ? "🎬"
-              : entityType === "gallery"
-                ? "🖼️"
-                : "📷"}
-          </div>
-          <h3
-            className="text-xl font-medium mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {emptyMessage}
-          </h3>
-        </div>
-      </div>
-    );
+    return <EmptyState title={emptyMessage} />;
   }
 
   return (

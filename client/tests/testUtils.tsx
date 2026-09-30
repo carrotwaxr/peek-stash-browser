@@ -142,6 +142,8 @@ interface ListPageOptions {
   defaultPresets?: Record<string, string>;
   /** Card display settings by entity type, over the defaults */
   cardSettings?: Record<string, Record<string, unknown>>;
+  /** The user's settings, over the server's defaults */
+  userSettings?: Parameters<typeof userSettingsResponse>[0];
 }
 
 /**
@@ -159,6 +161,7 @@ export const renderListPage = (
     presets = {},
     defaultPresets = {},
     cardSettings = {},
+    userSettings = {},
   }: ListPageOptions = {}
 ) => {
   const queryClient = new QueryClient({
@@ -170,7 +173,10 @@ export const renderListPage = (
   queryClient.setQueryData(queryKeys.user.defaultPresets(), {
     defaults: defaultPresets,
   });
-  queryClient.setQueryData(queryKeys.user.settings(), userSettingsResponse());
+  queryClient.setQueryData(
+    queryKeys.user.settings(),
+    userSettingsResponse(userSettings)
+  );
 
   const cardDisplay = {
     getSettings: (entityType: string) => ({

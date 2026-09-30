@@ -1,8 +1,8 @@
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import { ListControls } from "@tests/helpers/ListControls";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SearchControls from "../../../src/components/ui/SearchControls";
 
 type ApiMock = (...args: unknown[]) => Promise<unknown>;
 const mockApiGet = vi.fn<ApiMock>();
@@ -44,14 +44,9 @@ const renderPage = (client: QueryClient) =>
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/"]}>
-        <SearchControls
-          artifactType="scene"
-          onQueryChange={vi.fn()}
-          totalPages={1}
-          totalCount={0}
-        >
+        <ListControls artifactType="scene" totalPages={1} totalCount={0}>
           {null}
-        </SearchControls>
+        </ListControls>
       </MemoryRouter>
     </QueryClientProvider>
   );

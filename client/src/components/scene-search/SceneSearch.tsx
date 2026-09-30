@@ -1,468 +1,160 @@
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
-import { type LibrarySearchParams } from "../../api";
-import { useSceneList } from "../../api/hooks";
-import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
-import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags";
-import { useTableColumns } from "../../hooks/useTableColumns";
-import {
-  WALL_VIEW_SETTINGS,
-  useWallPlayback,
-} from "../../hooks/useWallPlayback";
-import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
-import { FolderView } from "../folder/index";
-import { ColumnConfigPopover, TableView } from "../table/index";
-import TimelineView from "../timeline/TimelineView";
-import {
-  ErrorMessage,
-  LibraryInitializingBanner,
-  PageHeader,
-  PageLayout,
-  SceneCard,
-  SearchControls,
-} from "../ui/index";
-import WallView from "../wall/WallView";
+import EntityListPage from "../list/EntityListPage";
+import type {
+  CardHandlers,
+  ListPageConfig,
+  ListPageData,
+  ListPageExtras,
+} from "../list/listPageConfigs";
+import { LIST_SOURCES } from "../list/listSources";
+import { viewModeOptions } from "../list/listViewModes";
+import { sceneTimelineAndFolderFilters } from "../list/viewFilters";
+import { SceneCard } from "../ui/index";
 import SceneGrid from "./SceneGrid";
 
-// View modes available for scene search
-const VIEW_MODES = [
-  { id: "grid", label: "Grid view" },
-  { id: "wall", label: "Wall view" },
-  { id: "table", label: "Table view" },
-  { id: "timeline", label: "Timeline view" },
-  { id: "folder", label: "Folder view" },
-] as const;
+type SceneCardScene = React.ComponentProps<typeof SceneCard>["scene"];
 
 /**
- * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the
- * search functionality of the Stash API to provide a consistent search experience across the app.
- *
- * It displays a search input, sorting & filtering options, and pagination controls. It also handles the logic for
- * performing searches and pagination. Consumers can optionally provide a title/header, permanent filters (for use on
- * a Performer, Studio, or Tag page for instance), and default sorting options.
+ * The scene list's own part: a card or wall tile opens the scene with the
+ * page's scenes as its playback queue. One handler for every card, the same
+ * across refetches, so memoised cards stay put.
  */
+function useSceneListPage({
+  items,
+  title,
+  fromPageTitle,
+}: ListPageData): ListPageExtras {
+  const navigate = useNavigate();
+  const { hasMultipleInstances } = useConfig();
+  // The handler reads the page's current scenes without changing identity
+  const itemsRef = useRef(items);
+  useLayoutEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const handleSceneClick = useCallback(
+    (scene: Record<string, unknown>) => {
+      // Navigate to video player page with scene data and virtual playlist context
+      const currentScenes = itemsRef.current;
+      const currentIndex = currentScenes.findIndex(
+        (s: Record<string, unknown>) =>
+          s.id === scene.id && s.instanceId === scene.instanceId
+      );
+
+      // Build navigation state
+      const navigationState: Record<string, unknown> = {
+        scene,
+        playlist: buildPlaybackQueue({
+          id: "virtual-grid",
+          name: title || "Scene Grid",
+          scenes: currentScenes as unknown as NormalizedScene[],
+          currentIndex: currentIndex >= 0 ? currentIndex : 0,
+        }),
+      };
+
+      // Only capture fromPageTitle if provided
+      if (fromPageTitle) {
+        navigationState.fromPageTitle = fromPageTitle;
+      }
+
+      void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
+        state: navigationState,
+      });
+    },
+    [navigate, hasMultipleInstances, title, fromPageTitle]
+  );
+
+  const cardHandlers = useMemo<CardHandlers>(
+    () => ({ onItemClick: handleSceneClick }),
+    [handleSceneClick]
+  );
+  return { cardHandlers };
+}
+
+/** The scene list: Scenes, and the Scenes tab of every detail page */
+const SCENE_LIST: ListPageConfig = {
+  entityType: "scene",
+  title: "Scenes",
+  subtitle: "Browse your complete scene library",
+  defaultSort: "o_counter",
+  viewModes: viewModeOptions("scene"),
+  source: LIST_SOURCES.scene,
+  renderCard: (item, { onHideSuccess, fromPageTitle }) => (
+    <SceneCard
+      scene={item as unknown as SceneCardScene}
+      onHideSuccess={onHideSuccess}
+      fromPageTitle={fromPageTitle}
+      tabIndex={0}
+    />
+  ),
+  // The grid with selection and bulk actions; every card gets the page's
+  // one click handler, not a closure per card
+  renderGrid: ({ items, loading, gridDensity, ctx, emptyMessage }) => (
+    <SceneGrid
+      scenes={items as unknown as NormalizedScene[]}
+      density={gridDensity}
+      loading={loading}
+      onSceneClick={
+        ctx.onItemClick as ((scene: NormalizedScene) => void) | undefined
+      }
+      onHideSuccess={ctx.onHideSuccess}
+      fromPageTitle={ctx.fromPageTitle}
+      emptyMessage={emptyMessage}
+      emptyDescription="Try adjusting your search filters"
+    />
+  ),
+  skeleton: { aspect: "landscape", heightRem: 5 },
+  wallPlaybackSetting: true,
+  viewFilters: sceneTimelineAndFolderFilters,
+  emptyMessage: "No scenes found",
+  usePage: useSceneListPage,
+};
+
 interface SceneSearchProps {
+  /** The preset context (scene, scene_performer, scene_tag, ...) */
   context?: string;
   initialSort?: string;
+  /** The page's own filters (a performer page's performer) */
   permanentFilters?: Record<string, Record<string, unknown>>;
+  /** Names for the page's own filters' chips */
   permanentFiltersMetadata?: Record<string, unknown>;
   subtitle?: string;
   title?: string;
   fromPageTitle?: string;
 }
 
+/**
+ * The scene list with its search, sort, filters and paging, its state in
+ * the URL: the Scenes page, and a detail page's Scenes tab, which fixes its
+ * own entity (`permanentFilters`) and preset context. The page sets the
+ * document title.
+ */
 const SceneSearch = ({
-  context, // Optional context for filter preset defaults (scene_performer, scene_tag, etc.)
-  initialSort = "o_counter",
-  permanentFilters = {},
-  permanentFiltersMetadata = {},
+  context,
+  initialSort,
+  permanentFilters,
+  permanentFiltersMetadata,
   subtitle,
   title,
   fromPageTitle,
-}: SceneSearchProps) => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { hasMultipleInstances } = useConfig();
-
-  const { wallPlayback } = useWallPlayback();
-
-  // Table columns hook for table view
-  const {
-    allColumns,
-    visibleColumns,
-    visibleColumnIds,
-    columnOrder,
-    toggleColumn,
-    hideColumn,
-    moveColumn,
-    getColumnConfig,
-  } = useTableColumns("scene");
-
-  const [queryParams, setQueryParams] =
-    useState<LibrarySearchParams<"scene"> | null>(null);
-  const queryClient = useQueryClient();
-  const {
-    data,
-    isLoading: queryLoading,
-    error,
-    isPlaceholderData,
-  } = useSceneList(queryParams);
-  // The library is on its first sync: the notice, not the error page
-  const initializing = isLibraryInitializing(error);
-  const isLoading = queryParams === null || queryLoading || initializing;
-
-  // Track current view mode for context settings
-  // Seeded from the URL; SearchControls reports each change, Back included
-  const [currentViewMode, setCurrentViewMode] = useState(
-    searchParams.get("view") || "grid"
-  );
-
-  // Extract filter IDs for timeline/folder views
-  const viewFilters = useMemo(() => {
-    const filters: Record<string, string> = {};
-
-    // Extract performer ID
-    const performerIds = permanentFilters.performers?.value as
-      | unknown[]
-      | undefined;
-    if (performerIds?.length) {
-      filters.performerId = String(performerIds[0]);
-    }
-
-    // Extract tag ID
-    const tagIds = permanentFilters.tags?.value as unknown[] | undefined;
-    if (tagIds?.length) {
-      filters.tagId = String(tagIds[0]);
-    }
-
-    // Extract studio ID
-    const studioIds = permanentFilters.studios?.value as unknown[] | undefined;
-    if (studioIds?.length) {
-      filters.studioId = String(studioIds[0]);
-    }
-
-    // Extract group ID
-    const groupIds = permanentFilters.groups?.value as unknown[] | undefined;
-    if (groupIds?.length) {
-      filters.groupId = String(groupIds[0]);
-    }
-
-    return Object.keys(filters).length > 0 ? filters : null;
-  }, [permanentFilters]);
-
-  // Fetch tags for folder view (only when folder view is active)
-  const {
-    tags: folderTags,
-    isLoading: tagsLoading,
-    error: folderTagsError,
-    refetch: refetchFolderTags,
-  } = useFolderViewTags(currentViewMode === "folder", viewFilters);
-  // A failed tree shows its error; the library's first sync counts as loading
-  const folderTagsFailed =
-    !!folderTagsError && !isLibraryInitializing(folderTagsError);
-
-  // Track timeline date filter for filtering by selected period
-  const [timelineDateFilter, setTimelineDateFilter] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-
-  // The open folder's tag as "id:instanceId", for filtering by selected folder
-  const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
-
-  // Merge timeline/folder filters into permanent filters based on view mode
-  const effectivePermanentFilters = useMemo(() => {
-    const filters: Record<string, unknown> = { ...permanentFilters };
-
-    // Add timeline date filter when in timeline view
-    if (currentViewMode === "timeline" && timelineDateFilter) {
-      filters.date = timelineDateFilter;
-    }
-
-    // Add folder tag filter when in folder view
-    // Use depth: 0 to get only scenes directly tagged with this folder (not children)
-    // Child folders are shown from tag hierarchy, scenes paginate separately
-    if (currentViewMode === "folder" && folderTagFilter) {
-      filters.tags = {
-        value: [folderTagFilter],
-        modifier: "INCLUDES",
-        depth: 0, // Exact tag match only - don't include child tags
-      };
-    }
-
-    return filters;
-  }, [permanentFilters, currentViewMode, timelineDateFilter, folderTagFilter]);
-
-  // Context settings only shown in wall view
-  const contextSettings = useMemo(() => {
-    return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
-  }, [currentViewMode]);
-
-  // Handle successful hide - remove the scene on that instance from cache
-  const handleHideSuccess = (
-    sceneId: string,
-    _entityType: string,
-    instanceId?: string
-  ) => {
-    if (!queryParams) return;
-    const hidden = makeCompositeKey(sceneId, instanceId);
-    const qk = queryKeys.scenes.list(
-      undefined,
-      (queryParams ?? {}) as Record<string, unknown>
-    );
-    queryClient.setQueryData(qk, (old: unknown) => {
-      if (!old || typeof old !== "object") return old;
-      const oldData = old as Record<string, unknown>;
-      const fs = oldData.findScenes as Record<string, unknown> | undefined;
-      if (!fs?.scenes) return old;
-      return {
-        ...oldData,
-        findScenes: {
-          ...fs,
-          scenes: (fs.scenes as Array<Record<string, unknown>>).filter(
-            (s) =>
-              makeCompositeKey(
-                s.id as string,
-                s.instanceId as string | undefined
-              ) !== hidden
-          ),
-          count: Math.max(0, ((fs.count as number) || 0) - 1),
-        },
-      };
-    });
-  };
-
-  const handleSceneClick = (scene: Record<string, unknown>) => {
-    // Navigate to video player page with scene data and virtual playlist context
-    const findScenes = (data as Record<string, unknown>)?.findScenes as
-      | Record<string, unknown>
-      | undefined;
-    const currentScenes =
-      (findScenes?.scenes as Record<string, unknown>[]) || [];
-    const currentIndex = currentScenes.findIndex(
-      (s: Record<string, unknown>) =>
-        s.id === scene.id && s.instanceId === scene.instanceId
-    );
-
-    // Build navigation state
-    const navigationState: Record<string, unknown> = {
-      scene,
-      playlist: buildPlaybackQueue({
-        id: "virtual-grid",
-        name: title || "Scene Grid",
-        scenes: currentScenes as unknown as NormalizedScene[],
-        currentIndex: currentIndex >= 0 ? currentIndex : 0,
-      }),
-    };
-
-    // Only capture fromPageTitle if provided
-    if (fromPageTitle) {
-      navigationState.fromPageTitle = fromPageTitle;
-    }
-
-    void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
-      state: navigationState,
-    });
-  };
-
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams<"scene">) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
-
-  const findScenesData = (data as Record<string, unknown>)?.findScenes as
-    | Record<string, unknown>
-    | undefined;
-  const currentScenes =
-    (findScenesData?.scenes as Record<string, unknown>[]) || [];
-
-  const totalCount = (findScenesData?.count as number) || 0;
-
-  // Track effective perPage from SearchControls state (fixes stale URL param bug)
-  const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page") || "24")
-  );
-  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
-
-  if (error && !initializing) {
-    return (
-      <PageLayout>
-        <PageHeader title={title ?? ""} subtitle={subtitle} />
-        <ErrorMessage error={error} />
-      </PageLayout>
-    );
-  }
-
-  return (
-    <PageLayout>
-      <PageHeader title={title ?? ""} subtitle={subtitle} />
-
-      <LibraryInitializingBanner />
-
-      <SearchControls
-        artifactType="scene"
-        isRefreshing={isPlaceholderData}
-        context={context}
-        initialSort={initialSort}
-        onQueryChange={handleQueryChange}
-        onPerPageStateChange={setEffectivePerPage}
-        permanentFilters={effectivePermanentFilters}
-        permanentFiltersMetadata={permanentFiltersMetadata}
-        deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        supportsWallView={true}
-        viewModes={
-          VIEW_MODES as unknown as React.ComponentProps<
-            typeof SearchControls
-          >["viewModes"]
-        }
-        currentTableColumns={getColumnConfig()}
-        tableColumnsPopover={
-          <ColumnConfigPopover
-            allColumns={allColumns}
-            visibleColumnIds={visibleColumnIds}
-            columnOrder={columnOrder}
-            onToggleColumn={toggleColumn}
-            onMoveColumn={moveColumn}
-          />
-        }
-        contextSettings={contextSettings}
-        onViewModeChange={setCurrentViewMode}
-      >
-        {
-          (({
-            viewMode,
-            zoomLevel,
-            gridDensity,
-            sortField,
-            sortDirection,
-            onSort,
-            timelinePeriod,
-            setTimelinePeriod,
-          }: {
-            viewMode: string;
-            zoomLevel: string;
-            gridDensity: string;
-            sortField: string;
-            sortDirection: string;
-            onSort: (field: string, direction: string) => void;
-            timelinePeriod: string | null;
-            setTimelinePeriod: (period: string | null) => void;
-          }) =>
-            viewMode === "table" ? (
-              <TableView
-                items={currentScenes}
-                columns={
-                  visibleColumns as React.ComponentProps<
-                    typeof TableView
-                  >["columns"]
-                }
-                sort={{
-                  field: sortField,
-                  direction: sortDirection as "ASC" | "DESC",
-                }}
-                onSort={
-                  onSort as React.ComponentProps<typeof TableView>["onSort"]
-                }
-                onHideColumn={hideColumn}
-                entityType="scene"
-                isLoading={isLoading}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : viewMode === "wall" ? (
-              <WallView
-                items={currentScenes}
-                entityType="scene"
-                zoomLevel={zoomLevel as "small" | "medium" | "large"}
-                playbackMode={wallPlayback}
-                onItemClick={handleSceneClick}
-                loading={isLoading}
-                emptyMessage="No scenes found"
-              />
-            ) : viewMode === "timeline" ? (
-              <TimelineView
-                entityType="scene"
-                items={currentScenes}
-                renderItem={(scene: Record<string, unknown>) => (
-                  <SceneCard
-                    key={scene.id as string}
-                    scene={
-                      scene as unknown as React.ComponentProps<
-                        typeof SceneCard
-                      >["scene"]
-                    }
-                    onHideSuccess={handleHideSuccess}
-                    fromPageTitle={fromPageTitle}
-                    tabIndex={0}
-                  />
-                )}
-                onItemClick={handleSceneClick}
-                onDateFilterChange={
-                  setTimelineDateFilter as unknown as React.ComponentProps<
-                    typeof TimelineView
-                  >["onDateFilterChange"]
-                }
-                onPeriodChange={setTimelinePeriod}
-                initialPeriod={
-                  timelinePeriod as React.ComponentProps<
-                    typeof TimelineView
-                  >["initialPeriod"]
-                }
-                loading={isLoading}
-                emptyMessage="No scenes found for this time period"
-                gridDensity={gridDensity}
-                filters={viewFilters}
-              />
-            ) : viewMode === "folder" && folderTagsFailed ? (
-              <ErrorMessage
-                error={folderTagsError}
-                onRetry={() => void refetchFolderTags()}
-              />
-            ) : viewMode === "folder" ? (
-              <FolderView
-                items={currentScenes}
-                tags={folderTags}
-                gridDensity={gridDensity}
-                loading={isLoading || tagsLoading}
-                emptyMessage="No scenes found"
-                onFolderPathChange={setFolderTagFilter}
-                filters={viewFilters}
-                renderItem={(scene: Record<string, unknown>) => (
-                  <SceneCard
-                    key={scene.id as string}
-                    scene={
-                      scene as unknown as React.ComponentProps<
-                        typeof SceneCard
-                      >["scene"]
-                    }
-                    onHideSuccess={handleHideSuccess}
-                    fromPageTitle={fromPageTitle}
-                    tabIndex={0}
-                  />
-                )}
-              />
-            ) : (
-              <SceneGrid
-                scenes={
-                  currentScenes as unknown as React.ComponentProps<
-                    typeof SceneGrid
-                  >["scenes"]
-                }
-                density={gridDensity}
-                loading={isLoading}
-                onSceneClick={
-                  handleSceneClick as unknown as React.ComponentProps<
-                    typeof SceneGrid
-                  >["onSceneClick"]
-                }
-                onHideSuccess={handleHideSuccess}
-                fromPageTitle={fromPageTitle}
-                emptyMessage="No scenes found"
-                emptyDescription="Try adjusting your search filters"
-                enableKeyboard={true}
-              />
-            )) as unknown as React.ReactNode
-        }
-      </SearchControls>
-    </PageLayout>
-  );
-};
+}: SceneSearchProps) => (
+  <EntityListPage
+    config={SCENE_LIST}
+    embed={{
+      context,
+      defaultSort: initialSort,
+      permanentFilters,
+      permanentFiltersMetadata,
+      title,
+      subtitle,
+      fromPageTitle,
+    }}
+  />
+);
 
 export default SceneSearch;

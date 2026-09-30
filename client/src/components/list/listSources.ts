@@ -6,25 +6,34 @@
  */
 import { useCallback } from "react";
 import { type UseQueryResult, useQueryClient } from "@tanstack/react-query";
-import type { LibrarySearchParams } from "../../api";
+import type {
+  ClipFilterParams,
+  GetClipsOptions,
+  LibrarySearchParams,
+} from "../../api";
 import {
+  useClipList,
   useGalleryList,
   useGroupList,
   useImageList,
   usePerformerList,
+  useSceneList,
   useStudioList,
   useTagList,
 } from "../../api/hooks";
 import { queryKeys } from "../../api/queryKeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import type { ListQuery } from "../../utils/listQuery";
 
 export type ListSourceEntity =
+  | "scene"
   | "performer"
   | "studio"
   | "group"
   | "tag"
   | "gallery"
-  | "image";
+  | "image"
+  | "clip";
 
 export type ListRequest = Record<string, unknown> | null;
 
@@ -40,13 +49,59 @@ export type CardHideHandler = (
 export interface ListSource {
   useList: (request: ListRequest) => UseQueryResult;
   listKey: (params: Record<string, unknown>) => readonly unknown[];
-  /** The response's key for the list ("findPerformers") */
-  result: string;
+  /**
+   * The response's key for the list ("findPerformers"); null when the rows
+   * and the total sit at its top level (clips)
+   */
+  result: string | null;
   /** The list's key for its rows ("performers") */
   items: string;
+  /** The list's key for its total; "count" unless named */
+  count?: string;
+  /**
+   * The request the list hook takes, from the list's query and the page's
+   * permanent filters; the query itself unless named
+   */
+  toRequest?: (
+    query: ListQuery,
+    permanentFilters: Record<string, unknown>
+  ) => Record<string, unknown>;
+}
+
+/**
+ * The clip list's request (`getClips`' flat options) from the list's query:
+ * its page, sort and search, every parameter the panel built
+ * (`buildClipFilter`), and the page's fixed scene
+ */
+export function clipRequestOf(
+  query: ListQuery,
+  permanentFilters: Record<string, unknown>
+): GetClipsOptions {
+  const { filter } = query;
+  const clipFilter: ClipFilterParams =
+    ("clip_filter" in query ? query.clip_filter : undefined) ?? {};
+  const sceneId = permanentFilters.sceneId;
+  return {
+    ...clipFilter,
+    page: filter.page,
+    perPage: filter.per_page,
+    sortBy: (filter.sort === ""
+      ? "stashCreatedAt"
+      : filter.sort) as GetClipsOptions["sortBy"],
+    sortDir: filter.direction === "ASC" ? "asc" : "desc",
+    ...(filter.q === "" ? {} : { q: filter.q }),
+    ...(typeof sceneId === "string" && sceneId !== "" ? { sceneId } : {}),
+  };
 }
 
 export const LIST_SOURCES: Record<ListSourceEntity, ListSource> = {
+  scene: {
+    useList: (request) =>
+      useSceneList(request as LibrarySearchParams<"scene"> | null),
+    listKey: (params) => queryKeys.scenes.list(undefined, params),
+    result: "findScenes",
+    items: "scenes",
+  },
   performer: {
     useList: (request) =>
       usePerformerList(request as LibrarySearchParams<"performer"> | null),
@@ -89,12 +144,33 @@ export const LIST_SOURCES: Record<ListSourceEntity, ListSource> = {
     result: "findImages",
     items: "images",
   },
+  clip: {
+    useList: (request) => useClipList(request as GetClipsOptions | null),
+    listKey: (params) => queryKeys.clips.list(params),
+    result: null,
+    items: "clips",
+    count: "total",
+    toRequest: (query, permanentFilters) =>
+      clipRequestOf(query, permanentFilters) as Record<string, unknown>,
+  },
 };
 
-type ListResponse = Record<
-  string,
-  { count?: number } & Record<string, unknown>
->;
+type ListResult = Record<string, unknown>;
+type ListResponse = Record<string, unknown>;
+
+/** The part of a response that holds the rows and the total */
+const listOf = (
+  source: ListSource,
+  data: ListResponse | undefined
+): ListResult | undefined =>
+  source.result === null
+    ? data
+    : (data?.[source.result] as ListResult | undefined);
+
+const countOf = (source: ListSource, list: ListResult | undefined): number => {
+  const count = list?.[source.count ?? "count"];
+  return typeof count === "number" ? count : 0;
+};
 
 const NO_ROWS: ListRow[] = [];
 
@@ -107,10 +183,10 @@ export function pickPage(
   source: ListSource,
   data: unknown
 ): { items: ListRow[]; count: number } {
-  const list = (data as ListResponse | undefined)?.[source.result];
+  const list = listOf(source, data as ListResponse | undefined);
   return {
     items: (list?.[source.items] as ListRow[] | undefined) ?? NO_ROWS,
-    count: list?.count ?? 0,
+    count: countOf(source, list),
   };
 }
 
@@ -130,19 +206,19 @@ export function useHideFromList(
       if (!request) return;
       const hidden = makeCompositeKey(entityId, instanceId);
       queryClient.setQueryData<ListResponse>(source.listKey(request), (old) => {
-        const current = old?.[source.result];
+        const current = listOf(source, old);
         const rows = current?.[source.items] as ListRow[] | undefined;
         if (!old || !current || !rows) return old;
         const kept = rows.filter((row) => rowKey(row) !== hidden);
         if (kept.length === rows.length) return old;
-        return {
-          ...old,
-          [source.result]: {
-            ...current,
-            [source.items]: kept,
-            count: Math.max(0, (current.count ?? 0) - 1),
-          },
+        const next = {
+          ...current,
+          [source.items]: kept,
+          [source.count ?? "count"]: Math.max(0, countOf(source, current) - 1),
         };
+        return source.result === null
+          ? next
+          : { ...old, [source.result]: next };
       });
     },
     [queryClient, source, request]

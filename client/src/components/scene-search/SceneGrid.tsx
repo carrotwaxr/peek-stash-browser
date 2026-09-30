@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import {
   LucideCheckSquare,
@@ -65,8 +65,8 @@ const SceneGrid = ({
   // Selection state (always enabled, no mode toggle)
   const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
 
-  // Selection handlers
-  const handleToggleSelect = (scene: NormalizedScene) => {
+  // Selection handlers; one toggle for every card, so memoised cards keep
+  const handleToggleSelect = useCallback((scene: NormalizedScene) => {
     // Two servers can hold the same scene id: a scene is its id on its server
     const isThis = (s: NormalizedScene) =>
       s.id === scene.id && s.instanceId === scene.instanceId;
@@ -78,7 +78,7 @@ const SceneGrid = ({
         return [...prev, scene];
       }
     });
-  };
+  }, []);
 
   const handleSelectAll = () => {
     setSelectedScenes(scenes || []);
@@ -128,22 +128,7 @@ const SceneGrid = ({
   }
 
   if (!scenes || scenes.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-center">
-          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-            🎬
-          </div>
-          <h3
-            className="text-xl font-medium mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {emptyMessage}
-          </h3>
-          <p style={{ color: "var(--text-secondary)" }}>{emptyDescription}</p>
-        </div>
-      </div>
-    );
+    return <EmptyState title={emptyMessage} description={emptyDescription} />;
   }
 
   return (
@@ -176,11 +161,8 @@ const SceneGrid = ({
           <SceneCard
             key={makeCompositeKey(scene.id, scene.instanceId)}
             scene={scene}
-            onClick={
-              selectedScenes.length === 0 && onSceneClick
-                ? () => onSceneClick(scene)
-                : undefined
-            }
+            // The page's one handler: the card calls it with its scene
+            onClick={selectedScenes.length === 0 ? onSceneClick : undefined}
             onHideSuccess={onHideSuccess}
             fromPageTitle={fromPageTitle}
             isSelected={selectedScenes.some(
