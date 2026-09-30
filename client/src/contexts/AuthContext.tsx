@@ -85,10 +85,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         credentials: "include",
       });
     } catch {
-      // Error logging out - clear auth state regardless
+      // Error logging out - the session is dropped locally regardless
     } finally {
-      setIsAuthenticated(false);
-      setUser(null);
+      // The auth state stays as it is: flipping it would make the route guard
+      // navigate in-app to /login and race the full load below. The load
+      // resets it, so a sign-out navigates once.
       // The next person to sign in on this browser gets neither this user's
       // page, playlist queue nor cached data. Nothing in the tab's session
       // storage outlives a sign-out. A full load also drops what components

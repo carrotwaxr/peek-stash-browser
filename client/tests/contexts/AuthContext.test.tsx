@@ -387,53 +387,43 @@ describe("logout()", () => {
     expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
   });
 
-  // 8. Successful logout
-  it("calls /api/auth/logout and clears user and isAuthenticated", async () => {
-    // Start authenticated
+  // The full load of /login resets all in-memory state. Flipping the auth
+  // state first would make the route guard navigate in-app to /login and race
+  // the full load (an E2E page.goto in between is interrupted).
+  it("navigates once: leaves the auth state alone so no in-app redirect races the full load", async () => {
     const { result } = renderWithAuth();
-
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-
     expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.user).toEqual(mockUser);
-
-    // Mock the logout call
     globalThis.fetch = vi.fn().mockImplementation(() => okResponse({}));
 
     await act(async () => {
       await result.current.logout();
     });
 
-    expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.user).toBeNull();
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.user).toEqual(mockUser);
+    expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
   });
 
-  // 9. Logout with network error clears state regardless
-  it("clears auth state even when logout fetch throws", async () => {
-    // Start authenticated
+  it("navigates once even when the logout request throws", async () => {
     const { result } = renderWithAuth();
-
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-
-    expect(result.current.isAuthenticated).toBe(true);
-
-    // Mock the logout call to throw
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
     await act(async () => {
       await result.current.logout();
     });
 
-    expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.user).toBeNull();
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
   });
 });
 
