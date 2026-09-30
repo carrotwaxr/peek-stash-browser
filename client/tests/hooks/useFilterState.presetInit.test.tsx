@@ -4,8 +4,8 @@
  * Validates that useFilterState correctly loads viewMode and perPage from
  * default presets. This is the data layer that SearchControls depends on.
  */
-import { MemoryRouter } from "react-router-dom";
 import { renderHook, waitFor } from "@testing-library/react";
+import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { apiGet } from "../../src/api";

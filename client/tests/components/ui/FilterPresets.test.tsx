@@ -7,7 +7,9 @@
  * - Setting default presets
  * - Deleting presets
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
+import type { RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { must } from "@tests/testUtils";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +28,19 @@ vi.mock("../../../src/api", () => ({
   apiPut: (...args: unknown[]) => mockApiPut(...args),
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
+
+// Presets come from the query cache, so every render needs a client
+const render = (ui: React.ReactElement, options?: RenderOptions) => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+    ...options,
+  });
+};
 
 // Mock window.confirm for delete confirmation
 const originalConfirm = window.confirm;
@@ -390,6 +405,61 @@ describe("FilterPresets", () => {
           })
         );
       });
+    });
+
+    it("saving a preset refetches the list once and shows the new preset", async () => {
+      const user = userEvent.setup();
+      let saved = false;
+      mockApiPost.mockImplementation(() => {
+        saved = true;
+        return Promise.resolve({});
+      });
+      mockApiGet.mockImplementation((url) => {
+        if (url === "/user/filter-presets") {
+          return Promise.resolve({
+            presets: {
+              scene: saved
+                ? [
+                    ...mockPresets,
+                    {
+                      id: "preset-3",
+                      name: "My Preset",
+                      filters: {},
+                      sort: "rating",
+                      direction: "DESC",
+                    },
+                  ]
+                : mockPresets,
+            },
+          });
+        }
+        return Promise.resolve({ defaults: {} });
+      });
+      const presetGets = () =>
+        mockApiGet.mock.calls.filter((c) => c[0] === "/user/filter-presets")
+          .length;
+
+      render(<FilterPresets {...defaultProps} />);
+      await waitFor(() => {
+        expect(presetGets()).toBe(1);
+      });
+
+      await user.click(must(screen.getByText("Save Preset").closest("button")));
+      await user.type(
+        screen.getByPlaceholderText("Enter preset name..."),
+        "My Preset"
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => {
+        expect(presetGets()).toBe(2);
+      });
+
+      await user.click(must(screen.getByText("Load Preset").closest("button")));
+      await waitFor(() => {
+        expect(screen.getByText("My Preset")).toBeInTheDocument();
+      });
+      expect(presetGets()).toBe(2);
     });
 
     it("closes dialog on Cancel", async () => {

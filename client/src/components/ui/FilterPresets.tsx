@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LucideBookmark,
   LucideChevronDown,
@@ -6,7 +7,14 @@ import {
   LucideSave,
   LucideTrash2,
 } from "lucide-react";
-import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
+import { apiDelete, apiPost, apiPut } from "../../api";
+import {
+  type SavedPreset,
+  invalidatePresets,
+  presetsForContext,
+  useDefaultPresets,
+  useFilterPresets,
+} from "../../api/hooks/usePresets";
 import Button from "./Button";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 
@@ -87,21 +95,12 @@ const FilterPresets = ({
 }: Props) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
-  interface Preset {
-    id: string;
-    name: string;
-    filters: Record<string, unknown>;
-    sort: string;
-    direction: string;
-    viewMode?: string;
-    zoomLevel?: string;
-    gridDensity?: string;
-    tableColumns?: Record<string, unknown> | null;
-    perPage?: number | null;
-  }
-
-  const [presets, setPresets] = useState<Preset[]>([]);
-  const [defaultPresetId, setDefaultPresetId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const presetsQuery = useFilterPresets();
+  const defaultsQuery = useDefaultPresets();
+  const presets = presetsForContext(presetsQuery.data, effectiveContext);
+  const defaultPresetId =
+    defaultsQuery.data?.defaults?.[effectiveContext] ?? null;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
@@ -109,43 +108,6 @@ const FilterPresets = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Fetch presets on mount
-  useEffect(() => {
-    void fetchPresets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only fetch once on mount, fetchPresets is stable
-
-  const fetchPresets = async () => {
-    try {
-      // Fetch both presets and default presets
-      const [presetsResponse, defaultsResponse] = await Promise.all([
-        apiGet("/user/filter-presets"),
-        apiGet("/user/default-presets"),
-      ]);
-
-      const allPresets =
-        ((presetsResponse as Record<string, unknown>)?.presets as Record<
-          string,
-          Preset[]
-        >) || {};
-      // Get presets for the artifact type (scene grid contexts use "scene" presets)
-      const presetArtifactType = effectiveContext.startsWith("scene_")
-        ? "scene"
-        : effectiveContext;
-      setPresets(allPresets[presetArtifactType] ?? []);
-
-      const defaults =
-        ((defaultsResponse as Record<string, unknown>)?.defaults as Record<
-          string,
-          string
-        >) || {};
-      // Get default for this specific context
-      setDefaultPresetId(defaults[effectiveContext] || null);
-    } catch (err) {
-      console.error("Error fetching filter presets:", err);
-    }
-  };
 
   const handleSavePreset = async () => {
     if (!presetName.trim()) {
@@ -185,8 +147,7 @@ const FilterPresets = ({
       setSetAsDefault(false);
       setIsSaveDialogOpen(false);
 
-      // Refresh presets
-      await fetchPresets();
+      await invalidatePresets(queryClient);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
@@ -197,7 +158,7 @@ const FilterPresets = ({
     }
   };
 
-  const handleLoadPreset = (preset: Preset) => {
+  const handleLoadPreset = (preset: SavedPreset) => {
     // Merge permanent filters back in when loading
     const mergedFilters = {
       ...preset.filters,
@@ -242,13 +203,13 @@ const FilterPresets = ({
         setSuccess(
           `"${presetName}" removed as default for ${getContextLabel(effectiveContext)}`
         );
-        setDefaultPresetId(null);
       } else {
         setSuccess(
           `"${presetName}" set as default for ${getContextLabel(effectiveContext)}!`
         );
-        setDefaultPresetId(presetId);
       }
+
+      await invalidatePresets(queryClient);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
@@ -271,8 +232,7 @@ const FilterPresets = ({
       await apiDelete(`/user/filter-presets/${artifactType}/${presetId}`);
       setSuccess(`Preset "${presetName}" deleted`);
 
-      // Refresh presets
-      await fetchPresets();
+      await invalidatePresets(queryClient);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);

@@ -9,8 +9,8 @@
  * parent (e.g., Tags.jsx). The parent's activeViewMode stays "grid", so
  * the hierarchy data fetch useEffect never triggers.
  */
-import { MemoryRouter } from "react-router-dom";
 import { render, waitFor } from "@testing-library/react";
+import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchControls from "../../../src/components/ui/SearchControls";
 

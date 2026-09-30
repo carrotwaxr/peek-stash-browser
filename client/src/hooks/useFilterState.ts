@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { apiGet } from "../api";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  defaultPresetsQueryOptions,
+  presetsForContext,
+  presetsQueryOptions,
+} from "../api/hooks/usePresets";
 import { buildSearchParams, parseSearchParams } from "../utils/urlParams";
 
 /**
@@ -42,6 +47,7 @@ export const useFilterState = ({
 }: UseFilterStateOptions = {}) => {
   const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const initializedRef = useRef(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef<FilterState | null>(null); // For capturing current state in debounced callbacks
@@ -82,34 +88,14 @@ export const useFilterState = ({
 
         // Load presets
         const [presetsRes, defaultsRes] = await Promise.all([
-          apiGet<{
-            presets: Record<
-              string,
-              Array<{
-                id: string;
-                name: string;
-                filters: Record<string, unknown>;
-                sort?: string;
-                direction?: string;
-                perPage?: number;
-                viewMode?: string;
-                zoomLevel?: string;
-                gridDensity?: string;
-                tableColumns?: Record<string, unknown> | null;
-              }>
-            >;
-          }>("/user/filter-presets"),
-          apiGet<{ defaults: Record<string, string> }>("/user/default-presets"),
+          queryClient.fetchQuery(presetsQueryOptions),
+          queryClient.fetchQuery(defaultPresetsQueryOptions),
         ]);
 
-        const allPresets = presetsRes?.presets || {};
         const defaults = defaultsRes?.defaults || {};
         const defaultPresetId = defaults[effectiveContext];
 
-        const presetArtifactType = effectiveContext.startsWith("scene_")
-          ? "scene"
-          : effectiveContext;
-        const presets = allPresets[presetArtifactType] ?? [];
+        const presets = presetsForContext(presetsRes, effectiveContext);
         const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
         // Parse URL params
