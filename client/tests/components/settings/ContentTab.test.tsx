@@ -139,4 +139,79 @@ describe("ContentTab", () => {
     expect(checkbox("Backup")).toBeEnabled();
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
   });
+
+  it("an empty saved selection shows every source checked, as the server reads it", async () => {
+    mockApiGet.mockResolvedValue({
+      ...TWO_SOURCES,
+      selectedInstanceIds: [],
+    });
+
+    renderTab();
+
+    await waitFor(() => {
+      expect(checkbox("Main")).toBeChecked();
+    });
+    expect(checkbox("Backup")).toBeChecked();
+  });
+
+  it("checking a source again adds it to the saved selection", async () => {
+    mockApiGet.mockResolvedValue({
+      ...TWO_SOURCES,
+      selectedInstanceIds: ["inst-1"],
+    });
+    mockApiPut.mockResolvedValue({ success: true });
+
+    renderTab();
+    await waitFor(() => {
+      expect(checkbox("Backup")).not.toBeChecked();
+    });
+    fireEvent.click(checkbox("Backup"));
+
+    await waitFor(() => {
+      expect(mockApiPut).toHaveBeenCalledWith("/user/stash-instances", {
+        instanceIds: ["inst-1", "inst-2"],
+      });
+    });
+    expect(checkbox("Backup")).toBeChecked();
+  });
+
+  it("the last checked source cannot be unchecked, and nothing is sent", async () => {
+    mockApiGet.mockResolvedValue({
+      ...TWO_SOURCES,
+      selectedInstanceIds: ["inst-1"],
+    });
+
+    renderTab();
+    await waitFor(() => {
+      expect(checkbox("Main")).toBeChecked();
+    });
+    fireEvent.click(checkbox("Main"));
+
+    expect(checkbox("Main")).toBeChecked();
+    expect(mockApiPut).not.toHaveBeenCalled();
+  });
+
+  it("shows no Content Sources when the list cannot be loaded", async () => {
+    mockApiGet.mockRejectedValue(new Error("offline"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderTab();
+
+    await waitFor(() => {
+      expect(errorSpy).toHaveBeenCalled();
+    });
+    expect(screen.queryByText("Content Sources")).not.toBeInTheDocument();
+    errorSpy.mockRestore();
+  });
+
+  it("an answer without a source list shows no Content Sources", async () => {
+    mockApiGet.mockResolvedValue({});
+
+    renderTab();
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith("/user/stash-instances");
+    });
+    expect(screen.queryByText("Content Sources")).not.toBeInTheDocument();
+  });
 });

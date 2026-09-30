@@ -678,4 +678,291 @@ describe("StashInstanceSection", () => {
       });
     });
   });
+  describe("Instance form", () => {
+    beforeEach(() => {
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+    });
+
+    const openAddForm = async () => {
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Add Instance")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Add Instance"));
+    };
+
+    it("refuses to save without a name and a URL, and sends nothing", async () => {
+      await openAddForm();
+
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+
+      expect(
+        await screen.findByText("Name and URL are required")
+      ).toBeInTheDocument();
+      expect(mockApiPost).not.toHaveBeenCalled();
+    });
+
+    it("shows the server's message when saving fails, and keeps the form", async () => {
+      mockApiPost.mockRejectedValue(new Error("URL already in use"));
+      await openAddForm();
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Dup" },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://dup:9999/graphql" } }
+      );
+
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+
+      expect(await screen.findByText("URL already in use")).toBeInTheDocument();
+      expect(screen.getByText("Add New Instance")).toBeInTheDocument();
+    });
+
+    it("falls back to a generic message when a failed save has none", async () => {
+      mockApiPost.mockRejectedValue(new Error(""));
+      await openAddForm();
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Dup" },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://dup:9999/graphql" } }
+      );
+
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+
+      expect(
+        await screen.findByText("Failed to save instance")
+      ).toBeInTheDocument();
+    });
+
+    it("Cancel closes the form and shows the list again", async () => {
+      await openAddForm();
+      expect(screen.getByText("Add New Instance")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Cancel"));
+
+      expect(screen.queryByText("Add New Instance")).not.toBeInTheDocument();
+      expect(screen.getByText("Test Stash")).toBeInTheDocument();
+    });
+
+    it("editing sends the API key only when a new one is typed", async () => {
+      mockApiPut.mockResolvedValue({});
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+      fireEvent.change(screen.getByPlaceholderText("Optional description"), {
+        target: { value: "" },
+      });
+
+      fireEvent.click(screen.getByText("Save Changes"));
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1",
+          {
+            name: "Test Stash",
+            description: null,
+            url: "http://localhost:9999/graphql",
+            uiUrl: null,
+            enabled: true,
+            priority: 0,
+          }
+        );
+      });
+    });
+
+    it("editing with a new API key sends it", async () => {
+      mockApiPut.mockResolvedValue({});
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+      fireEvent.change(screen.getByPlaceholderText("••••••••"), {
+        target: { value: "new-key" },
+      });
+
+      fireEvent.click(screen.getByText("Save Changes"));
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledTimes(1);
+      });
+      expect(mockApiPut.mock.calls[0]?.[1]).toMatchObject({
+        apiKey: "new-key",
+      });
+    });
+
+    it("Test Connection stays disabled while the URL is empty", async () => {
+      await openAddForm();
+      // The button is disabled with no URL, so type one and clear it again
+      const url = screen.getByPlaceholderText("http://localhost:9999/graphql");
+      fireEvent.change(url, { target: { value: "x" } });
+      fireEvent.change(url, { target: { value: "" } });
+
+      expect(screen.getByText("Test Connection")).toBeDisabled();
+      expect(mockApiPost).not.toHaveBeenCalled();
+    });
+
+    it("a successful test names Stash's version and sends the typed key", async () => {
+      mockApiPost.mockResolvedValue({ version: "0.25.0" });
+      await openAddForm();
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://test:9999/graphql" } }
+      );
+      fireEvent.change(screen.getByPlaceholderText("Your Stash API key"), {
+        target: { value: "secret" },
+      });
+
+      fireEvent.click(screen.getByText("Test Connection"));
+
+      expect(
+        await screen.findByText("Connected successfully! Stash version: 0.25.0")
+      ).toBeInTheDocument();
+      expect(mockApiPost).toHaveBeenCalledWith("/setup/test-stash-connection", {
+        url: "http://test:9999/graphql",
+        apiKey: "secret",
+      });
+    });
+
+    it("a successful test with no version says unknown", async () => {
+      mockApiPost.mockResolvedValue({});
+      await openAddForm();
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://test:9999/graphql" } }
+      );
+
+      fireEvent.click(screen.getByText("Test Connection"));
+
+      expect(
+        await screen.findByText(
+          "Connected successfully! Stash version: unknown"
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("a failed test shows the reason, and a reasonless one says Connection failed", async () => {
+      mockApiPost.mockRejectedValueOnce(new Error("401 Unauthorized"));
+      await openAddForm();
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://test:9999/graphql" } }
+      );
+
+      fireEvent.click(screen.getByText("Test Connection"));
+      expect(await screen.findByText("401 Unauthorized")).toBeInTheDocument();
+
+      mockApiPost.mockRejectedValueOnce(new Error(""));
+      fireEvent.click(screen.getByText("Test Connection"));
+      expect(await screen.findByText("Connection failed")).toBeInTheDocument();
+    });
+  });
+
+  describe("Instance list details", () => {
+    beforeEach(() => {
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
+    });
+
+    it("shows host and port for both URLs, or the raw text when it is not a URL", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          {
+            ...mockInstance,
+            url: "https://stash.example.com/graphql",
+            uiUrl: "http://ui.example.com:9998",
+          },
+          {
+            ...mockInstance,
+            id: "inst-2",
+            name: "Odd",
+            url: "not a url",
+            createdAt: null,
+            description: null,
+          },
+        ],
+      });
+
+      renderSection();
+
+      expect(
+        await screen.findByText("stash.example.com:443")
+      ).toBeInTheDocument();
+      expect(screen.getByText("→ ui.example.com:9998")).toBeInTheDocument();
+      expect(screen.getByText("not a url")).toBeInTheDocument();
+      expect(screen.getByText("Added: N/A")).toBeInTheDocument();
+      expect(screen.getByText("Test description")).toBeInTheDocument();
+    });
+
+    it("a disabled instance shows Disabled and offers Enable", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [{ ...mockInstance, enabled: false }],
+      });
+
+      renderSection();
+
+      expect(await screen.findByText("Disabled")).toBeInTheDocument();
+      expect(screen.getByText("Enable")).toBeInTheDocument();
+    });
+
+    it("an admin's list answering without instances shows the empty state", async () => {
+      mockApiGet.mockResolvedValue({});
+
+      renderSection();
+
+      expect(
+        await screen.findByText("No Stash Instance Configured")
+      ).toBeInTheDocument();
+    });
+
+    it("a failed load without a message says so", async () => {
+      mockApiGet.mockRejectedValue(new Error(""));
+
+      renderSection();
+
+      expect(
+        await screen.findByText("Failed to load Stash instances")
+      ).toBeInTheDocument();
+    });
+
+    it("a non-admin whose answer has no instance sees the empty state", async () => {
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "USER" },
+      });
+      mockApiGet.mockResolvedValue({});
+
+      renderSection();
+
+      expect(
+        await screen.findByText("No Stash Instance Configured")
+      ).toBeInTheDocument();
+    });
+
+    it("a failed delete without a message toasts a generic one", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [mockInstance, { ...mockInstance, id: "inst-2", name: "B" }],
+      });
+      mockApiDelete.mockRejectedValue(new Error(""));
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getAllByText("Delete").length).toBe(2);
+      });
+      fireEvent.click(must(screen.getAllByText("Delete")[0]));
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith("Failed to delete instance");
+      });
+    });
+  });
 });
