@@ -219,6 +219,8 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
           fromPageTitle={fromPageTitle}
           linkState={linkState}
           onClickOverride={wrappedNavigationClick}
+          // A card's own image content (a preview) draws the image
+          mediaInChildren={renderImageContent !== undefined}
         >
           {/* Custom image content (e.g., sprite preview) */}
           {renderImageContent?.()}

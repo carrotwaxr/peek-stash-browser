@@ -1,5 +1,10 @@
 import { type CSSProperties, type ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import {
+  useHoverCapable,
+  useSharedMediaQuery,
+} from "../../hooks/useHoverCapable";
+import { useInView } from "../../hooks/useInView";
 
 interface Props {
   children: ReactNode;
@@ -39,81 +44,41 @@ const MarqueeText = ({
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [overflowAmount, setOverflowAmount] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
-  const [isInView, setIsInView] = useState(false);
-  const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const hasHoverCapability = useHoverCapable();
+  const prefersReducedMotion = useSharedMediaQuery(
+    "(prefers-reduced-motion: reduce)"
+  );
+  // On a touch device the text scrolls while it is in view
+  const scrollsInView = autoplayOnScroll && !hasHoverCapability;
+  const isInView = useInView(containerRef, {
+    rootMargin: "-5% 0px",
+    threshold: [0, 0.5, 0.9, 1.0],
+    minRatio: 0.9,
+    skip: !scrollsInView,
+  });
+  const wantsToScroll =
+    !prefersReducedMotion && (scrollsInView ? isInView : isHovering);
 
-  // Detect hover capability
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover)");
-    setHasHoverCapability(mediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) =>
-      setHasHoverCapability(e.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // Detect reduced motion preference
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // Measure overflow on mount and when children change
+  // Measure the overflow (and follow resizes) only while the text would
+  // scroll: a grid of idle cards measures nothing
   useEffect(() => {
     const container = containerRef.current;
     const text = textRef.current;
-    if (!container || !text) return;
+    if (!wantsToScroll || !container || !text) return;
 
     const checkOverflow = () => {
-      const containerWidth = container.offsetWidth;
-      const textWidth = text.scrollWidth;
-      const overflow = textWidth - containerWidth;
-
+      const overflow = text.scrollWidth - container.offsetWidth;
       setIsOverflowing(overflow > 0);
       setOverflowAmount(overflow > 0 ? overflow : 0);
     };
 
     checkOverflow();
-
-    // Re-check on resize
     const resizeObserver = new ResizeObserver(checkOverflow);
     resizeObserver.observe(container);
-
     return () => resizeObserver.disconnect();
-  }, [children]);
+  }, [wantsToScroll, children]);
 
-  // IntersectionObserver for scroll-based autoplay
-  useEffect(() => {
-    if (!autoplayOnScroll || !containerRef.current || hasHoverCapability)
-      return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry) return;
-        setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.9);
-      },
-      {
-        threshold: [0, 0.5, 0.9, 1.0],
-        rootMargin: "-5% 0px",
-      }
-    );
-    observer.observe(containerRef.current);
-
-    return () => observer.disconnect();
-  }, [autoplayOnScroll, hasHoverCapability]);
-
-  // Derive animation state at render time instead of via effect
-  const isAnimating =
-    !prefersReducedMotion &&
-    isOverflowing &&
-    (autoplayOnScroll && !hasHoverCapability ? isInView : isHovering);
+  const isAnimating = wantsToScroll && isOverflowing;
 
   // Calculate animation duration based on overflow amount
   // Target: ~30 pixels/second for comfortable, relaxed reading
@@ -124,13 +89,12 @@ const MarqueeText = ({
 
   // Animation uses keyframes defined in index.css
   // CSS variable --marquee-distance is set per-instance for the scroll amount
-  const animationStyle =
-    isAnimating && isOverflowing
-      ? {
-          animation: `marquee-scroll ${totalDuration}s ease-in-out infinite`,
-          "--marquee-distance": `-${overflowAmount}px`,
-        }
-      : {};
+  const animationStyle = isAnimating
+    ? {
+        animation: `marquee-scroll ${totalDuration}s ease-in-out infinite`,
+        "--marquee-distance": `-${overflowAmount}px`,
+      }
+    : {};
 
   return (
     <div

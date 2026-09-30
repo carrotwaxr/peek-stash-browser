@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { getClipPreviewUrl } from "../../api";
+import { useHoverCapable } from "../../hooks/useHoverCapable";
+import { useInView } from "../../hooks/useInView";
 import type { Clip } from "./ClipCard";
 
 interface Props {
@@ -9,10 +11,13 @@ interface Props {
 
 const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const [isHovering, setIsHovering] = useState(false);
-  const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false);
-  const [containerElement, setContainerElement] =
-    useState<HTMLDivElement | null>(null);
+  const hasHoverCapability = useHoverCapable();
+  const containerRef = useRef<HTMLDivElement>(null);
+  // The screenshot loads once the card comes within 200px of the viewport
+  const shouldLoadScreenshot = useInView(containerRef, {
+    rootMargin: "200px",
+    once: true,
+  });
 
   // Get preview URLs (every clip from the API carries its instance)
   const previewUrl = clip.isGenerated
@@ -22,47 +27,13 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const screenshotUrl =
     clip.screenshotUrl || clip.scene?.pathScreenshot || null;
 
-  // Detect hover capability (mouse/trackpad vs touch-only)
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover)");
-    setHasHoverCapability(mediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setHasHoverCapability(e.matches);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // Lazy loading for screenshots - only load when card enters viewport
-  useEffect(() => {
-    if (!containerElement || shouldLoadScreenshot) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setShouldLoadScreenshot(true);
-          observer.disconnect();
-        }
-      },
-      {
-        rootMargin: "200px",
-        threshold: 0,
-      }
-    );
-    observer.observe(containerElement);
-
-    return () => observer.disconnect();
-  }, [containerElement, shouldLoadScreenshot]);
-
   const shouldShowVideo = isHovering && hasHoverCapability && previewUrl;
   const objectFitClass =
     objectFit === "cover" ? "object-cover" : "object-contain";
 
   return (
     <div
-      ref={setContainerElement}
+      ref={containerRef}
       className="w-full h-full relative overflow-hidden"
       onMouseEnter={() => hasHoverCapability && setIsHovering(true)}
       onMouseLeave={() => hasHoverCapability && setIsHovering(false)}

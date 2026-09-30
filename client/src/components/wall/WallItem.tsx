@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useInView } from "../../hooks/useInView";
 import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 
 interface WallItemConfig {
@@ -37,7 +38,6 @@ const WallItem = ({
   const containerRef = useRef<HTMLAnchorElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovering, setIsHovering] = useState(false);
-  const [isInView, setIsInView] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
@@ -63,24 +63,11 @@ const WallItem = ({
         )
       : getEntityPath(entityType, item, hasMultipleInstances);
 
-  // Intersection Observer for autoplay mode
-  useEffect(() => {
-    if (playbackMode !== "autoplay" || !hasPreview) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry) return;
-        setIsInView(entry.isIntersecting);
-      },
-      { threshold: 0.5 }
-    );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [playbackMode, hasPreview]);
+  // Autoplay mode plays the preview while half the tile is in view
+  const isInView = useInView(containerRef, {
+    threshold: 0.5,
+    skip: playbackMode !== "autoplay" || !hasPreview,
+  });
 
   // Video playback control
   useEffect(() => {

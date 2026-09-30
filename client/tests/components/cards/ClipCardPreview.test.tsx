@@ -15,11 +15,11 @@ beforeEach(() => {
     (callback: IntersectionObserverCallback) => {
       intersectionCallback = callback;
       return {
-        observe: vi.fn(() => {
+        observe: vi.fn((target: Element) => {
           // Trigger intersection asynchronously after observer is assigned
           queueMicrotask(() => {
             intersectionCallback(
-              [{ isIntersecting: true } as IntersectionObserverEntry],
+              [{ isIntersecting: true, target } as IntersectionObserverEntry],
               {} as IntersectionObserver
             );
           });

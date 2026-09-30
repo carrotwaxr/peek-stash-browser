@@ -174,7 +174,7 @@ describe("MarqueeText", () => {
   });
 
   describe("cleanup", () => {
-    it("cleans up ResizeObserver on unmount", () => {
+    it("measures nothing until hovered, and cleans up its ResizeObserver on unmount", () => {
       const disconnectMock = vi.fn();
       mockResizeObserver.mockImplementation(() => ({
         observe: vi.fn(),
@@ -183,8 +183,12 @@ describe("MarqueeText", () => {
       }));
 
       const { unmount } = render(<MarqueeText>Test</MarqueeText>);
-      unmount();
+      expect(mockResizeObserver).not.toHaveBeenCalled();
 
+      fireEvent.mouseEnter(must(screen.getByText("Test").parentElement));
+      expect(mockResizeObserver).toHaveBeenCalledTimes(1);
+
+      unmount();
       expect(disconnectMock).toHaveBeenCalled();
     });
 
