@@ -103,4 +103,40 @@ describe("ThemeProvider", () => {
       isCustom: true,
     });
   });
+
+  it("changeTheme right after refreshCustomThemes accepts the new key", async () => {
+    mockGet.mockResolvedValue({ themes: [] });
+    const { result } = renderTheme(
+      createAuthValue({ isAuthenticated: true, isLoading: false })
+    );
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    // The server now has the theme; the same tick that refreshes it selects it
+    mockGet.mockResolvedValue({ themes: [customTheme] });
+    await act(async () => {
+      await result.current.refreshCustomThemes();
+      result.current.changeTheme("custom-7");
+    });
+
+    expect(result.current.currentTheme).toBe("custom-7");
+    expect(localStorage.getItem("app-theme")).toBe("custom-7");
+  });
+
+  it("still refuses a key no theme has", async () => {
+    const { result } = renderTheme(
+      createAuthValue({ isAuthenticated: true, isLoading: false })
+    );
+    await waitFor(() => {
+      expect(result.current.customThemes).toEqual([customTheme]);
+    });
+
+    act(() => {
+      result.current.changeTheme("custom-99");
+    });
+
+    expect(result.current.currentTheme).not.toBe("custom-99");
+    expect(localStorage.getItem("app-theme")).toBeNull();
+  });
 });

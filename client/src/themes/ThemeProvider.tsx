@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { apiGet } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -12,12 +12,37 @@ import {
   generateThemeCSSVars,
 } from "./themes";
 
+const builtIns = builtInThemes as Record<string, ThemeDefinition>;
+
+/** The built-in themes plus the user's custom ones, keyed `custom-<id>` */
+const mergeThemes = (
+  customThemes: CustomTheme[]
+): Record<string, ThemeDefinition> => {
+  const merged: Record<string, ThemeDefinition> = { ...builtIns };
+  customThemes.forEach((customTheme) => {
+    merged[`custom-${customTheme.id}`] = {
+      name: customTheme.name,
+      properties: generateThemeCSSVars(customTheme.config),
+      isCustom: true,
+      id: customTheme.id,
+    };
+  });
+  return merged;
+};
+
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
-  const [allThemes, setAllThemes] = useState<Record<string, ThemeDefinition>>(
-    builtInThemes as Record<string, ThemeDefinition>
-  );
+  const [allThemes, setAllThemesState] =
+    useState<Record<string, ThemeDefinition>>(builtIns);
+  // What changeTheme validates against: set with the state, so a caller that
+  // awaits refreshCustomThemes and then selects the new key in the same tick
+  // does not read the closure of the render before the refresh.
+  const allThemesRef = useRef(allThemes);
+  const setAllThemes = (next: Record<string, ThemeDefinition>) => {
+    allThemesRef.current = next;
+    setAllThemesState(next);
+  };
 
   const [currentTheme, setCurrentTheme] = useState(() => {
     // Load theme from localStorage or use default
@@ -32,7 +57,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     if (authLoading) return;
     if (!isAuthenticated) {
       setCustomThemes([]);
-      setAllThemes(builtInThemes as Record<string, ThemeDefinition>);
+      setAllThemes(builtIns);
       return;
     }
 
@@ -47,25 +72,12 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         const themes = data.themes ?? [];
         setCustomThemes(themes);
 
-        // Merge built-in themes with custom themes
-        const merged: Record<string, ThemeDefinition> = {
-          ...(builtInThemes as Record<string, ThemeDefinition>),
-        };
-        themes.forEach((customTheme) => {
-          const key = `custom-${customTheme.id}`;
-          merged[key] = {
-            name: customTheme.name,
-            properties: generateThemeCSSVars(customTheme.config),
-            isCustom: true,
-            id: customTheme.id,
-          };
-        });
-        setAllThemes(merged);
+        setAllThemes(mergeThemes(themes));
       } catch (error) {
         if (cancelled) return;
         // If the API call fails, just use built-in themes
         console.error("Failed to load custom themes:", error);
-        setAllThemes(builtInThemes as Record<string, ThemeDefinition>);
+        setAllThemes(builtIns);
       }
     };
 
@@ -76,7 +88,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isAuthenticated, authLoading]);
 
   const changeTheme = (themeKey: string) => {
-    if (allThemes[themeKey]) {
+    if (allThemesRef.current[themeKey]) {
       setCurrentTheme(themeKey);
       localStorage.setItem("app-theme", themeKey);
     }
@@ -90,20 +102,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       const themes = data.themes ?? [];
       setCustomThemes(themes);
 
-      // Merge built-in themes with custom themes
-      const merged: Record<string, ThemeDefinition> = {
-        ...(builtInThemes as Record<string, ThemeDefinition>),
-      };
-      themes.forEach((customTheme) => {
-        const key = `custom-${customTheme.id}`;
-        merged[key] = {
-          name: customTheme.name,
-          properties: generateThemeCSSVars(customTheme.config),
-          isCustom: true,
-          id: customTheme.id,
-        };
-      });
-      setAllThemes(merged);
+      setAllThemes(mergeThemes(themes));
     } catch (error) {
       console.error("Failed to refresh custom themes:", error);
     }
@@ -121,9 +120,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       });
     } else {
       // Fallback to built-in theme if custom theme not loaded yet
-      const builtIn = (builtInThemes as Record<string, ThemeDefinition>)[
-        currentTheme
-      ];
+      const builtIn = builtIns[currentTheme];
       if (builtIn) {
         Object.entries(builtIn.properties).forEach(([property, value]) => {
           root.style.setProperty(property, value);
