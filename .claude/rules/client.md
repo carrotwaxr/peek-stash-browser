@@ -22,6 +22,7 @@ paths:
 - After a hide, bulk hide, restore or Restore All, `useHiddenEntities` calls `invalidateExclusionDependents` (library queries, Recommended, stats; Hidden Items marked stale, not refetched). `invalidateInstanceQueries` calls it too. A new query that shows the user's visible set belongs under a root the library predicate matches, or in that helper.
 - `logout` removes the post-login redirect, clears the query cache and does a full load of /login.
 - Detail pages take their tab counts from `useRelationCounts` (the tabs show `TAB_COUNT_LOADING` and none opens until it answers) and filter, read and count on the loaded entity's `instanceId`, never the URL's `instance` param (a bare-id link has none).
+- Every write component and API call takes the entity's `instanceId` as a required string (`hideEntity`, `EntityMenu`, `libraryApi.updateRating`/`updateFavorite`, `useHideBulkAction`). A cache update for a list row matches by `makeCompositeKey(id, instanceId)`, never the bare id.
 
 ## useFilterState
 
