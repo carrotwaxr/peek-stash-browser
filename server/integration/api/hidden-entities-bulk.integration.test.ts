@@ -100,9 +100,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.data.error).toBe("entities[1]: instanceId is required");
 
       const hidden = await testUserClient.get<{
-        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+        items: Array<{ entityType: string; entityId: string }>;
       }>("/api/user/hidden-entities?entityType=tag");
-      expect(hidden.data.hiddenEntities.map((e) => e.entityId)).not.toContain(
+      expect(hidden.data.items.map((e) => e.entityId)).not.toContain(
         TEST_ENTITIES.tagWithEntities
       );
     });
@@ -208,9 +208,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.data.error).toBe("entities[1]: Not found");
 
       const hidden = await testUserClient.get<{
-        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+        items: Array<{ entityType: string; entityId: string }>;
       }>("/api/user/hidden-entities?entityType=tag");
-      expect(hidden.data.hiddenEntities.map((e) => e.entityId)).not.toContain(
+      expect(hidden.data.items.map((e) => e.entityId)).not.toContain(
         TEST_ENTITIES.tagWithEntities
       );
     });
@@ -239,12 +239,12 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
       // Then, fetch hidden entities
       const response = await testUserClient.get<{
-        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+        items: Array<{ entityType: string; entityId: string }>;
       }>("/api/user/hidden-entities?entityType=scene");
 
       expect(response.ok).toBe(true);
 
-      const hiddenIds = response.data.hiddenEntities.map((e) => e.entityId);
+      const hiddenIds = response.data.items.map((e) => e.entityId);
       expect(hiddenIds).toContain(sceneId1);
       expect(hiddenIds).toContain(sceneId2);
     });
