@@ -29,6 +29,15 @@ html.tv-mode [data-tv-item]:focus-visible::before {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* A tag tree row spans the page: no zoom (it would overflow the page) and no
+   border (it would shift the row); the ring is an outline */
+html.tv-mode [role="treeitem"][data-tv-item]:focus-visible {
+  transform: none !important;
+  border: none !important;
+  outline: 3px solid var(--focus-ring-color) !important;
+  outline-offset: 2px;
+}
+
 html.tv-mode :focus-visible:not([data-tv-item]) {
   outline: 3px solid var(--focus-ring-color) !important;
   outline-offset: 2px;
