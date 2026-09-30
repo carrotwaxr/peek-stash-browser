@@ -40,6 +40,7 @@ import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { entityImageCountService } from "../../services/EntityImageCountService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { linkCountService } from "../../services/LinkCountService.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
@@ -1038,6 +1039,56 @@ async function imageState(
   };
 }
 
+/** A count column of one row, as stored. */
+async function countColumn(
+  table: string,
+  column: string,
+  instanceId: string,
+  id: string = ID
+): Promise<number> {
+  const [row] = await prisma.$queryRawUnsafe<Array<{ n: number | bigint }>>(
+    `SELECT "${column}" AS n FROM "${table}" WHERE "id" = ? AND "stashInstanceId" = ?`,
+    id,
+    instanceId
+  );
+  return Number(must(row, `${table} ${id} on ${instanceId}`).n);
+}
+
+/** Sets a count column of row `id` on both instances, as a lagging Stash number would. */
+async function setCountColumn(
+  table: string,
+  column: string,
+  n: number,
+  id: string = ID
+): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `UPDATE "${table}" SET "${column}" = ? WHERE "id" = ? AND "stashInstanceId" IN (?, ?)`,
+    n,
+    id,
+    ...INSTANCES
+  );
+}
+
+/**
+ * Every live performer in the database whose sceneCount is not its live
+ * ScenePerformer rows, as "id:instance".
+ */
+async function performersOffTheirScenes(): Promise<string[]> {
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ id: string; instanceId: string }>
+  >(
+    `SELECT p."id" AS id, p."stashInstanceId" AS instanceId
+     FROM "StashPerformer" p
+     WHERE p."deletedAt" IS NULL AND p."sceneCount" != (
+       SELECT COUNT(*) FROM "ScenePerformer" sp
+       JOIN "StashScene" s ON s."id" = sp."sceneId" AND s."stashInstanceId" = sp."sceneInstanceId"
+       WHERE sp."performerId" = p."id" AND sp."performerInstanceId" = p."stashInstanceId"
+         AND s."deletedAt" IS NULL
+     )`
+  );
+  return rows.map((row) => `${row.id}:${row.instanceId}`);
+}
+
 type Step = MockInstance<() => Promise<void>>;
 
 /** The message texts logged at info level. */
@@ -1054,6 +1105,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
     >;
     gallery: Step;
     imageCounts: Step;
+    linkCounts: MockInstance<typeof linkCountService.rebuildLinkCounts>;
     stats: Step;
     tagCounts: Step;
   };
@@ -1131,6 +1183,9 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       imageCounts: vi
         .spyOn(entityImageCountService, "rebuildAllImageCounts")
         .mockResolvedValue(undefined),
+      linkCounts: vi
+        .spyOn(linkCountService, "rebuildLinkCounts")
+        .mockResolvedValue({}),
       stats: vi
         .spyOn(userStatsService, "rebuildAllStats")
         .mockResolvedValue(undefined),
@@ -1162,6 +1217,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 0,
       gallery: 0,
       imageCounts: 0,
+      linkCounts: 0,
       stats: 0,
       tagCounts: 0,
     });
@@ -1194,6 +1250,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 1,
       gallery: 0,
       imageCounts: 1,
+      linkCounts: 1,
       stats: 1,
       tagCounts: 1,
     });
@@ -1227,6 +1284,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 0,
       gallery: 1,
       imageCounts: 0,
+      linkCounts: 0,
       stats: 0,
       tagCounts: 0,
     });
@@ -1245,6 +1303,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 1,
       gallery: 1,
       imageCounts: 1,
+      linkCounts: 1,
       stats: 1,
       tagCounts: 1,
     });
@@ -1279,6 +1338,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 0,
       gallery: 0,
       imageCounts: 0,
+      linkCounts: 0,
       stats: 0,
       tagCounts: 0,
     });
@@ -1301,6 +1361,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       sceneTags: 0,
       gallery: 0,
       imageCounts: 1,
+      linkCounts: 1,
       stats: 1,
       tagCounts: 1,
     });
@@ -1523,6 +1584,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
         sceneTags: 1,
         gallery: 1,
         imageCounts: 1,
+        linkCounts: 1,
         stats: 1,
         tagCounts: 1,
       });
@@ -1656,6 +1718,80 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
         "3": ["3"],
         "4": ["3"],
       });
+    }, 60_000);
+
+    it("a scene gaining a performer counts toward the card count of the tag it now inherits, on its own instance only", async () => {
+      steps.linkCounts.mockRestore();
+      const lib = inheritanceLibrary();
+      // Scene 1 gains performer 2, who carries tag 3
+      const scene: SyncScene = {
+        ...must(lib.scene[0]),
+        performers: [
+          partialRow<SyncScene["performers"][number]>({ id: ID }),
+          partialRow<SyncScene["performers"][number]>({ id: "2" }),
+        ],
+        updated_at: LATER_AT,
+      };
+      stubInstances({ [PC_A]: { all: lib, updated: { scene: [scene] } } });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsOf(PC_A, ID)).toEqual(["3"]);
+      // The other scenes' lists hold UNTOUCHED, so scene 1 is tag 3's only
+      // scene, as the scene list's tag filter reads the lists
+      expect(await countColumn("StashTag", "sceneCountAll", PC_A, "3")).toBe(1);
+      expect(await countColumn("StashTag", "sceneCountAll", PC_B, "3")).toBe(0);
+    }, 60_000);
+
+    it("a collection moving to another studio moves its count from the old studio to the new one", async () => {
+      steps.linkCounts.mockRestore();
+      await prisma.stashStudio.create({
+        data: {
+          id: "2",
+          stashInstanceId: PC_A,
+          stashUpdatedAt: UPDATED_AT,
+          name: "PostSync IT studio 2",
+        },
+      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "StashStudio" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
+        UPDATED_AT,
+        PC_A
+      );
+      await prisma.stashGroup.update({
+        where: { id_stashInstanceId: { id: ID, stashInstanceId: PC_A } },
+        data: { studioId: ID },
+      });
+      await setCountColumn("StashStudio", "groupCount", 1);
+      const lib = inheritanceLibrary();
+      const moved: SyncGroup = {
+        ...groupRow(["3"]),
+        studio: partialRow({ id: "2" }),
+      };
+      stubInstances({
+        [PC_A]: {
+          all: {
+            ...lib,
+            studio: [
+              ...lib.studio,
+              {
+                ...studioRow([], UPDATED_AT),
+                id: "2",
+                name: "PostSync IT studio 2",
+              },
+            ],
+            group: [moved],
+          },
+          updated: { group: [moved] },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await countColumn("StashStudio", "groupCount", PC_A, ID)).toBe(0);
+      expect(await countColumn("StashStudio", "groupCount", PC_A, "2")).toBe(1);
+      // pc-b's studio 1 did not move
+      expect(await countColumn("StashStudio", "groupCount", PC_B, ID)).toBe(1);
     }, 60_000);
   });
 
@@ -1894,6 +2030,98 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       });
       // pc-b had no change, and its counts were rebuilt all the same
       expect(await imageCountsOf(PC_B)).toEqual(SEEDED_COUNTS);
+    }, 60_000);
+  });
+
+  describe("link counts", () => {
+    beforeEach(() => {
+      // Real here: the stored counts are what these tests check
+      steps.linkCounts.mockRestore();
+      steps.linkCounts = vi.spyOn(linkCountService, "rebuildLinkCounts");
+    });
+
+    it("after a full sync, every performer's sceneCount equals its live ScenePerformer rows", async () => {
+      // A count Stash left behind its junction rows, on both instances
+      await setCountColumn("StashPerformer", "sceneCount", 99);
+      stubInstances({ [PC_A]: { all: library() } });
+
+      await stashSyncService.fullSync(PC_A);
+
+      expect(await countColumn("StashPerformer", "sceneCount", PC_A)).toBe(1);
+      // A full pass recounts the whole library, every instance
+      expect(await countColumn("StashPerformer", "sceneCount", PC_B)).toBe(1);
+      expect(await performersOffTheirScenes()).toEqual([]);
+    }, 60_000);
+
+    it("an incremental sync recounts what its changes reach, on their instance only", async () => {
+      await setCountColumn("StashPerformer", "sceneCount", 99);
+      await setCountColumn("StashTag", "sceneCountAll", 99);
+      stubInstances({
+        [PC_A]: { all: library(), updated: { scene: [updatedScene()] } },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await countColumn("StashPerformer", "sceneCount", PC_A)).toBe(1);
+      expect(await countColumn("StashTag", "sceneCountAll", PC_A)).toBe(1);
+      expect(await countColumn("StashPerformer", "sceneCount", PC_B)).toBe(99);
+      expect(await countColumn("StashTag", "sceneCountAll", PC_B)).toBe(99);
+    }, 60_000);
+
+    it("an incremental performer update keeps the live counts instead of Stash's", async () => {
+      const performer = {
+        ...must(library().performer[0]),
+        scene_count: 7,
+        gallery_count: 7,
+        group_count: 7,
+        updated_at: LATER_AT,
+      };
+      stubInstances({
+        [PC_A]: { all: library(), updated: { performer: [performer] } },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      // Scene 1 and gallery 1; no collection
+      for (const [column, n] of [
+        ["sceneCount", 1],
+        ["galleryCount", 1],
+        ["groupCount", 0],
+      ] as const) {
+        expect(await countColumn("StashPerformer", column, PC_A)).toBe(n);
+      }
+    }, 60_000);
+
+    it("a scene Stash no longer has lowers the counts of its performer and tag", async () => {
+      // Scene 2, on performer 1 and tag 1, is gone from Stash
+      await seedGoneScene(PC_A);
+      await prisma.scenePerformer.create({
+        data: {
+          sceneId: "2",
+          sceneInstanceId: PC_A,
+          performerId: ID,
+          performerInstanceId: PC_A,
+        },
+      });
+      await prisma.sceneTag.create({
+        data: {
+          sceneId: "2",
+          sceneInstanceId: PC_A,
+          tagId: ID,
+          tagInstanceId: PC_A,
+        },
+      });
+      await setCountColumn("StashPerformer", "sceneCount", 2);
+      await setCountColumn("StashTag", "sceneCount", 2);
+      await setCountColumn("StashTag", "sceneCountAll", 2);
+      stubInstances({ [PC_A]: { all: library() } });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await countColumn("StashPerformer", "sceneCount", PC_A)).toBe(1);
+      expect(await countColumn("StashTag", "sceneCount", PC_A)).toBe(1);
+      expect(await countColumn("StashTag", "sceneCountAll", PC_A)).toBe(1);
+      expect(await countColumn("StashPerformer", "sceneCount", PC_B)).toBe(2);
     }, 60_000);
   });
 

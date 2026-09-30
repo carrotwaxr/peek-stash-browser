@@ -220,6 +220,8 @@ export interface TagQueryRow {
   groupCount: number | null;
   sceneMarkerCount: number | null;
   sceneCountViaPerformers: number | null;
+  /** Live scenes tagged directly or inheriting the tag, each once */
+  sceneCountAll: number;
   description: string | null;
   aliases: string | null; // JSON-encoded string[]
   parentIds: string | null; // JSON-encoded string[]

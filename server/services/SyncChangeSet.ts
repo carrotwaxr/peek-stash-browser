@@ -52,7 +52,7 @@ export interface BatchChanges {
   changed: EntityRef[];
   /** Old and new far sides of the changed entities, per junction */
   farSides: Partial<Record<JunctionName, EntityRef[]>>;
-  /** Old and new studio of changed scenes, images and galleries */
+  /** Old and new studio of changed scenes, images, galleries and collections */
   studioIds: EntityRef[];
   /** Performers, studios and groups whose tag set differs */
   tagSetChanged: EntityRef[];
@@ -413,7 +413,7 @@ export class SyncChangeSet {
     return this.farSidesByJunction.get(junction) ?? NOTHING;
   }
 
-  /** Old and new studios of changed scenes, images and galleries. */
+  /** Old and new studios of changed scenes, images, galleries and collections. */
   studios(): RefScope {
     return this.studioRefs;
   }

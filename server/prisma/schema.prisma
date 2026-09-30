@@ -874,8 +874,10 @@ model StashTag {
   favorite Boolean @default(false)
   color    String? // Hex color from Stash (e.g., "#ff0000")
 
-  // === Counts (synced from Stash) ===
-  sceneCount       Int @default(0)
+  // === Counts: Peek's live link counts (LinkCountService; Stash's on
+  // insert only). imageCount includes gallery inheritance; the marker count
+  // stays Stash's ===
+  sceneCount       Int @default(0) // Live scenes tagged directly
   imageCount       Int @default(0)
   galleryCount     Int @default(0)
   performerCount   Int @default(0)
@@ -885,6 +887,7 @@ model StashTag {
 
   // === Computed counts (calculated after sync) ===
   sceneCountViaPerformers Int @default(0) // Scenes where a performer has this tag
+  sceneCountAll           Int @default(0) // The card's: live scenes tagged directly or inheriting the tag, each once
 
   // === Extended fields ===
   description String? // Tag description

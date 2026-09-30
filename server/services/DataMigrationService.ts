@@ -4,6 +4,7 @@ import { logger } from "../utils/logger.js";
 import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
+import { linkCountService } from "./LinkCountService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashSyncService } from "./StashSyncService.js";
 import {
@@ -554,6 +555,24 @@ const migrations: Migration[] = [
         `${MIGRATION_009} Cleaned saved filter presets and carousel rules`,
         { ...summary }
       );
+    },
+  },
+  // The card counts become Peek's live link counts (item 36): sync stopped
+  // overwriting them with Stash's numbers, whose entity counts lag the
+  // junction rows, and StashTag.sceneCountAll (migration 20260930000200)
+  // holds the old card number until counted. After the startup sync, like
+  // every entry, so the counts are of the synced library
+  {
+    name: "010_rebuild_link_counts",
+    description:
+      "Count every performer's, studio's, tag's, collection's and gallery's links from the synced library, so each card shows what the page behind it lists",
+    run: async () => {
+      const startTime = Date.now();
+      const written = await linkCountService.rebuildLinkCounts("all");
+      logger.info("[Migration 010] Rebuilt the link counts", {
+        durationMs: Date.now() - startTime,
+        written,
+      });
     },
   },
 ];

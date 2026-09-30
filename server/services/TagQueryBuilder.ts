@@ -55,7 +55,7 @@ import {
 const SELECT_COLUMNS = `
     t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
     t.sceneCount, t.imageCount, t.galleryCount, t.performerCount, t.studioCount, t.groupCount, t.sceneMarkerCount,
-    t.sceneCountViaPerformers,
+    t.sceneCountViaPerformers, t.sceneCountAll,
     t.description, t.aliases, t.parentIds, t.imagePath,
     t.stashCreatedAt, t.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -77,9 +77,12 @@ const TAG_SPEC: EntitySpec = {
     field === "name" ? undefined : "t.name COLLATE NOCASE ASC",
 };
 
-/** The scene count the card shows: the larger of the direct and via-performer counts */
-const SCENE_COUNT =
-  "MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0))";
+/**
+ * The scene count the card shows: the live scenes tagged directly or
+ * inheriting the tag, each once, as the scene list's tag filter matches them
+ * (LinkCountService)
+ */
+const SCENE_COUNT = "t.sceneCountAll";
 
 /** A junction holding the tag and another entity (a performer's tags) */
 const tagJunction = (
@@ -347,8 +350,9 @@ class TagQueryBuilder extends EntityQueryBuilder<
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),
 
-      // Counts: the larger of the direct and via-performer scene counts
-      scene_count: Math.max(directSceneCount, performerSceneCount),
+      // Counts: the card's scene count is the tag's Scenes tab (direct or
+      // inherited, each scene once), beside its two parts
+      scene_count: row.sceneCountAll,
       scene_count_direct: directSceneCount,
       scene_count_via_performers: performerSceneCount,
       image_count: row.imageCount ?? 0,

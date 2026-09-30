@@ -10,6 +10,7 @@ import prisma from "../../prisma/singleton.js";
 import { entityImageCountService } from "../../services/EntityImageCountService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { linkCountService } from "../../services/LinkCountService.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
@@ -59,6 +60,9 @@ vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({
 vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: { rebuildAllImageCounts: vi.fn() },
 }));
+vi.mock("../../services/LinkCountService.js", () => ({
+  linkCountService: { rebuildLinkCounts: vi.fn() },
+}));
 vi.mock("../../services/StashSyncService.js", () => ({
   stashSyncService: { computeTagSceneCountsViaPerformers: vi.fn() },
 }));
@@ -70,6 +74,7 @@ const mockSceneTags = vi.mocked(sceneTagInheritanceService, true);
 const mockGalleryInheritance = vi.mocked(imageGalleryInheritanceService, true);
 const mockImageCounts = vi.mocked(entityImageCountService, true);
 const mockSync = vi.mocked(stashSyncService, true);
+const mockLinkCounts = vi.mocked(linkCountService, true);
 
 /** Every migration, in order */
 const MIGRATIONS = [
@@ -82,6 +87,7 @@ const MIGRATIONS = [
   "007_drop_scene_rankings",
   "008_delete_orphaned_user_rows",
   "009_clean_stored_filters",
+  "010_rebuild_link_counts",
 ];
 
 /** Every migration but the named ones, as applied rows */
@@ -170,6 +176,11 @@ describe("DataMigrationService", () => {
           name: "009_clean_stored_filters",
           appliedAt: new Date(),
         },
+        {
+          id: 10,
+          name: "010_rebuild_link_counts",
+          appliedAt: new Date(),
+        },
       ]);
 
       const { logger } = await import("../../utils/logger.js");
@@ -203,8 +214,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // All nine migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(9);
+      // All ten migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(10);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -232,10 +243,13 @@ describe("DataMigrationService", () => {
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "009_clean_stored_filters" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "010_rebuild_link_counts" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 to 009 pending
+      // 001 already applied, 002 to 010 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         {
           id: 1,
@@ -254,8 +268,8 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // 001 is skipped; 002 to 009 are created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(8);
+      // 001 is skipped; 002 to 010 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(9);
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
@@ -364,6 +378,39 @@ describe("DataMigrationService", () => {
       );
       expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
       expect(mockExclusionService.recomputeAllUsers).not.toHaveBeenCalled();
+    });
+
+    it("counts every link of the library in migration 010", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("010_rebuild_link_counts")
+      );
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
+      mockLinkCounts.rebuildLinkCounts.mockResolvedValue({});
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      expect(mockLinkCounts.rebuildLinkCounts).toHaveBeenCalledExactlyOnceWith(
+        "all"
+      );
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
+        data: { name: "010_rebuild_link_counts" },
+      });
+    });
+
+    it("does not mark 010 as applied when the rebuild throws", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue(
+        appliedAllBut("010_rebuild_link_counts")
+      );
+      mockLinkCounts.rebuildLinkCounts.mockRejectedValueOnce(
+        new Error("counts failed")
+      );
+
+      const service = await importFresh();
+      await expect(service.runPendingMigrations()).rejects.toThrow(
+        "counts failed"
+      );
+      expect(mockPrisma.dataMigration.create).not.toHaveBeenCalled();
     });
 
     it("deletes the stored scene rankings in migration 007, one write unit per user", async () => {
