@@ -5,6 +5,7 @@ import {
   useUserSettings,
 } from "../../../api/hooks/useUserSettings";
 import { useUnitPreference } from "../../../contexts/UnitPreferenceContext";
+import { useSaveTableColumns } from "../../../hooks/useTableColumns";
 import { showError, showSuccess } from "../../../utils/toast";
 import { ErrorMessage } from "../../ui/index";
 import CardDisplaySettings from "../CardDisplaySettings";
@@ -24,6 +25,7 @@ const CustomizationTab = () => {
   // would replace every stored entity's columns: show Retry instead
   const { data, isPending, error, refetch } = useUserSettings();
   const save = useUpdateUserSettings();
+  const saveTableColumns = useSaveTableColumns();
   const { unitPreference, setUnitPreference } = useUnitPreference();
   const settings = data?.settings;
   const preferredPreviewQuality = settings?.preferredPreviewQuality ?? "sprite";
@@ -42,18 +44,14 @@ const CustomizationTab = () => {
     }
   };
 
-  // Reports a failure and rethrows it, so the editor keeps its changes
-  // marked unsaved
+  // The edited types over the latest saved map, through the tables' save
+  // queue. A failure is reported there and rethrown, so the editor keeps its
+  // changes marked unsaved
   const saveTableColumnDefaults = async (
-    newDefaults: Record<string, { visible: string[]; order: string[] }>
+    edited: Record<string, { visible: string[]; order: string[] }>
   ) => {
-    try {
-      await save.mutateAsync({ tableColumnDefaults: newDefaults });
-      showSuccess("Table columns saved!");
-    } catch (err) {
-      showError(getErrorMessage(err, "Failed to save the table columns"));
-      throw err;
-    }
+    await saveTableColumns(edited);
+    showSuccess("Table columns saved!");
   };
 
   if (isPending) {

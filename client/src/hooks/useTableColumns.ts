@@ -28,13 +28,19 @@ import { showError } from "../utils/toast";
 
 type ColumnMap = Record<string, TableColumnsConfig>;
 type SendSettings = (patch: UpdateUserSettingsBody) => Promise<unknown>;
+/** A caller waiting for the save that carries its change */
+interface Waiter {
+  resolve: () => void;
+  reject: (err: unknown) => void;
+}
 
 /**
  * The column saves of one query client. The PUT replaces the whole
  * `tableColumnDefaults` field, so each save sends the whole map, and saves
  * run one at a time: changes made while one is in flight collapse into one
  * more save of the latest map. A change made before the settings load waits
- * in `early` and is merged into the loaded map.
+ * in `early` and is merged into the loaded map. Settings' editor saves its
+ * edited types through the same queue (`save`), merged over the latest map.
  */
 class ColumnSaves {
   /** Changes made before the settings loaded, by table type */
@@ -43,6 +49,8 @@ class ColumnSaves {
   private wanted: ColumnMap | null = null;
   private inFlight = false;
   private queued = false;
+  /** Callers of `save` whose change the next save carries */
+  private waiting: Waiter[] = [];
   private listeners = new Set<() => void>();
 
   constructor(private readonly queryClient: QueryClient) {}
@@ -65,6 +73,21 @@ class ColumnSaves {
       return;
     }
     this.want({ ...(this.wanted ?? loaded), [type]: columns }, send);
+  }
+
+  /**
+   * Save `changes` (whole types' columns) over the latest map; settles once
+   * a save carrying them has. A failure is reported here, then rejects.
+   */
+  save(changes: ColumnMap, send: SendSettings): Promise<void> {
+    const loaded = this.loadedMap();
+    if (!loaded) {
+      return Promise.reject(new Error("The settings have not loaded"));
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.waiting.push({ resolve, reject });
+      this.want({ ...(this.wanted ?? loaded), ...changes }, send);
+    });
   }
 
   /** Save the changes made before the settings loaded, once they have. */
@@ -106,9 +129,12 @@ class ColumnSaves {
     const map = this.wanted;
     if (!map) return;
     this.inFlight = true;
+    const carried = this.waiting;
+    this.waiting = [];
     send({ tableColumnDefaults: map }).then(
       () => {
         this.inFlight = false;
+        for (const waiter of carried) waiter.resolve();
         if (!this.queued) {
           this.wanted = null;
           return;
@@ -122,7 +148,11 @@ class ColumnSaves {
         this.inFlight = false;
         this.queued = false;
         this.wanted = null;
+        // The queued change is dropped with the failed one
+        const dropped = [...carried, ...this.waiting];
+        this.waiting = [];
         showError(getErrorMessage(err, "Failed to save the table columns"));
+        for (const waiter of dropped) waiter.reject(err);
         void this.queryClient.invalidateQueries({
           queryKey: queryKeys.user.settings(),
         });
@@ -145,6 +175,20 @@ function columnSavesFor(queryClient: QueryClient): ColumnSaves {
   }
   return saves;
 }
+
+/**
+ * Save whole types' columns (Settings' editor) through the tables' queue,
+ * merged over the latest saved map, so another type saved meanwhile keeps
+ * its columns. Rejects after reporting a failure.
+ */
+export const useSaveTableColumns = () => {
+  const saves = columnSavesFor(useQueryClient());
+  const { mutateAsync: send } = useUpdateUserSettings();
+  return useCallback(
+    (changes: ColumnMap) => saves.save(changes, send),
+    [saves, send]
+  );
+};
 
 /**
  * A table's columns: the user's saved columns for its type

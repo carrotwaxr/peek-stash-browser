@@ -32,8 +32,11 @@ const NO_COLUMNS: Record<string, ColumnConfig> = {};
 
 interface Props {
   tableColumnDefaults: Record<string, ColumnConfig> | null;
-  /** Rejects when the save failed, after reporting it. */
-  onSave: (defaults: Record<string, ColumnConfig>) => Promise<void>;
+  /**
+   * Saves the edited types' columns over the saved map; rejects when the
+   * save failed, after reporting it.
+   */
+  onSave: (edited: Record<string, ColumnConfig>) => Promise<void>;
 }
 
 /**
@@ -42,16 +45,17 @@ interface Props {
  */
 const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const [activeEntity, setActiveEntity] = useState("scene");
-  // Unsaved edits, else null: without edits the editor shows the saved
-  // columns as they are now, so a change a table saves shows here at once
-  const [edits, setEdits] = useState<Record<string, ColumnConfig> | null>(null);
+  // Unsaved edits by type: every other type shows its saved columns as they
+  // are now, so a change a table saves shows here at once, and Save sends
+  // only the edited types
+  const [edits, setEdits] = useState<Record<string, ColumnConfig>>(NO_COLUMNS);
   const saved = tableColumnDefaults ?? NO_COLUMNS;
-  const localDefaults = edits ?? saved;
-  const hasChanges = edits !== null;
+  const localDefaults = { ...saved, ...edits };
+  const hasChanges = Object.keys(edits).length > 0;
 
-  /** Change the active type's columns; the first edit starts from the saved map */
+  /** Change the active type's columns */
   const editActive = (config: ColumnConfig) =>
-    setEdits((prev) => ({ ...(prev ?? saved), [activeEntity]: config }));
+    setEdits((prev) => ({ ...prev, [activeEntity]: config }));
 
   // Get current entity's columns config
   const allColumns = getColumnsForEntity(activeEntity);
@@ -109,8 +113,8 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
 
   const handleSave = async () => {
     try {
-      await onSave(localDefaults);
-      setEdits(null);
+      await onSave(edits);
+      setEdits(NO_COLUMNS);
     } catch {
       // onSave reported the failure; the changes stay marked unsaved
     }
