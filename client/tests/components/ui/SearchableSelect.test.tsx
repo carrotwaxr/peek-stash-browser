@@ -384,3 +384,65 @@ describe("SearchableSelect options", () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe("SearchableSelect stored bare values", () => {
+  // A bare id stands for that id on every server, so removing the option it
+  // resolved to removes the bare value for the others too.
+  it("a stored bare 466 shown as its option 466:inst is removed by the chip's × (and stands for that id on every server)", async () => {
+    mockFindTagsMinimal.mockResolvedValue([row("466", "inst", "Tag 466")]);
+    const onChange = vi.fn();
+
+    render(
+      <SearchableSelect
+        entityType="tags"
+        value={["466", "7:inst"]}
+        onChange={onChange}
+        multi
+      />
+    );
+
+    fireEvent.click(await screen.findByLabelText("Remove Tag 466"));
+
+    expect(onChange).toHaveBeenCalledWith(["7:inst"]);
+  });
+
+  it("a stored bare 466 is shown selected in the option list and its option toggle removes it", async () => {
+    mockFindTagsMinimal.mockResolvedValue([row("466", "inst", "Tag 466")]);
+    const onChange = vi.fn();
+
+    const { container } = render(
+      <SearchableSelect
+        entityType="tags"
+        value={["466", "7:inst"]}
+        onChange={onChange}
+        multi
+      />
+    );
+    await screen.findByLabelText("Remove Tag 466");
+
+    fireEvent.click(trigger(container));
+    await waitFor(() => {
+      expect(screen.getByText("✓")).toBeTruthy();
+    });
+    const option = must(
+      screen.getByText("✓").closest("button"),
+      "the option, shown selected"
+    );
+    fireEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(["7:inst"]);
+  });
+
+  it("a stored bare id in single mode is removed by the chip's ×", async () => {
+    mockFindTagsMinimal.mockResolvedValue([row("466", "inst", "Tag 466")]);
+    const onChange = vi.fn();
+
+    render(
+      <SearchableSelect entityType="tags" value="466" onChange={onChange} />
+    );
+
+    fireEvent.click(await screen.findByLabelText("Remove Tag 466"));
+
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+});

@@ -8,7 +8,7 @@ import {
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useDebouncedValue } from "../../hooks/useDebounce";
-import { makeCompositeKey } from "../../utils/compositeKey";
+import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";
 
 /**
@@ -71,6 +71,14 @@ const toOption = (entity: MinimalEntity): SelectOption => ({
   id: makeCompositeKey(entity.id, entity.instanceId),
   name: entity.name || "Unknown",
 });
+
+/**
+ * Whether a stored value stands for the option: its "id:instanceId", or a bare
+ * id (a bookmark or preset saved without its server), which stands for that id
+ * on every server.
+ */
+const storedValueIs = (stored: string, optionId: string): boolean =>
+  stored === optionId || stored === parseCompositeKey(optionId).id;
 
 interface Props {
   entityType: EntityType;
@@ -305,10 +313,14 @@ const SearchableSelect = ({
   const handleSelect = (option: SelectOption) => {
     if (multi) {
       const currentValue = (value || []) as string[];
-      const isAlreadySelected = currentValue.includes(option.id);
+      const isAlreadySelected = currentValue.some((stored) =>
+        storedValueIs(stored, option.id)
+      );
 
       if (isAlreadySelected) {
-        onChange(currentValue.filter((id: string) => id !== option.id));
+        onChange(
+          currentValue.filter((stored) => !storedValueIs(stored, option.id))
+        );
       } else {
         onChange([...currentValue, option.id]);
       }
@@ -323,7 +335,9 @@ const SearchableSelect = ({
     e.stopPropagation();
     if (multi) {
       onChange(
-        ((value || []) as string[]).filter((id: string) => id !== optionId)
+        ((value || []) as string[]).filter(
+          (stored) => !storedValueIs(stored, optionId)
+        )
       );
     } else {
       onChange("");
@@ -337,9 +351,11 @@ const SearchableSelect = ({
 
   const isSelected = (optionId: string) => {
     if (multi) {
-      return ((value || []) as string[]).includes(optionId);
+      return ((value || []) as string[]).some((stored) =>
+        storedValueIs(stored, optionId)
+      );
     }
-    return value === optionId;
+    return typeof value === "string" && storedValueIs(value, optionId);
   };
 
   return (
