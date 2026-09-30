@@ -117,24 +117,24 @@
   },
   "src/components/pages/GalleryDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 6
+      "count": 2
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/pages/GroupDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 6
+      "count": 3
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
+      "count": 2
     }
   },
   "src/components/pages/Groups.tsx": {
@@ -189,13 +189,13 @@
   },
   "src/components/pages/PerformerDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 8
+      "count": 2
     },
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 8
+      "count": 7
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 9
+      "count": 7
     }
   },
   "src/components/pages/Performers.tsx": {
@@ -273,13 +273,13 @@
   },
   "src/components/pages/StudioDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 13
+      "count": 7
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
+      "count": 5
     }
   },
   "src/components/pages/Studios.tsx": {
@@ -292,13 +292,13 @@
   },
   "src/components/pages/TagDetail.tsx": {
     "@typescript-eslint/no-non-null-assertion": {
-      "count": 9
+      "count": 2
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 10
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 3
     }
   },
   "src/components/pages/Tags.tsx": {

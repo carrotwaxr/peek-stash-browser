@@ -2,6 +2,7 @@ import express from "express";
 import {
   findStudios,
   findStudiosMinimal,
+  getStudioCounts,
 } from "../../controllers/library/studios.js";
 import {
   authenticate,
@@ -23,6 +24,13 @@ router.post(
   "/studios/minimal",
   requirePickerReady,
   libraryHandler(findStudiosMinimal)
+);
+
+// The detail page's tab counts, as the viewer sees them
+router.get(
+  "/studios/:id/counts",
+  requireCacheReady,
+  libraryHandler(getStudioCounts)
 );
 
 export default router;

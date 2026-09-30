@@ -1,11 +1,13 @@
 /**
  * StashEntityService's transforms against the real test SQLite database:
- * damaged cached JSON reads as empty, a renamed studio or tag shows its new
+ * damaged cached JSON reads as empty (a collection's through its list
+ * builder, which its detail page reads), a renamed studio or tag shows its new
  * name on the next read, and a scene's nested entities carry the ref shapes,
  * never Stash's favorite or rating (D11).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import {
   FX,
@@ -107,11 +109,13 @@ describe("StashEntityService transforms", () => {
     expect(scene?.inheritedTags).toBeUndefined();
   });
 
-  it("reads the other entities with damaged JSON columns as empty", async () => {
-    const tag = await stashEntityService.getTag(TAG, A);
-    expect(tag?.aliases).toEqual([]);
-    expect(tag?.parents).toEqual([]);
-    const group = await stashEntityService.getGroup(GROUP, A);
+  it("reads a collection with damaged JSON columns as empty, as its detail page loads it", async () => {
+    const [group] = await groupQueryBuilder.getByRefs({
+      userId: 0,
+      allowedInstanceIds: [A],
+      applyExclusions: false,
+      refs: [{ id: GROUP, instanceId: A }],
+    });
     expect(group?.urls).toEqual([]);
   });
 

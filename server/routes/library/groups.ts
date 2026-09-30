@@ -2,6 +2,7 @@ import express from "express";
 import {
   findGroups,
   findGroupsMinimal,
+  getGroupCounts,
 } from "../../controllers/library/groups.js";
 import {
   authenticate,
@@ -23,6 +24,13 @@ router.post(
   "/groups/minimal",
   requirePickerReady,
   libraryHandler(findGroupsMinimal)
+);
+
+// The detail page's tab counts, as the viewer sees them
+router.get(
+  "/groups/:id/counts",
+  requireCacheReady,
+  libraryHandler(getGroupCounts)
 );
 
 export default router;

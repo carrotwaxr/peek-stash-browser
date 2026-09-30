@@ -1,5 +1,4 @@
 import { findMinimalEntities } from "../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import type {
   AmbiguousLookupResponse,
@@ -18,6 +17,7 @@ import {
 } from "../../utils/listRequest.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { relationCountsHandler } from "./relationCounts.js";
 
 /**
  * findStudios using SQL query builder
@@ -70,44 +70,11 @@ export const findStudios = async (
     return;
   }
 
-  // For single-entity requests (detail pages), get studio with computed counts
-  let resultStudios = studios;
-  if (lookup && resultStudios.length === 1) {
-    // Get studio with computed counts from junction tables
-    const firstStudio = resultStudios[0] as (typeof resultStudios)[number];
-    const studioWithCounts = await stashEntityService.getStudio(
-      firstStudio.id,
-      firstStudio.instanceId
-    );
-    if (studioWithCounts) {
-      // Merge with the studio data (which has user ratings/stats)
-      const existingStudio = firstStudio;
-      resultStudios = [
-        {
-          ...existingStudio,
-          scene_count: studioWithCounts.scene_count,
-          image_count: studioWithCounts.image_count,
-          gallery_count: studioWithCounts.gallery_count,
-          performer_count: studioWithCounts.performer_count,
-          group_count: studioWithCounts.group_count,
-        },
-      ];
-
-      logger.debug("Computed counts for studio detail", {
-        studioId: existingStudio.id,
-        studioName: existingStudio.name,
-        sceneCount: studioWithCounts.scene_count,
-        imageCount: studioWithCounts.image_count,
-        galleryCount: studioWithCounts.gallery_count,
-        performerCount: studioWithCounts.performer_count,
-        groupCount: studioWithCounts.group_count,
-      });
-    }
-  }
-
+  // A detail page reads its studio's counts from the row, as its card
+  // shows them; its tabs count through GET /studios/:id/counts
   // Add stashUrl to each studio; its parent and children come with the
   // row, as the viewer may see them
-  const studiosWithStashUrl = resultStudios.map((studio) => ({
+  const studiosWithStashUrl = studios.map((studio) => ({
     ...studio,
     stashUrl: buildStashEntityUrl(
       "studio",
@@ -153,3 +120,6 @@ export const findStudiosMinimal = async (
   );
   res.json({ studios });
 };
+
+/** GET /api/library/studios/:id/counts: the studio page's tab counts */
+export const getStudioCounts = relationCountsHandler("studio");

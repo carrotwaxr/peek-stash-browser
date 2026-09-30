@@ -4,13 +4,7 @@
  * Tests the cached entity query service using mocked Prisma client
  */
 // Import mocked module
-import type {
-  StashGallery,
-  StashGroup,
-  StashScene,
-  StashStudio,
-  StashTag,
-} from "@prisma/client";
+import type { StashScene } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 // Import service after mocking
@@ -91,65 +85,6 @@ const mockCachedScene = partialRow<StashScene>({
   deletedAt: null,
 });
 
-const mockCachedStudio = partialRow<StashStudio>({
-  id: "studio-1",
-  name: "Test Studio",
-  url: null,
-  details: null,
-  rating100: null,
-  favorite: false,
-  imagePath: null,
-  stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
-  stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
-  syncedAt: new Date(),
-  deletedAt: null,
-});
-
-const mockCachedTag = partialRow<StashTag>({
-  id: "tag-1",
-  name: "Test Tag",
-  description: "Test tag description",
-  favorite: false,
-  imagePath: null,
-  stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
-  stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
-  syncedAt: new Date(),
-  deletedAt: null,
-});
-
-const mockCachedGallery = partialRow<StashGallery>({
-  id: "gallery-1",
-  title: "Test Gallery",
-  code: null,
-  date: null,
-  details: null,
-  studioId: null,
-  rating100: null,
-  imageCount: 50,
-  stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
-  stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
-  syncedAt: new Date(),
-  deletedAt: null,
-});
-
-const mockCachedGroup = partialRow<StashGroup>({
-  id: "group-1",
-  stashInstanceId: "test-instance",
-  name: "Test Group",
-  duration: null,
-  date: null,
-  rating100: null,
-  studioId: null,
-  director: null,
-  synopsis: null,
-  frontImagePath: null,
-  backImagePath: null,
-  stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
-  stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
-  syncedAt: new Date(),
-  deletedAt: null,
-});
-
 describe("StashEntityService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -222,38 +157,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Studio Queries", () => {
-    it("should get studio by ID", async () => {
-      mockPrisma.stashStudio.findFirst.mockResolvedValue({
-        ...mockCachedStudio,
-      });
-      // Mock counts for getStudio
-      mockPrisma.stashScene.count.mockResolvedValue(20);
-      mockPrisma.stashImage.count.mockResolvedValue(15);
-      mockPrisma.stashGallery.count.mockResolvedValue(5);
-      // Mock raw query results for performer and group counts
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 10 }]);
-
-      const result = await stashEntityService.getStudio(
-        "studio-1",
-        "test-instance"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("studio-1");
-      expect(must(result).scene_count).toBe(20);
-    });
-
-    it("should return null for non-existent studio", async () => {
-      mockPrisma.stashStudio.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getStudio(
-        "non-existent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("should get studio count", async () => {
       mockPrisma.stashStudio.count.mockResolvedValue(75);
 
@@ -264,36 +167,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Tag Queries", () => {
-    it("should get tag by ID", async () => {
-      mockPrisma.stashTag.findFirst.mockResolvedValue({
-        ...mockCachedTag,
-      });
-      // Mock junction table counts for getTag
-      mockPrisma.sceneTag.count.mockResolvedValue(25);
-      mockPrisma.imageTag.count.mockResolvedValue(10);
-      mockPrisma.galleryTag.count.mockResolvedValue(5);
-      mockPrisma.performerTag.count.mockResolvedValue(8);
-      mockPrisma.studioTag.count.mockResolvedValue(3);
-      mockPrisma.groupTag.count.mockResolvedValue(2);
-
-      const result = await stashEntityService.getTag("tag-1", "test-instance");
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("tag-1");
-      expect(must(result).scene_count).toBe(25);
-    });
-
-    it("should return null for non-existent tag", async () => {
-      mockPrisma.stashTag.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getTag(
-        "non-existent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("should get tag count", async () => {
       mockPrisma.stashTag.count.mockResolvedValue(200);
 
@@ -304,54 +177,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Gallery Queries", () => {
-    it("should get gallery by ID", async () => {
-      mockPrisma.stashGallery.findFirst.mockResolvedValue({
-        ...mockCachedGallery,
-      });
-      // Mock junction table counts for getGallery
-      mockPrisma.imageGallery.count.mockResolvedValue(50);
-
-      const result = await stashEntityService.getGallery(
-        "gallery-1",
-        "test-instance"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("gallery-1");
-      expect(must(result).title).toBe("Test Gallery");
-      expect(must(result).image_count).toBe(50);
-      // The default user fields
-      expect(must(result).favorite).toBe(false);
-    });
-
-    it("a gallery with an empty title takes its folder name as the title", async () => {
-      mockPrisma.stashGallery.findFirst.mockResolvedValue({
-        ...mockCachedGallery,
-        title: "",
-        fileBasename: null,
-        folderPath: "/pics/holiday",
-      });
-      mockPrisma.imageGallery.count.mockResolvedValue(1);
-
-      const result = await stashEntityService.getGallery(
-        "gallery-1",
-        "test-instance"
-      );
-
-      expect(must(result).title).toBe("holiday");
-    });
-
-    it("should return null for non-existent gallery", async () => {
-      mockPrisma.stashGallery.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getGallery(
-        "non-existent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("should get gallery count", async () => {
       mockPrisma.stashGallery.count.mockResolvedValue(50);
 
@@ -362,39 +187,6 @@ describe("StashEntityService", () => {
   });
 
   describe("Group Queries", () => {
-    it("should get group by ID", async () => {
-      mockPrisma.stashGroup.findFirst.mockResolvedValue({
-        ...mockCachedGroup,
-      });
-      // Mock junction table counts for getGroup
-      mockPrisma.sceneGroup.count.mockResolvedValue(15);
-      // Mock raw query for performer count
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 8 }]);
-
-      const result = await stashEntityService.getGroup(
-        "group-1",
-        "test-instance"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).id).toBe("group-1");
-      expect(must(result).name).toBe("Test Group");
-      expect(must(result).scene_count).toBe(15);
-      // The default user fields
-      expect(must(result).favorite).toBe(false);
-    });
-
-    it("should return null for non-existent group", async () => {
-      mockPrisma.stashGroup.findFirst.mockResolvedValue(null);
-
-      const result = await stashEntityService.getGroup(
-        "non-existent",
-        "test-instance"
-      );
-
-      expect(result).toBeNull();
-    });
-
     it("should get group count", async () => {
       mockPrisma.stashGroup.count.mockResolvedValue(25);
 
@@ -534,23 +326,6 @@ describe("StashEntityService", () => {
 
       expect(result).not.toBeNull();
       expect(must(result).instanceId).toBe("instance-alpha");
-    });
-
-    it("transformGroup includes instanceId from stashInstanceId", async () => {
-      mockPrisma.stashGroup.findFirst.mockResolvedValue({
-        ...mockCachedGroup,
-        stashInstanceId: "instance-beta",
-      });
-      // getGroup calls $queryRaw for scene/performer counts
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
-
-      const result = await stashEntityService.getGroup(
-        "group-1",
-        "instance-beta"
-      );
-
-      expect(result).not.toBeNull();
-      expect(must(result).instanceId).toBe("instance-beta");
     });
 
     it("scenes from different instances have distinct instanceIds", async () => {

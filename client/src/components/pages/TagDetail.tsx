@@ -6,11 +6,13 @@ import {
   IMAGE_FIELDS,
   type NormalizedImage,
   PERFORMER_FIELDS,
+  type RelationCountsByType,
   SCENE_FIELDS,
   STUDIO_FIELDS,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
@@ -27,6 +29,7 @@ import {
   StudioGrid,
 } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
@@ -89,33 +92,29 @@ const TagDetail = () => {
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get("includeSubTags") === "true";
 
-  // Compute tabs with counts for smart default selection
+  // Reads, tab filters and counts use the loaded tag's own server: a
+  // bare-id link names none
+  const tagInstanceId = tag?.instanceId as string | undefined;
+  const tagRef = makeCompositeKey(tagId ?? "", tagInstanceId);
+
+  // Each tab's count is the total of its list, as the viewer sees it; the
+  // tabs show no badge and none opens until the counts answer
+  const { data: countsData } = useRelationCounts("tag", tagId, tagInstanceId, {
+    includeSubTags,
+  });
+  const counts = countsData?.counts;
   const contentTabs = [
-    { id: "scenes", label: "Scenes", count: (tag?.scene_count as number) || 0 },
-    {
-      id: "galleries",
-      label: "Galleries",
-      count: (tag?.gallery_count as number) || 0,
-    },
-    { id: "images", label: "Images", count: (tag?.image_count as number) || 0 },
-    {
-      id: "performers",
-      label: "Performers",
-      count: (tag?.performer_count as number) || 0,
-    },
-    {
-      id: "studios",
-      label: "Studios",
-      count: (tag?.studio_count as number) || 0,
-    },
-    {
-      id: "groups",
-      label: "Collections",
-      count: (tag?.group_count as number) || 0,
-    },
-  ];
-  const effectiveDefaultTab =
-    contentTabs.find((t) => t.count > 0)?.id || "scenes";
+    { id: "scenes", label: "Scenes", count: counts?.scenes },
+    { id: "galleries", label: "Galleries", count: counts?.galleries },
+    { id: "images", label: "Images", count: counts?.images },
+    { id: "performers", label: "Performers", count: counts?.performers },
+    { id: "studios", label: "Studios", count: counts?.studios },
+    { id: "groups", label: "Collections", count: counts?.groups },
+  ].map((t) => ({ ...t, count: t.count ?? TAB_COUNT_LOADING }));
+  // The first tab with content, once the counts are in
+  const effectiveDefaultTab = counts
+    ? (contentTabs.find((t) => t.count > 0)?.id ?? "scenes")
+    : "";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -296,7 +295,12 @@ const TagDetail = () => {
 
         {/* Full Width Sections - Statistics, Parents, Children, Aliases */}
         <div className="space-y-6 mb-8">
-          <TagStats tag={tag} tagId={tagId} />
+          <TagStats
+            tag={tag}
+            counts={counts}
+            activeTab={activeTab}
+            defaultTab={effectiveDefaultTab}
+          />
           <TagDetails tag={tag} hasMultipleInstances={hasMultipleInstances} />
         </div>
 
@@ -326,7 +330,7 @@ const TagDetail = () => {
             </div>
           )}
 
-          {contentTabs.every((t) => t.count === 0) ? (
+          {counts && contentTabs.every((t) => t.count === 0) ? (
             <div
               className="py-16 text-center"
               style={{ color: "var(--text-muted)" }}
@@ -347,7 +351,7 @@ const TagDetail = () => {
                   context="scene_tag"
                   permanentFilters={{
                     tags: {
-                      value: [makeCompositeKey(tagId!, instanceId)],
+                      value: [tagRef],
                       modifier: "INCLUDES",
                       ...(includeSubTags && { depth: -1 }),
                     },
@@ -355,7 +359,7 @@ const TagDetail = () => {
                   permanentFiltersMetadata={{
                     tags: [
                       {
-                        id: makeCompositeKey(tagId!, instanceId),
+                        id: tagRef,
                         name: (tag?.name as string) || "Unknown Tag",
                       },
                     ],
@@ -371,7 +375,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId!, instanceId)],
+                        value: [tagRef],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -384,8 +388,7 @@ const TagDetail = () => {
 
               {activeTab === "images" && (
                 <ImagesTab
-                  tagId={tagId}
-                  instanceId={instanceId}
+                  tagRef={tagRef}
                   tagName={tag?.name as string | undefined}
                   includeSubTags={includeSubTags}
                 />
@@ -397,7 +400,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId!, instanceId)],
+                        value: [tagRef],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -414,7 +417,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     studio_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId!, instanceId)],
+                        value: [tagRef],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -431,7 +434,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId!, instanceId)],
+                        value: [tagRef],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -520,16 +523,18 @@ const TagImage = ({ tag }: TagImageProps) => {
 // Tag Stats Component
 interface TagStatsProps {
   tag: Record<string, unknown> | null;
-  tagId: string | undefined;
+  /** The tabs' counts; undefined while they load */
+  counts: RelationCountsByType["tag"] | undefined;
+  activeTab: string;
+  defaultTab: string;
 }
 
-const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
+const TagStats = ({ tag, counts, activeTab, defaultTab }: TagStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === "scenes") {
+    if (tabId === defaultTab) {
       newParams.delete("tab");
     } else {
       newParams.set("tab", tabId);
@@ -585,7 +590,7 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatField
           label="Scenes:"
-          value={tag?.scene_count as number | undefined}
+          value={counts?.scenes}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("scenes")}
           isActive={activeTab === "scenes"}
@@ -597,35 +602,35 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
         />
         <StatField
           label="Images:"
-          value={tag?.image_count as number | undefined}
+          value={counts?.images}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("images")}
           isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
-          value={tag?.gallery_count as number | undefined}
+          value={counts?.galleries}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("galleries")}
           isActive={activeTab === "galleries"}
         />
         <StatField
           label="Performers:"
-          value={tag?.performer_count as number | undefined}
+          value={counts?.performers}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("performers")}
           isActive={activeTab === "performers"}
         />
         <StatField
           label="Studios:"
-          value={tag?.studio_count as number | undefined}
+          value={counts?.studios}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("studios")}
           isActive={activeTab === "studios"}
         />
         <StatField
           label="Collections:"
-          value={tag?.group_count as number | undefined}
+          value={counts?.groups}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("groups")}
           isActive={activeTab === "groups"}
@@ -700,15 +705,14 @@ const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
 
 // Images Tab Component with Lightbox
 interface TagImagesTabProps {
-  tagId: string | undefined;
-  instanceId: string | null;
+  /** The tag as "id:instanceId" */
+  tagRef: string;
   tagName: string | undefined;
   includeSubTags?: boolean;
 }
 
 const ImagesTab = ({
-  tagId,
-  instanceId,
+  tagRef,
   tagName,
   includeSubTags = false,
 }: TagImagesTabProps) => {
@@ -737,7 +741,7 @@ const ImagesTab = ({
         filter: { page, per_page: perPage },
         image_filter: {
           tags: {
-            value: [makeCompositeKey(tagId!, instanceId)],
+            value: [tagRef],
             modifier: "INCLUDES",
             ...(includeSubTags && { depth: -1 }),
           },
@@ -748,12 +752,12 @@ const ImagesTab = ({
         count: data.findImages?.count || 0,
       };
     },
-    [tagId, instanceId, includeSubTags]
+    [tagRef, includeSubTags]
   );
 
   const paginationResult = useImagesPagination<NormalizedImage>({
     fetchImages,
-    dependencies: [tagId, instanceId, includeSubTags],
+    dependencies: [tagRef, includeSubTags],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });

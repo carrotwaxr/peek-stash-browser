@@ -12,7 +12,6 @@ import {
 
 import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
 import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
 import {
   malformed,
   reqFor,
@@ -23,13 +22,6 @@ import { createMockGallery } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
-
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getGallery: vi.fn(),
-    getStudio: vi.fn(),
-  },
-}));
 
 vi.mock("../../../services/GalleryQueryBuilder.js", () => ({
   galleryQueryBuilder: { execute: vi.fn() },
@@ -56,7 +48,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGalleryQueryBuilder = vi.mocked(galleryQueryBuilder);
 const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
@@ -178,18 +169,15 @@ describe("Galleries Controller", () => {
       expect(res.json).not.toHaveBeenCalled();
     });
 
-    it("fetches detail counts for single-ID lookup", async () => {
+    it("a detail answers the builder's row as it is: the card's image count", async () => {
       const gallery = createMockGallery({
         id: "101",
         instanceId: "default",
+        image_count: 42,
       });
       mockGalleryQueryBuilder.execute.mockResolvedValue({
         items: [gallery],
         total: 1,
-      });
-      mockStashEntityService.getGallery.mockResolvedValue({
-        ...gallery,
-        image_count: 42,
       });
 
       const req = reqFor(findGalleries, {
@@ -200,11 +188,9 @@ describe("Galleries Controller", () => {
 
       await findGalleries(req, res);
 
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getGallery).toHaveBeenCalledWith(
-        "101",
-        "default"
-      );
+      expect(res._getOkBody().findGalleries.galleries).toEqual([
+        { ...gallery, stashUrl: null },
+      ]);
     });
   });
 

@@ -1,8 +1,13 @@
 import React, { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { GroupRelationRef, TagRef } from "@peek/shared-types";
+import type {
+  GroupRelationRef,
+  RelationCountsByType,
+  TagRef,
+} from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
@@ -14,6 +19,7 @@ import { getEntityPath } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import { PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
@@ -58,21 +64,27 @@ const GroupDetail = () => {
   const group = lookup.entity ?? null;
   const isLoading = lookup.status === "loading";
 
-  // Compute tabs with counts for smart default selection
+  // Reads, tab filters and counts use the loaded collection's own server:
+  // a bare-id link names none
+  const groupInstanceId = group?.instanceId as string | undefined;
+  const groupRef = makeCompositeKey(groupId ?? "", groupInstanceId);
+
+  // Each tab's count is the total of its list, as the viewer sees it; the
+  // tabs show no badge and none opens until the counts answer
+  const { data: countsData } = useRelationCounts(
+    "group",
+    groupId,
+    groupInstanceId
+  );
+  const counts = countsData?.counts;
   const contentTabs = [
-    {
-      id: "scenes",
-      label: "Scenes",
-      count: (group?.scene_count as number) || 0,
-    },
-    {
-      id: "performers",
-      label: "Performers",
-      count: (group?.performer_count as number) || 0,
-    },
-  ];
-  const effectiveDefaultTab =
-    contentTabs.find((t) => t.count > 0)?.id || "scenes";
+    { id: "scenes", label: "Scenes", count: counts?.scenes },
+    { id: "performers", label: "Performers", count: counts?.performers },
+  ].map((t) => ({ ...t, count: t.count ?? TAB_COUNT_LOADING }));
+  // The first tab with content, once the counts are in
+  const effectiveDefaultTab = counts
+    ? (contentTabs.find((t) => t.count > 0)?.id ?? "scenes")
+    : "";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -242,7 +254,12 @@ const GroupDetail = () => {
 
         {/* Full Width Sections - Statistics, Studio, Tags, Parent/Sub Collections */}
         <div className="space-y-6 mb-8">
-          <GroupStats group={group} />
+          <GroupStats
+            group={group}
+            counts={counts}
+            activeTab={activeTab}
+            defaultTab={effectiveDefaultTab}
+          />
           <GroupDetails
             group={group}
             hasMultipleInstances={hasMultipleInstances}
@@ -251,7 +268,7 @@ const GroupDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {contentTabs.every((t) => t.count === 0) ? (
+          {counts && contentTabs.every((t) => t.count === 0) ? (
             <div
               className="py-16 text-center"
               style={{ color: "var(--text-muted)" }}
@@ -272,14 +289,14 @@ const GroupDetail = () => {
                   initialSort="scene_index"
                   permanentFilters={{
                     groups: {
-                      value: [makeCompositeKey(groupId!, instanceId)],
+                      value: [groupRef],
                       modifier: "INCLUDES",
                     },
                   }}
                   permanentFiltersMetadata={{
                     groups: [
                       {
-                        id: makeCompositeKey(groupId!, instanceId),
+                        id: groupRef,
                         name: (group?.name as string) || "Unknown Collection",
                       },
                     ],
@@ -294,7 +311,7 @@ const GroupDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       groups: {
-                        value: [makeCompositeKey(groupId!, instanceId)],
+                        value: [groupRef],
                         modifier: "INCLUDES",
                       },
                     },
@@ -450,15 +467,23 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
 // Group Stats Component
 interface GroupStatsProps {
   group: Record<string, unknown> | null;
+  /** The tabs' counts; undefined while they load */
+  counts: RelationCountsByType["group"] | undefined;
+  activeTab: string;
+  defaultTab: string;
 }
 
-const GroupStats = ({ group }: GroupStatsProps) => {
+const GroupStats = ({
+  group,
+  counts,
+  activeTab,
+  defaultTab,
+}: GroupStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === "scenes") {
+    if (tabId === defaultTab) {
       newParams.delete("tab");
     } else {
       newParams.set("tab", tabId);
@@ -514,14 +539,14 @@ const GroupStats = ({ group }: GroupStatsProps) => {
       <div className="grid grid-cols-2 gap-4">
         <StatField
           label="Scenes:"
-          value={group?.scene_count as number | undefined}
+          value={counts?.scenes}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("scenes")}
           isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
-          value={group?.performer_count as number | undefined}
+          value={counts?.performers}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("performers")}
           isActive={activeTab === "performers"}

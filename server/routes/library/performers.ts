@@ -2,6 +2,7 @@ import express from "express";
 import {
   findPerformers,
   findPerformersMinimal,
+  getPerformerCounts,
 } from "../../controllers/library/performers.js";
 import {
   authenticate,
@@ -23,6 +24,13 @@ router.post(
   "/performers/minimal",
   requirePickerReady,
   libraryHandler(findPerformersMinimal)
+);
+
+// The detail page's tab counts, as the viewer sees them
+router.get(
+  "/performers/:id/counts",
+  requireCacheReady,
+  libraryHandler(getPerformerCounts)
 );
 
 export default router;

@@ -1164,6 +1164,16 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
+### GET /api/library/galleries/:id/counts
+
+**Authentication:** Required
+
+**Controller:** `getGalleryCounts` in `../../controllers/library/galleries.ts`
+
+The tab counts of a gallery page, as the viewer sees them: each is the total of the tab's list. `instanceId` (required) names the entity's server; Any other query answers 400; an entity the viewer cannot see answers 404.
+
+---
+
 ### POST /api/library/groups
 
 **Authentication:** Required
@@ -1177,6 +1187,16 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 **Authentication:** Required
 
 **Controller:** `findGroupsMinimal` in `../../controllers/library/groups.ts`
+
+---
+
+### GET /api/library/groups/:id/counts
+
+**Authentication:** Required
+
+**Controller:** `getGroupCounts` in `../../controllers/library/groups.ts`
+
+The tab counts of a collection page, as the viewer sees them: each is the total of the tab's list. `instanceId` (required) names the entity's server; Any other query answers 400; an entity the viewer cannot see answers 404.
 
 ---
 
@@ -1201,6 +1221,16 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 **Authentication:** Required
 
 **Controller:** `findPerformersMinimal` in `../../controllers/library/performers.ts`
+
+---
+
+### GET /api/library/performers/:id/counts
+
+**Authentication:** Required
+
+**Controller:** `getPerformerCounts` in `../../controllers/library/performers.ts`
+
+The tab counts of a performer page, as the viewer sees them: each is the total of the tab's list. `instanceId` (required) names the entity's server; Any other query answers 400; an entity the viewer cannot see answers 404.
 
 ---
 
@@ -1244,6 +1274,16 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
+### GET /api/library/studios/:id/counts
+
+**Authentication:** Required
+
+**Controller:** `getStudioCounts` in `../../controllers/library/studios.ts`
+
+The tab counts of a studio page, as the viewer sees them: each is the total of the tab's list. `instanceId` (required) names the entity's server; `includeSubStudios=true` counts the sub-studios' content. Any other query answers 400; an entity the viewer cannot see answers 404.
+
+---
+
 ### POST /api/library/tags
 
 **Authentication:** Required
@@ -1257,5 +1297,15 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 **Authentication:** Required
 
 **Controller:** `findTagsMinimal` in `../../controllers/library/tags.ts`
+
+---
+
+### GET /api/library/tags/:id/counts
+
+**Authentication:** Required
+
+**Controller:** `getTagCounts` in `../../controllers/library/tags.ts`
+
+The tab counts of a tag page, as the viewer sees them: each is the total of the tab's list. `instanceId` (required) names the entity's server; `includeSubTags=true` counts the sub-tags' content. Any other query answers 400; an entity the viewer cannot see answers 404.
 
 ---

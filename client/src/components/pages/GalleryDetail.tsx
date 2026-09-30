@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type React from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type {
-  NormalizedImage,
-  RelationTotals,
-  TagRef,
-} from "@peek/shared-types";
+import type { NormalizedImage, TagRef } from "@peek/shared-types";
 import { ArrowLeft, Play } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
@@ -19,6 +16,7 @@ import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { galleryTitle } from "../../utils/gallery";
 import SceneSearch from "../scene-search/SceneSearch";
+import { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
@@ -76,18 +74,26 @@ const GalleryDetail = () => {
   const gallery = lookup.entity ?? null;
   const isLoading = lookup.status === "loading";
 
-  // Compute tabs with counts for smart default selection
-  // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
-  const galleryImageCount = totalCount || (gallery?.image_count as number) || 0;
-  // The scenes the user can see, counted by the server (gallery rows carry no scene list)
-  const galleryScenesCount =
-    (gallery?.relation_totals as RelationTotals | undefined)?.scenes ?? 0;
+  // Reads, tab filters and counts use the loaded gallery's own server: a
+  // bare-id link names none, so nothing is read until the gallery is
+  const galleryInstanceId = gallery?.instanceId as string | undefined;
+
+  // Each tab's count is the total of its list, as the viewer sees it; the
+  // tabs show no badge and none opens until the counts answer
+  const { data: countsData } = useRelationCounts(
+    "gallery",
+    galleryId,
+    galleryInstanceId
+  );
+  const counts = countsData?.counts;
   const contentTabs = [
-    { id: "images", label: "Images", count: galleryImageCount },
-    { id: "scenes", label: "Scenes", count: galleryScenesCount },
-  ];
-  const effectiveDefaultTab =
-    contentTabs.find((t) => t.count > 0)?.id || "images";
+    { id: "images", label: "Images", count: counts?.images },
+    { id: "scenes", label: "Scenes", count: counts?.scenes },
+  ].map((t) => ({ ...t, count: t.count ?? TAB_COUNT_LOADING }));
+  // The first tab with content, once the counts are in
+  const effectiveDefaultTab = counts
+    ? (contentTabs.find((t) => t.count > 0)?.id ?? "images")
+    : "";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -112,14 +118,15 @@ const GalleryDetail = () => {
   // Fetch function for prefetching adjacent pages
   const fetchPage = useCallback(
     async (page: number) => {
+      if (!galleryId || !galleryInstanceId) return { images: [] };
       const { images } = await libraryApi.findGalleryImages(
-        galleryId!,
-        instanceId,
+        galleryId,
+        galleryInstanceId,
         { page, perPage: PER_PAGE }
       );
       return { images };
     },
-    [galleryId, instanceId]
+    [galleryId, galleryInstanceId]
   );
 
   // Paginated lightbox state and handlers
@@ -144,12 +151,14 @@ const GalleryDetail = () => {
   }
 
   useEffect(() => {
+    // Waits for the gallery, whose own server the images are asked on
+    if (!galleryId || !galleryInstanceId) return;
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
         const data = await libraryApi.findGalleryImages(
-          galleryId!,
-          instanceId,
+          galleryId,
+          galleryInstanceId,
           { page: lightbox.currentPage, perPage: PER_PAGE }
         );
         setImages(data.images);
@@ -166,7 +175,7 @@ const GalleryDetail = () => {
 
     void fetchImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryId, instanceId, lightbox.currentPage]);
+  }, [galleryId, galleryInstanceId, lightbox.currentPage]);
 
   const handleRatingChange = async (newRating: number | null) => {
     // Write on the loaded gallery's own server: a bare-id link names none
@@ -437,7 +446,7 @@ const GalleryDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mb-6">
-          {contentTabs.every((t) => t.count === 0) ? (
+          {counts && contentTabs.every((t) => t.count === 0) ? (
             <div
               className="py-16 text-center"
               style={{ color: "var(--text-muted)" }}
@@ -498,14 +507,19 @@ const GalleryDetail = () => {
                   context="gallery_scenes"
                   permanentFilters={{
                     galleries: {
-                      value: [makeCompositeKey(galleryId!, instanceId)],
+                      value: [
+                        makeCompositeKey(galleryId ?? "", galleryInstanceId),
+                      ],
                       modifier: "INCLUDES",
                     },
                   }}
                   permanentFiltersMetadata={{
                     galleries: [
                       {
-                        id: makeCompositeKey(galleryId!, instanceId),
+                        id: makeCompositeKey(
+                          galleryId ?? "",
+                          galleryInstanceId
+                        ),
                         title: galleryTitle(gallery),
                       },
                     ],

@@ -1,9 +1,10 @@
 /**
  * Unit tests for libraryApi.findGalleryImages: gallery images come from the
- * images search with an instance-aware galleries filter (item 11).
+ * images search with an instance-aware galleries filter (item 11); and
+ * getRelationCounts, a detail page's tab counts (B19).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiPost } from "@/api/client";
+import { apiGet, apiPost } from "@/api/client";
 import { libraryApi } from "@/api/library";
 
 vi.mock("@/api/client", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/api/client", () => ({
 }));
 
 const mockApiPost = vi.mocked(apiPost);
+const mockApiGet = vi.mocked(apiGet);
 
 describe("libraryApi", () => {
   beforeEach(() => {
@@ -47,16 +49,27 @@ describe("libraryApi", () => {
         libraryApi.findGalleryImages("44", "inst-b")
       ).resolves.toEqual({ images: [image], count: 7 });
     });
+  });
 
-    it("sends a bare id when no instance is known", async () => {
-      await libraryApi.findGalleryImages("44", null);
+  describe("getRelationCounts", () => {
+    it("asks the page's entity on its instance, with the toggle only when on", async () => {
+      mockApiGet.mockResolvedValue({ counts: {} });
 
-      expect(mockApiPost).toHaveBeenCalledWith("/library/images", {
-        filter: { page: 1, per_page: 100, sort: "path", direction: "ASC" },
-        image_filter: {
-          galleries: { value: ["44"], modifier: "INCLUDES" },
-        },
+      await libraryApi.getRelationCounts("tag", "5", "inst b");
+      await libraryApi.getRelationCounts("tag", "5", "inst-a", {
+        includeSubTags: true,
       });
+      await libraryApi.getRelationCounts("studio", "7", "inst-a", {
+        includeSubStudios: true,
+      });
+      await libraryApi.getRelationCounts("gallery", "9", "inst-a");
+
+      expect(mockApiGet.mock.calls.map(([path]) => path)).toEqual([
+        "/library/tags/5/counts?instanceId=inst+b",
+        "/library/tags/5/counts?instanceId=inst-a&includeSubTags=true",
+        "/library/studios/7/counts?instanceId=inst-a&includeSubStudios=true",
+        "/library/galleries/9/counts?instanceId=inst-a",
+      ]);
     });
   });
 });

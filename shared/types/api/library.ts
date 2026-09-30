@@ -341,3 +341,71 @@ export interface FindImagesResponse {
     images: WithStashUrl<ImageListItem>[];
   };
 }
+
+// =============================================================================
+// DETAIL PAGE COUNTS
+// =============================================================================
+
+/**
+ * A detail page's counted tabs, by the page's entity: each count is the
+ * total of the tab's list for the viewer, with the tab's own filter
+ */
+export interface RelationCountsByType {
+  performer: {
+    scenes: number;
+    galleries: number;
+    images: number;
+    groups: number;
+  };
+  studio: {
+    scenes: number;
+    galleries: number;
+    images: number;
+    performers: number;
+    groups: number;
+  };
+  tag: {
+    scenes: number;
+    galleries: number;
+    images: number;
+    performers: number;
+    studios: number;
+    groups: number;
+  };
+  group: { scenes: number; performers: number };
+  gallery: { images: number; scenes: number };
+}
+
+/** The entities whose detail pages ask for their counts */
+export type RelationCountsType = keyof RelationCountsByType;
+
+export interface RelationCountsParams extends Record<string, string> {
+  id: string;
+}
+
+/**
+ * GET /api/library/<entities>/:id/counts: the query. Anything else, or an
+ * option of another page, answers 400.
+ */
+export interface RelationCountsQuery extends Record<
+  string,
+  string | undefined
+> {
+  /** The entity's instance (required) */
+  instanceId?: string;
+  /** Tag pages: "true" counts the sub-tags' content as the tabs list it */
+  includeSubTags?: string;
+  /** Studio pages: "true" counts the sub-studios' content as the tabs list it */
+  includeSubStudios?: string;
+}
+
+/**
+ * GET /api/library/<entities>/:id/counts: the page's tab counts, as the
+ * viewer sees them (the same numbers as the entity's card). 404 for an
+ * entity the viewer cannot see.
+ */
+export interface RelationCountsResponse<
+  T extends RelationCountsType = RelationCountsType,
+> {
+  counts: RelationCountsByType[T];
+}

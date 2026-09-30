@@ -12,18 +12,10 @@ import type {
   StashGroup,
   StashPerformer,
   StashScene,
-  StashStudio,
   StashTag,
 } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import type {
-  NormalizedGallery,
-  NormalizedGroup,
-  NormalizedScene,
-  NormalizedStudio,
-  NormalizedTag,
-  SceneStream,
-} from "../types/index.js";
+import type { NormalizedScene, SceneStream } from "../types/index.js";
 import type { SceneScoringRow } from "../types/internal/queryRows.js";
 import type { EntityRef } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
@@ -36,10 +28,7 @@ import {
 } from "../utils/sceneStreams.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
-import {
-  getGalleryFallbackTitle,
-  getSceneFallbackTitle,
-} from "../utils/titleUtils.js";
+import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import type { ScoringScene } from "./RecommendationScoringService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import {
@@ -86,34 +75,6 @@ interface SceneWithRelations extends StashScene {
   galleries?: SceneGalleryWithGallery[];
 }
 
-/** Tag input for transformTag - Prisma result with optional computed counts */
-type TagInput = StashTag & {
-  sceneMarkerCount?: number;
-};
-
-/** Gallery performer junction entry */
-interface GalleryPerformerEntry {
-  performer: StashPerformer;
-}
-
-/** Gallery tag junction entry with included tag */
-interface GalleryTagWithTag {
-  tagId: string;
-  tag?: StashTag | null;
-}
-
-/** Gallery scene junction entry */
-interface GallerySceneEntry {
-  scene: StashScene;
-}
-
-/** Gallery input for transformGallery - Prisma result with optional relations and computed counts */
-type GalleryInput = StashGallery & {
-  performers?: GalleryPerformerEntry[];
-  tags?: GalleryTagWithTag[];
-  scenes?: GallerySceneEntry[];
-};
-
 /** The stored stream choices and file fields a scene's stream list is built from */
 type SceneStreamSource = Pick<
   StashScene,
@@ -141,46 +102,6 @@ const DEFAULT_SCENE_USER_FIELDS = {
   o_history: [],
   last_played_at: null,
   last_o_at: null,
-};
-
-/**
- * Default user fields for studios
- */
-const DEFAULT_STUDIO_USER_FIELDS = {
-  rating: null,
-  favorite: false,
-  o_counter: 0,
-  play_count: 0,
-};
-
-/**
- * Default user fields for tags
- */
-const DEFAULT_TAG_USER_FIELDS = {
-  rating: null,
-  rating100: null,
-  favorite: false,
-  o_counter: 0,
-  play_count: 0,
-};
-
-/**
- * Default user fields for galleries
- */
-const DEFAULT_GALLERY_USER_FIELDS = {
-  rating: null,
-  favorite: false,
-};
-
-/**
- * Default user fields for groups
- */
-const DEFAULT_GROUP_USER_FIELDS = {
-  rating: null,
-  favorite: false,
-  // Per user (it leaves out the sub-groups they cannot see): GroupQueryBuilder
-  // sets it on the list and detail rows
-  sub_group_count: 0,
 };
 
 class StashEntityService {
@@ -419,76 +340,6 @@ class StashEntityService {
   // ==================== Studio Queries ====================
 
   /**
-   * Get studio by ID with computed counts
-   * @param id - Studio ID
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getStudio(
-    id: string,
-    instanceId: string
-  ): Promise<NormalizedStudio | null> {
-    const cached = await prisma.stashStudio.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    if (!cached) return null;
-
-    // Compute counts from junction tables and scene data (except imageCount which uses stored inherited value)
-    const studioInstanceId = cached.stashInstanceId;
-    const [sceneCount, galleryCount] = await Promise.all([
-      prisma.stashScene.count({
-        where: {
-          studioId: id,
-          stashInstanceId: studioInstanceId,
-          deletedAt: null,
-        },
-      }),
-      prisma.stashGallery.count({
-        where: {
-          studioId: id,
-          stashInstanceId: studioInstanceId,
-          deletedAt: null,
-        },
-      }),
-    ]);
-
-    // Get performer count by counting distinct performers from scenes
-    const performerCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(DISTINCT sp.performerId) as count
-      FROM ScenePerformer sp
-      INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
-      WHERE s.studioId = ${id}
-        AND s.stashInstanceId = ${studioInstanceId}
-        AND s.deletedAt IS NULL
-    `;
-    const performerCount = Number(performerCountResult[0]?.count ?? 0);
-
-    // Get group count by counting distinct groups from scenes
-    const groupCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(DISTINCT sg.groupId) as count
-      FROM SceneGroup sg
-      INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
-      WHERE s.studioId = ${id}
-        AND s.stashInstanceId = ${studioInstanceId}
-        AND s.deletedAt IS NULL
-    `;
-    const groupCount = Number(groupCountResult[0]?.count ?? 0);
-    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
-
-    return this.transformStudio({
-      ...cached,
-      sceneCount,
-      galleryCount,
-      performerCount,
-      groupCount,
-    });
-  }
-
-  /**
    * Get total studio count
    */
   async getStudioCount(): Promise<number> {
@@ -498,75 +349,6 @@ class StashEntityService {
   }
 
   // ==================== Tag Queries ====================
-
-  /**
-   * Get tag by ID with computed counts
-   * @param id - Tag ID
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getTag(id: string, instanceId: string): Promise<NormalizedTag | null> {
-    const cached = await prisma.stashTag.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    if (!cached) return null;
-
-    // Compute counts from junction tables (except imageCount which uses stored inherited value)
-    const tagInstanceId = cached.stashInstanceId;
-    const [sceneCount, galleryCount, performerCount, studioCount, groupCount] =
-      await Promise.all([
-        prisma.sceneTag.count({
-          where: {
-            tagId: id,
-            tagInstanceId,
-            scene: { deletedAt: null },
-          },
-        }),
-        prisma.galleryTag.count({
-          where: {
-            tagId: id,
-            tagInstanceId,
-            gallery: { deletedAt: null },
-          },
-        }),
-        prisma.performerTag.count({
-          where: {
-            tagId: id,
-            tagInstanceId,
-            performer: { deletedAt: null },
-          },
-        }),
-        prisma.studioTag.count({
-          where: {
-            tagId: id,
-            tagInstanceId,
-            studio: { deletedAt: null },
-          },
-        }),
-        prisma.groupTag.count({
-          where: {
-            tagId: id,
-            tagInstanceId,
-            group: { deletedAt: null },
-          },
-        }),
-      ]);
-    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
-
-    return this.transformTag({
-      ...cached,
-      sceneCount,
-      galleryCount,
-      performerCount,
-      studioCount,
-      groupCount,
-      sceneMarkerCount: 0, // Scene markers not currently synced
-    });
-  }
 
   /**
    * Get total tag count
@@ -580,45 +362,6 @@ class StashEntityService {
   // ==================== Gallery Queries ====================
 
   /**
-   * Get gallery by ID with computed counts
-   * @param id - Gallery ID
-   * @param instanceId - Stash instance ID for multi-instance support
-   */
-  async getGallery(
-    id: string,
-    instanceId: string
-  ): Promise<NormalizedGallery | null> {
-    const cached = await prisma.stashGallery.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-      include: {
-        performers: { include: { performer: true } },
-        tags: { include: { tag: true } },
-        scenes: { include: { scene: true } },
-      },
-    });
-
-    if (!cached) return null;
-
-    // Compute image count from ImageGallery junction table (instance-scoped)
-    const imageCount = await prisma.imageGallery.count({
-      where: {
-        galleryId: id,
-        galleryInstanceId: cached.stashInstanceId,
-        image: { deletedAt: null },
-      },
-    });
-
-    return this.transformGallery({
-      ...cached,
-      imageCount,
-    });
-  }
-
-  /**
    * Get total gallery count
    */
   async getGalleryCount(): Promise<number> {
@@ -628,54 +371,6 @@ class StashEntityService {
   }
 
   // ==================== Group Queries ====================
-
-  /**
-   * Get group by ID with computed counts
-   * @param id - Group ID
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getGroup(
-    id: string,
-    instanceId: string
-  ): Promise<NormalizedGroup | null> {
-    const cached = await prisma.stashGroup.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    if (!cached) return null;
-
-    // Compute counts from junction tables
-    const groupInstanceId = cached.stashInstanceId;
-    const sceneCount = await prisma.sceneGroup.count({
-      where: {
-        groupId: id,
-        groupInstanceId,
-        scene: { deletedAt: null },
-      },
-    });
-
-    // Get performer count by counting distinct performers from scenes in this group
-    const performerCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(DISTINCT sp.performerId) as count
-      FROM SceneGroup sg
-      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
-      INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
-      WHERE sg.groupId = ${id}
-        AND sg.groupInstanceId = ${groupInstanceId}
-        AND s.deletedAt IS NULL
-    `;
-    const performerCount = Number(performerCountResult[0]?.count ?? 0);
-
-    return this.transformGroup({
-      ...cached,
-      sceneCount,
-      performerCount,
-    });
-  }
 
   /**
    * Get total group count
@@ -1055,151 +750,6 @@ class StashEntityService {
     }
 
     return base;
-  }
-
-  private transformStudio(studio: StashStudio): NormalizedStudio {
-    return {
-      ...DEFAULT_STUDIO_USER_FIELDS,
-      id: studio.id,
-      instanceId: studio.stashInstanceId,
-      name: studio.name,
-      parent_studio: studio.parentId ? { id: studio.parentId } : null,
-      favorite: studio.favorite,
-      rating100: studio.rating100,
-      scene_count: studio.sceneCount,
-      image_count: studio.imageCount,
-      gallery_count: studio.galleryCount,
-      performer_count: studio.performerCount,
-      group_count: studio.groupCount,
-      details: studio.details,
-      url: studio.url,
-      tags: [],
-      image_path: toProxyUrl(studio.imagePath, studio.stashInstanceId),
-      created_at: studio.stashCreatedAt?.toISOString() ?? null,
-      updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
-    };
-  }
-
-  private transformTag(tag: TagInput): NormalizedTag {
-    return {
-      ...DEFAULT_TAG_USER_FIELDS,
-      id: tag.id,
-      instanceId: tag.stashInstanceId,
-      name: tag.name,
-      favorite: tag.favorite,
-      scene_count: tag.sceneCount,
-      image_count: tag.imageCount,
-      gallery_count: tag.galleryCount,
-      performer_count: tag.performerCount,
-      studio_count: tag.studioCount,
-      group_count: tag.groupCount,
-      scene_marker_count: tag.sceneMarkerCount,
-      scene_count_via_performers: tag.sceneCountViaPerformers,
-      description: tag.description,
-      aliases: parseJsonArray(tag.aliases),
-      parents: parseJsonArray(tag.parentIds).map((id) => ({ id })),
-      image_path: toProxyUrl(tag.imagePath, tag.stashInstanceId),
-      created_at: tag.stashCreatedAt?.toISOString() ?? null,
-      updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
-    };
-  }
-
-  private transformGroup(group: StashGroup): NormalizedGroup {
-    return {
-      ...DEFAULT_GROUP_USER_FIELDS,
-      id: group.id,
-      instanceId: group.stashInstanceId,
-      name: group.name,
-      date: group.date,
-      studio: group.studioId ? { id: group.studioId } : null,
-      rating100: group.rating100,
-      duration: group.duration,
-      scene_count: group.sceneCount,
-      performer_count: group.performerCount,
-      director: group.director,
-      synopsis: group.synopsis,
-      urls: parseJsonArray(group.urls),
-      tags: [],
-      front_image_path: toProxyUrl(group.frontImagePath, group.stashInstanceId),
-      back_image_path: toProxyUrl(group.backImagePath, group.stashInstanceId),
-      created_at: group.stashCreatedAt?.toISOString() ?? null,
-      updated_at: group.stashUpdatedAt?.toISOString() ?? null,
-    };
-  }
-
-  private transformGallery(gallery: GalleryInput): NormalizedGallery {
-    const coverUrl = toProxyUrl(gallery.coverPath, gallery.stashInstanceId);
-    // Extract tags from junction table relation (if included) or empty array
-    // Include image_path for TooltipEntityGrid display
-    const tags =
-      gallery.tags?.map((gt: GalleryTagWithTag) => ({
-        id: gt.tagId,
-        name: emptyToNull(gt.tag?.name) ?? "Unknown",
-        image_path: gt.tag
-          ? toProxyUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
-          : null,
-      })) ?? [];
-
-    // Transform performers from junction table
-    // Include image_path and gender for TooltipEntityGrid display
-    const performers =
-      gallery.performers?.map((gp: GalleryPerformerEntry) => ({
-        id: gp.performer.id,
-        name: gp.performer.name,
-        gender: gp.performer.gender,
-        image_path: toProxyUrl(
-          gp.performer.imagePath,
-          gp.performer.stashInstanceId
-        ),
-      })) ?? [];
-
-    // Transform scenes from junction table
-    // Include minimal data for display (id, title, screenshot)
-    const scenes =
-      gallery.scenes?.map((gs: GallerySceneEntry) => ({
-        id: gs.scene.id,
-        title: gs.scene.title,
-        paths: {
-          screenshot: toProxyUrl(
-            gs.scene.pathScreenshot,
-            gs.scene.stashInstanceId
-          ),
-        },
-      })) ?? [];
-
-    // Build files array for frontend title fallback (zip galleries)
-    const files = gallery.fileBasename
-      ? [{ basename: gallery.fileBasename }]
-      : [];
-
-    return {
-      ...DEFAULT_GALLERY_USER_FIELDS,
-      id: gallery.id,
-      instanceId: gallery.stashInstanceId,
-      title:
-        emptyToNull(gallery.title) ??
-        getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
-      date: gallery.date,
-      studio: gallery.studioId ? { id: gallery.studioId } : null,
-      rating100: gallery.rating100,
-      image_count: gallery.imageCount,
-      details: gallery.details,
-      url: gallery.url,
-      code: gallery.code,
-      folder: gallery.folderPath ? { path: gallery.folderPath } : null,
-      // Files array for frontend galleryTitle() fallback
-      files,
-      // Cover as simple string URL for consistency
-      cover: coverUrl,
-      // Tags from junction table relation - will be hydrated with names in controller
-      tags,
-      // Performers from junction table
-      performers,
-      // Scenes from junction table
-      scenes,
-      created_at: gallery.stashCreatedAt?.toISOString() ?? null,
-      updated_at: gallery.stashUpdatedAt?.toISOString() ?? null,
-    };
   }
 }
 
