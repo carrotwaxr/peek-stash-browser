@@ -3,7 +3,7 @@
  * filtered to the card's entity, on its instance, through a filter the page
  * declares; a count whose page has no filter for that entity opens nothing,
  * rather than an unfiltered list. Each link is read back with the page's own
- * filter options, as `useFilterState` reads it on arrival. GalleryCard's
+ * filter options, as `useListUrlState` reads it on arrival. GalleryCard's
  * links are in GalleryCard.test.tsx.
  */
 import type { ReactElement } from "react";

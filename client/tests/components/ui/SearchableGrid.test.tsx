@@ -6,22 +6,17 @@ import SearchableGrid from "../../../src/components/ui/SearchableGrid";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
 
-const { api, filterState } = vi.hoisted(() => ({
+const { api } = vi.hoisted(() => ({
   api: {
     findPerformers: vi.fn<Find>(),
     findGalleries: vi.fn<Find>(),
     findStudios: vi.fn<Find>(),
     findGroups: vi.fn<Find>(),
   },
-  /** What the mocked useFilterState returns: one object per test, so its filters stay the same object */
-  filterState: { current: {} },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: true, isLoading: false }),
-}));
-vi.mock("@/hooks/useFilterState", () => ({
-  useFilterState: () => filterState.current,
 }));
 vi.mock("@/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
@@ -50,34 +45,6 @@ vi.mock("@/api", () => ({
   },
 }));
 
-/** useFilterState, initialized, with the panel's filters */
-const filterStateWith = (filters: Record<string, unknown>) => ({
-  filters,
-  sort: { field: "name", direction: "ASC" },
-  pagination: { page: 1, perPage: 24 },
-  searchText: "",
-  viewMode: "grid",
-  zoomLevel: "medium",
-  gridDensity: "medium",
-  timelinePeriod: null,
-  isInitialized: true,
-  isLoadingPresets: false,
-  setFilter: vi.fn(),
-  setFilters: vi.fn(),
-  removeFilter: vi.fn(),
-  clearFilters: vi.fn(),
-  setSort: vi.fn(),
-  setPage: vi.fn(),
-  setPerPage: vi.fn(),
-  setSearchText: vi.fn(),
-  setViewMode: vi.fn(),
-  setZoomLevel: vi.fn(),
-  setGridDensity: vi.fn(),
-  setTableColumns: vi.fn(),
-  setTimelinePeriod: vi.fn(),
-  loadPreset: vi.fn(),
-});
-
 describe("SearchableGrid", () => {
   it("is defined as a component", () => {
     expect(SearchableGrid).toBeDefined();
@@ -92,14 +59,14 @@ describe("SearchableGrid", () => {
 /** A detail page's tab lock: the page's studio or tag, with its sub-items */
 const LOCK = { value: ["7:inst-a"], modifier: "INCLUDES", depth: -1 };
 
-/** A detail tab of each grid kind: its lock and a filter set in its panel */
+/** A detail tab of each grid kind: its lock and a filter set in its panel (in the URL) */
 const TABS = [
   {
     tab: "a tag's Performers tab",
     entityType: "performer",
     find: "findPerformers",
     filterKey: "performer_filter",
-    panel: { gender: "FEMALE" },
+    panel: "?gender=FEMALE",
     fromPanel: { gender: { value: "FEMALE", modifier: "EQUALS" } },
     locked: { tags: LOCK },
   },
@@ -108,7 +75,7 @@ const TABS = [
     entityType: "gallery",
     find: "findGalleries",
     filterKey: "gallery_filter",
-    panel: { favorite: true },
+    panel: "?favorite=true",
     fromPanel: { favorite: true },
     locked: { studios: LOCK },
   },
@@ -117,7 +84,7 @@ const TABS = [
     entityType: "studio",
     find: "findStudios",
     filterKey: "studio_filter",
-    panel: { favorite: true },
+    panel: "?favorite=true",
     fromPanel: { favorite: true },
     locked: { tags: LOCK },
   },
@@ -126,7 +93,7 @@ const TABS = [
     entityType: "group",
     find: "findGroups",
     filterKey: "group_filter",
-    panel: { name: "Summer" },
+    panel: "?name=Summer",
     fromPanel: { name: { value: "Summer", modifier: "INCLUDES" } },
     locked: { studios: LOCK },
   },
@@ -159,10 +126,8 @@ describe("SearchableGrid lockedFilters", () => {
   it.each(TABS)(
     "$tab: a panel filter and the lock both reach the request",
     async ({ entityType, find, filterKey, panel, fromPanel, locked }) => {
-      filterState.current = filterStateWith(panel);
-
       render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[`/tab${panel}`]}>
           <SearchableGrid
             entityType={entityType}
             lockedFilters={{ [filterKey]: locked }}
@@ -180,10 +145,8 @@ describe("SearchableGrid lockedFilters", () => {
   );
 
   it("the lock wins over the panel's criterion of the same field", async () => {
-    filterState.current = filterStateWith({ tagIds: ["9:inst-b"] });
-
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/tab?tagIds=9:inst-b"]}>
         <SearchableGrid
           entityType="performer"
           lockedFilters={{ performer_filter: { tags: LOCK } }}

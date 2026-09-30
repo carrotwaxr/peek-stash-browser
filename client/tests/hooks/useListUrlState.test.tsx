@@ -295,16 +295,61 @@ describe("useListUrlState", () => {
       });
     });
 
-    it("rating_min alone disables the preset's filters, and clearFilters removes it", async () => {
+    it("rating_min alone disables the preset's filters", () => {
       const list = renderList(
         "/scenes?rating_min=60",
         SCENE_OPTIONS,
         favoritePreset
       );
       expect(list.state.filters).toEqual({ rating: { min: "60" } });
+    });
+
+    it("clearFilters with a filtering default preset shows the unfiltered list and Back restores the filters", async () => {
+      const list = renderList("/scenes", SCENE_OPTIONS, favoritePreset);
+      expect(list.state.filters).toEqual({ favorite: true });
 
       await actAsync(() => list.state.clearFilters());
+      expect(list.state.filters).toEqual({});
+      expect(list.params().get("filters")).toBe("none");
+      expect(list.state.listKey).not.toContain("none");
+
+      await act(() => list.router.navigate(-1));
+      expect(list.state.filters).toEqual({ favorite: true });
+    });
+
+    it("removing the last chip leaves the list unfiltered", async () => {
+      const list = renderList(
+        "/scenes?rating_min=60",
+        SCENE_OPTIONS,
+        favoritePreset
+      );
+
+      await actAsync(() => list.state.removeFilter("rating"));
       expect(list.params().has("rating_min")).toBe(false);
+      expect(list.state.filters).toEqual({});
+
+      // A later filter write drops the marker
+      await actAsync(() => list.state.applyFilters({ rating: { min: "80" } }));
+      expect(list.params().has("filters")).toBe(false);
+      expect(list.state.filters).toEqual({ rating: { min: "80" } });
+    });
+
+    it("loading a preset with no filters leaves the list unfiltered", async () => {
+      const list = renderList("/scenes", SCENE_OPTIONS, favoritePreset);
+
+      await actAsync(() => list.state.loadPreset(preset({ filters: {} })));
+      expect(list.state.filters).toEqual({});
+    });
+
+    it("a bare list URL still applies the default preset", async () => {
+      const list = renderList(
+        "/scenes?filters=none",
+        SCENE_OPTIONS,
+        favoritePreset
+      );
+      expect(list.state.filters).toEqual({});
+
+      await act(() => list.router.navigate("/scenes"));
       expect(list.state.filters).toEqual({ favorite: true });
     });
 
@@ -500,7 +545,7 @@ describe("useListUrlState", () => {
       });
       await actAsync(() => list.state.clearFilters());
       expect(list.state.filters).toEqual({});
-      expect(list.url()).toBe("/scenes");
+      expect(list.url()).toBe("/scenes?filters=none");
     });
 
     it("setQuery writes q and resets the page", async () => {
@@ -509,6 +554,13 @@ describe("useListUrlState", () => {
       expect(list.state.q).toBe("test query");
       expect(list.params().get("q")).toBe("test query");
       expect(list.state.page).toBe(1);
+    });
+
+    it("setQuery with the search the URL already holds writes nothing", async () => {
+      const list = renderList("/scenes?q=beach&page=2");
+      await actAsync(() => list.state.setQuery("beach"));
+      expect(list.actions).toEqual([]);
+      expect(list.state.page).toBe(2);
     });
 
     it("setFolderPath writes the path and resets the page", async () => {

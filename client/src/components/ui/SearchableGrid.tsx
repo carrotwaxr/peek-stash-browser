@@ -33,7 +33,6 @@ export interface SearchableGridProps {
   emptyMessage?: string;
   emptyDescription?: string;
   skeletonCount?: number;
-  syncToUrl?: boolean;
   density?: "small" | "medium" | "large";
 }
 
@@ -73,7 +72,6 @@ export const SearchableGrid = ({
   emptyMessage,
   emptyDescription,
   skeletonCount = 24,
-  syncToUrl = true,
   density = "medium",
 }: SearchableGridProps) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -217,7 +215,6 @@ export const SearchableGrid = ({
       permanentFiltersMetadata={permanentFiltersMetadata}
       totalPages={totalPages}
       totalCount={totalCount}
-      syncToUrl={syncToUrl}
     >
       <SearchResults
         entityType={entityType}

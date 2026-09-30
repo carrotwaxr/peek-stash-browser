@@ -248,15 +248,24 @@ Save your current view configuration for quick access later.
 
 ## URL Persistence
 
-Your browse state is reflected in the URL, making it easy to bookmark or share specific views.
+Your browse state is reflected in the URL, making it easy to bookmark or share specific views. The list follows the address bar:
+
+- **Back and Forward** step through filters, sort, pages and folders.
+- **Search text, per page, view, zoom and density** replace the current history entry, so they add no Back steps.
+- **A default preset** applies whenever the URL names no filter. Clearing the filters (Clear All, removing the last chip, or loading a preset without filters) writes `filters=none`, so the list stays unfiltered and Back brings the filters back; a plain list link, such as the sidebar's, gets the default preset again.
+- **Random order** keeps its seed in the URL (`sort=random_12345678`), so coming back from a scene shows the same order.
 
 **URL parameters include:**
 
-- `view` - grid, wall, table, or hierarchy
+- `q` - search text
+- `page` and `per_page` - the page and its size
+- `sort` and `dir` - current sort settings
+- `view` - grid, wall, table, timeline, folder or hierarchy
 - `grid_density` - small, medium, or large (grid view)
 - `zoom` - small, medium, or large (wall view)
-- `sort` and `dir` - current sort settings
-- Filter parameters - active filters
+- `timeline_period` - the selected period (timeline view)
+- `folderPath` - the open folder (folder view)
+- Filter parameters - active filters, or `filters=none` when you cleared them
 
 Sharing a URL shares your exact view configuration.
 

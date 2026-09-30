@@ -97,13 +97,13 @@ vi.mock("@/components/ui/index", async (importOriginal) => {
   const PanelStub = ({
     onQueryChange,
   }: {
-    onQueryChange: (query: Record<string, unknown>) => void;
+    onQueryChange?: ((query: Record<string, unknown>) => void) | undefined;
   }) => {
     const fired = React.useRef(false);
     React.useEffect(() => {
       if (fired.current) return;
       fired.current = true;
-      onQueryChange(panelQuery.current);
+      onQueryChange?.(panelQuery.current);
     }, [onQueryChange]);
     return null;
   };

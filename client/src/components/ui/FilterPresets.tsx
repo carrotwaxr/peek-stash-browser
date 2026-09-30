@@ -159,14 +159,10 @@ const FilterPresets = ({
   };
 
   const handleLoadPreset = (preset: SavedPreset) => {
-    // Merge permanent filters back in when loading
-    const mergedFilters = {
-      ...preset.filters,
-      ...permanentFilters,
-    };
-
+    // The preset's own filters: the page's permanent filters are merged into
+    // the request, never written into the list's URL
     onLoadPreset({
-      filters: mergedFilters,
+      filters: preset.filters,
       sort: preset.sort,
       direction: preset.direction,
       viewMode: preset.viewMode || "grid",

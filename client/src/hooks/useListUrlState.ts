@@ -6,7 +6,8 @@
  * Each field is the URL's value if present and valid, else the default
  * preset's, else the entity default. The preset's filters apply only while
  * the URL names no filter (a key of the entity's `UI_KEYS`, a companion,
- * singular, range or date form, or `q`); `instance`, `tab`, `sort`, `view`
+ * singular, range or date form, `q`, or `filters=none`, which a filter
+ * change that leaves no filter writes); `instance`, `tab`, `sort`, `view`
  * and every other key leave them on.
  *
  * Setters rewrite only the list's own keys (`listOwnedKeys`). History: push
@@ -16,7 +17,7 @@
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { DEFAULT_SORT } from "@peek/shared-types";
+import { DEFAULT_SORT, Q_MAX_LENGTH } from "@peek/shared-types";
 import {
   type SavedPreset,
   presetsForContext,
@@ -53,6 +54,9 @@ export interface ListDefaults {
 }
 
 type SortOptions = readonly { value: string }[];
+
+/** What loading a preset applies: a saved preset, or the Load Preset menu's copy of one */
+export type PresetToLoad = Omit<SavedPreset, "id" | "name">;
 
 export interface UseListUrlStateOptions {
   entityType: ListEntity;
@@ -96,19 +100,19 @@ export interface ListUrlState {
   listKey: string;
   /** The serialised list query without its page; "" until ready */
   listKeyWithoutPage: string;
-  applyFilters(filters: Record<string, unknown>): void;
-  removeFilter(key: string): void;
-  clearFilters(): void;
-  setSort(field: string, direction?: Direction): void;
-  setPage(page: number, opts?: { history?: "push" | "replace" }): void;
-  setPerPage(perPage: number): void;
-  setQuery(q: string): void;
-  setViewMode(mode: string): void;
-  setZoomLevel(zoom: string): void;
-  setGridDensity(density: string): void;
-  setTimelinePeriod(period: string | null): void;
-  setFolderPath(path: string[]): void;
-  loadPreset(preset: SavedPreset): void;
+  applyFilters: (filters: Record<string, unknown>) => void;
+  removeFilter: (key: string) => void;
+  clearFilters: () => void;
+  setSort: (field: string, direction?: Direction) => void;
+  setPage: (page: number, opts?: { history?: "push" | "replace" }) => void;
+  setPerPage: (perPage: number) => void;
+  setQuery: (q: string) => void;
+  setViewMode: (mode: string) => void;
+  setZoomLevel: (zoom: string) => void;
+  setGridDensity: (density: string) => void;
+  setTimelinePeriod: (period: string | null) => void;
+  setFolderPath: (path: string[]) => void;
+  loadPreset: (preset: PresetToLoad) => void;
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -305,9 +309,15 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
     [write]
   );
 
+  // The same search again (the search box showing a URL's q after Back)
+  // writes nothing, so it cannot eat the Back with a replace
+  const currentQ = derived.q;
   const setQuery = useCallback(
-    (q: string) => write({ q, page: 1 }, "replace"),
-    [write]
+    (q: string) => {
+      if (q.slice(0, Q_MAX_LENGTH) === currentQ) return;
+      write({ q, page: 1 }, "replace");
+    },
+    [write, currentQ]
   );
 
   const setViewMode = useCallback(
@@ -343,7 +353,7 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   );
 
   const loadPreset = useCallback(
-    (preset: SavedPreset) => {
+    (preset: PresetToLoad) => {
       const field = parseSortValue(preset.sort || defaults.sort).field;
       write(
         {

@@ -189,7 +189,7 @@ describe("FilterPresets", () => {
       });
     });
 
-    it("merges permanent filters when loading preset", async () => {
+    it("loads the preset's own filters, not the page's permanent filters", async () => {
       const user = userEvent.setup();
       const onLoadPreset = vi.fn();
       render(
@@ -217,9 +217,9 @@ describe("FilterPresets", () => {
       // Click on preset
       await user.click(screen.getByText("Favorites"));
 
-      // Should include both preset filters and permanent filters
+      // The request merges the permanent filters; the URL never holds them
       expect(onLoadPreset).toHaveBeenCalledWith({
-        filters: { favorite: true, studioId: "studio-123" },
+        filters: { favorite: true },
         sort: "rating",
         direction: "DESC",
         viewMode: "grid",

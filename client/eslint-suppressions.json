@@ -707,20 +707,11 @@
     }
   },
   "src/components/ui/SearchControls.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
     "@typescript-eslint/no-non-null-assertion": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 7
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
+      "count": 3
     }
   },
   "src/components/ui/SearchInput.tsx": {
@@ -1183,29 +1174,6 @@
       "count": 2
     }
   },
-  "src/hooks/useFilterState.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 11
-    },
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 20
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 10
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 14
-    }
-  },
   "src/hooks/useFocusTrap.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
@@ -1587,25 +1555,6 @@
       "count": 1
     }
   },
-  "tests/components/ui/SearchControls.test.tsx": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 8
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 10
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 11
-    }
-  },
-  "tests/components/ui/SearchControlsInit.test.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
   "tests/components/video-player/PlaybackControls.download.test.tsx": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 2
@@ -1626,22 +1575,6 @@
     },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 123
-    }
-  },
-  "tests/hooks/useFilterState.test.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    }
-  },
-  "tests/hooks/useFilterState.viewMode.test.tsx": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 1
     }
   },
   "tests/hooks/usePaginatedLightbox.test.tsx": {

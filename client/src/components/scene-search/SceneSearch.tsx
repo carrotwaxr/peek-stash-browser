@@ -55,7 +55,6 @@ interface SceneSearchProps {
   subtitle?: string;
   title?: string;
   fromPageTitle?: string;
-  syncToUrl?: boolean;
 }
 
 const SceneSearch = ({
@@ -66,7 +65,6 @@ const SceneSearch = ({
   subtitle,
   title,
   fromPageTitle,
-  syncToUrl = true, // Whether to sync pagination/filters to URL
 }: SceneSearchProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -100,7 +98,7 @@ const SceneSearch = ({
   const isLoading = queryParams === null || queryLoading || initializing;
 
   // Track current view mode for context settings
-  // Initialize from URL to stay in sync with useFilterState on back navigation
+  // Seeded from the URL; SearchControls reports each change, Back included
   const [currentViewMode, setCurrentViewMode] = useState(
     searchParams.get("view") || "grid"
   );
@@ -301,7 +299,6 @@ const SceneSearch = ({
         deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
         totalPages={totalPages}
         totalCount={totalCount}
-        syncToUrl={syncToUrl}
         supportsWallView={true}
         viewModes={
           VIEW_MODES as unknown as React.ComponentProps<

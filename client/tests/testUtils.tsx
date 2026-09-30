@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
-import { type Mock, vi } from "vitest";
+import { vi } from "vitest";
 import type { AuthContextValue } from "@/contexts/AuthContextProvider";
 
 // ============================================================================
@@ -160,29 +160,6 @@ export const createMockApi = () => ({
     updateFavorite: vi.fn().mockResolvedValue({}),
   },
 });
-
-/**
- * Sets up preset API mocks for useFilterState tests
- *
- * @param {object} apiGet - The mocked apiGet function
- * @param {object} options - Configuration options
- * @param {object} options.presets - Presets by artifact type
- * @param {object} options.defaults - Default preset IDs by artifact type
- */
-export const setupPresetMocks = (
-  apiGet: Mock<(url: string) => Promise<unknown>>,
-  { presets = {}, defaults = {} } = {}
-) => {
-  apiGet.mockImplementation((url) => {
-    if (url === "/user/filter-presets") {
-      return Promise.resolve({ presets });
-    }
-    if (url === "/user/default-presets") {
-      return Promise.resolve({ defaults });
-    }
-    return Promise.resolve({});
-  });
-};
 
 // ============================================================================
 // Event Simulation Helpers

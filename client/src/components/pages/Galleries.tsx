@@ -65,7 +65,7 @@ const Galleries = () => {
   const isLoading = queryParams === null || queryLoading || initializing;
 
   // Track current view mode for timeline date filter and folder view
-  // Initialize from URL to stay in sync with useFilterState on back navigation
+  // Seeded from the URL; SearchControls reports each change, Back included
   const [currentViewMode, setCurrentViewMode] = useState(
     searchParams.get("view") || "grid"
   );

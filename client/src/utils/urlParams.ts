@@ -305,8 +305,17 @@ export const parseSearchParams = (
 /** A list the URL holds the state of: the seven entity lists and clips */
 export type ListEntity = ListKind;
 
+/**
+ * `filters=none`: the user cleared the filters, so the default preset's
+ * filters stay off. Written by a filter change that leaves no filter, dropped
+ * by the next one that sets any; never sent to the server.
+ */
+const NO_FILTERS_KEY = "filters";
+const NO_FILTERS_VALUE = "none";
+
 /** The keys every list owns beside its filters */
 const LIST_STATE_KEYS = [
+  NO_FILTERS_KEY,
   "q",
   "sort",
   "dir",
@@ -370,7 +379,10 @@ export const LIST_OWNED_KEYS: readonly string[] = [
 export interface ListUrlParams {
   /** The page's filters the URL names (panel shape) */
   filters: Record<string, unknown>;
-  /** The URL names a filter or a search, so the default preset's filters stay off */
+  /**
+   * The URL names a filter, a search or `filters=none`, so the default
+   * preset's filters stay off
+   */
   hasFilters: boolean;
   /** At most Q_MAX_LENGTH characters */
   q: string | null;
@@ -390,7 +402,8 @@ export interface ListUrlParams {
 /**
  * Reads a list's state from the URL, each field with its presence. The
  * filters go through the one parser (`urlParamsToFilters`); "the URL has
- * filters" means it holds one of the entity's filter keys or `q`.
+ * filters" means it holds one of the entity's filter keys, `q` or
+ * `filters=none`.
  */
 export const readListParams = (
   searchParams: URLSearchParams,
@@ -408,7 +421,9 @@ export const readListParams = (
   return {
     filters: urlParamsToFilters(searchParams, filterOptions),
     hasFilters:
-      q !== null || listFilterKeys(entity).some((key) => searchParams.has(key)),
+      q !== null ||
+      searchParams.get(NO_FILTERS_KEY) === NO_FILTERS_VALUE ||
+      listFilterKeys(entity).some((key) => searchParams.has(key)),
     q,
     sort: param("sort"),
     dir: param("dir"),
@@ -471,7 +486,8 @@ const setOrDelete = (
  * The next URL for a list change: rewrites only the keys of the fields the
  * patch names, all of them the entity's list-owned keys, and keeps every
  * other key. Presentation keys are written only when they differ from what
- * the page shows without them; `page` is left out at 1.
+ * the page shows without them; `page` is left out at 1. Filters that leave
+ * no filter key write `filters=none`, so the default preset stays off.
  */
 export const writeListParams = (
   prev: URLSearchParams,
@@ -481,9 +497,12 @@ export const writeListParams = (
   const next = new URLSearchParams(prev);
   if (patch.filters !== undefined) {
     for (const key of listFilterKeys(entity)) next.delete(key);
-    filtersToUrlParams(patch.filters, filterOptions).forEach((value, key) => {
+    next.delete(NO_FILTERS_KEY);
+    const written = filtersToUrlParams(patch.filters, filterOptions);
+    written.forEach((value, key) => {
       next.set(key, value);
     });
+    if (written.toString() === "") next.set(NO_FILTERS_KEY, NO_FILTERS_VALUE);
   }
   if (patch.q !== undefined) {
     setOrDelete(next, "q", patch.q.slice(0, Q_MAX_LENGTH));

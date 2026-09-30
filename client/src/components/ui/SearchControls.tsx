@@ -5,10 +5,16 @@ import React, {
   useRef,
   useState,
 } from "react";
+import deepEqual from "fast-deep-equal";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
-import { useFilterState } from "../../hooks/useFilterState";
+import {
+  type ListDefaults,
+  type ListUrlState,
+  type PresetToLoad,
+  useListUrlState,
+} from "../../hooks/useListUrlState";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { useTVMode } from "../../hooks/useTVMode";
 import {
@@ -19,19 +25,15 @@ import {
   IMAGE_FILTER_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   SCENE_FILTER_OPTIONS,
-  SCENE_SORT_OPTIONS,
-  SCENE_SORT_OPTIONS_BASE,
   STUDIO_FILTER_OPTIONS,
   TAG_FILTER_OPTIONS,
 } from "../../utils/filterConfig";
 import {
-  buildFilter,
-  getSortOptions,
-  hasIncludingCollection,
-  offersSceneIndex,
-  sortOffered,
+  type ListQuery,
+  buildListQuery,
+  sortOptionsFor,
 } from "../../utils/listQuery";
-// Note: parseSearchParams and buildSearchParams now handled by useFilterState hook
+import type { ListEntity } from "../../utils/urlParams";
 import {
   ActiveFilterChips,
   Button,
@@ -60,104 +62,75 @@ interface SearchControlsProps {
   artifactType?: string;
   context?: string;
   children: React.ReactNode;
+  /**
+   * The list's state from the page's `useListUrlState`. Without it the
+   * controls derive it themselves and report it through the callbacks below
+   * (until every page passes it).
+   */
+  listState?: ListUrlState;
+  /** The entity's default sort (without `listState`) */
   initialSort?: string;
-  onQueryChange: (query: Record<string, unknown>) => void;
+  /**
+   * Called with the list's request (`ListQuery`) whenever it changes
+   * (without `listState`)
+   */
+  onQueryChange?: (query: Record<string, unknown>) => void;
+  /** Called with the per page whenever it changes (without `listState`) */
   onPerPageStateChange?: (perPage: number) => void;
+  /** Filled with a page setter: the Images lightbox pages across the list with it */
   paginationHandlerRef?: React.RefObject<((page: number) => void) | null>;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: Record<string, unknown>;
   totalPages: number;
   totalCount: number;
-  syncToUrl?: boolean;
   supportsWallView?: boolean;
   viewModes?: ViewModeConfig[];
+  /** Called with the view whenever it changes (without `listState`) */
   onViewModeChange?: (mode: string) => void;
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
   contextSettings?: SettingConfig[];
+  /** No request while the permanent filters are still empty (the timeline's first period) */
   deferInitialQueryUntilFiltersReady?: boolean;
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
 }
 
-const SearchControls = ({
-  artifactType = "scene",
-  context,
-  children,
-  initialSort = "o_counter",
-  onQueryChange,
-  onPerPageStateChange,
-  paginationHandlerRef,
-  permanentFilters = {},
-  permanentFiltersMetadata = {},
-  totalPages,
-  totalCount,
-  syncToUrl = true,
-  supportsWallView = false,
-  viewModes,
-  onViewModeChange,
-  currentTableColumns = null,
-  tableColumnsPopover = null,
-  contextSettings = [],
-  deferInitialQueryUntilFiltersReady = false,
-  isRefreshing = false,
-}: SearchControlsProps) => {
-  // Use context if provided, otherwise fall back to artifactType
-  const effectiveContext = context || artifactType;
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [highlightedFilterKey, setHighlightedFilterKey] = useState<
-    string | null
-  >(null);
-  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
-  const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
-  const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
-  const randomSeedRef = useRef(-1); // Random seed for stable pagination (-1 = uninitialized)
+const NO_FILTERS: Record<string, unknown> = {};
 
-  // TV Mode
-  const { isTVMode } = useTVMode();
+/** A filter value that filters: not empty, and an object with a value set */
+const isActiveFilter = (value: unknown) =>
+  value !== undefined &&
+  value !== "" &&
+  (typeof value !== "object" ||
+    value === null ||
+    Object.values(value).some((v) => v !== "" && v !== undefined));
+const NO_SETTINGS: SettingConfig[] = [];
 
-  // Unit preference for filter conversions
+/** A card display setting's value, or the fallback when it has none */
+const settingOr = (value: unknown, fallback: string) =>
+  typeof value === "string" && value !== "" ? value : fallback;
+
+/** The panel's options for an entity, the body-measure ranges in the user's units */
+function useFilterOptions(artifactType: string): FilterOption[] {
   const { unitPreference } = useUnitPreference();
-
-  // Get default view mode and density settings from card display settings
-  const { getSettings } = useCardDisplaySettings();
-  const entitySettings = getSettings(artifactType);
-  const defaultViewMode = entitySettings.defaultViewMode || "grid";
-  const defaultGridDensity = entitySettings.defaultGridDensity || "medium";
-  const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
-
-  // Get filter options for this artifact type
-  const filterOptions: FilterOption[] = useMemo(() => {
-    // Transform filter options based on unit preference
+  return useMemo(() => {
     const transformForUnits = (options: FilterOption[]) => {
       if (unitPreference !== "imperial") return options;
       return options.map((opt) => {
-        // Transform height filter for imperial
         if (opt.key === "height") {
           return {
             ...opt,
             label: "Height (ft/in)",
             type: "imperial-height-range",
-            // Store in separate keys that buildPerformerFilter will convert
+            // Separate keys that buildPerformerFilter converts
           };
         }
-        // Transform weight filter for imperial
         if (opt.key === "weight") {
-          return {
-            ...opt,
-            label: "Weight (lbs)",
-            min: 50,
-            max: 500,
-          };
+          return { ...opt, label: "Weight (lbs)", min: 50, max: 500 };
         }
-        // Transform penisLength filter for imperial
         if (opt.key === "penisLength") {
-          return {
-            ...opt,
-            label: "Penis Length (inches)",
-            min: 1,
-            max: 15,
-          };
+          return { ...opt, label: "Penis Length (inches)", min: 1, max: 15 };
         }
         return opt;
       });
@@ -183,6 +156,190 @@ const SearchControls = ({
         return [...SCENE_FILTER_OPTIONS];
     }
   }, [artifactType, unitPreference]);
+}
+
+/**
+ * A page that does not pass `listState` yet: the controls derive the list
+ * state from the URL themselves and keep the old outward contract, through
+ * effects over derived values only, so the page's copies follow Back too.
+ */
+const SearchControlsOnUrl = (props: SearchControlsProps) => {
+  const {
+    artifactType = "scene",
+    context,
+    initialSort = "o_counter",
+    onQueryChange,
+    onPerPageStateChange,
+    onViewModeChange,
+    permanentFilters = NO_FILTERS,
+    supportsWallView = false,
+    viewModes,
+    deferInitialQueryUntilFiltersReady = false,
+  } = props;
+  const entity = artifactType as ListEntity;
+  const filterOptions = useFilterOptions(artifactType);
+  const { unitPreference } = useUnitPreference();
+
+  // Entity defaults, the user's card display settings folded in
+  const { getSettings } = useCardDisplaySettings();
+  const entitySettings = getSettings(artifactType);
+  const defaultViewMode = settingOr(entitySettings.defaultViewMode, "grid");
+  const defaultGridDensity = settingOr(
+    entitySettings.defaultGridDensity,
+    "medium"
+  );
+  const defaultZoomLevel = settingOr(entitySettings.defaultWallZoom, "medium");
+  const defaults = useMemo<ListDefaults>(
+    () => ({
+      sort: initialSort,
+      direction: "DESC",
+      perPage: 24,
+      viewMode: defaultViewMode,
+      zoomLevel: defaultZoomLevel,
+      gridDensity: defaultGridDensity,
+    }),
+    [initialSort, defaultViewMode, defaultZoomLevel, defaultGridDensity]
+  );
+
+  const viewModeIds = useMemo(
+    () =>
+      viewModes
+        ? viewModes.map((mode) => mode.id)
+        : supportsWallView
+          ? ["grid", "wall"]
+          : ["grid"],
+    [viewModes, supportsWallView]
+  );
+
+  const sortOptions = useCallback(
+    (filters: Record<string, unknown>) => sortOptionsFor(artifactType, filters),
+    [artifactType]
+  );
+
+  const listState = useListUrlState({
+    entityType: entity,
+    ...(context ? { context } : {}),
+    filterOptions,
+    sortOptions,
+    viewModes: viewModeIds,
+    defaults,
+    permanentFilters,
+  });
+
+  const { ready, filters, sort, page, perPage, q, viewMode } = listState;
+  const query = useMemo(
+    () =>
+      buildListQuery(
+        entity,
+        { ready, filters, sort, page, perPage, q },
+        permanentFilters,
+        unitPreference
+      ),
+    [
+      entity,
+      ready,
+      filters,
+      sort,
+      page,
+      perPage,
+      q,
+      permanentFilters,
+      unitPreference,
+    ]
+  );
+
+  // The page's request follows the URL: sent whenever it changes, not while
+  // the timeline's first period is still to come
+  const deferred =
+    deferInitialQueryUntilFiltersReady &&
+    Object.keys(permanentFilters).length === 0;
+  const lastSentRef = useRef<ListQuery | null>(null);
+  useEffect(() => {
+    if (!query || deferred || !onQueryChange) return;
+    if (lastSentRef.current && deepEqual(lastSentRef.current, query)) return;
+    lastSentRef.current = query;
+    onQueryChange(query);
+  }, [query, deferred, onQueryChange]);
+
+  // The page's copies of the view and per page follow the URL too
+  useEffect(() => {
+    onViewModeChange?.(viewMode);
+  }, [viewMode, onViewModeChange]);
+  useEffect(() => {
+    onPerPageStateChange?.(perPage);
+  }, [perPage, onPerPageStateChange]);
+
+  return <SearchControlsView {...props} listState={listState} />;
+};
+
+/**
+ * The list's controls: search, sort, filters, presets, view and paging. Every
+ * control writes the URL through the list state; nothing here holds a copy
+ * of it (the filter panel keeps only the draft being edited).
+ */
+const SearchControls = (props: SearchControlsProps) =>
+  props.listState ? (
+    <SearchControlsView {...props} listState={props.listState} />
+  ) : (
+    <SearchControlsOnUrl {...props} />
+  );
+
+const SearchControlsView = ({
+  artifactType = "scene",
+  context,
+  children,
+  listState,
+  paginationHandlerRef,
+  permanentFilters = NO_FILTERS,
+  permanentFiltersMetadata = NO_FILTERS,
+  totalPages,
+  totalCount,
+  supportsWallView = false,
+  viewModes,
+  currentTableColumns = null,
+  tableColumnsPopover = null,
+  contextSettings = NO_SETTINGS,
+  isRefreshing = false,
+}: SearchControlsProps & { listState: ListUrlState }) => {
+  // Use context if provided, otherwise fall back to artifactType
+  const effectiveContext = context || artifactType;
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [highlightedFilterKey, setHighlightedFilterKey] = useState<
+    string | null
+  >(null);
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
+  const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
+  const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
+
+  const { isTVMode } = useTVMode();
+  const filterOptions = useFilterOptions(artifactType);
+
+  const {
+    filters,
+    sort,
+    page: currentPage,
+    perPage,
+    q: searchText,
+    viewMode,
+    zoomLevel,
+    gridDensity,
+    timelinePeriod,
+    ready,
+    applyFilters,
+    removeFilter,
+    clearFilters,
+    setSort,
+    setPage,
+    setPerPage,
+    setQuery,
+    setViewMode,
+    setZoomLevel,
+    setGridDensity,
+    setTimelinePeriod,
+    loadPreset,
+  } = listState;
+  const sortField = sort.field;
+  const sortDirection = sort.direction;
 
   // Track collapsed state for each filter section
   const [collapsedSections, setCollapsedSections] = useState<
@@ -197,303 +354,43 @@ const SearchControls = ({
     return initial;
   });
 
-  // Use the centralized filter state hook for URL sync and preset loading
-  const {
-    filters,
-    sort,
-    pagination,
-    searchText,
-    viewMode,
-    zoomLevel,
-    isInitialized,
-    isLoadingPresets,
-    setFilters: setFiltersAction,
-    removeFilter: removeFilterAction,
-    clearFilters: clearFiltersAction,
-    setSort: setSortAction,
-    setPage,
-    setPerPage: setPerPageAction,
-    setSearchText: setSearchTextAction,
-    setViewMode,
-    setZoomLevel,
-    gridDensity,
-    setGridDensity,
-    loadPreset,
-    timelinePeriod,
-    setTimelinePeriod,
-  } = useFilterState({
-    artifactType,
-    context: effectiveContext,
-    initialSort,
-    permanentFilters,
-    filterOptions,
-    syncToUrl,
-    defaultViewMode: defaultViewMode as string,
-    defaultGridDensity: defaultGridDensity as string,
-    defaultZoomLevel: defaultZoomLevel as string,
-  });
-
-  // Extract values for compatibility with existing code
-  const currentPage = pagination.page;
-  const perPage = pagination.perPage;
-  const sortField = sort.field;
-  const sortDirection = sort.direction;
-
-  // Local filters state for filter panel editing (before submit)
-  const [localFilters, setLocalFilters] = useState(filters);
-
-  // Sync local filters when hook filters change (e.g., from preset load)
-  useEffect(() => {
-    setLocalFilters(filters);
-  }, [filters]);
-
-  // Get sort value with embedded random seed when needed
-  // Uses ref so seed persists across renders without causing re-renders
-  const getSortWithSeed = useCallback((sort: string) => {
-    // Normalize: treat both "random" and "random_*" as random sort
-    // (latter can happen if saved in preset, though we try to avoid it)
-    const isRandomSort = sort === "random" || sort.startsWith("random_");
-
-    if (isRandomSort) {
-      if (randomSeedRef.current === -1) {
-        // Generate new 8-digit seed on first call
-        randomSeedRef.current = Math.floor(Math.random() * 1e8);
-      }
-      return `random_${randomSeedRef.current}`;
-    }
-    return sort;
-  }, []);
-
-  // Reset random seed (call when changing sort type or loading presets)
-  const resetRandomSeed = useCallback(() => {
-    randomSeedRef.current = -1;
-  }, []);
-
-  // Track if we've triggered the initial query
-  const hasTriggeredInitialQuery = useRef(false);
-
-  // Check if permanentFilters are ready (non-empty when deferring is enabled)
-  const permanentFiltersReady =
-    !deferInitialQueryUntilFiltersReady ||
-    Object.keys(permanentFilters).length > 0;
-
-  // Effect 1: Fire initial search query when hook is initialized and filters are ready
-  useEffect(() => {
-    if (
-      !isInitialized ||
-      hasTriggeredInitialQuery.current ||
-      !permanentFiltersReady
-    )
-      return;
-    hasTriggeredInitialQuery.current = true;
-
-    // Include permanent filters in initial query
-    const mergedFilters = { ...filters, ...permanentFilters };
-
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: currentPage,
-        per_page: perPage,
-        q: searchText,
-        sort: getSortWithSeed(
-          sortOffered(artifactType, sortField, mergedFilters)
-        ),
-      },
-      ...buildFilter(artifactType, mergedFilters, unitPreference),
-    };
-    onQueryChange(query);
-  }, [
-    isInitialized,
-    permanentFiltersReady,
-    sortDirection,
-    currentPage,
-    perPage,
-    searchText,
-    sortField,
-    filters,
-    permanentFilters,
-    artifactType,
-    unitPreference,
-    onQueryChange,
-    getSortWithSeed,
-  ]);
-
-  // Effect 2: Notify parent of initial viewMode and perPage after first query fires
-  // Separated from the query effect to isolate concerns — this syncs parent state
-  // (e.g., when a default preset sets viewMode to "hierarchy")
-  const hasNotifiedParent = useRef(false);
-  useEffect(() => {
-    if (!hasTriggeredInitialQuery.current || hasNotifiedParent.current) return;
-    hasNotifiedParent.current = true;
-
-    onViewModeChange?.(viewMode);
-    onPerPageStateChange?.(perPage);
-  }, [onViewModeChange, viewMode, onPerPageStateChange, perPage]);
-
-  // Track previous permanentFilters to detect changes
-  const prevPermanentFiltersRef = useRef(permanentFilters);
-
-  // Re-trigger query when permanentFilters change (e.g., timeline date filter)
-  useEffect(() => {
-    // Skip if not initialized or if initial query hasn't fired yet
-    if (!isInitialized || !hasTriggeredInitialQuery.current) return;
-
-    // Check if permanentFilters actually changed
-    const prev = prevPermanentFiltersRef.current;
-    const changed = JSON.stringify(prev) !== JSON.stringify(permanentFilters);
-
-    if (changed) {
-      prevPermanentFiltersRef.current = permanentFilters;
-
-      // Merge new permanent filters with current filters
-      const mergedFilters = { ...filters, ...permanentFilters };
-
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: 1, // Reset to first page when filters change
-          per_page: perPage,
-          q: searchText,
-          sort: getSortWithSeed(
-            sortOffered(artifactType, sortField, mergedFilters)
-          ),
-        },
-        ...buildFilter(artifactType, mergedFilters, unitPreference),
-      };
-      onQueryChange(query);
-    }
-  }, [
-    isInitialized,
-    permanentFilters,
-    filters,
-    sortDirection,
-    perPage,
-    searchText,
-    sortField,
-    artifactType,
-    unitPreference,
-    onQueryChange,
-    getSortWithSeed,
-  ]);
+  // The panel's draft: edits not yet applied, over the filters they started
+  // from. Once the list's filters change (Back, a chip, a preset) the draft
+  // is dropped and the panel shows the list's filters again.
+  const [draft, setDraft] = useState<{
+    base: Record<string, unknown>;
+    values: Record<string, unknown>;
+  } | null>(null);
+  const draftIsCurrent = draft !== null && deepEqual(draft.base, filters);
+  const panelFilters = draft && draftIsCurrent ? draft.values : filters;
 
   // Clear all filters
   const handleClearFilters = useCallback(() => {
-    clearFiltersAction(); // Hook handles URL sync and resets to page 1
-    setLocalFilters({ ...permanentFilters });
+    clearFilters();
+    setDraft(null);
     setIsFilterPanelOpen(false);
-
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: 1,
-        per_page: perPage,
-        q: searchText,
-        sort: getSortWithSeed(
-          sortOffered(artifactType, sortField, permanentFilters)
-        ),
-      },
-      ...buildFilter(artifactType, { ...permanentFilters }, unitPreference),
-    };
-
-    onQueryChange(query);
-  }, [
-    clearFiltersAction,
-    permanentFilters,
-    sortDirection,
-    perPage,
-    searchText,
-    sortField,
-    artifactType,
-    unitPreference,
-    onQueryChange,
-    getSortWithSeed,
-  ]);
+  }, [clearFilters]);
 
   // Handle filter change in panel (editing before submit)
-  const handleFilterChange = useCallback((filterKey: string, value: any) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      [filterKey]: value === "" ? undefined : value,
-    }));
-  }, []);
-
-  // Handle filter submission - applies local filters to hook state and closes panel
-  const handleFilterSubmit = useCallback(() => {
-    setFiltersAction(localFilters); // Hook handles URL sync and resets to page 1
-    setIsFilterPanelOpen(false);
-
-    // Trigger search with new filters
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: 1,
-        per_page: perPage,
-        q: searchText,
-        sort: getSortWithSeed(
-          sortOffered(artifactType, sortField, {
-            ...localFilters,
-            ...permanentFilters,
-          })
-        ),
-      },
-      ...buildFilter(artifactType, localFilters, unitPreference),
-    };
-
-    onQueryChange(query);
-  }, [
-    setFiltersAction,
-    localFilters,
-    permanentFilters,
-    sortDirection,
-    perPage,
-    searchText,
-    sortField,
-    artifactType,
-    unitPreference,
-    onQueryChange,
-    getSortWithSeed,
-  ]);
-
-  // Handle removing a single filter chip
-  const handleRemoveFilter = useCallback(
-    (filterKey: string) => {
-      removeFilterAction(filterKey); // Hook handles URL sync and resets to page 1
-
-      // Calculate updated filters for query
-      const { [filterKey]: _removed, ...newFilters } = filters;
-      const updatedFilters = { ...newFilters, ...permanentFilters };
-
-      // Trigger search with updated filters
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: 1,
-          per_page: perPage,
-          q: searchText,
-          sort: getSortWithSeed(
-            sortOffered(artifactType, sortField, updatedFilters)
-          ),
+  const handleFilterChange = useCallback(
+    (filterKey: string, value: unknown) => {
+      setDraft((prev) => ({
+        base: filters,
+        values: {
+          ...(prev && deepEqual(prev.base, filters) ? prev.values : filters),
+          [filterKey]: value === "" ? undefined : value,
         },
-        ...buildFilter(artifactType, updatedFilters, unitPreference),
-      };
-
-      onQueryChange(query);
+      }));
     },
-    [
-      removeFilterAction,
-      filters,
-      permanentFilters,
-      sortDirection,
-      perPage,
-      searchText,
-      sortField,
-      artifactType,
-      onQueryChange,
-      unitPreference,
-      getSortWithSeed,
-    ]
+    [filters]
   );
+
+  // Apply the draft and close the panel
+  const handleFilterSubmit = useCallback(() => {
+    applyFilters(panelFilters);
+    setDraft(null);
+    setIsFilterPanelOpen(false);
+  }, [applyFilters, panelFilters]);
 
   // Handle clicking on a filter chip to highlight that filter
   const handleFilterChipClick = useCallback(
@@ -536,76 +433,14 @@ const SearchControls = ({
     return undefined;
   }, [highlightedFilterKey]);
 
-  // Handle loading a saved preset
   const handleLoadPreset = useCallback(
-    (preset: Record<string, any>) => {
-      loadPreset(preset); // Hook handles URL sync and state updates
-      onPerPageStateChange?.(preset.perPage || perPage);
-      if (preset.viewMode) onViewModeChange?.(preset.viewMode);
-
-      // Reset random seed when loading preset (like Stash does)
-      // This ensures fresh randomization each time a preset is loaded
-      resetRandomSeed();
-
-      // Use preset's perPage if available, otherwise keep current
-      const effectivePerPage = preset.perPage || perPage;
-
-      // Trigger search with preset values
-      const query = {
-        filter: {
-          direction: preset.direction,
-          page: 1,
-          per_page: effectivePerPage,
-          q: searchText,
-          sort: getSortWithSeed(preset.sort),
-        },
-        ...buildFilter(
-          artifactType,
-          {
-            ...permanentFilters,
-            ...preset.filters,
-          },
-          unitPreference
-        ),
-      };
-
-      onQueryChange(query);
-    },
-    [
-      loadPreset,
-      onPerPageStateChange,
-      onViewModeChange,
-      permanentFilters,
-      perPage,
-      searchText,
-      artifactType,
-      onQueryChange,
-      unitPreference,
-      getSortWithSeed,
-      resetRandomSeed,
-    ]
+    (preset: PresetToLoad) => loadPreset(preset),
+    [loadPreset]
   );
 
   const handlePageChange = useCallback(
     (page: number) => {
-      setPage(page); // Hook handles URL sync
-
-      // Merge user filters with permanent filters (e.g., folder tag filter)
-      const mergedFilters = { ...permanentFilters, ...filters };
-
-      // Trigger search with new page
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page,
-          per_page: perPage,
-          q: searchText,
-          sort: getSortWithSeed(sortField),
-        },
-        ...buildFilter(artifactType, mergedFilters, unitPreference),
-      };
-
-      onQueryChange(query);
+      setPage(page);
 
       // Scroll to top pagination if it's not in view
       setTimeout(() => {
@@ -623,28 +458,17 @@ const SearchControls = ({
         }
       }, 50);
     },
-    [
-      setPage,
-      sortDirection,
-      perPage,
-      searchText,
-      sortField,
-      filters,
-      permanentFilters,
-      artifactType,
-      unitPreference,
-      onQueryChange,
-      getSortWithSeed,
-    ]
+    [setPage]
   );
 
-  // Expose the pagination handler to the parent (the Images lightbox pages
-  // across the list with it)
+  // The Images lightbox pages across the list with it; paging from the
+  // lightbox replaces the entry
   useEffect(() => {
     if (paginationHandlerRef) {
-      paginationHandlerRef.current = handlePageChange;
+      paginationHandlerRef.current = (page: number) =>
+        setPage(page, { history: "replace" });
     }
-  }, [paginationHandlerRef, handlePageChange]);
+  }, [paginationHandlerRef, setPage]);
 
   // TV mode: PageUp and PageDown change the page (a desktop PageDown scrolls)
   useShortcutScope({
@@ -664,215 +488,31 @@ const SearchControls = ({
     },
   });
 
-  const handleChangeSearchText = useCallback(
-    (searchStr: string) => {
-      if (searchStr === searchText) return; // No change
-      setSearchTextAction(searchStr); // Hook handles URL sync and resets to page 1
-
-      // Trigger search with new text
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: 1,
-          per_page: perPage,
-          q: searchStr,
-          sort: getSortWithSeed(sortField),
-        },
-        ...buildFilter(artifactType, filters, unitPreference),
-      };
-
-      onQueryChange(query);
-    },
-    [
-      searchText,
-      setSearchTextAction,
-      sortDirection,
-      perPage,
-      sortField,
-      filters,
-      artifactType,
-      unitPreference,
-      onQueryChange,
-      getSortWithSeed,
-    ]
-  );
-
-  // Handle sort change
+  // A sort chosen in the menu, or a table header's field and direction
   const handleSortChange = useCallback(
-    (field: string) => {
-      let newSortDirection = "DESC";
-      let newSortField = sortField;
-
-      // If same field, toggle direction (keep same seed for random)
-      if (field === sortField) {
-        newSortDirection = sortDirection === "ASC" ? "DESC" : "ASC";
-      } else {
-        // New field, default to DESC
-        newSortField = field;
-
-        // Reset random seed when changing TO or FROM random sort
-        // This ensures fresh randomization when switching sort types
-        if (field === "random" || sortField === "random") {
-          resetRandomSeed();
-        }
-      }
-      setSortAction(newSortField, newSortDirection); // Hook handles URL sync
-
-      // Trigger search with new sort
-      const query = {
-        filter: {
-          direction: newSortDirection,
-          page: currentPage,
-          per_page: perPage,
-          q: searchText,
-          sort: getSortWithSeed(newSortField),
-        },
-        ...buildFilter(artifactType, filters, unitPreference),
-      };
-
-      onQueryChange(query);
-    },
-    [
-      sortField,
-      sortDirection,
-      setSortAction,
-      resetRandomSeed,
-      currentPage,
-      perPage,
-      searchText,
-      filters,
-      artifactType,
-      unitPreference,
-      onQueryChange,
-      getSortWithSeed,
-    ]
+    (field: string, direction?: "ASC" | "DESC") => setSort(field, direction),
+    [setSort]
   );
 
   const handleToggleFilterPanel = useCallback(() => {
     setIsFilterPanelOpen((prev) => !prev);
   }, []);
 
-  const handlePerPageChange = useCallback(
-    (newPerPage: number) => {
-      setPerPageAction(newPerPage); // Hook handles URL sync and resets to page 1
-      onPerPageStateChange?.(newPerPage);
-
-      // Trigger search with new per page value
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: 1,
-          per_page: newPerPage,
-          q: searchText,
-          sort: getSortWithSeed(sortField),
-        },
-        ...buildFilter(artifactType, filters, unitPreference),
-      };
-
-      onQueryChange(query);
-    },
-    [
-      setPerPageAction,
-      onPerPageStateChange,
-      sortDirection,
-      searchText,
-      sortField,
-      filters,
-      artifactType,
-      unitPreference,
-      onQueryChange,
-      getSortWithSeed,
-    ]
+  // How many filters are active: the Filters button's badge
+  const activeFilterCount = useMemo(
+    () => Object.values(filters).filter(isActiveFilter).length,
+    [filters]
   );
+  const hasActiveFilters = activeFilterCount > 0;
 
-  // Handle view mode change - notify parent directly instead of via effect
-  const handleViewModeChange = useCallback(
-    (newMode: string) => {
-      setViewMode(newMode);
-      onViewModeChange?.(newMode);
-    },
-    [setViewMode, onViewModeChange]
+  // The sorts this list offers: Scene Number only beside a collection filter
+  // that includes, the page's permanent one or the panel's
+  const sortOptions = useMemo(
+    () => [
+      ...sortOptionsFor(artifactType, { ...filters, ...permanentFilters }),
+    ],
+    [artifactType, filters, permanentFilters]
   );
-
-  // Check if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return Object.values(filters).some(
-      (value) =>
-        value !== undefined &&
-        value !== "" &&
-        (typeof value !== "object" ||
-          Object.values(value).some((v) => v !== "" && v !== undefined))
-    );
-  }, [filters]);
-
-  const groupFilters: unknown = filters.groups;
-  const groupIds: unknown = filters.groupIds;
-  const groupIdsModifier: unknown = filters.groupIdsModifier;
-  const permanentGroups = permanentFilters.groups;
-
-  const sortOptions = useMemo(() => {
-    const baseOptions = getSortOptions(artifactType);
-
-    // For scenes, include scene_index (Scene Number) only beside a collection
-    // filter that includes: the collection page's permanent `groups`
-    // ({ value, modifier }), the panel's `groupIds` with its modifier, or a
-    // list of ids. The server answers 400 for the sort without one.
-    if (artifactType === "scene") {
-      const hasGroupFilter =
-        hasIncludingCollection(permanentGroups) ||
-        offersSceneIndex({
-          groups: groupFilters,
-          groupIds,
-          groupIdsModifier,
-        });
-      if (hasGroupFilter) {
-        return SCENE_SORT_OPTIONS; // Full list with scene_index
-      }
-      return SCENE_SORT_OPTIONS_BASE; // Without scene_index
-    }
-
-    return baseOptions;
-  }, [artifactType, groupFilters, groupIds, groupIdsModifier, permanentGroups]);
-
-  // A sort the list no longer offers (Scene Number after its collection
-  // filter is removed) falls back to the default, so a saved or URL sort
-  // never reaches the server as a 400
-  useEffect(() => {
-    if (!isInitialized) return;
-    const offered = sortOffered(artifactType, sortField, {
-      ...filters,
-      ...permanentFilters,
-    });
-    if (offered !== sortField) setSortAction(offered, sortDirection);
-  }, [
-    isInitialized,
-    artifactType,
-    sortField,
-    sortDirection,
-    filters,
-    permanentFilters,
-    setSortAction,
-  ]);
-
-  // Show loading state while fetching default presets
-  if (isLoadingPresets) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div
-            className="inline-block animate-spin rounded-full h-8 w-8 border-b-2"
-            style={{ borderColor: "var(--accent-primary)" }}
-          />
-          <p
-            className="mt-2 text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Loading filters...
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -918,7 +558,7 @@ const SearchControls = ({
                 <SearchInput
                   placeholder="Search..."
                   value={searchText}
-                  onSearch={handleChangeSearchText}
+                  onSearch={setQuery}
                   className="w-full"
                 />
               </div>
@@ -981,17 +621,7 @@ const SearchControls = ({
                           color: "white",
                         }}
                       >
-                        {
-                          Object.keys(filters).filter(
-                            (key) =>
-                              filters[key] !== undefined &&
-                              filters[key] !== "" &&
-                              (typeof filters[key] !== "object" ||
-                                Object.values(filters[key]).some(
-                                  (v: any) => v !== "" && v !== undefined
-                                ))
-                          ).length
-                        }
+                        {activeFilterCount}
                       </span>
                     )}
                   </Button>
@@ -1025,7 +655,7 @@ const SearchControls = ({
                   <ViewModeToggle
                     modes={viewModes}
                     value={viewMode}
-                    onChange={handleViewModeChange}
+                    onChange={setViewMode}
                   />
                 </div>
               )}
@@ -1065,7 +695,7 @@ const SearchControls = ({
             <ActiveFilterChips
               filters={filters}
               filterOptions={filterOptions}
-              onRemoveFilter={handleRemoveFilter}
+              onRemoveFilter={removeFilter}
               onChipClick={handleFilterChipClick}
               permanentFilters={permanentFilters}
               permanentFiltersMetadata={permanentFiltersMetadata}
@@ -1081,7 +711,7 @@ const SearchControls = ({
             currentPage={currentPage}
             onPageChange={handlePageChange}
             perPage={perPage}
-            onPerPageChange={handlePerPageChange}
+            onPerPageChange={setPerPage}
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
@@ -1193,7 +823,7 @@ const SearchControls = ({
               }}
               isHighlighted={highlightedFilterKey === key}
               onChange={(value: unknown) => handleFilterChange(key, value)}
-              value={localFilters[key] || defaultValue}
+              value={panelFilters[key] || defaultValue}
               type={
                 type as
                   | "select"
@@ -1211,8 +841,9 @@ const SearchControls = ({
               modifierOptions={modifierOptions}
               // Untouched, the option's default: the modifier the request carries
               modifierValue={
-                (modifierKey ? localFilters[modifierKey] : undefined) ??
-                defaultModifier
+                (modifierKey
+                  ? (panelFilters[modifierKey] as string | undefined)
+                  : undefined) ?? defaultModifier
               }
               onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)
@@ -1220,7 +851,9 @@ const SearchControls = ({
               supportsHierarchy={supportsHierarchy}
               hierarchyLabel={hierarchyLabel}
               hierarchyValue={
-                hierarchyKey ? localFilters[hierarchyKey] : undefined
+                hierarchyKey
+                  ? (panelFilters[hierarchyKey] as number | undefined)
+                  : undefined
               }
               onHierarchyChange={
                 hierarchyKey
@@ -1244,22 +877,24 @@ const SearchControls = ({
           transition: "opacity 0.2s ease",
         }}
       >
-        {typeof children === "function"
-          ? (
-              children as (
-                renderProps: Record<string, unknown>
-              ) => React.ReactNode
-            )({
-              viewMode,
-              zoomLevel,
-              gridDensity,
-              sortField,
-              sortDirection,
-              onSort: handleSortChange,
-              timelinePeriod,
-              setTimelinePeriod,
-            })
-          : children}
+        {!ready
+          ? null
+          : typeof children === "function"
+            ? (
+                children as (
+                  renderProps: Record<string, unknown>
+                ) => React.ReactNode
+              )({
+                viewMode,
+                zoomLevel,
+                gridDensity,
+                sortField,
+                sortDirection,
+                onSort: handleSortChange,
+                timelinePeriod,
+                setTimelinePeriod,
+              })
+            : children}
       </div>
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
@@ -1268,7 +903,7 @@ const SearchControls = ({
             currentPage={currentPage}
             onPageChange={handlePageChange}
             perPage={perPage}
-            onPerPageChange={handlePerPageChange}
+            onPerPageChange={setPerPage}
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
