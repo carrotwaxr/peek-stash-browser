@@ -399,8 +399,10 @@ describe("DataMigrationService", () => {
       const service = await importFresh();
       await service.runPendingMigrations();
 
+      // Compare-and-set, so a sync's newer count written meanwhile stands
       expect(mockLinkCounts.rebuildLinkCounts).toHaveBeenCalledExactlyOnceWith(
-        "all"
+        "all",
+        { onlyIfUnchanged: true }
       );
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledExactlyOnceWith({
         data: { name: "010_rebuild_link_counts" },

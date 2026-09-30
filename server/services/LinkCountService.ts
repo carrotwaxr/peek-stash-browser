@@ -477,8 +477,25 @@ interface CountRow {
 /** A live row to recount: its key and its stored count columns, by name */
 type CurrentRow = EntityRef & Record<string, unknown>;
 
+/** A row whose count moved: id, instance, the new count, the value read */
+type MovedCount = [string, string, number, number | null];
+
 /** Rows written per relation, by `<table>.<column>` */
 export type LinkCountResult = Record<string, number>;
+
+export interface LinkCountOptions {
+  /**
+   * Write a row only while its column still holds the value this rebuild
+   * read (`AND x.col IS <value read>`), so a count another writer stored
+   * between the read and the write stands. For the data migration
+   * (010_rebuild_link_counts), which runs after the startup sync while
+   * later syncs run: a sync that commits meanwhile has written a newer
+   * count. The sync's own rebuild runs under the sync lock and writes
+   * unconditionally, so its fresh count also replaces anything a migration
+   * wrote before it.
+   */
+  onlyIfUnchanged?: boolean;
+}
 
 /** `refs` in pages of PER_PAGE_MAX */
 function pages(refs: readonly EntityRef[]): EntityRef[][] {
@@ -497,7 +514,8 @@ class LinkCountService {
    * `sceneCountAll` reads `inheritedTagIds`).
    */
   async rebuildLinkCounts(
-    scope: LinkCountScope | "all"
+    scope: LinkCountScope | "all",
+    options: LinkCountOptions = {}
   ): Promise<LinkCountResult> {
     const startedAt = Date.now();
     const written: LinkCountResult = {};
@@ -529,17 +547,24 @@ class LinkCountService {
           counted: counts.size,
         });
 
-        const moved: Array<[string, string, number]> = [];
+        const moved: MovedCount[] = [];
         for (const row of current) {
           const n = counts.get(entityKey(row.id, row.instanceId)) ?? 0;
-          if (n !== Number(row[relation.column])) {
-            moved.push([row.id, row.instanceId, n]);
+          const stored = row[relation.column];
+          if (n !== Number(stored)) {
+            // As a JSON number (a bigint would not serialize), null as null
+            const read = stored === null ? null : Number(stored);
+            moved.push([row.id, row.instanceId, n, read]);
           }
         }
         const writeStart = Date.now();
-        await this.write(table, relation.column, moved);
+        written[`${table}.${relation.column}`] = await this.write(
+          table,
+          relation.column,
+          moved,
+          options.onlyIfUnchanged ?? false
+        );
         writeMs += Date.now() - writeStart;
-        written[`${table}.${relation.column}`] = moved.length;
       }
     }
     logger.info("Link counts rebuilt", {
@@ -661,25 +686,30 @@ class LinkCountService {
 
   /**
    * Writes the moved counts, WRITE_CHUNK rows a unit, each an UPDATE ...
-   * FROM driven from the bound [id, instanceId, n] triples, looking each
-   * row up by primary key.
+   * FROM driven from the bound [id, instanceId, n, read] rows, looking each
+   * row up by primary key; with `onlyIfUnchanged`, only where the column
+   * still holds the value read. Returns the rows written.
    */
   private async write(
     table: string,
     column: string,
-    moved: ReadonlyArray<[string, string, number]>
-  ): Promise<void> {
+    moved: readonly MovedCount[],
+    onlyIfUnchanged: boolean
+  ): Promise<number> {
+    const unchanged = onlyIfUnchanged ? `AND x."${column}" IS v.readValue` : "";
     const sql = `
       UPDATE "${table}" AS x SET "${column}" = v.n
       FROM (
-        SELECT json_extract(value, '$[0]') AS id, json_extract(value, '$[1]') AS instanceId, json_extract(value, '$[2]') AS n
+        SELECT json_extract(value, '$[0]') AS id, json_extract(value, '$[1]') AS instanceId, json_extract(value, '$[2]') AS n, json_extract(value, '$[3]') AS readValue
         FROM json_each(?)
       ) AS v
-      WHERE x.id = v.id AND x.stashInstanceId = v.instanceId`;
+      WHERE x.id = v.id AND x.stashInstanceId = v.instanceId
+        ${unchanged}`;
+    let written = 0;
     for (let i = 0; i < moved.length; i += WRITE_CHUNK) {
       const chunk = JSON.stringify(moved.slice(i, i + WRITE_CHUNK));
       const startedAt = Date.now();
-      await dbWrite(`sync.linkCounts.${table}.${column}`, () =>
+      written += await dbWrite(`sync.linkCounts.${table}.${column}`, () =>
         prisma.$executeRawUnsafe(sql, chunk)
       );
       logger.debug("Link count chunk written", {
@@ -689,6 +719,7 @@ class LinkCountService {
         ms: Date.now() - startedAt,
       });
     }
+    return written;
   }
 }
 
