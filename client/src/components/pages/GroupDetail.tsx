@@ -90,9 +90,17 @@ const GroupDetail = () => {
   }
 
   const handleRatingChange = async (newRating: number | null) => {
+    // Write on the loaded group's own server: a bare-id link names none
+    const entityInstanceId = group?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setRating(newRating);
     try {
-      await libraryApi.updateRating("group", groupId!, newRating, instanceId);
+      await libraryApi.updateRating(
+        "group",
+        groupId!,
+        newRating,
+        entityInstanceId
+      );
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((group as Record<string, unknown>)?.rating as number | null);
@@ -100,9 +108,17 @@ const GroupDetail = () => {
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
+    // Write on the loaded group's own server: a bare-id link names none
+    const entityInstanceId = group?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("group", groupId!, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        "group",
+        groupId!,
+        newValue,
+        entityInstanceId
+      );
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((group?.favorite as boolean) || false);

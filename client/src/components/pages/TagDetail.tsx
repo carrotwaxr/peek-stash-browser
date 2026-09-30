@@ -150,9 +150,12 @@ const TagDetail = () => {
   }
 
   const handleRatingChange = async (newRating: number | null) => {
+    // Write on the loaded tag's own server: a bare-id link names none
+    const entityInstanceId = tag?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setRating(newRating);
     try {
-      await libraryApi.updateRating("tag", tagId!, newRating, instanceId);
+      await libraryApi.updateRating("tag", tagId!, newRating, entityInstanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((tag as Record<string, unknown>)?.rating as number | null);
@@ -160,9 +163,17 @@ const TagDetail = () => {
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
+    // Write on the loaded tag's own server: a bare-id link names none
+    const entityInstanceId = tag?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("tag", tagId!, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        "tag",
+        tagId!,
+        newValue,
+        entityInstanceId
+      );
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((tag?.favorite as boolean) || false);

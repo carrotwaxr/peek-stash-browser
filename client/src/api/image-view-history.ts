@@ -4,16 +4,16 @@
 import { apiGet, apiPost } from "./client";
 
 export const imageViewHistoryApi = {
-  incrementO: (imageId: string, instanceId?: string) =>
+  incrementO: (imageId: string, instanceId: string) =>
     apiPost("/image-view-history/increment-o", {
       imageId,
-      ...(instanceId && { instanceId }),
+      instanceId,
     }),
 
-  recordView: (imageId: string, instanceId?: string) =>
+  recordView: (imageId: string, instanceId: string) =>
     apiPost("/image-view-history/view", {
       imageId,
-      ...(instanceId && { instanceId }),
+      instanceId,
     }),
 
   getViewHistory: (imageId: string, instanceId: string) =>

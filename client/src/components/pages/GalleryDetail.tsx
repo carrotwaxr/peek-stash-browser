@@ -169,13 +169,16 @@ const GalleryDetail = () => {
   }, [galleryId, instanceId, lightbox.currentPage]);
 
   const handleRatingChange = async (newRating: number | null) => {
+    // Write on the loaded gallery's own server: a bare-id link names none
+    const entityInstanceId = gallery?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setRating(newRating);
     try {
       await libraryApi.updateRating(
         "gallery",
         galleryId!,
         newRating,
-        instanceId
+        entityInstanceId
       );
     } catch (error) {
       console.error("Failed to update rating:", error);
@@ -184,13 +187,16 @@ const GalleryDetail = () => {
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
+    // Write on the loaded gallery's own server: a bare-id link names none
+    const entityInstanceId = gallery?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite(
         "gallery",
         galleryId!,
         newValue,
-        instanceId
+        entityInstanceId
       );
     } catch (error) {
       console.error("Failed to update favorite:", error);
