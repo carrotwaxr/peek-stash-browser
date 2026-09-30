@@ -60,13 +60,25 @@ export function markLibraryNotReady(client: QueryClient): void {
 }
 
 /**
- * Refetches the library queries on screen; the others are marked stale and
- * refetch when next shown.
+ * Refetches the library queries on screen (lists, details, pickers, clips
+ * and carousels); the others are marked stale and refetch when next shown.
  */
-function invalidateLibraryQueries(client: QueryClient): Promise<void> {
+export function invalidateLibraryQueries(client: QueryClient): Promise<void> {
   return client.invalidateQueries({
     predicate: (query) => isLibraryQuery(query.queryKey),
   });
+}
+
+/**
+ * After a Stash instance is added, edited, enabled, disabled or deleted, or
+ * a user's Content Sources change: the setup status (its instance count
+ * decides whether cards name their server) and the library queries.
+ */
+export function invalidateInstanceQueries(client: QueryClient): Promise<void> {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: queryKeys.setup.status() }),
+    invalidateLibraryQueries(client),
+  ]).then(() => undefined);
 }
 
 async function checkLibraryReady(

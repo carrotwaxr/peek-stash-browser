@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Server } from "lucide-react";
 import { apiGet, apiPut } from "../../../api";
+import { getErrorMessage } from "../../../api/client";
+import { invalidateInstanceQueries } from "../../../api/hooks/useLibraryReady";
 import { useHiddenEntities } from "../../../hooks/useHiddenEntities";
+import { showError } from "../../../utils/toast";
 
 interface StashInstance {
   id: string;
@@ -13,6 +17,7 @@ interface StashInstance {
 const ContentTab = () => {
   const { hideConfirmationDisabled, updateHideConfirmation } =
     useHiddenEntities();
+  const queryClient = useQueryClient();
 
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -58,10 +63,12 @@ const ContentTab = () => {
 
     try {
       await apiPut("/user/stash-instances", { instanceIds: newSelectedIds });
+      // The library now reads other instances
+      void invalidateInstanceQueries(queryClient);
     } catch (err) {
-      console.error("Failed to update instances:", err);
       // Revert on error
       setSelectedIds(selectedIds);
+      showError(getErrorMessage(err, "Failed to update Content Sources"));
     } finally {
       setSaving(false);
     }

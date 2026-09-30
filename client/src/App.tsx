@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy } from "react";
 import {
   Navigate,
   Route,
@@ -6,15 +6,16 @@ import {
   Routes,
 } from "react-router-dom";
 import type { GetSetupStatusResponse } from "@peek/shared-types";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "react-hot-toast";
-import { queryClient, setupApi } from "./api";
+import { queryClient, queryKeys } from "./api";
 import {
   LoginGuard,
   ProtectedRoute,
   SetupGuard,
 } from "./components/guards/RouteGuards";
+import { SetupStatusGate } from "./components/guards/SetupStatusGate";
 import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
 import Login from "./components/pages/Login";
 import SetupWizard from "./components/pages/SetupWizard";
@@ -69,47 +70,40 @@ const PageLoader = () => (
 
 // Main app component with authentication and routing
 const AppContent = () => {
-  const [setupStatus, setSetupStatus] = useState<GetSetupStatusResponse | null>(
-    null
-  );
-  const [checkingSetup, setCheckingSetup] = useState(true);
+  const client = useQueryClient();
 
-  useEffect(() => {
-    const checkSetup = async () => {
-      try {
-        const status = await setupApi.getSetupStatus();
-        setSetupStatus(status);
-      } catch (error) {
-        console.error("Failed to check setup status:", error);
-        // If check fails, assume setup is not complete
-        setSetupStatus({
-          setupComplete: false,
-          hasUsers: false,
-          hasStashInstance: false,
-          stashInstanceCount: 0,
-        });
-      } finally {
-        setCheckingSetup(false);
-      }
-    };
-
-    void checkSetup();
-  }, []);
-
-  // Ensure setupStatus has defaults to prevent null access in guards
-  const safeSetupStatus = setupStatus ?? {
-    setupComplete: false,
-    hasUsers: false,
-    hasStashInstance: false,
-    stashInstanceCount: 0,
-  };
-
-  // Handler for when setup completes - triggers re-check and navigation
+  // Setup has just completed: the wizard is done, so the next load goes to
+  // Home (the user is already logged in via auto-login)
   const handleSetupComplete = () => {
-    setSetupStatus({ ...safeSetupStatus, setupComplete: true });
-    // Navigate to home after setup (user is already logged in via auto-login)
+    client.setQueryData<GetSetupStatusResponse>(
+      queryKeys.setup.status(),
+      (status) => status && { ...status, setupComplete: true }
+    );
     window.location.href = "/";
   };
+
+  return (
+    <SetupStatusGate>
+      {(setupStatus) => (
+        <AppRoutes
+          setupStatus={setupStatus}
+          onSetupComplete={handleSetupComplete}
+        />
+      )}
+    </SetupStatusGate>
+  );
+};
+
+/** The routes, given the loaded setup status */
+const AppRoutes = ({
+  setupStatus,
+  onSetupComplete,
+}: {
+  setupStatus: GetSetupStatusResponse;
+  onSetupComplete: () => void;
+}) => {
+  // The gate renders the routes only once the status has loaded
+  const checkingSetup = false;
 
   return (
     <Router>
@@ -120,12 +114,12 @@ const AppContent = () => {
             path={PUBLIC_ROUTES.setup}
             element={
               <SetupGuard
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <SetupWizard
-                  setupStatus={safeSetupStatus}
-                  onSetupComplete={handleSetupComplete}
+                  setupStatus={setupStatus}
+                  onSetupComplete={onSetupComplete}
                 />
               </SetupGuard>
             }
@@ -136,7 +130,7 @@ const AppContent = () => {
             path={PUBLIC_ROUTES.login}
             element={
               <LoginGuard
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <Login />
@@ -155,7 +149,7 @@ const AppContent = () => {
             path="/"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -168,7 +162,7 @@ const AppContent = () => {
             path="/scenes"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -181,7 +175,7 @@ const AppContent = () => {
             path="/recommended"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -194,7 +188,7 @@ const AppContent = () => {
             path="/performers"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -207,7 +201,7 @@ const AppContent = () => {
             path="/studios"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -220,7 +214,7 @@ const AppContent = () => {
             path="/tags"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -233,7 +227,7 @@ const AppContent = () => {
             path="/collections"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -246,7 +240,7 @@ const AppContent = () => {
             path="/galleries"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -259,7 +253,7 @@ const AppContent = () => {
             path="/images"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -272,7 +266,7 @@ const AppContent = () => {
             path="/gallery/:galleryId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -285,7 +279,7 @@ const AppContent = () => {
             path="/performer/:performerId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -298,7 +292,7 @@ const AppContent = () => {
             path="/studio/:studioId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -311,7 +305,7 @@ const AppContent = () => {
             path="/tag/:tagId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -324,7 +318,7 @@ const AppContent = () => {
             path="/collection/:groupId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -337,7 +331,7 @@ const AppContent = () => {
             path="/watch-history"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -350,7 +344,7 @@ const AppContent = () => {
             path="/user-stats"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -363,7 +357,7 @@ const AppContent = () => {
             path="/hidden-items"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -376,7 +370,7 @@ const AppContent = () => {
             path="/downloads"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -389,7 +383,7 @@ const AppContent = () => {
             path="/settings"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -416,7 +410,7 @@ const AppContent = () => {
             path="/playlists"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -429,7 +423,7 @@ const AppContent = () => {
             path="/clips"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -442,7 +436,7 @@ const AppContent = () => {
             path="/playlist/:playlistId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -455,7 +449,7 @@ const AppContent = () => {
             path="/scene/:sceneId"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -468,7 +462,7 @@ const AppContent = () => {
             path="/settings/carousels/new"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>
@@ -481,7 +475,7 @@ const AppContent = () => {
             path="/settings/carousels/:id/edit"
             element={
               <ProtectedRoute
-                setupStatus={safeSetupStatus}
+                setupStatus={setupStatus}
                 checkingSetup={checkingSetup}
               >
                 <GlobalLayout>

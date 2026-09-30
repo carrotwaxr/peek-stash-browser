@@ -36,6 +36,12 @@ The data directory could not be given to Peek's user, usually because it cannot 
 
 Remove `--user` from `docker run` (or `user:` from your Compose file) and set `PUID`/`PGID` instead.
 
+## "Peek is starting"
+
+The page shows **Peek is starting. Waiting for the server...** while the server is starting, or applying an upgrade's database migrations, and cannot answer yet. The HTTP status in brackets, such as `(HTTP 502)`, is the last answer the page got; a reverse proxy answers 502 while Peek is down. Nothing needs doing: the page keeps asking on its own and opens as soon as the server answers.
+
+After a minute it adds **Still waiting. If this lasts, check the server's log.** Look there (see [Viewing Logs](#viewing-logs)) for a migration that is still running, or for an error that stopped the server from starting (see [Container Won't Start](#container-wont-start)).
+
 ## Can't Connect to Stash
 
 **Symptoms:** Empty library, "Connection failed" errors, sync fails.

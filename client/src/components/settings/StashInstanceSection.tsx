@@ -4,8 +4,10 @@ import type {
   DeleteStashInstanceResponse,
   UpdateStashInstanceResponse,
 } from "@peek/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import { getErrorMessage } from "../../api/client";
+import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
@@ -52,6 +54,7 @@ interface TestResult {
 const StashInstanceSection = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const queryClient = useQueryClient();
 
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,6 +254,9 @@ const StashInstanceSection = () => {
         );
       }
 
+      // Instance count, names and content change for everyone
+      void invalidateInstanceQueries(queryClient);
+
       // The instance is saved; its sync waits for the running one
       if (result.sync === "queued") {
         showInfo(
@@ -283,6 +289,7 @@ const StashInstanceSection = () => {
         `/setup/stash-instance/${instance.id}`
       );
       showSuccess(result.message);
+      void invalidateInstanceQueries(queryClient);
       await loadInstances();
     } catch (err) {
       // A toast, so the list stays: a 409 (a sync is running) asks the admin
@@ -310,6 +317,7 @@ const StashInstanceSection = () => {
       await apiPut(`/setup/stash-instance/${instance.id}`, {
         enabled: !instance.enabled,
       });
+      void invalidateInstanceQueries(queryClient);
       await loadInstances();
     } catch (err) {
       // A toast, so the list stays: the server refuses to disable the last

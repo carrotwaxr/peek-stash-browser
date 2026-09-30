@@ -1,17 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
-import { setupApi } from "../../src/api";
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { createQueryWrapper } from "@tests/testUtils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { invalidateInstanceQueries } from "../../src/api/hooks/useLibraryReady";
 import { ConfigProvider, useConfig } from "../../src/contexts/ConfigContext";
-
-vi.mock("../../src/api", () => ({
-  setupApi: {
-    getSetupStatus: vi.fn(),
-  },
-}));
-
-const getSetupStatusMock = setupApi.getSetupStatus as unknown as Mock;
+import { jsonResponse, requestsTo, stubApi } from "../helpers/stubApi";
 
 /**
  * Helper component that renders config values as text for assertion.
@@ -26,148 +20,151 @@ function ConfigDisplay() {
   );
 }
 
+/** Answers GET /setup/status with this body */
+const answerStatus = (body: Record<string, unknown>) =>
+  stubApi({ "/setup/status": () => jsonResponse(200, body) });
+
+const renderConfig = () => {
+  const Wrapper = createQueryWrapper();
+  return render(
+    <Wrapper>
+      <ConfigProvider>
+        <ConfigDisplay />
+      </ConfigProvider>
+    </Wrapper>
+  );
+};
+
 describe("ConfigContext", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe("ConfigProvider", () => {
     it("has isLoading=true and hasMultipleInstances=false before fetch resolves", () => {
-      // Never-resolving promise to keep the provider in loading state
-      getSetupStatusMock.mockReturnValue(new Promise(() => {}));
+      // Never-resolving answer keeps the provider loading
+      stubApi({ "/setup/status": () => new Promise<Response>(() => {}) });
 
-      render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
+      renderConfig();
 
       expect(screen.getByTestId("loading").textContent).toBe("true");
       expect(screen.getByTestId("multiple").textContent).toBe("false");
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is 1", async () => {
-      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 1 });
+      answerStatus({ stashInstanceCount: 1 });
 
-      render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
+      renderConfig();
 
       await waitFor(() => {
         expect(screen.getByTestId("loading").textContent).toBe("false");
       });
-
       expect(screen.getByTestId("multiple").textContent).toBe("false");
     });
 
     it("sets hasMultipleInstances=true when stashInstanceCount > 1", async () => {
-      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 3 });
+      answerStatus({ stashInstanceCount: 3 });
 
-      render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
+      renderConfig();
 
       await waitFor(() => {
         expect(screen.getByTestId("loading").textContent).toBe("false");
       });
-
       expect(screen.getByTestId("multiple").textContent).toBe("true");
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is 0", async () => {
-      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 0 });
+      answerStatus({ stashInstanceCount: 0 });
 
-      render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
+      renderConfig();
 
       await waitFor(() => {
         expect(screen.getByTestId("loading").textContent).toBe("false");
       });
-
       expect(screen.getByTestId("multiple").textContent).toBe("false");
     });
 
-    it("sets hasMultipleInstances=false when stashInstanceCount is undefined", async () => {
-      getSetupStatusMock.mockResolvedValue({});
+    it("sets hasMultipleInstances=false when stashInstanceCount is missing", async () => {
+      answerStatus({});
 
-      render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
+      renderConfig();
 
       await waitFor(() => {
         expect(screen.getByTestId("loading").textContent).toBe("false");
       });
-
       expect(screen.getByTestId("multiple").textContent).toBe("false");
     });
 
-    it("sets hasMultipleInstances=false when stashInstanceCount is null", async () => {
-      getSetupStatusMock.mockResolvedValue({
-        stashInstanceCount: null,
+    it("stays loading while the status fails, with hasMultipleInstances=false", async () => {
+      const fetchMock = stubApi({
+        "/setup/status": () => jsonResponse(502, { error: "Bad Gateway" }),
       });
+      const client = new QueryClient();
 
       render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
+        <QueryClientProvider client={client}>
+          <ConfigProvider>
+            <ConfigDisplay />
+          </ConfigProvider>
+        </QueryClientProvider>
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("loading").textContent).toBe("false");
+        expect(requestsTo(fetchMock, "/setup/status").length).toBe(1);
       });
-
+      expect(screen.getByTestId("loading").textContent).toBe("true");
       expect(screen.getByTestId("multiple").textContent).toBe("false");
+      // Stops the retry
+      client.clear();
     });
 
-    it("handles API error gracefully and sets isLoading=false", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      getSetupStatusMock.mockRejectedValue(new Error("Network error"));
+    it("renders children", async () => {
+      const fetchMock = answerStatus({ stashInstanceCount: 1 });
+      const Wrapper = createQueryWrapper();
 
       render(
-        <ConfigProvider>
-          <ConfigDisplay />
-        </ConfigProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId("loading").textContent).toBe("false");
-      });
-
-      expect(screen.getByTestId("multiple").textContent).toBe("false");
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Failed to fetch config:",
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it("renders children correctly", async () => {
-      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 1 });
-
-      render(
-        <ConfigProvider>
-          <div data-testid="child">Hello</div>
-        </ConfigProvider>
+        <Wrapper>
+          <ConfigProvider>
+            <div data-testid="child">Hello</div>
+          </ConfigProvider>
+        </Wrapper>
       );
 
       expect(screen.getByTestId("child").textContent).toBe("Hello");
-
-      // Wait for the async fetch to settle to avoid act() warning
       await waitFor(() => {
-        expect(setupApi.getSetupStatus).toHaveBeenCalled();
+        expect(requestsTo(fetchMock, "/setup/status").length).toBe(1);
       });
+    });
+
+    it("hasMultipleInstances follows the setup-status query and changes when it is invalidated", async () => {
+      let count = 1;
+      const fetchMock = stubApi({
+        "/setup/status": () =>
+          jsonResponse(200, { setupComplete: true, stashInstanceCount: count }),
+      });
+      const client = new QueryClient();
+
+      render(
+        <QueryClientProvider client={client}>
+          <ConfigProvider>
+            <ConfigDisplay />
+          </ConfigProvider>
+        </QueryClientProvider>
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("loading").textContent).toBe("false");
+      });
+      expect(screen.getByTestId("multiple").textContent).toBe("false");
+
+      // An admin adds a second instance
+      count = 2;
+      await invalidateInstanceQueries(client);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("multiple").textContent).toBe("true");
+      });
+      expect(requestsTo(fetchMock, "/setup/status")).toHaveLength(2);
+      client.clear();
     });
   });
 
@@ -180,22 +177,22 @@ describe("ConfigContext", () => {
     });
 
     it("returns fetched config values when used inside a provider", async () => {
-      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 2 });
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <ConfigProvider>{children}</ConfigProvider>
+      answerStatus({ stashInstanceCount: 2 });
+      const QueryWrapper = createQueryWrapper();
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <QueryWrapper>
+          <ConfigProvider>{children}</ConfigProvider>
+        </QueryWrapper>
       );
 
       const { result } = renderHook(() => useConfig(), { wrapper });
 
-      // Initially loading
       expect(result.current.isLoading).toBe(true);
       expect(result.current.hasMultipleInstances).toBe(false);
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
-
       expect(result.current.hasMultipleInstances).toBe(true);
     });
   });

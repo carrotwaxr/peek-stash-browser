@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { setupApi } from "../api";
+import React, { createContext, useContext, useMemo } from "react";
+import { useSetupStatus } from "../api/hooks/useSetupStatus";
 
 /**
  * Config context for app-wide configuration values.
@@ -13,28 +13,16 @@ const ConfigContext = createContext({
 });
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = useState({
-    hasMultipleInstances: false,
-    isLoading: true,
-  });
+  // The same query as the app's route gate: one request for both, refreshed
+  // when an instance change invalidates it
+  const { data, isPending } = useSetupStatus();
+  // More than one enabled Stash instance: cards and pages name the server
+  const hasMultipleInstances = (data?.stashInstanceCount ?? 0) > 1;
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const status = await setupApi.getSetupStatus();
-        // stashInstanceCount > 1 means multiple Stash instances are configured
-        const hasMultiple = (status.stashInstanceCount || 0) > 1;
-        setConfig({
-          hasMultipleInstances: hasMultiple,
-          isLoading: false,
-        });
-      } catch (error) {
-        console.error("Failed to fetch config:", error);
-        setConfig((prev) => ({ ...prev, isLoading: false }));
-      }
-    };
-    void fetchConfig();
-  }, []);
+  const config = useMemo(
+    () => ({ hasMultipleInstances, isLoading: isPending }),
+    [hasMultipleInstances, isPending]
+  );
 
   return (
     <ConfigContext.Provider value={config}>{children}</ConfigContext.Provider>
