@@ -41,7 +41,6 @@ interface ClipSearchProps {
   subtitle?: string;
   title?: string;
   fromPageTitle?: string;
-  syncToUrl?: boolean;
 }
 
 const ClipSearch = ({
@@ -52,7 +51,6 @@ const ClipSearch = ({
   subtitle,
   title,
   fromPageTitle,
-  syncToUrl = true,
 }: ClipSearchProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -177,7 +175,6 @@ const ClipSearch = ({
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
         totalCount={totalCount}
-        syncToUrl={syncToUrl}
         supportsWallView={true}
         viewModes={
           VIEW_MODES as React.ComponentProps<typeof SearchControls>["viewModes"]

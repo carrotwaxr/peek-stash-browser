@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 /**
  * A MemoryRouter inside a fresh QueryClient, for rendering list controls whose
- * preset queries need a client (SearchControls, FilterPresets, useFilterState).
+ * preset queries need a client (SearchControls, FilterPresets, useListUrlState).
  * The client lives as long as the mounted router, so a remount starts empty.
  */
 export function MemoryRouterWithQuery(

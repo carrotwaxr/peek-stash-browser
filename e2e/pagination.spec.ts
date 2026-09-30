@@ -46,10 +46,6 @@ test.describe("Pagination", () => {
   });
 
   test("page=2 in the URL opens the second page", async ({ page }) => {
-    // App bug: a URL whose only parameters are page and per_page opens page 1
-    // (useFilterState's initialize sets currentPage: 1 unless the URL holds
-    // another parameter, such as sort). Remove this line with the fix.
-    test.fail();
     const { list, cards } = await openScenes(page, "/scenes?per_page=24");
     requireData((await cards.count()) >= 13, "13 scenes");
     const thirteenth = (await titleOf(cards.nth(12)).innerText()).trim();

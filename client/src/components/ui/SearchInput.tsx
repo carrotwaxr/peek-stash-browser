@@ -46,6 +46,9 @@ const SearchInput = ({
       userClearedRef.current = false;
     }
     if (value !== undefined && value !== query) {
+      // A value from outside (Back across a search) is already searched:
+      // the debounce must not send it back
+      lastSearchedRef.current = value;
       setQuery(value);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

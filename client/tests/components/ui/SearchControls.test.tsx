@@ -1,31 +1,41 @@
 /**
- * SearchControls Component Tests
- *
- * Tests critical user flows for filter application, sorting, and pagination.
- * These tests focus on what the user sees and does, not implementation details.
- *
- * Key principle: Test what SHOULD happen, not what currently happens.
- * If a test fails, investigate whether it's a bug in the code or the test.
+ * SearchControls on the URL state: every control writes the URL through
+ * `useListUrlState`, and the page's query is derived from it, so Back and
+ * Forward step through the list. Seeded by URL, with the presets in the
+ * query cache; each test asserts what the page is asked for and the URL.
  */
-import { MemoryRouter as PlainMemoryRouter } from "react-router-dom";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { type ComponentType, useState } from "react";
+import {
+  MemoryRouter as PlainMemoryRouter,
+  RouterProvider,
+  createMemoryRouter,
+} from "react-router-dom";
+import type { FilterPreset } from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as apiModule from "../../../src/api";
+import {
+  defaultPresetsQueryOptions,
+  presetsQueryOptions,
+} from "../../../src/api/hooks/usePresets";
 import SearchControls from "../../../src/components/ui/SearchControls";
 import {
   WALL_VIEW_SETTINGS,
   useWallPlayback,
 } from "../../../src/hooks/useWallPlayback";
 
-// Create a mock state object that can be manipulated per test
-let mockFilterState = {};
-
-// Mock the hooks and contexts
 vi.mock("../../../src/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
 }));
@@ -49,13 +59,8 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   }),
 }));
 
-// Mock useFilterState to provide controllable state
-vi.mock("../../../src/hooks/useFilterState", () => ({
-  useFilterState: () => mockFilterState,
-}));
-
 vi.mock("../../../src/api", () => ({
-  apiGet: vi.fn().mockResolvedValue({ presets: {}, defaults: {} }),
+  apiGet: vi.fn(),
   apiPost: vi.fn().mockResolvedValue({}),
   apiPut: vi.fn().mockResolvedValue({ success: true }),
   libraryApi: {
@@ -80,83 +85,156 @@ vi.mock("../../../src/api", () => ({
   },
 }));
 
-// Create default mock filter state for tests
-const createMockFilterState = (overrides = {}) => ({
+/** What the page is asked for: paging, sort and search, and the entity's filter */
+interface SentQuery {
+  filter: {
+    page: number;
+    per_page: number;
+    q: string;
+    sort: string;
+    direction: string;
+  };
+  [filterKey: string]: unknown;
+}
+
+type OnQueryChange = (query: Record<string, unknown>) => void;
+
+type Props = Partial<React.ComponentProps<typeof SearchControls>>;
+
+/** A default preset for a context, or "pending" for presets still loading */
+type Presets =
+  | {
+      presets: Record<string, FilterPreset[]>;
+      defaults: Record<string, string>;
+    }
+  | "pending";
+
+const NO_PRESETS: Presets = { presets: {}, defaults: {} };
+
+const preset = (fields: Partial<FilterPreset> = {}): FilterPreset => ({
+  id: "p1",
+  name: "Default",
   filters: {},
-  sort: { field: "o_counter", direction: "DESC" },
-  pagination: { page: 1, perPage: 24 },
-  searchText: "",
-  isInitialized: true,
-  isLoadingPresets: false,
-  setFilter: vi.fn(),
-  setFilters: vi.fn(),
-  removeFilter: vi.fn(),
-  clearFilters: vi.fn(),
-  setSort: vi.fn(),
-  setPage: vi.fn(),
-  setPerPage: vi.fn(),
-  setSearchText: vi.fn(),
-  loadPreset: vi.fn(),
-  ...overrides,
+  sort: "rating",
+  direction: "ASC",
+  ...fields,
 });
 
-// Helper to render SearchControls with required providers
-const renderSearchControls = (props = {}, filterStateOverrides = {}) => {
-  // Set up the mock filter state before rendering
-  mockFilterState = createMockFilterState(filterStateOverrides);
-
-  const defaultProps = {
+/**
+ * Renders SearchControls (or `element(props)`, a page around it) at `url`,
+ * recording each navigation's history action
+ */
+function renderSearchControls(
+  props: Props = {},
+  {
+    url = "/scenes",
+    presets = NO_PRESETS,
+    element: Element,
+  }: {
+    url?: string;
+    presets?: Presets;
+    element?: ComponentType<React.ComponentProps<typeof SearchControls>>;
+  } = {}
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  if (presets !== "pending") {
+    queryClient.setQueryData(presetsQueryOptions.queryKey, {
+      presets: presets.presets,
+    });
+    queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, {
+      defaults: presets.defaults,
+    });
+  }
+  const onQueryChange = vi.fn<OnQueryChange>();
+  const merged: React.ComponentProps<typeof SearchControls> = {
     artifactType: "scene",
-    onQueryChange: vi.fn(),
     totalPages: 10,
     totalCount: 240,
-    children: null as React.ReactNode,
+    children: null,
+    ...props,
+    onQueryChange,
   };
-
-  const mergedProps = { ...defaultProps, ...props };
-
+  const router = createMemoryRouter(
+    [
+      {
+        path: "*",
+        element: Element ? (
+          <Element {...merged} />
+        ) : (
+          <SearchControls {...merged} />
+        ),
+      },
+    ],
+    { initialEntries: [url] }
+  );
+  const actions: string[] = [];
+  let last = router.state.location;
+  router.subscribe((next) => {
+    if (next.location === last) return;
+    last = next.location;
+    actions.push(next.historyAction);
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
   return {
-    ...render(
-      <MemoryRouter initialEntries={["/"]}>
-        <SearchControls {...mergedProps} />
-      </MemoryRouter>
-    ),
-    onQueryChange: mergedProps.onQueryChange,
+    onQueryChange,
+    router,
+    actions,
+    params: () => new URLSearchParams(router.state.location.search),
+    /** The last query the page was asked for */
+    lastQuery: () =>
+      must(
+        onQueryChange.mock.lastCall,
+        "a query sent to the page"
+      )[0] as SentQuery,
   };
-};
+}
+
+/** Waits for the page's first query */
+async function firstQuery(
+  onQueryChange: ReturnType<typeof vi.fn<OnQueryChange>>
+): Promise<SentQuery> {
+  await waitFor(() => expect(onQueryChange).toHaveBeenCalled());
+  return must(onQueryChange.mock.calls[0], "the first query")[0] as SentQuery;
+}
+
+const sortSelect = () => must(screen.getAllByRole("combobox")[0], "sort");
+
+const perPageSelect = () =>
+  must(
+    screen
+      .getAllByRole("combobox")
+      .filter((box) => box.id === "perPage")
+      .at(-1),
+    "per page"
+  );
 
 describe("SearchControls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFilterState = createMockFilterState();
+    vi.mocked(apiModule.apiGet).mockImplementation(() =>
+      Promise.resolve({ presets: {}, defaults: {} })
+    );
   });
 
   describe("Initial Rendering", () => {
     it("renders search input, sort control, and filters button", () => {
       renderSearchControls();
 
-      // Should have search input
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
-
-      // Should have sort dropdown (there are multiple comboboxes - sort and per-page)
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes.length).toBeGreaterThanOrEqual(1);
-
-      // Should have filters button
+      expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("Filters")).toBeInTheDocument();
     });
 
     it("triggers initial query on mount", async () => {
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
+      const { onQueryChange } = renderSearchControls();
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
-
-      // Initial query should have default values
-      const query = must(onQueryChange.mock.calls[0])[0];
-      expect(query.filter).toMatchObject({
+      expect((await firstQuery(onQueryChange)).filter).toMatchObject({
         page: 1,
         per_page: 24,
         direction: "DESC",
@@ -164,16 +242,73 @@ describe("SearchControls", () => {
     });
 
     it("uses correct filter type for artifact type", async () => {
-      const onQueryChange = vi.fn();
-      renderSearchControls({ artifactType: "performer", onQueryChange });
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
+      const { onQueryChange } = renderSearchControls({
+        artifactType: "performer",
       });
 
-      const query = must(onQueryChange.mock.calls[0])[0];
+      const query = await firstQuery(onQueryChange);
       expect(query).toHaveProperty("performer_filter");
       expect(query).not.toHaveProperty("scene_filter");
+    });
+
+    it("renders the controls at once while the presets load; the results wait", async () => {
+      vi.mocked(apiModule.apiGet).mockImplementation(
+        () => new Promise(() => {})
+      );
+      const { onQueryChange } = renderSearchControls(
+        { children: <div>result cards</div> },
+        { presets: "pending" }
+      );
+
+      expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+      expect(screen.queryByText("Loading filters...")).not.toBeInTheDocument();
+      expect(screen.queryByText("result cards")).not.toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(onQueryChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Back and Forward", () => {
+    it("Back after Next reports page 1 to onQueryChange", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls();
+      expect((await firstQuery(list.onQueryChange)).filter.page).toBe(1);
+
+      await user.click(
+        must(screen.getAllByRole("button", { name: "Next Page" }).at(-1))
+      );
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(2));
+      expect(list.params().get("page")).toBe("2");
+
+      await act(() => list.router.navigate(-1));
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
+    });
+
+    it("onViewModeChange and onPerPageStateChange follow the URL", async () => {
+      const onViewModeChange = vi.fn<(mode: string) => void>();
+      const onPerPageStateChange = vi.fn<(perPage: number) => void>();
+      const list = renderSearchControls(
+        {
+          onViewModeChange,
+          onPerPageStateChange,
+          supportsWallView: true,
+          viewModes: [
+            { id: "grid", label: "Grid view" },
+            { id: "wall", label: "Wall view" },
+          ],
+        },
+        { url: "/scenes?view=wall&per_page=48" }
+      );
+      await waitFor(() =>
+        expect(onViewModeChange).toHaveBeenLastCalledWith("wall")
+      );
+      expect(onPerPageStateChange).toHaveBeenLastCalledWith(48);
+
+      await act(() => list.router.navigate("/scenes"));
+      await waitFor(() =>
+        expect(onViewModeChange).toHaveBeenLastCalledWith("grid")
+      );
+      expect(onPerPageStateChange).toHaveBeenLastCalledWith(24);
     });
   });
 
@@ -182,33 +317,20 @@ describe("SearchControls", () => {
       const user = userEvent.setup();
       renderSearchControls();
 
-      // Find Filters button by its text and click
-      const filtersButton = screen.getByText("Filters").closest("button")!;
-      await user.click(filtersButton);
+      await user.click(must(screen.getByText("Filters").closest("button")));
 
-      // Filter panel should be visible - look for Apply Filters button
-      await waitFor(() => {
-        expect(screen.getByText("Apply Filters")).toBeInTheDocument();
-      });
+      expect(await screen.findByText("Apply Filters")).toBeInTheDocument();
     });
 
     it("closes filter panel when Apply Filters is clicked", async () => {
       const user = userEvent.setup();
       renderSearchControls();
 
-      // Open panel
-      const filtersButton = screen.getByText("Filters").closest("button")!;
-      await user.click(filtersButton);
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.click(
+        must((await screen.findByText("Apply Filters")).closest("button"))
+      );
 
-      await waitFor(() => {
-        expect(screen.getByText("Apply Filters")).toBeInTheDocument();
-      });
-
-      // Click Apply
-      const applyButton = screen.getByText("Apply Filters").closest("button")!;
-      await user.click(applyButton);
-
-      // Panel should close (Apply Filters button should disappear)
       await waitFor(() => {
         expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
       });
@@ -218,16 +340,12 @@ describe("SearchControls", () => {
   describe("Modifier dropdowns", () => {
     it("an untouched Performers modifier reads Has ANY, the modifier the request carries", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn<(query: Record<string, unknown>) => void>();
-      renderSearchControls(
-        { onQueryChange },
-        { filters: { performerIds: ["7:server-a"] } }
+      const { onQueryChange } = renderSearchControls(
+        {},
+        { url: "/scenes?performerIds=7:server-a" }
       );
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
-      expect(must(onQueryChange.mock.calls[0])[0].scene_filter).toEqual({
+      expect((await firstQuery(onQueryChange)).scene_filter).toEqual({
         performers: { value: ["7:server-a"], modifier: "INCLUDES" },
       });
 
@@ -245,69 +363,206 @@ describe("SearchControls", () => {
   });
 
   describe("Filter Application", () => {
-    it("calls onQueryChange when filter panel is submitted", async () => {
+    it("Apply resets the page to 1", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
+      const list = renderSearchControls({}, { url: "/scenes?page=3" });
+      expect((await firstQuery(list.onQueryChange)).filter.page).toBe(3);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.click(
+        must((await screen.findByText("Apply Filters")).closest("button"))
+      );
+
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
+      expect(list.actions).toEqual(["PUSH"]);
+    });
+
+    it("a filter set in the panel reaches the request on Apply, with one history entry", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls();
+      await firstQuery(list.onQueryChange);
+
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      const favorite = must(
+        screen.getByText("Favorite Scenes", { selector: "label" })
+          .parentElement,
+        "the Favorite control"
+      );
+      await user.click(within(favorite).getByRole("checkbox"));
+      expect(list.onQueryChange).toHaveBeenCalledTimes(1);
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({ favorite: true })
+      );
+      expect(list.params().get("favorite")).toBe("true");
+      expect(list.actions).toEqual(["PUSH"]);
+    });
+
+    it("removing a chip asks for the list without its filter", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      await firstQuery(list.onQueryChange);
+
+      await user.click(
+        screen.getByRole("button", { name: /^Remove filter: Favorite/ })
+      );
+
+      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      expect(list.params().has("favorite")).toBe(false);
+    });
+
+    it("Apply keeps a folder's permanent tag", async () => {
+      const user = userEvent.setup();
+      const FOLDER_TAG = { value: ["5:abc"], modifier: "INCLUDES", depth: 0 };
+      /** A folder page: the folder opens after the list mounted */
+      function FolderPage(props: React.ComponentProps<typeof SearchControls>) {
+        const [permanent, setPermanent] = useState<Record<string, unknown>>({});
+        return (
+          <>
+            <button onClick={() => setPermanent({ tags: FOLDER_TAG })}>
+              Open folder
+            </button>
+            <SearchControls {...props} permanentFilters={permanent} />
+          </>
+        );
+      }
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?view=folder&page=2", element: FolderPage }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await user.click(screen.getByRole("button", { name: "Open folder" }));
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.click(
+        must((await screen.findByText("Apply Filters")).closest("button"))
+      );
+
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(1));
+      expect(list.lastQuery().scene_filter).toEqual({ tags: FOLDER_TAG });
+    });
+  });
+
+  describe("Presets", () => {
+    it("a preset naming performers does not replace the page's permanent performer", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        {
+          context: "scene_performer",
+          permanentFilters: {
+            performers: { value: ["1:abc"], modifier: "INCLUDES" },
+          },
+        },
+        {
+          url: "/performer/1",
+          presets: {
+            presets: {
+              scene: [
+                preset({
+                  filters: {
+                    performers: { value: ["9:abc"], modifier: "INCLUDES" },
+                  },
+                }),
+              ],
+            },
+            defaults: { scene_performer: "p1" },
+          },
+        }
+      );
+      const first = await firstQuery(list.onQueryChange);
+      expect(first.scene_filter).toEqual({
+        performers: { value: ["1:abc"], modifier: "INCLUDES" },
       });
 
-      // Clear initial call
-      onQueryChange.mockClear();
+      await user.click(
+        must(screen.getAllByRole("button", { name: "Next Page" }).at(-1))
+      );
 
-      // Open filter panel
-      const filtersButton = screen.getByText("Filters").closest("button")!;
-      await user.click(filtersButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Apply Filters")).toBeInTheDocument();
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(2));
+      expect(list.lastQuery().scene_filter).toEqual({
+        performers: { value: ["1:abc"], modifier: "INCLUDES" },
       });
-
-      // Apply filters (even without changes, should still trigger onQueryChange)
-      const applyButton = screen.getByText("Apply Filters").closest("button")!;
-      await user.click(applyButton);
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
-
-      // Query should have page reset to 1
-      const query = must(onQueryChange.mock.calls[0])[0];
-      expect(query.filter.page).toBe(1);
     });
   });
 
   describe("Sort Controls", () => {
     it("changes sort field when dropdown selection changes", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
+      const list = renderSearchControls();
+      await firstQuery(list.onQueryChange);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      await user.selectOptions(sortSelect(), "rating");
 
-      onQueryChange.mockClear();
+      await waitFor(() => expect(list.lastQuery().filter.sort).toBe("rating"));
+      expect(list.params().get("sort")).toBe("rating");
+    });
 
-      // Find and change the sort dropdown (first combobox)
-      const sortSelect = must(screen.getAllByRole("combobox")[0]);
-      await user.selectOptions(sortSelect, "rating");
+    it("a sort change on /performer/1?tab=galleries&includeSubTags=true keeps both params", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        { artifactType: "gallery", initialSort: "title" },
+        { url: "/performer/1?tab=galleries&includeSubTags=true" }
+      );
+      await firstQuery(list.onQueryChange);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      await user.selectOptions(sortSelect(), "rating");
 
-      const query = must(onQueryChange.mock.calls[0])[0];
-      expect(query.filter.sort).toBe("rating");
+      await waitFor(() => expect(list.lastQuery().filter.sort).toBe("rating"));
+      const params = list.params();
+      expect(params.get("tab")).toBe("galleries");
+      expect(params.get("includeSubTags")).toBe("true");
+      expect(params.get("sort")).toBe("rating");
+    });
+
+    it("a sort change keeps the timeline period and its date filter", async () => {
+      const user = userEvent.setup();
+      const MARCH = { start: "2024-03-01", end: "2024-03-31" };
+      /** A timeline page: the period's date filter arrives after the list mounted */
+      function TimelinePage(
+        props: React.ComponentProps<typeof SearchControls>
+      ) {
+        const [permanent, setPermanent] = useState<Record<string, unknown>>({});
+        return (
+          <>
+            <button onClick={() => setPermanent({ date: MARCH })}>
+              Pick March
+            </button>
+            <SearchControls
+              {...props}
+              permanentFilters={permanent}
+              deferInitialQueryUntilFiltersReady
+            />
+          </>
+        );
+      }
+      const list = renderSearchControls(
+        {},
+        {
+          url: "/scenes?view=timeline&timeline_period=2024-03",
+          element: TimelinePage,
+        }
+      );
+
+      await user.click(screen.getByRole("button", { name: "Pick March" }));
+      expect(await firstQuery(list.onQueryChange)).toHaveProperty(
+        "scene_filter.date"
+      );
+
+      await user.selectOptions(sortSelect(), "rating");
+
+      await waitFor(() => expect(list.lastQuery().filter.sort).toBe("rating"));
+      expect(list.lastQuery()).toHaveProperty("scene_filter.date");
+      expect(list.params().get("timeline_period")).toBe("2024-03");
     });
 
     describe("Scene Number", () => {
       const sortValues = () =>
-        Array.from(
-          must(screen.getAllByRole("combobox")[0]).querySelectorAll("option")
-        ).map((option) => option.value);
+        Array.from(sortSelect().querySelectorAll("option")).map(
+          (option) => option.value
+        );
 
       it("is not offered without a collection filter", () => {
         renderSearchControls();
@@ -326,7 +581,7 @@ describe("SearchControls", () => {
       it("is offered when the panel's collection filter includes", () => {
         renderSearchControls(
           {},
-          { filters: { groupIds: ["7:inst"], groupIdsModifier: "INCLUDES" } }
+          { url: "/scenes?groupIds=7:inst&groupIdsModifier=INCLUDES" }
         );
         expect(sortValues()).toContain("scene_index");
       });
@@ -334,138 +589,76 @@ describe("SearchControls", () => {
       it("is not offered when the collection filter excludes or is empty", () => {
         renderSearchControls(
           {},
-          { filters: { groupIds: ["7:inst"], groupIdsModifier: "EXCLUDES" } }
+          { url: "/scenes?groupIds=7:inst&groupIdsModifier=EXCLUDES" }
         );
         expect(sortValues()).not.toContain("scene_index");
       });
     });
 
     describe("a sort the list no longer offers", () => {
-      type SortedQuery = { filter: { sort: string } };
-      const sceneIndexState = (filters = {}) => ({
-        filters,
-        sort: { field: "scene_index", direction: "ASC" },
-      });
-
       it("Scene Number without a collection filter is reset to the default, and the query does not carry it", async () => {
-        const onQueryChange = vi.fn<(query: SortedQuery) => void>();
-        const setSort = vi.fn();
-        renderSearchControls(
-          { onQueryChange },
-          { ...sceneIndexState(), setSort }
+        const { onQueryChange } = renderSearchControls(
+          { initialSort: "created_at" },
+          { url: "/scenes?sort=scene_index&dir=ASC" }
         );
 
-        await waitFor(() => {
-          expect(onQueryChange).toHaveBeenCalled();
-        });
-        const query = must(onQueryChange.mock.calls[0])[0];
+        const query = await firstQuery(onQueryChange);
         expect(query.filter.sort).toBe("created_at");
-        expect(setSort).toHaveBeenCalledWith("created_at", "ASC");
+        expect(query.filter.direction).toBe("ASC");
+        expect(sortSelect()).toHaveValue("created_at");
       });
 
       it("Scene Number beside an including collection filter is kept", async () => {
-        const onQueryChange = vi.fn<(query: SortedQuery) => void>();
-        const setSort = vi.fn();
-        renderSearchControls(
-          { onQueryChange },
+        const { onQueryChange } = renderSearchControls(
+          { initialSort: "created_at" },
           {
-            ...sceneIndexState({
-              groupIds: ["7:inst"],
-              groupIdsModifier: "INCLUDES",
-            }),
-            setSort,
+            url: "/scenes?sort=scene_index&dir=ASC&groupIds=7:inst&groupIdsModifier=INCLUDES",
           }
         );
 
-        await waitFor(() => {
-          expect(onQueryChange).toHaveBeenCalled();
-        });
-        const query = must(onQueryChange.mock.calls[0])[0];
-        expect(query.filter.sort).toBe("scene_index");
-        expect(setSort).not.toHaveBeenCalled();
+        expect((await firstQuery(onQueryChange)).filter.sort).toBe(
+          "scene_index"
+        );
       });
     });
 
     it("generates random seed for random sort", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
+      const list = renderSearchControls();
+      await firstQuery(list.onQueryChange);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      await user.selectOptions(sortSelect(), "random");
 
-      onQueryChange.mockClear();
-
-      // Select random sort
-      const sortSelect = must(screen.getAllByRole("combobox")[0]);
-      await user.selectOptions(sortSelect, "random");
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
-
-      const query = must(onQueryChange.mock.calls[0])[0];
-      // Sort should be random_XXXXXXXX format
-      expect(query.filter.sort).toMatch(/^random_\d+$/);
+      await waitFor(() =>
+        expect(list.lastQuery().filter.sort).toMatch(/^random_\d+$/)
+      );
+      expect(list.params().get("sort")).toBe(list.lastQuery().filter.sort);
     });
   });
 
   describe("Search Text", () => {
-    it("updates query when search text changes", async () => {
-      const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
-
-      onQueryChange.mockClear();
-
-      // Type in search box
-      const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "test query");
-
-      // Should trigger query with search text (may be debounced)
-      await waitFor(
-        () => {
-          expect(onQueryChange).toHaveBeenCalled();
-        },
-        { timeout: 1000 }
-      );
-
-      const query = must(
-        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1]
-      )[0];
-      expect(query.filter.q).toBe("test query");
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    it("resets page to 1 when search text changes", async () => {
-      const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange });
+    it("typing a search writes q once, 300 ms after the last key", async () => {
+      vi.useFakeTimers();
+      const list = renderSearchControls({}, { url: "/scenes?page=2" });
+      const input = screen.getByPlaceholderText(/search/i);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      for (const text of ["t", "te", "test"]) {
+        fireEvent.change(input, { target: { value: text } });
+        await act(() => vi.advanceTimersByTimeAsync(100));
+      }
+      await act(() => vi.advanceTimersByTimeAsync(199));
+      expect(list.params().has("q")).toBe(false);
 
-      onQueryChange.mockClear();
-
-      const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "test");
-
-      await waitFor(
-        () => {
-          expect(onQueryChange).toHaveBeenCalled();
-        },
-        { timeout: 1000 }
-      );
-
-      const query = must(
-        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1]
-      )[0];
-      expect(query.filter.page).toBe(1);
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expect(list.params().get("q")).toBe("test");
+      expect(list.params().has("page")).toBe(false);
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      expect(list.actions).toEqual(["REPLACE"]);
+      expect(list.lastQuery().filter).toMatchObject({ q: "test", page: 1 });
     });
   });
 
@@ -473,42 +666,33 @@ describe("SearchControls", () => {
     it("renders pagination controls when totalPages > 0", () => {
       renderSearchControls({ totalPages: 10, totalCount: 240 });
 
-      // Should have pagination info showing (both top and bottom pagination)
-      const paginationElements = screen.getAllByText(/of 240/);
-      expect(paginationElements.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/of 240/).length).toBeGreaterThanOrEqual(1);
     });
 
-    it("changes per_page when dropdown selection changes", async () => {
+    it("paginationHandlerRef pages the list without a history entry", async () => {
+      const paginationHandlerRef: {
+        current: ((page: number) => void) | null;
+      } = { current: null };
+      const list = renderSearchControls({ paginationHandlerRef });
+      await firstQuery(list.onQueryChange);
+
+      act(() => must(paginationHandlerRef.current, "the page handler")(3));
+
+      await waitFor(() => expect(list.lastQuery().filter.page).toBe(3));
+      expect(list.actions).toEqual(["REPLACE"]);
+    });
+
+    it("changing per page adds no history entry", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-      renderSearchControls({ onQueryChange, totalPages: 10, totalCount: 240 });
+      const list = renderSearchControls({}, { url: "/scenes?page=2" });
+      await firstQuery(list.onQueryChange);
 
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      await user.selectOptions(perPageSelect(), "48");
 
-      onQueryChange.mockClear();
-
-      // Find per_page dropdown - it should have options like 12, 24, 48
-      const comboboxes = screen.getAllByRole("combobox");
-      // Per page selector should be one with "24" as current value
-      const perPageSelect = comboboxes.find((cb) =>
-        Array.from((cb as HTMLSelectElement).options).some(
-          (opt: HTMLOptionElement) => opt.value === "48"
-        )
-      ) as HTMLSelectElement | undefined;
-
-      if (perPageSelect) {
-        await user.selectOptions(perPageSelect, "48");
-
-        await waitFor(() => {
-          expect(onQueryChange).toHaveBeenCalled();
-        });
-
-        const query = must(onQueryChange.mock.calls[0])[0];
-        expect(query.filter.per_page).toBe(48);
-        expect(query.filter.page).toBe(1); // Should reset to page 1
-      }
+      await waitFor(() => expect(list.lastQuery().filter.per_page).toBe(48));
+      expect(list.lastQuery().filter.page).toBe(1);
+      expect(list.params().get("per_page")).toBe("48");
+      expect(list.actions).toEqual(["REPLACE"]);
     });
   });
 
@@ -516,205 +700,102 @@ describe("SearchControls", () => {
     it("shows performer sort options for performer artifact type", () => {
       renderSearchControls({ artifactType: "performer" });
 
-      // Find the sort dropdown
-      const sortSelect = screen.getAllByRole(
-        "combobox"
-      )[0] as HTMLSelectElement;
-
-      // Should have performer-specific sort options like "Height"
-      const options = Array.from(sortSelect.options).map(
-        (opt: HTMLOptionElement) => opt.textContent
+      const options = Array.from(sortSelect().querySelectorAll("option")).map(
+        (option) => option.textContent
       );
       expect(options).toContain("Height");
     });
 
-    it("builds correct filter type for each artifact type", async () => {
-      const testCases = [
-        { artifactType: "scene", expectedKey: "scene_filter" },
-        { artifactType: "performer", expectedKey: "performer_filter" },
-        { artifactType: "studio", expectedKey: "studio_filter" },
-        { artifactType: "tag", expectedKey: "tag_filter" },
-        { artifactType: "group", expectedKey: "group_filter" },
-        { artifactType: "gallery", expectedKey: "gallery_filter" },
-        { artifactType: "image", expectedKey: "image_filter" },
-      ];
-
-      for (const { artifactType, expectedKey } of testCases) {
-        const onQueryChange = vi.fn();
-
-        const { unmount } = render(
-          <MemoryRouter initialEntries={["/"]}>
-            <SearchControls
-              artifactType={artifactType}
-              onQueryChange={onQueryChange}
-              totalPages={1}
-              totalCount={10}
-            >
-              {null}
-            </SearchControls>
-          </MemoryRouter>
-        );
-
-        await waitFor(() => {
-          expect(onQueryChange).toHaveBeenCalled();
+    it.each([
+      { artifactType: "scene", expectedKey: "scene_filter" },
+      { artifactType: "performer", expectedKey: "performer_filter" },
+      { artifactType: "studio", expectedKey: "studio_filter" },
+      { artifactType: "tag", expectedKey: "tag_filter" },
+      { artifactType: "group", expectedKey: "group_filter" },
+      { artifactType: "gallery", expectedKey: "gallery_filter" },
+      { artifactType: "image", expectedKey: "image_filter" },
+    ])(
+      "builds $expectedKey for $artifactType",
+      async ({ artifactType, expectedKey }) => {
+        const { onQueryChange } = renderSearchControls({
+          artifactType,
+          totalPages: 1,
+          totalCount: 10,
         });
 
-        const query = must(onQueryChange.mock.calls[0])[0];
-        expect(query).toHaveProperty(expectedKey);
-
-        unmount();
+        expect(await firstQuery(onQueryChange)).toHaveProperty(expectedKey);
       }
-    });
-  });
-
-  describe("Loading State", () => {
-    it("shows loading spinner when isLoadingPresets is true", () => {
-      mockFilterState = createMockFilterState({ isLoadingPresets: true });
-
-      render(
-        <MemoryRouter initialEntries={["/"]}>
-          <SearchControls
-            artifactType="scene"
-            onQueryChange={vi.fn()}
-            totalPages={10}
-            totalCount={240}
-          >
-            {null}
-          </SearchControls>
-        </MemoryRouter>
-      );
-
-      // Should show loading text
-      expect(screen.getByText("Loading filters...")).toBeInTheDocument();
-    });
+    );
   });
 
   describe("Clear Filters", () => {
     it("shows Clear All button when filters are active", async () => {
       const user = userEvent.setup();
-      // Render with active filters
-      renderSearchControls({}, { filters: { favorite: true } });
+      renderSearchControls({}, { url: "/scenes?favorite=true" });
 
-      // Open filter panel to see Clear All
-      const filtersButton = screen.getByText("Filters").closest("button")!;
-      await user.click(filtersButton);
+      await user.click(must(screen.getByText("Filters").closest("button")));
 
-      await waitFor(() => {
-        expect(screen.getByText("Clear All")).toBeInTheDocument();
-      });
+      expect(await screen.findByText("Clear All")).toBeInTheDocument();
     });
 
-    it("calls onQueryChange when Clear All is clicked", async () => {
+    it("Clear All asks for the unfiltered list", async () => {
       const user = userEvent.setup();
-      const onQueryChange = vi.fn();
-
-      renderSearchControls({ onQueryChange }, { filters: { favorite: true } });
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        favorite: true,
       });
 
-      onQueryChange.mockClear();
+      await user.click(must(screen.getByText("Filters").closest("button")));
+      await user.click(
+        must((await screen.findByText("Clear All")).closest("button"))
+      );
 
-      // Open filter panel
-      const filtersButton = screen.getByText("Filters").closest("button")!;
-      await user.click(filtersButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Clear All")).toBeInTheDocument();
-      });
-
-      // Click Clear All
-      const clearButton = screen.getByText("Clear All").closest("button")!;
-      await user.click(clearButton);
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
-      });
+      await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
+      expect(list.params().has("favorite")).toBe(false);
     });
   });
 
   describe("Timeline View Deferred Query", () => {
     it("defers initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters empty", async () => {
-      mockFilterState = createMockFilterState();
-      const onQueryChange = vi.fn();
+      const { onQueryChange } = renderSearchControls({
+        artifactType: "gallery",
+        totalPages: 1,
+        totalCount: 0,
+        deferInitialQueryUntilFiltersReady: true,
+        permanentFilters: {},
+      });
 
-      render(
-        <MemoryRouter initialEntries={["/"]}>
-          <SearchControls
-            artifactType="gallery"
-            onQueryChange={onQueryChange}
-            totalPages={1}
-            totalCount={0}
-            deferInitialQueryUntilFiltersReady={true}
-            permanentFilters={{}}
-          >
-            {null}
-          </SearchControls>
-        </MemoryRouter>
-      );
-
-      // Wait a tick to ensure no query is fired
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Query should NOT have been called because permanentFilters is empty
       expect(onQueryChange).not.toHaveBeenCalled();
     });
 
     it("fires initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters has values", async () => {
-      mockFilterState = createMockFilterState();
-      const onQueryChange = vi.fn();
-
-      render(
-        <MemoryRouter initialEntries={["/"]}>
-          <SearchControls
-            artifactType="gallery"
-            onQueryChange={onQueryChange}
-            totalPages={1}
-            totalCount={10}
-            deferInitialQueryUntilFiltersReady={true}
-            permanentFilters={{
-              date: { start: "2024-01-01", end: "2024-01-31" },
-            }}
-          >
-            {null}
-          </SearchControls>
-        </MemoryRouter>
-      );
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
+      const { onQueryChange } = renderSearchControls({
+        artifactType: "gallery",
+        totalPages: 1,
+        totalCount: 10,
+        deferInitialQueryUntilFiltersReady: true,
+        permanentFilters: {
+          date: { start: "2024-01-01", end: "2024-01-31" },
+        },
       });
 
-      // Verify the query includes the date filter
-      const query = must(onQueryChange.mock.calls[0])[0];
-      expect(query.gallery_filter).toBeDefined();
-      expect(query.gallery_filter.date).toBeDefined();
-      expect(query.gallery_filter.date.value).toBe("2024-01-01");
+      expect(await firstQuery(onQueryChange)).toMatchObject({
+        gallery_filter: { date: { value: "2024-01-01" } },
+      });
     });
 
     it("fires initial query immediately when deferInitialQueryUntilFiltersReady is false", async () => {
-      mockFilterState = createMockFilterState();
-      const onQueryChange = vi.fn();
-
-      render(
-        <MemoryRouter initialEntries={["/"]}>
-          <SearchControls
-            artifactType="gallery"
-            onQueryChange={onQueryChange}
-            totalPages={1}
-            totalCount={10}
-            deferInitialQueryUntilFiltersReady={false}
-            permanentFilters={{}}
-          >
-            {null}
-          </SearchControls>
-        </MemoryRouter>
-      );
-
-      await waitFor(() => {
-        expect(onQueryChange).toHaveBeenCalled();
+      const { onQueryChange } = renderSearchControls({
+        artifactType: "gallery",
+        totalPages: 1,
+        totalCount: 10,
+        deferInitialQueryUntilFiltersReady: false,
+        permanentFilters: {},
       });
+
+      await firstQuery(onQueryChange);
     });
   });
 
@@ -755,10 +836,9 @@ describe("SearchControls", () => {
             : { presets: {}, defaults: {} }
         )
       );
-      mockFilterState = createMockFilterState({ viewMode: "wall" });
       render(
         <SignedInWithQuery>
-          <PlainMemoryRouter initialEntries={["/"]}>
+          <PlainMemoryRouter initialEntries={["/scenes?view=wall"]}>
             <SearchControls
               artifactType="scene"
               onQueryChange={vi.fn()}
