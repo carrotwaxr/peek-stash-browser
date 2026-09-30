@@ -280,6 +280,41 @@ test.describe("Detail Pages", () => {
     });
   });
 
+  test("a favourite filter on a performer's Scenes tab does not follow to the Galleries tab", async ({
+    page,
+  }) => {
+    // The performer with the most galleries, on its Scenes tab with a scene
+    // filter and a page in the URL
+    const found = await page.request.post("/api/library/performers", {
+      data: {
+        filter: { per_page: 1, sort: "gallery_count", direction: "DESC" },
+      },
+    });
+    expect(found.ok(), await found.text()).toBeTruthy();
+    const [performer] = ((await found.json()) as FindPerformersBody)
+      .findPerformers.performers;
+    const { id, instanceId } = requireData(performer, "a performer");
+    const instance = encodeURIComponent(instanceId);
+    await page.goto(
+      `/performer/${id}?instance=${instance}&tab=scenes&favorite=true&sort=title&page=2`
+    );
+
+    const galleries = page.getByRole("button", { name: /^Galleries\b/ });
+    const scenes = page.getByRole("button", { name: /^Scenes\b/ });
+    await expect(scenes.or(galleries).first()).toBeVisible({ timeout: 10_000 });
+    requireData(
+      (await galleries.count()) > 0 && (await scenes.count()) > 0,
+      "a performer with scenes and galleries"
+    );
+    await expect(page).toHaveURL(/[?&]favorite=true\b/);
+
+    await galleries.click();
+
+    await expect(page).toHaveURL(/[?&]tab=galleries\b/);
+    await expect(page).toHaveURL(new RegExp(`[?&]instance=${instance}`));
+    await expect(page).not.toHaveURL(/[?&](favorite|sort|page)=/);
+  });
+
   test("images page loads and shows content or empty state", async ({
     page,
   }) => {

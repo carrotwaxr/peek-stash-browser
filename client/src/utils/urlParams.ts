@@ -375,6 +375,29 @@ export const LIST_OWNED_KEYS: readonly string[] = [
   ),
 ];
 
+/**
+ * The URL a detail page's tab switch goes to: every key a list owns
+ * (filters, search, sort, paging, presentation, folder path) and the open
+ * image go, since each tab is its own list; `tab` is set, or removed for
+ * the default tab; every other key (`instance`, `includeSubTags`,
+ * `includeSubStudios`) stays. Returns a new object.
+ */
+export const switchTabParams = (
+  params: URLSearchParams,
+  tabId: string,
+  defaultTab: string
+): URLSearchParams => {
+  const next = new URLSearchParams(params);
+  for (const key of LIST_OWNED_KEYS) next.delete(key);
+  next.delete("image");
+  if (tabId === defaultTab) {
+    next.delete("tab");
+  } else {
+    next.set("tab", tabId);
+  }
+  return next;
+};
+
 /** A list's state as the URL holds it; a field the URL lacks is null */
 export interface ListUrlParams {
   /** The page's filters the URL names (panel shape) */
