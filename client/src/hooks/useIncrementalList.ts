@@ -31,7 +31,8 @@ interface IncrementalList<T> {
  * Renders a list the client holds whole in chunks: the first `chunk` items,
  * and one more chunk each time the sentinel after the last row comes into
  * view (through the shared `useInView` observer). A new `items` array starts
- * over at the first chunk, so pass a memoised array. Without an
+ * over at the first chunk, plus one when the sentinel is in view, so pass a
+ * memoised array. Without an
  * IntersectionObserver every item shows, as the list did before chunking.
  */
 export const useIncrementalList = <T>(
@@ -49,17 +50,21 @@ export const useIncrementalList = <T>(
   const inView = useInView(sentinelRef, { rootMargin: SENTINEL_MARGIN });
 
   // One chunk each time the sentinel comes into view, not one per render
-  // while it stays there
-  const wasInView = useRef(false);
+  // while it stays there. A new items array starts over: its sentinel may
+  // already be in view (a list narrowed near the bottom, or one that had
+  // shown every item), where the observer reports no change
+  const edge = useRef<{ inView: boolean; items: readonly T[] } | null>(null);
   useEffect(() => {
-    const reached = inView && !wasInView.current;
-    wasInView.current = inView;
+    const prev = edge.current;
+    edge.current = { inView, items };
+    const reached =
+      hasMore && inView && (!prev?.inView || prev.items !== items);
     if (!reached) return;
-    setShown((prev) => ({
-      items: prev.items,
-      count: Math.min(prev.count + chunk, prev.items.length),
+    setShown((current) => ({
+      items: current.items,
+      count: Math.min(current.count + chunk, current.items.length),
     }));
-  }, [inView, chunk]);
+  }, [inView, items, hasMore, chunk]);
 
   const showAtLeast = useCallback(
     (wanted: number) =>

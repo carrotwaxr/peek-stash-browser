@@ -114,11 +114,32 @@ describe("useIncrementalList", () => {
     const { rerender } = render(<List items={numbered(1000)} />);
     reach();
     expect(count()).toBe(400);
+    leave();
     rerender(<List items={numbered(1000)} />);
     expect(count()).toBe(200);
     // and the sentinel still pages the new list
-    leave();
     reach();
+    expect(count()).toBe(400);
+  });
+
+  it("a longer list after every chunk showed loads its next chunk with the sentinel in view", () => {
+    const { rerender } = render(<List items={numbered(300)} />);
+    reach();
+    expect(count()).toBe(300);
+    expect(screen.queryByTestId("sentinel")).not.toBeInTheDocument();
+
+    rerender(<List items={numbered(1000)} />);
+    reach();
+    expect(count()).toBe(400);
+  });
+
+  it("a new items array with the sentinel still in view loads the next chunk", () => {
+    const { rerender } = render(<List items={numbered(1000)} />);
+    reach();
+    expect(count()).toBe(400);
+    // Narrowed near the bottom: the sentinel after the first chunk is in view
+    // and the observer reports no change
+    rerender(<List items={numbered(900)} />);
     expect(count()).toBe(400);
   });
 
