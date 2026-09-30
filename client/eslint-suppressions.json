@@ -1109,19 +1109,19 @@
   },
   "src/components/wall/wallConfig.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 21
+      "count": 16
     },
     "@typescript-eslint/no-unsafe-argument": {
-      "count": 9
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 44
+      "count": 28
     },
     "@typescript-eslint/no-unsafe-return": {
-      "count": 9
+      "count": 8
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 7

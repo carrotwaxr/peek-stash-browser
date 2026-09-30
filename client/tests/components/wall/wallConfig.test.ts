@@ -169,15 +169,29 @@ describe("wallConfig", () => {
   describe("clip config", () => {
     const config = wallConfig.clip;
 
-    it("returns clip preview URL when id exists", () => {
-      const clip = { id: "clip-1", instanceId: "inst-1" };
-      expect(config.getImageUrl(clip)).toBe(
-        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
-      );
+    it("a clip's still image is its screenshot, else its scene's screenshot, never the preview video", () => {
+      const base = { id: "clip-1", instanceId: "inst-1", sceneId: "s1" };
+      expect(
+        config.getImageUrl({
+          ...base,
+          screenshotUrl: "/clip-shot.jpg",
+          scene: { pathScreenshot: "/scene-shot.jpg" },
+        })
+      ).toBe("/clip-shot.jpg");
+      expect(
+        config.getImageUrl({
+          ...base,
+          screenshotUrl: null,
+          scene: { pathScreenshot: "/scene-shot.jpg" },
+        })
+      ).toBe("/scene-shot.jpg");
+      expect(config.getImageUrl({ ...base, isGenerated: true })).toBeNull();
     });
 
-    it("returns null when clip has no id", () => {
-      expect(config.getImageUrl({})).toBeNull();
+    it("returns null image URL when the clip has no screenshot", () => {
+      expect(
+        config.getImageUrl({ id: "c", instanceId: "i", sceneId: "s" })
+      ).toBeNull();
     });
 
     it("returns preview URL for generated clips", () => {
@@ -192,11 +206,8 @@ describe("wallConfig", () => {
       expect(config.getPreviewUrl(clip)).toBeNull();
     });
 
-    it("carries the clip's instance on both URLs", () => {
+    it("carries the clip's instance on the preview URL", () => {
       const clip = { id: "clip-1", instanceId: "inst-1", isGenerated: true };
-      expect(config.getImageUrl(clip)).toBe(
-        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
-      );
       expect(config.getPreviewUrl(clip)).toBe(
         "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
       );
