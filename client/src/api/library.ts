@@ -17,6 +17,7 @@ import type {
   FindStudiosMinimalRequest,
   FindStudiosMinimalResponse,
   FindStudiosRequest,
+  FindTagTreeRequest,
   FindTagTreeResponse,
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
@@ -25,7 +26,6 @@ import type {
   NormalizedImage,
   RelationCountsResponse,
   RelationCountsType,
-  TagTreeScope,
 } from "@peek/shared-types";
 import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
@@ -155,14 +155,11 @@ export const libraryApi = {
 
   /**
    * The compact tag tree for the hierarchy and folder views: every tag the
-   * user can see, or with a scope the tags on its scenes and their ancestors
+   * user can see, or with a scope the tags on its scenes and their
+   * ancestors; with `untagged`, that type's count of untagged items
    */
-  findTagTree: (scope?: TagTreeScope, signal?: AbortSignal) =>
-    apiPost<FindTagTreeResponse>(
-      "/library/tags/tree",
-      scope ? { scope } : {},
-      signal
-    ),
+  findTagTree: (request: FindTagTreeRequest, signal?: AbortSignal) =>
+    apiPost<FindTagTreeResponse>("/library/tags/tree", request, signal),
 
   findGalleries: (params: FindGalleriesRequest = {}, signal?: AbortSignal) =>
     apiFetch("/library/galleries", {

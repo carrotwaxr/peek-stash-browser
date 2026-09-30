@@ -37,6 +37,7 @@ export type {
   TagTreeScope,
   FindTagTreeRequest,
   TagTreeRow,
+  UntaggedKind,
   FindTagTreeResponse,
   // Galleries
   FindGalleriesRequest,

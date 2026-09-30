@@ -50,8 +50,8 @@ export const queryKeys = {
     all: (instanceId?: string) => ["tags", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["tags", instanceId, "list", params] as const,
-    tree: (scope: Record<string, unknown> | undefined) =>
-      ["tags", undefined, "tree", scope ?? null] as const,
+    tree: (scope: Record<string, unknown> | undefined, untagged?: string) =>
+      ["tags", undefined, "tree", scope ?? null, untagged ?? null] as const,
     detail: (instanceId: string | undefined, id: string | undefined) =>
       ["tags", instanceId, "detail", id] as const,
     counts: (

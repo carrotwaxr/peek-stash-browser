@@ -650,6 +650,71 @@ describeWithDb(
       WALK_TIMEOUT_MS
     );
 
+    /**
+     * A gallery's or image's tag count is its junction rows on its own
+     * instance (an image's include its galleries' tags): for each count, 0
+     * (the folder view's Untagged) first, the rows the list gives and the
+     * rows with that many
+     */
+    async function tagCountLists(kind: "gallery" | "image") {
+      const [table, junction, idCol, instanceCol] =
+        kind === "gallery"
+          ? ["StashGallery", "GalleryTag", "galleryId", "galleryInstanceId"]
+          : ["StashImage", "ImageTag", "imageId", "imageInstanceId"];
+      const rows = await prisma.$queryRawUnsafe<{ id: string; n: bigint }[]>(
+        `SELECT x.id, (SELECT COUNT(*) FROM ${junction} j WHERE j.${idCol} = x.id AND j.${instanceCol} = x.stashInstanceId) AS n
+         FROM ${table} x WHERE x.stashInstanceId = ? AND x.deletedAt IS NULL`,
+        must(walk.allowedInstanceIds[0])
+      );
+      const counts = [...new Set([0, ...rows.map((row) => Number(row.n))])];
+      const listed = [];
+      const expected = [];
+      for (const n of counts) {
+        const body = {
+          filter: { page: 1, per_page: 250, q: "" },
+          [FILTER_BODY_KEYS[kind]]: {
+            tag_count: { value: n, modifier: "EQUALS" },
+          },
+        };
+        const options = {
+          userId: walk.userId,
+          allowedInstanceIds: walk.allowedInstanceIds,
+          applyExclusions: false,
+        };
+        const parse = { userId: walk.userId } as const;
+        const result =
+          kind === "gallery"
+            ? await galleryQueryBuilder.execute({
+                ...options,
+                request: parseListRequest("gallery", body, parse),
+              })
+            : await imageQueryBuilder.execute({
+                ...options,
+                request: parseListRequest("image", body, parse),
+              });
+        const ids = result.items.map((item) => item.id).sort();
+        listed.push({ n, ids, total: result.total });
+        const matching = rows
+          .filter((row) => Number(row.n) === n)
+          .map((row) => row.id)
+          .sort();
+        expected.push({ n, ids: matching, total: matching.length });
+      }
+      return { listed, expected, tagged: rows.some((row) => row.n > 0n) };
+    }
+
+    it("gallery tag_count EQUALS 0 lists only untagged galleries", async () => {
+      const { listed, expected, tagged } = await tagCountLists("gallery");
+      expect(tagged).toBe(true);
+      expect(listed).toEqual(expected);
+    });
+
+    it("image tag_count EQUALS 0 lists only untagged images", async () => {
+      const { listed, expected, tagged } = await tagCountLists("image");
+      expect(tagged).toBe(true);
+      expect(listed).toEqual(expected);
+    });
+
     it("names only lists the walk knows in KNOWN_GAPS", () => {
       const unknown = Object.keys(KNOWN_GAPS).filter(
         (id) =>

@@ -15,6 +15,7 @@ import {
   WALL_VIEW_SETTINGS,
   useWallPlayback,
 } from "../../hooks/useWallPlayback";
+import { UNTAGGED_KIND } from "../../utils/buildFolderTree";
 import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
@@ -205,10 +206,15 @@ const EntityListPage = ({
   const { wallPlayback } = useWallPlayback();
   const {
     tags: folderTags,
+    untaggedCount: folderUntaggedCount,
     isLoading: tagsLoading,
     error: folderTagsError,
     refetch: refetchFolderTags,
-  } = useFolderViewTags(viewMode === "folder", scope);
+  } = useFolderViewTags(
+    viewMode === "folder",
+    scope,
+    config.folder ? UNTAGGED_KIND[config.folder.countField] : undefined
+  );
   // A failed tree shows its error; the library's first sync is loading
   const folderTagsInitializing = isLibraryInitializing(folderTagsError);
   const folderTagsFailed = !!folderTagsError && !folderTagsInitializing;
@@ -390,6 +396,7 @@ const EntityListPage = ({
           itemCount={count}
           tags={folderTags}
           countField={config.folder.countField}
+          untaggedCount={folderUntaggedCount}
           entityLabel={config.folder.label}
           path={folderPath}
           onPathChange={listState.setFolderPath}

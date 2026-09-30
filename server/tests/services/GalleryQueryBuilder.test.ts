@@ -429,6 +429,18 @@ describe("GalleryQueryBuilder", () => {
       }
     });
 
+    it("tag_count counts the gallery's own tag rows on its instance (Untagged is EQUALS 0)", async () => {
+      await run({
+        filter: { tag_count: { modifier: "EQUALS", value: 0 } },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "(SELECT COUNT(*) FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId) = ?"
+      );
+      expect(params).toContain(0);
+    });
+
     it("the search matches the title, details and photographer, a % in it matching itself", async () => {
       await run({ q: "100% Real" });
 

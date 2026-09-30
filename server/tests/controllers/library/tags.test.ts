@@ -13,7 +13,10 @@ import {
 import { ValidationError } from "../../../middleware/errorHandler.js";
 import { findMinimalEntities } from "../../../services/MinimalEntityQuery.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
-import { loadTagTree } from "../../../services/TagTreeService.js";
+import {
+  loadTagTree,
+  loadUntaggedCount,
+} from "../../../services/TagTreeService.js";
 import {
   malformed,
   reqFor,
@@ -32,6 +35,7 @@ vi.mock("../../../services/TagQueryBuilder.js", () => ({
 
 vi.mock("../../../services/TagTreeService.js", () => ({
   loadTagTree: vi.fn(),
+  loadUntaggedCount: vi.fn(),
 }));
 
 vi.mock("../../../services/MinimalEntityQuery.js", () => ({
@@ -56,6 +60,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 }));
 
 const mockLoadTagTree = vi.mocked(loadTagTree);
+const mockLoadUntaggedCount = vi.mocked(loadUntaggedCount);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
 const mockFindMinimalEntities = vi.mocked(findMinimalEntities);
 
@@ -296,7 +301,7 @@ describe("Tags Controller", () => {
       o_counter: 0,
     };
 
-    it("answers the whole tree on the user's allowed instances", async () => {
+    it("answers the whole tree on the user's allowed instances, and no untagged count unasked", async () => {
       mockLoadTagTree.mockResolvedValue([row]);
 
       const req = reqFor(findTagTree, {
@@ -313,7 +318,30 @@ describe("Tags Controller", () => {
         allowedInstanceIds: ["inst-a", "inst-b"],
         scope: undefined,
       });
+      expect(mockLoadUntaggedCount).not.toHaveBeenCalled();
       expect(res._getOkBody()).toEqual({ tags: [row] });
+    });
+
+    it("with untagged, answers that type's untagged count for the same user, instances and scope", async () => {
+      mockLoadTagTree.mockResolvedValue([row]);
+      mockLoadUntaggedCount.mockResolvedValue(42);
+
+      const req = reqFor(findTagTree, {
+        body: { scope: { performer: "12:inst-a" }, untagged: "image" },
+        user: defaultUser,
+        allowedInstanceIds: ["inst-a"],
+      });
+      const res = resFor(findTagTree);
+
+      await findTagTree(req, res);
+
+      expect(mockLoadUntaggedCount).toHaveBeenCalledWith({
+        userId: defaultUser.id,
+        allowedInstanceIds: ["inst-a"],
+        scope: { performer: { id: "12", instanceId: "inst-a" } },
+        kind: "image",
+      });
+      expect(res._getOkBody()).toEqual({ tags: [row], untagged: 42 });
     });
 
     it("an absent body is the whole tree", async () => {
@@ -357,6 +385,7 @@ describe("Tags Controller", () => {
       [{ scope: { group: "1:bad instance" } }, "scope.group"],
       [{ scope: { tag: 7 } }, "scope.tag"],
       [{ scope: "1" }, "scope"],
+      [{ untagged: "performer" }, "untagged"],
       [{ extra: true }, ""],
     ])("%j answers 400 naming %s", async (body, path) => {
       const req = reqFor(findTagTree, {
@@ -377,6 +406,7 @@ describe("Tags Controller", () => {
           : undefined
       ).toContain(path);
       expect(mockLoadTagTree).not.toHaveBeenCalled();
+      expect(mockLoadUntaggedCount).not.toHaveBeenCalled();
     });
   });
 });

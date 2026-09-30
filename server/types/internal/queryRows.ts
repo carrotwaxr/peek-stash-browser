@@ -265,6 +265,11 @@ export interface TagTreeQueryRow {
   scopeSceneCount: bigint | null;
 }
 
+/** The folder view's Untagged count (`loadUntaggedCount`): COUNT(*), a bigint */
+export interface UntaggedCountRow {
+  n: bigint;
+}
+
 // ---------------------------------------------------------------------------
 // GalleryQueryBuilder
 // ---------------------------------------------------------------------------

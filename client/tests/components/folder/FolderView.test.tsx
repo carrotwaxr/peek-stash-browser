@@ -414,6 +414,53 @@ describe("FolderView", () => {
       ).toBeGreaterThan(0);
     });
 
+    it("opening Untagged lists untagged items with a working page count", async () => {
+      api.findTagTree.mockResolvedValue({ ...TREE, untagged: 30 });
+      // A tag filter from the panel would leave Untagged empty: it is dropped
+      renderListPage(<Galleries />, {
+        initialEntries: ["/galleries?view=folder&tagIds=5:a"],
+      });
+
+      // At the root, Untagged sits after the tag folders with the page's count
+      await waitFor(() => expect(folderNames()).toEqual(["Five", "Untagged"]));
+      // The tree counts the page's type only
+      expect(api.findTagTree).toHaveBeenCalledWith(
+        { untagged: "gallery" },
+        expect.anything()
+      );
+      expect(
+        within(folderCard("Untagged")).getByLabelText("30 galleries")
+      ).toBeInTheDocument();
+      expect(api.findGalleries).not.toHaveBeenCalled();
+
+      fireEvent.click(folderCard("Untagged"));
+
+      expect(await screen.findAllByTestId("gallery-card")).toHaveLength(24);
+      const params = must(api.findGalleries.mock.calls.at(-1))[0] as {
+        gallery_filter: Record<string, unknown>;
+      };
+      expect(params.gallery_filter).toEqual({
+        tag_count: { value: 0, modifier: "EQUALS" },
+      });
+      expect(
+        screen.getByText("30 galleries in this folder")
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByText("Showing 1-24 of 30 records").length
+      ).toBeGreaterThan(0);
+      // No tag folder inside Untagged
+      expect(folderNames()).toEqual([]);
+    });
+
+    it("the root shows no Untagged folder when nothing of the page's type is untagged", async () => {
+      api.findTagTree.mockResolvedValue({ ...TREE, untagged: 0 });
+      renderListPage(<Galleries />, {
+        initialEntries: ["/galleries?view=folder"],
+      });
+
+      await waitFor(() => expect(folderNames()).toEqual(["Five"]));
+    });
+
     it("at the root no list request is made", async () => {
       renderListPage(<Galleries />, {
         initialEntries: ["/galleries?view=folder"],

@@ -5,7 +5,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { loadTagTree } from "../../services/TagTreeService.js";
+import {
+  loadTagTree,
+  loadUntaggedCount,
+} from "../../services/TagTreeService.js";
 import type { TagTreeQueryRow } from "../../types/internal/queryRows.js";
 import { must } from "../helpers/must.js";
 
@@ -262,5 +265,89 @@ describe("loadTagTree", () => {
       [2, 0, 0, 0],
       [0, 0, 0, 0],
     ]);
+  });
+});
+
+describe("loadUntaggedCount", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ n: 3n }]);
+  });
+
+  it("answers 0 and sends nothing without an allowed instance", async () => {
+    await expect(
+      loadUntaggedCount({ userId: 7, allowedInstanceIds: [], kind: "image" })
+    ).resolves.toBe(0);
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["scene", "StashScene s", "s", "s.tagCount = 0"],
+    [
+      "gallery",
+      "StashGallery g",
+      "g",
+      "NOT EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId)",
+    ],
+    [
+      "image",
+      "StashImage i",
+      "i",
+      "NOT EXISTS (SELECT 1 FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId)",
+    ],
+  ] as const)(
+    "counts the visible %ss with no tag of their own, under the exclusion join",
+    async (kind, from, alias, untagged) => {
+      await expect(
+        loadUntaggedCount({ userId: 7, allowedInstanceIds: ["a", "b"], kind })
+      ).resolves.toBe(3);
+
+      const { sql, params } = statement();
+      expect(sql).toContain(`FROM ${from}\n`);
+      // The list's count of tag_count EQUALS 0: live, allowed instances and
+      // the exclusion anti-join with the instance (invariant 3)
+      expect(sql).toContain(
+        `${alias}e.entityType = '${kind}' AND ${alias}e.entityId = ${alias}.id AND (${alias}e.instanceId = '' OR ${alias}e.instanceId = ${alias}.stashInstanceId)`
+      );
+      expect(sql).toContain(
+        `WHERE ${alias}.deletedAt IS NULL AND ${alias}e.id IS NULL AND ${alias}.stashInstanceId IN (?, ?) AND ${untagged}`
+      );
+      expect(params).toEqual([7, "a", "b"]);
+      expect(placeholders(sql)).toBe(params.length);
+    }
+  );
+
+  it("with a scope, counts the scope's visible untagged scenes", async () => {
+    await expect(
+      loadUntaggedCount({
+        userId: 7,
+        allowedInstanceIds: ["a"],
+        scope: { performer: { id: "12", instanceId: "a" } },
+        kind: "scene",
+      })
+    ).resolves.toBe(3);
+
+    const { sql, params } = statement();
+    expect(sql).toContain(
+      "SELECT j.sceneId, j.sceneInstanceId FROM ScenePerformer j WHERE j.performerId = ? AND j.performerInstanceId = ?"
+    );
+    expect(sql).toContain(
+      "CROSS JOIN StashScene s ON s.id = x.id AND s.stashInstanceId = x.inst"
+    );
+    expect(sql).toContain(
+      "s.deletedAt IS NULL AND se.id IS NULL AND s.stashInstanceId IN (?) AND s.tagCount = 0"
+    );
+    expect(params).toEqual(["12", "a", 7, "a"]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+
+  it("with a scope, galleries and images are 0 without a statement, as the scoped rows count", async () => {
+    const scope = { performer: { id: "12", instanceId: "a" } };
+    for (const kind of ["gallery", "image"] as const) {
+      await expect(
+        loadUntaggedCount({ userId: 7, allowedInstanceIds: ["a"], scope, kind })
+      ).resolves.toBe(0);
+    }
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 });

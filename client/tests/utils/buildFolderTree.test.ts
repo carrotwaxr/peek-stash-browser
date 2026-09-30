@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   type FolderCountField,
   type FolderTreeTag,
+  UNTAGGED_FOLDER_ID,
   buildFolderTree,
 } from "../../src/utils/buildFolderTree";
 
@@ -118,6 +119,29 @@ describe("buildFolderTree", () => {
       { id: "9:a", name: "Unknown" },
     ]);
     expect(buildFolderTree(tags, [], "scene_count").breadcrumbs).toEqual([]);
+  });
+
+  it("the root ends with Untagged while the tree counts untagged items of the page's type; nothing lies inside it", () => {
+    const tags = [tag("1", "Zeta", [], { gallery_count: 2 })];
+
+    const root = buildFolderTree(tags, [], "gallery_count", 7).folders;
+    expect(root.map((f) => [f.id, f.name, f.count, f.tag?.name])).toEqual([
+      ["1:a", "Zeta", 2, "Zeta"],
+      [UNTAGGED_FOLDER_ID, "Untagged", 7, undefined],
+    ]);
+    // None untagged: no folder
+    expect(folders(tags, [], "gallery_count")).toEqual([["Zeta", 2]]);
+
+    const inside = buildFolderTree(
+      tags,
+      [UNTAGGED_FOLDER_ID],
+      "gallery_count",
+      7
+    );
+    expect(inside.folders).toEqual([]);
+    expect(inside.breadcrumbs).toEqual([
+      { id: UNTAGGED_FOLDER_ID, name: "Untagged" },
+    ]);
   });
 
   describe("across instances", () => {

@@ -3,14 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFolderViewTags } from "@/hooks/useFolderViewTags";
 
 const mockUseTagTree = vi.fn((_scope: unknown, _enabled: boolean) => ({
-  data: undefined as { tags: Array<{ id: string }> } | undefined,
+  data: undefined as
+    | { tags: Array<{ id: string }>; untagged?: number }
+    | undefined,
   isLoading: false,
   error: null,
   refetch: vi.fn(),
 }));
+/** The Untagged type each call asked for */
+const askedKinds: unknown[] = [];
 vi.mock("@/api/hooks", () => ({
-  useTagTree: (scope: unknown, enabled: boolean) =>
-    mockUseTagTree(scope, enabled),
+  useTagTree: (scope: unknown, enabled: boolean, untagged?: unknown) => {
+    askedKinds.push(untagged);
+    return mockUseTagTree(scope, enabled);
+  },
 }));
 
 describe("useFolderViewTags", () => {
@@ -57,6 +63,23 @@ describe("useFolderViewTags", () => {
       { tag: "4:a", group: "9:a" },
       true
     );
+  });
+
+  it("asks for the page type's untagged count and returns it, 0 until the tree answers", () => {
+    const { result, rerender } = renderHook(() =>
+      useFolderViewTags(true, null, "image")
+    );
+    expect(askedKinds.at(-1)).toBe("image");
+    expect(result.current.untaggedCount).toBe(0);
+
+    mockUseTagTree.mockReturnValueOnce({
+      data: { tags: [], untagged: 12 },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    rerender();
+    expect(result.current.untaggedCount).toBe(12);
   });
 
   it("returns the tree's error and a refetch that reloads the tag tree", () => {
