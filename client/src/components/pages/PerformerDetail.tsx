@@ -102,13 +102,16 @@ const PerformerDetail = () => {
   }
 
   const handleRatingChange = async (newRating: number | null) => {
+    // Write on the loaded performer's own server: a bare-id link names none
+    const entityInstanceId = performer?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setRating(newRating);
     try {
       await libraryApi.updateRating(
         "performer",
         performerId!,
         newRating,
-        instanceId
+        entityInstanceId
       );
     } catch (error) {
       console.error("Failed to update rating:", error);
@@ -119,13 +122,16 @@ const PerformerDetail = () => {
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
+    // Write on the loaded performer's own server: a bare-id link names none
+    const entityInstanceId = performer?.instanceId as string | undefined;
+    if (!entityInstanceId) return;
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite(
         "performer",
         performerId!,
         newValue,
-        instanceId
+        entityInstanceId
       );
     } catch (error) {
       console.error("Failed to update favorite:", error);
