@@ -38,9 +38,17 @@ Remove `--user` from `docker run` (or `user:` from your Compose file) and set `P
 
 ## "Peek is starting"
 
-The page shows **Peek is starting. Waiting for the server...** while the server is starting, or applying an upgrade's database migrations, and cannot answer yet. The HTTP status in brackets, such as `(HTTP 502)`, is the last answer the page got; a reverse proxy answers 502 while Peek is down. Nothing needs doing: the page keeps asking on its own and opens as soon as the server answers.
+The page shows **Peek is starting. Waiting for the server...** while the server is starting, or applying an upgrade's database migrations, and cannot answer yet. The HTTP status in brackets, such as `(HTTP 502)`, is the last answer the page got; a reverse proxy answers 502 while Peek is down. Nothing needs doing: the page keeps asking on its own and opens as soon as the server answers. If you see a panel that says **Something went wrong** instead, see [An error panel instead of a page](#an-error-panel-instead-of-a-page).
 
 After a minute it adds **Still waiting. If this lasts, check the server's log.** Look there (see [Viewing Logs](#viewing-logs)) for a migration that is still running, or for an error that stopped the server from starting (see [Container Won't Start](#container-wont-start)).
+
+## An error panel instead of a page
+
+If a page fails while it draws, or its code cannot be loaded, Peek shows a panel that says **Something went wrong** inside the app, with the sidebar still in place, instead of a blank screen. **Reload** loads the page again; **Home** goes to the start page. The panel clears by itself when you open another page.
+
+After an upgrade, a tab that was left open asks for files the new version no longer has. Peek reloads that tab once on its own to pick up the new version. If the files are still missing after that reload, the panel says **Peek was updated**; Reload again, and if it keeps coming back, check that your reverse proxy is not serving an old copy of Peek.
+
+If the panel keeps returning, open the browser's console (F12), copy the line that starts with `[route]` and report it when you ask for help (see [Getting Help](#getting-help)). This is different from ["Peek is starting"](#peek-is-starting), which is the server not answering yet; the panel means the page itself failed.
 
 ## Can't Connect to Stash
 

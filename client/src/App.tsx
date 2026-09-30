@@ -19,6 +19,7 @@ import { SetupStatusGate } from "./components/guards/SetupStatusGate";
 import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
 import Login from "./components/pages/Login";
 import SetupWizard from "./components/pages/SetupWizard";
+import PageLoader from "./components/ui/PageLoader";
 import { GlobalLayout } from "./components/ui/index";
 import { PUBLIC_ROUTES } from "./constants/navigation";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -59,13 +60,6 @@ const Downloads = lazy(() => import("./components/pages/Downloads"));
 const Clips = lazy(() => import("./components/pages/Clips"));
 const CarouselBuilder = lazy(
   () => import("./components/carousel-builder/CarouselBuilder")
-);
-
-// Loading fallback component
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="text-xl">Loading...</div>
-  </div>
 );
 
 // Main app component with authentication and routing

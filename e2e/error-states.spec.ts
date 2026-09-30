@@ -25,10 +25,31 @@ const UNKNOWN_ID = "99999999";
 test.describe("Error States", () => {
   test("non-existent route shows navigation", async ({ page }) => {
     await page.goto("/this-route-does-not-exist-at-all");
-    // App should handle gracefully: either redirect or show navigation
+    // The catch-all route redirects to home
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
     await expect(page.getByRole("navigation").first()).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test("a page whose code fails to load shows the error panel and keeps the navigation", async ({
+    page,
+  }) => {
+    // The hermetic run serves Vite's dev server, so the lazy import is this URL
+    const pageModule = "**/src/components/pages/Performers.tsx*";
+    await page.route(pageModule, (route) => route.abort());
+
+    await page.goto("/performers");
+
+    const panel = page.getByRole("alert");
+    await expect(panel).toContainText("Peek was updated", { timeout: 15_000 });
+    await expect(page.getByRole("navigation").first()).toBeVisible();
+
+    await page.unroute(pageModule);
+    await panel.getByRole("button", { name: "Reload" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Performers" })
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   for (const { path, type, list } of DETAIL_PAGES) {
@@ -53,10 +74,13 @@ test.describe("Error States", () => {
 
   test("special characters in URL are handled gracefully", async ({ page }) => {
     await page.goto("/scenes?q=%3Cscript%3Ealert(1)%3C/script%3E");
-    // Should not crash: navigation still visible
+    // Should not crash: navigation still visible, no error panel
     await expect(page.getByRole("navigation").first()).toBeVisible({
       timeout: 10_000,
     });
+    await expect(
+      page.getByRole("alert").filter({ hasText: /something went wrong/i })
+    ).toHaveCount(0);
     // Search input should contain the decoded text (safely)
     await expect(page.getByPlaceholder("Search...")).toBeVisible({
       timeout: 10_000,

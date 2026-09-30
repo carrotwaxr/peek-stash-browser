@@ -1,9 +1,11 @@
-import { type ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiGet } from "../../api";
 import { migrateNavPreferences } from "../../constants/navigation";
 import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
 import useScrollRestoration from "../../hooks/useScrollRestoration";
+import { RouteErrorBoundary } from "./ErrorBoundary";
+import PageLoader from "./PageLoader";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 
@@ -19,10 +21,12 @@ type NavPreference = ReturnType<typeof migrateNavPreferences>[number];
  * Layout structure:
  * - Sidebar (hidden on mobile, visible lg+)
  * - TopBar (logo, help, settings, user menu)
- * - Main content area with responsive spacing
+ * - Main content area with responsive spacing, holding an error boundary and
+ *   a Suspense so a failed or loading page keeps the sidebar
  */
 const GlobalLayout = ({ children }: Props) => {
   const [navPreferences, setNavPreferences] = useState<NavPreference[]>([]);
+  const location = useLocation();
 
   useEffect(() => {
     const loadNavPreferences = async () => {
@@ -63,7 +67,11 @@ const GlobalLayout = ({ children }: Props) => {
       <TopBar navPreferences={navPreferences} />
 
       {/* Main content area - full width after sidebar, Plex-style */}
-      <main className="lg:ml-16 xl:ml-60 pt-16 lg:pt-0">{children}</main>
+      <main className="lg:ml-16 xl:ml-60 pt-16 lg:pt-0">
+        <RouteErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<PageLoader />}>{children}</Suspense>
+        </RouteErrorBoundary>
+      </main>
     </div>
   );
 };
