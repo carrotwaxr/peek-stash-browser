@@ -32,12 +32,17 @@ export interface CardIndicator {
 export interface RatingControlsProps {
   entityType?: string;
   entityId: string;
-  instanceId?: string | null;
+  /** The entity's Stash instance: ratings, O presses and hides name it */
+  instanceId?: string;
   entityTitle?: string;
   initialRating?: number | null;
   initialFavorite?: boolean;
   initialOCounter?: number;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
   onHideClick?: (hideInfo: Record<string, unknown>) => void;
   onOCounterChange?: (entityId: string, count: number) => void;
   onRatingChange?: (entityId: string, rating: number) => void;
@@ -255,6 +260,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                 entityType={ratingControlsProps.entityType || entityType}
                 entityId={ratingControlsProps.entityId}
                 entityName={ratingControlsProps.entityTitle ?? ""}
+                instanceId={ratingControlsProps.instanceId}
                 onHide={
                   ratingControlsProps.onHideClick as
                     | ((payload: {
@@ -310,6 +316,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                   <CardMenuRow
                     entityType={ratingControlsProps.entityType || entityType}
                     entityId={ratingControlsProps.entityId}
+                    instanceId={ratingControlsProps.instanceId}
                     entityTitle={ratingControlsProps.entityTitle}
                     onHideSuccess={ratingControlsProps.onHideSuccess}
                   />

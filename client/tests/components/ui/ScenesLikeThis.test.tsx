@@ -53,11 +53,15 @@ vi.mock("@/components/scene-search/SceneGrid", () => ({
     onHideSuccess,
   }: {
     scenes: Array<{ id: string }>;
-    onHideSuccess: (id: string) => void;
+    onHideSuccess: (
+      id: string,
+      entityType: string,
+      instanceId?: string
+    ) => void;
   }) => (
     <div data-testid="scene-grid">
       {scenes.map((s) => s.id).join(",")}
-      <button onClick={() => onHideSuccess("s2")}>hide s2</button>
+      <button onClick={() => onHideSuccess("s2", "scene", "a")}>hide s2</button>
     </div>
   ),
 }));

@@ -12,7 +12,12 @@ interface Props {
   tag: NormalizedTag & { child_count?: number };
   fromPageTitle?: string;
   tabIndex?: number;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  /** Called once the card's entity is hidden, with its instance */
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
 }
 
 const TagCard = forwardRef<HTMLDivElement, Props>(

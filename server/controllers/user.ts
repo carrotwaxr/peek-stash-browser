@@ -10,10 +10,7 @@ import {
   ValidationError,
 } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
-import {
-  getIdsVisibleOnAnyInstance,
-  getVisibleEntityKeys,
-} from "../services/EntityAccessService.js";
+import { getVisibleEntityKeys } from "../services/EntityAccessService.js";
 import {
   type RestrictionRowInput,
   exclusionComputationService,
@@ -1496,7 +1493,9 @@ export const deleteUserRestrictions = async (
 
 /**
  * Validate one hide target from a request body. Hidden ids are stored and
- * later reach exclusion queries, so only numeric Stash ids are accepted.
+ * later reach exclusion queries, so only numeric Stash ids are accepted. A
+ * hide names its instance: a bare id could mean the same id on another
+ * server. `unknownHideInstance` then checks that the instance exists.
  */
 function validateHideTarget(target: {
   entityType?: unknown;
@@ -1525,22 +1524,31 @@ function validateHideTarget(target: {
     };
   }
 
-  // Validate instanceId if provided
-  if (instanceId !== undefined && instanceId !== null && instanceId !== "") {
-    if (typeof instanceId !== "string") {
-      return { ok: false, error: "Invalid instanceId" };
-    }
-    if (!stashInstanceManager.getConfig(instanceId)) {
-      return { ok: false, error: "Invalid instanceId" };
-    }
+  if (instanceId === undefined || instanceId === null || instanceId === "") {
+    return { ok: false, error: "instanceId is required" };
+  }
+  if (typeof instanceId !== "string") {
+    return { ok: false, error: "Invalid instanceId" };
   }
 
-  return {
-    ok: true,
-    entityType,
-    entityId,
-    instanceId: typeof instanceId === "string" ? instanceId : "",
-  };
+  return { ok: true, entityType, entityId, instanceId };
+}
+
+/**
+ * The index of the first target whose instance names no configured Stash
+ * server (enabled or not), or -1. One query for the whole batch.
+ */
+async function unknownHideInstance(targets: HideTarget[]): Promise<number> {
+  const named = [...new Set(targets.map((t) => t.instanceId))];
+  const known = new Set(
+    (
+      await prisma.stashInstance.findMany({
+        where: { id: { in: named } },
+        select: { id: true },
+      })
+    ).map((i) => i.id)
+  );
+  return targets.findIndex((t) => !known.has(t.instanceId));
 }
 
 /**
@@ -1562,15 +1570,14 @@ type HideAccess = "hide" | "already-hidden" | "not-found";
 
 /**
  * May this user hide these targets? Hiding requires visibility: the user
- * must see the entity on the given instance, or on some instance when none
- * is given (the rule ratings use). A target this user has already hidden is
- * "already-hidden": a repeat hide succeeds without writing. Anything else is
- * "not-found", the same answer as an id that does not exist, so a hide never
- * reveals whether a restricted entity exists.
+ * must see the entity on the target's instance. A target this user has
+ * already hidden (on that instance, or by a legacy row for every instance)
+ * is "already-hidden": a repeat hide succeeds without writing. Anything else
+ * is "not-found", the same answer as an id that does not exist, so a hide
+ * never reveals whether a restricted entity exists.
  *
  * One query for the user's existing hides, then one visibility query per
- * entity type for the targets with an instance and one for those without,
- * whatever the batch size.
+ * entity type, whatever the batch size.
  */
 async function checkHideTargets(
   userId: number,
@@ -1585,43 +1592,27 @@ async function checkHideTargets(
     }))
   );
 
-  const scoped = new Map<EntityType, EntityRef[]>();
-  const bare = new Map<EntityType, string[]>();
+  const byType = new Map<EntityType, EntityRef[]>();
   targets.forEach((target, i) => {
     if (alreadyHidden[i]) return;
-    if (target.instanceId) {
-      const refs = scoped.get(target.entityType) ?? [];
-      refs.push({ id: target.entityId, instanceId: target.instanceId });
-      scoped.set(target.entityType, refs);
-    } else {
-      const ids = bare.get(target.entityType) ?? [];
-      ids.push(target.entityId);
-      bare.set(target.entityType, ids);
-    }
+    const refs = byType.get(target.entityType) ?? [];
+    refs.push({ id: target.entityId, instanceId: target.instanceId });
+    byType.set(target.entityType, refs);
   });
 
   const visibleKeys = new Map<EntityType, Set<string>>();
-  for (const [entityType, refs] of scoped) {
+  for (const [entityType, refs] of byType) {
     visibleKeys.set(
       entityType,
       await getVisibleEntityKeys(userId, entityType, refs)
     );
   }
-  const visibleIds = new Map<EntityType, Set<string>>();
-  for (const [entityType, ids] of bare) {
-    visibleIds.set(
-      entityType,
-      await getIdsVisibleOnAnyInstance(userId, entityType, ids)
-    );
-  }
 
   return targets.map((target, i) => {
     if (alreadyHidden[i]) return "already-hidden";
-    const visible = target.instanceId
-      ? visibleKeys
-          .get(target.entityType)
-          ?.has(entityKey(target.entityId, target.instanceId))
-      : visibleIds.get(target.entityType)?.has(target.entityId);
+    const visible = visibleKeys
+      .get(target.entityType)
+      ?.has(entityKey(target.entityId, target.instanceId));
     return visible ? "hide" : "not-found";
   });
 }
@@ -1638,6 +1629,10 @@ export const hideEntity = async (
   const target = validateHideTarget(req.body);
   if (!target.ok) {
     res.status(400).json({ error: target.error });
+    return;
+  }
+  if ((await unknownHideInstance([target])) !== -1) {
+    res.status(400).json({ error: "Invalid instanceId" });
     return;
   }
 
@@ -1680,6 +1675,7 @@ export const unhideEntity = async (
     return;
   }
 
+  // Without an instance, the legacy row stored for every instance ("") goes
   const unhideInstanceId = req.query.instanceId ?? "";
 
   // Validate instanceId if provided
@@ -1800,6 +1796,11 @@ export const hideEntities = async (
       return;
     }
     targets.push(target);
+  }
+  const unknown = await unknownHideInstance(targets);
+  if (unknown !== -1) {
+    res.status(400).json({ error: `entities[${unknown}]: Invalid instanceId` });
+    return;
   }
   const access = await checkHideTargets(userId, targets);
   const notFound = access.indexOf("not-found");

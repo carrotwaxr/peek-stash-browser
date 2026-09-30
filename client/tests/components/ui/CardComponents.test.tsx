@@ -5,9 +5,31 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CardDescription,
   CardImage,
+  CardMenuRow,
   CardOverlay,
+  CardRatingRow,
   CardTitle,
 } from "../../../src/components/ui/CardComponents";
+
+// Hides go through without the confirmation dialog
+const mockHideEntity = vi.fn((_hide: Record<string, unknown>) =>
+  Promise.resolve(true)
+);
+vi.mock("../../../src/hooks/useHiddenEntities", () => ({
+  useHiddenEntities: () => ({
+    hideEntity: mockHideEntity,
+    hideConfirmationDisabled: true,
+  }),
+}));
+const mockIncrement = vi.fn((_vars: Record<string, unknown>) =>
+  Promise.resolve({ success: true, oCount: 1 })
+);
+vi.mock("../../../src/api/hooks", () => ({
+  useIncrementOCounter: () => ({
+    mutateAsync: mockIncrement,
+    isPending: false,
+  }),
+}));
 
 /** The props of the overlay's root element */
 interface OverlayRootProps {
@@ -168,5 +190,73 @@ describe("CardTitle", () => {
 
     fireEvent.click(screen.getByText("Test Subtitle"));
     expect(onClickOverride).toHaveBeenCalled();
+  });
+});
+
+describe("the card's instance", () => {
+  /** Opens the card menu and presses its hide item */
+  async function hideFromMenu() {
+    fireEvent.click(screen.getByLabelText("More options"));
+    fireEvent.click(screen.getByText("Hide Scene"));
+    await vi.waitFor(() => expect(mockHideEntity).toHaveBeenCalled());
+  }
+
+  it("the card menu's hide and the O button carry the card's instance", async () => {
+    const onHideSuccess = vi.fn();
+    render(
+      <CardRatingRow
+        entityType="scene"
+        entityId="12"
+        instanceId="B"
+        initialRating={null}
+        initialFavorite={false}
+        initialOCounter={0}
+        entityTitle="Scene 12"
+        onHideSuccess={onHideSuccess}
+      />
+    );
+
+    await hideFromMenu();
+    expect(mockHideEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "scene",
+        entityId: "12",
+        instanceId: "B",
+      })
+    );
+    await vi.waitFor(() =>
+      expect(onHideSuccess).toHaveBeenCalledWith("12", "scene", "B")
+    );
+
+    fireEvent.click(screen.getByLabelText(/Increment O counter/));
+    await vi.waitFor(() =>
+      expect(mockIncrement).toHaveBeenCalledWith({
+        sceneId: "12",
+        imageId: undefined,
+        instanceId: "B",
+      })
+    );
+  });
+
+  it("the standalone menu row's hide carries the card's instance", async () => {
+    mockHideEntity.mockClear();
+    const onHideSuccess = vi.fn();
+    render(
+      <CardMenuRow
+        entityType="scene"
+        entityId="12"
+        instanceId="A"
+        entityTitle="Scene 12"
+        onHideSuccess={onHideSuccess}
+      />
+    );
+
+    await hideFromMenu();
+    expect(mockHideEntity).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: "12", instanceId: "A" })
+    );
+    await vi.waitFor(() =>
+      expect(onHideSuccess).toHaveBeenCalledWith("12", "scene", "A")
+    );
   });
 });

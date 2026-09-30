@@ -1,14 +1,27 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import {
+  TestClient,
+  adminClient,
+  findTestInstanceId,
+} from "../helpers/testClient.js";
 
 describe("Hidden Entities Bulk API Integration Tests", () => {
   let testUserId: number;
   let testUserClient: TestClient;
+  let instanceId: string;
+
+  /** A target on the test instance */
+  const on = (entityType: string, entityId: string) => ({
+    entityType,
+    entityId,
+    instanceId,
+  });
 
   beforeAll(async () => {
     // Ensure admin client is logged in
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    instanceId = await findTestInstanceId();
 
     // Create a test user for bulk hide testing
     const createResponse = await adminClient.post<{
@@ -53,9 +66,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
   describe("POST /api/user/hidden-entities/bulk", () => {
     it("should hide multiple entities at once", async () => {
       const entities = [
-        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithRelations },
-        { entityType: "scene", entityId: TEST_ENTITIES.sceneInGroup },
-        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithInheritedTags },
+        on("scene", TEST_ENTITIES.sceneWithRelations),
+        on("scene", TEST_ENTITIES.sceneInGroup),
+        on("scene", TEST_ENTITIES.sceneWithInheritedTags),
       ];
 
       const response = await testUserClient.post<{
@@ -70,6 +83,28 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.successCount).toBe(3);
       expect(response.data.failCount).toBe(0);
+    });
+
+    it("a bulk target without an instance answers 400 naming it", async () => {
+      const response = await testUserClient.post<{ error: string }>(
+        "/api/user/hidden-entities/bulk",
+        {
+          entities: [
+            on("tag", TEST_ENTITIES.tagWithEntities),
+            { entityType: "tag", entityId: TEST_ENTITIES.tagWithEntities },
+          ],
+        }
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.data.error).toBe("entities[1]: instanceId is required");
+
+      const hidden = await testUserClient.get<{
+        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+      }>("/api/user/hidden-entities?entityType=tag");
+      expect(hidden.data.hiddenEntities.map((e) => e.entityId)).not.toContain(
+        TEST_ENTITIES.tagWithEntities
+      );
     });
 
     it("should validate that entities array is provided", async () => {
@@ -99,7 +134,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     });
 
     it("should validate entity type", async () => {
-      const entities = [{ entityType: "invalid_type", entityId: "1" }];
+      const entities = [on("invalid_type", "1")];
 
       const response = await testUserClient.post<{ error: string }>(
         "/api/user/hidden-entities/bulk",
@@ -127,7 +162,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     });
 
     it("should reject a non-numeric entityId", async () => {
-      const entities = [{ entityType: "scene", entityId: "abc" }];
+      const entities = [on("scene", "abc")];
 
       const response = await testUserClient.post<{ error: string }>(
         "/api/user/hidden-entities/bulk",
@@ -142,12 +177,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     it("should handle mixed entity types", async () => {
       const entities = [
         // Hidden by the test above: a repeat hide still counts as hidden
-        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithRelations },
-        {
-          entityType: "performer",
-          entityId: TEST_ENTITIES.performerWithScenes,
-        },
-        { entityType: "studio", entityId: TEST_ENTITIES.studioWithScenes },
+        on("scene", TEST_ENTITIES.sceneWithRelations),
+        on("performer", TEST_ENTITIES.performerWithScenes),
+        on("studio", TEST_ENTITIES.studioWithScenes),
       ];
 
       const response = await testUserClient.post<{
@@ -163,8 +195,8 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
     it("should hide nothing when any target does not exist", async () => {
       const entities = [
-        { entityType: "tag", entityId: TEST_ENTITIES.tagWithEntities },
-        { entityType: "scene", entityId: "990000001" },
+        on("tag", TEST_ENTITIES.tagWithEntities),
+        on("scene", "990000001"),
       ];
 
       const response = await testUserClient.post<{ error: string }>(
@@ -185,7 +217,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
     it("should require authentication", async () => {
       const unauthClient = new TestClient();
-      const entities = [{ entityType: "scene", entityId: "990000021" }];
+      const entities = [on("scene", "990000021")];
 
       const response = await unauthClient.post(
         "/api/user/hidden-entities/bulk",
@@ -200,10 +232,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       // Use real scene IDs from test fixtures so they exist in cache
       const sceneId1 = TEST_ENTITIES.sceneWithRelations;
       const sceneId2 = TEST_ENTITIES.sceneInGroup;
-      const entities = [
-        { entityType: "scene", entityId: sceneId1 },
-        { entityType: "scene", entityId: sceneId2 },
-      ];
+      const entities = [on("scene", sceneId1), on("scene", sceneId2)];
 
       // First, hide the entities
       await testUserClient.post("/api/user/hidden-entities/bulk", { entities });

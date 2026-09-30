@@ -613,6 +613,13 @@ export const CardIndicators = ({
   );
 };
 
+/** Called once a card's entity is hidden, with the instance it was hidden on */
+type HideSuccessHandler = (
+  entityId: string,
+  entityType: string,
+  instanceId?: string
+) => void;
+
 /**
  * Standalone menu row - used when menu should appear without rating controls
  * Renders just the ellipsis menu on its own row
@@ -620,8 +627,10 @@ export const CardIndicators = ({
 interface CardMenuRowProps {
   entityType: string;
   entityId: string;
+  /** The entity's Stash instance: its hide names it */
+  instanceId?: string;
   entityTitle?: string;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onHideSuccess?: HideSuccessHandler;
 }
 
 interface HideInfo {
@@ -634,6 +643,7 @@ interface HideInfo {
 export const CardMenuRow = ({
   entityType,
   entityId,
+  instanceId,
   entityTitle,
   onHideSuccess,
 }: CardMenuRowProps) => {
@@ -648,7 +658,7 @@ export const CardMenuRow = ({
         skipConfirmation: true,
       });
       if (success) {
-        onHideSuccess?.(entityId, entityType);
+        onHideSuccess?.(entityId, entityType, instanceId);
       }
     } else {
       setPendingHide(hideInfo);
@@ -665,7 +675,7 @@ export const CardMenuRow = ({
     setHideDialogOpen(false);
     setPendingHide(null);
     if (success) {
-      onHideSuccess?.(entityId, entityType);
+      onHideSuccess?.(entityId, entityType, instanceId);
     }
   };
 
@@ -679,6 +689,7 @@ export const CardMenuRow = ({
           entityType={entityType}
           entityId={entityId}
           entityName={entityTitle || ""}
+          instanceId={instanceId}
           onHide={(hideInfo) => void handleHideClick(hideInfo)}
         />
       </div>
@@ -702,7 +713,7 @@ export const CardMenuRow = ({
  * O Counter is interactive for scenes and images, display-only for other entities
  * @param {string} entityType - Type of entity (scene, performer, etc.)
  * @param {string} entityId - Entity ID
- * @param {string|null} instanceId - Stash instance ID for multi-instance support
+ * @param {string} instanceId - The entity's Stash instance: ratings, O presses and hides name it
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
  * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
  * @param {Function} onRatingChange - Callback when rating changes (for parent to update state)
@@ -715,12 +726,12 @@ export const CardMenuRow = ({
 interface CardRatingRowProps {
   entityType: string;
   entityId: string;
-  instanceId?: string | null;
+  instanceId?: string;
   initialRating: number | null | undefined;
   initialFavorite: boolean;
   initialOCounter: number | null | undefined;
   entityTitle?: string;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onHideSuccess?: HideSuccessHandler;
   onOCounterChange?: (entityId: string, count: number) => void;
   onRatingChange?: (entityId: string, rating: number | null) => void;
   onFavoriteChange?: (entityId: string, isFavorite: boolean) => void;
@@ -733,7 +744,7 @@ interface CardRatingRowProps {
 export const CardRatingRow = ({
   entityType,
   entityId,
-  instanceId = null,
+  instanceId,
   initialRating,
   initialFavorite,
   initialOCounter,
@@ -819,7 +830,7 @@ export const CardRatingRow = ({
 
       if (success) {
         // Notify parent to update state (remove item from grid)
-        onHideSuccess?.(entityId, entityType);
+        onHideSuccess?.(entityId, entityType, instanceId);
       }
     } else {
       // Show confirmation dialog
@@ -841,7 +852,7 @@ export const CardRatingRow = ({
 
     if (success) {
       // Notify parent to update state (remove item from grid)
-      onHideSuccess?.(entityId, entityType);
+      onHideSuccess?.(entityId, entityType, instanceId);
     }
   };
 
@@ -903,6 +914,7 @@ export const CardRatingRow = ({
             <OCounterButton
               sceneId={entityType === "scene" ? entityId : undefined}
               imageId={entityType === "image" ? entityId : undefined}
+              instanceId={instanceId}
               initialCount={oCounter ?? 0}
               onChange={handleOCounterChange}
               size="small"
@@ -923,6 +935,7 @@ export const CardRatingRow = ({
               entityType={entityType}
               entityId={entityId}
               entityName={entityTitle || ""}
+              instanceId={instanceId}
               onHide={(hideInfo) => void handleHideClick(hideInfo)}
             />
           )}

@@ -69,12 +69,14 @@ vi.mock("@/utils/entityLinks", () => ({
 }));
 
 // Mock TanStack Query
+const mockSetQueryData =
+  vi.fn<(key: unknown, updater: (old: unknown) => unknown) => void>();
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
   return {
     ...actual,
     useQueryClient: vi.fn(() => ({
-      setQueryData: vi.fn(),
+      setQueryData: mockSetQueryData,
       invalidateQueries: vi.fn(),
     })),
   };
@@ -217,6 +219,34 @@ describe("SceneSearch", () => {
       "scene"
     );
     expect(screen.getByTestId("scene-grid")).toBeInTheDocument();
+  });
+
+  describe("Hiding a scene", () => {
+    it("hiding A:12 removes only A:12's card when B:12 is on the page", () => {
+      render(<SceneSearch title="Scenes" />);
+      const gridProps = must(mockSceneGridProps.mock.calls.at(-1))[0];
+      const onHideSuccess = gridProps.onHideSuccess as (
+        sceneId: string,
+        entityType: string,
+        instanceId?: string
+      ) => void;
+
+      onHideSuccess("12", "scene", "A");
+
+      const updater = must(mockSetQueryData.mock.calls.at(-1))[1];
+      const page = {
+        findScenes: {
+          count: 2,
+          scenes: [
+            { id: "12", instanceId: "A" },
+            { id: "12", instanceId: "B" },
+          ],
+        },
+      };
+      expect(updater(page)).toEqual({
+        findScenes: { count: 1, scenes: [{ id: "12", instanceId: "B" }] },
+      });
+    });
   });
 
   describe("Stale results", () => {

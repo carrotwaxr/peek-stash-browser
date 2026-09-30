@@ -314,7 +314,41 @@ User settings and preference endpoints.
 
 **Authentication:** Required
 
+**Request Body:**
+
+```typescript
+interface HideEntityBody {
+  entityType: string; // scene, performer, studio, tag, group, gallery or image
+  entityId: string; // numeric Stash id
+  instanceId: string; // required: the entity's Stash instance
+}
+```
+
+A hide without `instanceId` answers 400 "instanceId is required"; one naming no configured instance answers 400 "Invalid instanceId". The hide applies to that instance only: an entity with the same id on another Stash server stays visible. An entity the user cannot see answers 404.
+
 **Controller:** `hideEntity` in `../controllers/user.ts`
+
+---
+
+### POST /api/user/hidden-entities/bulk
+
+**Authentication:** Required
+
+**Request Body:**
+
+```typescript
+interface HideEntitiesBody {
+  entities: Array<{
+    entityType: string;
+    entityId: string;
+    instanceId: string; // required, as for a single hide
+  }>;
+}
+```
+
+All or nothing: a target without `instanceId`, or with an unknown one, answers 400 naming it (`entities[1]: instanceId is required`), and a target the user cannot see answers 404 naming it; nothing is hidden in either case.
+
+**Controller:** `hideEntities` in `../controllers/user.ts`
 
 ---
 
@@ -329,6 +363,8 @@ User settings and preference endpoints.
 ### DELETE /api/user/hidden-entities/:entityType/:entityId
 
 **Authentication:** Required
+
+**Query:** `instanceId` (optional): the hidden row's instance. Without it, the legacy row stored for every instance is removed.
 
 **Controller:** `unhideEntity` in `../controllers/user.ts`
 

@@ -16,7 +16,12 @@ interface Props {
   onClick?: (image: NormalizedImage) => void;
   fromPageTitle?: string;
   tabIndex?: number;
-  onHideSuccess?: (entityId: string, entityType: string) => void;
+  /** Called once the card's entity is hidden, with its instance */
+  onHideSuccess?: (
+    entityId: string,
+    entityType: string,
+    instanceId?: string
+  ) => void;
   onOCounterChange?: (entityId: string, count: number) => void;
   onRatingChange?: (entityId: string, rating: number) => void;
   onFavoriteChange?: (entityId: string, value: boolean) => void;

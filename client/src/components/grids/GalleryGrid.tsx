@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { GalleryCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -24,13 +25,16 @@ const GalleryGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="date"
       density={density}
-      renderItem={(gallery: any, _index: number, { onHideSuccess }: any) => (
-        <GalleryCard
-          key={gallery.id}
-          gallery={gallery}
-          onHideSuccess={() => onHideSuccess(gallery.id)}
-        />
-      )}
+      renderItem={(item, _index, { onHideSuccess }) => {
+        const gallery = item as ComponentProps<typeof GalleryCard>["gallery"];
+        return (
+          <GalleryCard
+            key={gallery.id}
+            gallery={gallery}
+            onHideSuccess={() => onHideSuccess(gallery.id, gallery.instanceId)}
+          />
+        );
+      }}
       {...rest}
     />
   );

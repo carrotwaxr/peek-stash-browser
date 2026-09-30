@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { GroupCard } from "../cards/index";
 import { SearchableGrid } from "../ui/SearchableGrid";
 
@@ -24,13 +25,16 @@ const GroupGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(group: any, _index: number, { onHideSuccess }: any) => (
-        <GroupCard
-          key={group.id}
-          group={group}
-          onHideSuccess={() => onHideSuccess(group.id)}
-        />
-      )}
+      renderItem={(item, _index, { onHideSuccess }) => {
+        const group = item as ComponentProps<typeof GroupCard>["group"];
+        return (
+          <GroupCard
+            key={group.id}
+            group={group}
+            onHideSuccess={() => onHideSuccess(group.id, group.instanceId)}
+          />
+        );
+      }}
       {...rest}
     />
   );
