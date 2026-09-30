@@ -175,10 +175,7 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     }
     if (filter.tags) push(await this.tagClause(filter.tags, ctx));
     if (filter.studios) push(await this.studioClause(filter.studios, ctx));
-    if (filter.galleries) {
-      const { refs, modifier } = filter.galleries;
-      push(refClause(IMAGE_GALLERIES, refs, modifier, opts("galleries")));
-    }
+    if (filter.galleries) push(this.galleryClause(filter.galleries, ctx));
 
     // Dates
     if (filter.date) push(buildDateFilter(filter.date, "i.date"));
@@ -217,6 +214,30 @@ class ImageQueryBuilder extends EntityQueryBuilder<
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", IMAGE_STUDIO, criterion, ctx, {
       name: "studios",
+    });
+  }
+
+  /**
+   * The gallery filter (a gallery page lists its images this way). Up to
+   * the inline limit an INCLUDES reads the galleries' images once from
+   * ImageGallery's gallery index as a row-value IN (`sortedByIndex: false`,
+   * `junctionInList`), under every sort and for the count alike: a gallery
+   * is a small share of the library, so the page sorts its few rows where
+   * the correlated EXISTS walked the sort index and probed the junction for
+   * every live image. On prod's 141,957 images a 1,074-image gallery's page
+   * takes 2 to 3 ms against up to 45, its count 1.5 against 42, sorted by
+   * title or created_at; the created_at index walk wins on no page, the
+   * first included (2.4 against 27) (S2, C7). Above the limit, and for
+   * EXCLUDES, the default shapes.
+   */
+  private galleryClause(
+    criterion: RefCriterion,
+    ctx: QueryContext
+  ): FilterClause {
+    return refClause(IMAGE_GALLERIES, criterion.refs, criterion.modifier, {
+      name: "galleries",
+      allowedInstanceIds: ctx.allowedInstanceIds,
+      sortedByIndex: false,
     });
   }
 

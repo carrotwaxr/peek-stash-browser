@@ -8,10 +8,14 @@
  * and scene ids, as two Stash servers do; instance A also holds a root tag
  * with CHILDREN child tags, each on one scene of its own. A tag on both
  * instances is held by one scene of each directly and one of each through
- * its inherited list. Every seeded row is deleted before the file ends.
+ * its inherited list. A gallery id on both instances holds images of its
+ * own instance (one of them deleted), their ids reused across the two, as
+ * a gallery page lists them. Every seeded row is deleted before the file
+ * ends.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
 import type {
@@ -54,6 +58,61 @@ const INHERITED_TAG = "7849997";
 const DIRECT_SCENE = "7859995";
 const INHERITING_SCENE = "7859994";
 
+/** A gallery id on both instances, and the images seeded under it */
+const GALLERY = "7870001";
+const galleryImage = (i: number) => String(7880000 + i);
+/** An image on A in no gallery */
+const LOOSE_IMAGE = galleryImage(9);
+/** The images seeded on A: title (null reads the file name), day created, deleted, in the gallery */
+const IMAGES_ON_A: ReadonlyArray<{
+  id: string;
+  title: string | null;
+  titleSort: string;
+  day: number;
+  deleted?: boolean;
+  inGallery: boolean;
+}> = [
+  {
+    id: galleryImage(1),
+    title: "Delta",
+    titleSort: "delta",
+    day: 1,
+    inGallery: true,
+  },
+  {
+    id: galleryImage(2),
+    title: "alpha",
+    titleSort: "alpha",
+    day: 5,
+    inGallery: true,
+  },
+  {
+    id: galleryImage(3),
+    title: "Charlie",
+    titleSort: "charlie",
+    day: 3,
+    inGallery: true,
+  },
+  {
+    id: galleryImage(4),
+    title: null,
+    titleSort: "bravo",
+    day: 2,
+    inGallery: true,
+  },
+  {
+    id: galleryImage(5),
+    title: "Echo",
+    titleSort: "echo",
+    day: 4,
+    deleted: true,
+    inGallery: true,
+  },
+  { id: LOOSE_IMAGE, title: "Aaa", titleSort: "aaa", day: 6, inGallery: false },
+];
+/** The images seeded on B, all in B's gallery of the same id */
+const IMAGES_ON_B = [galleryImage(1), galleryImage(2)];
+
 let u: number;
 let planner: LargeLibraryPlanner;
 
@@ -80,6 +139,11 @@ function request(
 async function removeRows(): Promise<void> {
   await prisma.user.deleteMany({ where: { username: USERNAME } });
   const where = { stashInstanceId: { in: [A, B] } };
+  await prisma.imageGallery.deleteMany({
+    where: { galleryInstanceId: { in: [A, B] } },
+  });
+  await prisma.stashImage.deleteMany({ where });
+  await prisma.stashGallery.deleteMany({ where });
   await prisma.stashScene.deleteMany({ where });
   await prisma.stashTag.deleteMany({ where });
   await prisma.userStashInstance.deleteMany({
@@ -186,6 +250,50 @@ async function seed(): Promise<void> {
         sceneInstanceId: instance,
         tagId: INHERITED_TAG,
         tagInstanceId: instance,
+      })),
+    ],
+  });
+
+  await prisma.stashGallery.createMany({
+    data: [A, B].map((instance) => ({
+      id: GALLERY,
+      stashInstanceId: instance,
+      title: `Refshape gallery ${instance}`,
+    })),
+  });
+  await prisma.stashImage.createMany({
+    data: [
+      ...IMAGES_ON_A.map((image) => ({
+        id: image.id,
+        stashInstanceId: A,
+        title: image.title,
+        titleSort: image.titleSort,
+        filePath: `/refshape/${image.titleSort}.jpg`,
+        stashCreatedAt: new Date(Date.UTC(2024, 0, image.day)),
+        deletedAt: image.deleted ? new Date() : null,
+      })),
+      ...IMAGES_ON_B.map((id, i) => ({
+        id,
+        stashInstanceId: B,
+        title: `Refshape image B ${i}`,
+        titleSort: `refshape image b ${i}`,
+        stashCreatedAt: new Date(Date.UTC(2024, 1, i + 1)),
+      })),
+    ],
+  });
+  await prisma.imageGallery.createMany({
+    data: [
+      ...IMAGES_ON_A.filter((image) => image.inGallery).map((image) => ({
+        imageId: image.id,
+        imageInstanceId: A,
+        galleryId: GALLERY,
+        galleryInstanceId: A,
+      })),
+      ...IMAGES_ON_B.map((id) => ({
+        imageId: id,
+        imageInstanceId: B,
+        galleryId: GALLERY,
+        galleryInstanceId: B,
       })),
     ],
   });
@@ -508,6 +616,93 @@ describeWithDb("Ref clause shapes", () => {
       );
     }
   );
+
+  // S2 (C7): a gallery's images are read once from ImageGallery's gallery
+  // index, where the correlated EXISTS probed the junction for every live
+  // image (measured on the prod and 200k copies, see the progress log)
+  it("a gallery's images list and count match the junction, sorted by title and by created_at", async () => {
+    // The junction's live images of each instance's gallery
+    const junction = async (instance: string) =>
+      (
+        await prisma.imageGallery.findMany({
+          where: {
+            galleryId: GALLERY,
+            galleryInstanceId: instance,
+            image: { deletedAt: null },
+          },
+          select: { imageId: true },
+        })
+      )
+        .map((row) => row.imageId)
+        .sort();
+    expect(await junction(A)).toHaveLength(4);
+
+    // Each instance's gallery in each order (B's titles and days follow its ids)
+    const orders: Record<"title" | "created_at", Record<string, number[]>> = {
+      title: { [A]: [2, 4, 3, 1], [B]: [1, 2] },
+      created_at: { [A]: [2, 3, 4, 1], [B]: [2, 1] },
+    };
+    for (const [field, direction] of [
+      ["title", "ASC"],
+      ["created_at", "DESC"],
+    ] as const) {
+      for (const instance of [A, B]) {
+        const recorder = recordStatements();
+        let result: Awaited<ReturnType<typeof imageQueryBuilder.execute>>;
+        try {
+          result = await imageQueryBuilder.execute({
+            userId: u,
+            allowedInstanceIds: [A, B],
+            request: {
+              page: 1,
+              perPage: 40,
+              q: undefined,
+              sort: { field, direction, seed: undefined },
+              filter: {
+                galleries: {
+                  refs: [ref(GALLERY, instance)],
+                  modifier: "INCLUDES",
+                  depth: 0,
+                },
+              },
+              specificInstanceId: undefined,
+            },
+          });
+        } finally {
+          recorder.restore();
+        }
+
+        const listed = result.items.map((image) => image.id);
+        expect(
+          result.items.every((image) => image.instanceId === instance)
+        ).toBe(true);
+        expect([...listed].sort(), `${field} on ${instance}`).toEqual(
+          await junction(instance)
+        );
+        expect(result.total).toBe(listed.length);
+        expect(listed, `${field} on ${instance}`).toEqual(
+          must(orders[field][instance]).map(galleryImage)
+        );
+
+        // The page and the count read the gallery's images from the
+        // junction's gallery index as a list, probed by no image
+        const [page, count] = recorder.statements.filter((statement) =>
+          statement.sql.includes("FROM StashImage i")
+        );
+        expect(must(count).sql).toContain("SELECT COUNT(*) AS total");
+        for (const statement of [page, count]) {
+          const plan = (
+            await planner.planOf(must(statement).sql, ...must(statement).params)
+          ).join("\n");
+          expect(plan, `${field} plan`).toMatch(
+            /SEARCH ig USING (COVERING )?INDEX ImageGallery_galleryId_galleryInstanceId_idx/
+          );
+          expect(plan, `${field} plan`).toMatch(/LIST SUBQUERY/);
+          expect(plan, `${field} plan`).not.toContain("CORRELATED");
+        }
+      }
+    }
+  });
 
   it("IS_NULL and NOT_NULL match on title, details and the codecs", async () => {
     const ids = async (filter: ParsedFilter<"scene">) => {

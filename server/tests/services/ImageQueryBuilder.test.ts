@@ -766,6 +766,42 @@ describe("ImageQueryBuilder", () => {
       }
     });
 
+    it("one gallery's images are selected as (i.id, i.stashInstanceId) IN (SELECT … FROM ImageGallery …)", async () => {
+      for (const field of ["title", "created_at", "rating"] as const) {
+        const statements = await recording(() =>
+          run({
+            sort: { field, direction: "DESC", seed: undefined },
+            filter: { galleries: criterion([ref("gallery-1")]) },
+          })
+        );
+
+        // The page and its count alike: the junction's gallery index lists
+        // the gallery's images once, where the correlated EXISTS probed the
+        // junction for every live image
+        const [page, count] = statements;
+        for (const statement of [page, count]) {
+          const sql = must(statement, `the ${field} statement`).sql;
+          expect(sql).toContain(
+            "(i.id, i.stashInstanceId) IN (SELECT ig.imageId, ig.imageInstanceId FROM ImageGallery ig WHERE ("
+          );
+          expect(sql).not.toContain("EXISTS (SELECT 1 FROM ImageGallery");
+        }
+        expect(must(count, "the count").sql).toContain(
+          "SELECT COUNT(*) AS total"
+        );
+      }
+
+      // EXCLUDES keeps the correlated NOT EXISTS
+      const excludes = await recording(() =>
+        run({
+          filter: { galleries: criterion([ref("gallery-1")], "EXCLUDES") },
+        })
+      );
+      expect(must(excludes[0], "the EXCLUDES page").sql).toContain(
+        "NOT EXISTS (SELECT 1 FROM ImageGallery ig"
+      );
+    });
+
     it("drives each relation from the page's (id, instance) pairs", async () => {
       // A studio to look up; the lookup runs only when a row names one
       await prisma.stashStudio.create({
