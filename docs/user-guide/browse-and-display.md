@@ -171,7 +171,8 @@ A detail page (performer, studio, tag, collection or gallery) counts its tabs th
 
 **Tag-specific:**
 
-- Description and relationship indicators only
+- Description and relationship indicators
+- Show rating, Show favorite and Show O-counter, as on performers and studios
 
 ### Per-Entity Defaults
 
