@@ -215,6 +215,35 @@ export class SyncBusyError extends Error {
 }
 
 /**
+ * The change would leave no enabled Stash instance (item 24): Peek always
+ * keeps one, so the last enabled instance can be neither disabled nor
+ * deleted. Checked inside the write unit that makes the change, so two
+ * changes sent together cannot both pass it.
+ */
+export class LastEnabledInstanceError extends Error {
+  constructor() {
+    super(
+      "The last enabled Stash instance can be neither disabled nor deleted"
+    );
+    this.name = "LastEnabledInstanceError";
+  }
+}
+
+/**
+ * Throws LastEnabledInstanceError when no instance but `instanceId` is
+ * enabled. Runs inside the caller's write unit, before the change.
+ */
+async function assertAnotherEnabledInstance(
+  tx: Prisma.TransactionClient,
+  instanceId: string
+): Promise<void> {
+  const others = await tx.stashInstance.count({
+    where: { enabled: true, id: { not: instanceId } },
+  });
+  if (others === 0) throw new LastEnabledInstanceError();
+}
+
+/**
  * The cached tables of an instance, in purge order: an entity before the
  * ones it references (a clip's scene and primary tag, an image's or
  * gallery's studio), so no foreign key action has to touch a row the purge
@@ -4794,7 +4823,9 @@ class StashSyncService extends EventEmitter {
    * Deletes a Stash instance and everything Peek keeps for it (item 18).
    *
    * Refused with SyncBusyError while a sync or another deletion holds the
-   * lock. Then, in one batch: the instance row (its `UserStashInstance` rows
+   * lock, and with LastEnabledInstanceError when the instance is the last
+   * enabled one (checked inside the unit). Then, in one transaction: the
+   * instance row (its `UserStashInstance` rows
    * cascade), its `SyncState`, every user's own rows for it (history,
    * ratings and favorites, image views, playlist entries, hides, entity
    * downloads, merge records) and the derived per-user rows (stats and
@@ -4817,38 +4848,47 @@ class StashSyncService extends EventEmitter {
     try {
       affectedUsers = await getUsersSelecting(instanceId);
       const own = { instanceId };
-      await dbWriteBatch("instance.delete", [
-        prisma.stashInstance.delete({ where: { id: instanceId } }),
-        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } }),
+      await dbWriteTransaction("instance.delete", async (tx) => {
+        const instance = await tx.stashInstance.findUnique({
+          where: { id: instanceId },
+          select: { enabled: true },
+        });
+        if (instance?.enabled === true) {
+          await assertAnotherEnabledInstance(tx, instanceId);
+        }
+        await tx.stashInstance.delete({ where: { id: instanceId } });
+        await tx.syncState.deleteMany({
+          where: { stashInstanceId: instanceId },
+        });
         // Every user's own rows for the instance (owner, 2026-09-24)
-        prisma.watchHistory.deleteMany({ where: own }),
-        prisma.sceneRating.deleteMany({ where: own }),
-        prisma.performerRating.deleteMany({ where: own }),
-        prisma.studioRating.deleteMany({ where: own }),
-        prisma.tagRating.deleteMany({ where: own }),
-        prisma.galleryRating.deleteMany({ where: own }),
-        prisma.groupRating.deleteMany({ where: own }),
-        prisma.imageRating.deleteMany({ where: own }),
-        prisma.imageViewHistory.deleteMany({ where: own }),
-        prisma.playlistItem.deleteMany({ where: own }),
-        prisma.userHiddenEntity.deleteMany({ where: own }),
-        prisma.download.deleteMany({ where: own }),
-        prisma.mergeRecord.deleteMany({
+        await tx.watchHistory.deleteMany({ where: own });
+        await tx.sceneRating.deleteMany({ where: own });
+        await tx.performerRating.deleteMany({ where: own });
+        await tx.studioRating.deleteMany({ where: own });
+        await tx.tagRating.deleteMany({ where: own });
+        await tx.galleryRating.deleteMany({ where: own });
+        await tx.groupRating.deleteMany({ where: own });
+        await tx.imageRating.deleteMany({ where: own });
+        await tx.imageViewHistory.deleteMany({ where: own });
+        await tx.playlistItem.deleteMany({ where: own });
+        await tx.userHiddenEntity.deleteMany({ where: own });
+        await tx.download.deleteMany({ where: own });
+        await tx.mergeRecord.deleteMany({
           where: {
             OR: [
               { sourceInstanceId: instanceId },
               { targetInstanceId: instanceId },
             ],
           },
-        }),
+        });
         // Derived rows; UserExcludedEntity has no instanceId index, so the
         // purge removes its rows in chunks instead
-        prisma.userEntityStats.deleteMany({ where: own }),
-        prisma.userPerformerStats.deleteMany({ where: own }),
-        prisma.userStudioStats.deleteMany({ where: own }),
-        prisma.userTagStats.deleteMany({ where: own }),
-        prisma.userEntityRanking.deleteMany({ where: own }),
-      ]);
+        await tx.userEntityStats.deleteMany({ where: own });
+        await tx.userPerformerStats.deleteMany({ where: own });
+        await tx.userStudioStats.deleteMany({ where: own });
+        await tx.userTagStats.deleteMany({ where: own });
+        await tx.userEntityRanking.deleteMany({ where: own });
+      });
       await stashInstanceManager.reload();
     } catch (error) {
       this.release();

@@ -86,7 +86,6 @@ const AppContent = () => {
           setupComplete: false,
           hasUsers: false,
           hasStashInstance: false,
-          userCount: 0,
           stashInstanceCount: 0,
         });
       } finally {
@@ -102,7 +101,6 @@ const AppContent = () => {
     setupComplete: false,
     hasUsers: false,
     hasStashInstance: false,
-    userCount: 0,
     stashInstanceCount: 0,
   };
 

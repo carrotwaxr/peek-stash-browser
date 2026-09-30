@@ -1,5 +1,6 @@
 import { type AddressInfo, createServer } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TEST_CONFIG } from "../helpers/config.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
@@ -130,5 +131,95 @@ describe("Setup routes once setup is complete", () => {
     expect(await anonymousCreateAdmin("203.0.113.50")).toBe(429);
 
     expect(await anonymousCreateAdmin("203.0.113.51")).toBe(403);
+  });
+});
+
+/**
+ * Peek keeps one enabled instance (item 24, CS-01): the check runs inside the
+ * update's write unit, so two disables sent together, one per instance,
+ * cannot both pass it. The replay has two enabled instances; every test puts
+ * them back, and afterAll re-enables any left disabled.
+ */
+describe("the last enabled instance", () => {
+  interface InstanceRow {
+    id: string;
+    enabled: boolean;
+  }
+
+  async function listInstances(): Promise<InstanceRow[]> {
+    const response = await adminClient.get<{ instances: InstanceRow[] }>(
+      "/api/setup/stash-instances"
+    );
+    expect(response.status, "list the instances").toBe(200);
+    return response.data.instances;
+  }
+
+  async function setEnabled(id: string, enabled: boolean): Promise<number> {
+    const response = await adminClient.put(`/api/setup/stash-instance/${id}`, {
+      enabled,
+    });
+    return response.status;
+  }
+
+  async function enableEvery(): Promise<void> {
+    for (const instance of await listInstances()) {
+      if (!instance.enabled) {
+        expect(await setEnabled(instance.id, true), "re-enable").toBe(200);
+      }
+    }
+  }
+
+  let instanceIds: string[];
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    const instances = await listInstances();
+    expect(
+      instances.filter((instance) => instance.enabled),
+      "two enabled instances to start from"
+    ).toHaveLength(2);
+    instanceIds = instances.map((instance) => instance.id);
+  });
+
+  afterAll(enableEvery);
+
+  it("two simultaneous disables of the last two enabled instances leave exactly one enabled", async () => {
+    try {
+      const statuses = await Promise.all(
+        instanceIds.map((id) => setEnabled(id, false))
+      );
+
+      expect([...statuses].sort()).toEqual([200, 400]);
+      const enabled = (await listInstances()).filter((i) => i.enabled);
+      expect(enabled).toHaveLength(1);
+    } finally {
+      await enableEvery();
+    }
+  });
+
+  it("after a refused disable, /setup/status still says setupComplete", async () => {
+    const [first, second] = instanceIds;
+    try {
+      expect(await setEnabled(must(first, "first instance"), false)).toBe(200);
+      const refused = await adminClient.put<{ error: string }>(
+        `/api/setup/stash-instance/${must(second, "second instance")}`,
+        { enabled: false }
+      );
+      expect(refused.status).toBe(400);
+      expect(refused.data.error).toBe(
+        "Peek needs an enabled Stash instance. Add another instance first, or change this one's address under Edit."
+      );
+
+      const status = await new TestClient().get<{
+        setupComplete: boolean;
+        hasStashInstance: boolean;
+      }>("/api/setup/status");
+      expect(status.status).toBe(200);
+      expect(status.data.setupComplete).toBe(true);
+      expect(status.data.hasStashInstance).toBe(true);
+      expect(status.data).not.toHaveProperty("userCount");
+    } finally {
+      await enableEvery();
+    }
   });
 });

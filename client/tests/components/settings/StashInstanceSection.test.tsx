@@ -117,6 +117,7 @@ describe("StashInstanceSection", () => {
     it("toggles instance enabled state", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       mockApiPut.mockResolvedValue({});
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
       render(<StashInstanceSection />);
 
@@ -132,6 +133,73 @@ describe("StashInstanceSection", () => {
           { enabled: false }
         );
       });
+      confirmSpy.mockRestore();
+    });
+
+    it("Disable asks to confirm, and a cancel sends nothing", async () => {
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getByText("Disable")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Disable"));
+
+      expect(confirmSpy).toHaveBeenCalledWith(
+        'Disable "Test Stash"? Every user stops seeing its content until you ' +
+          "enable it again. Ratings, history and playlists are kept."
+      );
+      expect(mockApiPut).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it("Enable sends at once, with no confirm", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [{ ...mockInstance, enabled: false }],
+      });
+      mockApiPut.mockResolvedValue({});
+      const confirmSpy = vi.spyOn(window, "confirm");
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getByText("Enable")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Enable"));
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1",
+          { enabled: true }
+        );
+      });
+      expect(confirmSpy).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it("a refused disable shows the server's message in a toast and keeps the list", async () => {
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+      const message =
+        "Peek needs an enabled Stash instance. Add another instance first, or change this one's address under Edit.";
+      mockApiPut.mockRejectedValue(
+        new ApiError(message, 400, { error: message })
+      );
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getByText("Disable")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Disable"));
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith(message);
+      });
+      // The list stays, with the instance still active
+      expect(screen.getByText("Test Stash")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(screen.getByText("Disable")).toBeInTheDocument();
+      confirmSpy.mockRestore();
     });
 
     it("creates new instance when form is submitted", async () => {

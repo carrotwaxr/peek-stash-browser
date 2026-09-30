@@ -7,6 +7,7 @@ import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import {
+  LastEnabledInstanceError,
   SyncBusyError,
   stashSyncService,
 } from "../services/StashSyncService.js";
@@ -35,6 +36,7 @@ import type {
   UpdateStashInstanceRequest,
   UpdateStashInstanceResponse,
 } from "../types/api/index.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 
@@ -52,33 +54,35 @@ const getDefaultCarouselPreferences = (): CarouselPreference[] => [
 
 /**
  * Check setup status (for determining if wizard is needed)
- * Checks for both user existence and Stash instance configuration
+ * Checks for both user existence and Stash instance configuration. Public:
+ * it answers only whether each exists, and how many instances are enabled.
  */
 export const getSetupStatus = async (
   req: Request,
   res: TypedResponse<GetSetupStatusResponse | ApiErrorResponse>
 ) => {
-  // Check if at least one user exists
-  const userCount = await prisma.user.count();
-  const hasUsers = userCount > 0;
+  const hasUsers = (await prisma.user.count()) > 0;
 
-  // Check if at least one Stash instance is configured
+  // Any instance, disabled included, means setup is done: the wizard can
+  // only add a first instance, so a disabled one would lock everyone into it
+  const hasStashInstance = (await prisma.stashInstance.count()) > 0;
+
+  // The client's multi-instance links read the enabled count
   const stashInstanceCount = await prisma.stashInstance.count({
     where: { enabled: true },
   });
-  const hasStashInstance = stashInstanceCount > 0;
-
-  // Setup is complete if both users and Stash instance exist
-  const setupComplete = hasUsers && hasStashInstance;
 
   res.json({
-    setupComplete,
+    setupComplete: hasUsers && hasStashInstance,
     hasUsers,
     hasStashInstance,
-    userCount,
     stashInstanceCount,
   });
 };
+
+/** What the admin reads when a change would leave no enabled instance */
+const LAST_ENABLED_INSTANCE_MESSAGE =
+  "Peek needs an enabled Stash instance. Add another instance first, or change this one's address under Edit.";
 
 /**
  * Create first admin user (public, rate-limited endpoint for setup wizard)
@@ -644,33 +648,47 @@ export const updateStashInstance = async (
     }
   }
 
-  // Update instance
-  const instance = await prisma.stashInstance.update({
-    where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(description !== undefined && { description }),
-      ...(url !== undefined && { url }),
-      ...(uiUrl !== undefined && { uiUrl }),
-      ...(apiKey !== undefined && { apiKey }),
-      ...(enabled !== undefined && { enabled }),
-      ...(priority !== undefined && { priority }),
-      // Another address may be another Stash: the instance is new again,
-      // hidden from users until its resync's exclusions are computed
-      ...(urlChanged && { firstSyncedAt: null }),
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      url: true,
-      uiUrl: true,
-      enabled: true,
-      priority: true,
-      createdAt: true,
-      updatedAt: true,
-      firstSyncedAt: true,
-    },
+  // Peek keeps one enabled instance: a disable checks inside the unit that
+  // writes it, so two disables sent together cannot both pass the check
+  const disabling = enabled === false && existing.enabled;
+  const instance = await dbWriteTransaction("instance.update", async (tx) => {
+    if (disabling) {
+      const others = await tx.stashInstance.count({
+        where: { enabled: true, id: { not: id } },
+      });
+      if (others === 0) throw new LastEnabledInstanceError();
+    }
+    return tx.stashInstance.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(url !== undefined && { url }),
+        ...(uiUrl !== undefined && { uiUrl }),
+        ...(apiKey !== undefined && { apiKey }),
+        ...(enabled !== undefined && { enabled }),
+        ...(priority !== undefined && { priority }),
+        // Another address may be another Stash: the instance is new again,
+        // hidden from users until its resync's exclusions are computed
+        ...(urlChanged && { firstSyncedAt: null }),
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        url: true,
+        uiUrl: true,
+        enabled: true,
+        priority: true,
+        createdAt: true,
+        updatedAt: true,
+        firstSyncedAt: true,
+      },
+    });
+  }).catch((error: unknown) => {
+    throw error instanceof LastEnabledInstanceError
+      ? new ValidationError(LAST_ENABLED_INSTANCE_MESSAGE)
+      : error;
   });
 
   logger.info("Stash instance updated", {
@@ -735,29 +753,15 @@ export const deleteStashInstance = async (
     return;
   }
 
-  // Check if this is the last enabled instance
-  const enabledCount = await prisma.stashInstance.count({
-    where: { enabled: true },
-  });
-
-  if (enabledCount === 1) {
-    const lastEnabled = await prisma.stashInstance.findFirst({
-      where: { enabled: true },
-    });
-    if (lastEnabled?.id === id) {
-      res.status(400).json({
-        error:
-          "Cannot delete the last enabled Stash instance. Disable it first or add another instance.",
-      });
-      return;
-    }
-  }
-
   // Deletes the instance row and every user's rows for it, reloads the
-  // instance manager, then removes the cached library in the background
+  // instance manager, then removes the cached library in the background.
+  // It refuses the last enabled instance inside its write unit.
   try {
     await stashSyncService.deleteInstance(id);
   } catch (error) {
+    if (error instanceof LastEnabledInstanceError) {
+      throw new ValidationError(LAST_ENABLED_INSTANCE_MESSAGE);
+    }
     if (error instanceof SyncBusyError) {
       throw new ConflictError(
         error.job === "sync"
