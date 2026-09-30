@@ -428,6 +428,44 @@ describe("Images", () => {
       expect(router.state.historyAction).toBe("REPLACE");
     });
 
+    it("a failed next page returns the lightbox to the image it showed, on its page", async () => {
+      const first = Array.from({ length: 24 }, (_, i) => ({
+        id: String(i + 1),
+        instanceId: "a",
+        title: `Image ${i + 1}`,
+      }));
+      api.findImages.mockImplementation((params) =>
+        pageOf(params) === 1
+          ? Promise.resolve(images(first, 48))
+          : Promise.reject(new Error("The server is down"))
+      );
+      const { router } = renderPage();
+      await waitFor(() => expect(cards()).toHaveLength(24));
+
+      fireEvent.click(screen.getByRole("button", { name: "Open Image 24" }));
+      fireEvent.click(
+        within(screen.getByTestId("lightbox")).getByRole("button", {
+          name: "Lightbox next",
+        })
+      );
+      await waitFor(() =>
+        expect(
+          api.findImages.mock.calls.map((call) => pageOf(call[0]))
+        ).toContain(2)
+      );
+
+      await waitFor(() =>
+        expect(
+          new URLSearchParams(router.state.location.search).get("page")
+        ).toBeNull()
+      );
+      await waitFor(() => expect(cards()).toHaveLength(24));
+      const lightbox = screen.getByTestId("lightbox");
+      expect(lightbox).toHaveAttribute("data-is-open", "true");
+      expect(lightbox).toHaveAttribute("data-index", "23");
+      expect(imageParam(router)).toBe("24:a");
+    });
+
     it("opening an image names it in the URL and Back closes the lightbox", async () => {
       twoImages();
       const { router } = renderPage("/images?page=1");

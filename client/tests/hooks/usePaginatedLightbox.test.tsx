@@ -1,8 +1,24 @@
-import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
+import { type ReactNode, useCallback, useMemo } from "react";
+import {
+  type Location,
+  NavigationType,
+  Router,
+  type To,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useSearchParams,
+} from "react-router-dom";
 import { act, renderHook } from "@testing-library/react";
-import { createRouterWrapper } from "@tests/testUtils";
+import { createRouterWrapper, must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { usePaginatedLightbox } from "../../src/hooks/usePaginatedLightbox";
+import {
+  type PageChangeOptions,
+  usePaginatedLightbox,
+} from "../../src/hooks/usePaginatedLightbox";
+import { showError } from "../../src/utils/toast";
+
+vi.mock("../../src/utils/toast", () => ({ showError: vi.fn() }));
 
 type Options = Parameters<typeof usePaginatedLightbox>[0];
 
@@ -29,6 +45,49 @@ const pageOf = (n: number, perPage = 10, instanceId = "inst-a") =>
     id: String((n - 1) * perPage + i + 1),
     instanceId,
   }));
+
+/**
+ * The hook as a page uses it: the page is the URL's `page` (a replace when
+ * the lightbox asks for one) and the images are that page's, 3 pages of 10
+ */
+const renderUrlPagedLightbox = (entries: string[]) =>
+  renderHook(
+    () => {
+      const [searchParams, setSearchParams] = useSearchParams();
+      const page = Number(searchParams.get("page") ?? "1");
+      const onExternalPageChange = useCallback(
+        (next: number, options?: PageChangeOptions) =>
+          setSearchParams(
+            (prev) => {
+              const params = new URLSearchParams(prev);
+              params.set("page", String(next));
+              return params;
+            },
+            { replace: options?.replace === true }
+          ),
+        [setSearchParams]
+      );
+      const images = useMemo(() => pageOf(page), [page]);
+      return {
+        lightbox: usePaginatedLightbox({
+          perPage: 10,
+          totalCount: 30,
+          externalPage: page,
+          onExternalPageChange,
+          images,
+        }),
+        location: useLocation(),
+        navigationType: useNavigationType(),
+        navigate: useNavigate(),
+      };
+    },
+    { wrapper: createRouterWrapper(entries) }
+  );
+
+type UrlPaged = ReturnType<typeof renderUrlPagedLightbox>["result"];
+
+const search = (result: UrlPaged) =>
+  new URLSearchParams(result.current.location.search);
 
 describe("usePaginatedLightbox", () => {
   afterEach(() => {
@@ -276,7 +335,8 @@ describe("usePaginatedLightbox", () => {
       });
       expect(result.current.lightbox.lightboxOpen).toBe(false);
       expect(imageParam(result)).toBeNull();
-      expect(result.current.navigationType).toBe("REPLACE");
+      // Opened by its own push, it closes by going back over that entry
+      expect(result.current.navigationType).toBe("POP");
     });
 
     it("Back closes the lightbox and stays on the page", () => {
@@ -298,6 +358,51 @@ describe("usePaginatedLightbox", () => {
       expect(result.current.lightbox.lightboxOpen).toBe(false);
       expect(result.current.location.pathname).toBe("/images");
       expect(result.current.location.search).toBe("?sort=title");
+    });
+
+    it("a Back that lands before the open's own entry rendered still closes it", () => {
+      // BrowserRouter renders a navigation as a transition, so a Back can
+      // land before the open's own entry was ever rendered; the pop then
+      // brings a new location object for the entry the hook already saw
+      const entry = (): Location => ({
+        pathname: "/images",
+        search: "?sort=title",
+        hash: "",
+        state: null,
+        key: "k0",
+      });
+      const navigator = {
+        createHref: (to: To) => (typeof to === "string" ? to : "/images"),
+        go: vi.fn(),
+        push: vi.fn(),
+        replace: vi.fn(),
+      };
+      let shown = { location: entry(), type: NavigationType.Push };
+      const { result, rerender } = renderHook(
+        () => usePaginatedLightbox({ perPage: 10, images: pageOf(1) }),
+        {
+          wrapper: ({ children }: { children: ReactNode }) => (
+            <Router
+              location={shown.location}
+              navigationType={shown.type}
+              navigator={navigator}
+            >
+              {children}
+            </Router>
+          ),
+        }
+      );
+
+      act(() => {
+        result.current.openLightbox(3);
+      });
+      expect(navigator.push).toHaveBeenCalledTimes(1);
+      expect(result.current.lightboxOpen).toBe(true);
+
+      shown = { location: entry(), type: NavigationType.Pop };
+      rerender();
+
+      expect(result.current.lightboxOpen).toBe(false);
     });
 
     it("a reload with image=<key> opens the lightbox on that image", () => {
@@ -364,6 +469,144 @@ describe("usePaginatedLightbox", () => {
       expect(result.current.lightbox.lightboxOpen).toBe(true);
       expect(imageParam(result)).toBe("11:inst-a");
       expect(result.current.navigationType).toBe("REPLACE");
+    });
+  });
+
+  describe("closing leaves no dead Back step", () => {
+    it("closing a lightbox opened from the grid goes back: one more Back leaves the list", () => {
+      const { result } = renderUrlPagedLightbox(["/other", "/images"]);
+
+      act(() => {
+        result.current.lightbox.openLightbox(3);
+      });
+      act(() => {
+        result.current.lightbox.onIndexChange(4);
+      });
+      act(() => {
+        result.current.lightbox.closeLightbox();
+      });
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(result.current.location.pathname).toBe("/images");
+      expect(search(result).get("image")).toBeNull();
+
+      act(() => {
+        void result.current.navigate(-1);
+      });
+      expect(result.current.location.pathname).toBe("/other");
+    });
+
+    it("closing after a boundary crossing shows the last image's page", () => {
+      const { result } = renderUrlPagedLightbox(["/other", "/images"]);
+
+      act(() => {
+        result.current.lightbox.openLightbox(9);
+      });
+      act(() => {
+        result.current.lightbox.onPageBoundary("next");
+      });
+      act(() => {
+        result.current.lightbox.consumePendingLightboxIndex();
+      });
+      expect(search(result).get("image")).toBe("11:inst-a");
+
+      act(() => {
+        result.current.lightbox.closeLightbox();
+      });
+      expect(result.current.location.pathname).toBe("/images");
+      expect(search(result).get("page")).toBe("2");
+      expect(search(result).get("image")).toBeNull();
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+
+      act(() => {
+        void result.current.navigate(-1);
+      });
+      expect(result.current.location.pathname).toBe("/other");
+    });
+
+    it("Back after a boundary crossing also shows the last image's page", () => {
+      const { result } = renderUrlPagedLightbox(["/other", "/images"]);
+
+      act(() => {
+        result.current.lightbox.openLightbox(9);
+      });
+      act(() => {
+        result.current.lightbox.onPageBoundary("next");
+      });
+      act(() => {
+        result.current.lightbox.consumePendingLightboxIndex();
+      });
+      act(() => {
+        void result.current.navigate(-1);
+      });
+
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(result.current.location.pathname).toBe("/images");
+      expect(search(result).get("page")).toBe("2");
+      expect(search(result).get("image")).toBeNull();
+    });
+
+    it("a lightbox opened from its address closes by replace", () => {
+      const { result } = renderUrlPagedLightbox([
+        "/other",
+        "/images?image=4%3Ainst-a",
+      ]);
+      expect(result.current.lightbox.lightboxOpen).toBe(true);
+
+      act(() => {
+        result.current.lightbox.closeLightbox();
+      });
+      expect(result.current.location.pathname).toBe("/images");
+      expect(search(result).get("image")).toBeNull();
+      expect(result.current.navigationType).toBe("REPLACE");
+
+      act(() => {
+        void result.current.navigate(-1);
+      });
+      expect(result.current.location.pathname).toBe("/other");
+    });
+  });
+
+  describe("a failed page during a crossing", () => {
+    it("returns to the last image shown and its page, and says why", () => {
+      const { result } = renderUrlPagedLightbox(["/images"]);
+
+      act(() => {
+        result.current.lightbox.openLightbox(9);
+      });
+      act(() => {
+        result.current.lightbox.onPageBoundary("next");
+      });
+      expect(search(result).get("page")).toBe("2");
+      const transitionKey = result.current.lightbox.transitionKey;
+
+      let failed = false;
+      act(() => {
+        failed = result.current.lightbox.failPendingPage(
+          new Error("The server is down")
+        );
+      });
+
+      expect(failed).toBe(true);
+      expect(result.current.lightbox.isPageTransitioning).toBe(false);
+      expect(result.current.lightbox.lightboxOpen).toBe(true);
+      expect(result.current.lightbox.lightboxIndex).toBe(9);
+      expect(result.current.lightbox.transitionKey).toBeGreaterThan(
+        transitionKey
+      );
+      expect(search(result).get("page")).toBe("1");
+      expect(search(result).get("image")).toBe("10:inst-a");
+      expect(result.current.navigationType).toBe("REPLACE");
+      expect(vi.mocked(showError)).toHaveBeenCalledTimes(1);
+      expect(
+        String(must(vi.mocked(showError).mock.calls[0], "the toast")[0])
+      ).toContain("The server is down");
+
+      // Nothing was pending any more: a later failure is not the crossing's
+      act(() => {
+        failed = result.current.lightbox.failPendingPage(new Error("again"));
+      });
+      expect(failed).toBe(false);
+      expect(vi.mocked(showError)).toHaveBeenCalledTimes(1);
     });
   });
 

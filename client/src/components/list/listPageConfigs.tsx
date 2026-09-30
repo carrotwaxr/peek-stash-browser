@@ -67,6 +67,8 @@ export interface ListPageData {
   count: number;
   /** The page's request (null while none is sent); its cache key's params */
   request: ListRequest;
+  /** The list request's error, if it failed */
+  error: unknown;
 }
 
 /** What a page's own hook adds to the list page */

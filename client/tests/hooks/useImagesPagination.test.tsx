@@ -4,6 +4,8 @@ import { createRouterWrapper, must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
 import { useImagesPagination } from "../../src/hooks/useImagesPagination";
 
+vi.mock("../../src/utils/toast", () => ({ showError: vi.fn() }));
+
 type PaginationOptions = Parameters<typeof useImagesPagination>[0];
 
 /**
@@ -169,6 +171,54 @@ describe("useImagesPagination", () => {
       });
 
       expect(onExternalPageChange).toHaveBeenCalledWith(3);
+    });
+
+    it("a failed page during a lightbox crossing ends the transition and returns to the page shown", async () => {
+      const fetchImages = vi.fn((page: number) =>
+        page === 1
+          ? Promise.resolve({
+              images: Array.from({ length: 10 }, (_, i) => ({
+                id: String(i + 1),
+                instanceId: "a",
+              })),
+              count: 30,
+            })
+          : Promise.reject(new Error("The server is down"))
+      );
+      const onExternalPageChange = vi.fn();
+      const { result, rerender } = renderHook(
+        ({ externalPage }) =>
+          useImagesPagination({
+            fetchImages,
+            perPage: 10,
+            externalPage,
+            onExternalPageChange,
+          }),
+        { initialProps: { externalPage: 1 }, wrapper: createRouterWrapper() }
+      );
+      await waitFor(() => {
+        expect(result.current.images).toHaveLength(10);
+      });
+
+      act(() => {
+        result.current.lightbox.openLightbox(9);
+      });
+      act(() => {
+        result.current.lightbox.onPageBoundary("next");
+      });
+      expect(onExternalPageChange).toHaveBeenLastCalledWith(2, {
+        replace: true,
+      });
+      rerender({ externalPage: 2 });
+
+      await waitFor(() => {
+        expect(result.current.lightbox.isPageTransitioning).toBe(false);
+      });
+      expect(onExternalPageChange).toHaveBeenLastCalledWith(1, {
+        replace: true,
+      });
+      expect(result.current.lightbox.lightboxOpen).toBe(true);
+      expect(result.current.lightbox.lightboxIndex).toBe(9);
     });
 
     it("a page fetch that resolves after a newer one is ignored", async () => {

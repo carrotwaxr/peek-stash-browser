@@ -168,6 +168,47 @@ test.describe("Gallery lightbox", () => {
     }
   });
 
+  test("closing the viewer leaves no dead Back step", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    // Opening an image records a view: a throwaway user's, deleted with it
+    const user = await createUser(page.request, "lightbox-close");
+    userId = user.id;
+
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const userPage = await context.newPage();
+
+      // 1. From the galleries list, open the first gallery
+      const list = new ListPage(userPage);
+      await list.goto("/galleries");
+      const galleries = await list.waitForResults("Gallery");
+      requireData(galleries > 0, "a gallery");
+      await list.cards("Gallery").first().locator("a:has(.card-title)").click();
+      const firstImage = userPage.locator(".wall-item").first();
+      await expect(firstImage).toBeVisible({ timeout: 15_000 });
+      const galleryUrl = userPage.url();
+
+      // 2. Open an image and close the viewer with its own control
+      await firstImage.click();
+      const viewer = userPage.getByRole("dialog", { name: "Image viewer" });
+      await expect(viewer).toBeVisible();
+      await expect(userPage).toHaveURL(/[?&]image=/);
+      await userPage.keyboard.press("Escape");
+      await expect(viewer).toBeHidden();
+      await expect(userPage).toHaveURL(galleryUrl);
+
+      // 3. One Back leaves the gallery for the list
+      await userPage.goBack();
+      await expect(userPage).toHaveURL(/\/galleries(\?|$)/);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("r then 4 in the lightbox rates the image and leaves the gallery unrated", async ({
     page,
     browser,

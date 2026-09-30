@@ -34,7 +34,7 @@ Each image card displays:
 
 Click any image to open it in the full-screen lightbox viewer.
 
-The open image is part of the page's address. Your browser's **Back** button (or the phone's back gesture) closes the viewer and leaves you on the list where you were, and copying or bookmarking the address while an image is open opens the viewer straight on that image. Moving from image to image, even onto the next page, does not add history entries, so one Back always closes the viewer.
+The open image is part of the page's address. Your browser's **Back** button (or the phone's back gesture) closes the viewer and leaves you on the list where you were, and copying or bookmarking the address while an image is open opens the viewer straight on that image. Moving from image to image, even onto the next page, does not add history entries, so one Back always closes the viewer. Closing the viewer, with Back or its own close button, leaves the list on the page of the last image you viewed, and the next Back leaves the list. If the next page of images fails to load, the viewer stays on the image you were on and a message says what went wrong.
 
 ### Navigation
 

@@ -137,7 +137,13 @@ const EntityListPage = ({ config }: { config: ListPageConfig }) => {
 
   // The page's own handlers and parts (the Images lightbox)
   const usePage = config.usePage ?? useNoExtras;
-  const { cardHandlers, after } = usePage({ listState, items, count, request });
+  const { cardHandlers, after } = usePage({
+    listState,
+    items,
+    count,
+    request,
+    error,
+  });
 
   // One hide handler and one context for every card, so memoised cards keep
   const onHideSuccess = useHideFromList(source, request);

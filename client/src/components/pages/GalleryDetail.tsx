@@ -179,7 +179,10 @@ const GalleryDetail = () => {
         // Handle pending lightbox navigation after page loads
         lightbox.consumePendingLightboxIndex();
       } catch (error) {
+        if (!latest) return;
         console.error("Error loading images:", error);
+        // A lightbox crossing waiting for this page goes back to its image
+        lightbox.failPendingPage(error);
       } finally {
         if (latest) setImagesLoading(false);
       }
