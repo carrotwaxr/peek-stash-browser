@@ -28,6 +28,8 @@ interface ColumnConfig {
   order: string[];
 }
 
+const NO_COLUMNS: Record<string, ColumnConfig> = {};
+
 interface Props {
   tableColumnDefaults: Record<string, ColumnConfig> | null;
   /** Rejects when the save failed, after reporting it. */
@@ -40,8 +42,16 @@ interface Props {
  */
 const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const [activeEntity, setActiveEntity] = useState("scene");
-  const [localDefaults, setLocalDefaults] = useState(tableColumnDefaults ?? {});
-  const [hasChanges, setHasChanges] = useState(false);
+  // Unsaved edits, else null: without edits the editor shows the saved
+  // columns as they are now, so a change a table saves shows here at once
+  const [edits, setEdits] = useState<Record<string, ColumnConfig> | null>(null);
+  const saved = tableColumnDefaults ?? NO_COLUMNS;
+  const localDefaults = edits ?? saved;
+  const hasChanges = edits !== null;
+
+  /** Change the active type's columns; the first edit starts from the saved map */
+  const editActive = (config: ColumnConfig) =>
+    setEdits((prev) => ({ ...(prev ?? saved), [activeEntity]: config }));
 
   // Get current entity's columns config
   const allColumns = getColumnsForEntity(activeEntity);
@@ -60,14 +70,7 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
       ? currentConfig.visible.filter((id) => id !== columnId)
       : [...currentConfig.visible, columnId];
 
-    setLocalDefaults((prev) => ({
-      ...prev,
-      [activeEntity]: {
-        ...currentConfig,
-        visible: newVisible,
-      },
-    }));
-    setHasChanges(true);
+    editActive({ ...currentConfig, visible: newVisible });
   };
 
   const handleMoveColumn = (
@@ -101,34 +104,23 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
     newOrder.splice(currentIndex, 1);
     newOrder.splice(newIndex, 0, columnId);
 
-    setLocalDefaults((prev) => ({
-      ...prev,
-      [activeEntity]: {
-        ...currentConfig,
-        order: newOrder,
-      },
-    }));
-    setHasChanges(true);
+    editActive({ ...currentConfig, order: newOrder });
   };
 
   const handleSave = async () => {
     try {
       await onSave(localDefaults);
-      setHasChanges(false);
+      setEdits(null);
     } catch {
       // onSave reported the failure; the changes stay marked unsaved
     }
   };
 
   const handleReset = () => {
-    setLocalDefaults((prev) => ({
-      ...prev,
-      [activeEntity]: {
-        visible: getDefaultVisibleColumns(activeEntity),
-        order: getDefaultColumnOrder(activeEntity),
-      },
-    }));
-    setHasChanges(true);
+    editActive({
+      visible: getDefaultVisibleColumns(activeEntity),
+      order: getDefaultColumnOrder(activeEntity),
+    });
   };
 
   interface TableColumn {

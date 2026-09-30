@@ -159,6 +159,49 @@ describe("CustomizationTab", () => {
     expect(mockApiGet).toHaveBeenCalledTimes(1);
   });
 
+  it("an open editor follows a column change made on a table", async () => {
+    mockApiPut.mockResolvedValue({ success: true });
+    render(
+      <SignedInWithQuery>
+        <SceneTableDuration />
+        <CustomizationTab />
+      </SignedInWithQuery>
+    );
+    const section = await tableColumns();
+    expect(columnBox(section, "Duration")).not.toBeChecked();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle Duration on the table" })
+    );
+
+    await waitFor(() => expect(columnBox(section, "Duration")).toBeChecked());
+    expect(
+      within(section).getByRole("button", { name: "Save Changes" })
+    ).toBeDisabled();
+  });
+
+  it("unsaved edits in the editor are kept when a table changes its columns", async () => {
+    mockApiPut.mockResolvedValue({ success: true });
+    render(
+      <SignedInWithQuery>
+        <SceneTableDuration />
+        <CustomizationTab />
+      </SignedInWithQuery>
+    );
+    const section = await tableColumns();
+    fireEvent.click(columnBox(section, "Rating"));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle Duration on the table" })
+    );
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalledTimes(1));
+
+    expect(columnBox(section, "Rating")).toBeChecked();
+    expect(
+      within(section).getByRole("button", { name: "Save Changes" })
+    ).toBeEnabled();
+  });
+
   it("a failed view preference save shows the server's message and keeps the stored value", async () => {
     mockApiGet.mockResolvedValue(
       userSettingsResponse({ wallPlayback: "hover" })

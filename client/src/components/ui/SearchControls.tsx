@@ -53,10 +53,10 @@ interface SearchControlsProps {
   currentTableColumns?: Record<string, unknown> | null;
   tableColumnsPopover?: React.ReactNode;
   /**
-   * Shows a preset's table columns: called when a loaded preset carries
-   * them, and once when the default preset resolves with them
+   * Shows a preset's table columns, or null for the user's own: called on
+   * each Load Preset and when the default preset resolves or changes
    */
-  onPresetColumns?: (columns: ColumnConfig) => void;
+  onPresetColumns?: (columns: ColumnConfig | null) => void;
   contextSettings?: SettingConfig[];
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
@@ -239,20 +239,19 @@ const SearchControls = ({
   const handleLoadPreset = useCallback(
     (preset: PresetToLoad) => {
       loadPreset(preset);
-      const columns = presetColumnsOf(preset.tableColumns);
-      if (columns) onPresetColumns?.(columns);
+      onPresetColumns?.(presetColumnsOf(preset.tableColumns));
     },
     [loadPreset, onPresetColumns]
   );
 
-  // The default preset's table columns show once it resolves with them
-  const shownDefaultColumnsRef = useRef<string | null>(null);
+  // The default preset's table columns show when it resolves or changes;
+  // one without columns shows the user's own
+  const defaultPresetIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const columns = presetColumnsOf(activePreset?.tableColumns);
-    if (!activePreset || !columns || !onPresetColumns) return;
-    if (shownDefaultColumnsRef.current === activePreset.id) return;
-    shownDefaultColumnsRef.current = activePreset.id;
-    onPresetColumns(columns);
+    const id = activePreset?.id ?? null;
+    if (!onPresetColumns || defaultPresetIdRef.current === id) return;
+    defaultPresetIdRef.current = id;
+    onPresetColumns(presetColumnsOf(activePreset?.tableColumns));
   }, [activePreset, onPresetColumns]);
 
   const handlePageChange = useCallback(
