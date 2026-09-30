@@ -5,10 +5,11 @@
  * folded to lower case, as the list's title sort compares it; and
  * `performerCount` / `tagCount`, the scene's `ScenePerformer` and `SceneTag`
  * rows. The list sorts and filters on them through indexes instead of
- * computing them per scene on every request.
+ * computing them per scene on every request. Images store the same
+ * `titleSort` (routed C7): their title, else `getImageFallbackTitle`.
  *
- * The first case reads every scene the startup sync wrote. The others write
- * scenes through the scene batch writer under a made-up instance,
+ * The first case of each block reads every row the startup sync wrote. The
+ * others write through the batch writers under a made-up instance,
  * `derived-it`, which real sync never touches.
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -19,8 +20,14 @@ import {
 } from "../../services/StashSyncService.js";
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
-import { SCENE_DEFAULTS } from "../../tests/helpers/syncRowDefaults.js";
-import { getSceneFallbackTitle } from "../../utils/titleUtils.js";
+import {
+  IMAGE_DEFAULTS,
+  SCENE_DEFAULTS,
+} from "../../tests/helpers/syncRowDefaults.js";
+import {
+  getImageFallbackTitle,
+  getSceneFallbackTitle,
+} from "../../utils/titleUtils.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -28,6 +35,7 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const DERIVED = "derived-it";
 
 type SyncScene = SyncEntityOf<"scene">;
+type SyncImage = SyncEntityOf<"image">;
 
 /** A scene as Stash's sync query returns it */
 function sceneRow(
@@ -230,5 +238,157 @@ describeWithDb("Scene sort columns (integration)", () => {
       after.map((s) => [s.titleSort, s.performerCount, s.tagCount])
     ).toEqual([["after", 0, 1]]);
     expect(mismatches(after)).toEqual([]);
+  });
+});
+
+/** An image as Stash's sync query returns it */
+function imageRow(
+  id: string,
+  fields: { title?: string | null; path?: string | null },
+  updatedAt = "2026-01-02T00:00:00Z"
+): SyncImage {
+  return partialRow<SyncImage>({
+    ...IMAGE_DEFAULTS,
+    id,
+    title: fields.title ?? null,
+    files:
+      fields.path === undefined || fields.path === null
+        ? []
+        : [partialRow({ path: fields.path })],
+    studio: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: updatedAt,
+  });
+}
+
+function syncImages(images: SyncImage[]) {
+  return ENTITY_SYNC.image.processBatch(images, DERIVED, {
+    signal: new AbortController().signal,
+    changes: new SyncChangeSet(),
+  });
+}
+
+interface StoredImage {
+  id: string;
+  stashInstanceId: string;
+  title: string | null;
+  filePath: string | null;
+  titleSort: string | null;
+}
+
+/** The live images of `instanceId`, or of every configured instance */
+async function storedImages(instanceId?: string): Promise<StoredImage[]> {
+  const instanceIds = instanceId
+    ? [instanceId]
+    : (await prisma.stashInstance.findMany({ select: { id: true } })).map(
+        (i) => i.id
+      );
+  return prisma.$queryRawUnsafe<StoredImage[]>(
+    `SELECT i.id, i.stashInstanceId, i.title, i.filePath, i.titleSort
+     FROM StashImage i
+     WHERE i.deletedAt IS NULL
+       AND i.stashInstanceId IN (SELECT value FROM json_each(?))
+     ORDER BY i.stashInstanceId, i.id`,
+    JSON.stringify(instanceIds)
+  );
+}
+
+/** Each stored image whose titleSort differs from its displayed title */
+function imageMismatches(images: StoredImage[]) {
+  return images
+    .map((i) => {
+      // As the list shows it: `title || getImageFallbackTitle(filePath)`
+      const shown =
+        i.title !== null && i.title !== ""
+          ? i.title
+          : getImageFallbackTitle(i.filePath);
+      return {
+        image: `${i.id}@${i.stashInstanceId}`,
+        titleSort: i.titleSort,
+        expected: shown === null ? null : foldAscii(shown),
+      };
+    })
+    .filter((m) => m.titleSort !== m.expected);
+}
+
+async function clearImages(): Promise<void> {
+  await prisma.stashImage.deleteMany({ where: { stashInstanceId: DERIVED } });
+}
+
+describeWithDb("Image sort key (integration)", () => {
+  beforeEach(async () => {
+    await clearImages();
+  });
+
+  afterAll(async () => {
+    await clearImages();
+  });
+
+  it("every synced image's titleSort is its displayed title, case-folded", async () => {
+    const images = await storedImages();
+
+    expect(images.length).toBeGreaterThan(0);
+    expect(imageMismatches(images)).toEqual([]);
+  });
+
+  it("an untitled image's titleSort is its file name without the extension, ASCII lower-cased", async () => {
+    await syncImages([
+      imageRow("1", { path: "/pictures/Beach Day.JPG" }),
+      imageRow("2", { title: "", path: "/pictures/Beach Day (2).jpg" }),
+      imageRow("3", { path: "D:\\Photos\\Final.Cut.png" }),
+      imageRow("4", { path: "/pictures/no-extension" }),
+      imageRow("5", { path: "/pictures/.hidden" }),
+      imageRow("6", { path: "/pictures/ends-with-dot." }),
+      imageRow("7", { path: "/pictures/folder/" }),
+      imageRow("8", {}),
+      imageRow("9", { title: "Élan VITAL", path: "/pictures/other.jpg" }),
+      imageRow("10", { title: "  Spaced", path: "/pictures/other.jpg" }),
+      // An image inside a zip: Stash's path names the member after the zip
+      imageRow("11", { path: "/pictures/Set.zip/Img 01.webp" }),
+    ]);
+
+    const images = await storedImages(DERIVED);
+    expect(imageMismatches(images)).toEqual([]);
+    expect(images.map((i) => [i.id, i.titleSort])).toEqual([
+      ["1", "beach day"],
+      ["10", "  spaced"],
+      ["11", "img 01"],
+      ["2", "beach day (2)"],
+      ["3", "final.cut"],
+      ["4", "no-extension"],
+      ["5", ""],
+      ["6", "ends-with-dot."],
+      ["7", "/pictures/folder/"],
+      ["8", null],
+      // SQLite's lower() folds ASCII only, as NOCASE compares
+      ["9", "Élan vital"],
+    ]);
+  });
+
+  it("a title change on sync rewrites titleSort", async () => {
+    await syncImages([imageRow("1", { title: "Before", path: "/p/a.jpg" })]);
+    const before = await storedImages(DERIVED);
+
+    await syncImages([
+      imageRow(
+        "1",
+        { title: "After", path: "/p/a.jpg" },
+        "2026-01-03T00:00:00Z"
+      ),
+    ]);
+    const renamed = await storedImages(DERIVED);
+
+    await syncImages([
+      imageRow(
+        "1",
+        { title: null, path: "/p/Moved.JPG" },
+        "2026-01-04T00:00:00Z"
+      ),
+    ]);
+    const untitled = await storedImages(DERIVED);
+
+    expect(before.map((i) => i.titleSort)).toEqual(["before"]);
+    expect(renamed.map((i) => i.titleSort)).toEqual(["after"]);
+    expect(untitled.map((i) => i.titleSort)).toEqual(["moved"]);
   });
 });

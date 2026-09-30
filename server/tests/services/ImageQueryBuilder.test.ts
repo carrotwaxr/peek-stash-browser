@@ -752,6 +752,20 @@ describe("ImageQueryBuilder", () => {
       expect(page.sql).not.toContain("i.oCounter");
     });
 
+    it("the title sort reads the stored i.titleSort, so a page walks its index", async () => {
+      for (const direction of ["ASC", "DESC"] as const) {
+        const statements = await recording(() =>
+          run({ sort: { field: "title", direction, seed: undefined } })
+        );
+
+        const page = must(statements[0], "the page statement");
+        expect(page.sql).toContain(
+          `ORDER BY i.titleSort ${direction}, i.id ${direction}, i.stashInstanceId ${direction}`
+        );
+        expect(page.sql).not.toContain("COLLATE NOCASE");
+      }
+    });
+
     it("drives each relation from the page's (id, instance) pairs", async () => {
       // A studio to look up; the lookup runs only when a row names one
       await prisma.stashStudio.create({
