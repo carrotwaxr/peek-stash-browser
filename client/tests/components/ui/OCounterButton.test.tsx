@@ -44,4 +44,53 @@ describe("OCounterButton", () => {
       instanceId: "inst-b",
     });
   });
+
+  it("a press shows the server's count until the count passed in moves on", async () => {
+    const { rerender } = render(
+      <OCounterButton sceneId="7" instanceId="inst-a" initialCount={3} />,
+      { wrapper: createQueryWrapper() }
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Increment O counter (current: 4)")
+      ).toBeTruthy()
+    );
+
+    // The caller has not caught up yet
+    rerender(
+      <OCounterButton sceneId="7" instanceId="inst-a" initialCount={3} />
+    );
+    expect(
+      screen.getByLabelText("Increment O counter (current: 4)")
+    ).toBeTruthy();
+
+    // A count from elsewhere replaces the press
+    rerender(
+      <OCounterButton sceneId="7" instanceId="inst-a" initialCount={9} />
+    );
+    expect(
+      screen.getByLabelText("Increment O counter (current: 9)")
+    ).toBeTruthy();
+  });
+
+  it("a press that fails shows the count passed in again", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    vi.mocked(apiPost).mockRejectedValue(new Error("offline"));
+    render(
+      <OCounterButton sceneId="7" instanceId="inst-a" initialCount={3} />,
+      { wrapper: createQueryWrapper() }
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    expect(
+      screen.getByLabelText("Increment O counter (current: 3)")
+    ).toBeTruthy();
+    consoleError.mockRestore();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LucideDroplets } from "lucide-react";
 import { useIncrementOCounter } from "../../api/hooks";
 
@@ -38,14 +38,20 @@ const OCounterButton = ({
   variant = "card",
   interactive = true,
 }: Props) => {
-  const [count, setCount] = useState(initialCount ?? 0);
+  const shownCount = initialCount ?? 0;
+  // The count after this button's presses, shown over `initialCount` until
+  // the prop moves on (the caller caught up, or the server sent another
+  // count): read from props, not copied into state, so a new count renders
+  // once
+  const [pressed, setPressed] = useState<{
+    count: number;
+    over: number;
+  } | null>(null);
+  if (pressed && pressed.over !== shownCount) setPressed(null);
+  const count =
+    pressed && pressed.over === shownCount ? pressed.count : shownCount;
   const [isAnimating, setIsAnimating] = useState(false);
   const incrementMutation = useIncrementOCounter();
-
-  // Sync count when initialCount changes
-  useEffect(() => {
-    setCount(initialCount ?? 0);
-  }, [initialCount]);
 
   // Size configurations
   const sizes = {
@@ -70,9 +76,9 @@ const OCounterButton = ({
       return;
     }
 
-    const previousCount = count;
+    const previous = pressed;
     const newCount = count + 1;
-    setCount(newCount); // Optimistic update
+    setPressed({ count: newCount, over: shownCount }); // Optimistic update
     setIsAnimating(true);
 
     try {
@@ -83,12 +89,14 @@ const OCounterButton = ({
       });
 
       if (response?.success) {
-        setCount(response.oCount ?? newCount); // Update with server value
-        onChange?.(response.oCount ?? newCount);
+        // The server's count
+        const serverCount = response.oCount ?? newCount;
+        setPressed({ count: serverCount, over: shownCount });
+        onChange?.(serverCount);
       }
     } catch (err) {
       console.error(`Error incrementing O counter for ${entityType}:`, err);
-      setCount(previousCount); // Revert on error
+      setPressed(previous); // Revert on error
     } finally {
       setTimeout(() => {
         setIsAnimating(false);

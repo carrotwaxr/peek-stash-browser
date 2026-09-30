@@ -1,6 +1,5 @@
-import { forwardRef } from "react";
+import { forwardRef, memo, useCallback, useMemo } from "react";
 import type { NormalizedImage } from "@peek/shared-types";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -8,8 +7,8 @@ import {
   getEffectiveImageMetadata,
   getImageTitle,
 } from "../../utils/imageGalleryInheritance";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
+import { BaseCard, type CardIndicator } from "../ui/BaseCard";
+import { useCardIndicators } from "./cardIndicators";
 
 interface Props {
   image: NormalizedImage;
@@ -52,208 +51,165 @@ const formatResolution = (width: number | null, height: number | null) => {
 
 /**
  * ImageCard - Card for displaying image entities
- * Supports onClick for lightbox integration
+ * Supports onClick for lightbox integration. Memoised: a grid that renders
+ * again with the same row skips this card.
  */
-const ImageCard = forwardRef<HTMLDivElement, Props>(
-  (
-    {
-      image,
-      onClick,
-      fromPageTitle,
-      tabIndex,
-      onHideSuccess,
-      onOCounterChange,
-      onRatingChange,
-      onFavoriteChange,
-      ...rest
-    },
-    ref
-  ) => {
-    const { getSettings } = useCardDisplaySettings();
-    const imageSettings = getSettings("image");
-    const { hasMultipleInstances } = useConfig();
-    // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const {
-      effectivePerformers,
-      effectiveTags,
-      effectiveStudio,
-      effectiveDate,
-    } = getEffectiveImageMetadata(image);
+const ImageCard = memo(
+  forwardRef<HTMLDivElement, Props>(
+    (
+      {
+        image,
+        onClick,
+        fromPageTitle,
+        tabIndex,
+        onHideSuccess,
+        onOCounterChange,
+        onRatingChange,
+        onFavoriteChange,
+        ...rest
+      },
+      ref
+    ) => {
+      const { getSettings } = useCardDisplaySettings();
+      const imageSettings = getSettings("image");
+      const { hasMultipleInstances } = useConfig();
+      // Get effective metadata (inherits from galleries if image doesn't have its own)
+      const effective = useMemo(
+        () => getEffectiveImageMetadata(image),
+        [image]
+      );
+      const { effectiveStudio, effectiveDate } = effective;
 
-    // Build subtitle from studio and date (respecting settings)
-    const subtitle = (() => {
-      const parts = [];
+      // Build subtitle from studio and date (respecting settings)
+      const subtitle = (() => {
+        const parts = [];
 
-      if (imageSettings.showStudio && effectiveStudio?.name) {
-        parts.push(effectiveStudio.name);
-      }
+        if (imageSettings.showStudio && effectiveStudio?.name) {
+          parts.push(effectiveStudio.name);
+        }
 
-      if (imageSettings.showDate && effectiveDate) {
-        parts.push(new Date(effectiveDate).toLocaleDateString());
-      }
+        if (imageSettings.showDate && effectiveDate) {
+          parts.push(new Date(effectiveDate).toLocaleDateString());
+        }
 
-      return parts.length > 0 ? parts.join(" • ") : null;
-    })();
+        return parts.length > 0 ? parts.join(" • ") : null;
+      })();
 
-    // Resolution badge
-    const resolution = formatResolution(image.width, image.height);
+      // Resolution badge
+      const resolution = formatResolution(image.width, image.height);
 
-    const galleries = image.galleries || [];
-
-    // Build rich tooltip content using centralized config
-    const performersTooltip = getIndicatorBehavior("image", "performers") ===
-      "rich" &&
-      effectivePerformers.length > 0 && (
-        <TooltipEntityGrid
-          entityType="performer"
-          entities={
-            effectivePerformers as React.ComponentProps<
-              typeof TooltipEntityGrid
-            >["entities"]
-          }
-          title="Performers"
-          parentInstanceId={image.instanceId}
-        />
+      // The counts, from the image card's table, on the effective relations
+      const indicatorRow = useMemo(
+        () => ({
+          instanceId: image.instanceId,
+          galleries: image.galleries || [],
+          performers: effective.effectivePerformers,
+          tags: effective.effectiveTags,
+        }),
+        [image.instanceId, image.galleries, effective]
+      );
+      const relationIndicators = useCardIndicators("image", indicatorRow);
+      const indicators = useMemo<CardIndicator[]>(
+        () => [
+          ...(resolution
+            ? [
+                {
+                  type: "RESOLUTION",
+                  label: resolution,
+                  tooltipContent: `${image.width}x${image.height}`,
+                },
+              ]
+            : []),
+          ...relationIndicators,
+        ],
+        [resolution, image.width, image.height, relationIndicators]
       );
 
-    const tagsTooltip = getIndicatorBehavior("image", "tags") === "rich" &&
-      effectiveTags.length > 0 && (
-        <TooltipEntityGrid
-          entityType="tag"
-          entities={
-            effectiveTags as React.ComponentProps<
-              typeof TooltipEntityGrid
-            >["entities"]
+      // Only show indicators if setting is enabled
+      const indicatorsToShow = imageSettings.showRelationshipIndicators
+        ? indicators
+        : [];
+
+      // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
+      const handleClick = onClick
+        ? (e?: React.MouseEvent<HTMLDivElement>) => {
+            e?.preventDefault();
+            onClick(image);
           }
-          title="Tags"
-          parentInstanceId={image.instanceId}
-        />
+        : undefined;
+
+      // The rating row's changes name the image's instance. Stable while the
+      // parent's handlers and the instance are, so the memoised rating row
+      // skips a render of this card that changes neither
+      const { instanceId } = image;
+      const handleOCounterChange = useCallback(
+        (id: string, count: number) =>
+          onOCounterChange?.(id, count, instanceId),
+        [onOCounterChange, instanceId]
+      );
+      const handleRatingChange = useCallback(
+        (id: string, rating: number) =>
+          onRatingChange?.(id, rating, instanceId),
+        [onRatingChange, instanceId]
+      );
+      const handleFavoriteChange = useCallback(
+        (id: string, value: boolean) =>
+          onFavoriteChange?.(id, value, instanceId),
+        [onFavoriteChange, instanceId]
       );
 
-    const galleriesCount = galleries.length;
-    const galleriesContent = getIndicatorBehavior("image", "galleries") ===
-      "rich" &&
-      galleriesCount > 0 && (
-        <TooltipEntityGrid
-          entityType="gallery"
-          entities={
-            galleries as React.ComponentProps<
-              typeof TooltipEntityGrid
-            >["entities"]
+      return (
+        <BaseCard
+          ref={ref}
+          entityType="image"
+          imagePath={image.paths?.thumbnail || image.paths?.image}
+          title={getImageTitle(image)}
+          subtitle={subtitle}
+          description={image.details}
+          onClick={handleClick}
+          linkTo={
+            onClick
+              ? undefined
+              : getEntityPath("image", image, hasMultipleInstances)
           }
-          title="Galleries"
-          parentInstanceId={image.instanceId}
+          fromPageTitle={fromPageTitle}
+          tabIndex={tabIndex}
+          indicators={indicatorsToShow}
+          displayPreferences={{
+            showDescription: imageSettings.showDescriptionOnCard as
+              | boolean
+              | undefined,
+          }}
+          ratingControlsProps={
+            image.rating100 !== undefined ||
+            image.favorite !== undefined ||
+            image.oCounter !== undefined
+              ? {
+                  entityId: image.id,
+                  instanceId: image.instanceId,
+                  initialRating: image.rating100,
+                  initialFavorite: image.favorite || false,
+                  initialOCounter: image.oCounter ?? 0,
+                  onHideSuccess,
+                  onOCounterChange: onOCounterChange && handleOCounterChange,
+                  onRatingChange: onRatingChange && handleRatingChange,
+                  onFavoriteChange: onFavoriteChange && handleFavoriteChange,
+                  showRating: imageSettings.showRating as boolean | undefined,
+                  showFavorite: imageSettings.showFavorite as
+                    | boolean
+                    | undefined,
+                  showOCounter: imageSettings.showOCounter as
+                    | boolean
+                    | undefined,
+                  showMenu: imageSettings.showMenu as boolean | undefined,
+                }
+              : undefined
+          }
+          {...rest}
         />
       );
-
-    const indicators = [
-      ...(resolution
-        ? [
-            {
-              type: "RESOLUTION",
-              label: resolution,
-              tooltipContent: `${image.width}x${image.height}`,
-            },
-          ]
-        : []),
-      ...(galleriesCount > 0
-        ? [
-            {
-              type: "GALLERIES",
-              count: galleriesCount,
-              tooltipContent: galleriesContent,
-            },
-          ]
-        : []),
-      ...(effectivePerformers.length > 0
-        ? [
-            {
-              type: "PERFORMERS",
-              count: effectivePerformers.length,
-              tooltipContent: performersTooltip,
-            },
-          ]
-        : []),
-      ...(effectiveTags.length > 0
-        ? [
-            {
-              type: "TAGS",
-              count: effectiveTags.length,
-              tooltipContent: tagsTooltip,
-            },
-          ]
-        : []),
-    ];
-
-    // Only show indicators if setting is enabled
-    const indicatorsToShow = imageSettings.showRelationshipIndicators
-      ? indicators
-      : [];
-
-    // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
-    const handleClick = onClick
-      ? (e?: React.MouseEvent<HTMLDivElement>) => {
-          e?.preventDefault();
-          onClick(image);
-        }
-      : undefined;
-
-    return (
-      <BaseCard
-        ref={ref}
-        entityType="image"
-        imagePath={image.paths?.thumbnail || image.paths?.image}
-        title={getImageTitle(image)}
-        subtitle={subtitle}
-        description={image.details}
-        onClick={handleClick}
-        linkTo={
-          onClick
-            ? undefined
-            : getEntityPath("image", image, hasMultipleInstances)
-        }
-        fromPageTitle={fromPageTitle}
-        tabIndex={tabIndex}
-        indicators={indicatorsToShow}
-        displayPreferences={{
-          showDescription: imageSettings.showDescriptionOnCard as
-            | boolean
-            | undefined,
-        }}
-        ratingControlsProps={
-          image.rating100 !== undefined ||
-          image.favorite !== undefined ||
-          image.oCounter !== undefined
-            ? {
-                entityId: image.id,
-                instanceId: image.instanceId,
-                initialRating: image.rating100,
-                initialFavorite: image.favorite || false,
-                initialOCounter: image.oCounter ?? 0,
-                onHideSuccess,
-                onOCounterChange:
-                  onOCounterChange &&
-                  ((id, count) =>
-                    onOCounterChange(id, count, image.instanceId)),
-                onRatingChange:
-                  onRatingChange &&
-                  ((id, rating) =>
-                    onRatingChange(id, rating, image.instanceId)),
-                onFavoriteChange:
-                  onFavoriteChange &&
-                  ((id, value) =>
-                    onFavoriteChange(id, value, image.instanceId)),
-                showRating: imageSettings.showRating as boolean | undefined,
-                showFavorite: imageSettings.showFavorite as boolean | undefined,
-                showOCounter: imageSettings.showOCounter as boolean | undefined,
-                showMenu: imageSettings.showMenu as boolean | undefined,
-              }
-            : undefined
-        }
-        {...rest}
-      />
-    );
-  }
+    }
+  )
 );
 
 ImageCard.displayName = "ImageCard";

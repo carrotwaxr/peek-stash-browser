@@ -25,6 +25,7 @@ import StudioCard from "../../../src/components/cards/StudioCard";
 import TagCard from "../../../src/components/cards/TagCard";
 import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
 import SceneCard from "../../../src/components/ui/SceneCard";
+import type * as indicatorBehaviors from "../../../src/config/indicatorBehaviors";
 import {
   type FilterOption,
   GALLERY_FILTER_OPTIONS,
@@ -58,7 +59,8 @@ vi.mock("../../../src/hooks/useTVMode", () => ({
 }));
 // Every count set to open a list, as a user's settings could; by default
 // most relationship counts show a tooltip instead
-vi.mock("../../../src/config/indicatorBehaviors", () => ({
+vi.mock("../../../src/config/indicatorBehaviors", async (importOriginal) => ({
+  ...(await importOriginal<typeof indicatorBehaviors>()),
   getIndicatorBehavior: () => "nav",
 }));
 // Captures the indicators each card hands to BaseCard

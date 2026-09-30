@@ -7,6 +7,7 @@ import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryCard from "../../../src/components/cards/GalleryCard";
 import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
+import type * as indicatorBehaviors from "../../../src/config/indicatorBehaviors";
 import { IMAGE_FILTER_OPTIONS } from "../../../src/utils/filterConfig";
 import { parseSearchParams } from "../../../src/utils/urlParams";
 
@@ -29,7 +30,8 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
 }));
 // Every count set to open a list, as a user's settings could: scenes and
 // images are "nav" by default, performers and tags "rich"
-vi.mock("../../../src/config/indicatorBehaviors", () => ({
+vi.mock("../../../src/config/indicatorBehaviors", async (importOriginal) => ({
+  ...(await importOriginal<typeof indicatorBehaviors>()),
   getIndicatorBehavior: () => "nav",
 }));
 // Captures the indicators GalleryCard hands to BaseCard
