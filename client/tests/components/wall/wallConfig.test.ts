@@ -170,8 +170,10 @@ describe("wallConfig", () => {
     const config = wallConfig.clip;
 
     it("returns clip preview URL when id exists", () => {
-      const clip = { id: "clip-1" };
-      expect(config.getImageUrl(clip)).toBe("/api/proxy/clip/clip-1/preview");
+      const clip = { id: "clip-1", instanceId: "inst-1" };
+      expect(config.getImageUrl(clip)).toBe(
+        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
+      );
     });
 
     it("returns null when clip has no id", () => {
@@ -179,12 +181,14 @@ describe("wallConfig", () => {
     });
 
     it("returns preview URL for generated clips", () => {
-      const clip = { id: "clip-1", isGenerated: true };
-      expect(config.getPreviewUrl(clip)).toBe("/api/proxy/clip/clip-1/preview");
+      const clip = { id: "clip-1", instanceId: "inst-1", isGenerated: true };
+      expect(config.getPreviewUrl(clip)).toBe(
+        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
+      );
     });
 
     it("returns null preview URL for non-generated clips", () => {
-      const clip = { id: "clip-1", isGenerated: false };
+      const clip = { id: "clip-1", instanceId: "inst-1", isGenerated: false };
       expect(config.getPreviewUrl(clip)).toBeNull();
     });
 
