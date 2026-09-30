@@ -94,6 +94,8 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
         if (!isLatest()) return;
         console.error("Error loading images:", err);
         setError(err);
+        // A lightbox crossing waiting for this page goes back to its image
+        lightbox.failPendingPage(err);
       } finally {
         if (isLatest()) setIsLoading(false);
       }

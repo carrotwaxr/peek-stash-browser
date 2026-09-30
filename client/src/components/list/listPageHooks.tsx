@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
+import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useConfig } from "../../contexts/ConfigContext";
 import {
   type PageChangeOptions,
@@ -69,6 +70,7 @@ export function useImageListPage({
   items,
   count,
   request,
+  error,
 }: ListPageData): ListPageExtras {
   const queryClient = useQueryClient();
   const { page, perPage, setPage } = listState;
@@ -86,13 +88,18 @@ export function useImageListPage({
     onExternalPageChange: turnPage,
     images: items,
   });
-  const { openLightbox, consumePendingLightboxIndex } = lightbox;
+  const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
+    lightbox;
 
   // A page turned from the lightbox opens at its first or last image once
-  // the page's images arrive
+  // the page's images arrive; if the page fails, the lightbox goes back to
+  // the image it left (a first sync's 503 is loading, not a failure)
   useEffect(() => {
-    consumePendingLightboxIndex();
-  }, [items, consumePendingLightboxIndex]);
+    if (!error) consumePendingLightboxIndex();
+  }, [items, error, consumePendingLightboxIndex]);
+  useEffect(() => {
+    if (error && !isLibraryInitializing(error)) failPendingPage(error);
+  }, [error, failPendingPage]);
 
   const onItemClick = useCallback(
     (image: ListRow) => {
