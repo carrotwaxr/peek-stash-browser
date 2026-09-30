@@ -17,6 +17,7 @@ paths:
 - The hooks don't wait for auth themselves; `ProtectedRoute` holds back rendering until auth resolves. A component outside it gates its own queries.
 - Entity references in URLs and filter values are `"id:instanceId"`, built by `src/utils/compositeKey.ts`; a bare id means no instance was known.
 - A card's count opens a list through `getFilteredListPath` (`utils/entityLinks.ts`), built from that page's filter options: the singular param of the page's option for the entity type (`/scenes?tagId=5`) plus `instance`, which `urlParamsToFilters` joins into `id:instance`. A page with no such option gets no link.
+- After a Stash instance is added, edited, enabled, disabled or deleted, or a user's Content Sources change, call `invalidateInstanceQueries(queryClient)` (`api/hooks/useLibraryReady.ts`): the setup status and the library queries (`invalidateLibraryQueries`).
 
 ## useFilterState
 
@@ -24,6 +25,6 @@ It reads the URL once on mount and afterwards only writes it; reading it back ag
 
 ## Structure
 
-- Provider order in `App.tsx`: Auth, Theme, QueryClient, Config, UnitPreference, TVMode, CardDisplaySettings. The root providers load user data only while `isAuthenticated`; `ConfigProvider` reads only the public `/setup/status`.
+- Provider order in `App.tsx`: Auth, Theme, QueryClient, Config, UnitPreference, TVMode, CardDisplaySettings. The root providers load user data only while `isAuthenticated`; `ConfigProvider` and the route gate (`SetupStatusGate`) read the one setup-status query, `useSetupStatus` (`queryKeys.setup.status()`), which retries every failure with back-off and never turns one into "setup not complete"; the app's routes render only from a loaded status.
 - New code uses theme CSS variables (`var(--bg-card)`, `var(--accent-primary)`). About 50 Tailwind palette classes remain, mostly spinners, grays and status colors; don't copy them. The `visual-style` skill has the full system.
 - `src/utils/filterConfig.ts` (3,600+ lines) defines every entity's filter options, so a change there reaches every search page. Its option keys, modifier and hierarchy keys and sort values follow `shared/types/filters` (`UI_KEYS`, `SORTS`); `tests/utils/filterContract.test.ts` fails when they drift, so a new option starts in the contract. Its `build*Filter` return the shared wire types (`SceneFilterInput`, ..., `ClipFilterParams`) through `rangeCriterion`, `dateCriterion` and `refCriterion`; `refCriterion` takes a picker's default modifier from its option and sends only modifiers the contract field takes, so a panel option cannot send what the parser refuses.
