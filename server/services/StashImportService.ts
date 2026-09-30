@@ -61,7 +61,7 @@ import { mergeHistory, readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { rankingComputeService } from "./RankingComputeService.js";
 import { recommendationService } from "./RecommendationService.js";
-import { userStatsService } from "./UserStatsService.js";
+import { type SceneStatsDelta, userStatsService } from "./UserStatsService.js";
 
 /** Entities per Stash page, and rows per writer-queue unit. */
 export const IMPORT_PAGE_SIZE = 500;
@@ -547,6 +547,30 @@ function historyChange(
   return changed ? change : null;
 }
 
+/**
+ * What a history write adds to the stats of its scene's entities: the
+ * counts it raised (an import never lowers one) and its latest play and O.
+ */
+function statsDelta(
+  sceneId: string,
+  change: HistoryChange,
+  row: HistoryRow | undefined
+): SceneStatsDelta {
+  const delta: SceneStatsDelta = {
+    sceneId,
+    oCount:
+      change.oCount === undefined ? 0 : change.oCount - (row?.oCount ?? 0),
+    playCount:
+      change.playCount === undefined
+        ? 0
+        : change.playCount - (row?.playCount ?? 0),
+  };
+  if (change.lastPlayedAt) delta.lastPlayedAt = change.lastPlayedAt;
+  const lastOAt = change.oHistory ? latestPlay(change.oHistory, null) : null;
+  if (lastOAt) delta.lastOAt = lastOAt;
+  return delta;
+}
+
 /** Imports the user's O and play history from one instance; true when a row was written. */
 async function importSceneHistory(
   stash: StashClient,
@@ -572,6 +596,12 @@ async function importSceneHistory(
       const scenes =
         index === 0 ? items : items.filter((scene) => !done.has(scene.id));
       if (scenes.length === 0) continue;
+      // The scenes' performers, studios and tags, read before the unit
+      const writeStats = await userStatsService.statsWritesForScenes(
+        userId,
+        instanceId,
+        scenes.map((scene) => scene.id)
+      );
       const written = await dbWriteTransaction(
         "syncFromStash.history",
         async (tx) => {
@@ -583,11 +613,13 @@ async function importSceneHistory(
             },
           });
           const existing = new Map(rows.map((row) => [row.sceneId, row]));
+          const deltas: SceneStatsDelta[] = [];
           let count = 0;
           for (const scene of scenes) {
             const row = existing.get(scene.id);
             const change = historyChange(scene, row, passOptions);
             if (change === null) continue;
+            deltas.push(statsDelta(scene.id, change, row));
             await tx.watchHistory.upsert({
               where: {
                 userId_instanceId_sceneId: {
@@ -613,6 +645,10 @@ async function importSceneHistory(
             else counter.markUpdated(scene.id);
             count++;
           }
+          // The plays and O presses merged here reach the stats in this
+          // unit, as a play's do: a stats rebuild that gives way to later
+          // plays keeps stats that already hold them
+          await writeStats(tx, deltas);
           return count;
         },
         {

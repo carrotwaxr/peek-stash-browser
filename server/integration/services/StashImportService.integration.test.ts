@@ -221,3 +221,142 @@ describeWithDb("importFromStash (real SQLite)", () => {
     ]);
   });
 });
+
+describeWithDb("importFromStash stats (real SQLite)", () => {
+  // A scene with a performer, a studio and a tag in the cache, on an
+  // instance of its own
+  const INSTANCE = "import-it-stats";
+  const SCENE = "70";
+  const STUDIO = "71";
+  const PERFORMER = "72";
+  const TAG = "73";
+  let userId: number;
+
+  async function removeRows(): Promise<void> {
+    const where = { sceneInstanceId: INSTANCE };
+    await prisma.scenePerformer.deleteMany({ where });
+    await prisma.sceneTag.deleteMany({ where });
+    const own = { stashInstanceId: INSTANCE };
+    await prisma.stashScene.deleteMany({ where: own });
+    await prisma.stashPerformer.deleteMany({ where: own });
+    await prisma.stashTag.deleteMany({ where: own });
+    await prisma.stashStudio.deleteMany({ where: own });
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    const own = { stashInstanceId: INSTANCE };
+    await prisma.stashStudio.create({
+      data: { id: STUDIO, ...own, name: "Import studio" },
+    });
+    await prisma.stashPerformer.create({
+      data: { id: PERFORMER, ...own, name: "Import performer" },
+    });
+    await prisma.stashTag.create({
+      data: { id: TAG, ...own, name: "Import tag" },
+    });
+    await prisma.stashScene.create({
+      data: { id: SCENE, ...own, title: "Import scene", studioId: STUDIO },
+    });
+    const scene = { sceneId: SCENE, sceneInstanceId: INSTANCE };
+    await prisma.scenePerformer.create({
+      data: { ...scene, performerId: PERFORMER, performerInstanceId: INSTANCE },
+    });
+    await prisma.sceneTag.create({
+      data: { ...scene, tagId: TAG, tagInstanceId: INSTANCE },
+    });
+    const user = await prisma.user.create({
+      data: { username: `import-it-stats-${Date.now()}`, password: "unused" },
+    });
+    userId = user.id;
+  });
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await prisma.user.delete({ where: { id: userId } });
+    await removeRows();
+  });
+
+  it("an import whose stats rebuild loses the race to other plays still leaves the imported plays in the stats", async () => {
+    // Every read of the rebuild is overtaken by another play (the user's
+    // write generation moves), so it keeps the stats as they are
+    const buildRebuild = userStatsService["buildRebuild"];
+    const rebuildReads = vi.fn();
+    userStatsService["buildRebuild"] = async (id) => {
+      const batch = await buildRebuild.call(userStatsService, id);
+      rebuildReads();
+      userStatsService.bumpWriteGeneration(id);
+      return batch;
+    };
+    const options = defaultImportOptions();
+    for (const key of Object.keys(options) as Array<keyof typeof options>) {
+      const fields: Record<string, boolean> = options[key];
+      for (const field of Object.keys(fields)) fields[field] = false;
+    }
+    options.scenes.oCounter = true;
+    options.scenes.playCount = true;
+    const client = partialRow<StashClient>({
+      findScenes: () =>
+        Promise.resolve({
+          findScenes: {
+            count: 1,
+            duration: 0,
+            filesize: 0,
+            scenes: [
+              partialRow({
+                id: SCENE,
+                rating100: null,
+                o_counter: 1,
+                o_history: [U],
+                play_count: 2,
+                play_history: [T, T_PLUS_2S],
+              }),
+            ],
+          },
+        }),
+    });
+
+    try {
+      await importFromStash(userId, options, [[INSTANCE, client]]);
+      // Again: nothing new to write, so nothing counted twice
+      await importFromStash(userId, options, [[INSTANCE, client]]);
+    } finally {
+      userStatsService["buildRebuild"] = buildRebuild;
+    }
+
+    expect(rebuildReads).toHaveBeenCalledTimes(4);
+    const key = { userId, instanceId: INSTANCE };
+    expect(
+      await prisma.userPerformerStats.findMany({
+        where: key,
+        select: {
+          performerId: true,
+          playCount: true,
+          oCounter: true,
+          lastPlayedAt: true,
+          lastOAt: true,
+        },
+      })
+    ).toEqual([
+      {
+        performerId: PERFORMER,
+        playCount: 2,
+        oCounter: 1,
+        lastPlayedAt: new Date(T_PLUS_2S),
+        lastOAt: new Date(U),
+      },
+    ]);
+    expect(
+      await prisma.userStudioStats.findMany({
+        where: key,
+        select: { studioId: true, playCount: true, oCounter: true },
+      })
+    ).toEqual([{ studioId: STUDIO, playCount: 2, oCounter: 1 }]);
+    expect(
+      await prisma.userTagStats.findMany({
+        where: key,
+        select: { tagId: true, playCount: true, oCounter: true },
+      })
+    ).toEqual([{ tagId: TAG, playCount: 2, oCounter: 1 }]);
+  });
+});
