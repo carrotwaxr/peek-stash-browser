@@ -5,6 +5,7 @@ import {
   type ShortcutScopeOptions,
   ShortcutScopeProvider,
 } from "@/contexts/ShortcutScopeContext";
+import { ShortcutDispatcher } from "@/contexts/shortcutDispatcher";
 import {
   useShortcutScope,
   useShortcutScopeContext,
@@ -368,5 +369,68 @@ describe("ShortcutScopeProvider", () => {
     press("k");
 
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ShortcutDispatcher.dispatch", () => {
+  const unregister: (() => void)[] = [];
+  afterEach(() => {
+    for (const off of unregister.splice(0)) off();
+  });
+
+  function setup(...scopes: ShortcutScopeOptions[]) {
+    const dispatcher = new ShortcutDispatcher();
+    for (const options of scopes) {
+      unregister.push(dispatcher.register(() => options));
+    }
+    return dispatcher;
+  }
+
+  it("runs a key a control stopped from bubbling, and prevents its default", () => {
+    const mute = vi.fn();
+    const dispatcher = setup({ layer: "player", keys: { m: mute } });
+    const control = focusNew("div", { tabindex: "0" });
+    control.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      dispatcher.dispatch(event);
+    });
+
+    const event = press("m", control);
+
+    expect(mute).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+    control.remove();
+  });
+
+  it("handles a dispatched event once when it also reaches the window listener", () => {
+    const handler = vi.fn(() => false);
+    const dispatcher = setup({ layer: "player", keys: { m: handler } });
+    const control = focusNew("div", { tabindex: "0" });
+    control.addEventListener("keydown", (event) => {
+      dispatcher.dispatch(event);
+    });
+
+    press("m", control);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    control.remove();
+  });
+
+  it("a dispatched key stops at a modal overlay like any other", () => {
+    const mute = vi.fn();
+    const dispatcher = setup(
+      { layer: "player", keys: { m: mute } },
+      { layer: "overlay" }
+    );
+    const control = focusNew("div", { tabindex: "0" });
+    control.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      dispatcher.dispatch(event);
+    });
+
+    press("m", control);
+
+    expect(mute).not.toHaveBeenCalled();
+    control.remove();
   });
 });

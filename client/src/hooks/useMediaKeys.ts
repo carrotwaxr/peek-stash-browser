@@ -1,6 +1,9 @@
 import type React from "react";
-import { useMemo } from "react";
-import type { ShortcutHandler } from "../contexts/shortcutDispatcher";
+import { useCallback, useContext, useMemo } from "react";
+import {
+  type ShortcutHandler,
+  ShortcutScopeContext,
+} from "../contexts/shortcutDispatcher";
 import { useShortcutScope } from "./useShortcutScope";
 
 interface VideoPlayer {
@@ -281,6 +284,29 @@ export const usePlaylistMediaKeys = ({
     keys,
   });
 };
+
+/** The event video.js hands over: its copy of the DOM event */
+type VideoJsKeyEvent = KeyboardEvent & { isPropagationStopped?: () => boolean };
+
+/**
+ * The player's `userActions.hotkeys` option: video.js's controls (the play
+ * button, the control bar) stop every key but Tab from bubbling and pass the
+ * keys they do not use to this function, which hands them to the shortcut
+ * dispatcher, so the player's keys work with focus on its controls. Keys a
+ * control uses (Space and Enter click a button, arrows move a slider) never
+ * come here. video.js also passes every key that bubbles through the player's
+ * element; those reach the dispatcher's `window` listener, so they are left
+ * to it and handled once, after the page's element handlers.
+ */
+export function usePlayerHotkeys(): (event: VideoJsKeyEvent) => void {
+  const dispatcher = useContext(ShortcutScopeContext);
+  return useCallback(
+    (event: VideoJsKeyEvent) => {
+      if (event.isPropagationStopped?.()) dispatcher.dispatch(event);
+    },
+    [dispatcher]
+  );
+}
 
 /**
  * Jump to a percentage of the video duration

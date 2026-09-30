@@ -28,6 +28,9 @@ import {
  * 4. The walk stops at the first enabled modal scope (an overlay: the
  *    lightbox, a dialog). Exception: an arrow the modal leaves unhandled goes
  *    to the `tv` scopes, which move focus inside `topModalRoot()`.
+ *
+ * A control that stops a key from bubbling but does not use it (video.js's
+ * controls do) hands it over with `dispatch(event)`, which runs the same steps.
  */
 
 export type ShortcutLayer = "global" | "tv" | "page" | "player" | "overlay";
@@ -81,6 +84,8 @@ const isModal = (options: ShortcutScopeOptions) =>
 
 export class ShortcutDispatcher {
   private readonly scopes = new Set<RegisteredScope>();
+  // Events dispatch() took, so the window listener does not take them again
+  private readonly dispatched = new WeakSet<KeyboardEvent>();
   private nextOrder = 0;
   private pending: PendingSequence | null = null;
   private listening = false;
@@ -133,7 +138,20 @@ export class ShortcutDispatcher {
       );
   }
 
+  /**
+   * Runs the dispatcher's steps for a key that will not reach its `window`
+   * listener: a control inside a scope's root stopped it from bubbling and
+   * left it unused. The event may be a copy of the DOM event whose
+   * `preventDefault` forwards to it, as video.js hands over. An event already
+   * dispatched is not dispatched again, from here or from the listener.
+   */
+  dispatch(event: KeyboardEvent): void {
+    this.handleKeyDown(event);
+  }
+
   private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (this.dispatched.has(event)) return;
+    this.dispatched.add(event);
     if (event.defaultPrevented || event.isComposing) return;
     if (isModifierKey(event.key)) return;
 
