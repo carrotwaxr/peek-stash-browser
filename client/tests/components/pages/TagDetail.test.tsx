@@ -3,7 +3,7 @@
  * of a scene, gallery, image, performer, studio and collection) takes a
  * depth in the shared contract, so each tab sends depth -1 while it is on.
  */
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,12 +110,17 @@ function renderPage(search: string) {
   return renderAt(`/tag/5?instance=inst-a&${search}`);
 }
 
+const CurrentSearch = () => (
+  <output data-testid="search">{useLocation().search}</output>
+);
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/tag/:tagId" element={<TagDetail />} />
       </Routes>
+      <CurrentSearch />
     </MemoryRouter>
   );
 }
@@ -320,5 +325,61 @@ describe("TagDetail: counts", () => {
       must(sceneSearch.mock.lastCall, "SceneSearch's props")[0].permanentFilters
         ?.tags
     ).toEqual({ value: ["5:inst-a"], modifier: "INCLUDES", depth: -1 });
+  });
+});
+
+describe("TagDetail: a statistic starts its tab clean", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
+  });
+
+  const search = () =>
+    Object.fromEntries(
+      new URLSearchParams(screen.getByTestId("search").textContent ?? "")
+    );
+
+  /** The button of a statistic in the Statistics card */
+  const stat = (label: string) =>
+    must(
+      screen.getByText(label).parentElement?.querySelector("button"),
+      `the ${label} statistic`
+    );
+
+  it("the Images statistic opens the Images tab at page 1 when the scenes list was on page 7", () => {
+    renderPage("page=7&sort=title&favorite=true&includeSubTags=true");
+
+    fireEvent.click(stat("Images:"));
+
+    expect(search()).toEqual({
+      instance: "inst-a",
+      includeSubTags: "true",
+      tab: "images",
+    });
+  });
+
+  it("ticking Include sub-tags on page 5 shows page 1", () => {
+    renderPage("tab=performers&page=5");
+
+    fireEvent.click(must(toggle(), "the Include sub-tags toggle"));
+
+    expect(search()).toEqual({
+      instance: "inst-a",
+      tab: "performers",
+      includeSubTags: "true",
+    });
+  });
+
+  it("with no scenes, the Scenes statistic's default tab is the first tab with content", () => {
+    relationCounts.mockReturnValue({
+      data: { counts: { ...ALL_COUNTS, scenes: 0 } },
+    });
+    renderPage("tab=images&page=2");
+
+    // Galleries is the first tab with content: switching to it drops `tab`
+    fireEvent.click(stat("Galleries:"));
+
+    expect(search().tab).toBeUndefined();
   });
 });

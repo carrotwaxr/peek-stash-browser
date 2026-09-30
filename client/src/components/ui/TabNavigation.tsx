@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+import { switchTabParams } from "@/utils/urlParams";
 
 /** Use this value for tab count when data is still loading (shows tab without count badge) */
 export const TAB_COUNT_LOADING = -1;
@@ -48,26 +49,10 @@ const TabNavigation = ({
     (tab) => tab.count > 0 || tab.count === TAB_COUNT_LOADING || showEmpty
   );
 
-  // Pagination/filter params that should be cleared when switching tabs
-  // Each tab has its own pagination state, so these shouldn't carry over
-  const PAGINATION_PARAMS = ["page", "per_page", "sort", "dir", "q"];
-
   const handleTabClick = (tabId: string) => {
     if (tabId === activeTab) return; // Already on this tab
 
-    // Update URL query parameter and clear pagination params
-    const newParams = new URLSearchParams(searchParams);
-
-    // Clear pagination params - each tab has independent pagination state
-    PAGINATION_PARAMS.forEach((param) => newParams.delete(param));
-
-    if (tabId === defaultTab) {
-      // Remove tab param if switching to default
-      newParams.delete("tab");
-    } else {
-      newParams.set("tab", tabId);
-    }
-    setSearchParams(newParams);
+    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
 
     // Call optional callback
     if (onTabChange) {

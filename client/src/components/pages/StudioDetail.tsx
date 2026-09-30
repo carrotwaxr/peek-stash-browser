@@ -11,6 +11,7 @@ import {
   type TagRef,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { switchTabParams } from "@/utils/urlParams";
 import { libraryApi } from "../../api";
 import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -131,6 +132,8 @@ const StudioDetail = () => {
   // Handler for toggling include sub-studios
   const handleIncludeSubStudiosChange = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams);
+    // The tab's list starts again: a page from the other setting may not exist
+    newParams.delete("page");
     if (checked) {
       newParams.set("includeSubStudios", "true");
     } else {
@@ -546,13 +549,7 @@ const StudioStats = ({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTabSwitch = (tabId: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (tabId === defaultTab) {
-      newParams.delete("tab");
-    } else {
-      newParams.set("tab", tabId);
-    }
-    setSearchParams(newParams);
+    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 

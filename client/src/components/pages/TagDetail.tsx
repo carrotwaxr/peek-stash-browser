@@ -11,6 +11,7 @@ import {
   STUDIO_FIELDS,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { switchTabParams } from "@/utils/urlParams";
 import { libraryApi } from "../../api";
 import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -128,6 +129,8 @@ const TagDetail = () => {
   // Handler for toggling include sub-tags
   const handleIncludeSubTagsChange = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams);
+    // The tab's list starts again: a page from the other setting may not exist
+    newParams.delete("page");
     if (checked) {
       newParams.set("includeSubTags", "true");
     } else {
@@ -542,13 +545,7 @@ const TagStats = ({ tag, counts, activeTab, defaultTab }: TagStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTabSwitch = (tabId: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (tabId === defaultTab) {
-      newParams.delete("tab");
-    } else {
-      newParams.set("tab", tabId);
-    }
-    setSearchParams(newParams);
+    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 

@@ -4,7 +4,7 @@
  * collection's studio) sends depth -1 while it is on; the Performers tab's
  * field takes none, so the toggle is hidden there.
  */
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -87,12 +87,17 @@ vi.mock("@/components/ui/index", async (importOriginal) => ({
   PaginatedImageGrid: () => null,
 }));
 
+const CurrentSearch = () => (
+  <output data-testid="search">{useLocation().search}</output>
+);
+
 function renderPage(search: string) {
   return render(
     <MemoryRouter initialEntries={[`/studio/5?instance=inst-a&${search}`]}>
       <Routes>
         <Route path="/studio/:studioId" element={<StudioDetail />} />
       </Routes>
+      <CurrentSearch />
     </MemoryRouter>
   );
 }
@@ -214,6 +219,57 @@ describe("StudioDetail: Include sub-studios", () => {
     expect(await sentCriterion("performers")).toEqual({
       value: ["5:inst-a"],
       modifier: "INCLUDES",
+    });
+  });
+});
+
+describe("StudioDetail: a tab and its toggle start clean", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+    relationCounts.mockReturnValue({
+      data: {
+        counts: {
+          scenes: 3,
+          galleries: 2,
+          images: 4,
+          performers: 2,
+          groups: 1,
+        },
+      },
+    });
+  });
+
+  const search = () =>
+    Object.fromEntries(
+      new URLSearchParams(screen.getByTestId("search").textContent ?? "")
+    );
+
+  it("ticking Include sub-studios on page 5 shows page 1", () => {
+    renderPage("tab=groups&page=5");
+
+    fireEvent.click(must(toggle(), "the Include sub-studios toggle"));
+
+    expect(search()).toEqual({
+      instance: "inst-a",
+      tab: "groups",
+      includeSubStudios: "true",
+    });
+  });
+
+  it("the Images statistic opens the Images tab clean", () => {
+    renderPage("page=7&sort=title&includeSubStudios=true");
+
+    const images = must(
+      screen.getByText("Images:").parentElement?.querySelector("button"),
+      "the Images statistic"
+    );
+    fireEvent.click(images);
+
+    expect(search()).toEqual({
+      instance: "inst-a",
+      includeSubStudios: "true",
+      tab: "images",
     });
   });
 });

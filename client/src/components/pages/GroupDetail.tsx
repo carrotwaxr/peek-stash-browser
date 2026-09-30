@@ -6,6 +6,7 @@ import type {
   TagRef,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { switchTabParams } from "@/utils/urlParams";
 import { libraryApi } from "../../api";
 import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -487,13 +488,7 @@ const GroupStats = ({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTabSwitch = (tabId: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (tabId === defaultTab) {
-      newParams.delete("tab");
-    } else {
-      newParams.set("tab", tabId);
-    }
-    setSearchParams(newParams);
+    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
