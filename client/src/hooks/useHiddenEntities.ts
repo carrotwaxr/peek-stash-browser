@@ -1,5 +1,11 @@
 import { useCallback, useState } from "react";
+import type {
+  GetHiddenEntitiesResponse,
+  HiddenEntityType,
+} from "@peek/shared-types";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../api";
+import { queryKeys } from "../api/queryKeys";
 import { showError, showSuccess } from "../utils/toast";
 import { useAuth } from "./useAuth";
 
@@ -7,6 +13,29 @@ import { useAuth } from "./useAuth";
 interface ApiErrorBody {
   data?: { error?: string };
 }
+
+/** Rows per page of the Hidden Items list */
+export const HIDDEN_ITEMS_PER_PAGE = 50;
+
+/**
+ * One page of the user's hidden items, of one type or "all", with the
+ * number of each type. Restore and Restore All invalidate
+ * `queryKeys.user.hiddenEntities()`, which every page's key starts with.
+ */
+export const useHiddenItems = (type: HiddenEntityType | "all", page: number) =>
+  useQuery({
+    queryKey: queryKeys.user.hiddenItems(type, page),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (type !== "all") params.set("entityType", type);
+      params.set("page", String(page));
+      params.set("per_page", String(HIDDEN_ITEMS_PER_PAGE));
+      return apiGet<GetHiddenEntitiesResponse>(
+        `/user/hidden-entities?${params.toString()}`
+      );
+    },
+    placeholderData: keepPreviousData,
+  });
 
 /**
  * Hook for managing hidden entities
@@ -165,25 +194,6 @@ export const useHiddenEntities = () => {
   );
 
   /**
-   * Get all hidden entities (optionally filtered by type)
-   */
-  const getHiddenEntities = useCallback(async (entityType?: string) => {
-    try {
-      const endpoint = entityType
-        ? `/user/hidden-entities?entityType=${entityType}`
-        : "/user/hidden-entities";
-      const response = await apiGet<{
-        hiddenEntities: Array<{ entityType: string; entityId: string }>;
-      }>(endpoint);
-      return response.hiddenEntities;
-    } catch (error) {
-      console.error("Failed to get hidden entities:", error);
-      showError("Failed to load hidden items");
-      return [];
-    }
-  }, []);
-
-  /**
    * Unhide all entities (optionally filtered by type)
    */
   const unhideAll = useCallback(async (entityType?: string) => {
@@ -230,7 +240,6 @@ export const useHiddenEntities = () => {
     hideEntities,
     unhideEntity,
     unhideAll,
-    getHiddenEntities,
     updateHideConfirmation,
     isHiding,
     hideConfirmationDisabled: user?.hideConfirmationDisabled || false,

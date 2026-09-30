@@ -1,5 +1,4 @@
 // server/tests/services/MultiInstanceIsolation.test.ts
-import type { StashPerformer } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
@@ -11,7 +10,6 @@ import {
   TAG_SCENE_FAVORITE_WEIGHT,
   scoreScoringDataByPreferences,
 } from "../../services/RecommendationScoringService.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import type { SceneScoringData } from "../../types/index.js";
 import { entityKey } from "../../utils/entityRef.js";
 import { must } from "../helpers/must.js";
@@ -47,50 +45,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
-/** A cached `StashPerformer` row with id "perf1"; override any column. */
-function stashPerformerRow(
-  overrides: Partial<StashPerformer> = {}
-): StashPerformer {
-  return {
-    id: "perf1",
-    stashInstanceId: "inst-a",
-    stashIds: "[]",
-    name: "Performer",
-    disambiguation: null,
-    gender: null,
-    birthdate: null,
-    favorite: false,
-    rating100: null,
-    sceneCount: 0,
-    imageCount: 0,
-    galleryCount: 0,
-    groupCount: 0,
-    details: null,
-    aliasList: "[]",
-    country: null,
-    ethnicity: null,
-    hairColor: null,
-    eyeColor: null,
-    heightCm: null,
-    weightKg: null,
-    measurements: null,
-    fakeTits: null,
-    penisLength: null,
-    circumcised: null,
-    tattoos: null,
-    piercings: null,
-    careerLength: null,
-    deathDate: null,
-    url: null,
-    imagePath: null,
-    stashCreatedAt: new Date("2024-01-01"),
-    stashUpdatedAt: new Date("2024-01-01"),
-    syncedAt: new Date("2024-01-01"),
-    deletedAt: null,
-    ...overrides,
-  };
-}
-
 const createEmptyPrefs = (): LightweightEntityPreferences => ({
   favoritePerformers: new Set(),
   highlyRatedPerformers: new Set(),
@@ -109,68 +63,6 @@ const createEmptyPrefs = (): LightweightEntityPreferences => ({
 describe("Multi-Instance Isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("StashEntityService.getPerformer with instanceId", () => {
-    it("returns the correct performer when same ID exists in two instances", async () => {
-      // Instance A has performer "perf1" named "Alice"
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue(
-        stashPerformerRow({
-          stashInstanceId: "inst-a",
-          name: "Alice",
-          sceneCount: 5,
-        })
-      );
-      mockPrisma.scenePerformer.count.mockResolvedValue(5);
-      mockPrisma.galleryPerformer.count.mockResolvedValue(0);
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
-
-      const performer = await stashEntityService.getPerformer(
-        "perf1",
-        "inst-a"
-      );
-
-      expect(performer).not.toBeNull();
-      expect(must(performer).name).toBe("Alice");
-      expect(must(performer).instanceId).toBe("inst-a");
-
-      // Verify the query filtered by instanceId
-      expect(mockPrisma.stashPerformer.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: "perf1",
-          deletedAt: null,
-          stashInstanceId: "inst-a",
-        },
-      });
-    });
-
-    it("always filters by instanceId when specified (required parameter)", async () => {
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue(
-        stashPerformerRow({
-          stashInstanceId: "inst-b",
-          name: "Bob",
-          sceneCount: 3,
-        })
-      );
-      mockPrisma.scenePerformer.count.mockResolvedValue(3);
-      mockPrisma.galleryPerformer.count.mockResolvedValue(0);
-      mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
-
-      const performer = await stashEntityService.getPerformer(
-        "perf1",
-        "inst-b"
-      );
-
-      expect(performer).not.toBeNull();
-      // instanceId is required — query must always include stashInstanceId filter
-      expect(mockPrisma.stashPerformer.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: "perf1",
-          deletedAt: null,
-          stashInstanceId: "inst-b",
-        },
-      });
-    });
   });
 
   describe("Recommendation scoring composite keys", () => {

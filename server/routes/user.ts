@@ -13,7 +13,6 @@ import {
   getDefaultFilterPresets,
   getFilterPresets,
   getHiddenEntities,
-  getHiddenEntityIds,
   getRecoveryKey,
   getSetupStatus,
   getUserGroupMemberships,
@@ -146,8 +145,7 @@ router.delete(
   "/hidden-entities/:entityType/:entityId",
   authenticated(unhideEntity)
 ); // Unhide an entity
-router.get("/hidden-entities", authenticated(getHiddenEntities)); // Get all hidden entities (optionally filtered by type)
-router.get("/hidden-entities/ids", authenticated(getHiddenEntityIds)); // Get hidden entity IDs organized by type
+router.get("/hidden-entities", authenticated(getHiddenEntities)); // One page of hidden entities, with counts per type
 
 // Hide confirmation preference
 router.put("/hide-confirmation", authenticated(updateHideConfirmation)); // Update hide confirmation preference

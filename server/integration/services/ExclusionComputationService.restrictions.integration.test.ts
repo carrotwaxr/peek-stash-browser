@@ -55,6 +55,8 @@ const INSTANCES = [A, B];
 const USER_NAME = "restr_it_user";
 const ADMIN_NAME = "restr_it_admin";
 const PASSWORD = "restr_it_password_1";
+/** The Hidden Items list's first page, every type */
+const FIRST_PAGE = { entityType: undefined, page: 1, perPage: 50 };
 
 type Reason = "restricted" | "cascade" | "hidden" | "empty";
 
@@ -901,7 +903,10 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       g1: "hidden",
     });
 
-    const listed = await userHiddenEntityService.getHiddenEntities(userId);
+    const { items: listed } = await userHiddenEntityService.getHiddenEntities(
+      userId,
+      FIRST_PAGE
+    );
     const byKey = new Map(
       listed.map((item) => [`${item.entityType}:${item.entityId}`, item])
     );
@@ -910,7 +915,7 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       expect(byKey.get(key)).toMatchObject({
         instanceId: A,
         restricted: true,
-        entity: null,
+        summary: null,
       });
     }
     for (const key of ["studio:1", "scene:s1", "gallery:g1"]) {
@@ -918,9 +923,9 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
         instanceId: A,
         restricted: false,
       });
-      expect(byKey.get(key)?.entity).not.toBeNull();
+      expect(byKey.get(key)?.summary).not.toBeNull();
     }
-    expect(byKey.get("studio:1")?.entity).toMatchObject({ name: "Root" });
+    expect(byKey.get("studio:1")?.summary).toMatchObject({ name: "Root" });
   }, 60000);
 
   it("hiding a restricted entity keeps its restriction reason", async () => {
@@ -940,14 +945,17 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
         .sort()
     ).toEqual(["2:restricted", "5:restricted"]);
 
-    const listed = await userHiddenEntityService.getHiddenEntities(userId);
+    const { items: listed } = await userHiddenEntityService.getHiddenEntities(
+      userId,
+      FIRST_PAGE
+    );
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({
       entityType: "tag",
       entityId: "2",
       instanceId: A,
       restricted: true,
-      entity: null,
+      summary: null,
     });
   }, 60000);
 
@@ -989,7 +997,10 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     );
 
     // Restrictions never apply to an admin, so their own hide lists in full
-    const listed = await userHiddenEntityService.getHiddenEntities(adminId);
+    const { items: listed } = await userHiddenEntityService.getHiddenEntities(
+      adminId,
+      FIRST_PAGE
+    );
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({
       entityType: "tag",
@@ -997,7 +1008,7 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       instanceId: A,
       restricted: false,
     });
-    expect(must(listed[0]).entity).toMatchObject({ name: "Explicit" });
+    expect(must(listed[0]).summary).toMatchObject({ name: "Explicit" });
 
     await userHiddenEntityService.unhideEntity(adminId, "tag", "2", A);
     // unhide queues a background recompute; let it start, then coalesce with it

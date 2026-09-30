@@ -5,7 +5,7 @@
  * Tests getFilterPresets, saveFilterPreset, deleteFilterPreset,
  * getDefaultFilterPresets, setDefaultFilterPreset, getUserRestrictions,
  * updateUserRestrictions, deleteUserRestrictions, hideEntity, unhideEntity,
- * unhideAllEntities, getHiddenEntities, getHiddenEntityIds, hideEntities,
+ * unhideAllEntities, getHiddenEntities, hideEntities,
  * updateHideConfirmation, getUserPermissions, getAnyUserPermissions,
  * updateUserPermissionOverrides, getUserGroupMemberships,
  * getUserStashInstances, updateUserStashInstances, getSetupStatus,
@@ -21,7 +21,6 @@ import {
   getDefaultFilterPresets,
   getFilterPresets,
   getHiddenEntities,
-  getHiddenEntityIds,
   getSetupStatus,
   getUserGroupMemberships,
   getUserPermissions,
@@ -125,15 +124,18 @@ vi.mock(
       hideEntities: vi.fn().mockResolvedValue(undefined),
       unhideEntity: vi.fn().mockResolvedValue(undefined),
       unhideAll: vi.fn().mockResolvedValue(5),
-      getHiddenEntities: vi.fn().mockResolvedValue([]),
-      getHiddenEntityIds: vi.fn().mockResolvedValue({
-        scenes: new Set(),
-        performers: new Set(),
-        studios: new Set(),
-        tags: new Set(),
-        groups: new Set(),
-        galleries: new Set(),
-        images: new Set(),
+      getHiddenEntities: vi.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        counts: {
+          scene: 0,
+          performer: 0,
+          studio: 0,
+          tag: 0,
+          group: 0,
+          gallery: 0,
+          image: 0,
+        },
       }),
     },
   })
@@ -935,11 +937,50 @@ describe("User Controller — Features", () => {
   });
 
   describe("getHiddenEntities", () => {
-    it("returns hidden entities list", async () => {
+    const hidden = vi.mocked(userHiddenEntityService, true);
+
+    it("answers the service's page, asking page 1 of 50 by default", async () => {
       const req = reqFor(getHiddenEntities, { user: USER });
       const res = resFor(getHiddenEntities);
       await getHiddenEntities(req, res);
-      expect(res._getOkBody().hiddenEntities).toEqual([]);
+      expect(res._getOkBody()).toMatchObject({ items: [], total: 0 });
+      expect(hidden.getHiddenEntities).toHaveBeenCalledWith(USER.id, {
+        entityType: undefined,
+        page: 1,
+        perPage: 50,
+      });
+    });
+
+    it("passes page and per_page", async () => {
+      const req = reqFor(getHiddenEntities, {
+        query: { entityType: "tag", page: "3", per_page: "100" },
+        user: USER,
+      });
+      const res = resFor(getHiddenEntities);
+      await getHiddenEntities(req, res);
+      expect(res._getStatus()).toBe(200);
+      expect(hidden.getHiddenEntities).toHaveBeenCalledWith(USER.id, {
+        entityType: "tag",
+        page: 3,
+        perPage: 100,
+      });
+    });
+
+    it.each([
+      [{ per_page: "0" }],
+      [{ per_page: "101" }],
+      [{ per_page: "5x" }],
+      [{ per_page: "" }],
+      [{ page: "0" }],
+      [{ page: "-1" }],
+      [{ page: "1.5" }],
+      [malformed({ page: ["1", "2"] })],
+    ])("answers 400 for %j and asks nothing", async (query) => {
+      const req = reqFor(getHiddenEntities, { query, user: USER });
+      const res = resFor(getHiddenEntities);
+      await getHiddenEntities(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(hidden.getHiddenEntities).not.toHaveBeenCalled();
     });
   });
 
@@ -1016,7 +1057,7 @@ describe("User Controller — Features", () => {
           return res._getStatus();
         },
         passed: () =>
-          hidden.getHiddenEntities.mock.calls.map((call) => call[1]),
+          hidden.getHiddenEntities.mock.calls.map((call) => call[1].entityType),
       },
     };
 
@@ -1036,17 +1077,6 @@ describe("User Controller — Features", () => {
         expect(await handler.call(entityType), entityType).toBe(200);
       }
       expect(handler.passed()).toEqual(SEVEN_TYPES);
-    });
-  });
-
-  describe("getHiddenEntityIds", () => {
-    it("returns hidden IDs organized by type", async () => {
-      const req = reqFor(getHiddenEntityIds, { user: USER });
-      const res = resFor(getHiddenEntityIds);
-      await getHiddenEntityIds(req, res);
-      const ids = res._getOkBody().hiddenIds;
-      expect(ids.scenes).toEqual([]);
-      expect(ids.performers).toEqual([]);
     });
   });
 

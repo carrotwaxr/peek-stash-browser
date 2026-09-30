@@ -94,6 +94,9 @@ export const queryKeys = {
     defaultPresets: () => ["user", "defaultPresets"] as const,
     watchHistory: (page?: number) => ["user", "watchHistory", page] as const,
     hiddenEntities: () => ["user", "hiddenEntities"] as const,
+    /** One page of the Hidden Items list; `hiddenEntities()` is its prefix */
+    hiddenItems: (type: string, page: number) =>
+      ["user", "hiddenEntities", type, page] as const,
   },
 
   // ── Playlists ────────────────────────────────────────────────────────

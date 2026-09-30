@@ -461,27 +461,64 @@ export interface UnhideAllEntitiesResponse {
   count: number;
 }
 
+/** The entity types a user can hide */
+export type HiddenEntityType =
+  | "scene"
+  | "performer"
+  | "studio"
+  | "tag"
+  | "group"
+  | "gallery"
+  | "image";
+
 /** GET /api/user/hidden-entities */
 export interface GetHiddenEntitiesQuery extends Record<
   string,
   string | string[] | undefined
 > {
   entityType?: string;
+  /** 1-based, default 1 */
+  page?: string;
+  /** 1 to 100, default 50 */
+  per_page?: string;
 }
 
-/** GET /api/user/hidden-entity-ids */
-export interface HiddenEntityIds {
-  scenes: string[];
-  performers: string[];
-  studios: string[];
-  tags: string[];
-  groups: string[];
-  galleries: string[];
-  images: string[];
+/**
+ * What the Hidden Items page shows of an entity the user could see if they
+ * had hidden nothing, read from the instance it shows from.
+ */
+export interface HiddenEntitySummary {
+  id: string;
+  /** The instance the entity shows from (a hide stored for every instance resolves to one) */
+  instanceId: string;
+  /** Title or name, else the file or folder name; null when there is none */
+  name: string | null;
+  /** A Peek proxy URL naming `instanceId`, used as it is; null for no image */
+  imageUrl: string | null;
 }
 
-export interface GetHiddenEntityIdsResponse {
-  hiddenIds: HiddenEntityIds;
+/** One hidden row */
+export interface HiddenEntityItem {
+  id: number;
+  entityType: HiddenEntityType;
+  entityId: string;
+  /** As stored: "" for a hide that applies to every instance */
+  instanceId: string;
+  /** ISO timestamp */
+  hiddenAt: string;
+  /** The user could not see the entity even without their own hides */
+  restricted: boolean;
+  /** null when restricted */
+  summary: HiddenEntitySummary | null;
+}
+
+export interface GetHiddenEntitiesResponse {
+  /** The page's rows, newest first */
+  items: HiddenEntityItem[];
+  /** Rows of the requested type (every hideable type when none) */
+  total: number;
+  /** The user's rows per hideable type, whatever type was requested */
+  counts: Record<HiddenEntityType, number>;
 }
 
 /** POST /api/user/hidden-entities/bulk */

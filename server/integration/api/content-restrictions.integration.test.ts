@@ -12,13 +12,14 @@ import {
 describe("Content Restrictions Integration Tests", () => {
   let testUserId: number;
   let testUserClient: TestClient;
+  let testInstanceId: string;
 
   beforeAll(async () => {
     // Ensure admin client is logged in
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
 
     // Scope to test instance only — avoids scanning production data during recompute
-    await selectTestInstanceOnly();
+    testInstanceId = await selectTestInstanceOnly();
 
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
@@ -326,6 +327,7 @@ describe("Content Restrictions Integration Tests", () => {
         }>("/api/user/hidden-entities", {
           entityType: "scene",
           entityId: TEST_ENTITIES.sceneWithRelations,
+          instanceId: testInstanceId,
         });
 
         expect(response.ok).toBe(true);
@@ -344,6 +346,7 @@ describe("Content Restrictions Integration Tests", () => {
         }>("/api/user/hidden-entities", {
           entityType: "performer",
           entityId: TEST_ENTITIES.performerWithScenes,
+          instanceId: testInstanceId,
         });
 
         // If this fails with a 500 error, it means the cascade exclusion code is broken
@@ -354,11 +357,11 @@ describe("Content Restrictions Integration Tests", () => {
 
         // Verify the exclusion was created by checking the hidden entities list
         const hiddenResponse = await testUserClient.get<{
-          hiddenEntities: Array<{ entityType: string; entityId: string }>;
+          items: Array<{ entityType: string; entityId: string }>;
         }>("/api/user/hidden-entities");
 
         expect(hiddenResponse.ok).toBe(true);
-        const hiddenPerformer = hiddenResponse.data.hiddenEntities.find(
+        const hiddenPerformer = hiddenResponse.data.items.find(
           (e) =>
             e.entityType === "performer" &&
             e.entityId === TEST_ENTITIES.performerWithScenes
@@ -367,7 +370,7 @@ describe("Content Restrictions Integration Tests", () => {
 
         // Clean up
         await testUserClient.delete(
-          `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}`
+          `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}?instanceId=${testInstanceId}`
         );
       }, 30_000); // unhideAll recompute + performer cascade + cleanup recompute
 
@@ -398,52 +401,33 @@ describe("Content Restrictions Integration Tests", () => {
     });
 
     describe("GET /api/user/hidden-entities", () => {
-      it("should return hidden entities", async () => {
+      it("should return a page of hidden entities with counts", async () => {
         const response = await testUserClient.get<{
-          hiddenEntities: Array<{
+          items: Array<{
             entityType: string;
             entityId: string;
           }>;
+          total: number;
+          counts: Record<string, number>;
         }>("/api/user/hidden-entities");
 
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
-        expect(response.data.hiddenEntities).toBeDefined();
-        expect(Array.isArray(response.data.hiddenEntities)).toBe(true);
+        expect(Array.isArray(response.data.items)).toBe(true);
+        expect(typeof response.data.total).toBe("number");
+        expect(typeof response.data.counts.scene).toBe("number");
       });
 
       it("should filter by entity type", async () => {
         const response = await testUserClient.get<{
-          hiddenEntities: Array<{ entityType: string }>;
+          items: Array<{ entityType: string }>;
         }>("/api/user/hidden-entities?entityType=scene");
 
         expect(response.ok).toBe(true);
         // All returned should be scenes
-        for (const entity of response.data.hiddenEntities) {
+        for (const entity of response.data.items) {
           expect(entity.entityType).toBe("scene");
         }
-      });
-    });
-
-    describe("GET /api/user/hidden-entities/ids", () => {
-      it("should return hidden entity IDs by type", async () => {
-        const response = await testUserClient.get<{
-          hiddenIds: {
-            scenes: string[];
-            performers: string[];
-            studios: string[];
-            tags: string[];
-            groups: string[];
-            galleries: string[];
-            images: string[];
-          };
-        }>("/api/user/hidden-entities/ids");
-
-        expect(response.ok).toBe(true);
-        expect(response.status).toBe(200);
-        expect(response.data.hiddenIds).toBeDefined();
-        expect(Array.isArray(response.data.hiddenIds.scenes)).toBe(true);
-        expect(Array.isArray(response.data.hiddenIds.performers)).toBe(true);
       });
     });
 

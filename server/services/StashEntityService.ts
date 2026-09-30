@@ -10,7 +10,6 @@
 import type {
   StashGallery,
   StashGroup,
-  StashImage,
   StashPerformer,
   StashScene,
   StashStudio,
@@ -20,8 +19,6 @@ import prisma from "../prisma/singleton.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
-  NormalizedImage,
-  NormalizedPerformer,
   NormalizedScene,
   NormalizedStudio,
   NormalizedTag,
@@ -41,7 +38,6 @@ import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull, parseJsonArray } from "../utils/sqlHelpers.js";
 import {
   getGalleryFallbackTitle,
-  getImageFallbackTitle,
   getSceneFallbackTitle,
 } from "../utils/titleUtils.js";
 import type { ScoringScene } from "./RecommendationScoringService.js";
@@ -118,33 +114,6 @@ type GalleryInput = StashGallery & {
   scenes?: GallerySceneEntry[];
 };
 
-/** Image performer junction entry */
-interface ImagePerformerEntry {
-  performer: StashPerformer;
-}
-
-/** Image tag junction entry */
-interface ImageTagEntry {
-  tag: StashTag;
-}
-
-/** Image gallery junction entry with nested relations */
-interface ImageGalleryEntry {
-  gallery: StashGallery & {
-    studio?: { id: string; name: string } | null;
-    performers?: GalleryPerformerEntry[];
-    tags?: GalleryTagWithTag[];
-  };
-}
-
-/** Image input for transformImage - Prisma result with optional relations */
-type ImageInput = StashImage & {
-  studio?: { id: string; name: string } | null;
-  performers?: ImagePerformerEntry[];
-  tags?: ImageTagEntry[];
-  galleries?: ImageGalleryEntry[];
-};
-
 /** The stored stream choices and file fields a scene's stream list is built from */
 type SceneStreamSource = Pick<
   StashScene,
@@ -156,11 +125,6 @@ type SceneStreamSource = Pick<
   | "fileWidth"
   | "fileHeight"
 >;
-
-/** Transformed image output shape (returned by transformImage) */
-// TransformedImage is a subset of NormalizedImage (without user activity fields).
-// Using NormalizedImage directly as return type since user fields are optional.
-type TransformedImage = NormalizedImage;
 
 /**
  * Default user fields for scenes (when no user data is merged)
@@ -175,18 +139,6 @@ const DEFAULT_SCENE_USER_FIELDS = {
   resume_time: 0,
   play_history: [],
   o_history: [],
-  last_played_at: null,
-  last_o_at: null,
-};
-
-/**
- * Default user fields for performers
- */
-const DEFAULT_PERFORMER_USER_FIELDS = {
-  rating: null,
-  favorite: false,
-  o_counter: 0,
-  play_count: 0,
   last_played_at: null,
   last_o_at: null,
 };
@@ -454,65 +406,6 @@ class StashEntityService {
   }
 
   // ==================== Performer Queries ====================
-
-  /**
-   * Get performer by ID with computed counts
-   * @param id - Performer ID
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getPerformer(
-    id: string,
-    instanceId: string
-  ): Promise<NormalizedPerformer | null> {
-    const cached = await prisma.stashPerformer.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-    });
-
-    if (!cached) return null;
-
-    // Compute counts from junction tables (except imageCount which uses stored inherited value)
-    const performerInstanceId = cached.stashInstanceId;
-    const [sceneCount, galleryCount] = await Promise.all([
-      prisma.scenePerformer.count({
-        where: {
-          performerId: id,
-          performerInstanceId,
-          scene: { deletedAt: null },
-        },
-      }),
-      prisma.galleryPerformer.count({
-        where: {
-          performerId: id,
-          performerInstanceId,
-          gallery: { deletedAt: null },
-        },
-      }),
-    ]);
-
-    // Get group count by counting distinct groups from scenes
-    const groupCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(DISTINCT sg.groupId) as count
-      FROM ScenePerformer sp
-      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
-      INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
-      WHERE sp.performerId = ${id}
-        AND sp.performerInstanceId = ${performerInstanceId}
-        AND s.deletedAt IS NULL
-    `;
-    const groupCount = Number(groupCountResult[0]?.count ?? 0);
-
-    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
-    return this.transformPerformer({
-      ...cached,
-      sceneCount,
-      galleryCount,
-      groupCount,
-    });
-  }
 
   /**
    * Get total performer count
@@ -794,48 +687,6 @@ class StashEntityService {
   }
 
   // ==================== Image Queries ====================
-
-  /**
-   * Image includes for relations
-   */
-  private readonly imageIncludes = {
-    performers: { include: { performer: true } },
-    tags: { include: { tag: true } },
-    studio: true,
-    galleries: {
-      include: {
-        gallery: {
-          include: {
-            performers: { include: { performer: true } },
-            tags: { include: { tag: true } },
-            studio: true,
-          },
-        },
-      },
-    },
-  };
-
-  /**
-   * Get image by ID with relations
-   * @param id - Image ID
-   * @param instanceId - Stash instance ID for multi-instance disambiguation
-   */
-  async getImage(
-    id: string,
-    instanceId: string
-  ): Promise<NormalizedImage | null> {
-    const cached = await prisma.stashImage.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        stashInstanceId: instanceId,
-      },
-      include: this.imageIncludes,
-    });
-
-    if (!cached) return null;
-    return this.transformImage(cached as unknown as ImageInput);
-  }
 
   /**
    * Get total image count
@@ -1206,46 +1057,6 @@ class StashEntityService {
     return base;
   }
 
-  private transformPerformer(performer: StashPerformer): NormalizedPerformer {
-    return {
-      ...DEFAULT_PERFORMER_USER_FIELDS,
-      id: performer.id,
-      instanceId: performer.stashInstanceId,
-      name: performer.name,
-      disambiguation: performer.disambiguation,
-      gender: performer.gender,
-      birthdate: performer.birthdate,
-      favorite: performer.favorite,
-      rating100: performer.rating100,
-      scene_count: performer.sceneCount,
-      image_count: performer.imageCount,
-      gallery_count: performer.galleryCount,
-      group_count: performer.groupCount,
-      details: performer.details,
-      alias_list: parseJsonArray(performer.aliasList),
-      country: performer.country,
-      ethnicity: performer.ethnicity,
-      hair_color: performer.hairColor,
-      eye_color: performer.eyeColor,
-      height_cm: performer.heightCm,
-      weight: performer.weightKg,
-      measurements: performer.measurements,
-      fake_tits: performer.fakeTits,
-      tattoos: performer.tattoos,
-      piercings: performer.piercings,
-      career_length: performer.careerLength,
-      death_date: performer.deathDate,
-      url: performer.url,
-      // No caller includes the tags relation
-      tags: [],
-      penis_length: performer.penisLength,
-      circumcised: performer.circumcised,
-      image_path: toProxyUrl(performer.imagePath, performer.stashInstanceId),
-      created_at: performer.stashCreatedAt?.toISOString() ?? null,
-      updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
-    };
-  }
-
   private transformStudio(studio: StashStudio): NormalizedStudio {
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
@@ -1388,113 +1199,6 @@ class StashEntityService {
       scenes,
       created_at: gallery.stashCreatedAt?.toISOString() ?? null,
       updated_at: gallery.stashUpdatedAt?.toISOString() ?? null,
-    };
-  }
-
-  private transformImage(image: ImageInput): TransformedImage {
-    // Transform performers from junction table (include image_path and gender for display)
-    const performers = (image.performers ?? []).map(
-      (ip: ImagePerformerEntry) => ({
-        id: ip.performer.id,
-        name: ip.performer.name,
-        gender: ip.performer.gender,
-        image_path: toProxyUrl(
-          ip.performer.imagePath,
-          ip.performer.stashInstanceId
-        ),
-      })
-    );
-
-    // Transform tags from junction table
-    const tags = (image.tags ?? []).map((it: ImageTagEntry) => ({
-      id: it.tag.id,
-      name: it.tag.name,
-    }));
-
-    // Transform galleries from junction table (with their performers/tags/studio for inheritance)
-    const galleries = (image.galleries ?? []).map((ig: ImageGalleryEntry) => ({
-      id: ig.gallery.id,
-      title: ig.gallery.title,
-      date: ig.gallery.date,
-      details: ig.gallery.details,
-      photographer: ig.gallery.photographer,
-      urls: parseJsonArray(ig.gallery.urls),
-      cover: toProxyUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
-      studioId: ig.gallery.studioId,
-      // Include studio object for inheritance
-      studio: ig.gallery.studio
-        ? {
-            id: ig.gallery.studio.id,
-            name: ig.gallery.studio.name,
-          }
-        : null,
-      performers: (ig.gallery.performers ?? []).map(
-        (gp: GalleryPerformerEntry) => ({
-          id: gp.performer.id,
-          name: gp.performer.name,
-          gender: gp.performer.gender,
-          image_path: toProxyUrl(
-            gp.performer.imagePath,
-            gp.performer.stashInstanceId
-          ),
-        })
-      ),
-      tags: (ig.gallery.tags ?? []).map((gt: GalleryTagWithTag) => ({
-        id: gt.tag?.id ?? gt.tagId,
-        name: emptyToNull(gt.tag?.name) ?? "Unknown",
-      })),
-    }));
-
-    // Build studio object with name if available
-    const studio = image.studio
-      ? {
-          id: image.studio.id,
-          name: image.studio.name,
-        }
-      : image.studioId
-        ? { id: image.studioId }
-        : null;
-
-    return {
-      id: image.id,
-      instanceId: image.stashInstanceId,
-      title: emptyToNull(image.title) ?? getImageFallbackTitle(image.filePath),
-      code: image.code,
-      details: image.details,
-      photographer: image.photographer,
-      urls: parseJsonArray(image.urls),
-      date: image.date,
-      studio,
-      studioId: image.studioId,
-      rating100: image.rating100,
-      o_counter: image.oCounter,
-      organized: image.organized,
-      filePath: image.filePath,
-      width: image.width,
-      height: image.height,
-      fileSize: image.fileSize ? Number(image.fileSize) : null,
-      files: image.filePath
-        ? [
-            {
-              path: image.filePath,
-              width: image.width,
-              height: image.height,
-              size: image.fileSize ? Number(image.fileSize) : null,
-            },
-          ]
-        : [],
-      paths: {
-        thumbnail: `/api/proxy/image/${image.id}/thumbnail`,
-        preview: `/api/proxy/image/${image.id}/preview`,
-        image: `/api/proxy/image/${image.id}/image`,
-      },
-      performers,
-      tags,
-      galleries,
-      created_at: image.stashCreatedAt?.toISOString() ?? null,
-      updated_at: image.stashUpdatedAt?.toISOString() ?? null,
-      stashCreatedAt: image.stashCreatedAt?.toISOString() ?? null,
-      stashUpdatedAt: image.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 }

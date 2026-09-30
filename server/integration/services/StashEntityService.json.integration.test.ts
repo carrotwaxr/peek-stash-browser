@@ -111,13 +111,8 @@ describe("StashEntityService transforms", () => {
     const tag = await stashEntityService.getTag(TAG, A);
     expect(tag?.aliases).toEqual([]);
     expect(tag?.parents).toEqual([]);
-    const performer = await stashEntityService.getPerformer(PERFORMER, A);
-    expect(performer?.alias_list).toEqual([]);
     const group = await stashEntityService.getGroup(GROUP, A);
     expect(group?.urls).toEqual([]);
-    const image = await stashEntityService.getImage(IMAGE, A);
-    expect(image?.urls).toEqual([]);
-    expect(image?.galleries[0]?.urls).toEqual([]);
   });
 
   it("nests refs without Stash's favorite or rating, and no Stash counters", async () => {
