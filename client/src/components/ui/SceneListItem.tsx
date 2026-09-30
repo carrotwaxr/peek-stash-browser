@@ -2,7 +2,10 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useConfig } from "../../contexts/ConfigContext";
-import { useCardSelection } from "../../hooks/useCardSelection";
+import {
+  type ToggleSelectOptions,
+  useCardSelection,
+} from "../../hooks/useCardSelection";
 import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneDescription } from "../../utils/format";
@@ -33,7 +36,10 @@ interface Props {
   sceneId?: string;
   showSessionOIndicator?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: (scene: NormalizedScene) => void;
+  onToggleSelect?: (
+    scene: NormalizedScene,
+    options?: ToggleSelectOptions
+  ) => void;
   selectionMode?: boolean;
 }
 
@@ -58,7 +64,10 @@ const SceneListItem = ({
       entity: scene as unknown as Record<string, unknown>,
       selectionMode,
       onToggleSelect: onToggleSelect as
-        | ((entity: Record<string, unknown>) => void)
+        | ((
+            entity: Record<string, unknown>,
+            options?: ToggleSelectOptions
+          ) => void)
         | undefined,
     });
 
@@ -204,7 +213,7 @@ const SceneListItem = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (scene) onToggleSelect?.(scene);
+                  if (scene) onToggleSelect?.(scene, { range: e.shiftKey });
                 }}
                 className="absolute top-2 left-2 z-20 w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
                 style={{

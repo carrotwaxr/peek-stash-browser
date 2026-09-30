@@ -7,7 +7,7 @@ import { useCardSelection } from "../../src/hooks/useCardSelection";
 /** A mouse event with only the fields the hook reads */
 const mouseEvent = (
   fields: Partial<
-    Pick<MouseEvent, "target" | "currentTarget" | "preventDefault">
+    Pick<MouseEvent, "target" | "currentTarget" | "preventDefault" | "shiftKey">
   >
 ) => fields as MouseEvent;
 
@@ -221,11 +221,30 @@ describe("useCardSelection", () => {
     );
 
     act(() => {
-      result.current.handleNavigationClick(mouseEvent({ preventDefault }));
+      result.current.handleNavigationClick(
+        mouseEvent({ preventDefault, shiftKey: false })
+      );
     });
 
     expect(preventDefault).toHaveBeenCalled();
-    expect(onToggleSelect).toHaveBeenCalledWith(entity);
+    expect(onToggleSelect).toHaveBeenCalledWith(entity, { range: false });
+  });
+
+  it("a shift-click in selection mode asks for a range", () => {
+    const onToggleSelect = vi.fn();
+    const entity = { id: "1" };
+
+    const { result } = renderHook(() =>
+      useCardSelection({ entity, selectionMode: true, onToggleSelect })
+    );
+
+    act(() => {
+      result.current.handleNavigationClick(
+        mouseEvent({ preventDefault: vi.fn(), shiftKey: true })
+      );
+    });
+
+    expect(onToggleSelect).toHaveBeenCalledWith(entity, { range: true });
   });
 
   it("long-press selection does not trigger navigation - click after long-press is blocked", () => {

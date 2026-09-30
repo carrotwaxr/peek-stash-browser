@@ -2,6 +2,7 @@ import { forwardRef, memo, useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import type { ToggleSelectOptions } from "../../hooks/useCardSelection";
 import { useTVMode } from "../../hooks/useTVMode";
 import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -12,7 +13,7 @@ import {
   getSceneTitle,
 } from "../../utils/format";
 import { useCardIndicators } from "../cards/cardIndicators";
-import BaseCard from "./BaseCard";
+import BaseCard, { type BaseCardProps } from "./BaseCard";
 import { SceneCardPreview } from "./index";
 
 interface Props {
@@ -22,7 +23,10 @@ interface Props {
   tabIndex?: number;
   className?: string;
   isSelected?: boolean;
-  onToggleSelect?: (scene: NormalizedScene) => void;
+  onToggleSelect?: (
+    scene: NormalizedScene,
+    options?: ToggleSelectOptions
+  ) => void;
   selectionMode?: boolean;
   autoplayOnScroll?: boolean;
   hideRatingControls?: boolean;
@@ -127,7 +131,7 @@ const SceneCard = memo(
       const handleCheckboxClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        onToggleSelect?.(scene);
+        onToggleSelect?.(scene, { range: e.shiftKey });
       };
 
       // Render slot: Selection checkbox overlay
@@ -224,11 +228,7 @@ const SceneCard = memo(
           // Selection mode - BaseCard handles all gesture/keyboard logic
           selectionMode={selectionMode}
           isSelected={isSelected}
-          onToggleSelect={
-            onToggleSelect as
-              | ((entity: Record<string, unknown> | undefined) => void)
-              | undefined
-          }
+          onToggleSelect={onToggleSelect as BaseCardProps["onToggleSelect"]}
           // Content
           imagePath={scene.paths?.screenshot}
           title={title}
@@ -257,7 +257,8 @@ const SceneCard = memo(
               : undefined
           }
           // Render slots
-          renderOverlay={renderOverlay}
+          // Only a card that can select has a checkbox
+          renderOverlay={onToggleSelect ? renderOverlay : undefined}
           renderImageContent={renderImageContent}
           // Standard props
           className={className}

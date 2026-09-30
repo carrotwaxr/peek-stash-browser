@@ -99,6 +99,8 @@ export interface GridContext {
   ctx: CardContext;
   /** "No scenes found" */
   emptyMessage: string;
+  /** The list's query, page included: what a selection belongs to */
+  selectionScope: string;
 }
 
 /** A view beyond grid and table (the Tags hierarchy) */

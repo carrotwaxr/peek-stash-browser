@@ -16,6 +16,10 @@ The default card-based layout showing thumbnails with metadata.
 - Three density levels: Small, Medium, Large
 - Available for all entity types
 
+#### Selecting scenes
+
+On the Scenes page (and any scene list), tick a card's checkbox, or press and hold a card, to select scenes for a bulk action (hide, add to a playlist). A selection covers the page you see: it clears when you change the filters, the sort or the page. Shift+click a second checkbox selects every scene between the two, and Select All selects the scenes on the page.
+
 ### Wall View
 
 A justified gallery layout that preserves aspect ratios.

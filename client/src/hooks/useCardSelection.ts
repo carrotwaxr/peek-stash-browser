@@ -9,10 +9,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {Function} options.onToggleSelect - Callback when entity should be toggled
  * @returns {Object} - { isLongPressing, selectionHandlers, handleNavigationClick }
  */
+/** How a toggle was asked for: Shift held selects a range up to the entity */
+export interface ToggleSelectOptions {
+  range: boolean;
+}
+
 interface UseCardSelectionOptions {
   entity: Record<string, unknown>;
   selectionMode?: boolean;
-  onToggleSelect?: (entity: Record<string, unknown>) => void;
+  onToggleSelect?: (
+    entity: Record<string, unknown>,
+    options?: ToggleSelectOptions
+  ) => void;
 }
 
 export const useCardSelection = ({
@@ -134,7 +142,7 @@ export const useCardSelection = ({
       // In selection mode, toggle instead of navigate
       if (selectionMode) {
         e.preventDefault();
-        onToggleSelect?.(entity);
+        onToggleSelect?.(entity, { range: e.shiftKey });
         return;
       }
 

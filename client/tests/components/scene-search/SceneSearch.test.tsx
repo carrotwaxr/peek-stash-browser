@@ -65,8 +65,16 @@ vi.mock("@/components/ui/SceneCard", () => ({
     scene: { id: string; instanceId: string; title: string };
     onClick?: (scene: unknown) => void;
     onHideSuccess?: (id: string, type: string, instanceId: string) => void;
+    isSelected?: boolean;
+    onToggleSelect?: (scene: unknown, opts?: { range: boolean }) => void;
   }) => (
     <div data-testid="scene-card">
+      <button
+        aria-pressed={props.isSelected}
+        onClick={() => props.onToggleSelect?.(props.scene, { range: false })}
+      >
+        Select {props.scene.title}
+      </button>
       <button onClick={() => props.onClick?.(props.scene)}>
         {props.scene.title}
       </button>
@@ -158,6 +166,62 @@ describe("SceneSearch", () => {
       expect(
         screen.getAllByText("Showing 1-1 of 1 records").length
       ).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Selecting scenes", () => {
+    it("a page change clears the selection: a selection is the page you see", async () => {
+      api.findScenes.mockImplementation((params) =>
+        Promise.resolve(
+          scenes(
+            rowsOf(
+              (params.filter as { page: number }).page === 2 ? "p2" : "p1"
+            ),
+            48
+          )
+        )
+      );
+      renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: ["/scenes"],
+      });
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Select p1-0" })
+      );
+      expect(
+        screen.getByRole("button", { name: "Select p1-0" })
+      ).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(
+        must(screen.getAllByRole("button", { name: "Next Page" })[0])
+      );
+      expect(await screen.findByText("Select p2-0")).toBeInTheDocument();
+
+      expect(screen.queryByText("Clear")).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Select p2-0" })
+      ).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("a new filter clears the selection", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
+      renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: ["/scenes"],
+      });
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Select scene-0" })
+      );
+      expect(screen.getByText("Clear")).toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText("Search..."), {
+        target: { value: "ada" },
+      });
+
+      await waitFor(() =>
+        expect(lastSent().filter).toMatchObject({ q: "ada" })
+      );
+      await waitFor(() =>
+        expect(screen.queryByText("Clear")).not.toBeInTheDocument()
+      );
     });
   });
 
