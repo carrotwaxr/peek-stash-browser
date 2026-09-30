@@ -434,7 +434,9 @@ export const proxySceneWebp = async (
  * Requires a Peek session. The path must be one of Stash's media routes for
  * a numeric id (utils/stashMediaPath.ts); only the `t` and `default` query
  * keys go upstream. Every entity the path names must be visible to the user
- * (a scene_marker path names its scene and its clip). Rejecting `#` and `%`
+ * apart from their own hides (a scene_marker path names its scene and its
+ * clip): the paths stored on entities are the thumbnails Hidden Items shows
+ * for what the user hid. Rejecting `#` and `%`
  * also closes fragment and double-encoding tricks.
  */
 export const proxyStashMedia = async (
@@ -460,7 +462,15 @@ export const proxyStashMedia = async (
 
   if (!instanceIdOrRespond(instanceId, res)) return;
 
-  if (!(await canUserLoadMedia(req.user.id, target.entities, instanceId))) {
+  // An entity the user hid themselves keeps its thumbnail on Hidden Items
+  if (
+    !(await canUserLoadMedia(
+      req.user.id,
+      target.entities,
+      instanceId,
+      "apartFromOwnHides"
+    ))
+  ) {
     res.status(404).json({ error: "Not found" });
     return;
   }
