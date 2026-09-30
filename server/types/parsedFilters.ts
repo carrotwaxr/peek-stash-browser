@@ -139,6 +139,11 @@ export interface ParsedListRequest<E extends EntityKind> {
   readonly filter: ParsedFilter<E>;
   /** `<entity>_filter.instance_id`, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
+  /**
+   * `filter.count`: false reads the page alone and answers a null total (a
+   * page change of a list whose total the client holds); counted otherwise
+   */
+  readonly count?: boolean;
 }
 
 /**
@@ -155,6 +160,8 @@ export interface ParsedClipQuery {
   readonly filter: ParsedClipFilter;
   /** The `instanceId` parameter, INSTANCE_ID_PATTERN */
   readonly specificInstanceId: string | undefined;
+  /** The `count` parameter: false reads the page alone, as the list's `filter.count` */
+  readonly count?: boolean;
 }
 
 /**

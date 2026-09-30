@@ -123,6 +123,23 @@ describe("parseListRequest: pagination", () => {
     ).toEqual(["filter.q"]);
   });
 
+  it("filter.count false asks for the page alone; true or absent counts; anything else is invalid", () => {
+    expect(
+      parseListRequest("scene", { filter: { count: false } }, opts()).count
+    ).toBe(false);
+    expect(
+      parseListRequest("image", { filter: { count: true } }, opts()).count
+    ).toBe(true);
+    expect(parseListRequest("scene", {}, opts()).count).toBeUndefined();
+    expect(
+      paths(
+        issuesOf(() =>
+          parseListRequest("scene", { filter: { count: "false" } }, opts())
+        )
+      )
+    ).toEqual(["filter.count"]);
+  });
+
   it("an unknown key in filter is invalid", () => {
     expect(
       paths(
@@ -816,6 +833,15 @@ describe("parseClipQuery", () => {
       isGenerated: false,
     });
     expect(parseClipQuery({}, opts()).filter.isGenerated).toBe(undefined);
+  });
+
+  it("count=false asks for the page alone; true or absent counts; anything else is invalid", () => {
+    expect(parseClipQuery({ count: "false" }, opts()).count).toBe(false);
+    expect(parseClipQuery({ count: "true" }, opts()).count).toBe(true);
+    expect(parseClipQuery({}, opts()).count).toBeUndefined();
+    expect(
+      paths(issuesOf(() => parseClipQuery({ count: "no" }, opts())))
+    ).toEqual(["count"]);
   });
 
   it("sortBy is whitelisted and sortDir is asc or desc", () => {

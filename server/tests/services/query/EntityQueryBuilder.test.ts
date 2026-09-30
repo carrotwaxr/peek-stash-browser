@@ -432,6 +432,52 @@ describe("EntityQueryBuilder", () => {
     expect(must(statements()[0]).sql).toMatch(/SELECT COUNT\(\*\) AS total/);
   });
 
+  it("count false runs one statement: the page, and answers a null total", async () => {
+    // Only the page is read: queue its rows alone
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      { id: "1", stashInstanceId: "inst-a" },
+    ]);
+    const result = await builder.execute({
+      userId: 7,
+      allowedInstanceIds: ["inst-a"],
+      request: request({ count: false }),
+    });
+
+    expect(statements()).toHaveLength(1);
+    expect(must(statements()[0]).sql).not.toMatch(/COUNT\(\*\) AS total/);
+    expect(must(statements()[0]).sql).toContain("LIMIT ? OFFSET ?");
+    expect(result).toEqual({
+      items: [{ id: "1", instanceId: "inst-a" }],
+      total: null,
+    });
+  });
+
+  it("count true runs the page and the count, as absent does", async () => {
+    const result = await builder.execute({
+      userId: 7,
+      allowedInstanceIds: ["inst-a"],
+      request: request({ count: true }),
+    });
+
+    expect(statements()).toHaveLength(2);
+    expect(result.total).toBe(1);
+  });
+
+  it("count (a detail page's tab counts) counts even for a request that says count false", async () => {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([{ total: 9n }]);
+    const total = await builder.count({
+      userId: 7,
+      allowedInstanceIds: ["inst-a"],
+      request: request({ count: false }),
+    });
+
+    expect(total).toBe(9);
+    expect(statements()).toHaveLength(1);
+    expect(must(statements()[0]).sql).toMatch(/SELECT COUNT\(\*\) AS total/);
+  });
+
   it("count answers 0 when the statement returns no row", async () => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);

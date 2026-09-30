@@ -17,6 +17,7 @@ import type {
   TypedLibraryRequest,
   TypedResponse,
 } from "../types/api/express.js";
+import type { ListCount } from "../types/api/library.js";
 import {
   parseClipQuery,
   parseFilterRef,
@@ -31,7 +32,7 @@ import { logger } from "../utils/logger.js";
  */
 export const getClips = async (
   req: TypedLibraryRequest<never, Record<string, string>, GetClipsQuery>,
-  res: TypedResponse<GetClipsResponse | ApiErrorResponse>
+  res: TypedResponse<GetClipsResponse<ListCount> | ApiErrorResponse>
 ) => {
   // A ValidationError (400) reaches the central error handler
   const request = parseClipQuery(req.query, { userId: req.user.id });
@@ -51,7 +52,9 @@ export const getClips = async (
     total: result.total,
     page,
     perPage,
-    totalPages: Math.ceil(result.total / perPage),
+    // count=false: the page alone, the client keeps the total it holds
+    totalPages:
+      result.total === null ? null : Math.ceil(result.total / perPage),
   });
 };
 

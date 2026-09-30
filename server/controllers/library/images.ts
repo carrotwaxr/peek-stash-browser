@@ -4,6 +4,7 @@ import type {
   ApiErrorResponse,
   FindImagesRequest,
   FindImagesResponse,
+  ListCount,
   TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
@@ -17,7 +18,7 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 export const findImages = async (
   req: TypedLibraryRequest<FindImagesRequest>,
   res: TypedResponse<
-    FindImagesResponse | ApiErrorResponse | AmbiguousLookupResponse
+    FindImagesResponse<ListCount> | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
   const startTime = Date.now();

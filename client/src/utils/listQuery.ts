@@ -4,6 +4,7 @@
  * entity's `<entity>_filter`. Also the sort rules a list reads its state by.
  */
 import { DEFAULT_SORT, UI_KEYS, type UiKey } from "@peek/shared-types";
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import {
   CLIP_SORT_OPTIONS,
   type FilterOption,
@@ -212,6 +213,140 @@ export const listKeyWithoutPageOf = (query: ListQuery | null): string => {
   const { page: _page, ...filter } = query.filter;
   return JSON.stringify({ ...query, filter });
 };
+
+/** A list request without its page: every page of one list shares one total */
+export function requestWithoutPage(
+  request: Readonly<Record<string, unknown>>
+): Record<string, unknown> {
+  const { page: _page, ...rest } = request;
+  const { filter } = rest;
+  if (typeof filter !== "object" || filter === null || Array.isArray(filter))
+    return rest;
+  const { page: _filterPage, ...filterRest } = filter as Record<
+    string,
+    unknown
+  >;
+  return { ...rest, filter: filterRest };
+}
+
+/**
+ * Where a list's total is cached for its pages: beside the list's own keys
+ * (`[root, instance?, "list", request]`), under the same root, so every
+ * invalidation of the library's queries (a hide, a restore, Restore All, an
+ * instance change) marks it too
+ */
+export const listCountKey = (listKey: QueryKey): QueryKey => [
+  ...listKey.slice(0, -2),
+  "listCount",
+  requestWithoutPage(listKey.at(-1) as Record<string, unknown>),
+];
+
+type ListData = Record<string, unknown>;
+
+/** Where a list response holds its total, and how its request asks for none */
+export interface ListTotalShape<R> {
+  /** The request for the page alone: the server answers a null total */
+  uncounted: (request: R) => R;
+  /** The response's total; null when it was not counted */
+  total: (data: unknown) => number | null;
+  /** The response with this total */
+  withTotal: (data: unknown, total: number) => unknown;
+}
+
+/** A library list (`POST /api/library/<entities>`): the total in `<result>.count`, asked off by `filter.count: false` */
+export const libraryListTotal = (
+  result: string
+): ListTotalShape<Record<string, unknown>> => ({
+  uncounted: (request) => ({
+    ...request,
+    filter: {
+      ...(request.filter as Record<string, unknown> | undefined),
+      count: false,
+    },
+  }),
+  total: (data) => {
+    const count = (
+      (data as ListData | undefined)?.[result] as ListData | undefined
+    )?.count;
+    return typeof count === "number" ? count : null;
+  },
+  withTotal: (data, total) => {
+    const response = data as ListData;
+    return {
+      ...response,
+      [result]: { ...(response[result] as ListData), count: total },
+    };
+  },
+});
+
+/** The clip list (`GET /api/clips`): `total` and `totalPages`, asked off by `count=false` */
+export const clipListTotal: ListTotalShape<Record<string, unknown>> = {
+  uncounted: (request) => ({ ...request, count: false }),
+  total: (data) => {
+    const total = (data as ListData | undefined)?.total;
+    return typeof total === "number" ? total : null;
+  },
+  withTotal: (data, total) => {
+    const response = data as ListData;
+    const perPage = response.perPage;
+    return {
+      ...response,
+      total,
+      totalPages:
+        typeof perPage === "number" && perPage > 0
+          ? Math.ceil(total / perPage)
+          : 0,
+    };
+  },
+};
+
+/** The cache's stale time as a number of milliseconds; 0 when it is not one */
+const staleTimeOf = (client: QueryClient): number => {
+  const staleTime = client.getDefaultOptions().queries?.staleTime;
+  return typeof staleTime === "number" ? staleTime : 0;
+};
+
+/**
+ * One page of a list, the total from the list's other pages when it can be
+ * trusted (owner decision 12: a page change reuses the count). A total the
+ * server counted for this list (the same request but its page) is kept
+ * under `listCountKey`; while that entry is not invalidated (every hide,
+ * restore, Restore All and instance change invalidates the library's
+ * queries) and younger than the cache's stale time (a sync changes the
+ * library without telling the client, and a cached page is shown that long
+ * too), the page is asked for alone and answered with it. Otherwise the
+ * page is counted and its total kept for the next page: a first load, a
+ * reload, a filter, search, sort or per-page change, a refetch of the list
+ * after an invalidation.
+ */
+export async function fetchListPage<R extends Record<string, unknown>>(
+  { client, queryKey }: { client: QueryClient; queryKey: QueryKey },
+  request: R,
+  shape: ListTotalShape<Record<string, unknown>>,
+  fetchPage: (request: R) => Promise<unknown>
+): Promise<unknown> {
+  const countKey = listCountKey(queryKey);
+  const cached = client
+    .getQueryCache()
+    .find<number>({ queryKey: countKey, exact: true });
+  const reusable =
+    cached !== undefined &&
+    typeof cached.state.data === "number" &&
+    !cached.isStaleByTime(staleTimeOf(client))
+      ? cached.state.data
+      : null;
+
+  const data = await fetchPage(
+    reusable === null ? request : (shape.uncounted(request) as R)
+  );
+  const total = shape.total(data);
+  if (total === null) {
+    return reusable === null ? data : shape.withTotal(data, reusable);
+  }
+  // Counted: this total is the one the list's next page reuses
+  client.setQueryData<number>(countKey, total);
+  return data;
+}
 
 /**
  * The contract fields a page fixes, named by its permanent filters: the top

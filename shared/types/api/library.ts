@@ -86,9 +86,16 @@ export interface MinimalEntity {
  */
 export type FindScenesRequest = ListRequestInput<"scene">;
 
-export interface FindScenesResponse {
+/**
+ * A list response's total: a number, or null when the request asked for no
+ * count (`filter.count: false`, or the clip list's `count=false`). A reader
+ * that never sends the flag reads the default, a number.
+ */
+export type ListCount = number | null;
+
+export interface FindScenesResponse<Count extends ListCount = number> {
   findScenes: {
-    count: number;
+    count: Count;
     scenes: WithStashUrl<NormalizedScene>[];
   };
 }
@@ -154,9 +161,9 @@ export interface GetRecommendedScenesResponse {
  */
 export type FindPerformersRequest = ListRequestInput<"performer">;
 
-export interface FindPerformersResponse {
+export interface FindPerformersResponse<Count extends ListCount = number> {
   findPerformers: {
-    count: number;
+    count: Count;
     performers: WithStashUrl<NormalizedPerformer>[];
   };
 }
@@ -179,9 +186,9 @@ export interface FindPerformersMinimalResponse {
  */
 export type FindStudiosRequest = ListRequestInput<"studio">;
 
-export interface FindStudiosResponse {
+export interface FindStudiosResponse<Count extends ListCount = number> {
   findStudios: {
-    count: number;
+    count: Count;
     studios: WithStashUrl<NormalizedStudio>[];
   };
 }
@@ -204,9 +211,9 @@ export interface FindStudiosMinimalResponse {
  */
 export type FindTagsRequest = ListRequestInput<"tag">;
 
-export interface FindTagsResponse {
+export interface FindTagsResponse<Count extends ListCount = number> {
   findTags: {
-    count: number;
+    count: Count;
     tags: WithStashUrl<NormalizedTag>[];
   };
 }
@@ -300,9 +307,9 @@ export interface FindTagTreeResponse {
  */
 export type FindGalleriesRequest = ListRequestInput<"gallery">;
 
-export interface FindGalleriesResponse {
+export interface FindGalleriesResponse<Count extends ListCount = number> {
   findGalleries: {
-    count: number;
+    count: Count;
     galleries: WithStashUrl<NormalizedGallery>[];
   };
 }
@@ -325,9 +332,9 @@ export interface FindGalleriesMinimalResponse {
  */
 export type FindGroupsRequest = ListRequestInput<"group">;
 
-export interface FindGroupsResponse {
+export interface FindGroupsResponse<Count extends ListCount = number> {
   findGroups: {
-    count: number;
+    count: Count;
     groups: WithStashUrl<NormalizedGroup>[];
   };
 }
@@ -350,9 +357,9 @@ export interface FindGroupsMinimalResponse {
  */
 export type FindImagesRequest = ListRequestInput<"image">;
 
-export interface FindImagesResponse {
+export interface FindImagesResponse<Count extends ListCount = number> {
   findImages: {
-    count: number;
+    count: Count;
     images: WithStashUrl<ImageListItem>[];
   };
 }

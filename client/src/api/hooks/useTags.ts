@@ -1,5 +1,6 @@
 import type { TagTreeScope, UntaggedKind } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { fetchListPage, libraryListTotal } from "../../utils/listQuery";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
@@ -15,8 +16,15 @@ export function useTagList(
     queryFn:
       params === null
         ? skipToken
-        : ({ signal }) => libraryApi.findTags(params, signal),
-    // Keep the current results on screen while the next page loads
+        : (context) =>
+            fetchListPage(
+              context,
+              params,
+              libraryListTotal("findTags"),
+              (request) => libraryApi.findTags(request, context.signal)
+            ),
+    // Keep the current results on screen while the next page loads; a page
+    // change reuses the list's count (`fetchListPage`)
     placeholderData: keepPreviousData,
   });
 }

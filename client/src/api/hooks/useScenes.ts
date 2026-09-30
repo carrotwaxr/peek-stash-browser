@@ -4,6 +4,7 @@ import type {
 } from "@peek/shared-types";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "..";
+import { fetchListPage, libraryListTotal } from "../../utils/listQuery";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 import { useLibraryReady } from "./useLibraryReady";
@@ -20,8 +21,15 @@ export function useSceneList(
     queryFn:
       params === null
         ? skipToken
-        : ({ signal }) => libraryApi.findScenes(params, signal),
-    // Keep the current results on screen while the next page loads
+        : (context) =>
+            fetchListPage(
+              context,
+              params,
+              libraryListTotal("findScenes"),
+              (request) => libraryApi.findScenes(request, context.signal)
+            ),
+    // Keep the current results on screen while the next page loads; a page
+    // change reuses the list's count (`fetchListPage`)
     placeholderData: keepPreviousData,
   });
 }

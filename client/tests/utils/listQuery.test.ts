@@ -1,9 +1,17 @@
 import { DEFAULT_SORT } from "@peek/shared-types";
-import { describe, expect, it } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
+import { must } from "@tests/testUtils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { invalidateInstanceQueries } from "@/api/hooks/useLibraryReady";
+import { invalidateExclusionDependents } from "@/api/invalidateExclusionDependents";
+import { queryKeys } from "@/api/queryKeys";
 import { SCENE_FILTER_OPTIONS, buildSceneFilter } from "@/utils/filterConfig";
 import {
   type ListQueryState,
   buildListQuery,
+  clipListTotal,
+  fetchListPage,
+  libraryListTotal,
   listKeyOf,
   listKeyWithoutPageOf,
   lockedFieldsOf,
@@ -139,5 +147,170 @@ describe("locked fields", () => {
       const next = options[options.indexOf(header) + 1];
       expect(next && next.type !== "section-header").toBe(true);
     }
+  });
+});
+
+describe("a page change reuses its list's count (fetchListPage)", () => {
+  const FIVE_MINUTES = 5 * 60 * 1000;
+  type Request = {
+    filter: Record<string, unknown>;
+    performer_filter: Record<string, unknown>;
+  };
+  const request = (
+    page: number,
+    filter: Record<string, unknown> = {},
+    performerFilter: Record<string, unknown> = {}
+  ): Request => ({
+    filter: {
+      page,
+      per_page: 24,
+      q: "",
+      sort: "name",
+      direction: "ASC",
+      ...filter,
+    },
+    performer_filter: performerFilter,
+  });
+
+  let sent: Request[];
+  let total: number;
+  /** The server: counts unless asked not to */
+  const server = (sentRequest: Request) => {
+    sent.push(sentRequest);
+    return Promise.resolve({
+      findPerformers: {
+        count: sentRequest.filter.count === false ? null : total,
+        performers: [],
+      },
+    });
+  };
+  const newClient = () =>
+    new QueryClient({
+      defaultOptions: { queries: { staleTime: FIVE_MINUTES, retry: false } },
+    });
+  type Page = { findPerformers: { count: number } };
+  const load = async (
+    client: QueryClient,
+    listRequest: Request
+  ): Promise<Page> => {
+    const data = await client.fetchQuery({
+      queryKey: queryKeys.performers.list(undefined, listRequest),
+      queryFn: (context) =>
+        fetchListPage(
+          context,
+          listRequest,
+          libraryListTotal("findPerformers"),
+          server
+        ),
+    });
+    return data as Page;
+  };
+  const countAsked = (index: number) =>
+    must(sent[index]).filter.count !== false;
+
+  let client: QueryClient;
+  beforeEach(() => {
+    sent = [];
+    total = 60;
+    client = newClient();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("page 2 of the same list sends count false and shows page 1's total", async () => {
+    await load(client, request(1));
+    total = 59;
+    const page2 = await load(client, request(2));
+
+    expect(countAsked(0)).toBe(true);
+    expect(must(sent[1]).filter).toEqual({
+      ...request(2).filter,
+      count: false,
+    });
+    expect(page2.findPerformers.count).toBe(60);
+    // Page 3 reuses the count page 1's request took, too
+    expect((await load(client, request(3))).findPerformers.count).toBe(60);
+    expect(countAsked(2)).toBe(false);
+  });
+
+  it.each([
+    ["a filter change", request(2, {}, { favorite: { value: true } })],
+    ["a search", request(2, { q: "anna" })],
+    ["a sort change", request(2, { sort: "scenes_count" })],
+    ["a direction change", request(2, { direction: "DESC" })],
+    ["a per page change", request(2, { per_page: 48 })],
+  ])("%s asks for the count again", async (_change, changed) => {
+    await load(client, request(1));
+    total = 12;
+    const next = await load(client, changed);
+
+    expect(countAsked(1)).toBe(true);
+    expect(next.findPerformers.count).toBe(12);
+  });
+
+  it.each([
+    ["a hide, a restore or Restore All", invalidateExclusionDependents],
+    ["an instance change", invalidateInstanceQueries],
+  ])("after %s, the next page asks for the count", async (_what, change) => {
+    await load(client, request(1));
+    await change(client);
+    total = 59;
+    const page2 = await load(client, request(2));
+
+    expect(countAsked(1)).toBe(true);
+    expect(page2.findPerformers.count).toBe(59);
+    // The fresh count is the one the next page reuses
+    expect((await load(client, request(3))).findPerformers.count).toBe(59);
+    expect(countAsked(2)).toBe(false);
+  });
+
+  it("a reload on page 3 asks for the count", async () => {
+    await load(client, request(1));
+    const reloaded = newClient();
+    await load(reloaded, request(3));
+
+    expect(countAsked(1)).toBe(true);
+  });
+
+  it("a count older than the cache's stale time is asked for again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    await load(client, request(1));
+    vi.setSystemTime(Date.now() + FIVE_MINUTES + 1);
+    total = 70;
+    const page2 = await load(client, request(2));
+
+    expect(countAsked(1)).toBe(true);
+    expect(page2.findPerformers.count).toBe(70);
+  });
+
+  it("a clip page change sends count false and fills total and totalPages", async () => {
+    const clipSent: Record<string, unknown>[] = [];
+    const clipServer = (clipRequest: Record<string, unknown>) => {
+      clipSent.push(clipRequest);
+      const counted = clipRequest.count !== false;
+      return Promise.resolve({
+        clips: [],
+        total: counted ? 50 : null,
+        page: clipRequest.page,
+        perPage: 24,
+        totalPages: counted ? 3 : null,
+      });
+    };
+    const loadClips = (page: number) => {
+      const clipRequest = { page, perPage: 24, sortBy: "title" };
+      return client.fetchQuery({
+        queryKey: queryKeys.clips.list(clipRequest),
+        queryFn: (context) =>
+          fetchListPage(context, clipRequest, clipListTotal, clipServer),
+      });
+    };
+
+    await loadClips(1);
+    const page2 = await loadClips(2);
+
+    expect(must(clipSent[0]).count).toBeUndefined();
+    expect(must(clipSent[1]).count).toBe(false);
+    expect(page2).toMatchObject({ total: 50, totalPages: 3, page: 2 });
   });
 });

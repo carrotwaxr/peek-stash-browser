@@ -27,6 +27,7 @@ import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import { must } from "../../tests/helpers/must.js";
 import type { ParsedListRequest } from "../../types/parsedFilters.js";
 import {
   FX,
@@ -59,7 +60,7 @@ type Page = (
   perPage: number
 ) => Promise<{
   items: Row[];
-  total: number;
+  total: number | null;
 }>;
 
 /**
@@ -68,9 +69,10 @@ type Page = (
  */
 async function walk(page: Page): Promise<{ all: string[]; walked: string[] }> {
   const whole = await page(1, 250);
-  expect(whole.total).toBe(whole.items.length);
+  const total = must(whole.total, "the list's total");
+  expect(total).toBe(whole.items.length);
   const walked: string[] = [];
-  for (let n = 1; n <= whole.total; n++) {
+  for (let n = 1; n <= total; n++) {
     const { items } = await page(n, 1);
     walked.push(...items.map(key));
   }

@@ -276,6 +276,8 @@ export type {
 // Library endpoint types
 export type {
   WithStashUrl,
+  // A list's total, null when the request asked for none
+  ListCount,
   // Entity pickers
   MinimalRequest,
   MinimalScope,

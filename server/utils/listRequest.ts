@@ -732,6 +732,20 @@ interface PageState {
   perPage: number | undefined;
   q: string | undefined;
   direction: SortDirection | undefined;
+  /** false: the page alone, no count */
+  count: boolean | undefined;
+}
+
+/** `filter.count` as sent: a boolean; absent when missing or invalid */
+function parseCountFlag(
+  raw: unknown,
+  path: string,
+  problems: Problems
+): boolean | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === "boolean") return raw;
+  problems.add(path, "Expected true or false");
+  return undefined;
 }
 
 /** `POST /api/library/<entities>`: paging, sort, search, top-level ids and the entity's filter */
@@ -749,6 +763,7 @@ export function parseListRequest<E extends EntityKind>(
     perPage: undefined,
     q: undefined,
     direction: undefined,
+    count: undefined,
   };
   let sortField: SortField<E> | undefined;
   let fields: ParsedFieldsResult = {
@@ -772,6 +787,10 @@ export function parseListRequest<E extends EntityKind>(
       (raw, path) => (state.direction = parseDirection(raw, path, problems)),
     ],
     ["q", (raw, path) => (state.q = parseQ(raw, path, problems))],
+    [
+      "count",
+      (raw, path) => (state.count = parseCountFlag(raw, path, problems)),
+    ],
   ]);
 
   const handlers = new Map<string, (raw: unknown, path: string) => void>([
@@ -821,6 +840,7 @@ export function parseListRequest<E extends EntityKind>(
     // The one boundary cast: each criterion was validated by its field's schema
     filter: fields.criteria as ParsedFilter<E>,
     specificInstanceId: fields.specificInstanceId,
+    ...(state.count === undefined ? {} : { count: state.count }),
   };
 }
 
@@ -1024,6 +1044,7 @@ export function parseClipQuery(
     perPage: undefined,
     q: undefined,
     direction: undefined,
+    count: undefined,
   };
   let sortField: SortField<"clip"> | undefined;
   let specificInstanceId: string | undefined;
@@ -1045,6 +1066,10 @@ export function parseClipQuery(
       (raw, path) => (state.direction = parseDirection(raw, path, problems)),
     ],
     ["q", (raw, path) => (state.q = parseQ(raw, path, problems))],
+    [
+      "count",
+      (raw, path) => (state.count = parseBooleanText(raw, path, problems)),
+    ],
   ]);
   for (const [key, spec] of Object.entries(CLIP_PARAMS)) {
     switch (spec.kind) {
@@ -1087,6 +1112,7 @@ export function parseClipQuery(
     sort: resolveSort("clip", sortField, state.direction, options.userId),
     filter,
     specificInstanceId,
+    ...(state.count === undefined ? {} : { count: state.count }),
   };
 }
 

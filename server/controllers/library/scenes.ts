@@ -14,6 +14,7 @@ import type {
   FindSimilarScenesResponse,
   GetRecommendedScenesQuery,
   GetRecommendedScenesResponse,
+  ListCount,
   TypedLibraryRequest,
   TypedResponse,
   WithStashUrl,
@@ -64,7 +65,7 @@ export function addStreamabilityInfo(
 export const findScenes = async (
   req: TypedLibraryRequest<FindScenesRequest>,
   res: TypedResponse<
-    FindScenesResponse | ApiErrorResponse | AmbiguousLookupResponse
+    FindScenesResponse<ListCount> | ApiErrorResponse | AmbiguousLookupResponse
   >
 ) => {
   const requestStart = Date.now();

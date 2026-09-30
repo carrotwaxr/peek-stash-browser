@@ -144,6 +144,8 @@ interface ListPageOptions {
   cardSettings?: Record<string, Record<string, unknown>>;
   /** The user's settings, over the server's defaults */
   userSettings?: Parameters<typeof userSettingsResponse>[0];
+  /** The query cache's stale time (the app's is 5 minutes); 0 by default */
+  staleTime?: number;
 }
 
 /**
@@ -162,10 +164,11 @@ export const renderListPage = (
     defaultPresets = {},
     cardSettings = {},
     userSettings = {},
+    staleTime = 0,
   }: ListPageOptions = {}
 ) => {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime } },
   });
   // The preset queries' keys (`usePresets`), read here so importing this
   // file evaluates no query options a test's mocks could break

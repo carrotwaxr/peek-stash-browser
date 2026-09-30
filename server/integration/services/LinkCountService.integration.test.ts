@@ -30,6 +30,7 @@ import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
+import { must } from "../../tests/helpers/must.js";
 import type { RefCriterion } from "../../types/parsedFilters.js";
 import type { EntityRef } from "../../utils/entityRef.js";
 import { mirrorInheritedTags } from "../helpers/inheritedTags.js";
@@ -313,8 +314,9 @@ async function columnsAndTabs(): Promise<
   const out: Array<{ column: string; stored: number; listed: number }> = [];
   const push = (column: string, stored: number, listed: number) =>
     out.push({ column, stored, listed });
-  const total = async (run: Promise<{ total: number }>): Promise<number> =>
-    (await run).total;
+  const total = async (
+    run: Promise<{ total: number | null }>
+  ): Promise<number> => must((await run).total, "the list's total");
 
   for (const id of ["1", "2"]) {
     const p = await performer(id);

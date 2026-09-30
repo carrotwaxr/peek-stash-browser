@@ -148,6 +148,45 @@ describe("list request validation", () => {
     );
   });
 
+  it.each([
+    { path: "/api/library/images", result: "findImages", rows: "images" },
+    { path: "/api/library/scenes", result: "findScenes", rows: "scenes" },
+  ])(
+    "filter.count false answers page 2 with a null count and the same rows ($path)",
+    async ({ path, result, rows }) => {
+      type Listed = Record<
+        string,
+        { count: number | null } & Record<string, unknown>
+      >;
+      const page = async (count?: false) => {
+        const response = await adminClient.post<Listed>(path, {
+          filter: {
+            page: 2,
+            per_page: 3,
+            ...(count === undefined ? {} : { count }),
+          },
+        });
+        expect(response.status).toBe(200);
+        return must(response.data[result]);
+      };
+
+      const counted = await page();
+      const uncounted = await page(false);
+
+      expect(counted.count).toBeGreaterThan(3);
+      expect(uncounted.count).toBeNull();
+      expect(uncounted[rows]).toEqual(counted[rows]);
+    }
+  );
+
+  it("filter.count other than a boolean answers 400 naming it", async () => {
+    const response = await adminClient.post("/api/library/scenes", {
+      filter: { count: "no" },
+    });
+
+    expectRefused(response, ["filter.count"]);
+  });
+
   it("a body that is a string answers 400", async () => {
     const response = await adminClient.post(
       "/api/library/scenes",
@@ -183,6 +222,24 @@ describe("list request validation", () => {
       expect(response.data.totalPages).toBe(
         Math.ceil(response.data.total / 250)
       );
+    });
+
+    it("count=false answers the page with total and totalPages null", async () => {
+      const counted = await adminClient.get<GetClipsResponse>(
+        "/api/clips?perPage=2&page=1"
+      );
+      const uncounted = await adminClient.get<GetClipsResponse<null>>(
+        "/api/clips?perPage=2&page=1&count=false"
+      );
+
+      expect(counted.status).toBe(200);
+      expect(uncounted.status).toBe(200);
+      expect(counted.data.total).toBeGreaterThan(0);
+      expect(uncounted.data.total).toBeNull();
+      expect(uncounted.data.totalPages).toBeNull();
+      const ids = (clips: unknown[]) =>
+        clips.map((clip) => (clip as { id: string }).id);
+      expect(ids(uncounted.data.clips)).toEqual(ids(counted.data.clips));
     });
 
     it("sortDir sideways answers 400", async () => {

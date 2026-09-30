@@ -7,6 +7,7 @@ import type {
   FindGalleriesMinimalResponse,
   FindGalleriesRequest,
   FindGalleriesResponse,
+  ListCount,
   TypedLibraryRequest,
   TypedResponse,
 } from "../../types/api/index.js";
@@ -26,7 +27,9 @@ import { relationCountsHandler } from "./relationCounts.js";
 export const findGalleries = async (
   req: TypedLibraryRequest<FindGalleriesRequest>,
   res: TypedResponse<
-    FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse
+    | FindGalleriesResponse<ListCount>
+    | ApiErrorResponse
+    | AmbiguousLookupResponse
   >
 ) => {
   // A ValidationError (400) reaches the central error handler

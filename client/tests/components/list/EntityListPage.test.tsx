@@ -258,6 +258,35 @@ describe("EntityListPage", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("page 2 of the same list sends count false and shows page 1's total", async () => {
+    api.findPerformers.mockImplementation((params) => {
+      const filter = params.filter as { count?: boolean } | undefined;
+      const rows = rowsOf(`p${pageOf(params)}`);
+      return Promise.resolve(
+        filter?.count === false
+          ? { findPerformers: { count: null, performers: rows } }
+          : response("findPerformers", "performers", rows, 48)
+      );
+    });
+
+    renderListPage(<Performers />, {
+      initialEntries: ["/performers"],
+      staleTime: 5 * 60 * 1000,
+    });
+    expect(await screen.findByText("p1-0")).toBeInTheDocument();
+
+    fireEvent.click(
+      must(screen.getAllByRole("button", { name: "Next Page" })[0])
+    );
+    expect(await screen.findByText("p2-0")).toBeInTheDocument();
+
+    const page2 = must(api.findPerformers.mock.calls.at(-1))[0];
+    expect(page2.filter).toMatchObject({ page: 2, count: false });
+    expect(
+      screen.getAllByText("Showing 25-48 of 48 records").length
+    ).toBeGreaterThan(0);
+  });
+
   it("hiding a performer removes its card and lowers the count", async () => {
     api.findPerformers.mockResolvedValue(
       response("findPerformers", "performers", rowsOf("perf", 3), 3)

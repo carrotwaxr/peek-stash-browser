@@ -185,6 +185,11 @@ export interface ListPageInput<E extends EntityKind> {
   sort?: SortOf<E> | RandomSortKey;
   direction?: SortDirection;
   q?: string;
+  /**
+   * false: the page alone, its `count` null (a page change of a list whose
+   * total the client already holds); counted when absent
+   */
+  count?: false;
 }
 
 /** `POST /api/library/<entities>`: paging, top-level ids and the entity's filter */
@@ -212,6 +217,8 @@ export type ClipQueryInput = {
   sortBy?: SortOf<"clip"> | RandomSortKey;
   sortDir?: "asc" | "desc";
   q?: string;
+  /** "false": the page alone, its `total` and `totalPages` null; counted when absent */
+  count?: "false";
 } & {
   /** Refs as one comma-separated list; booleans as "true" or "false" */
   [K in keyof ClipParams]?: ClipParams[K] extends BooleanSpec
