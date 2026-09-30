@@ -948,6 +948,20 @@ describe("User Controller — Features", () => {
       expect(res._getErrorBody().error).toBe("Invalid instanceId");
       expect(userHiddenEntityService.unhideEntity).not.toHaveBeenCalled();
     });
+
+    it("returns 400 for a repeated instanceId, reading and unhiding nothing", async () => {
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "scene", entityId: "42" },
+        query: malformed({ instanceId: ["inst-1", "inst-2"] }),
+        user: USER,
+      });
+      const res = resFor(unhideEntity);
+      await unhideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toBe("instanceId must be a string");
+      expect(mockPrisma.stashInstance.findMany).not.toHaveBeenCalled();
+      expect(userHiddenEntityService.unhideEntity).not.toHaveBeenCalled();
+    });
   });
 
   describe("unhideAllEntities", () => {

@@ -1699,8 +1699,15 @@ export const unhideEntity = async (
     return;
   }
 
+  // A repeated ?instanceId= arrives as an array; it names no one instance
+  const requested: unknown = req.query.instanceId;
+  if (requested !== undefined && typeof requested !== "string") {
+    res.status(400).json({ error: "instanceId must be a string" });
+    return;
+  }
+
   // Without an instance, the legacy row stored for every instance ("") goes
-  const unhideInstanceId = req.query.instanceId ?? "";
+  const unhideInstanceId = requested ?? "";
 
   // Validate instanceId if provided, against the database as a hide does
   if (unhideInstanceId) {
