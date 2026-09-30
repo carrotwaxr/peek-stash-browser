@@ -1,5 +1,5 @@
-import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
+import type { FilterRef } from "../types/parsedFilters.js";
 import { type SqlParam, instanceClause } from "../utils/sqlClauses.js";
 
 export type Granularity = "years" | "months" | "weeks" | "days";
@@ -16,14 +16,15 @@ interface QueryClause {
 }
 
 /**
- * One entity to filter by per field, as the detail pages send it:
- * `"id:instanceId"`, or a bare id, which matches that id on every instance
+ * One entity to filter by per field, as the detail pages send it and the
+ * controller parsed it: a ref with its instance, or a bare id
+ * (`instanceId` undefined), which matches that id on every instance
  */
 export interface TimelineFilters {
-  performerId?: string;
-  tagId?: string;
-  studioId?: string;
-  groupId?: string;
+  performerId?: FilterRef;
+  tagId?: FilterRef;
+  studioId?: FilterRef;
+  groupId?: FilterRef;
 }
 
 type TimelineFilter = keyof TimelineFilters;
@@ -177,14 +178,12 @@ export class TimelineService {
         instanceColumn = `${alias}.stashInstanceId`;
       }
 
-      // An empty instance ("42:") is a bare id
-      const ref = parseEntityRef(value);
-      if (ref.instanceId) {
+      if (value.instanceId) {
         conditions.push(`${idColumn} = ? AND ${instanceColumn} = ?`);
-        filterParams.push(ref.id, ref.instanceId);
+        filterParams.push(value.id, value.instanceId);
       } else {
         conditions.push(`${idColumn} = ?`);
-        filterParams.push(ref.id);
+        filterParams.push(value.id);
         if (path.kind === "junction") distinct = true;
       }
     }

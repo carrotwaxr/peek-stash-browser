@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { TimelineService } from "../../services/TimelineService.js";
+import type { FilterRef } from "../../types/parsedFilters.js";
 import { untrusted } from "../helpers/untrusted.js";
+
+/** A parsed filter value */
+const ref = (id: string, instanceId?: string): FilterRef => ({
+  id,
+  instanceId,
+});
 
 vi.mock("../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -128,7 +135,7 @@ describe("TimelineService", () => {
         1,
         ["inst-a", "inst-b"],
         "months",
-        { performerId: "42:inst-a" }
+        { performerId: ref("42", "inst-a") }
       );
 
       expect(sql).toContain(
@@ -144,26 +151,13 @@ describe("TimelineService", () => {
         1,
         ["inst-a", "inst-b"],
         "months",
-        { performerId: "42" }
+        { performerId: ref("42") }
       );
 
       expect(sql).toContain("sp.performerId = ?");
       expect(sql).not.toContain("sp.performerInstanceId = ?");
       expect(params).toEqual([1, "inst-a", "inst-b", "42"]);
       expect(placeholders(sql)).toBe(params.length);
-    });
-
-    it("an id with an empty instance is bare", () => {
-      const { sql, params } = service.buildDistributionQuery(
-        "scene",
-        1,
-        ["inst-a", "inst-b"],
-        "months",
-        { performerId: "42:" }
-      );
-
-      expect(sql).not.toContain("sp.performerInstanceId = ?");
-      expect(params).toEqual([1, "inst-a", "inst-b", "42"]);
     });
 
     it.each([
@@ -197,7 +191,7 @@ describe("TimelineService", () => {
           1,
           ["inst-a", "inst-b"],
           "months",
-          { [filter]: "7:inst-b" }
+          { [filter]: ref("7", "inst-b") }
         );
 
         expect(sql).toContain(condition);
@@ -213,10 +207,10 @@ describe("TimelineService", () => {
         ["inst-a", "inst-b"],
         "months",
         {
-          performerId: "1:a",
-          tagId: "2",
-          studioId: "3:a",
-          groupId: "4:a",
+          performerId: ref("1", "a"),
+          tagId: ref("2"),
+          studioId: ref("3", "a"),
+          groupId: ref("4", "a"),
         }
       );
 
@@ -241,7 +235,7 @@ describe("TimelineService", () => {
         1,
         ["inst-a", "inst-b"],
         "months",
-        { groupId: "4:a" }
+        { groupId: ref("4", "a") }
       );
 
       expect(sql).not.toContain("groupId");
@@ -258,8 +252,8 @@ describe("TimelineService", () => {
 
     it.each([
       ["no filter", undefined],
-      ["a bare ref", { performerId: "42" }],
-      ["a composite ref", { performerId: "42:inst-a" }],
+      ["a bare ref", { performerId: ref("42") }],
+      ["a composite ref", { performerId: ref("42", "inst-a") }],
     ])("never counts by bare id (%s)", (_name, filters) => {
       const { sql } = service.buildDistributionQuery(
         "scene",
@@ -279,9 +273,9 @@ describe("TimelineService", () => {
         ["inst-a", "inst-b"],
         "months",
         {
-          performerId: "42:inst-a",
-          tagId: "9:inst-a",
-          studioId: "3",
+          performerId: ref("42", "inst-a"),
+          tagId: ref("9", "inst-a"),
+          studioId: ref("3"),
         }
       );
 
@@ -296,7 +290,7 @@ describe("TimelineService", () => {
         ["inst-a", "inst-b"],
         "months",
         {
-          tagId: "9",
+          tagId: ref("9"),
         }
       );
 

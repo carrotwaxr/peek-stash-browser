@@ -1,6 +1,6 @@
 import express from "express";
 import { getDateDistribution } from "../controllers/timelineController.js";
-import { authenticate, requireCacheReady } from "../middleware/auth.js";
+import { authenticate, withAllowedInstances } from "../middleware/auth.js";
 import { libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -11,7 +11,7 @@ router.use(authenticate);
 // Get date distribution for entity type
 router.get(
   "/:entityType/distribution",
-  requireCacheReady,
+  withAllowedInstances,
   libraryHandler(getDateDistribution)
 );
 

@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { expectRefused } from "../helpers/refused.js";
 import {
   adminClient,
   findTestInstanceId,
   guestClient,
   restoreInstanceSelection,
   selectAllInstances,
+  selectTestInstanceOnly,
 } from "../helpers/testClient.js";
 
 interface DistributionResponse {
@@ -190,5 +193,81 @@ describe("Timeline API", () => {
         expect(bars).toEqual([]);
       }
     );
+  });
+
+  /**
+   * The bars count what the viewer's selected, synced instances hold (item
+   * 35): the second library reuses the test library's ids, so a total that
+   * includes it differs from the test instance's own
+   */
+  describe("counts only the viewer's instances", () => {
+    const path = "/api/timeline/scene/distribution?granularity=years";
+    type Bars = DistributionResponse["distribution"];
+
+    const total = (bars: Bars): number =>
+      bars.reduce((sum, bar) => sum + bar.count, 0);
+
+    async function scenesBars(): Promise<Bars> {
+      const response = await adminClient.get<DistributionResponse>(path);
+      expect(response.status).toBe(200);
+      return response.data.distribution;
+    }
+
+    afterAll(restoreInstanceSelection);
+
+    it("with only the test instance selected, the scene bars' total is the test instance's dated live scenes", async () => {
+      const instanceId = await selectTestInstanceOnly();
+      const rows = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+        `SELECT COUNT(*) AS n FROM StashScene
+         WHERE stashInstanceId = ? AND deletedAt IS NULL
+           AND date LIKE '____-__-__' AND date NOT LIKE '-%'`,
+        instanceId
+      );
+      const expected = Number(must(rows[0], "a count row").n);
+      expect(expected).toBeGreaterThan(0);
+
+      expect(total(await scenesBars())).toBe(expected);
+    });
+
+    it("a second instance on its first sync adds no bar", async () => {
+      const instanceId = await selectTestInstanceOnly();
+      const testOnly = await scenesBars();
+
+      const instances = await prisma.stashInstance.findMany({
+        where: { id: { not: instanceId } },
+        select: { id: true, firstSyncedAt: true },
+      });
+      const second = must(instances[0], "a second instance");
+      await selectAllInstances();
+      await prisma.stashInstance.update({
+        where: { id: second.id },
+        data: { firstSyncedAt: null },
+      });
+      try {
+        expect(await scenesBars()).toEqual(testOnly);
+      } finally {
+        await prisma.stashInstance.update({
+          where: { id: second.id },
+          data: { firstSyncedAt: second.firstSyncedAt },
+        });
+      }
+    });
+
+    it.each(["performerId", "tagId", "studioId", "groupId"])(
+      "a malformed %s answers 400 naming it",
+      async (filter) => {
+        const response = await adminClient.get(
+          `${path}&${filter}=not%20an%20id`
+        );
+        expectRefused(response, [filter]);
+      }
+    );
+
+    it("a repeated performerId answers 400 naming it", async () => {
+      const response = await adminClient.get(
+        `${path}&performerId=1&performerId=2`
+      );
+      expectRefused(response, ["performerId"]);
+    });
   });
 });

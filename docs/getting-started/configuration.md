@@ -59,6 +59,7 @@ When multiple instances are configured, each user can choose which instances the
 
 - Check or uncheck instances to control which content appears in your library
 - At least one instance must remain selected
+- The selection applies to every page, the timeline included: its bars count only content from the servers you selected, and not a server's content before its first sync has finished
 - New users see all instances by default
 - If an admin disables every instance a user selected, that user sees all the enabled instances instead, with their restrictions and hidden items applied, until they choose again
 

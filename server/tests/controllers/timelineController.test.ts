@@ -1,8 +1,10 @@
 // server/tests/controllers/timelineController.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDateDistribution } from "../../controllers/timelineController.js";
+import { ValidationError } from "../../middleware/errorHandler.js";
 import { timelineService } from "../../services/TimelineService.js";
 import { reqFor, resFor, testUser } from "../helpers/controllerTestUtils.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -89,10 +91,10 @@ describe("timelineController", () => {
         params: { entityType: "image" },
         query: {
           granularity: "days",
-          performerId: "p1:inst-a",
-          tagId: "t1:inst-a",
-          studioId: "s1:inst-a",
-          groupId: "g1:inst-a",
+          performerId: "1:inst-a",
+          tagId: "2:inst-a",
+          studioId: "3:inst-a",
+          groupId: "4:inst-a",
         },
         user: testUser({ id: 1 }),
         allowedInstanceIds: ["inst-a"],
@@ -106,12 +108,59 @@ describe("timelineController", () => {
         ["inst-a"],
         "days",
         {
-          performerId: "p1:inst-a",
-          tagId: "t1:inst-a",
-          studioId: "s1:inst-a",
-          groupId: "g1:inst-a",
+          performerId: { id: "1", instanceId: "inst-a" },
+          tagId: { id: "2", instanceId: "inst-a" },
+          studioId: { id: "3", instanceId: "inst-a" },
+          groupId: { id: "4", instanceId: "inst-a" },
         }
       );
+    });
+
+    it("passes req.allowedInstanceIds and the parsed refs to the service", async () => {
+      vi.mocked(timelineService.getDistribution).mockResolvedValue([]);
+
+      const req = reqFor(getDateDistribution, {
+        params: { entityType: "scene" },
+        query: { performerId: "7", tagId: "9:inst-b" },
+        user: testUser({ id: 3 }),
+        allowedInstanceIds: ["inst-a", "inst-b"],
+      });
+
+      await getDateDistribution(req, resFor(getDateDistribution));
+
+      expect(timelineService.getDistribution).toHaveBeenCalledWith(
+        "scene",
+        3,
+        ["inst-a", "inst-b"],
+        "months",
+        {
+          performerId: { id: "7", instanceId: undefined },
+          tagId: { id: "9", instanceId: "inst-b" },
+        }
+      );
+    });
+
+    it.each([
+      ["a malformed value", "not an id"],
+      ["a repeated parameter", ["1", "2"]],
+    ])("%s answers 400 naming the parameter", async (_name, value) => {
+      const req = reqFor(getDateDistribution, {
+        params: { entityType: "scene" },
+        query: { studioId: untrusted<string>(value) },
+        user: testUser({ id: 1 }),
+        allowedInstanceIds: ["inst-a"],
+      });
+
+      const error: unknown = await getDateDistribution(
+        req,
+        resFor(getDateDistribution)
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).issues).toEqual([
+        { path: "studioId", message: "Expected an id or id:instanceId" },
+      ]);
+      expect(timelineService.getDistribution).not.toHaveBeenCalled();
     });
 
     it("a request with only one filter passes only that filter", async () => {
@@ -119,7 +168,7 @@ describe("timelineController", () => {
 
       const req = reqFor(getDateDistribution, {
         params: { entityType: "gallery" },
-        query: { tagId: "t1:inst-a" },
+        query: { tagId: "2:inst-a" },
         user: testUser({ id: 1 }),
         allowedInstanceIds: ["inst-a"],
       });
@@ -131,7 +180,7 @@ describe("timelineController", () => {
         1,
         ["inst-a"],
         "months",
-        { tagId: "t1:inst-a" }
+        { tagId: { id: "2", instanceId: "inst-a" } }
       );
     });
 
