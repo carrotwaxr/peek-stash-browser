@@ -6,6 +6,7 @@
  */
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -13,7 +14,7 @@ import {
   within,
 } from "@testing-library/react";
 import { must, renderListPage } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Galleries from "@/components/pages/Galleries";
 import FolderView from "../../../src/components/folder/FolderView";
 
@@ -473,6 +474,85 @@ describe("FolderView", () => {
       expect(api.findGalleries).not.toHaveBeenCalled();
       expect(screen.queryByText(/Showing \d/)).not.toBeInTheDocument();
       expect(screen.queryByTestId("gallery-card")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("many folders", () => {
+    const callbacks: IntersectionObserverCallback[] = [];
+    const watched = new Set<Element>();
+
+    class FakeObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        callbacks.push(callback);
+      }
+      observe(target: Element) {
+        watched.add(target);
+      }
+      unobserve(target: Element) {
+        watched.delete(target);
+      }
+      disconnect() {}
+    }
+
+    /** Reports the sentinel of the folder cards, or of the sidebar, in view */
+    const reach = (testId: string) =>
+      act(() => {
+        const target = screen.getByTestId(testId);
+        callbacks.forEach((callback) =>
+          callback(
+            [
+              {
+                target,
+                isIntersecting: true,
+                intersectionRatio: 1,
+              } as unknown as IntersectionObserverEntry,
+            ],
+            {} as IntersectionObserver
+          )
+        );
+      });
+
+    beforeEach(() => {
+      callbacks.length = 0;
+      watched.clear();
+      vi.stubGlobal("IntersectionObserver", FakeObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const manyTags = Array.from({ length: 450 }, (_, i) => ({
+      id: `t${i}`,
+      name: `Folder ${String(i).padStart(3, "0")}`,
+      parents: [],
+      image_count: 1,
+    }));
+
+    it("mounts 200 folder cards and 200 sidebar rows, and each sentinel mounts 200 more", () => {
+      const { container } = renderFolder({ tags: manyTags });
+      const sidebarRows = () =>
+        container.querySelectorAll("[data-node-path]").length;
+
+      expect(folderNames()).toHaveLength(200);
+      expect(sidebarRows()).toBe(200);
+
+      reach("folder-sentinel");
+      expect(folderNames()).toHaveLength(400);
+      expect(sidebarRows()).toBe(200);
+
+      reach("folder-tree-sentinel");
+      expect(sidebarRows()).toBe(400);
+    });
+
+    it("the sidebar shows the open folder's root even past its chunk", () => {
+      const { container } = renderFolder({
+        tags: manyTags,
+        path: ["t449"],
+      });
+      expect(
+        container.querySelector('[data-node-path="t449"]')
+      ).toBeInTheDocument();
     });
   });
 });

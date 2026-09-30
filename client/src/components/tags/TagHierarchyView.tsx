@@ -4,6 +4,7 @@ import {
   ChevronsDownUp as LucideChevronsDownUp,
   ChevronsUpDown as LucideChevronsUpDown,
 } from "lucide-react";
+import { useIncrementalList } from "../../hooks/useIncrementalList";
 import {
   type TagTreeNode as TagTreeNodeData,
   type TagTreeSource,
@@ -19,6 +20,9 @@ import TagTreeNode from "./TagTreeNode";
  * instances' same-numbered tags expand apart.
  */
 type TreeNode = TagTreeNodeData<TagTreeSource>;
+
+/** The first view opens every root only while it shows fewer rows than this */
+const INITIAL_EXPAND_MAX_ROWS = 500;
 
 /** A row of the expanded tree, for keyboard navigation */
 interface VisibleNode {
@@ -62,6 +66,13 @@ const TagHierarchyView = ({
     [tags, searchQuery, sortField, sortDirection]
   );
 
+  // Roots mount in chunks; the sentinel after the last one loads the next
+  const {
+    visible: visibleRoots,
+    sentinelRef,
+    hasMore: hasMoreRoots,
+  } = useIncrementalList(tree);
+
   // Get all keys of nodes that have children (expandable nodes)
   const allExpandableIds = useMemo(() => {
     const keys = new Set<string>();
@@ -85,11 +96,12 @@ const TagHierarchyView = ({
         node.children.forEach((child) => traverse(child, key));
       }
     };
-    tree.forEach((root) => traverse(root, null));
+    visibleRoots.forEach((root) => traverse(root, null));
     return nodes;
-  }, [tree, expandedIds]);
+  }, [visibleRoots, expandedIds]);
 
-  // Initialize: expand first level (only on first load, not after Collapse All)
+  // Initialize: expand first level (only on first load, not after Collapse All),
+  // and only while that keeps the rows under INITIAL_EXPAND_MAX_ROWS
   useEffect(() => {
     if (
       tree.length > 0 &&
@@ -97,7 +109,13 @@ const TagHierarchyView = ({
       !hasInitializedRef.current
     ) {
       hasInitializedRef.current = true;
-      setExpandedIds(new Set(tree.map(tagTreeKey)));
+      const rows = tree.reduce(
+        (sum, root) => sum + 1 + root.children.length,
+        0
+      );
+      if (rows < INITIAL_EXPAND_MAX_ROWS) {
+        setExpandedIds(new Set(tree.map(tagTreeKey)));
+      }
     }
   }, [tree, expandedIds.size]);
 
@@ -287,7 +305,7 @@ const TagHierarchyView = ({
         onKeyDown={handleKeyDown}
         className="space-y-1"
       >
-        {tree.map((rootTag) => (
+        {visibleRoots.map((rootTag) => (
           <TagTreeNode
             key={tagTreeKey(rootTag)}
             tag={
@@ -303,6 +321,14 @@ const TagHierarchyView = ({
             onFocus={handleFocus}
           />
         ))}
+        {hasMoreRoots && (
+          <div
+            ref={sentinelRef}
+            data-testid="tree-sentinel"
+            aria-hidden="true"
+            className="h-px"
+          />
+        )}
       </div>
     </div>
   );

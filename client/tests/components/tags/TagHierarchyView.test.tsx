@@ -10,8 +10,8 @@
  * - Search filtering auto-expand
  */
 import { MemoryRouter } from "react-router-dom";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TagHierarchyView from "../../../src/components/tags/TagHierarchyView";
 
 // Wrapper to provide router context
@@ -402,6 +402,150 @@ describe("TagHierarchyView", () => {
 
       expect(screen.getByText("Six on A")).toBeInTheDocument();
       expect(screen.queryByText("Seven on B")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("large trees", () => {
+    /** Every observer built, so a test can report the sentinel in view */
+    const observers: Array<{
+      watched: Set<Element>;
+      callback: IntersectionObserverCallback;
+    }> = [];
+
+    class FakeObserver {
+      watched = new Set<Element>();
+      callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+        observers.push(this);
+      }
+      observe(target: Element) {
+        this.watched.add(target);
+      }
+      unobserve(target: Element) {
+        this.watched.delete(target);
+      }
+      disconnect() {
+        this.watched.clear();
+      }
+    }
+
+    const reachSentinel = () =>
+      observers.forEach((o) =>
+        act(() =>
+          o.callback(
+            [...o.watched].map(
+              (target) =>
+                ({
+                  target,
+                  isIntersecting: true,
+                  intersectionRatio: 1,
+                }) as IntersectionObserverEntry
+            ),
+            o as unknown as IntersectionObserver
+          )
+        )
+      );
+
+    beforeEach(() => {
+      observers.length = 0;
+      vi.stubGlobal("IntersectionObserver", FakeObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const rootTags = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: String(i),
+        instanceId: "a",
+        name: `Tag ${String(i).padStart(5, "0")}`,
+        parents: [],
+      }));
+
+    it("10,000 root tags mount at most 200 rows, and the sentinel mounts 200 more", () => {
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={rootTags(10000)}
+          isLoading={false}
+        />
+      );
+      expect(screen.getAllByRole("treeitem")).toHaveLength(200);
+
+      reachSentinel();
+      expect(screen.getAllByRole("treeitem")).toHaveLength(400);
+    });
+
+    it("the last chunk leaves no sentinel", () => {
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={rootTags(250)}
+          isLoading={false}
+        />
+      );
+      expect(screen.getAllByRole("treeitem")).toHaveLength(200);
+      reachSentinel();
+      expect(screen.getAllByRole("treeitem")).toHaveLength(250);
+      expect(screen.queryByTestId("tree-sentinel")).not.toBeInTheDocument();
+    });
+
+    it("269 tags with 11 roots render every root expanded, as today", () => {
+      const tags = [
+        ...Array.from({ length: 11 }, (_, i) => ({
+          id: `r${i}`,
+          instanceId: "a",
+          name: `Root ${String(i).padStart(2, "0")}`,
+          parents: [],
+        })),
+        ...Array.from({ length: 258 }, (_, i) => ({
+          id: `c${i}`,
+          instanceId: "a",
+          name: `Child ${i}`,
+          parents: [{ id: `r${i % 11}` }],
+        })),
+      ];
+      renderWithRouter(
+        <TagHierarchyView searchQuery="" tags={tags} isLoading={false} />
+      );
+      // Every root open: the 11 roots and their 258 children
+      expect(screen.getAllByRole("treeitem")).toHaveLength(269);
+      expect(screen.getByText("Child 257")).toBeInTheDocument();
+    });
+
+    it("opens no root at first when that would show 500 rows or more", () => {
+      const tags = [
+        { id: "r", instanceId: "a", name: "Root", parents: [] },
+        ...Array.from({ length: 600 }, (_, i) => ({
+          id: `c${i}`,
+          instanceId: "a",
+          name: `Child ${i}`,
+          parents: [{ id: "r" }],
+        })),
+      ];
+      renderWithRouter(
+        <TagHierarchyView searchQuery="" tags={tags} isLoading={false} />
+      );
+      expect(screen.getAllByRole("treeitem")).toHaveLength(1);
+
+      // A click still opens it
+      fireEvent.click(screen.getByText("Root"));
+      expect(screen.getAllByRole("treeitem")).toHaveLength(601);
+    });
+
+    it("keyboard navigation stays on the rows mounted", () => {
+      renderWithRouter(
+        <TagHierarchyView
+          searchQuery=""
+          tags={rootTags(500)}
+          isLoading={false}
+        />
+      );
+      const items = screen.getAllByRole("treeitem");
+      fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
+      expect(items[199]).toHaveAttribute("aria-selected", "true");
     });
   });
 });
