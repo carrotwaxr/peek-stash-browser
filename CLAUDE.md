@@ -18,7 +18,7 @@ Invariants:
 
 1. No user needs, sees or receives Stash credentials. The API key never leaves the server; Stash's address reaches only admins.
 2. Every request that shows or serves Stash content is authenticated as a Peek user: a session, or on the direct stream a personal signed link.
-3. A user's exclusions (restrictions, hidden items, cascades) apply on every surface that lists, counts, recommends, shows or serves an entity, by-id lookups, downloads and media included.
+3. A user's exclusions (restrictions, hidden items, cascades) apply on every surface that lists, counts, recommends, shows or serves an entity, by-id lookups, downloads and media included. One exception: the image proxy serves a user the images of items they hid themselves (not restricted ones), so the Hidden Items page shows thumbnails; streams and captions stay refused.
 4. Only admins set restrictions, and never on admin accounts; users cannot bypass them. Hidden items belong to the user who hid them.
 5. Admins bypass restrictions; everyone's own hidden items apply to them everywhere, except in the admin's Content Restrictions editor, which lists everything so an admin can restrict what they hid.
 6. No user sees another user's data, except shared playlists and admin exclusion counts. Deleting a user deletes all their data.
