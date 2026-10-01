@@ -140,12 +140,6 @@
     }
   },
   "src/components/pages/PlaylistDetail.tsx": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
@@ -1308,11 +1302,6 @@
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
-    }
-  },
-  "tests/components/pages/PlaylistDetail.test.tsx": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 3
     }
   },
   "tests/components/settings/CardDisplaySettings.test.tsx": {

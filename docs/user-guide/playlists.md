@@ -46,7 +46,11 @@ The **Add to Playlist** button on the player's controls works the same way.
 
 1. Click **Playlists** in the navigation
 2. Click on any playlist to see its scenes
-3. Scroll through to see all scenes in the playlist
+3. Use the page controls below the list to move between pages (50 scenes a page by default; choose 25, 50 or 100 with **Per page**)
+
+The playlist shows in its own order (**Playlist order**). Use the sort menu above the list to show it another way without changing the playlist: **Date added to playlist**, or any scene sort (title, date, duration, your rating, play count, random and more), with the arrow button to flip the direction. The sort and the page are in the address, so Back returns to the previous one and a link opens the same view. Play, and the next and previous scene while watching, follow the order you see.
+
+The video count above the list counts every scene in the playlist you can see, not just the ones on the page.
 
 On the Playlists page, each playlist shows thumbnails of the first four scenes you can see, and its video count counts only the scenes you can see. Scenes you hid, scenes restricted for you, scenes removed from Stash and scenes on a Stash server you don't use are left out of both.
 
