@@ -255,7 +255,7 @@ describe("SearchControls", () => {
       expect(query).not.toHaveProperty("scene_filter");
     });
 
-    it("renders the controls at once while the presets load; the results wait", async () => {
+    it("renders the controls and the results area at once while the presets load; no request goes out", async () => {
       vi.mocked(apiModule.apiGet).mockImplementation(
         () => new Promise(() => {})
       );
@@ -266,7 +266,8 @@ describe("SearchControls", () => {
 
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
       expect(screen.queryByText("Loading filters...")).not.toBeInTheDocument();
-      expect(screen.queryByText("result cards")).not.toBeInTheDocument();
+      // The page's own skeleton shows here, so the children render
+      expect(screen.getByText("result cards")).toBeInTheDocument();
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(onQueryChange).not.toHaveBeenCalled();
     });

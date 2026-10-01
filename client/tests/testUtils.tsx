@@ -146,6 +146,8 @@ interface ListPageOptions {
   userSettings?: Parameters<typeof userSettingsResponse>[0];
   /** The query cache's stale time (the app's is 5 minutes); 0 by default */
   staleTime?: number;
+  /** Leave the preset queries unseeded: the test's `apiGet` answers them */
+  presetsPending?: boolean;
 }
 
 /**
@@ -165,6 +167,7 @@ export const renderListPage = (
     cardSettings = {},
     userSettings = {},
     staleTime = 0,
+    presetsPending = false,
   }: ListPageOptions = {}
 ) => {
   const queryClient = new QueryClient({
@@ -172,10 +175,12 @@ export const renderListPage = (
   });
   // The preset queries' keys (`usePresets`), read here so importing this
   // file evaluates no query options a test's mocks could break
-  queryClient.setQueryData(queryKeys.user.filterPresets(), { presets });
-  queryClient.setQueryData(queryKeys.user.defaultPresets(), {
-    defaults: defaultPresets,
-  });
+  if (!presetsPending) {
+    queryClient.setQueryData(queryKeys.user.filterPresets(), { presets });
+    queryClient.setQueryData(queryKeys.user.defaultPresets(), {
+      defaults: defaultPresets,
+    });
+  }
   queryClient.setQueryData(
     queryKeys.user.settings(),
     userSettingsResponse(userSettings)

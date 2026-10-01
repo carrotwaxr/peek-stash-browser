@@ -127,7 +127,6 @@ const SearchControls = ({
     viewMode,
     zoomLevel,
     gridDensity,
-    ready,
     applyFilters,
     removeFilter,
     clearFilters,
@@ -684,7 +683,7 @@ const SearchControls = ({
           transition: "opacity 0.2s ease",
         }}
       >
-        {ready ? children : null}
+        {children}
       </div>
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

@@ -7,6 +7,7 @@ import type { ComponentType } from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { must, renderListPage } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet } from "@/api";
 import EntityListPage from "@/components/list/EntityListPage";
 import { PERFORMER_LIST } from "@/components/list/listPageConfigs";
 import Groups from "@/components/pages/Groups";
@@ -200,6 +201,35 @@ describe.each(PAGES)(
 
       renderListPage(<Page />, { initialEntries: [`${path}?per_page=48`] });
       expect(await screen.findAllByTestId("list-skeleton")).toHaveLength(24);
+    });
+
+    it("on a first visit with presets pending, the results area shows the list skeleton, then the cards", async () => {
+      // The saved presets and the default ids, each answered by the test
+      const answers: ((value: unknown) => void)[] = [];
+      const held = () =>
+        new Promise<unknown>((resolve) => {
+          answers.push(resolve);
+        });
+      vi.mocked(apiGet)
+        .mockImplementationOnce(held)
+        .mockImplementationOnce(held);
+      api[find].mockResolvedValue(
+        response(find, items, [{ id: "1", instanceId: "a", name: "Ada" }], 1)
+      );
+
+      renderListPage(<Page />, {
+        initialEntries: [path],
+        presetsPending: true,
+      });
+
+      expect(await screen.findAllByTestId("list-skeleton")).not.toHaveLength(0);
+      expect(api[find]).not.toHaveBeenCalled();
+
+      act(() => {
+        for (const answer of answers) answer({ presets: {}, defaults: {} });
+      });
+      expect(await screen.findByText("Ada")).toBeInTheDocument();
+      expect(screen.queryAllByTestId("list-skeleton")).toHaveLength(0);
     });
 
     it("an empty result stays out of view while the next query loads", async () => {
