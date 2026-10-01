@@ -1,45 +1,25 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { useQuery } from "@tanstack/react-query";
 import { PlayCircle } from "lucide-react";
-import { libraryApi } from "../../api";
 import {
   isLibraryInitializing,
   useLibraryReady,
 } from "../../api/hooks/useLibraryReady";
-import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
-import { useAllWatchHistory } from "../../hooks/useWatchHistory";
-import { makeCompositeKey } from "../../utils/compositeKey";
+import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import SceneCarousel from "./SceneCarousel";
 
-interface WatchHistoryEntry {
-  sceneId: string;
-  instanceId: string;
-  resumeTime?: number;
-  playCount?: number;
-  lastPlayedAt?: string | null;
-  playDuration?: number;
-  [key: string]: unknown;
-}
-
-interface SceneWithProgress extends NormalizedScene {
-  watchHistory: WatchHistoryEntry | null;
-  resumeTime: number;
-  playCount: number;
-  lastPlayedAt: string | null;
-}
-
-/** Scenes watched less than this share of their length are left out. */
-const MIN_WATCH_PERCENT = 2;
+/** How many scenes Continue Watching shows. */
+const CAROUSEL_SIZE = 12;
 
 /**
  * Continue Watching carousel component
- * Shows scenes that have been partially watched with resume times. While the
- * library is initializing it shows its loading state and asks nothing.
+ * Shows the scenes the viewer left part-way (the server's "in progress" view:
+ * a resume point before the last 10% and at least 2% watched), most recently
+ * played first. While the library is initializing it shows its loading state.
  */
 interface Props {
   selectedScenes?: NormalizedScene[];
@@ -54,76 +34,19 @@ const ContinueWatchingCarousel = ({
   const { hasMultipleInstances } = useConfig();
   const { ready } = useLibraryReady();
   const {
-    data: watchHistoryList,
-    loading: loadingHistory,
+    data,
+    isLoading: loading,
     error,
-  } = useAllWatchHistory({
-    inProgress: true,
-    limit: 12,
+  } = useWatchedScenes({
+    view: "in_progress",
+    sort: "recent",
+    page: 1,
+    perPage: CAROUSEL_SIZE,
+    count: false,
   });
+  const scenes = useMemo(() => data?.scenes ?? [], [data]);
 
-  const whList = watchHistoryList as WatchHistoryEntry[];
-  // "id:instanceId" refs: scene ids repeat across servers
-  const sceneRefs = useMemo(
-    () => whList.map((wh) => makeCompositeKey(wh.sceneId, wh.instanceId)),
-    [whList]
-  );
-
-  // The full scene of each watch history entry
-  const {
-    data: fetchedScenes,
-    isLoading: loadingScenes,
-    error: scenesFetchError,
-  } = useQuery({
-    queryKey: queryKeys.homeCarousels.continueWatching(sceneRefs),
-    queryFn: async ({ signal }) => {
-      const response = (await libraryApi.findScenes(
-        { ids: sceneRefs },
-        signal
-      )) as { findScenes?: { scenes?: NormalizedScene[] } };
-      return response.findScenes?.scenes ?? [];
-    },
-    enabled: ready && !loadingHistory && sceneRefs.length > 0,
-  });
-
-  const scenes = useMemo((): SceneWithProgress[] => {
-    const historyByScene = new Map(
-      whList.map((wh) => [makeCompositeKey(wh.sceneId, wh.instanceId), wh])
-    );
-    const withProgress = (fetchedScenes ?? []).map((scene) => {
-      const watchHistory = historyByScene.get(
-        makeCompositeKey(scene.id, scene.instanceId)
-      );
-      return {
-        ...scene,
-        watchHistory: watchHistory ?? null,
-        resumeTime: watchHistory?.resumeTime || 0,
-        playCount: watchHistory?.playCount || 0,
-        lastPlayedAt: watchHistory?.lastPlayedAt || null,
-      };
-    });
-
-    // Only scenes watched for at least 2% of their length: an accidental
-    // click does not clutter Continue Watching
-    const watched = withProgress.filter((scene) => {
-      const duration = scene.files?.[0]?.duration;
-      const playDuration = scene.watchHistory?.playDuration;
-      if (!duration || !playDuration) return false;
-      return (playDuration / duration) * 100 >= MIN_WATCH_PERCENT;
-    });
-
-    // Most recently played first
-    return watched.sort((a, b) => {
-      const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
-      const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
-      return dateB.getTime() - dateA.getTime();
-    });
-  }, [fetchedScenes, whList]);
-
-  // Waiting for the library only matters when there are scenes to show
-  const initializing =
-    sceneRefs.length > 0 && (!ready || isLibraryInitializing(scenesFetchError));
-  const loading = loadingHistory || loadingScenes;
+  const initializing = !ready || isLibraryInitializing(error);
 
   const handleSceneClick = (scene: NormalizedScene) => {
     const currentIndex = scenes.findIndex(
@@ -154,11 +77,8 @@ const ContinueWatchingCarousel = ({
   };
 
   // Don't show carousel if error (non-initialization) or no scenes
-  if (error || (scenesFetchError && !initializing)) {
-    console.error(
-      "Continue Watching error (non-initialization):",
-      error || scenesFetchError
-    );
+  if (error && !initializing) {
+    console.error("Continue Watching error (non-initialization):", error);
     return null;
   }
   if (!loading && !initializing && scenes.length === 0) {

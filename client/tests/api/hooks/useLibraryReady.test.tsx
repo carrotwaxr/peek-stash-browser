@@ -15,6 +15,7 @@ import { actAsync, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LIBRARY_READY_POLL_MS,
+  invalidateLibraryQueries,
   markLibraryNotReady,
   useLibraryReady,
 } from "@/api/hooks/useLibraryReady";
@@ -162,6 +163,37 @@ describe("useLibraryReady", () => {
       expect(fn).toHaveBeenCalledTimes(2);
     }
     expect(stats).toHaveBeenCalledOnce();
+  });
+
+  it("the library predicate matches watchHistory keys", async () => {
+    stubApi({ "/library/ready": () => jsonResponse(200, { ready: true }) });
+    const watched = vi.fn().mockResolvedValue({ scenes: [] });
+
+    renderHook(
+      () => {
+        useQuery({
+          queryKey: queryKeys.watchHistory.scenes({
+            view: "in_progress",
+            sort: "recent",
+            page: 1,
+            perPage: 12,
+          }),
+          queryFn: watched,
+        });
+        return useLibraryReady();
+      },
+      { wrapper: wrapperFor(client) }
+    );
+    await settle();
+    expect(watched).toHaveBeenCalledOnce();
+
+    // Hides, restores and instance changes invalidate the library queries
+    await actAsync(() => {
+      void invalidateLibraryQueries(client);
+    });
+    await settle();
+
+    expect(watched).toHaveBeenCalledTimes(2);
   });
 
   it("becoming ready does not refetch an external player link or a non-library query", async () => {

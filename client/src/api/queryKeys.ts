@@ -6,6 +6,17 @@
  *
  * Pattern: [domain, instanceId?, ...specifics]
  */
+import type { WatchedScenesSort, WatchedScenesView } from "@peek/shared-types";
+
+/** One request for the viewer's watched scenes (`GET /watch-history/scenes`) */
+export interface WatchedScenesKeyParams {
+  view: WatchedScenesView;
+  sort: WatchedScenesSort;
+  page: number;
+  perPage: number;
+  /** `false` when the totals are not wanted (`count=false`) */
+  count?: boolean;
+}
 
 export const queryKeys = {
   // ── Library (entity search) ──────────────────────────────────────────
@@ -96,12 +107,18 @@ export const queryKeys = {
   },
 
   // ── Carousels ────────────────────────────────────────────────────────
-  // The Home page's built-in carousels, and Continue Watching's scenes
+  // The Home page's built-in carousels
   homeCarousels: {
     all: () => ["homeCarousel"] as const,
     byKey: (fetchKey: string) => ["homeCarousel", fetchKey] as const,
-    continueWatching: (sceneIds: readonly string[]) =>
-      ["homeCarousel", "continueWatching", sceneIds] as const,
+  },
+  // The viewer's watched scenes (Continue Watching, Watch History). The root
+  // is one the library predicate matches: a hide, a restore or an instance
+  // change refetches it (`invalidateLibraryQueries`)
+  watchHistory: {
+    all: () => ["watchHistory"] as const,
+    scenes: (params: WatchedScenesKeyParams) =>
+      ["watchHistory", "scenes", params] as const,
   },
   // The user's custom carousels
   carousels: {

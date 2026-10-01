@@ -58,10 +58,12 @@ The **Continue Watching** section shows all partially-watched scenes:
 **Location:** Home page (top section)
 
 **What appears here:**
-- Scenes you've started but not finished
+- Scenes you've started but not finished: you stopped before the last 10% of the scene, after watching at least 2% of it
 - Sorted by most recently watched
 - Shows progress percentage
-- Limited to your last 20 in-progress scenes
+- Up to 12 scenes, always filled from your whole history (a finished, deleted or hidden scene never takes a slot)
+
+**See more:** the link at the end of the row opens the [Watch History](#viewing-your-history) page.
 
 **To resume:**
 1. Go to Home page
@@ -75,47 +77,45 @@ The **Continue Watching** section shows all partially-watched scenes:
 ### When Scenes Disappear from Continue Watching
 
 A scene is removed from Continue Watching when:
-- You **watch to completion** (95%+ watched counts as complete)
-- You **manually clear watch history** for that scene
-- It falls outside your **last 20 in-progress scenes**
+- You **watch it to the end**: your last session stopped in the final 10% of the scene
+- You **clear your watch history**
+- It is **hidden** or restricted for you
+- Twelve scenes you watched more recently are in progress
 
 ## Managing Watch History
 
 ### Viewing Your History
 
-**Full watch history coming in future update.** Currently:
+Open **Watch History** from the navigation (or the **See more** link on Continue Watching). It lists every scene you have watched, 24 to a page, with page controls under the list.
 
-- View in-progress scenes via **Continue Watching** on home page
-- See progress bars on scene cards throughout the app
-- Check scene detail page for watch progress
+**Filter:**
+
+- **All** - every scene you have played, watched for any length of time, or left with a resume point
+- **In Progress** - scenes you stopped before the last 10%, after watching at least 2% of the scene (the same as Continue Watching)
+- **Completed** - scenes you played at least once and whose last session finished, or stopped within the final 10% of the scene
+
+**Sort:** Recently Watched, Most Watched (play count) or Longest Duration (time you watched).
+
+The header shows the number of scenes in the view and **Total watch time** for the whole view, not just the page you are on. The filter, sort and page are in the address, so the Back button steps through your choices and a page can be bookmarked.
+
+You can also see progress bars on scene cards throughout the app and watch progress on the scene detail page.
 
 ### Marking as Watched
 
-To mark a scene as fully watched without watching it:
+A scene counts as completed when you have played it and your last session ended in the final 10%:
 
 1. Open the scene detail page
-2. Seek to the end of the video (last 5%)
-3. Let it play for a few seconds
-4. Scene is marked as watched
-
-Or manually skip to 95%+ completion to trigger "watched" status.
+2. Play it to the end, or seek into the last 10% and let it play for a few seconds
+3. The scene appears under **Completed** in Watch History
 
 ### Clearing Watch History
 
-**For a single scene:**
+Peek has no clear for a single scene. To clear everything:
 
-1. Open the scene detail page
-2. Click the **⋮** (three dots) menu
-3. Select **"Clear watch history"**
-4. Progress is reset to 0%
-
-**For all scenes:**
-
-1. Go to **Settings** → **My Settings**
-2. Scroll to **Watch History** section
-3. Click **"Clear all watch history"**
-4. Confirm the action
-5. All progress is reset
+1. Go to **Watch History**
+2. Click **Clear History**
+3. Confirm the action
+4. All scene progress is reset, and Home's Continue Watching and your stats refresh
 
 !!! warning "Cannot Be Undone"
     Clearing watch history is permanent. You cannot restore cleared progress.
@@ -194,7 +194,7 @@ Want to rewatch a favorite scene?
 
 **Possible reasons:**
 - You haven't started watching any scenes yet
-- All your in-progress scenes are completed
+- All your in-progress scenes are completed (they are under **Completed** in Watch History)
 - You cleared your watch history
 - You're using a different user account
 

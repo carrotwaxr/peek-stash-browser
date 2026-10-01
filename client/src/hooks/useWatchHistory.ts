@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { GetWatchedScenesResponse } from "@peek/shared-types";
+import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../api";
+import { useLibraryReady } from "../api/hooks/useLibraryReady";
+import { type WatchedScenesKeyParams, queryKeys } from "../api/queryKeys";
 import { useAuth } from "./useAuth";
 
 /**
@@ -86,56 +90,32 @@ export function useWatchHistory(
 }
 
 /**
- * Hook for fetching all watch history (for Continue Watching carousel)
+ * One page of the viewer's watched scenes (`GET /watch-history/scenes`), in
+ * the view and order asked for: Continue Watching and the Watch History page.
+ * The scenes carry the viewer's own `resume_time`, `play_count`,
+ * `play_duration`, `last_played_at`, `o_counter` and `last_o_at`.
  *
- * @param {Object} options - Fetch options
- * @param {boolean} options.inProgress - Only fetch scenes in progress
- * @param {number} options.limit - Number of items to fetch
- * @returns {Object} Watch history list and loading state
+ * The query sits under the `watchHistory` root, which the library predicate
+ * matches: a hide, a restore or an instance change refetches it, and it
+ * waits while the library is initializing.
  */
-export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
-  const { isAuthenticated } = useAuth();
-  const [data, setData] = useState<WatchHistoryData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAll = useCallback(async () => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const queryParams = new URLSearchParams({
-        limit: limit.toString(),
-        inProgress: inProgress.toString(),
+export function useWatchedScenes(params: WatchedScenesKeyParams) {
+  const { ready } = useLibraryReady();
+  return useQuery({
+    queryKey: queryKeys.watchHistory.scenes(params),
+    queryFn: ({ signal }) => {
+      const query = new URLSearchParams({
+        view: params.view,
+        sort: params.sort,
+        page: String(params.page),
+        per_page: String(params.perPage),
       });
-
-      const response = await apiGet<{ watchHistory?: WatchHistoryData[] }>(
-        `/watch-history?${queryParams}`
+      if (params.count === false) query.set("count", "false");
+      return apiGet<GetWatchedScenesResponse>(
+        `/watch-history/scenes?${query}`,
+        signal
       );
-      setData(response.watchHistory ?? []);
-    } catch (err) {
-      console.error("Error fetching all watch history:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch watch history"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, inProgress, limit]);
-
-  useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
-
-  return {
-    data,
-    loading,
-    error,
-    refresh: fetchAll,
-  };
+    },
+    enabled: ready,
+  });
 }

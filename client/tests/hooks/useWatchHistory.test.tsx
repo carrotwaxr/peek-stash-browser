@@ -1,12 +1,25 @@
+import type { ReactNode } from "react";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
-import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { actAsync } from "@tests/testUtils";
+import {
+  type Mock,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { apiGet } from "../../src/api";
+import { markLibraryNotReady } from "../../src/api/hooks/useLibraryReady";
+import { createQueryClient } from "../../src/api/queryClient";
 import type { AuthContextValue } from "../../src/contexts/AuthContextProvider";
 import { useAuth } from "../../src/hooks/useAuth";
 import {
-  useAllWatchHistory,
   useWatchHistory,
+  useWatchedScenes,
 } from "../../src/hooks/useWatchHistory";
 
 vi.mock("../../src/hooks/useAuth", () => ({
@@ -145,85 +158,86 @@ describe("useWatchHistory", () => {
   });
 });
 
-describe("useAllWatchHistory", () => {
+describe("useWatchedScenes", () => {
+  let client: QueryClient;
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const params = {
+    view: "in_progress",
+    sort: "recent",
+    page: 1,
+    perPage: 12,
+  } as const;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    client = createQueryClient();
   });
 
-  it("fetches all watch history on mount", async () => {
-    const mockHistory = [
-      { sceneId: "1", resumeTime: 60 },
-      { sceneId: "2", resumeTime: 120 },
-    ];
-    apiGetMock.mockResolvedValue({ watchHistory: mockHistory });
+  afterEach(() => {
+    client.clear();
+  });
 
-    const { result } = renderHook(() => useAllWatchHistory());
+  it("asks for one page with the view, sort, page and per_page", async () => {
+    const body = { scenes: [{ id: "1" }], total: 5, totalPlayDuration: 60 };
+    apiGetMock.mockResolvedValue(body);
+
+    const { result } = renderHook(() => useWatchedScenes(params), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(result.current.data).toEqual(body);
     });
-
+    expect(apiGet).toHaveBeenCalledOnce();
     expect(apiGet).toHaveBeenCalledWith(
-      "/watch-history?limit=20&inProgress=false"
+      "/watch-history/scenes?view=in_progress&sort=recent&page=1&per_page=12",
+      expect.anything()
     );
-    expect(result.current.data).toEqual(mockHistory);
   });
 
-  it("passes inProgress and limit params", async () => {
-    apiGetMock.mockResolvedValue({ watchHistory: [] });
+  it("sends count=false when the totals are not wanted", async () => {
+    apiGetMock.mockResolvedValue({ scenes: [], total: null });
 
-    renderHook(() => useAllWatchHistory({ inProgress: true, limit: 10 }));
+    renderHook(() => useWatchedScenes({ ...params, count: false }), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(apiGet).toHaveBeenCalledWith(
-        "/watch-history?limit=10&inProgress=true"
+        "/watch-history/scenes?view=in_progress&sort=recent&page=1&per_page=12&count=false",
+        expect.anything()
       );
     });
   });
 
-  it("does not fetch when not authenticated", async () => {
-    useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
+  it("asks a new question when the page changes", async () => {
+    apiGetMock.mockResolvedValue({ scenes: [], total: 0 });
 
-    const { result } = renderHook(() => useAllWatchHistory());
+    const { rerender } = renderHook(
+      ({ page }) => useWatchedScenes({ ...params, page }),
+      { wrapper, initialProps: { page: 1 } }
+    );
+    await waitFor(() => {
+      expect(apiGet).toHaveBeenCalledTimes(1);
+    });
+    rerender({ page: 2 });
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(apiGet).toHaveBeenCalledTimes(2);
     });
+    expect(apiGet).toHaveBeenLastCalledWith(
+      "/watch-history/scenes?view=in_progress&sort=recent&page=2&per_page=12",
+      expect.anything()
+    );
+  });
+
+  it("waits while the library is initializing", async () => {
+    markLibraryNotReady(client);
+    apiGetMock.mockResolvedValue({ scenes: [], total: 0 });
+
+    renderHook(() => useWatchedScenes(params), { wrapper });
+    await actAsync(() => undefined);
 
     expect(apiGet).not.toHaveBeenCalled();
-    expect(result.current.data).toEqual([]);
-  });
-
-  it("handles fetch error", async () => {
-    apiGetMock.mockRejectedValue(new Error("Network error"));
-
-    const { result } = renderHook(() => useAllWatchHistory());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    expect(result.current.error).toBe("Network error");
-  });
-
-  it("provides refresh function", async () => {
-    apiGetMock
-      .mockResolvedValueOnce({ watchHistory: [{ sceneId: "1" }] })
-      .mockResolvedValueOnce({
-        watchHistory: [{ sceneId: "1" }, { sceneId: "2" }],
-      });
-
-    const { result } = renderHook(() => useAllWatchHistory());
-
-    await waitFor(() => {
-      expect(result.current.data).toHaveLength(1);
-    });
-
-    await act(async () => {
-      await result.current.refresh();
-    });
-
-    expect(result.current.data).toHaveLength(2);
   });
 });
