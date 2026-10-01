@@ -34,15 +34,6 @@ export function useSceneList(
   });
 }
 
-export function useSceneDetail(id: string | undefined, instanceId?: string) {
-  return useQuery({
-    queryKey: queryKeys.scenes.detail(instanceId, id),
-    queryFn: id
-      ? () => libraryApi.findSceneById(id, instanceId ?? null)
-      : skipToken,
-  });
-}
-
 /**
  * The signed-in user's personal external-player link for a scene. Minted
  * when the Scene page mounts (iOS Safari drops custom-scheme navigations

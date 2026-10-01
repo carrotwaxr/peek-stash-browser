@@ -3,16 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  useGalleryDetail,
-  useGalleryList,
-} from "../../../src/api/hooks/useGalleries";
+import { useGalleryList } from "../../../src/api/hooks/useGalleries";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
     findGalleries: vi.fn(),
-    findGalleryById: vi.fn(),
   },
 }));
 
@@ -111,54 +107,5 @@ describe("useGalleryList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
-  });
-});
-
-describe("useGalleryDetail", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("does not fire query when id is undefined", () => {
-    const { result } = renderHook(() => useGalleryDetail(undefined), {
-      wrapper: createWrapper(),
-    });
-    expect(result.current.isFetching).toBe(false);
-    expect(libraryApi.findGalleryById).not.toHaveBeenCalled();
-  });
-
-  it("fires query and returns data on success", async () => {
-    const mockGallery = { id: "gallery-1", title: "Test Gallery" };
-    (libraryApi.findGalleryById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockGallery
-    );
-
-    const { result } = renderHook(() => useGalleryDetail("gallery-1"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockGallery);
-    expect(libraryApi.findGalleryById).toHaveBeenCalledWith("gallery-1", null);
-  });
-
-  it("passes instanceId to findGalleryById", async () => {
-    const mockGallery = { id: "gallery-1", title: "Test Gallery" };
-    (libraryApi.findGalleryById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockGallery
-    );
-
-    const { result } = renderHook(
-      () => useGalleryDetail("gallery-1", "instance-5"),
-      {
-        wrapper: createWrapper(),
-      }
-    );
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findGalleryById).toHaveBeenCalledWith(
-      "gallery-1",
-      "instance-5"
-    );
   });
 });

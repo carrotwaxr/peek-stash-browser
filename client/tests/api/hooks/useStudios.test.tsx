@@ -3,16 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  useStudioDetail,
-  useStudioList,
-} from "../../../src/api/hooks/useStudios";
+import { useStudioList } from "../../../src/api/hooks/useStudios";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
     findStudios: vi.fn(),
-    findStudioById: vi.fn(),
   },
 }));
 
@@ -111,54 +107,5 @@ describe("useStudioList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
-  });
-});
-
-describe("useStudioDetail", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("does not fire query when id is undefined", () => {
-    const { result } = renderHook(() => useStudioDetail(undefined), {
-      wrapper: createWrapper(),
-    });
-    expect(result.current.isFetching).toBe(false);
-    expect(libraryApi.findStudioById).not.toHaveBeenCalled();
-  });
-
-  it("fires query and returns data on success", async () => {
-    const mockStudio = { id: "studio-1", name: "Test Studio" };
-    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockStudio
-    );
-
-    const { result } = renderHook(() => useStudioDetail("studio-1"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockStudio);
-    expect(libraryApi.findStudioById).toHaveBeenCalledWith("studio-1", null);
-  });
-
-  it("passes instanceId to findStudioById", async () => {
-    const mockStudio = { id: "studio-1", name: "Test Studio" };
-    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockStudio
-    );
-
-    const { result } = renderHook(
-      () => useStudioDetail("studio-1", "instance-3"),
-      {
-        wrapper: createWrapper(),
-      }
-    );
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findStudioById).toHaveBeenCalledWith(
-      "studio-1",
-      "instance-3"
-    );
   });
 });

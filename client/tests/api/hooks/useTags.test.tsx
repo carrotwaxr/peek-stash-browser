@@ -3,13 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useTagDetail, useTagList } from "../../../src/api/hooks/useTags";
+import { useTagList } from "../../../src/api/hooks/useTags";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
     findTags: vi.fn(),
-    findTagById: vi.fn(),
   },
 }));
 
@@ -106,48 +105,5 @@ describe("useTagList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
-  });
-});
-
-describe("useTagDetail", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("does not fire query when id is undefined", () => {
-    const { result } = renderHook(() => useTagDetail(undefined), {
-      wrapper: createWrapper(),
-    });
-    expect(result.current.isFetching).toBe(false);
-    expect(libraryApi.findTagById).not.toHaveBeenCalled();
-  });
-
-  it("fires query and returns data on success", async () => {
-    const mockTag = { id: "tag-1", name: "Test Tag" };
-    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockTag
-    );
-
-    const { result } = renderHook(() => useTagDetail("tag-1"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockTag);
-    expect(libraryApi.findTagById).toHaveBeenCalledWith("tag-1", null);
-  });
-
-  it("passes instanceId to findTagById", async () => {
-    const mockTag = { id: "tag-1", name: "Test Tag" };
-    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockTag
-    );
-
-    const { result } = renderHook(() => useTagDetail("tag-1", "instance-4"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findTagById).toHaveBeenCalledWith("tag-1", "instance-4");
   });
 });

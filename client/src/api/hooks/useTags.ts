@@ -29,15 +29,6 @@ export function useTagList(
   });
 }
 
-export function useTagDetail(id: string | undefined, instanceId?: string) {
-  return useQuery({
-    queryKey: queryKeys.tags.detail(instanceId, id),
-    queryFn: id
-      ? () => libraryApi.findTagById(id, instanceId ?? null)
-      : skipToken,
-  });
-}
-
 /**
  * The compact tag tree (hierarchy and folder views), whole or scoped, with
  * the Untagged count of the folder view's type (`untagged`); fetched only

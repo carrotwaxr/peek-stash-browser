@@ -27,12 +27,3 @@ export function useGalleryList(
     placeholderData: keepPreviousData,
   });
 }
-
-export function useGalleryDetail(id: string | undefined, instanceId?: string) {
-  return useQuery({
-    queryKey: queryKeys.galleries.detail(instanceId, id),
-    queryFn: id
-      ? () => libraryApi.findGalleryById(id, instanceId ?? null)
-      : skipToken,
-  });
-}

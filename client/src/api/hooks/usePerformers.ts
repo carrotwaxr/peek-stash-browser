@@ -27,15 +27,3 @@ export function usePerformerList(
     placeholderData: keepPreviousData,
   });
 }
-
-export function usePerformerDetail(
-  id: string | undefined,
-  instanceId?: string
-) {
-  return useQuery({
-    queryKey: queryKeys.performers.detail(instanceId, id),
-    queryFn: id
-      ? () => libraryApi.findPerformerById(id, instanceId ?? null)
-      : skipToken,
-  });
-}
