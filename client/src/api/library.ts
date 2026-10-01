@@ -10,26 +10,38 @@ import type {
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
   FindGalleriesRequest,
+  FindGalleriesResponse,
   FindGroupsMinimalRequest,
   FindGroupsMinimalResponse,
   FindGroupsRequest,
+  FindGroupsResponse,
   FindImagesRequest,
   FindPerformersMinimalRequest,
   FindPerformersMinimalResponse,
   FindPerformersRequest,
+  FindPerformersResponse,
   FindScenesRequest,
+  FindScenesResponse,
   FindStudiosMinimalRequest,
   FindStudiosMinimalResponse,
   FindStudiosRequest,
+  FindStudiosResponse,
   FindTagTreeRequest,
   FindTagTreeResponse,
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
   FindTagsRequest,
+  FindTagsResponse,
   GetCarouselResponse,
   GetUserCarouselsResponse,
   ListRequestInput,
+  NormalizedGallery,
+  NormalizedGroup,
   NormalizedImage,
+  NormalizedPerformer,
+  NormalizedScene,
+  NormalizedStudio,
+  NormalizedTag,
   PreviewCarouselRequest,
   PreviewCarouselResponse,
   RatableEntityType,
@@ -39,6 +51,7 @@ import type {
   UpdateCarouselResponse,
   UpdateRatingRequest,
   UpdateRatingResponse,
+  WithStashUrl,
 } from "@peek/shared-types";
 import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
@@ -71,49 +84,75 @@ const COUNTS_PATHS: Record<RelationCountsType, string> = {
 
 // ── Single-entity lookup ───────────────────────────────────────────────
 
+/** The pages that look one entity up by id, besides the Scene page */
+export type DetailType = "performer" | "studio" | "tag" | "group" | "gallery";
+
+/** What each lookup answers: the entity's list row, with its View in Stash link */
+export interface DetailEntityByType {
+  performer: WithStashUrl<NormalizedPerformer>;
+  studio: WithStashUrl<NormalizedStudio>;
+  tag: WithStashUrl<NormalizedTag>;
+  group: WithStashUrl<NormalizedGroup>;
+  gallery: WithStashUrl<NormalizedGallery>;
+}
+
+/** Every by-id lookup's row: the detail pages' and the scene's */
+interface ByIdRowByType extends DetailEntityByType {
+  scene: WithStashUrl<NormalizedScene>;
+}
+
+/** Each list endpoint's response, as the lookup reads it */
+interface ByIdResponseByType {
+  scene: FindScenesResponse;
+  performer: FindPerformersResponse;
+  studio: FindStudiosResponse;
+  tag: FindTagsResponse;
+  group: FindGroupsResponse;
+  gallery: FindGalleriesResponse;
+}
+
+type ByIdType = keyof ByIdRowByType;
+
 /** The list endpoint each detail page looks its entity up through */
-const BY_ID = {
+const BY_ID: {
+  [T in ByIdType]: {
+    path: string;
+    filter: string;
+    /** The one row of the list's response, if it holds one */
+    pick: (data: ByIdResponseByType[T]) => ByIdRowByType[T] | undefined;
+  };
+} = {
   scene: {
     path: "/library/scenes",
     filter: "scene_filter",
-    result: "findScenes",
-    list: "scenes",
+    pick: (data) => data.findScenes.scenes[0],
   },
   performer: {
     path: "/library/performers",
     filter: "performer_filter",
-    result: "findPerformers",
-    list: "performers",
+    pick: (data) => data.findPerformers.performers[0],
   },
   studio: {
     path: "/library/studios",
     filter: "studio_filter",
-    result: "findStudios",
-    list: "studios",
+    pick: (data) => data.findStudios.studios[0],
   },
   tag: {
     path: "/library/tags",
     filter: "tag_filter",
-    result: "findTags",
-    list: "tags",
+    pick: (data) => data.findTags.tags[0],
   },
   gallery: {
     path: "/library/galleries",
     filter: "gallery_filter",
-    result: "findGalleries",
-    list: "galleries",
+    pick: (data) => data.findGalleries.galleries[0],
   },
   group: {
     path: "/library/groups",
     filter: "group_filter",
-    result: "findGroups",
-    list: "groups",
+    pick: (data) => data.findGroups.groups[0],
   },
-} as const;
-
-type ListResponse = Partial<
-  Record<string, Partial<Record<string, Record<string, unknown>[]>>>
->;
+};
 
 /**
  * One entity by id through its list endpoint, so the user's exclusions
@@ -121,18 +160,43 @@ type ListResponse = Partial<
  * looks the same). Without an instance, an id found on several servers
  * rejects with the server's 400 (an ApiError whose data lists the matches).
  */
-async function findOneById(
-  type: keyof typeof BY_ID,
+async function findOneById<T extends ByIdType>(
+  type: T,
   id: string,
   instanceId: string | null,
   signal?: AbortSignal
-): Promise<Record<string, unknown> | null> {
-  const { path, filter, result, list } = BY_ID[type];
-  const params: LibrarySearchParams = { ids: [id] };
+): Promise<ByIdRowByType[T] | null> {
+  const { path, filter, pick } = BY_ID[type];
+  const params: Record<string, unknown> = { ids: [id] };
   if (instanceId) params[filter] = { instance_id: instanceId };
-  const data = await apiPost<ListResponse>(path, params, signal);
-  return data[result]?.[list]?.[0] ?? null;
+  const data = await apiPost<ByIdResponseByType[T]>(path, params, signal);
+  return pick(data) ?? null;
 }
+
+/** The detail pages' lookup: the typed entity row, or null when none is visible */
+export function findEntityById<T extends DetailType>(
+  type: T,
+  id: string,
+  instanceId: string | null,
+  signal?: AbortSignal
+): Promise<DetailEntityByType[T] | null> {
+  return findOneById(type, id, instanceId, signal);
+}
+
+/**
+ * The untyped form the pages not yet on `findEntityById` read (B15 removes
+ * it with the `find*ById` methods below).
+ */
+const findRecordById = (
+  type: ByIdType,
+  id: string,
+  instanceId: string | null,
+  signal?: AbortSignal
+) =>
+  findOneById(type, id, instanceId, signal) as Promise<Record<
+    string,
+    unknown
+  > | null>;
 
 // ── Library API ────────────────────────────────────────────────────────
 
@@ -202,37 +266,37 @@ export const libraryApi = {
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("scene", id, instanceId, signal),
+  ) => findRecordById("scene", id, instanceId, signal),
 
   findPerformerById: (
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("performer", id, instanceId, signal),
+  ) => findRecordById("performer", id, instanceId, signal),
 
   findStudioById: (
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("studio", id, instanceId, signal),
+  ) => findRecordById("studio", id, instanceId, signal),
 
   findTagById: (
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("tag", id, instanceId, signal),
+  ) => findRecordById("tag", id, instanceId, signal),
 
   findGalleryById: (
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("gallery", id, instanceId, signal),
+  ) => findRecordById("gallery", id, instanceId, signal),
 
   findGroupById: (
     id: string,
     instanceId: string | null = null,
     signal?: AbortSignal
-  ) => findOneById("group", id, instanceId, signal),
+  ) => findRecordById("group", id, instanceId, signal),
 
   // Entity pickers: one page in name order, or the ids a picker selected
   findPerformersMinimal: async (

@@ -80,7 +80,8 @@ function playerValue(
   scene: { id: string; instanceId: string } | null
 ): ReturnType<typeof useScenePlayer> {
   return untrusted<ReturnType<typeof useScenePlayer>>({
-    scene,
+    // The server always sends a scene's groups and galleries, empty or not
+    scene: scene && { ...scene, groups: [], galleries: [] },
     sceneLoading: scene === null,
     sceneError: null,
     playlist: null,

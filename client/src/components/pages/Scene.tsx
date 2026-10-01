@@ -231,21 +231,21 @@ const SceneContent = () => {
                   label: "Similar Scenes",
                   count: similarScenesCount,
                 },
-                ...((scene.groups as unknown[])?.length > 0
+                ...(scene.groups.length > 0
                   ? [
                       {
                         id: "collections",
                         label: "Collections",
-                        count: (scene.groups as unknown[]).length,
+                        count: scene.groups.length,
                       },
                     ]
                   : []),
-                ...((scene.galleries as unknown[])?.length > 0
+                ...(scene.galleries.length > 0
                   ? [
                       {
                         id: "galleries",
                         label: "Galleries",
-                        count: (scene.galleries as unknown[]).length,
+                        count: scene.galleries.length,
                       },
                     ]
                   : []),
