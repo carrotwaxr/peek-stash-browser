@@ -17,4 +17,9 @@ export interface ExternalPlayerLinkResponse {
   url: string;
   /** ISO timestamp, 12 hours after minting. */
   expiresAt: string;
+  /**
+   * The scene file's MIME type from its extension (`video/x-matroska` for an
+   * mkv), `video/*` when unknown. The path itself is never returned.
+   */
+  mimeType: string;
 }

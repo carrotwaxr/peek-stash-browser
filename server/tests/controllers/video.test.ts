@@ -1633,6 +1633,47 @@ describe("Video Controller", () => {
       ).toBe(true);
     });
 
+    it("external-player-link returns the scene file's mimeType", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({ filePath: "/media/Some Scene.MKV" })
+      );
+      const req = reqFor(createExternalPlayerLink, {
+        params: { sceneId: "123" },
+        query: {},
+        body: { instanceId: "inst-a" },
+        user: USER,
+      });
+      const res = resFor(createExternalPlayerLink);
+
+      await createExternalPlayerLink(req, res);
+
+      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "123", stashInstanceId: "inst-a", deletedAt: null },
+        select: { filePath: true },
+      });
+      const body = res._getOkBody();
+      expect(body.mimeType).toBe("video/x-matroska");
+      // The path itself is never returned
+      expect(JSON.stringify(body)).not.toContain("/media/");
+    });
+
+    it("answers video/* when the scene has no file or no row", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+      const res = resFor(createExternalPlayerLink);
+
+      await createExternalPlayerLink(
+        reqFor(createExternalPlayerLink, {
+          params: { sceneId: "123" },
+          query: {},
+          body: { instanceId: "inst-a" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res._getOkBody().mimeType).toBe("video/*");
+    });
+
     it("signs passwordChangedAt as 0 for a user who never changed it", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({

@@ -44,6 +44,7 @@ import {
   stashFailure,
   stashFetchError,
 } from "../utils/streamProxy.js";
+import { videoMimeType } from "../utils/videoMimeType.js";
 
 /** How long Stash may take to answer, and to go quiet mid-body, on a stream. */
 const STREAM_HEADERS_TIMEOUT_MS = 60_000;
@@ -682,6 +683,13 @@ export const createExternalPlayerLink = async (
     return;
   }
 
+  // The direct stream serves the original file, so its extension is the
+  // container. Only the type leaves the server, never the path.
+  const scene = await prisma.stashScene.findFirst({
+    where: { id: sceneId, stashInstanceId: instanceId, deletedAt: null },
+    select: { filePath: true },
+  });
+
   const exp = Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS;
   const claims: StreamLinkClaims = {
     userId: req.user.id,
@@ -698,5 +706,6 @@ export const createExternalPlayerLink = async (
       signStreamLink(claims, getStreamLinkKey())
     ),
     expiresAt: new Date(exp * 1000).toISOString(),
+    mimeType: videoMimeType(scene?.filePath ?? null),
   });
 };

@@ -32,6 +32,7 @@ const mockApiPost = vi.mocked(apiPost);
 const LINK = {
   url: "/api/scene/5/proxy-stream/stream?instanceId=i&uid=1&exp=9&sig=abc",
   expiresAt: "2026-09-24T00:00:00.000Z",
+  mimeType: "video/mp4",
 };
 
 const ANDROID_UA =
@@ -170,6 +171,19 @@ describe("ExternalPlayerButton", () => {
     );
     // Mobile has no dropdown
     expect(screen.queryByLabelText("More options")).not.toBeInTheDocument();
+  });
+
+  it("on Android the intent carries type=video/x-matroska for an mkv link", async () => {
+    setUserAgent(ANDROID_UA);
+    mockApiPost.mockResolvedValue({ ...LINK, mimeType: "video/x-matroska" });
+
+    renderButton();
+
+    const anchor = screen.getByLabelText("Open in external player");
+    await waitFor(() => expect(anchor).toHaveAttribute("href"));
+    const href = anchor.getAttribute("href") as string;
+    expect(href).toContain(";type=video/x-matroska;");
+    expect(href).not.toContain("type=video/mp4");
   });
 
   it("on Android falls back to the title Video for an untitled scene", async () => {

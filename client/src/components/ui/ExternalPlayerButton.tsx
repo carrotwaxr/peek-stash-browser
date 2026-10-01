@@ -76,8 +76,10 @@ export default function ExternalPlayerButton({
       const scheme = url.protocol.slice(0, -1); // Remove trailing colon (https: -> https)
 
       // Build Intent URI
+      // type is the file's real MIME type from the server, so players that pick a
+      // handler by type open mkv, avi and wmv too
       // S.title passes the scene title as an extra string parameter
-      url.hash = `Intent;action=android.intent.action.VIEW;scheme=${scheme};type=video/mp4;S.title=${encodeURIComponent(title || "Video")};end`;
+      url.hash = `Intent;action=android.intent.action.VIEW;scheme=${scheme};type=${data?.mimeType ?? "video/*"};S.title=${encodeURIComponent(title || "Video")};end`;
 
       // Replace protocol with intent:
       // Note: Can't use url.protocol = "intent:" due to browser security restrictions
