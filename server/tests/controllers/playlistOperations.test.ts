@@ -226,6 +226,49 @@ describe("Playlist Controller Operations", () => {
       expect(res._getStatus()).toBe(400);
     });
 
+    it.each([
+      ["a numeric name", { name: 5 }, "Playlist name is required"],
+      ["an array name", { name: ["My Playlist"] }, "Playlist name is required"],
+      ["an object name", { name: { a: 1 } }, "Playlist name is required"],
+      [
+        "a numeric description",
+        { name: "My Playlist", description: 5 },
+        "description must be a string or null",
+      ],
+      [
+        "an object description",
+        { name: "My Playlist", description: { text: "x" } },
+        "description must be a string or null",
+      ],
+    ])("answers 400 for %s and writes nothing", async (_case, body, error) => {
+      const req = reqFor(createPlaylist, { body: malformed(body), user: USER });
+      const res = resFor(createPlaylist);
+
+      await createPlaylist(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody()).toEqual({ error });
+      expect(mockPrisma.playlist.create).not.toHaveBeenCalled();
+    });
+
+    it("stores a null description as null", async () => {
+      mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 1 }));
+
+      const req = reqFor(createPlaylist, {
+        body: malformed({ name: "My Playlist", description: null }),
+        user: USER,
+      });
+      const res = resFor(createPlaylist);
+      await createPlaylist(req, res);
+
+      expect(res._getStatus()).toBe(201);
+      expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: objectContaining({ name: "My Playlist", description: null }),
+        })
+      );
+    });
+
     it("returns 401 when user is not authenticated", async () => {
       const req = reqFor(createPlaylist, { body: { name: "Test" } });
       const res = resFor(createPlaylist);
@@ -300,6 +343,16 @@ describe("Playlist Controller Operations", () => {
       ["a blank name", { name: "   " }, "Playlist name is required"],
       ["a null name", { name: null }, "Playlist name is required"],
       ["a numeric name", { name: 5 }, "Playlist name is required"],
+      [
+        "a numeric description",
+        { description: 5 },
+        "description must be a string or null",
+      ],
+      [
+        "an array description",
+        { description: ["x"] },
+        "description must be a string or null",
+      ],
       [
         "an unknown repeat",
         { repeat: "forever" },
