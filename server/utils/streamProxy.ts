@@ -53,6 +53,44 @@ export function stashFetchError(err: unknown, res: Response): AppError | null {
   return new BadGatewayError(STASH_MEDIA_FAILED);
 }
 
+/**
+ * The range a HEAD asks Stash for when the client named none: Stash answers
+ * HEAD with 405 on its media routes, so a HEAD goes as a GET for one byte of
+ * a file Stash serves by range.
+ */
+export const HEAD_PROBE_RANGE = "bytes=0-0";
+
+/**
+ * The status and length to answer a HEAD with, from Stash's answer to its
+ * GET. A 206 (or a 416, for an empty file) to the one-byte range Peek added
+ * is answered as 200 with the whole file's length from `Content-Range`, and
+ * without that Content-Range, so the client reads what a GET would have
+ * answered; any other answer stands as it is.
+ */
+export function headAnswer(
+  upstream: {
+    status: number;
+    contentLength: string | null | undefined;
+    contentRange: string | null | undefined;
+  },
+  rangeAdded: boolean
+): {
+  status: number;
+  contentLength: string | undefined;
+  keepContentRange: boolean;
+} {
+  const { status } = upstream;
+  if (!rangeAdded || (status !== 206 && status !== 416)) {
+    return {
+      status,
+      contentLength: upstream.contentLength ?? undefined,
+      keepContentRange: true,
+    };
+  }
+  const total = /\/(\d+)$/.exec(upstream.contentRange ?? "")?.[1];
+  return { status: 200, contentLength: total, keepContentRange: false };
+}
+
 export interface StashFetchOptions {
   apiKey: string;
   /** Closing it aborts Stash's request (optional: a zip's job has no client) */

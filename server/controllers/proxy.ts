@@ -31,7 +31,11 @@ import {
   parseStashMediaPath,
   stashMediaUrl,
 } from "../utils/stashMediaPath.js";
-import { stashFailure } from "../utils/streamProxy.js";
+import {
+  HEAD_PROBE_RANGE,
+  headAnswer,
+  stashFailure,
+} from "../utils/streamProxy.js";
 
 // =============================================================================
 // Connection Pooling
@@ -114,32 +118,6 @@ function rangeHeaders(req: {
  */
 function isHead(req: { method?: string }): boolean {
   return req.method === "HEAD";
-}
-
-/** The range a HEAD asks Stash for when the browser named none. */
-const HEAD_PROBE_RANGE = "bytes=0-0";
-
-/**
- * The status and length to answer a HEAD with, from Stash's answer to its
- * GET. A 206 (or a 416, for an empty file) to the one-byte range Peek added
- * is answered as 200 with the whole file's length from `Content-Range`, so
- * the probe reads what a GET would have; any other answer stands as it is.
- */
-function headAnswer(
-  proxyRes: http.IncomingMessage,
-  rangeAdded: boolean
-): {
-  status: number;
-  contentLength: string | undefined;
-  keepContentRange: boolean;
-} {
-  const status = proxyRes.statusCode ?? 200;
-  const contentLength = proxyRes.headers["content-length"];
-  if (!rangeAdded || (status !== 206 && status !== 416)) {
-    return { status, contentLength, keepContentRange: true };
-  }
-  const total = /\/(\d+)$/.exec(proxyRes.headers["content-range"] ?? "")?.[1];
-  return { status: 200, contentLength: total, keepContentRange: false };
 }
 
 /**
@@ -274,13 +252,14 @@ function proxyHttpRequest(
     }
 
     // A HEAD reports the file as a GET would; anything else is Stash's own
-    const { status, contentLength, keepContentRange } = headOnly
-      ? headAnswer(proxyRes, rangeAdded)
-      : {
-          status: proxyRes.statusCode ?? 200,
-          contentLength: proxyRes.headers["content-length"],
-          keepContentRange: true,
-        };
+    const { status, contentLength, keepContentRange } = headAnswer(
+      {
+        status: proxyRes.statusCode ?? 200,
+        contentLength: proxyRes.headers["content-length"],
+        contentRange: proxyRes.headers["content-range"],
+      },
+      rangeAdded
+    );
 
     // Forward response headers
     if (proxyRes.headers["content-type"]) {

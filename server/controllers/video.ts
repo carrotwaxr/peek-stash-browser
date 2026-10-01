@@ -36,7 +36,9 @@ import {
   signStreamLink,
 } from "../utils/streamLink.js";
 import {
+  HEAD_PROBE_RANGE,
   fetchFromStash,
+  headAnswer,
   pipeResponseToClient,
   readStashText,
   stashFailure,
@@ -65,6 +67,64 @@ async function fromStash<T>(
     if (mapped) throw mapped;
     return undefined;
   }
+}
+
+/** Stash's headers a stream response passes on, beside its own Cache-Control. */
+const STREAM_RESPONSE_HEADERS = [
+  "content-type",
+  "content-length",
+  "accept-ranges",
+  "content-range",
+  "last-modified",
+  "etag",
+];
+
+/**
+ * Answer a HEAD on a stream from Stash's response headers alone, as the GET
+ * would have answered: the direct file's one-byte probe as 200 with its
+ * whole length (`headAnswer`), a manifest with the type Peek sends it as and
+ * no length (Peek rewrites it, so Stash's length is not the one a GET gets).
+ * The caller then aborts Stash's response unread.
+ */
+function answerStreamHead(
+  res: Response,
+  response: globalThis.Response,
+  o: { rangeAdded: boolean; manifest: "hls" | "dash" | undefined }
+): void {
+  const { status, contentLength, keepContentRange } = headAnswer(
+    {
+      status: response.status,
+      contentLength: response.headers.get("content-length"),
+      contentRange: response.headers.get("content-range"),
+    },
+    o.rangeAdded
+  );
+  res.status(status);
+  if (o.manifest === "hls") {
+    res.setHeader("content-type", "application/vnd.apple.mpegurl");
+    res.setHeader("cache-control", "private, no-cache");
+    res.end();
+    return;
+  }
+  for (const name of STREAM_RESPONSE_HEADERS) {
+    const value =
+      name === "content-length" ? contentLength : response.headers.get(name);
+    if (!value) continue;
+    if (name === "content-range" && !keepContentRange) continue;
+    if (name === "content-length" && o.manifest === "dash") continue;
+    res.setHeader(name, value);
+  }
+  if (o.manifest === "dash" && !response.headers.get("content-type")) {
+    res.setHeader("content-type", "application/dash+xml");
+  }
+  res.setHeader(
+    "cache-control",
+    privateCacheControl(
+      response.headers.get("cache-control"),
+      "private, no-cache"
+    )
+  );
+  res.end();
 }
 
 /**
@@ -338,14 +398,25 @@ export const proxyStashStream = async (
   // Manifests go whole: Stash honours Range on them, and a slice starting
   // past "apikey=" would carry a bare key through every rewrite below
   const isManifestPath = /\.(m3u8|mpd)$/.test(fullStreamPath);
+  // A HEAD (an external player probing its link) costs Stash no body. Stash
+  // refuses HEAD (405), so it goes as a GET: for the direct file, which
+  // Stash serves by range, one byte unless the player named a range; a
+  // transcode, a segment or a manifest takes no range and is dropped as soon
+  // as its headers arrive
+  const headOnly = req.method === "HEAD";
+  const rangeAdded =
+    headOnly && fullStreamPath === "stream" && !req.headers.range;
+  const range = rangeAdded
+    ? HEAD_PROBE_RANGE
+    : !isManifestPath
+      ? req.headers.range
+      : undefined;
   const fetched = await fromStash(res, () =>
     fetchFromStash(stashUrl, {
       apiKey,
       clientRes: res,
       headersTimeoutMs: STREAM_HEADERS_TIMEOUT_MS,
-      ...(req.headers.range && !isManifestPath
-        ? { headers: { Range: req.headers.range } }
-        : {}),
+      ...(range ? { headers: { Range: range } } : {}),
     })
   );
   if (!fetched) return;
@@ -368,6 +439,17 @@ export const proxyStashStream = async (
     fullStreamPath.endsWith(".m3u8") ||
     contentType.includes("mpegurl") ||
     contentType.includes("x-mpegURL");
+  const isDashManifest =
+    fullStreamPath.endsWith(".mpd") || contentType.includes("dash+xml");
+
+  if (headOnly) {
+    answerStreamHead(res, response, {
+      rangeAdded,
+      manifest: isHlsPlaylist ? "hls" : isDashManifest ? "dash" : undefined,
+    });
+    abort.abort();
+    return;
+  }
 
   if (isHlsPlaylist) {
     // For HLS playlists, read the entire response and rewrite URLs
@@ -406,9 +488,6 @@ export const proxyStashStream = async (
   );
 
   // A DASH manifest (about 1 KB) is read whole and sent without apikey
-  const isDashManifest =
-    fullStreamPath.endsWith(".mpd") || contentType.includes("dash+xml");
-
   if (isDashManifest) {
     const manifestText = await fromStash(res, () =>
       readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
@@ -430,19 +509,16 @@ export const proxyStashStream = async (
   }
 
   // Stream response body to client with proper backpressure and cleanup
-  const headersToForward = [
-    "content-type",
-    "content-length",
-    "accept-ranges",
-    "content-range",
-    "last-modified",
-    "etag",
-  ];
-
-  await pipeResponseToClient(response, res, "[PROXY]", headersToForward, {
-    idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
-    abort,
-  });
+  await pipeResponseToClient(
+    response,
+    res,
+    "[PROXY]",
+    STREAM_RESPONSE_HEADERS,
+    {
+      idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
+      abort,
+    }
+  );
 
   logger.debug(`[PROXY] Stream proxied successfully: ${fullStreamPath}`);
 };
