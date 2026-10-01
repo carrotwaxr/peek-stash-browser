@@ -254,3 +254,91 @@ export const getOrderedNavItems = (preferences: NavPreference[]) => {
     .map((pref) => getNavDefinition(pref.id))
     .filter(Boolean); // Remove any undefined (in case of deleted nav items)
 };
+
+/** The sidebar's and menus' items, by the name they show. */
+export type NavKey =
+  | "Home"
+  | "Scenes"
+  | "Recommended"
+  | "Performers"
+  | "Studios"
+  | "Tags"
+  | "Collections"
+  | "Galleries"
+  | "Images"
+  | "Playlists"
+  | "Clips"
+  | "Watch History"
+  | "Settings";
+
+/**
+ * The first path segment of every route, with the item that shows it. A list
+ * page and its detail page share the item (`/performers` and `/performer/3`).
+ */
+const NAV_KEY_BY_SEGMENT: Record<string, NavKey> = {
+  scenes: "Scenes",
+  scene: "Scenes",
+  recommended: "Recommended",
+  performers: "Performers",
+  performer: "Performers",
+  studios: "Studios",
+  studio: "Studios",
+  tags: "Tags",
+  tag: "Tags",
+  collections: "Collections",
+  collection: "Collections",
+  galleries: "Galleries",
+  gallery: "Galleries",
+  images: "Images",
+  playlists: "Playlists",
+  playlist: "Playlists",
+  clips: "Clips",
+  "watch-history": "Watch History",
+  settings: "Settings",
+};
+
+/** The item a path belongs to, or null for a page no item stands for. */
+export const getNavKeyForPath = (pathname: string): NavKey | null => {
+  if (pathname === "/") return "Home";
+  const segment = pathname.split("/")[1] ?? "";
+  return NAV_KEY_BY_SEGMENT[segment] ?? null;
+};
+
+/** The page whose shortcuts Help shows. */
+export type HelpPage =
+  | "scene"
+  | "scenes"
+  | "performer"
+  | "performers"
+  | "studio"
+  | "studios"
+  | "tag"
+  | "tags"
+  | "gallery"
+  | "galleries"
+  | "group"
+  | "groups"
+  | "playlists"
+  | "global";
+
+const HELP_PAGE_BY_SEGMENT: Record<string, HelpPage> = {
+  scene: "scene",
+  scenes: "scenes",
+  performer: "performer",
+  performers: "performers",
+  studio: "studio",
+  studios: "studios",
+  tag: "tag",
+  tags: "tags",
+  gallery: "gallery",
+  galleries: "galleries",
+  collection: "group",
+  collections: "groups",
+  playlists: "playlists",
+};
+
+/** The Help page for a path; the global shortcuts where it has none. */
+export const getHelpPageForPath = (pathname: string): HelpPage => {
+  const segment = pathname.split("/")[1] ?? "";
+  return HELP_PAGE_BY_SEGMENT[segment] ?? "global";
+};

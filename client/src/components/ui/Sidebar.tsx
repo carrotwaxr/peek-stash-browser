@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { getOrderedNavItems } from "../../constants/navigation";
+import {
+  getNavKeyForPath,
+  getOrderedNavItems,
+} from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTVMode } from "../../hooks/useTVMode";
 import { PeekLogo } from "../branding/PeekLogo";
@@ -81,28 +84,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
     []
   );
 
-  // Get current page from React Router location
-  const getCurrentPage = () => {
-    const path = location.pathname;
-    if (path === "/") return "Home";
-    if (path.startsWith("/scenes")) return "Scenes";
-    if (path.startsWith("/recommended")) return "Recommended";
-    if (path.startsWith("/performers")) return "Performers";
-    if (path.startsWith("/studios")) return "Studios";
-    if (path.startsWith("/tags")) return "Tags";
-    if (path.startsWith("/collections") || path.startsWith("/collection/"))
-      return "Collections";
-    if (path.startsWith("/galleries") || path.startsWith("/gallery/"))
-      return "Galleries";
-    if (path.startsWith("/images")) return "Images";
-    if (path.startsWith("/playlists") || path.startsWith("/playlist/"))
-      return "Playlists";
-    if (path.startsWith("/clips")) return "Clips";
-    if (path.startsWith("/watch-history")) return "Watch History";
-    return null;
-  };
-
-  const currentPage = getCurrentPage();
+  // The nav item the current path belongs to
+  const currentPage = getNavKeyForPath(location.pathname);
+  const isSettingsActive = currentPage === "Settings";
 
   return (
     <>
@@ -203,7 +187,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       <Tooltip content="Settings" position="right">
                         <Link
                           to="/settings"
-                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
+                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
+                            isSettingsActive ? "nav-link-active" : "nav-link"
+                          }`}
                           aria-label="Settings"
                         >
                           <ThemedIcon name="settings" size={20} />
@@ -212,7 +198,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                     </div>
                     <Link
                       to="/settings"
-                      className="hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
+                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+                        isSettingsActive ? "nav-link-active" : "nav-link"
+                      }`}
                     >
                       <ThemedIcon name="settings" size={20} />
                       <span className="text-sm font-medium">Settings</span>
