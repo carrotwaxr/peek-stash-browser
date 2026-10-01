@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { useMediaQuery } from "../../src/hooks/useMediaQuery";
+import { controlMatchMedia } from "../helpers/matchMedia";
 
 /** The change listener the hook registers; tests call it with just matches */
 type ChangeListener = (event: Pick<MediaQueryListEvent, "matches">) => void;
@@ -75,16 +76,40 @@ describe("useMediaQuery", () => {
   });
 
   it("updates when media query changes", () => {
-    const { result } = renderHook(() => useMediaQuery("(max-width: 768px)"));
+    const media = controlMatchMedia();
+    try {
+      const { result } = renderHook(() => useMediaQuery("(max-width: 768px)"));
 
-    expect(result.current).toBe(false);
+      expect(result.current).toBe(false);
 
-    // Simulate media query change
-    act(() => {
-      listeners.forEach((listener) => listener({ matches: true }));
-    });
+      act(() => media.set("(max-width: 768px)", true));
 
-    expect(result.current).toBe(true);
+      expect(result.current).toBe(true);
+    } finally {
+      media.restore();
+    }
+  });
+
+  it("two components reading one query add one change listener", () => {
+    const media = controlMatchMedia();
+    try {
+      const first = renderHook(() => useMediaQuery("(orientation: portrait)"));
+      const second = renderHook(() => useMediaQuery("(orientation: portrait)"));
+
+      expect(media.listenerCount("(orientation: portrait)")).toBe(1);
+
+      act(() => media.set("(orientation: portrait)", true));
+      expect(first.result.current).toBe(true);
+      expect(second.result.current).toBe(true);
+
+      // The listener stays until the last reader leaves
+      first.unmount();
+      expect(media.listenerCount("(orientation: portrait)")).toBe(1);
+      second.unmount();
+      expect(media.listenerCount("(orientation: portrait)")).toBe(0);
+    } finally {
+      media.restore();
+    }
   });
 
   it("removes event listener on unmount", () => {

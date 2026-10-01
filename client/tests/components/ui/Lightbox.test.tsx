@@ -16,6 +16,7 @@ import { queryKeys } from "@/api/queryKeys";
 import Lightbox from "../../../src/components/ui/Lightbox";
 import { AuthContext } from "../../../src/contexts/AuthContextProvider";
 import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
+import { controlMatchMedia } from "../../helpers/matchMedia";
 
 // Mock the API (the rating hooks reach `libraryApi` through its own module)
 const { mockLibraryApi } = vi.hoisted(() => ({
@@ -758,6 +759,58 @@ describe("Lightbox", () => {
 
       press("Escape");
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("device queries", () => {
+    it("the arrows move to the portrait position when a phone turns upright", () => {
+      const media = controlMatchMedia();
+      try {
+        render(
+          <Lightbox
+            images={createMockImages(1, 3)}
+            initialIndex={0}
+            isOpen={true}
+            onClose={vi.fn()}
+          />
+        );
+        const next = () => screen.getByRole("button", { name: "Next image" });
+        expect(next().style.top).toBe("50%");
+
+        // A matchMedia change event, with no window resize
+        act(() =>
+          media.set("(max-width: 768px) and (orientation: portrait)", true)
+        );
+        expect(next().style.top).toBe("62%");
+
+        act(() =>
+          media.set("(max-width: 768px) and (orientation: portrait)", false)
+        );
+        expect(next().style.top).toBe("50%");
+      } finally {
+        media.restore();
+      }
+    });
+
+    it("adds no window resize or orientation listener", () => {
+      const media = controlMatchMedia();
+      const addSpy = vi.spyOn(window, "addEventListener");
+      try {
+        render(
+          <Lightbox
+            images={createMockImages(1, 3)}
+            initialIndex={0}
+            isOpen={false}
+            onClose={vi.fn()}
+          />
+        );
+        const events = addSpy.mock.calls.map(([type]) => type);
+        expect(events).not.toContain("resize");
+        expect(events).not.toContain("orientationchange");
+      } finally {
+        addSpy.mockRestore();
+        media.restore();
+      }
     });
   });
 

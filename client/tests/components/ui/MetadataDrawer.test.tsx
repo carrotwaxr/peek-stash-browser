@@ -1,8 +1,10 @@
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MetadataDrawer from "../../../src/components/ui/MetadataDrawer";
+import { controlMatchMedia } from "../../helpers/matchMedia";
 
 vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: false }),
@@ -104,6 +106,24 @@ describe("MetadataDrawer subtitle", () => {
     );
     const link = screen.getByRole("link", { name: "Acme" });
     expect(link).toHaveAttribute("href", "/studio/9");
+  });
+});
+
+describe("MetadataDrawer orientation", () => {
+  it("the drawer follows a landscape change", () => {
+    const media = controlMatchMedia();
+    try {
+      const { container } = renderDrawer(makeImage());
+      // The drawer's handle is a wide bar in portrait, a tall one in landscape
+      expect(container.querySelector(".w-10.h-1")).not.toBeNull();
+
+      act(() => media.set("(orientation: landscape)", true));
+
+      expect(container.querySelector(".h-10.w-1")).not.toBeNull();
+      expect(container.querySelector(".w-10.h-1")).toBeNull();
+    } finally {
+      media.restore();
+    }
   });
 });
 
