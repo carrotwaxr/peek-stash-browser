@@ -12,13 +12,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import type { ImageListItem } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../../api/client";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
+import { libraryApi } from "../../api/library";
 import { useConfig } from "../../contexts/ConfigContext";
 import {
   type PageChangeOptions,
   usePaginatedLightbox,
 } from "../../hooks/usePaginatedLightbox";
-import { makeCompositeKey } from "../../utils/compositeKey";
+import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import Lightbox from "../ui/Lightbox";
 import type {
@@ -60,6 +62,52 @@ const sameImage = (
 const sentPath = (path: string | null | undefined): string | undefined =>
   path == null || path === "" ? undefined : path;
 
+/** The viewer's image: its source and preview fall back to the image's
+ * proxy route when the server sent none */
+const viewerImage = (img: ImageListItem): ImageListItem => {
+  // The server serves an image only from the instance it names
+  const instanceQuery = img.instanceId
+    ? `?instanceId=${encodeURIComponent(img.instanceId)}`
+    : "";
+  const proxied = (kind: string) =>
+    `/api/proxy/image/${img.id}/${kind}${instanceQuery}`;
+  return {
+    ...img,
+    paths: {
+      image: sentPath(img.paths.image) ?? proxied("image"),
+      preview:
+        sentPath(img.paths.preview) ?? sentPath(img.paths.thumbnail) ?? null,
+      thumbnail: sentPath(img.paths.thumbnail) ?? proxied("thumbnail"),
+    },
+  };
+};
+
+/**
+ * One image by its "id:instanceId", read through the Images list on its own
+ * instance, so the viewer's exclusions apply and the rating, favorite and O
+ * count are the viewer's; null for an image they cannot see
+ */
+const readImage = async (
+  key: string,
+  signal: AbortSignal
+): Promise<ImageListItem | null> => {
+  const { id, instanceId } = parseCompositeKey(key);
+  try {
+    const { findImages } = await libraryApi.findImages(
+      {
+        ids: [String(id)],
+        ...(instanceId ? { image_filter: { instance_id: instanceId } } : {}),
+      },
+      signal
+    );
+    return findImages.images.find((image) => imageKey(image) === key) ?? null;
+  } catch (error) {
+    // The server refuses an id that is not one (a mangled link): no image
+    if (error instanceof ApiError && error.status === 400) return null;
+    throw error;
+  }
+};
+
 type ImagesResponse = {
   findImages?: { images?: ListRow[] } & Record<string, unknown>;
 } & Record<string, unknown>;
@@ -69,7 +117,9 @@ type ImagesResponse = {
  * the image, so Back closes it), which pages across the list by the list's
  * own page and page size (a page turned from the lightbox replaces the
  * entry); a card's O, rating and favorite change the image on its instance
- * in the cached page.
+ * in the cached page. An `image` param naming an image not on the loaded
+ * page (a link to it) reads that image by id and shows it alone; a detail
+ * page's tab reads it the same way, by id and instance only.
  */
 export function useImageListPage({
   listState,
@@ -98,6 +148,7 @@ export function useImageListPage({
     // An `image` param waits for this request's own rows (not a
     // placeholder's), and a failed page drops nothing
     ready: !loading && !error,
+    fetchImage: readImage,
   });
   const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
     lightbox;
@@ -192,27 +243,13 @@ export function useImageListPage({
   // The viewer's source and preview, each falling back to the image's proxy
   // route when the server sent none
   const lightboxImages = useMemo(
-    () =>
-      (lightboxRows as unknown as ImageListItem[]).map((img) => {
-        // The server serves an image only from the instance it names
-        const instanceQuery = img.instanceId
-          ? `?instanceId=${encodeURIComponent(img.instanceId)}`
-          : "";
-        const proxied = (kind: string) =>
-          `/api/proxy/image/${img.id}/${kind}${instanceQuery}`;
-        return {
-          ...img,
-          paths: {
-            image: sentPath(img.paths.image) ?? proxied("image"),
-            preview:
-              sentPath(img.paths.preview) ??
-              sentPath(img.paths.thumbnail) ??
-              null,
-            thumbnail: sentPath(img.paths.thumbnail) ?? proxied("thumbnail"),
-          },
-        };
-      }),
+    () => (lightboxRows as unknown as ImageListItem[]).map(viewerImage),
     [lightboxRows]
+  );
+  const { soloImage, updateSoloImage } = lightbox;
+  const soloImages = useMemo(
+    () => (soloImage ? [viewerImage(soloImage)] : null),
+    [soloImage]
   );
 
   // The lightbox's own changes, back into the cached page
@@ -227,24 +264,38 @@ export function useImageListPage({
     [updateCachedPage]
   );
 
-  const after =
-    lightboxRows.length > 0 ? (
-      <Lightbox
-        isOpen={lightbox.lightboxOpen}
-        images={lightboxImages}
-        initialIndex={lightbox.lightboxIndex}
-        autoPlay={lightbox.lightboxAutoPlay}
-        onClose={lightbox.closeLightbox}
-        onImagesUpdate={onImagesUpdate}
-        // Cross-page navigation, by the list's page and page size
-        onPageBoundary={lightbox.onPageBoundary}
-        totalCount={count}
-        pageOffset={(page - 1) * perPage}
-        onIndexChange={lightbox.onIndexChange}
-        isPageTransitioning={lightbox.isPageTransitioning}
-        transitionKey={lightbox.transitionKey}
-      />
-    ) : null;
+  const after = soloImages ? (
+    // An address's image from beyond the loaded page, alone: no paging
+    <Lightbox
+      isOpen={lightbox.lightboxOpen}
+      images={soloImages}
+      initialIndex={0}
+      autoPlay={lightbox.lightboxAutoPlay}
+      onClose={lightbox.closeLightbox}
+      onImagesUpdate={(updated) => {
+        const image = updated[0];
+        if (image) updateSoloImage(image);
+        onImagesUpdate(updated);
+      }}
+      transitionKey={lightbox.transitionKey}
+    />
+  ) : lightboxRows.length > 0 ? (
+    <Lightbox
+      isOpen={lightbox.lightboxOpen}
+      images={lightboxImages}
+      initialIndex={lightbox.lightboxIndex}
+      autoPlay={lightbox.lightboxAutoPlay}
+      onClose={lightbox.closeLightbox}
+      onImagesUpdate={onImagesUpdate}
+      // Cross-page navigation, by the list's page and page size
+      onPageBoundary={lightbox.onPageBoundary}
+      totalCount={count}
+      pageOffset={(page - 1) * perPage}
+      onIndexChange={lightbox.onIndexChange}
+      isPageTransitioning={lightbox.isPageTransitioning}
+      transitionKey={lightbox.transitionKey}
+    />
+  ) : null;
 
   // The open lightbox covers the list: a failed page is its toast, not the
   // error page (which would unmount it)

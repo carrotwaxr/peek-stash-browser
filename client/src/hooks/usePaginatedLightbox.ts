@@ -53,7 +53,16 @@ interface PaginatedLightboxOptions<TImage> {
    * and once ready one not among the images is dropped with a note
    */
   ready?: boolean;
+  /**
+   * Reads one image by its "id:instanceId", null when the viewer cannot see
+   * it. With it, an `image` param not on the loaded page opens the viewer on
+   * that image alone; without it, the param is dropped with a note.
+   */
+  fetchImage?: (key: string, signal: AbortSignal) => Promise<TImage | null>;
 }
+
+/** What the viewer says when an address's image cannot be read */
+export const IMAGE_GONE_MESSAGE = "That image is no longer available";
 
 /**
  * A paginated image grid's lightbox. The open image is in the URL as
@@ -64,8 +73,11 @@ interface PaginatedLightboxOptions<TImage> {
  * from an address (a reload, a link) closes by removing the param with a
  * replace. Either way, and on Back, the list then shows the page of the last
  * image. An address with the param opens the lightbox on that image once its
- * page is in, or, when the image is not on that page, drops the param (a
- * replace) and says so. A crossing whose page fails to load
+ * page is in. When the image is not on that page (a link to an image on a
+ * later page), `fetchImage` reads it by id and the lightbox shows it alone
+ * (`soloImage`: no paging across the list, which closing leaves on its
+ * page); an image the read does not find (gone, hidden, restricted) drops
+ * the param (a replace) and says so. A crossing whose page fails to load
  * (`failPendingPage`) returns to the image it left and says why.
  */
 export function usePaginatedLightbox<TImage = unknown>({
@@ -77,6 +89,7 @@ export function usePaginatedLightbox<TImage = unknown>({
   fetchPage,
   images = NO_IMAGES,
   ready = true,
+  fetchImage,
 }: PaginatedLightboxOptions<TImage>) {
   // Internal page state - only used when externalPage is not provided
   const [internalPage, setInternalPage] = useState(1);
@@ -122,6 +135,15 @@ export function usePaginatedLightbox<TImage = unknown>({
   // Track current lightbox index reported by Lightbox component (for prefetch triggering)
   // This is separate from lightboxIndex which is used as initialIndex prop
   const [trackedIndex, setTrackedIndex] = useState(0);
+
+  // An address's image read by id (not on the loaded page), shown alone
+  const [soloImage, setSoloImage] = useState<TImage | null>(null);
+  // The by-id read under way; a later navigation, open or close cancels it
+  const soloReadRef = useRef<AbortController | null>(null);
+  const cancelSoloRead = useCallback(() => {
+    soloReadRef.current?.abort();
+    soloReadRef.current = null;
+  }, []);
 
   const totalPages = Math.ceil(totalCount / perPage);
 
@@ -206,6 +228,7 @@ export function usePaginatedLightbox<TImage = unknown>({
         ownWritesRef.current = [];
         latestRef.current = imageParam;
         resolveRef.current = imageParam;
+        cancelSoloRead();
         if (imageParam === null) {
           pendingLightboxNav.current = null;
           crossingRef.current = null;
@@ -213,6 +236,7 @@ export function usePaginatedLightbox<TImage = unknown>({
           setIsPageTransitioning(false);
           setLandingIndex(null);
           setLightboxOpen(false);
+          setSoloImage(null);
         }
       }
       if (imageParam === null) {
@@ -232,6 +256,43 @@ export function usePaginatedLightbox<TImage = unknown>({
     if (key === null || !ready) return;
     const index = images.findIndex((image) => imageKey(image) === key);
     resolveRef.current = null;
+    if (index < 0 && fetchImage) {
+      // The page is in and the image is not on it (a link to an image on
+      // another page): read it by id and show it alone. Gone, hidden or
+      // restricted, it reads as none: the list stays, without the param.
+      const read = new AbortController();
+      soloReadRef.current = read;
+      const page = currentPage;
+      const drop = (message: string) => {
+        setSoloImage(null);
+        setLightboxOpen(false);
+        writeImage(null, "replace");
+        showError(message);
+      };
+      fetchImage(key, read.signal).then(
+        (found) => {
+          if (read.signal.aborted) return;
+          soloReadRef.current = null;
+          if (found === null) {
+            drop(IMAGE_GONE_MESSAGE);
+            return;
+          }
+          openedByPushRef.current = false;
+          viewerPageRef.current = page;
+          setSoloImage(found);
+          setLightboxIndex(0);
+          setTransitionKey((k) => k + 1);
+          setLightboxAutoPlay(false);
+          setLightboxOpen(true);
+        },
+        (error: unknown) => {
+          if (read.signal.aborted) return;
+          soloReadRef.current = null;
+          drop(getErrorMessage(error, IMAGE_GONE_MESSAGE));
+        }
+      );
+      return;
+    }
     if (index < 0) {
       // The page is in and the image is not on it (gone, hidden, or moved
       // by a change to the list): the list stays, without the param
@@ -241,6 +302,7 @@ export function usePaginatedLightbox<TImage = unknown>({
     }
     openedByPushRef.current = false;
     viewerPageRef.current = currentPage;
+    setSoloImage(null);
     setLightboxIndex(index);
     setLightboxAutoPlay(false);
     setLightboxOpen(true);
@@ -253,6 +315,8 @@ export function usePaginatedLightbox<TImage = unknown>({
     currentPage,
     changePage,
     writeImage,
+    fetchImage,
+    cancelSoloRead,
   ]);
 
   // After a boundary crossing, name the new page's image once it is in
@@ -274,6 +338,8 @@ export function usePaginatedLightbox<TImage = unknown>({
   // Returns true if navigation was handled (crossing page boundary), false otherwise
   const handlePageBoundary = useCallback(
     (direction: "next" | "prev") => {
+      // An image shown alone is not in the list: nowhere to page to
+      if (soloImage !== null) return false;
       if (direction === "next" && currentPage < totalPages) {
         // User navigated past last image on current page - load next page
         const targetIndex = 0; // First image of next page
@@ -308,7 +374,15 @@ export function usePaginatedLightbox<TImage = unknown>({
 
       return false; // Let lightbox handle normal wrapping
     },
-    [currentPage, totalPages, perPage, changePage, images, trackedIndex]
+    [
+      soloImage,
+      currentPage,
+      totalPages,
+      perPage,
+      changePage,
+      images,
+      trackedIndex,
+    ]
   );
 
   // The lightbox moved: track it for prefetching and name its image in the
@@ -318,7 +392,8 @@ export function usePaginatedLightbox<TImage = unknown>({
   // param the old index would overwrite. That includes a navigation not
   // followed yet: the lightbox reports before the observer runs (a child's
   // effects run first), and a Back to a cached page brings that page's
-  // images with it.
+  // images with it. An image shown alone, or one being read by id, is
+  // already the param; the index is not the page's.
   const handleLightboxIndexChange = useCallback(
     (index: number) => {
       setTrackedIndex(index);
@@ -328,6 +403,8 @@ export function usePaginatedLightbox<TImage = unknown>({
         !ownWritesRef.current.includes(imageParam);
       if (
         !lightboxOpen ||
+        soloImage !== null ||
+        soloReadRef.current !== null ||
         pendingLightboxNav.current !== null ||
         landingIndex !== null ||
         resolveRef.current !== null ||
@@ -338,12 +415,22 @@ export function usePaginatedLightbox<TImage = unknown>({
       const image = images[index];
       if (image) writeImage(imageKey(image), "replace");
     },
-    [lightboxOpen, landingIndex, images, writeImage, location, imageParam]
+    [
+      lightboxOpen,
+      soloImage,
+      landingIndex,
+      images,
+      writeImage,
+      location,
+      imageParam,
+    ]
   );
 
   // Handle lightbox close. The list then shows the page of the last image
   // (the URL observer replaces `page` once the param is gone).
   const handleLightboxClose = useCallback(() => {
+    cancelSoloRead();
+    setSoloImage(null);
     setLightboxOpen(false);
     pendingLightboxNav.current = null;
     crossingRef.current = null;
@@ -360,11 +447,13 @@ export function usePaginatedLightbox<TImage = unknown>({
     }
     openedByPushRef.current = false;
     writeImage(null, "replace");
-  }, [navigate, writeImage]);
+  }, [navigate, writeImage, cancelSoloRead]);
 
   // Open lightbox at a specific image
   const openLightbox = useCallback(
     (index: number, autoPlay = false) => {
+      cancelSoloRead();
+      setSoloImage(null);
       setLightboxIndex(index);
       setLightboxAutoPlay(autoPlay);
       setLightboxOpen(true);
@@ -375,7 +464,7 @@ export function usePaginatedLightbox<TImage = unknown>({
         writeImage(imageKey(image), "push");
       }
     },
-    [images, currentPage, writeImage]
+    [images, currentPage, writeImage, cancelSoloRead]
   );
 
   // Get the pending lightbox index after a page load (for cross-page navigation)
@@ -430,7 +519,7 @@ export function usePaginatedLightbox<TImage = unknown>({
 
   // Prefetch adjacent pages when near page boundaries
   useEffect(() => {
-    if (!lightboxOpen || !fetchPage) return;
+    if (!lightboxOpen || !fetchPage || soloImage !== null) return;
 
     // Near end of page - prefetch next page
     if (
@@ -475,6 +564,7 @@ export function usePaginatedLightbox<TImage = unknown>({
     }
   }, [
     lightboxOpen,
+    soloImage,
     trackedIndex,
     currentPage,
     totalPages,
@@ -500,11 +590,16 @@ export function usePaginatedLightbox<TImage = unknown>({
     lightboxAutoPlay,
     isPageTransitioning,
     transitionKey,
+    /** The address's image read by id, shown alone; null otherwise */
+    soloImage,
+    /** The viewer's own change to the image shown alone */
+    updateSoloImage: setSoloImage,
 
     // Lightbox handlers
     openLightbox,
     closeLightbox: handleLightboxClose,
-    onPageBoundary: totalPages > 1 ? handlePageBoundary : () => false,
+    onPageBoundary:
+      totalPages > 1 && soloImage === null ? handlePageBoundary : () => false,
     onIndexChange: handleLightboxIndexChange,
 
     // For consuming pending navigation after page load, or its failure

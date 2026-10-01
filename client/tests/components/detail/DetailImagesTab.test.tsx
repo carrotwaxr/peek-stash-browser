@@ -6,7 +6,13 @@
  * page holds.
  */
 import { createRef } from "react";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   type ApiStub,
@@ -21,7 +27,7 @@ import DetailImagesTab, {
   type DetailImagesLightbox,
 } from "@/components/detail/DetailImagesTab";
 import type * as toastModule from "@/utils/toast";
-import { showInfo } from "@/utils/toast";
+import { showError, showInfo } from "@/utils/toast";
 
 interface CardProps {
   image: Record<string, unknown>;
@@ -114,6 +120,21 @@ interface Setup {
 function stubServer({ presets = {}, defaults = {} }: Setup = {}): ApiStub {
   return stubApi({
     "/library/images": (_url, init) => {
+      // A read by id: the images that exist among them
+      const ids = jsonBody(init).ids as string[] | undefined;
+      if (ids) {
+        // An id that is not one is refused, as the server's parser does
+        if (ids.some((id) => !/^img-\d+$/.test(id))) {
+          return jsonResponse(400, { error: "Invalid request" });
+        }
+        const found = ids
+          .map((id) => Number(id.replace(/^img-/, "")))
+          .filter((n) => n >= 1 && n <= TOTAL)
+          .map(imageRow);
+        return jsonResponse(200, {
+          findImages: { images: found, count: found.length },
+        });
+      }
       const filter = jsonBody(init).filter as
         | { page?: number; per_page?: number }
         | undefined;
@@ -175,6 +196,7 @@ const cards = () => screen.getAllByTestId("image-card");
 describe("DetailImagesTab", () => {
   beforeEach(() => {
     vi.mocked(showInfo).mockClear();
+    vi.mocked(showError).mockClear();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -259,18 +281,43 @@ describe("DetailImagesTab", () => {
     ).toBe(false);
   });
 
-  it("an `image` param not on the tab's loaded page is dropped with the info toast", async () => {
-    const { router } = tagTab([`/tag/5?tab=images&image=img-99:${INSTANCE}`]);
+  it("an `image` param for an image beyond the loaded page opens the viewer on that image alone after one by-id read", async () => {
+    const { api, router } = tagTab([
+      `/tag/5?tab=images&image=img-27:${INSTANCE}`,
+    ]);
 
-    await waitFor(() => expect(search(router).image).toBeUndefined());
-    expect(search(router)).toMatchObject({ tab: "images" });
-    expect(showInfo).toHaveBeenCalledWith(
-      "That image isn't on this page of the list."
-    );
-    expect(
-      screen.queryByRole("dialog", { name: "Image viewer" })
-    ).not.toBeInTheDocument();
+    const viewer = await screen.findByRole("dialog", { name: "Image viewer" });
+    expect(within(viewer).getByAltText("Image 27")).toBeInTheDocument();
+    expect(within(viewer).getByText("1 / 1")).toBeInTheDocument();
+    const byId = bodiesTo(api, "/library/images").filter((body) => body.ids);
+    expect(byId).toEqual([
+      { ids: ["img-27"], image_filter: { instance_id: INSTANCE } },
+    ]);
+    expect(search(router)).toMatchObject({
+      tab: "images",
+      image: `img-27:${INSTANCE}`,
+    });
+    expect(showInfo).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["the server does not have", `img-99:${INSTANCE}`],
+    ["the server refuses the id of", `not-an-id:${INSTANCE}`],
+  ])(
+    "an `image` param for an image %s is dropped and says it is no longer available",
+    async (_case, key) => {
+      const { router } = tagTab([`/tag/5?tab=images&image=${key}`]);
+
+      await waitFor(() => expect(search(router).image).toBeUndefined());
+      expect(search(router)).toMatchObject({ tab: "images" });
+      expect(showError).toHaveBeenCalledWith(
+        "That image is no longer available"
+      );
+      expect(
+        screen.queryByRole("dialog", { name: "Image viewer" })
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it("rating an image in the viewer shows the new rating on the tab's card after the viewer closes", async () => {
     const { api } = tagTab();
