@@ -7,10 +7,12 @@
  * remove, reorder) take each scene's instance from the request; a move and
  * a bulk remove name items by item id.
  */
+import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import type { Playlist, PlaylistItem, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addSceneToPlaylist,
+  addScenesToPlaylist,
   createPlaylist,
   deletePlaylist,
   duplicatePlaylist,
@@ -1268,6 +1270,144 @@ describe("Playlist Controller Operations", () => {
       );
       expect(mockPrisma.playlist.findFirst).not.toHaveBeenCalled();
       expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addScenesToPlaylist", () => {
+    const bulkReq = (body: unknown, id = "1") => {
+      const req = reqFor(addScenesToPlaylist, {
+        params: { id },
+        body: malformed(body),
+        user: USER,
+      });
+      const res = resFor(addScenesToPlaylist);
+      return { run: () => addScenesToPlaylist(req, res), res };
+    };
+
+    const scenes = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        sceneId: String(i + 1),
+        instanceId: "inst-a",
+      }));
+
+    it("a playlist id that is not a number answers 400", async () => {
+      const { run, res } = bulkReq({ scenes: scenes(1) }, "abc");
+
+      await run();
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toBe("Invalid playlist ID");
+      expect(mockAppendItems).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["no scenes field", {}],
+      ["scenes that are not an array", { scenes: "42" }],
+      ["an empty array", { scenes: [] }],
+      ["more than a page of scenes", { scenes: scenes(PER_PAGE_MAX + 1) }],
+    ])("%s answers 400 and adds nothing", async (_what, body) => {
+      const { run, res } = bulkReq(body);
+
+      await run();
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toBe(
+        `scenes must be an array of 1 to ${PER_PAGE_MAX} scenes`
+      );
+      expect(mockGetAccess).not.toHaveBeenCalled();
+      expect(mockAppendItems).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["null", null, "scenes[1] must be an object"],
+      ["a string", "42", "scenes[1] must be an object"],
+      [
+        "an entry without a scene id",
+        { instanceId: "inst-a" },
+        "scenes[1].sceneId is required",
+      ],
+      [
+        "an entry without an instance",
+        { sceneId: "9" },
+        "scenes[1].instanceId is required",
+      ],
+      [
+        "an entry with a malformed instance",
+        { sceneId: "9", instanceId: "not an id!" },
+        "scenes[1].instanceId must be an instance id",
+      ],
+    ])(
+      "an entry that is %s answers 400 naming it, before any access check",
+      async (_what, entry, message) => {
+        const { run, res } = bulkReq({
+          scenes: [{ sceneId: "1", instanceId: "inst-a" }, entry],
+        });
+
+        await run();
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res._getErrorBody().error).toBe(message);
+        expect(mockGetAccess).not.toHaveBeenCalled();
+        expect(mockAppendItems).not.toHaveBeenCalled();
+      }
+    );
+
+    it("a playlist the user has no access to answers 404 and adds nothing", async () => {
+      mockGetAccess.mockResolvedValue({ level: "none" });
+      const { run, res } = bulkReq({ scenes: scenes(2) });
+
+      await run();
+
+      expect(mockGetAccess).toHaveBeenCalledWith(1, USER.id);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res._getErrorBody().error).toBe("Playlist not found");
+      expect(mockAppendItems).not.toHaveBeenCalled();
+    });
+
+    it("answers the counts appendItems returns, asking for the scenes in the order given", async () => {
+      mockGetAccess.mockResolvedValue({ level: "owner" });
+      mockAppendItems.mockResolvedValue({
+        added: 2,
+        alreadyInPlaylist: 1,
+        unavailable: 1,
+      });
+      const { run, res } = bulkReq({
+        scenes: [
+          { sceneId: "30", instanceId: "inst-b" },
+          { sceneId: "10", instanceId: "inst-a" },
+          { sceneId: "10", instanceId: "inst-b" },
+          { sceneId: "20", instanceId: "inst-a" },
+        ],
+      });
+
+      await run();
+
+      expect(mockAppendItems).toHaveBeenCalledWith(1, USER.id, [
+        { id: "30", instanceId: "inst-b" },
+        { id: "10", instanceId: "inst-a" },
+        { id: "10", instanceId: "inst-b" },
+        { id: "20", instanceId: "inst-a" },
+      ]);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res._getOkBody()).toEqual({
+        added: 2,
+        alreadyInPlaylist: 1,
+        unavailable: 1,
+      });
+    });
+
+    it("accepts a full page of scenes", async () => {
+      mockGetAccess.mockResolvedValue({ level: "owner" });
+      mockAppendItems.mockResolvedValue({
+        added: PER_PAGE_MAX,
+        alreadyInPlaylist: 0,
+        unavailable: 0,
+      });
+      const { run, res } = bulkReq({ scenes: scenes(PER_PAGE_MAX) });
+
+      await run();
+
+      expect(res._getOkBody().added).toBe(PER_PAGE_MAX);
     });
   });
 });

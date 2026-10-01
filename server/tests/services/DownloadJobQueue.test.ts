@@ -1,10 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import {
+  type MockInstance,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import prisma from "../../prisma/singleton.js";
 import {
   type BuildZip,
   DownloadJobQueue,
+  downloadJobQueue,
+  recoverPendingDownloads,
 } from "../../services/DownloadJobQueue.js";
+import { zipPath } from "../../utils/downloadPaths.js";
 import { logger } from "../../utils/logger.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -185,5 +201,156 @@ describe("DownloadJobQueue", () => {
     expect(ids(builds)).toEqual([1, 2]);
     must(builds[1]).finish();
     await queue.whenIdle();
+  });
+});
+
+describe("recoverPendingDownloads", () => {
+  const previousConfigDir = process.env.CONFIG_DIR;
+  const mockPrisma = vi.mocked(prisma, true);
+  let configDir: string;
+  let enqueue: MockInstance<DownloadJobQueue["enqueue"]>;
+  let isActive: MockInstance<DownloadJobQueue["isActive"]>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-recover-"));
+    process.env.CONFIG_DIR = configDir;
+    // The real queue would start building: only what recovery asks matters
+    enqueue = vi
+      .spyOn(downloadJobQueue, "enqueue")
+      .mockImplementation(() => {});
+    isActive = vi.spyOn(downloadJobQueue, "isActive").mockReturnValue(false);
+    mockPrisma.download.findMany.mockResolvedValue([]);
+    mockPrisma.download.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  afterEach(() => {
+    enqueue.mockRestore();
+    isActive.mockRestore();
+    if (previousConfigDir === undefined) delete process.env.CONFIG_DIR;
+    else process.env.CONFIG_DIR = previousConfigDir;
+    fs.rmSync(configDir, { recursive: true, force: true });
+  });
+
+  /** A partial zip a killed build left for the user's download */
+  function writePartial(userId: number, downloadId: number): string {
+    const file = zipPath(userId, downloadId);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "partial");
+    return file;
+  }
+
+  it("does nothing when no zip was interrupted", async () => {
+    await recoverPendingDownloads();
+
+    expect(mockPrisma.download.updateMany).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("reads the PENDING and PROCESSING playlist zips, oldest first", async () => {
+    await recoverPendingDownloads();
+
+    expect(mockPrisma.download.findMany).toHaveBeenCalledWith({
+      where: { type: "PLAYLIST", status: { in: ["PENDING", "PROCESSING"] } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, userId: true },
+    });
+  });
+
+  it("puts the rows back to PENDING at 0%, removes each partial file and queues them in the order read", async () => {
+    mockPrisma.download.findMany.mockResolvedValue([
+      partialRow({ id: 8, userId: 2 }),
+      partialRow({ id: 3, userId: 1 }),
+      partialRow({ id: 5, userId: 2 }),
+    ]);
+    const partial8 = writePartial(2, 8);
+    const partial3 = writePartial(1, 3);
+    // Id 5 never started writing: no file to remove
+
+    await recoverPendingDownloads();
+
+    expect(mockPrisma.download.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: [8, 3, 5] },
+        status: { in: ["PENDING", "PROCESSING"] },
+      },
+      data: { status: "PENDING", progress: 0 },
+    });
+    expect(fs.existsSync(partial8)).toBe(false);
+    expect(fs.existsSync(partial3)).toBe(false);
+    expect(enqueue.mock.calls).toEqual([
+      [8, 2],
+      [3, 1],
+      [5, 2],
+    ]);
+  });
+
+  it("leaves alone a zip the queue already holds: no reset, no file removed, not queued again", async () => {
+    mockPrisma.download.findMany.mockResolvedValue([
+      partialRow({ id: 1, userId: 1 }),
+      partialRow({ id: 2, userId: 1 }),
+    ]);
+    isActive.mockImplementation((id) => id === 1);
+    const held = writePartial(1, 1);
+    const stale = writePartial(1, 2);
+
+    await recoverPendingDownloads();
+
+    expect(mockPrisma.download.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [2] }, status: { in: ["PENDING", "PROCESSING"] } },
+      data: { status: "PENDING", progress: 0 },
+    });
+    expect(fs.existsSync(held)).toBe(true);
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(enqueue.mock.calls).toEqual([[2, 1]]);
+  });
+
+  it("writes nothing when the queue holds every one of them", async () => {
+    mockPrisma.download.findMany.mockResolvedValue([
+      partialRow({ id: 1, userId: 1 }),
+    ]);
+    isActive.mockReturnValue(true);
+
+    await recoverPendingDownloads();
+
+    expect(mockPrisma.download.updateMany).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("a zip queued while the rows were being reset keeps its file and is not queued again", async () => {
+    mockPrisma.download.findMany.mockResolvedValue([
+      partialRow({ id: 1, userId: 1 }),
+      partialRow({ id: 2, userId: 1 }),
+    ]);
+    // Two reads in the filter, then the recheck before each file
+    isActive
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+    const racing = writePartial(1, 1);
+    const stale = writePartial(1, 2);
+
+    await recoverPendingDownloads();
+
+    expect(fs.existsSync(racing)).toBe(true);
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(enqueue.mock.calls).toEqual([[2, 1]]);
+  });
+
+  it("a partial file that cannot be removed is logged and the zip is still queued", async () => {
+    mockPrisma.download.findMany.mockResolvedValue([
+      partialRow({ id: 4, userId: 1 }),
+    ]);
+    // A directory where the file belongs: unlink refuses it
+    fs.mkdirSync(zipPath(1, 4), { recursive: true });
+
+    await recoverPendingDownloads();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Could not remove an interrupted zip's partial file",
+      expect.objectContaining({ downloadId: 4 })
+    );
+    expect(enqueue.mock.calls).toEqual([[4, 1]]);
   });
 });
