@@ -8,10 +8,16 @@
  * module mocks each test file declares (`./detailPageMocks`).
  */
 import type { ComponentType } from "react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import type { GetUserSettingsResponse } from "@peek/shared-types";
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import {
   type ApiStub,
   initializingResponse,
@@ -63,7 +69,10 @@ const PAGES: Record<
   },
 };
 
-type Answer = (url: string, init?: RequestInit) => Response | Promise<Response>;
+export type Answer = (
+  url: string,
+  init?: RequestInit
+) => Response | Promise<Response>;
 
 /** An answer that never comes: the request stays in flight */
 const pending: Answer = () => new Promise<Response>(() => {});
@@ -82,9 +91,17 @@ export interface DetailPageOptions {
   /**
    * What the lookup answers: the entity; an empty list; a 400 listing the
    * id on two servers; a 500 "Down"; a 503 `ready: false` once, then the
-   * entity; or nothing yet (default "found")
+   * entity; nothing yet (default "found"); or an answer of the case's own
+   * (it reads the request's `ids`)
    */
-  lookup?: LookupState;
+  lookup?: LookupState | Answer;
+  /**
+   * Further ids the page may be moved to: their counts and writes are
+   * stubbed too (the entity the lookup answers stays the case's)
+   */
+  otherIds?: string[];
+  /** The images the images list answers (default none) */
+  images?: Record<string, unknown>[];
   /**
    * What the tab counts answer: these counts; nothing yet ("loading"); a
    * 500 "Counts are down" ("error"); or an answer of the case's own
@@ -93,7 +110,7 @@ export interface DetailPageOptions {
   counts?: Record<string, number> | "loading" | "error" | Answer;
   /** The viewer's settings (`GET /user/settings`), over the server's defaults */
   settings?: Partial<GetUserSettingsResponse["settings"]>;
-  /** The status `PUT /ratings/<type>/<id>` answers (default 200) */
+  /** The status `PUT /ratings/<type>/<id>` answers, after 20 ms (default 200) */
   ratingAnswer?: number;
 }
 
@@ -105,6 +122,17 @@ export const DEFAULT_ENTITY: Record<string, unknown> = {
 };
 
 let latestApi: ApiStub | undefined;
+let navigateRef: ReturnType<typeof useNavigate> | undefined;
+
+/** Moves the rendered page to `url` inside the router, as a link does */
+export function navigateTo(url: string): void {
+  if (!navigateRef)
+    throw new Error("No page rendered: call renderDetailPage first");
+  const navigate = navigateRef;
+  act(() => {
+    void navigate(url);
+  });
+}
 
 /** The URL's id segment: `/tag/5?x` is "5" */
 function idInUrl(url: string): string {
@@ -123,14 +151,24 @@ function countsAnswer(counts: DetailPageOptions["counts"]): Answer {
   return () => jsonResponse(200, { counts });
 }
 
+/** What the lookup answers with these rows */
+export function listResponse(
+  type: DetailType,
+  rows: Record<string, unknown>[]
+): Response {
+  const { plural, result } = PAGES[type];
+  return jsonResponse(200, {
+    [result]: { [plural]: rows, count: rows.length },
+  });
+}
+
 function lookupAnswer(
   type: DetailType,
-  state: LookupState,
+  state: LookupState | Answer,
   entity: Record<string, unknown>
 ): Answer {
-  const { plural, result } = PAGES[type];
-  const list = (rows: Record<string, unknown>[]) =>
-    jsonResponse(200, { [result]: { [plural]: rows, count: rows.length } });
+  const list = (rows: Record<string, unknown>[]) => listResponse(type, rows);
+  if (typeof state === "function") return state;
   switch (state) {
     case "found":
       return () => list([entity]);
@@ -173,6 +211,26 @@ export function renderDetailPage(
   const entity = options.entity ?? DEFAULT_ENTITY;
   const id = idInUrl(url);
   const entityId = typeof entity.id === "string" ? entity.id : id;
+  const images = options.images ?? [];
+  // Each id the page may show: its counts and its writes
+  const idRoutes: Record<string, Answer> = {};
+  for (const other of [entityId, ...(options.otherIds ?? [])]) {
+    // Answered after a round trip: a failure then lands in a render of its own
+    idRoutes[`/ratings/${type}/${other}`] = () =>
+      new Promise<Response>((resolve) =>
+        setTimeout(
+          () =>
+            resolve(
+              jsonResponse(options.ratingAnswer ?? 200, { success: true })
+            ),
+          20
+        )
+      );
+  }
+  for (const other of [id, ...(options.otherIds ?? [])]) {
+    idRoutes[`/library/${plural}/${encodeURIComponent(other)}/counts`] =
+      countsAnswer(options.counts);
+  }
 
   const api = stubApi({
     [`/library/${plural}`]: lookupAnswer(
@@ -180,14 +238,12 @@ export function renderDetailPage(
       options.lookup ?? "found",
       entity
     ),
-    [`/library/${plural}/${encodeURIComponent(id)}/counts`]: countsAnswer(
-      options.counts
-    ),
-    [`/ratings/${type}/${entityId}`]: () =>
-      jsonResponse(options.ratingAnswer ?? 200, { success: true }),
+    ...idRoutes,
     "/library/ready": () => jsonResponse(200, { ready: true }),
     "/library/images": () =>
-      jsonResponse(200, { findImages: { images: [], count: 0 } }),
+      jsonResponse(200, {
+        findImages: { images, count: images.length },
+      }),
     "/user/filter-presets": () => jsonResponse(200, { presets: {} }),
     "/user/default-presets": () => jsonResponse(200, { defaults: {} }),
     "/user/settings": () =>
@@ -196,10 +252,11 @@ export function renderDetailPage(
   latestApi = api;
 
   const queryClient = createQueryClient();
-  // The URL's query, for `currentSearch()`
-  const CurrentSearch = () => (
-    <output data-testid="search">{useLocation().search}</output>
-  );
+  // The URL's query, for `currentSearch()`, and the router's `navigate`
+  const CurrentSearch = () => {
+    navigateRef = useNavigate();
+    return <output data-testid="search">{useLocation().search}</output>;
+  };
   const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[url]}>

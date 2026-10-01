@@ -52,13 +52,17 @@ export const cardDisplaySettingsModule = {
 export const config = { current: { hasMultipleInstances: true } };
 export const configModule = { useConfig: () => config.current };
 
+/** What `useUnitPreference()` answers */
+export const unit = { current: "metric" };
 export const unitPreferenceModule = {
-  useUnitPreference: () => ({ unitPreference: "metric" }),
+  useUnitPreference: () => ({ unitPreference: unit.current }),
 };
 export const navigationStateModule = {
   useNavigationState: () => ({ goBack: vi.fn(), backButtonText: "Back" }),
 };
-export const authModule = { useAuth: () => ({ user: null }) };
+/** The signed-in user `useAuth()` answers (none by default; an admin sees View in Stash) */
+export const auth = { current: { user: null as { role: string } | null } };
+export const authModule = { useAuth: () => auth.current };
 export const pageTitleModule = { usePageTitle: vi.fn() };
 export const themeModule = { useTheme: () => ({ theme: undefined }) };
 
@@ -68,4 +72,6 @@ export function resetDetailPageMocks(): void {
   sceneSearch.mockClear();
   cardSettings.current = {};
   config.current = { hasMultipleInstances: true };
+  unit.current = "metric";
+  auth.current = { user: null };
 }
