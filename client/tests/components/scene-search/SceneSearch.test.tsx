@@ -243,7 +243,6 @@ describe("SceneSearch", () => {
         expect(router.state.location.pathname).toBe("/scene/12")
       );
       const state = router.state.location.state as {
-        scene: unknown;
         playlist: Record<string, unknown>;
       };
       const playlist = state.playlist;
@@ -272,8 +271,9 @@ describe("SceneSearch", () => {
           },
         },
       ]);
-      // The clicked scene itself still travels whole, for the player's codec check
-      expect(state.scene).toMatchObject({ id: "12", instanceId: "B" });
+      // Only the queue travels: the player loads the scene by id
+      expect(state).not.toHaveProperty("scene");
+      expect(playlist.key).toEqual(expect.stringMatching(/^[0-9a-f]{32}$/));
     });
   });
 

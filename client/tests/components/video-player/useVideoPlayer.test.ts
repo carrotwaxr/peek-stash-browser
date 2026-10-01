@@ -126,8 +126,9 @@ function renderPlayer(
   const hasResumedRef = { current: false };
   const initialResumeTimeRef = { current: null };
   const location = { state: null };
-  const rendered = renderHook(
-    ({ current }: { current: Scene }) =>
+  type Props = { current: Scene; restartCount?: number };
+  const rendered = renderHook<ReturnType<typeof useVideoPlayer>, Props>(
+    ({ current, restartCount = 0 }) =>
       useVideoPlayer({
         // No container: the lifecycle effect creates no player, the test's
         // stands in for it
@@ -141,6 +142,7 @@ function renderPlayer(
         currentIndex: 0,
         autoplayNext: controls.autoplayNext ?? true,
         repeat: controls.repeat ?? "none",
+        restartCount,
         dispatch,
         nextScene: noop,
         prevScene: noop,
@@ -225,6 +227,17 @@ describe("useVideoPlayer", () => {
 
     expect(vi.mocked(buildPlayerSources).mock.calls).toEqual([[onA], [onB]]);
     expect(player.load).toHaveBeenCalledTimes(2);
+  });
+
+  it("a queue step to an entry of the same scene seeks it to the start without loading it again", () => {
+    const player = fakePlayer();
+    const { rerender } = renderPlayer(player, onA);
+    expect(player.currentTime).not.toHaveBeenCalledWith(0);
+
+    rerender({ current: onA, restartCount: 1 });
+
+    expect(player.currentTime).toHaveBeenCalledWith(0);
+    expect(player.load).toHaveBeenCalledTimes(1);
   });
 
   it("the stream URL always names the scene's instance", async () => {

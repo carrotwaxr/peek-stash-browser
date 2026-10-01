@@ -5,8 +5,10 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useRef,
   useState,
 } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../api";
@@ -17,9 +19,15 @@ import {
   useLibraryReady,
 } from "../api/hooks/useLibraryReady";
 import { getEntityPath } from "../utils/entityLinks";
+import { clearInternalPop, takeInternalPop } from "../utils/historyGuard";
+import {
+  type PlaybackQueue,
+  readSceneLocationState,
+} from "../utils/playbackQueue";
 import { useConfig } from "./ConfigContext";
 import {
   type ScenePlayerReducerState,
+  controlsOf,
   initialState,
   scenePlayerReducer,
 } from "./scenePlayerReducer";
@@ -54,49 +62,102 @@ function entryInstanceId(entry: Record<string, unknown>): string | null {
     : null;
 }
 
+/**
+ * Is this queue entry the scene the URL names? Two servers can hold the same
+ * scene id, so with an instance in the URL the entry's instance must match.
+ */
+function isUrlEntry(
+  entry: Record<string, unknown>,
+  sceneId: string,
+  instanceId: string | null
+): boolean {
+  if (entry.sceneId !== sceneId) return false;
+  const entryServer = entryInstanceId(entry);
+  return !instanceId || entryServer === null || entryServer === instanceId;
+}
+
+/** Has the loaded scene the id and server this queue entry names? */
+function isLoadedEntry(
+  scene: { id: string; instanceId?: string } | null,
+  entry: Record<string, unknown>
+): boolean {
+  if (!scene || scene.id !== entry.sceneId) return false;
+  const entryServer = entryInstanceId(entry);
+  return entryServer === null || scene.instanceId === entryServer;
+}
+
+/** Does this history entry's state hold the queue with this key? */
+function holdsQueue(state: unknown, key: unknown): boolean {
+  const held = readSceneLocationState(state).playlist;
+  return held !== undefined && held.key === key;
+}
+
+/** The same controls, field by field (the history entry's against the player's) */
+function sameControls(
+  a: PlaybackQueue["controls"],
+  b: NonNullable<PlaybackQueue["controls"]>
+): boolean {
+  return (
+    a !== undefined &&
+    a.autoplayNext === b.autoplayNext &&
+    a.shuffle === b.shuffle &&
+    a.repeat === b.repeat &&
+    a.shuffleHistory.length === b.shuffleHistory.length &&
+    a.shuffleHistory.every((index, i) => index === b.shuffleHistory[i])
+  );
+}
+
 // ============================================================================
 // PROVIDER
 // ============================================================================
 
 interface ScenePlayerProviderProps {
   children: React.ReactNode;
+  /** The scene the URL names, and its server when the URL names one */
   sceneId: string;
   instanceId?: string | null;
-  playlist?: Record<string, unknown> | null;
+  /** The queue the route's history entry holds (`location.state.playlist`) */
+  playlist?: PlaybackQueue | null;
   shouldResume?: boolean;
-  compatibility?: Record<string, unknown> | null;
   initialQuality?: string;
   initialShouldAutoplay?: boolean;
 }
 
+/**
+ * The player's state, and its queue. The reducer owns the queue's position;
+ * the router follows it: after each step (and each control toggle) the
+ * history entry is replaced with the entry's scene and the queue in its
+ * state, so a reload or Back finds the queue there. A location change is
+ * followed only when it names another scene or another queue; a tab click
+ * on the current scene keeps the queue.
+ */
 export function ScenePlayerProvider({
   children,
   sceneId,
   instanceId = null,
   playlist = null,
   shouldResume = false,
-  compatibility = null,
   initialQuality = "direct",
   initialShouldAutoplay = false,
 }: ScenePlayerProviderProps) {
-  const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
-  const { hasMultipleInstances } = useConfig();
-  const queryClient = useQueryClient();
-  const { ready } = useLibraryReady();
-
-  // Initialize context from props
-  useEffect(() => {
-    dispatch({
+  // The first render starts from the route's entry: the queue a navigation
+  // handed over, or the one a reload or Back finds in the entry's state
+  const [state, dispatch] = useReducer(scenePlayerReducer, undefined, () =>
+    scenePlayerReducer(initialState, {
       type: "INITIALIZE",
       payload: {
         playlist,
-        currentIndex: playlist?.currentIndex || 0,
-        compatibility,
+        currentIndex: playlist?.currentIndex ?? 0,
         initialQuality,
         initialShouldAutoplay,
       },
-    });
-  }, [playlist, compatibility, initialQuality, initialShouldAutoplay]);
+    })
+  );
+  const { hasMultipleInstances } = useConfig();
+  const queryClient = useQueryClient();
+  const { ready } = useLibraryReady();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // ============================================================================
   // ACTION CREATORS (with side effects)
@@ -209,17 +270,184 @@ export function ScenePlayerProvider({
     }
   }, [effectiveSceneId, effectiveInstanceId, loadScene, loadAttempt, ready]);
 
-  // Update URL when navigating playlist (without React Router navigation)
+  // ============================================================================
+  // THE QUEUE AND THE ROUTER
+  // ============================================================================
+
+  // The latest render's values, for the effects below that run on one
+  // dependency only and must read the rest as they are now
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const locationRef = useRef(location);
+  locationRef.current = location;
+  const routeRef = useRef({ sceneId, instanceId, playlist });
+  routeRef.current = { sceneId, instanceId, playlist };
+  // The router's navigate changes with each location; the effects below
+  // must not run again for that
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  // What the last write put in the entry, and on which entry: a render
+  // before the router shows the write does not write it again
+  const lastWriteRef = useRef<{ write: string; onKey: string } | null>(null);
+  // The last history state that held the active queue: what a tab click's
+  // entry (no state) gets back, so its fromPageTitle and shouldResume stay
+  const queueStateRef = useRef<unknown>(playlist ? location.state : null);
+
+  /**
+   * Replaces the history entry with `url` and the queue as it is now: the
+   * current index and the controls, beside what the entry's state held
+   * (fromPageTitle, shouldResume). keepScroll: a step never scrolls the page.
+   */
+  const writeEntry = useCallback((url: string) => {
+    const current = stateRef.current;
+    const queue = current.playlist;
+    if (!queue) return;
+    const held: unknown = locationRef.current.state;
+    const base = (
+      holdsQueue(held, queue.key) ? held : queueStateRef.current
+    ) as Record<string, unknown> | null | undefined;
+    const controls = controlsOf(current);
+    const write = JSON.stringify([
+      url,
+      queue.key,
+      current.currentIndex,
+      controls,
+    ]);
+    const onKey = locationRef.current.key;
+    const last = lastWriteRef.current;
+    if (last && last.write === write && last.onKey === onKey) return;
+    lastWriteRef.current = { write, onKey };
+    const entryState = {
+      ...base,
+      playlist: { ...queue, currentIndex: current.currentIndex, controls },
+      keepScroll: true,
+    };
+    queueStateRef.current = entryState;
+    void navigateRef.current(url, { replace: true, state: entryState });
+  }, []);
+
+  /** The path of a queue entry's scene, on its own server */
+  const entryPath = useCallback(
+    (entry: Record<string, unknown>) =>
+      getEntityPath(
+        "scene",
+        {
+          id: entry.sceneId as string,
+          instanceId: entryInstanceId(entry) ?? undefined,
+        },
+        hasMultipleInstances
+      ),
+    [hasMultipleInstances]
+  );
+
+  // Follow the router: once per history entry, never on a step's own state
+  // change (the reducer state is read through its ref)
+  const seenLocationKeyRef = useRef(location.key);
+  const seenRouteSceneRef = useRef(`${sceneId}@${instanceId ?? ""}`);
+  const seenLocationRef = useRef(location);
   useEffect(() => {
-    if (state.playlist && state.scene) {
-      const newUrl = getEntityPath("scene", state.scene, hasMultipleInstances);
-      // Compare pathname + search to handle instance query param
-      const currentFullPath = window.location.pathname + window.location.search;
-      if (currentFullPath !== newUrl) {
-        window.history.replaceState(null, "", newUrl);
+    if (seenLocationKeyRef.current === location.key) return;
+    seenLocationKeyRef.current = location.key;
+    const previous = seenLocationRef.current;
+    seenLocationRef.current = location;
+    const route = routeRef.current;
+    const routeScene = `${route.sceneId}@${route.instanceId ?? ""}`;
+    const sceneChanged = routeScene !== seenRouteSceneRef.current;
+    seenRouteSceneRef.current = routeScene;
+
+    const current = stateRef.current;
+    const queue = current.playlist;
+    const entry = queue?.scenes?.[current.currentIndex];
+    const urlIsEntry = entry
+      ? isUrlEntry(entry, route.sceneId, route.instanceId)
+      : false;
+    const stateQueue = route.playlist;
+    const { shouldAutoplay } = readSceneLocationState(location.state);
+
+    // The fullscreen guard's own Back: stay on the entry being shown
+    if (takeInternalPop()) {
+      if (queue && entry) {
+        writeEntry(entryPath(entry));
+      } else {
+        void navigateRef.current(previous.pathname + previous.search, {
+          replace: true,
+          state: {
+            ...(previous.state as Record<string, unknown> | null),
+            keepScroll: true,
+          },
+        });
       }
+      return;
     }
-  }, [state.scene, state.playlist, hasMultipleInstances]);
+
+    // Another queue: start it where the navigation says
+    if (stateQueue && (!queue || stateQueue.key !== queue.key)) {
+      queueStateRef.current = location.state;
+      dispatch({
+        type: "INITIALIZE",
+        payload: {
+          playlist: stateQueue,
+          currentIndex: stateQueue.currentIndex,
+          initialQuality,
+          initialShouldAutoplay: shouldAutoplay ?? false,
+        },
+      });
+      return;
+    }
+
+    // This queue (Back or Forward to an entry of it): go to its index
+    if (stateQueue && queue) {
+      queueStateRef.current = location.state;
+      if (!urlIsEntry) {
+        dispatch({
+          type: "GOTO_SCENE_INDEX",
+          payload: { index: stateQueue.currentIndex, shouldAutoplay: false },
+        });
+      }
+      return;
+    }
+
+    // No queue in the entry. On the current scene (a tab click, a ?t= link)
+    // the entry gets the queue, so a reload and later steps keep it.
+    if (queue && urlIsEntry) {
+      writeEntry(location.pathname + location.search);
+      return;
+    }
+    // Another scene: it plays alone
+    if (queue || sceneChanged) {
+      dispatch({
+        type: "LEAVE_QUEUE",
+        payload: { shouldAutoplay: shouldAutoplay ?? false },
+      });
+    }
+  }, [location, initialQuality, writeEntry, entryPath]);
+
+  // Keep the history entry on the queue: after a step, once the entry's
+  // scene has loaded, its URL and index; after a control toggle, the
+  // controls on the same URL
+  useEffect(() => {
+    const queue = state.playlist;
+    const entry = queue?.scenes?.[state.currentIndex];
+    if (!queue || !entry) return;
+    const shown = locationRef.current;
+    const route = routeRef.current;
+    if (isUrlEntry(entry, route.sceneId, route.instanceId)) {
+      const held = readSceneLocationState(shown.state).playlist;
+      const unchanged =
+        held !== undefined &&
+        held.key === queue.key &&
+        held.currentIndex === state.currentIndex &&
+        sameControls(held.controls, controlsOf(state));
+      if (!unchanged) writeEntry(shown.pathname + shown.search);
+      return;
+    }
+    if (state.scene && isLoadedEntry(state.scene, entry)) {
+      writeEntry(getEntityPath("scene", state.scene, hasMultipleInstances));
+    }
+  }, [state, hasMultipleInstances, writeEntry]);
+
+  // A mark the guard left for a location change that never came
+  useEffect(() => clearInternalPop, []);
 
   // ============================================================================
   // CONTEXT VALUE

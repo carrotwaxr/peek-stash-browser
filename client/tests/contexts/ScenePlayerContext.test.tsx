@@ -1,9 +1,19 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import {
+  type Location,
+  MemoryRouter,
+  type NavigateFunction,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock, MockInstance } from "vitest";
+import type { Mock } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks are registered)
 // ---------------------------------------------------------------------------
@@ -17,7 +27,11 @@ import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "@/contexts/ScenePlayerContext";
-import { getEntityPath } from "@/utils/entityLinks";
+import { markInternalPop } from "@/utils/historyGuard";
+import {
+  type PlaybackQueue,
+  readSceneLocationState,
+} from "@/utils/playbackQueue";
 import { jsonResponse, stubApi } from "../helpers/stubApi";
 
 // ---------------------------------------------------------------------------
@@ -33,11 +47,6 @@ vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
 }));
 
-vi.mock("@/utils/entityLinks", () => ({
-  getEntityPath: vi.fn(() => "/scene/123"),
-}));
-
-const getEntityPathMock = getEntityPath as unknown as Mock;
 const useConfigMock = useConfig as unknown as Mock;
 
 // ---------------------------------------------------------------------------
@@ -55,36 +64,191 @@ const mockApiResponse = (scene: Record<string, unknown> = mockScene) => ({
   findScenes: { scenes: [scene] },
 });
 
-/**
- * Wrapper factory that provides ScenePlayerProvider with configurable props.
- */
+/** Answers each scene load with the scene it asked for, on inst-1 */
+function answerAskedScene() {
+  mockPost.mockImplementation((_path: unknown, body: unknown) => {
+    const { ids } = body as { ids: string[] };
+    return Promise.resolve(
+      mockApiResponse({
+        id: ids[0],
+        title: `Scene ${String(ids[0])}`,
+        instanceId: "inst-1",
+      })
+    );
+  });
+}
+
+/** The router as the provider sees it, read after each render */
+const probe: {
+  location: Location | null;
+  navigate: NavigateFunction | null;
+} = { location: null, navigate: null };
+
+/** A queue of scenes on inst-1, as `buildPlaybackQueue` makes it */
+function queueOf(
+  key: string,
+  sceneIds: string[],
+  currentIndex = 0
+): PlaybackQueue {
+  return {
+    key,
+    id: "virtual-grid",
+    name: "Grid",
+    shuffle: false,
+    repeat: "none",
+    currentIndex,
+    scenes: sceneIds.map((sceneId, position) => ({
+      sceneId,
+      instanceId: "inst-1",
+      position,
+      scene: {
+        title: `Scene ${sceneId}`,
+        paths: { screenshot: null },
+        files: [],
+        studio: null,
+      },
+    })),
+  };
+}
+
+/** The queue the current history entry holds */
+function entryQueue() {
+  return readSceneLocationState(probe.location?.state).playlist ?? null;
+}
+
 type ProviderProps = Omit<
   ComponentProps<typeof ScenePlayerProvider>,
-  "children"
+  "children" | "playlist" | "shouldResume" | "initialShouldAutoplay"
 >;
 
-function createWrapper(
+/**
+ * The Scene route as the page renders it: the provider takes the scene from
+ * the URL and the queue from the history entry's state. The queue object is
+ * new on every render, as a restore from storage made it.
+ */
+function SceneRoute({
+  children,
+  props,
+}: {
+  children: ReactNode;
+  props: Partial<ProviderProps>;
+}) {
+  const { sceneId } = useParams<{ sceneId: string }>();
+  const location = useLocation();
+  probe.location = location;
+  probe.navigate = useNavigate();
+  const state = readSceneLocationState(location.state);
+  const instanceId = new URLSearchParams(location.search).get("instance");
+  return (
+    <ScenePlayerProvider
+      sceneId={sceneId ?? ""}
+      instanceId={instanceId}
+      playlist={state.playlist ? { ...state.playlist } : null}
+      shouldResume={state.shouldResume ?? false}
+      initialShouldAutoplay={state.shouldAutoplay ?? false}
+      {...props}
+    >
+      {children}
+    </ScenePlayerProvider>
+  );
+}
+
+/** Another page of the app (Back from a queue lands here) */
+function OtherPage() {
+  probe.location = useLocation();
+  probe.navigate = useNavigate();
+  return null;
+}
+
+type Entry = { pathname: string; search?: string; state?: unknown };
+
+/** A router holding `entries` (the last one current) around the provider */
+function routerWrapper(
+  entries: Entry[],
   props: Partial<ProviderProps> = {},
   client = createQueryClient()
 ) {
-  const defaults: ProviderProps = {
-    sceneId: "scene-42",
-    instanceId: "inst-1",
-    playlist: null,
-    shouldResume: false,
-    compatibility: null,
-    initialQuality: "direct",
-    initialShouldAutoplay: false,
-  };
-  const merged: ProviderProps = { ...defaults, ...props };
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
+  return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={client}>
-        <ScenePlayerProvider {...merged}>{children}</ScenePlayerProvider>
+        <MemoryRouter
+          initialEntries={entries}
+          initialIndex={entries.length - 1}
+        >
+          <Routes>
+            <Route
+              path="/scene/:sceneId"
+              element={<SceneRoute props={props}>{children}</SceneRoute>}
+            />
+            <Route path="*" element={<OtherPage />} />
+          </Routes>
+        </MemoryRouter>
       </QueryClientProvider>
     );
   };
+}
+
+/** The provider on one scene, with what a navigation hands it */
+function createWrapper(
+  props: Partial<
+    ProviderProps & {
+      playlist: unknown;
+      shouldResume: boolean;
+      initialShouldAutoplay: boolean;
+    }
+  > = {},
+  client = createQueryClient()
+) {
+  const {
+    sceneId = "scene-42",
+    instanceId = "inst-1",
+    playlist = null,
+    shouldResume = false,
+    initialShouldAutoplay = false,
+    ...rest
+  } = props;
+  return routerWrapper(
+    [
+      {
+        pathname: `/scene/${sceneId}`,
+        search: instanceId ? `?instance=${instanceId}` : "",
+        state: {
+          playlist,
+          shouldResume,
+          shouldAutoplay: initialShouldAutoplay,
+        },
+      },
+    ],
+    rest,
+    client
+  );
+}
+
+/** A queue started from /scenes on its entry at `currentIndex` */
+function queueEntries(
+  queue: PlaybackQueue,
+  extra: Record<string, unknown> = {}
+) {
+  const entry = queue.scenes[queue.currentIndex];
+  return [
+    { pathname: "/scenes" },
+    {
+      pathname: `/scene/${entry?.sceneId ?? ""}`,
+      state: { playlist: queue, ...extra },
+    },
+  ];
+}
+
+/** Navigates as a click in the app would, inside act */
+async function go(
+  to: string | number,
+  options?: { state?: unknown; replace?: boolean }
+) {
+  const navigate = probe.navigate;
+  if (!navigate) throw new Error("no router rendered");
+  await act(async () => {
+    await (typeof to === "number" ? navigate(to) : navigate(to, options));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +256,6 @@ function createWrapper(
 // ---------------------------------------------------------------------------
 
 describe("ScenePlayerContext", () => {
-  let replaceState: MockInstance<History["replaceState"]>;
-
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -105,10 +267,9 @@ describe("ScenePlayerContext", () => {
     mockPost.mockResolvedValue(mockApiResponse());
     // Suppress console.error from intentional error tests
     vi.spyOn(console, "error").mockImplementation(() => {});
-    // Spy on window.history.replaceState
-    replaceState = vi
-      .spyOn(window.history, "replaceState")
-      .mockImplementation(() => {});
+    useConfigMock.mockReturnValue({ hasMultipleInstances: false });
+    probe.location = null;
+    probe.navigate = null;
   });
 
   // =========================================================================
@@ -174,7 +335,7 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.quality).toBe("direct");
       expect(result.current.currentIndex).toBe(0);
-      expect(result.current.compatibility).toBeNull();
+      expect(result.current).not.toHaveProperty("compatibility");
       expect(result.current.playlist).toBeNull();
     });
 
@@ -200,21 +361,15 @@ describe("ScenePlayerContext", () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
-    it("initializes with compatibility and quality props", async () => {
-      const compatibility = { hevc: false, av1: false };
-
+    it("initializes with the quality prop", async () => {
       const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({
-          compatibility,
-          initialQuality: "720p",
-        }),
+        wrapper: createWrapper({ initialQuality: "720p" }),
       });
 
       await waitFor(() => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(result.current.compatibility).toEqual(compatibility);
       expect(result.current.quality).toBe("720p");
     });
 
@@ -692,103 +847,269 @@ describe("ScenePlayerContext", () => {
   });
 
   // =========================================================================
-  // URL update effect
+  // The queue and the router
   // =========================================================================
 
-  describe("URL update effect", () => {
-    it("updates URL via replaceState when playlist scene changes", async () => {
-      const playlist = {
-        scenes: [
-          { sceneId: "s-1", instanceId: "i-1" },
-          { sceneId: "s-2", instanceId: "i-2" },
-        ],
-        currentIndex: 0,
-      };
+  describe("the queue and the router", () => {
+    beforeEach(() => {
+      answerAskedScene();
+    });
 
-      getEntityPathMock.mockReturnValue("/scene/scene-42");
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
+    /** The provider on a queue started from /scenes, its scene loaded */
+    async function startQueue(
+      queue: PlaybackQueue,
+      extra: Record<string, unknown> = {}
+    ) {
+      const rendered = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper(queueEntries(queue, extra)),
       });
-
       await waitFor(() => {
-        expect(result.current.scene).not.toBeNull();
-      });
-
-      // The URL update effect fires when state.playlist and state.scene are set
-      await waitFor(() => {
-        expect(getEntityPath).toHaveBeenCalledWith(
-          "scene",
-          expect.objectContaining({ id: "scene-42" }),
-          false
+        expect(rendered.result.current.scene?.id).toBe(
+          queue.scenes[queue.currentIndex]?.sceneId
         );
       });
+      return rendered;
+    }
 
-      expect(replaceState).toHaveBeenCalledWith(null, "", "/scene/scene-42");
+    it("a re-render with a new queue object of the same key does not re-initialize: after Next the index stays", async () => {
+      const { result, rerender } = await startQueue(
+        queueOf("q1", ["1", "2", "3"])
+      );
+
+      act(() => {
+        result.current.nextScene();
+      });
+      rerender();
+      rerender();
+
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("2");
+      });
+      expect(result.current.currentIndex).toBe(1);
     });
 
-    it("does not update URL when there is no playlist", async () => {
-      replaceState.mockClear();
+    it("advancing replaces the router location: the path is the entry's scene, state.playlist.currentIndex is the new index, and history length is unchanged", async () => {
+      const replaceState = vi.spyOn(window.history, "replaceState");
+      const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]), {
+        fromPageTitle: "Scenes",
+      });
 
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist: null }),
+      act(() => {
+        result.current.nextScene();
       });
 
       await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
+        expect(probe.location?.pathname).toBe("/scene/2");
       });
-
-      // replaceState should not have been called because playlist is null
+      expect(entryQueue()?.currentIndex).toBe(1);
+      expect(entryQueue()?.key).toBe("q1");
+      const state = probe.location?.state as Record<string, unknown>;
+      expect(state.fromPageTitle).toBe("Scenes");
+      // A queue step leaves the reader's scroll position alone
+      expect(state.keepScroll).toBe(true);
+      // Only the router's history moved, never the window's behind its back
       expect(replaceState).not.toHaveBeenCalled();
+      replaceState.mockRestore();
+
+      // Replaced, not pushed: one Back leaves the queue for the page it
+      // started from
+      await go(-1);
+      expect(probe.location?.pathname).toBe("/scenes");
     });
 
-    it("passes hasMultipleInstances to getEntityPath", async () => {
-      useConfigMock.mockReturnValue({ hasMultipleInstances: true });
-
-      const playlist = {
-        scenes: [{ sceneId: "s-1", instanceId: "i-1" }],
-        currentIndex: 0,
-      };
-
-      getEntityPathMock.mockReturnValue("/scene/scene-42?instance=inst-1");
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
+    it("a search-only navigation on the current scene (a tab click, no state) keeps the queue and index", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+      act(() => {
+        result.current.nextScene();
       });
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
+      });
+
+      await go("/scene/2?tab=collections");
 
       await waitFor(() => {
-        expect(result.current.scene).not.toBeNull();
+        expect(entryQueue()?.currentIndex).toBe(1);
       });
-
-      await waitFor(() => {
-        expect(getEntityPath).toHaveBeenCalledWith(
-          "scene",
-          expect.any(Object),
-          true // hasMultipleInstances
-        );
-      });
+      expect(probe.location?.search).toBe("?tab=collections");
+      expect(result.current.playlist?.key).toBe("q1");
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.scene?.id).toBe("2");
     });
 
-    it("does not call replaceState when URL already matches", async () => {
-      const playlist = {
-        scenes: [{ sceneId: "s-1", instanceId: "i-1" }],
-        currentIndex: 0,
-      };
+    it("a navigation to a scene not in the queue, with no queue in its state, leaves queue mode and loads that scene", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
 
-      // Make getEntityPath return the current location
-      const currentPath = window.location.pathname + window.location.search;
-      getEntityPathMock.mockReturnValue(currentPath);
+      await go("/scene/9");
 
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("9");
+      });
+      expect(result.current.playlist).toBeNull();
+      expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
+        ids: ["9"],
+      });
+      expect(probe.location?.pathname).toBe("/scene/9");
+    });
+
+    it("a navigation with a different queue key starts that queue at its currentIndex", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+
+      await go("/scene/5", {
+        state: { playlist: queueOf("q2", ["4", "5"], 1) },
       });
 
       await waitFor(() => {
-        expect(result.current.scene).not.toBeNull();
+        expect(result.current.scene?.id).toBe("5");
+      });
+      expect(result.current.playlist?.key).toBe("q2");
+      expect(result.current.currentIndex).toBe(1);
+    });
+
+    it("the fullscreen guard's own Back is not followed: the location is replaced with the current entry", async () => {
+      const queue = queueOf("q1", ["1", "2", "3"]);
+      // The guard's entry sits on top of the scene's own
+      const [list, scene] = queueEntries(queue);
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper([list as Entry, scene as Entry, scene as Entry]),
+      });
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("1");
+      });
+      act(() => {
+        result.current.nextScene();
+      });
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
       });
 
-      // replaceState should not be called when URL already matches
-      expect(replaceState).not.toHaveBeenCalled();
+      markInternalPop();
+      await go(-1);
+
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
+      });
+      expect(entryQueue()?.currentIndex).toBe(1);
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.scene?.id).toBe("2");
+    });
+
+    it("after a tab click, a reload restores the queue at its index and `shouldResume` survives the next step", async () => {
+      const first = await startQueue(queueOf("q1", ["1", "2", "3"]), {
+        shouldResume: true,
+        fromPageTitle: "Home",
+      });
+      act(() => {
+        first.result.current.nextScene();
+      });
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
+      });
+      await go("/scene/2?tab=collections");
+      await waitFor(() => {
+        expect(entryQueue()?.currentIndex).toBe(1);
+      });
+      const reloaded = probe.location;
+      if (!reloaded) throw new Error("no location");
+      first.unmount();
+
+      // A reload: the browser keeps the entry's state
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper([
+          { pathname: "/scenes" },
+          {
+            pathname: reloaded.pathname,
+            search: reloaded.search,
+            state: reloaded.state,
+          },
+        ]),
+      });
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("2");
+      });
+      expect(result.current.playlist?.key).toBe("q1");
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.shouldResume).toBe(true);
+
+      act(() => {
+        result.current.nextScene();
+      });
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/3");
+      });
+      const state = probe.location?.state as Record<string, unknown>;
+      expect(state.shouldResume).toBe(true);
+      expect(state.fromPageTitle).toBe("Home");
+    });
+
+    it("a reload after turning Shuffle on keeps Shuffle on and its history", async () => {
+      const random = vi.spyOn(Math, "random").mockReturnValue(0);
+      const first = await startQueue(queueOf("q1", ["1", "2", "3"]));
+      act(() => {
+        first.result.current.toggleShuffle();
+      });
+      act(() => {
+        first.result.current.toggleAutoplayNext();
+      });
+      // Shuffle picks the first scene not yet played: index 1
+      act(() => {
+        first.result.current.nextScene();
+      });
+      await waitFor(() => {
+        expect(probe.location?.pathname).toBe("/scene/2");
+      });
+      random.mockRestore();
+      const reloaded = probe.location;
+      if (!reloaded) throw new Error("no location");
+      first.unmount();
+
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper([
+          {
+            pathname: reloaded.pathname,
+            search: reloaded.search,
+            state: reloaded.state,
+          },
+        ]),
+      });
+      await waitFor(() => {
+        expect(result.current.scene?.id).toBe("2");
+      });
+
+      expect(result.current.shuffle).toBe(true);
+      expect(result.current.shuffleHistory).toEqual([0]);
+      expect(result.current.autoplayNext).toBe(false);
+      expect(result.current.currentIndex).toBe(1);
+    });
+
+    it("a control toggle writes the controls into the entry, on the same URL", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "2"]));
+      await go("/scene/1?tab=galleries");
+
+      act(() => {
+        result.current.toggleRepeat();
+      });
+
+      await waitFor(() => {
+        expect(entryQueue()?.controls?.repeat).toBe("all");
+      });
+      expect(probe.location?.pathname).toBe("/scene/1");
+      expect(probe.location?.search).toBe("?tab=galleries");
+    });
+
+    it("a step to an entry of the same scene restarts it without loading it again", async () => {
+      const { result } = await startQueue(queueOf("q1", ["1", "1"]));
+      const loads = mockPost.mock.calls.length;
+
+      act(() => {
+        result.current.nextScene();
+      });
+
+      await waitFor(() => {
+        expect(entryQueue()?.currentIndex).toBe(1);
+      });
+      expect(result.current.restartCount).toBe(1);
+      expect(mockPost.mock.calls.length).toBe(loads);
     });
   });
 });

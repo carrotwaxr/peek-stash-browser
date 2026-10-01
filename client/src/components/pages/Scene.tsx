@@ -10,7 +10,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
-import { canDirectPlayVideo } from "../../utils/videoFormat";
+import { readSceneLocationState } from "../../utils/playbackQueue";
 import { GalleryGrid, GroupGrid } from "../grids/index";
 import PlaylistSidebar from "../playlist/PlaylistSidebar";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard";
@@ -69,25 +69,29 @@ const SceneContent = () => {
     setSimilarScenesCount(TAB_COUNT_LOADING);
   }, [scene?.id]);
 
-  // Seek to timestamp from URL query param (e.g., ?t=120 for 2 minutes)
+  // Seek to timestamp from URL query param (e.g., ?t=120 for 2 minutes),
+  // once per scene and time: a tab click keeps ?t= in the URL and must not
+  // seek again
+  const startTime = searchParams.get("t");
+  const sceneKey = scene ? makeCompositeKey(scene.id, scene.instanceId) : null;
+  const seekedRef = useRef<string | null>(null);
   useEffect(() => {
-    const startTime = searchParams.get("t");
-    if (startTime && scene?.id) {
-      const seconds = parseInt(startTime, 10);
-      if (!isNaN(seconds) && seconds > 0) {
-        // Small delay to ensure video player is ready
-        const timer = setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent("seekToTime", {
-              detail: { seconds },
-            })
-          );
-        }, 500);
-        return () => clearTimeout(timer);
-      }
-    }
-    return undefined;
-  }, [scene?.id, searchParams]);
+    if (!startTime || !sceneKey) return undefined;
+    const seconds = parseInt(startTime, 10);
+    if (isNaN(seconds) || seconds <= 0) return undefined;
+    const seek = `${sceneKey}@${startTime}`;
+    if (seekedRef.current === seek) return undefined;
+    // Small delay to ensure video player is ready
+    const timer = setTimeout(() => {
+      seekedRef.current = seek;
+      window.dispatchEvent(
+        new CustomEvent("seekToTime", {
+          detail: { seconds },
+        })
+      );
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [sceneKey, startTime]);
 
   // Measure left column height and sync to sidebar
   useEffect(() => {
@@ -299,46 +303,6 @@ const SceneContent = () => {
   );
 };
 
-/** A player queue as the Scene page stores it for a page refresh */
-interface StoredPlaylist {
-  scenes?: unknown;
-  [key: string]: unknown;
-}
-
-/**
- * Is this queue entry the scene the URL names? Two servers can hold the same
- * scene id, so with an instance in the URL the entry's instance (or, in a
- * queue saved before entries carried one, its scene's) must match too.
- */
-function isEntryOf(
-  entry: unknown,
-  sceneId: string | undefined,
-  instanceId: string | null
-): boolean {
-  if (typeof entry !== "object" || entry === null) return false;
-  const {
-    sceneId: entrySceneId,
-    instanceId: entryInstance,
-    scene,
-  } = entry as { sceneId?: unknown; instanceId?: unknown; scene?: unknown };
-  if (entrySceneId !== sceneId) return false;
-  if (!instanceId) return true;
-  const sceneInstance =
-    typeof scene === "object" && scene !== null
-      ? (scene as { instanceId?: unknown }).instanceId
-      : undefined;
-  const entryServer = entryInstance ?? sceneInstance;
-  return entryServer === undefined || entryServer === instanceId;
-}
-
-/** What a navigation to a scene hands over in `location.state` */
-interface SceneLocationState {
-  playlist?: StoredPlaylist;
-  scene?: { files?: Array<Parameters<typeof canDirectPlayVideo>[0]> };
-  shouldResume?: boolean;
-  shouldAutoplay?: boolean;
-}
-
 // Outer component that wraps everything in ScenePlayerProvider
 const Scene = () => {
   const { sceneId } = useParams<{ sceneId: string }>();
@@ -348,102 +312,21 @@ const Scene = () => {
   const searchParams = new URLSearchParams(location.search);
   const instanceId = searchParams.get("instance");
 
-  // Capture location state in a ref to preserve it across re-renders
-  // React Router sometimes loses state on initial render, so we store it once it arrives
-  const locationStateRef = useRef<SceneLocationState | null>(null);
-
-  // Update ref synchronously during render (not in useEffect)
-  const navigationState = location.state as SceneLocationState | null;
-  if (navigationState && !locationStateRef.current) {
-    locationStateRef.current = navigationState;
-  }
-
-  // Extract data from location.state (prefer current state, fall back to ref)
-  const stateToUse = navigationState ?? locationStateRef.current;
-  let playlist = stateToUse?.playlist;
-  const shouldResume = stateToUse?.shouldResume;
-
-  // Persist auto-playlists to sessionStorage for page refresh support
-  // Use a stable key that doesn't change when navigating between scenes
-  const PLAYLIST_STORAGE_KEY = "currentPlaylist";
-
-  // If playlist came via location.state, save it once per navigation, after
-  // render. A full storage (or a browser that refuses it) only loses the
-  // refresh support; the player still gets the queue from navigation state.
-  const statePlaylist = stateToUse?.playlist;
-  useEffect(() => {
-    if (!statePlaylist) return;
-    try {
-      sessionStorage.setItem(
-        PLAYLIST_STORAGE_KEY,
-        JSON.stringify(statePlaylist)
-      );
-    } catch (e) {
-      console.warn("Could not store the playback queue:", e);
-    }
-  }, [statePlaylist]);
-
-  // If no playlist in location.state, try to restore from sessionStorage
-  // This handles page refresh for auto-generated playlists
-  if (!playlist) {
-    try {
-      const storedPlaylist = sessionStorage.getItem(PLAYLIST_STORAGE_KEY);
-      if (storedPlaylist) {
-        const parsed = JSON.parse(storedPlaylist) as StoredPlaylist | null;
-        // Verify the current scene, on this URL's server, is in this playlist
-        const currentIndex = Array.isArray(parsed?.scenes)
-          ? parsed.scenes.findIndex((entry) =>
-              isEntryOf(entry, sceneId, instanceId)
-            )
-          : -1;
-        if (parsed && currentIndex >= 0) {
-          // Resume the queue at the current scene
-          playlist = { ...parsed, currentIndex };
-        } else {
-          // Scene not in stored playlist, clear it
-          sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to restore stored playlist:", e);
-      try {
-        sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
-      } catch {
-        // Storage refuses even a removal: nothing left to clean up
-      }
-    }
-  }
-
-  // Cleanup: Clear playlist when navigating away from scene player
-  useEffect(() => {
-    return () => {
-      // Only clear if we're navigating away, not just to another scene
-      // This is handled by checking if location.state has a playlist on next navigation
-    };
-  }, []);
-
-  // Compute compatibility if scene data is available from navigation state
-  // (only available when navigating from scene cards, not on direct page load)
-  const scene = stateToUse?.scene;
-  const firstFile = scene?.files?.[0];
-  const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
-
-  // Always default to "direct" quality - the auto-fallback mechanism in
-  // useVideoPlayerSources will switch to 480p if browser can't play the codec
-  const initialQuality = "direct";
-
-  // Extract shouldAutoplay from location state (set by PlaylistDetail's Play button or clip cards)
-  const shouldAutoplayFromState = stateToUse?.shouldAutoplay ?? false;
+  // The history entry's state is the only source: the queue a navigation
+  // handed over, or the one the player wrote back into this entry (a reload
+  // or Back finds it there). An entry opened without state has no queue.
+  const { playlist, shouldResume, shouldAutoplay } = readSceneLocationState(
+    location.state
+  );
 
   return (
     <ScenePlayerProvider
       sceneId={sceneId ?? ""}
-      instanceId={instanceId ?? undefined}
-      playlist={playlist ?? undefined}
-      shouldResume={shouldResume ?? undefined}
-      compatibility={compatibility ?? undefined}
-      initialQuality={initialQuality}
-      initialShouldAutoplay={shouldAutoplayFromState}
+      instanceId={instanceId}
+      playlist={playlist ?? null}
+      shouldResume={shouldResume ?? false}
+      initialQuality="direct"
+      initialShouldAutoplay={shouldAutoplay ?? false}
     >
       <SceneContent />
     </ScenePlayerProvider>

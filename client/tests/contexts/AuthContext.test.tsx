@@ -349,15 +349,12 @@ describe("logout()", () => {
     expect(assign).toHaveBeenCalledExactlyOnceWith("/login");
   });
 
-  it("sign-out forgets the playlist queue and every other tab-scoped key", async () => {
+  it("sign-out forgets every tab-scoped key", async () => {
     const { result } = renderWithAuth();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    sessionStorage.setItem(
-      "currentPlaylist",
-      JSON.stringify({ scenes: [{ id: "1", title: "Private scene" }] })
-    );
+    sessionStorage.setItem("peek:scroll:abc", "1200");
     sessionStorage.setItem("videoPlayerAutoplay", "true");
     globalThis.fetch = vi.fn().mockImplementation(() => okResponse({}));
 
@@ -365,7 +362,6 @@ describe("logout()", () => {
       await result.current.logout();
     });
 
-    expect(sessionStorage.getItem("currentPlaylist")).toBeNull();
     expect(sessionStorage.length).toBe(0);
   });
 

@@ -61,7 +61,6 @@ const ContinueWatchingCarousel = ({
       ),
       {
         state: {
-          scene,
           fromPageTitle: "Home",
           shouldResume: true, // Auto-resume from continue watching
           playlist: buildPlaybackQueue({

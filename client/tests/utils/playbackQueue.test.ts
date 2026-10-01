@@ -151,6 +151,19 @@ describe("buildPlaybackQueue", () => {
     ]);
   });
 
+  it("each queue gets a key of its own", () => {
+    const options = {
+      id: "virtual-grid",
+      name: "Grid",
+      scenes: [fullScene(1)],
+      currentIndex: 0,
+    };
+
+    expect(buildPlaybackQueue(options).key).not.toBe(
+      buildPlaybackQueue(options).key
+    );
+  });
+
   it("leaves the options a caller does not set out of the queue", () => {
     const queue = buildPlaybackQueue({
       id: "virtual-grid",
@@ -160,6 +173,7 @@ describe("buildPlaybackQueue", () => {
     });
 
     expect(queue).toEqual({
+      key: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown,
       id: "virtual-grid",
       name: "Grid",
       shuffle: false,

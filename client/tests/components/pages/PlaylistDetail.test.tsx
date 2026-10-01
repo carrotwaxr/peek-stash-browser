@@ -506,19 +506,21 @@ describe("PlaylistDetail pages and sort", () => {
 
     await screen.findByText("Scene 100");
     type RowState = {
-      scene: unknown;
-      playlist?: { scenes: unknown[]; currentIndex: number };
+      playlist?: { key: string; scenes: unknown[]; currentIndex: number };
     };
     const stateOf = (sceneId: string) =>
       rowLinkStates.get(`${sceneId}:i`) as RowState | undefined;
     await waitFor(() => expect(stateOf("199")?.playlist).toBeDefined());
 
-    const shared = must(stateOf("100")?.playlist, "first row's queue").scenes;
+    const first = must(stateOf("100")?.playlist, "first row's queue");
+    const shared = first.scenes;
     expect(shared).toHaveLength(2000);
     for (let n = 100; n < 200; n++) {
       const queue = must(stateOf(String(n))?.playlist, `row ${n}'s queue`);
       expect(queue.scenes).toBe(shared);
       expect(queue.currentIndex).toBe(n);
+      // One queue: every row starts the same one, at its own index
+      expect(queue.key).toBe(first.key);
     }
   });
 });
@@ -648,18 +650,23 @@ describe("PlaylistDetail items on two servers", () => {
 
     await screen.findByText("Scene page /scene/7");
     const state = must(sceneStates.at(-1), "scene page state") as {
-      playlist: { scenes: unknown[]; currentIndex: number };
+      playlist: { key: string; scenes: unknown[]; currentIndex: number };
     };
     const expected = queueOf(twoServers).entries;
     expect(state.playlist.scenes).toEqual(expected);
     expect(state.playlist.currentIndex).toBe(0);
+    // A queue has an identity; the player loads the scene itself
+    expect(state.playlist.key).toMatch(/^[0-9a-f]{32}$/);
+    expect(state).not.toHaveProperty("scene");
 
     // The second row's link carries the same entries, at its own index
     const rowState = must(rowLinkStates.get("7:inst-b"), "row state") as {
-      playlist: { scenes: unknown[]; currentIndex: number };
+      playlist: { key: string; scenes: unknown[]; currentIndex: number };
     };
     expect(rowState.playlist.scenes).toEqual(expected);
     expect(rowState.playlist.currentIndex).toBe(1);
+    expect(rowState.playlist.key).toMatch(/^[0-9a-f]{32}$/);
+    expect(rowState).not.toHaveProperty("scene");
   });
 });
 

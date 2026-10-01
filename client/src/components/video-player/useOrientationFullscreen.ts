@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { markInternalPop } from "../../utils/historyGuard";
 
 /**
  * Automatically enter fullscreen when device rotates to landscape while video is playing
@@ -11,7 +12,12 @@ import { useEffect, useRef } from "react";
  * History guard: On mobile browsers, the Fullscreen API can interact with the
  * browser's history stack, causing unwanted back-navigation that redirects away
  * from the scene page. We push a guard history entry when entering auto-fullscreen
- * and intercept popstate to prevent this.
+ * and intercept popstate to prevent this. The guard's own Back (on leaving
+ * fullscreen) is marked, so the player's provider does not follow it to the
+ * entry below, which a queue step taken in fullscreen left behind.
+ *
+ * The listeners live as long as the player: a scene change (a queue step)
+ * keeps the guard, and only resets the "declined" flag.
  */
 export const useOrientationFullscreen = (
   playerRef: any,
@@ -19,11 +25,15 @@ export const useOrientationFullscreen = (
   enabled = true
 ) => {
   const userDeclinedRef = useRef(false);
-  const previousSceneIdRef = useRef(sceneId);
   // Track whether current fullscreen was auto-triggered by orientation change
   const autoFullscreenRef = useRef(false);
   // Track whether we have a guard history entry pushed
   const historyGuardActiveRef = useRef(false);
+
+  // A new video is a fresh preference: reset the declined flag, nothing else
+  useEffect(() => {
+    userDeclinedRef.current = false;
+  }, [sceneId]);
 
   useEffect(() => {
     if (!enabled || !playerRef?.current) {
@@ -31,12 +41,6 @@ export const useOrientationFullscreen = (
     }
 
     const player = playerRef.current;
-
-    // Reset declined flag when scene changes (new video = fresh preference)
-    if (sceneId !== previousSceneIdRef.current) {
-      userDeclinedRef.current = false;
-      previousSceneIdRef.current = sceneId;
-    }
 
     /**
      * Push a history guard entry to intercept browser back-navigation during fullscreen.
@@ -58,7 +62,9 @@ export const useOrientationFullscreen = (
       if (historyGuardActiveRef.current) {
         historyGuardActiveRef.current = false;
         // Go back to remove our guard entry. This triggers popstate,
-        // but since we cleared the flag first, the handler will skip it.
+        // but since we cleared the flag first, the handler will skip it;
+        // the mark tells the player's provider to stay where it is.
+        markInternalPop();
         window.history.back();
       }
     };
@@ -175,5 +181,5 @@ export const useOrientationFullscreen = (
         window.history.back();
       }
     };
-  }, [playerRef, sceneId, enabled]);
+  }, [playerRef, enabled]);
 };

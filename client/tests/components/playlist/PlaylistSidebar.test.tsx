@@ -3,6 +3,7 @@
  * grid, a carousel, Watch History or a playlist row names no autoplayNext,
  * and the player still plays on.
  */
+import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -39,13 +40,19 @@ describe("PlaylistSidebar", () => {
 
     render(
       <QueryClientProvider client={createQueryClient()}>
-        <ScenePlayerProvider
-          sceneId="1"
-          instanceId="inst-a"
-          playlist={{ ...queue }}
+        <MemoryRouter
+          initialEntries={[
+            { pathname: "/scene/1", state: { playlist: queue } },
+          ]}
         >
-          <PlaylistSidebar />
-        </ScenePlayerProvider>
+          <ScenePlayerProvider
+            sceneId="1"
+            instanceId="inst-a"
+            playlist={{ ...queue }}
+          >
+            <PlaylistSidebar />
+          </ScenePlayerProvider>
+        </MemoryRouter>
       </QueryClientProvider>
     );
 

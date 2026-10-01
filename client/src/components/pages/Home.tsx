@@ -163,7 +163,6 @@ const Home = () => {
 
       void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
         state: {
-          scene,
           fromPageTitle: "Home",
           playlist: buildPlaybackQueue({
             id: "virtual-carousel",

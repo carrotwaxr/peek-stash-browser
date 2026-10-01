@@ -153,11 +153,11 @@ describe("scenePlayerReducer", () => {
         shuffle: false,
         repeat: "none",
         shuffleHistory: [],
-
-        compatibility: null,
+        restartCount: 0,
 
         oCounter: 0,
       });
+      expect(initialState).not.toHaveProperty("compatibility");
     });
 
     it("deleted actions are gone", () => {
@@ -1169,16 +1169,14 @@ describe("scenePlayerReducer", () => {
   // INITIALIZE
   // -------------------------------------------------------------------------
   describe("INITIALIZE", () => {
-    it("sets playlist, currentIndex, compatibility, quality, shouldAutoplay", () => {
+    it("sets playlist, currentIndex, quality, shouldAutoplay", () => {
       const playlist = makePlaylist(3, { shuffle: true, repeat: "one" });
-      const compatibility = { hevc: false, av1: true };
 
       const result = scenePlayerReducer(initialState, {
         type: "INITIALIZE",
         payload: {
           playlist,
           currentIndex: 1,
-          compatibility,
           initialQuality: "720p",
           initialShouldAutoplay: true,
         },
@@ -1186,9 +1184,30 @@ describe("scenePlayerReducer", () => {
 
       expect(result.playlist).toBe(playlist);
       expect(result.currentIndex).toBe(1);
-      expect(result.compatibility).toBe(compatibility);
       expect(result.quality).toBe("720p");
       expect(result.shouldAutoplay).toBe(true);
+    });
+
+    it("INITIALIZE takes the controls a reload hands back over the queue's own", () => {
+      const playlist = {
+        ...rowQueue({ shuffle: false, repeat: "none" }),
+        controls: {
+          autoplayNext: false,
+          shuffle: true,
+          repeat: "all" as const,
+          shuffleHistory: [0, 2],
+        },
+      };
+
+      const result = scenePlayerReducer(initialState, {
+        type: "INITIALIZE",
+        payload: { playlist, currentIndex: 1 },
+      });
+
+      expect(result.autoplayNext).toBe(false);
+      expect(result.shuffle).toBe(true);
+      expect(result.repeat).toBe("all");
+      expect(result.shuffleHistory).toEqual([0, 2]);
     });
 
     it("INITIALIZE takes autoplayNext true when the queue names none", () => {
@@ -1221,7 +1240,6 @@ describe("scenePlayerReducer", () => {
 
       expect(result.playlist).toBeNull();
       expect(result.currentIndex).toBe(0);
-      expect(result.compatibility).toBeNull();
       expect(result.quality).toBe("direct");
       expect(result.autoplayNext).toBe(true);
       expect(result.shuffle).toBe(false);
@@ -1603,6 +1621,97 @@ describe("scenePlayerReducer", () => {
       expect(result.currentIndex).toBe(0);
       expect(result.oCounter).toBe(0);
       expect(result.ready).toBe(false);
+    });
+  });
+  // -------------------------------------------------------------------------
+  // LEAVE_QUEUE and a step to the same scene
+  // -------------------------------------------------------------------------
+  describe("LEAVE_QUEUE", () => {
+    it("drops the queue and its controls, and takes the navigation's autoplay", () => {
+      const state: ScenePlayerReducerState = {
+        ...initialState,
+        playlist: makePlaylist(3),
+        currentIndex: 2,
+        autoplayNext: false,
+        shuffle: true,
+        repeat: "all",
+        shuffleHistory: [0, 1],
+      };
+
+      const result = scenePlayerReducer(state, {
+        type: "LEAVE_QUEUE",
+        payload: { shouldAutoplay: true },
+      });
+
+      expect(result.playlist).toBeNull();
+      expect(result.currentIndex).toBe(0);
+      expect(result.autoplayNext).toBe(true);
+      expect(result.shuffle).toBe(false);
+      expect(result.repeat).toBe("none");
+      expect(result.shuffleHistory).toEqual([]);
+      expect(result.shouldAutoplay).toBe(true);
+    });
+  });
+
+  describe("a step to an entry of the same scene", () => {
+    const sameScene = {
+      scenes: [
+        { sceneId: "7", instanceId: "a" },
+        { sceneId: "7", instanceId: "a" },
+        { sceneId: "7", instanceId: "b" },
+      ],
+    };
+
+    it("keeps the loaded scene ready and asks the player to restart it", () => {
+      const state: ScenePlayerReducerState = {
+        ...initialState,
+        playlist: sameScene,
+        ready: true,
+        quality: "720p",
+        oCounter: 3,
+      };
+
+      const result = scenePlayerReducer(state, {
+        type: "NEXT_SCENE",
+        payload: { autoplay: true },
+      });
+
+      expect(result.currentIndex).toBe(1);
+      expect(result.ready).toBe(true);
+      expect(result.quality).toBe("720p");
+      expect(result.oCounter).toBe(3);
+      expect(result.shouldAutoplay).toBe(true);
+      expect(result.restartCount).toBe(1);
+    });
+
+    it("a one-scene queue on repeat all restarts at its end", () => {
+      const state: ScenePlayerReducerState = {
+        ...initialState,
+        playlist: { scenes: [{ sceneId: "7", instanceId: "a" }] },
+        repeat: "all",
+        ready: true,
+      };
+
+      const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
+
+      expect(result.currentIndex).toBe(0);
+      expect(result.ready).toBe(true);
+      expect(result.restartCount).toBe(1);
+    });
+
+    it("the same id on another server is another scene: it waits for its load", () => {
+      const state: ScenePlayerReducerState = {
+        ...initialState,
+        playlist: sameScene,
+        currentIndex: 1,
+        ready: true,
+      };
+
+      const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
+
+      expect(result.currentIndex).toBe(2);
+      expect(result.ready).toBe(false);
+      expect(result.restartCount).toBe(0);
     });
   });
 });

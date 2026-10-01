@@ -60,7 +60,7 @@ const SceneDetails = ({
   showTechnicalDetails,
   setShowTechnicalDetails,
 }: SceneDetailsProps) => {
-  const { scene, sceneLoading, compatibility } = useScenePlayer();
+  const { scene, sceneLoading } = useScenePlayer();
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene") as Record<string, boolean>;
   const { hasMultipleInstances } = useConfig();
@@ -485,26 +485,6 @@ const SceneDetails = ({
                       </div>
                     </div>
                   </>
-                )}
-
-                {compatibility && (
-                  <div>
-                    <h3
-                      className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-                      style={{
-                        color: "var(--text-primary)",
-                        borderBottom: "2px solid var(--accent-primary)",
-                      }}
-                    >
-                      Playback Method
-                    </h3>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {compatibility.reason as string}
-                    </p>
-                  </div>
                 )}
               </Paper.Body>
             )}

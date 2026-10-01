@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
+import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import { act, render, screen } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import {
   type MockInstance,
   afterAll,
@@ -12,21 +13,26 @@ import {
   vi,
 } from "vitest";
 import Scene from "@/components/pages/Scene";
+import { useScenePlayer } from "@/contexts/ScenePlayerContext";
 
-// The provider renders what it was handed, so a test reads the queue the page
+// The provider shows what it was handed, so a test reads the queue the page
 // passes down; the player itself is not under test here.
 vi.mock("@/contexts/ScenePlayerContext", () => ({
   ScenePlayerProvider: (props: {
     sceneId: string;
     instanceId?: string;
     playlist?: unknown;
+    shouldResume?: boolean;
     children?: ReactNode;
   }) => (
     <div
       data-testid="provider"
       data-scene-id={props.sceneId}
       data-playlist={JSON.stringify(props.playlist ?? null)}
-    />
+      data-should-resume={String(props.shouldResume ?? false)}
+    >
+      {props.children}
+    </div>
   ),
   useScenePlayer: vi.fn(),
 }));
@@ -38,8 +44,45 @@ vi.mock("@/components/video-player/VideoPlayer", () => ({
 vi.mock("@/components/video-player/PlaybackControls", () => ({
   default: () => null,
 }));
+// The rest of the page reads data the test does not serve
+vi.mock("@/components/pages/SceneDetails", () => ({ default: () => null }));
+vi.mock("@/components/playlist/PlaylistSidebar", () => ({
+  default: () => null,
+}));
+vi.mock("@/components/playlist/PlaylistStatusCard", () => ({
+  default: () => null,
+}));
+vi.mock("@/components/ui/ViewInStashButton", () => ({ default: () => null }));
+vi.mock("@/components/grids/index", () => ({
+  GalleryGrid: () => null,
+  GroupGrid: () => null,
+}));
+vi.mock("@/components/ui/index", () => ({
+  Button: (props: { children?: ReactNode }) => (
+    <button type="button">{props.children}</button>
+  ),
+  EntityNotFound: () => null,
+  ExternalPlayerButton: () => null,
+  LibraryInitializingBanner: () => null,
+  RecommendedSidebar: () => null,
+  ScenesLikeThis: () => null,
+}));
+
+/** What the page's content reads from the player, before a scene loads */
+function playerValue(
+  scene: { id: string; instanceId: string } | null
+): ReturnType<typeof useScenePlayer> {
+  return untrusted<ReturnType<typeof useScenePlayer>>({
+    scene,
+    sceneLoading: scene === null,
+    sceneError: null,
+    playlist: null,
+    retryScene: () => {},
+  });
+}
 
 const queue = {
+  key: "q1",
   id: "virtual-grid",
   name: "Grid",
   shuffle: false,
@@ -62,13 +105,11 @@ const queue = {
 };
 
 function page(entry: { pathname: string; search?: string; state?: unknown }) {
-  return (
-    <MemoryRouter initialEntries={[entry]}>
-      <Routes>
-        <Route path="/scene/:sceneId" element={<Scene />} />
-      </Routes>
-    </MemoryRouter>
+  const router = createMemoryRouter(
+    [{ path: "/scene/:sceneId", element: <Scene /> }],
+    { initialEntries: [entry] }
   );
+  return { router, element: <RouterProvider router={router} /> };
 }
 
 function playlistOf(testId = "provider") {
@@ -76,83 +117,91 @@ function playlistOf(testId = "provider") {
   return JSON.parse(raw ?? "null") as typeof queue | null;
 }
 
-describe("Scene page queue storage", () => {
-  // One spy for the file: happy-dom's Storage stops honouring a second spy on
-  // the same method once the first is restored
+describe("Scene page queue", () => {
+  let getItem: MockInstance<Storage["getItem"]>;
   let setItem: MockInstance<Storage["setItem"]>;
-  let warn: MockInstance<Console["warn"]>;
 
   beforeAll(() => {
+    getItem = vi.spyOn(Storage.prototype, "getItem");
     setItem = vi.spyOn(Storage.prototype, "setItem");
-    warn = vi.spyOn(console, "warn");
   });
 
   beforeEach(() => {
     sessionStorage.clear();
-    // Back to the real setItem, with no calls recorded
+    // Back to the real methods, with no calls recorded
+    getItem.mockReset();
     setItem.mockReset();
-    warn.mockReset().mockImplementation(() => undefined);
+    vi.mocked(useScenePlayer).mockReturnValue(playerValue(null));
   });
 
   afterAll(() => {
+    getItem.mockRestore();
     setItem.mockRestore();
-    warn.mockRestore();
     sessionStorage.clear();
   });
 
-  it("a sessionStorage that throws QuotaExceededError still renders the player with the queue from navigation state", () => {
-    setItem.mockImplementation(() => {
-      throw new DOMException("quota", "QuotaExceededError");
-    });
-
-    render(
-      page({
-        pathname: "/scene/1",
-        state: { scene: { id: "1" }, playlist: queue },
-      })
-    );
+  it("the page neither reads nor writes sessionStorage", () => {
+    render(page({ pathname: "/scene/1", state: { playlist: queue } }).element);
 
     expect(playlistOf()?.scenes).toHaveLength(2);
-    expect(warn).toHaveBeenCalled();
-  });
-
-  it("the queue is written once per navigation, not on every render", () => {
-    const element = () =>
-      page({
-        pathname: "/scene/1",
-        state: { scene: { id: "1" }, playlist: queue },
-      });
-
-    // A fresh element each time, so React renders the page again
-    const { rerender } = render(element());
-    rerender(element());
-    rerender(element());
-    rerender(element());
-
-    expect(setItem).toHaveBeenCalledTimes(1);
-    expect(setItem).toHaveBeenCalledWith(
-      "currentPlaylist",
-      JSON.stringify(queue)
+    // The data router reads its own view-transition key; the page reads none
+    const pageReads = getItem.mock.calls.filter(
+      ([key]) => key !== "remix-router-transitions"
     );
+    expect(pageReads).toEqual([]);
+    expect(setItem).not.toHaveBeenCalled();
   });
 
-  // A guard: PR 5 already matches the entry's server, and this stays true
-  it("a reload restores the stored queue when it holds the scene and the instance", () => {
-    sessionStorage.setItem("currentPlaylist", JSON.stringify(queue));
-
-    render(page({ pathname: "/scene/2", search: "?instance=b" }));
+  it("a reload (an initial entry whose state holds the queue) restores the queue at its index", () => {
+    render(
+      page({
+        pathname: "/scene/2",
+        search: "?instance=b",
+        state: { playlist: { ...queue, currentIndex: 1 }, shouldResume: true },
+      }).element
+    );
 
     const restored = playlistOf();
     expect(restored?.scenes).toHaveLength(2);
     expect(restored?.currentIndex).toBe(1);
+    expect(
+      screen.getByTestId("provider").getAttribute("data-should-resume")
+    ).toBe("true");
   });
 
-  it("a reload drops the stored queue when its entry for that scene is on another instance", () => {
+  it("an entry opened without state has no queue even if an old currentPlaylist key exists", () => {
     sessionStorage.setItem("currentPlaylist", JSON.stringify(queue));
+    setItem.mockClear();
 
-    render(page({ pathname: "/scene/2", search: "?instance=a" }));
+    render(page({ pathname: "/scene/2", search: "?instance=b" }).element);
 
     expect(playlistOf()).toBeNull();
-    expect(sessionStorage.getItem("currentPlaylist")).toBeNull();
+  });
+
+  it("?t=120 seeks once: a later tab click does not seek again", async () => {
+    vi.useFakeTimers();
+    const seeks = vi.fn();
+    window.addEventListener("seekToTime", seeks);
+    vi.mocked(useScenePlayer).mockReturnValue(
+      playerValue({ id: "1", instanceId: "a" })
+    );
+    const { router, element } = page({
+      pathname: "/scene/1",
+      search: "?t=120",
+    });
+    render(element);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(seeks).toHaveBeenCalledTimes(1);
+
+    await act(() => router.navigate("/scene/1?t=120&tab=collections"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(seeks).toHaveBeenCalledTimes(1);
+    window.removeEventListener("seekToTime", seeks);
+    vi.useRealTimers();
   });
 });
