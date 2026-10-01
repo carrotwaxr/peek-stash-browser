@@ -152,6 +152,13 @@ While watching a playlist:
 - **Previous Scene**: Click the previous button or press P
 - **Exit Playlist**: Click the back button to return to browsing
 
+The address follows the scene you are watching, and the queue stays with that page:
+
+- A refresh keeps your place in the queue, with your Autoplay, Shuffle and Repeat choices.
+- Changing a tab below the player, or paging Similar Scenes, keeps the queue.
+- Back leaves the player for the page the queue started from (the playlist, the grid or the carousel), however many scenes you played.
+- Opening one of the queue's scenes later from somewhere else plays it on its own: the old queue does not come back.
+
 ## Playlist Tips & Tricks
 
 ### Organization Ideas

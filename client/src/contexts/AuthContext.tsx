@@ -91,9 +91,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // navigate in-app to /login and race the full load below. The load
       // resets it, so a sign-out navigates once.
       // The next person to sign in on this browser gets neither this user's
-      // page, playlist queue nor cached data. Nothing in the tab's session
-      // storage outlives a sign-out. A full load also drops what components
-      // and contexts hold in memory.
+      // page nor cached data. Nothing in the tab's session storage outlives a
+      // sign-out. A full load also drops what components and contexts hold
+      // in memory.
       sessionStorage.clear();
       queryClient.clear();
       window.location.assign("/login");

@@ -118,10 +118,18 @@ const restoreWhenReachable = (
   return stop;
 };
 
+/** A REPLACE that asks to keep the scroll position (the player's queue step) */
+const keepsScroll = (state: unknown): boolean =>
+  typeof state === "object" &&
+  state !== null &&
+  (state as { keepScroll?: unknown }).keepScroll === true;
+
 /**
  * Scroll position across navigations, per history entry (location.key):
  * - PUSH/REPLACE to a new pathname scrolls to the top; a query-only change
- *   (page size, sort, filters, tabs) keeps the position.
+ *   (page size, sort, filters, tabs) keeps the position, as does a REPLACE
+ *   whose state has `keepScroll: true` (the player's queue step, which
+ *   replaces the scene's URL under a reader of its details).
  * - POP (Back, Forward, reload) restores the entry's saved position once the
  *   page is tall enough to reach it.
  */
@@ -156,7 +164,8 @@ const useScrollRestoration = () => {
     const pathnameChanged = prevPathname !== location.pathname;
     if (navigationType !== "POP") {
       // A new page; query-only changes keep their place
-      if (pathnameChanged) window.scrollTo(0, 0);
+      const kept = navigationType === "REPLACE" && keepsScroll(location.state);
+      if (pathnameChanged && !kept) window.scrollTo(0, 0);
       return;
     }
     const y = readPosition(STORAGE_PREFIX, location.key);

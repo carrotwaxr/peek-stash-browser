@@ -141,6 +141,7 @@ export function useVideoPlayer({
   currentIndex,
   autoplayNext,
   repeat,
+  restartCount,
   dispatch,
   nextScene,
   prevScene,
@@ -163,6 +164,8 @@ export function useVideoPlayer({
   /** The player's controls (the context's), never the queue's */
   autoplayNext: boolean;
   repeat: string;
+  /** Bumped by a queue step to an entry of the scene already loaded */
+  restartCount: number;
   dispatch: (action: any) => void;
   nextScene: () => void;
   prevScene: () => void;
@@ -624,6 +627,24 @@ export function useVideoPlayer({
   // ============================================================================
   // QUALITY SWITCHING (from useVideoPlayerSources)
   // ============================================================================
+
+  // ============================================================================
+  // RESTART (a queue step to an entry of the same scene)
+  // ============================================================================
+
+  // Nothing loads again for a duplicate entry, or a one-scene queue on
+  // repeat all: start the scene over (the autoplay effect below plays it)
+  const seenRestartRef = useRef(restartCount);
+  useEffect(() => {
+    if (restartCount === seenRestartRef.current) return;
+    seenRestartRef.current = restartCount;
+    const player = playerRef.current as {
+      isDisposed(): boolean;
+      currentTime(seconds: number): void;
+    } | null;
+    if (!player || player.isDisposed()) return;
+    player.currentTime(0);
+  }, [restartCount, playerRef]);
 
   // ============================================================================
   // AUTOPLAY AND RESUME (Stash pattern - simple and clean)

@@ -69,7 +69,8 @@ const WatchHistory = () => {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-  // One queue for the page, each row at its own index
+  // One queue for the page, each row at its own index; its key is new with
+  // each page of rows (buildPlaybackQueue makes one)
   const queue = useMemo(
     () =>
       buildPlaybackQueue({
@@ -316,7 +317,6 @@ const WatchHistory = () => {
                 }}
                 showSessionOIndicator={true}
                 linkState={{
-                  scene,
                   shouldResume: true, // Auto-resume from watch history
                   playlist: { ...queue, currentIndex: index },
                 }}

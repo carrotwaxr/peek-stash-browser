@@ -47,7 +47,6 @@ function useSceneListPage({
 
       // Build navigation state
       const navigationState: Record<string, unknown> = {
-        scene,
         playlist: buildPlaybackQueue({
           id: "virtual-grid",
           name: title || "Scene Grid",

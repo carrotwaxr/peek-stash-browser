@@ -127,6 +127,26 @@ describe("useScrollRestoration", () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
+  // The player's queue step replaces the entry with the next scene's URL; a
+  // reader of the details below the video stays where they are
+  it("a REPLACE to another pathname with keepScroll keeps the scroll position; without it scrolls to the top", async () => {
+    const { router } = renderHarness();
+    await act(() => router.navigate("/scene/1"));
+    setScrollY(1200);
+    scrollTo.mockClear();
+
+    await act(() =>
+      router.navigate("/scene/2", {
+        replace: true,
+        state: { keepScroll: true },
+      })
+    );
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    await act(() => router.navigate("/scene/3", { replace: true }));
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
   it("restores on Back only once the page is tall enough", async () => {
     const { router } = renderHarness();
     setScrollY(1500);

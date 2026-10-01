@@ -53,6 +53,7 @@ import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneTitle } from "../../utils/format";
@@ -288,6 +289,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
     () =>
       entries
         ? {
+            // New with each read of the queue: a row's link starts this one
+            key: newClientToken(),
             id: String(playlistId),
             name: playlistName,
             shuffle,
@@ -308,8 +311,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         // While the queue loads, a row links to its scene alone
         const state =
           queue && currentIndex !== undefined
-            ? { scene: item.scene, playlist: { ...queue, currentIndex } }
-            : { scene: item.scene };
+            ? { playlist: { ...queue, currentIndex } }
+            : undefined;
         return [itemKey(item), state];
       })
     );
@@ -543,6 +546,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         state: {
           shouldAutoplay: true, // Start playing immediately when entering from playlist
           playlist: {
+            key: newClientToken(),
             id: String(playlistId),
             name: playlistName,
             shuffle,

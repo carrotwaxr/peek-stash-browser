@@ -1,4 +1,5 @@
 import type { NormalizedScene, WithStashUrl } from "@peek/shared-types";
+import type { PlaybackQueueControls } from "../utils/playbackQueue";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -54,7 +55,12 @@ export interface ScenePlayerReducerState {
   shuffle: boolean;
   repeat: string;
   shuffleHistory: number[];
-  compatibility: Record<string, unknown> | null;
+  /**
+   * Bumped by a step that lands on the scene already loaded (a duplicate
+   * entry, or a one-scene queue on repeat all): nothing loads again, so the
+   * player restarts that scene from the start when it changes
+   */
+  restartCount: number;
   oCounter: number;
 }
 
@@ -152,17 +158,46 @@ export function prevIndex(
     : null;
 }
 
+/** The (scene, server) a queue entry names, or null when it names no scene */
+function entryScene(
+  playlist: PlaylistData | null,
+  index: number
+): string | null {
+  const entry = playlist?.scenes?.[index] as
+    | { sceneId?: unknown; instanceId?: unknown; scene?: unknown }
+    | undefined;
+  if (typeof entry?.sceneId !== "string") return null;
+  const scene = entry.scene as { instanceId?: unknown } | null | undefined;
+  const instanceId =
+    typeof entry.instanceId === "string" ? entry.instanceId : scene?.instanceId;
+  return `${entry.sceneId}@${typeof instanceId === "string" ? instanceId : ""}`;
+}
+
 /**
  * The state after a step to another queue entry: the player waits for the
  * new scene, quality starts at direct again, and the O count waits for the
  * scene's own. `autoplay` sets whether the new scene starts playing; left
- * out, the current choice stays.
+ * out, the current choice stays. An entry of the scene already loaded loads
+ * nothing: the player restarts it (`restartCount`) and keeps the rest.
  */
 function stepTo(
   state: ScenePlayerReducerState,
   step: QueueStep,
   autoplay: boolean | undefined
 ): ScenePlayerReducerState {
+  const target = entryScene(state.playlist, step.index);
+  if (
+    target !== null &&
+    target === entryScene(state.playlist, state.currentIndex)
+  ) {
+    return {
+      ...state,
+      currentIndex: step.index,
+      shuffleHistory: step.history,
+      restartCount: state.restartCount + 1,
+      shouldAutoplay: autoplay ?? state.shouldAutoplay,
+    };
+  }
   return {
     ...state,
     currentIndex: step.index,
@@ -177,6 +212,43 @@ function stepTo(
 /** NEXT_SCENE's and PREV_SCENE's optional payload */
 function stepAutoplay(payload: unknown): boolean | undefined {
   return (payload as { autoplay?: boolean } | undefined)?.autoplay;
+}
+
+/** The controls in a queue's `controls`, or null when it holds none valid */
+function readControls(value: unknown): PlaybackQueueControls | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { autoplayNext, shuffle, repeat, shuffleHistory } = value as Record<
+    string,
+    unknown
+  >;
+  if (
+    typeof autoplayNext !== "boolean" ||
+    typeof shuffle !== "boolean" ||
+    (repeat !== "none" && repeat !== "one" && repeat !== "all") ||
+    !Array.isArray(shuffleHistory) ||
+    !shuffleHistory.every((i) => Number.isInteger(i))
+  ) {
+    return null;
+  }
+  return {
+    autoplayNext,
+    shuffle,
+    repeat,
+    shuffleHistory: shuffleHistory as number[],
+  };
+}
+
+/** The reducer's controls, as the player writes them into the entry */
+export function controlsOf(
+  state: ScenePlayerReducerState
+): PlaybackQueueControls {
+  const repeat = state.repeat;
+  return {
+    autoplayNext: state.autoplayNext,
+    shuffle: state.shuffle,
+    repeat: repeat === "one" || repeat === "all" ? repeat : "none",
+    shuffleHistory: state.shuffleHistory,
+  };
 }
 
 // ============================================================================
@@ -203,9 +275,7 @@ export const initialState: ScenePlayerReducerState = {
   shuffle: false, // Play scenes in random order
   repeat: "none", // "none" | "all" | "one"
   shuffleHistory: [], // Track played scenes to avoid immediate repeats
-
-  // Compatibility (codec support)
-  compatibility: null,
+  restartCount: 0,
 
   // O Counter
   oCounter: 0,
@@ -366,16 +436,37 @@ export function scenePlayerReducer(
       };
     }
 
-    // Initialize from props
+    // A navigation to a scene outside the queue: the queue and its
+    // controls go, and the route's scene loads
+    case "LEAVE_QUEUE": {
+      const leavePayload = action.payload as
+        | { shouldAutoplay?: boolean }
+        | undefined;
+      return {
+        ...state,
+        playlist: null,
+        currentIndex: 0,
+        autoplayNext: true,
+        shuffle: false,
+        repeat: "none",
+        shuffleHistory: [],
+        shouldAutoplay: leavePayload?.shouldAutoplay ?? false,
+      };
+    }
+
+    // Start a queue (or none): from the navigation that handed it over, or
+    // from a history entry's state on a reload or Back
     case "INITIALIZE": {
       const initPayload = action.payload as {
         playlist?: PlaylistData | null;
         currentIndex?: number;
-        compatibility?: Record<string, unknown> | null;
         initialQuality?: string;
         initialShouldAutoplay?: boolean;
       };
       const playlist = initPayload.playlist;
+      // The controls the player wrote into the entry at its last step or
+      // toggle; a queue handed over by a page has none
+      const controls = readControls(playlist?.controls);
 
       // Get shouldAutoplay from props (passed via location.state)
       // Preserve existing value if already set (for re-initialization)
@@ -386,14 +477,19 @@ export function scenePlayerReducer(
         ...state,
         playlist: playlist ?? null,
         currentIndex: initPayload.currentIndex || 0,
-        compatibility: initPayload.compatibility ?? null,
         quality: initPayload.initialQuality || "direct",
         // A queue carries shuffle and repeat as starting values only;
         // autoplay starts on wherever a queue starts
-        autoplayNext: true,
-        shuffle: (playlist?.shuffle as boolean | undefined) ?? false,
-        repeat: (playlist?.repeat as string | undefined) ?? "none",
-        shuffleHistory: [],
+        autoplayNext: controls?.autoplayNext ?? true,
+        shuffle:
+          controls?.shuffle ??
+          (playlist?.shuffle as boolean | undefined) ??
+          false,
+        repeat:
+          controls?.repeat ??
+          (playlist?.repeat as string | undefined) ??
+          "none",
+        shuffleHistory: controls?.shuffleHistory ?? [],
         // Use the determined shouldAutoplay value
         shouldAutoplay: shouldAutoplay,
       };
