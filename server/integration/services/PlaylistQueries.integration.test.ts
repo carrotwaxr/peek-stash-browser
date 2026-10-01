@@ -23,7 +23,8 @@
  *
  * The owner's playlist SORTED, shared with the same group, holds T3, X1,
  * T4, T1 and T2 on A (SORTED_ITEMS), for the view sorts; "Save as playlist
- * order" saves copies of its own.
+ * order" saves copies of its own, and the moves use playlists of their
+ * own.
  *
  * The owner's playlist QUEUE (QUEUE_ITEMS), shared with the group too, holds
  * Q1 to Q3 on A beside hidden, soft-deleted, B and disabled-instance items,
@@ -50,6 +51,7 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  moveItem,
 } from "../../services/PlaylistQueryService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
@@ -1332,6 +1334,173 @@ describe("Playlist queries (integration)", () => {
       }
       expect(res.status).toHaveBeenCalledWith(404);
       expect(writesOf(gone)).toEqual([]);
+    });
+  });
+
+  describe("move one item", () => {
+    /** The item id of a scene in a playlist */
+    const itemIdOf = async (playlistId: number, [sceneId, instanceId]: Ref) =>
+      (
+        await prisma.playlistItem.findFirstOrThrow({
+          where: { playlistId, sceneId, instanceId },
+        })
+      ).id;
+
+    /** Moves the scene's item to `index` among the owner's visible items */
+    const moveAs = async (
+      user: User,
+      playlistId: number,
+      ref: Ref,
+      index: number
+    ) =>
+      moveItem(
+        playlistId,
+        user.id,
+        await getUserAllowedInstanceIds(user.id),
+        await itemIdOf(playlistId, ref),
+        index
+      );
+
+    it("moving the 5th visible item to index 1 puts it second and numbers the playlist 0..n-1", async () => {
+      const playlistId = await createPlaylist(owner.id, "move fifth", [
+        [P1, A],
+        [X1, A], // hidden by the owner
+        [P2, A],
+        [P3, A],
+        [P4, A],
+        [P5, A],
+        [T1, A],
+      ]);
+
+      expect(await moveAs(owner, playlistId, [P5, A], 1)).toBe(true);
+
+      // Before the visible item now second (P2), so after the hidden X1
+
+      expect(await positioned(playlistId)).toEqual([
+        [P1, A, 0],
+        [X1, A, 1],
+        [P5, A, 2],
+        [P2, A, 3],
+        [P3, A, 4],
+        [P4, A, 5],
+        [T1, A, 6],
+      ]);
+    });
+
+    it("moving down past the end puts it last among the visible items", async () => {
+      const playlistId = await createPlaylist(owner.id, "move past end", [
+        [P1, A],
+        [P2, A],
+        [P3, A],
+        [X1, A], // hidden by the owner
+        [DELETED, A],
+      ]);
+
+      expect(await moveAs(owner, playlistId, [P1, A], 99)).toBe(true);
+
+      expect(await positioned(playlistId)).toEqual([
+        [P2, A, 0],
+        [P3, A, 1],
+        [P1, A, 2],
+        [X1, A, 3],
+        [DELETED, A, 4],
+      ]);
+    });
+
+    it("an item the owner cannot see keeps its place between its neighbours", async () => {
+      const playlistId = await createPlaylist(owner.id, "move around hidden", [
+        [P1, A],
+        [P2, A],
+        [X1, A], // hidden by the owner, between visible 2 and 3
+        [P3, A],
+        [P4, A],
+      ]);
+
+      expect(await moveAs(owner, playlistId, [P4, A], 0)).toBe(true);
+
+      expect(await positioned(playlistId)).toEqual([
+        [P4, A, 0],
+        [P1, A, 1],
+        [P2, A, 2],
+        [X1, A, 3],
+        [P3, A, 4],
+      ]);
+    });
+
+    it("a playlist with gaps and equal positions comes out dense", async () => {
+      const playlist = await prisma.playlist.create({
+        data: {
+          userId: owner.id,
+          name: "move gaps",
+          items: {
+            create: [
+              { sceneId: P1, instanceId: A, position: 0 },
+              { sceneId: P2, instanceId: A, position: 3 },
+              { sceneId: P3, instanceId: A, position: 3 },
+              { sceneId: P4, instanceId: A, position: 9 },
+            ],
+          },
+        },
+      });
+
+      expect(await moveAs(owner, playlist.id, [P1, A], 1)).toBe(true);
+
+      expect(await positioned(playlist.id)).toEqual([
+        [P2, A, 0],
+        [P1, A, 1],
+        [P3, A, 2],
+        [P4, A, 3],
+      ]);
+    });
+
+    it("two moves at once both land", async () => {
+      const playlistId = await createPlaylist(owner.id, "move race", [
+        [P1, A],
+        [P2, A],
+        [P3, A],
+        [P4, A],
+        [P5, A],
+      ]);
+      const allowed = await getUserAllowedInstanceIds(owner.id);
+      const p1 = await itemIdOf(playlistId, [P1, A]);
+      const p4 = await itemIdOf(playlistId, [P4, A]);
+
+      const moved = await Promise.all([
+        moveItem(playlistId, owner.id, allowed, p1, 2),
+        moveItem(playlistId, owner.id, allowed, p4, 0),
+      ]);
+
+      expect(moved).toEqual([true, true]);
+      const rows = await positioned(playlistId);
+      expect(rows.map(([, , position]) => position)).toEqual([0, 1, 2, 3, 4]);
+      // P1 to 2 then P4 to 0, or P4 to 0 then P1 to 2
+      expect([
+        [P4, P2, P3, P1, P5],
+        [P4, P2, P1, P3, P5],
+      ]).toContainEqual(rows.map(([id]) => id));
+    });
+
+    it("an item the owner cannot see, or another playlist's item, is not moved", async () => {
+      const playlistId = await createPlaylist(owner.id, "move refused", [
+        [P1, A],
+        [X1, A], // hidden by the owner
+        [P2, A],
+      ]);
+      const allowed = await getUserAllowedInstanceIds(owner.id);
+      const elsewhere = await itemIdOf(pq, [P3, A]);
+      const pqBefore = await positioned(pq);
+
+      expect(await moveAs(owner, playlistId, [X1, A], 0)).toBe(false);
+      expect(await moveItem(playlistId, owner.id, allowed, elsewhere, 0)).toBe(
+        false
+      );
+
+      expect(await positioned(playlistId)).toEqual([
+        [P1, A, 0],
+        [X1, A, 1],
+        [P2, A, 2],
+      ]);
+      expect(await positioned(pq)).toEqual(pqBefore);
     });
   });
 });

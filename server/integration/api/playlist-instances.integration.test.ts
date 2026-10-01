@@ -4,7 +4,7 @@
  * Scene SAME exists on instance A and on instance B (see
  * helpers/accessFixture.ts), so a bare id names two scenes. Add, bulk add,
  * remove and reorder take the instance from the request and never guess
- * one; an add also checks the viewer can see the scene, and the playlist
+ * one; a move and a bulk remove name items by item id; an add also checks the viewer can see the scene, and the playlist
  * list's `containsScene` names one. The viewer hid GLOBAL on B.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
@@ -14,6 +14,7 @@ import type {
   AddSceneToPlaylistResponse,
   AddScenesToPlaylistResponse,
   GetUserPlaylistsResponse,
+  RemovePlaylistItemsResponse,
 } from "../../types/api/index.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import {
@@ -372,5 +373,121 @@ describe("Playlist items keep each scene's instance (integration)", () => {
       `${FX_ID.SAME}@${FX.A}`,
       `${FX_ID.SAME}@${FX.B}`,
     ]);
+  });
+
+  /** The item id of a scene on an instance in a playlist */
+  async function itemIdOf(
+    playlistId: number,
+    sceneId: string,
+    instanceId: string
+  ): Promise<number> {
+    return (
+      await prisma.playlistItem.findFirstOrThrow({
+        where: { playlistId, sceneId, instanceId },
+      })
+    ).id;
+  }
+
+  it("moving B:SAME leaves A:SAME where it was", async () => {
+    const playlistId = await playlistWith([
+      [FX_ID.SAME, FX.A],
+      [FX_ID.B_ONLY, FX.B],
+      [FX_ID.SAME, FX.B],
+    ]);
+    const itemId = await itemIdOf(playlistId, FX_ID.SAME, FX.B);
+
+    const res = await viewer.client.put(
+      `/api/playlists/${playlistId}/items/${itemId}/position`,
+      { index: 1 }
+    );
+
+    expect(res.status).toBe(200);
+    expect(await itemsOf(playlistId)).toEqual([
+      `${FX_ID.SAME}@${FX.A}`,
+      `${FX_ID.SAME}@${FX.B}`,
+      `${FX_ID.B_ONLY}@${FX.B}`,
+    ]);
+  });
+
+  it("moving an item of another playlist, or an unknown item id, answers 404", async () => {
+    const playlistId = await playlistWith([
+      [FX_ID.SAME, FX.A],
+      [FX_ID.SAME, FX.B],
+    ]);
+    const otherId = await playlistWith([[FX_ID.B_ONLY, FX.B]]);
+    const elsewhere = await itemIdOf(otherId, FX_ID.B_ONLY, FX.B);
+
+    for (const itemId of [elsewhere, 2_000_000_000]) {
+      const res = await viewer.client.put(
+        `/api/playlists/${playlistId}/items/${itemId}/position`,
+        { index: 0 }
+      );
+      expect(res.status).toBe(404);
+    }
+    expect(await itemsOf(playlistId)).toEqual([
+      `${FX_ID.SAME}@${FX.A}`,
+      `${FX_ID.SAME}@${FX.B}`,
+    ]);
+  });
+
+  it.each([[-1], [1.5], ["1"], [null]])(
+    "index %s answers 400",
+    async (index) => {
+      const playlistId = await playlistWith([
+        [FX_ID.SAME, FX.A],
+        [FX_ID.SAME, FX.B],
+      ]);
+      const itemId = await itemIdOf(playlistId, FX_ID.SAME, FX.B);
+
+      const res = await viewer.client.put(
+        `/api/playlists/${playlistId}/items/${itemId}/position`,
+        { index }
+      );
+
+      expect(res.status).toBe(400);
+      expect(await itemsOf(playlistId)).toEqual([
+        `${FX_ID.SAME}@${FX.A}`,
+        `${FX_ID.SAME}@${FX.B}`,
+      ]);
+    }
+  );
+
+  it("removing item ids [a, b] deletes those two only; an id of another playlist is ignored and not counted", async () => {
+    const playlistId = await playlistWith([
+      [FX_ID.SAME, FX.A],
+      [FX_ID.SAME, FX.B],
+      [FX_ID.B_ONLY, FX.B],
+    ]);
+    const otherId = await playlistWith([[FX_ID.B_ONLY, FX.B]]);
+    const a = await itemIdOf(playlistId, FX_ID.SAME, FX.A);
+    const b = await itemIdOf(playlistId, FX_ID.B_ONLY, FX.B);
+    const elsewhere = await itemIdOf(otherId, FX_ID.B_ONLY, FX.B);
+
+    const res = await viewer.client.post<RemovePlaylistItemsResponse>(
+      `/api/playlists/${playlistId}/items/remove`,
+      { itemIds: [a, b, elsewhere] }
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.data).toEqual({ removed: 2 });
+    expect(await itemsOf(playlistId)).toEqual([`${FX_ID.SAME}@${FX.B}`]);
+    expect(await itemsOf(otherId)).toEqual([`${FX_ID.B_ONLY}@${FX.B}`]);
+  });
+
+  it("removing more than 250 ids answers 400", async () => {
+    const playlistId = await playlistWith([[FX_ID.SAME, FX.A]]);
+    const a = await itemIdOf(playlistId, FX_ID.SAME, FX.A);
+    const itemIds = [
+      a,
+      ...Array.from({ length: PER_PAGE_MAX }, (_, i) => i + 1),
+    ];
+
+    const res = await viewer.client.post(
+      `/api/playlists/${playlistId}/items/remove`,
+      { itemIds }
+    );
+
+    expect(res.status).toBe(400);
+    expect(await itemsOf(playlistId)).toEqual([`${FX_ID.SAME}@${FX.A}`]);
   });
 });

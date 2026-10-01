@@ -567,6 +567,13 @@ export interface PlaylistItemQueryRow {
   addedAt: Date;
 }
 
+/** One item of a playlist being moved (PlaylistQueryService.moveItem) */
+export interface PlaylistMoveQueryRow {
+  id: number;
+  /** 1 when the owner sees the item's scene, else 0 */
+  visible: bigint;
+}
+
 /** One play queue entry's columns (PlaylistQueryService.loadPlaylistQueue) */
 export interface PlaylistQueueQueryRow {
   sceneId: string;

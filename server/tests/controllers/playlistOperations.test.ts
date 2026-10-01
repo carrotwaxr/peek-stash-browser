@@ -4,9 +4,10 @@
  * Tests createPlaylist, updatePlaylist, deletePlaylist, and duplicatePlaylist
  * controller functions. Covers validation, ownership checks, and the
  * access-control-based duplicate flow; and that the item writes (add,
- * remove, reorder) take each scene's instance from the request.
+ * remove, reorder) take each scene's instance from the request; a move and
+ * a bulk remove name items by item id.
  */
-import type { PlaylistItem, Prisma } from "@prisma/client";
+import type { Playlist, PlaylistItem, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addSceneToPlaylist,
@@ -14,6 +15,8 @@ import {
   deletePlaylist,
   duplicatePlaylist,
   getPlaylistShares,
+  movePlaylistItem,
+  removePlaylistItems,
   removeSceneFromPlaylist,
   reorderPlaylist,
   updatePlaylist,
@@ -29,6 +32,7 @@ import {
   appendItems,
   duplicateVisibleItems,
   loadPlaylistPreviews,
+  moveItem,
 } from "../../services/PlaylistQueryService.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -62,6 +66,7 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
   duplicateVisibleItems: vi.fn(),
   appendItems: vi.fn(),
+  moveItem: vi.fn(),
 }));
 
 // The writer queue runs for real; each unit's label is on `openUnits` while
@@ -109,6 +114,7 @@ const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 const mockAppendItems = vi.mocked(appendItems);
 const mockPreviews = vi.mocked(loadPlaylistPreviews);
 const mockDuplicateItems = vi.mocked(duplicateVisibleItems);
+const mockMoveItem = vi.mocked(moveItem);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 const ALLOWED = ["inst-a"];
@@ -1086,6 +1092,146 @@ describe("Playlist Controller Operations", () => {
         "items[1] is not in this playlist"
       );
       expect(mockPrisma.playlistItem.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("move one item, remove several", () => {
+    const OWNED = partialRow<Playlist>({
+      id: 1,
+      userId: USER.id,
+      name: "Mine",
+    });
+
+    const moveReq = (itemId: string, body: unknown) => {
+      const req = reqFor(movePlaylistItem, {
+        params: { id: "1", itemId },
+        body: malformed(body),
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+      const res = resFor(movePlaylistItem);
+      return { run: () => movePlaylistItem(req, res), res };
+    };
+
+    const removeReq = (body: unknown) => {
+      const req = reqFor(removePlaylistItems, {
+        params: { id: "1" },
+        body: malformed(body),
+        user: USER,
+      });
+      const res = resFor(removePlaylistItems);
+      return { run: () => removePlaylistItems(req, res), res };
+    };
+
+    it("a move hands the service the owner's view and answers success", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(OWNED);
+      mockMoveItem.mockResolvedValue(true);
+      const { run, res } = moveReq("7", { index: 2 });
+
+      await run();
+
+      expect(mockPrisma.playlist.findFirst).toHaveBeenCalledWith({
+        where: { id: 1, userId: USER.id },
+        select: { id: true },
+      });
+      expect(mockMoveItem).toHaveBeenCalledExactlyOnceWith(
+        1,
+        USER.id,
+        ALLOWED,
+        7,
+        2
+      );
+      expect(res._getOkBody()).toEqual({ success: true });
+    });
+
+    it("moving an item of another playlist, or an unknown item id, answers 404", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(OWNED);
+      // The service reads the playlist's own items and finds none with that id
+      mockMoveItem.mockResolvedValue(false);
+      const { run, res } = moveReq("999", { index: 0 });
+
+      await run();
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res._getErrorBody().error).toBe("Item not found");
+    });
+
+    it.each([
+      ["negative", { index: -1 }],
+      ["a fraction", { index: 1.5 }],
+      ["a string", { index: "1" }],
+      ["missing", {}],
+      ["null", { index: null }],
+    ])(
+      "index not a non-negative integer (%s) answers 400",
+      async (_what, body) => {
+        const { run, res } = moveReq("7", body);
+
+        await run();
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res._getErrorBody().error).toBe(
+          "index must be a non-negative integer"
+        );
+        expect(mockMoveItem).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([["abc"], ["0"], ["1.5"]])(
+      "an item id of %s answers 400",
+      async (itemId) => {
+        const { run, res } = moveReq(itemId, { index: 0 });
+
+        await run();
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(mockMoveItem).not.toHaveBeenCalled();
+      }
+    );
+
+    it("removing item ids deletes those of this playlist only, in one unit, and answers the count", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(OWNED);
+      const units: string[][] = [];
+      mockPrisma.playlistItem.deleteMany.mockImplementation(
+        prismaImpl(() => {
+          units.push([...openUnits]);
+          return { count: 2 };
+        })
+      );
+      const { run, res } = removeReq({ itemIds: [11, 12, 99] });
+
+      await run();
+
+      expect(
+        mockPrisma.playlistItem.deleteMany
+      ).toHaveBeenCalledExactlyOnceWith({
+        where: { playlistId: 1, id: { in: [11, 12, 99] } },
+      });
+      expect(units).toEqual([["playlist.removeItems"]]);
+      expect(res._getOkBody()).toEqual({ removed: 2 });
+    });
+
+    it.each([
+      [
+        "more than 250 ids",
+        { itemIds: Array.from({ length: 251 }, (_, i) => i + 1) },
+      ],
+      ["no ids", { itemIds: [] }],
+      ["not an array", { itemIds: 5 }],
+      ["a zero id", { itemIds: [1, 0] }],
+      ["a string id", { itemIds: [1, "2"] }],
+      ["no body field", {}],
+    ])("%s answers 400 and removes nothing", async (_what, body) => {
+      const { run, res } = removeReq(body);
+
+      await run();
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toBe(
+        "itemIds must be an array of 1 to 250 item ids"
+      );
+      expect(mockPrisma.playlist.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
     });
   });
 });

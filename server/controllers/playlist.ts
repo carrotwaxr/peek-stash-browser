@@ -12,6 +12,7 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
   loadPlaylistQueue,
+  moveItem,
   playlistsHoldingScene,
   removeUnavailableItems,
   sortPlaylistItems,
@@ -37,6 +38,11 @@ import type {
   GetSharedPlaylistsResponse,
   GetUserPlaylistsQuery,
   GetUserPlaylistsResponse,
+  MovePlaylistItemParams,
+  MovePlaylistItemRequest,
+  MovePlaylistItemResponse,
+  RemovePlaylistItemsRequest,
+  RemovePlaylistItemsResponse,
   RemoveSceneFromPlaylistParams,
   RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
@@ -653,6 +659,123 @@ export const removeSceneFromPlaylist = async (
   }
 
   res.json({ success: true, message: "Scene removed from playlist" });
+};
+
+/** A positive integer id from a route parameter or a body; NaN otherwise */
+function parseItemId(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : NaN;
+  }
+  if (typeof value === "string" && /^[1-9]\d*$/.test(value)) {
+    return Number(value);
+  }
+  return NaN;
+}
+
+/** The owner's playlist id, or null when the requester does not own it */
+async function ownedPlaylist(
+  playlistId: number,
+  userId: number
+): Promise<number | null> {
+  const playlist = await prisma.playlist.findFirst({
+    where: { id: playlistId, userId },
+    select: { id: true },
+  });
+  return playlist?.id ?? null;
+}
+
+/**
+ * Move one item (by item id) to an index among the items the owner sees, in
+ * playlist order (owner only; PlaylistQueryService.moveItem renumbers the
+ * playlist 0..n-1). An index past the end puts it after the last visible
+ * item. An item of another playlist, or one the owner cannot see, is 404.
+ */
+export const movePlaylistItem = async (
+  req: TypedLibraryRequest<MovePlaylistItemRequest, MovePlaylistItemParams>,
+  res: TypedResponse<MovePlaylistItemResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const playlistId = parseInt(req.params.id);
+
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const itemId = parseItemId(req.params.itemId);
+  if (isNaN(itemId)) {
+    res.status(400).json({ error: "Invalid item ID" });
+    return;
+  }
+
+  // The body is not validated: the index is checked here
+  const { index }: { index?: unknown } = req.body;
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0) {
+    res.status(400).json({ error: "index must be a non-negative integer" });
+    return;
+  }
+
+  if ((await ownedPlaylist(playlistId, userId)) === null) {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  const moved = await moveItem(
+    playlistId,
+    userId,
+    req.allowedInstanceIds,
+    itemId,
+    index
+  );
+  if (!moved) {
+    res.status(404).json({ error: "Item not found" });
+    return;
+  }
+
+  res.json({ success: true });
+};
+
+/**
+ * Remove several items by item id (owner only), in one statement; ids of
+ * another playlist's items are ignored and not counted
+ */
+export const removePlaylistItems = async (
+  req: TypedAuthRequest<RemovePlaylistItemsRequest, ReorderPlaylistParams>,
+  res: TypedResponse<RemovePlaylistItemsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const playlistId = parseInt(req.params.id);
+
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  // The body is not validated: every id is checked here
+  const { itemIds }: { itemIds?: unknown } = req.body;
+  const ids = Array.isArray(itemIds)
+    ? (itemIds as unknown[]).map((id) =>
+        typeof id === "number" ? parseItemId(id) : NaN
+      )
+    : [];
+  if (ids.length === 0 || ids.length > PER_PAGE_MAX || ids.some(Number.isNaN)) {
+    res.status(400).json({
+      error: `itemIds must be an array of 1 to ${PER_PAGE_MAX} item ids`,
+    });
+    return;
+  }
+
+  if ((await ownedPlaylist(playlistId, userId)) === null) {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  const { count } = await dbWrite("playlist.removeItems", () =>
+    prisma.playlistItem.deleteMany({
+      where: { playlistId, id: { in: ids } },
+    })
+  );
+  res.json({ removed: count });
 };
 
 /**
