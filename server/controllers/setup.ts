@@ -33,6 +33,8 @@ import type {
   GetAllStashInstancesResponse,
   GetSetupStatusResponse,
   GetStashInstanceResponse,
+  TestSavedStashInstanceParams,
+  TestSavedStashInstanceRequest,
   TestStashConnectionRequest,
   TestStashConnectionResponse,
   TypedRequest,
@@ -180,37 +182,34 @@ const hasConfiguration = (result: unknown): boolean =>
   "configuration" in result &&
   Boolean(result.configuration);
 
+const INVALID_URL_MESSAGE =
+  "Invalid URL format. Expected: http://hostname:port/graphql";
+
+/** What `probeStashConnection` learned: a version on success, else why not. */
+type StashProbe =
+  | { success: true; version: string | undefined }
+  | { success: false; reason: "empty-configuration" }
+  | { success: false; reason: "error"; friendly: string; details: string };
+
 /**
- * Test connection to a Stash server
- * POST /api/setup/test-stash-connection
- *
- * Public only before any user or instance exists (setupGuards.ts). Only an
- * admin gets the reason for a failure and the Stash version; everyone else
- * gets pass or fail. The full error stays in the log.
+ * Connect to a Stash server with `url` and `apiKey` and read its configuration
+ * and version. The caller decides what of the result its reader may see; the
+ * log gets the full error, and the key's length only, never its characters.
  */
-export const testStashConnection = async (
-  req: TypedRequest<TestStashConnectionRequest>,
-  res: TypedResponse<TestStashConnectionResponse | ApiErrorResponse>
-) => {
-  const { url, apiKey } = req.body;
-  const isAdmin = req.user?.role === "ADMIN";
-
-  if (!url || !apiKey) {
-    res.status(400).json({
-      error: "URL and API key are required",
-    });
-    return;
-  }
-
-  // Validate URL format
+const probeStashConnection = async (
+  url: string,
+  apiKey: string
+): Promise<StashProbe> => {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
   } catch {
-    res.status(400).json({
-      error: "Invalid URL format. Expected: http://hostname:port/graphql",
-    });
-    return;
+    return {
+      success: false,
+      reason: "error",
+      friendly: INVALID_URL_MESSAGE,
+      details: INVALID_URL_MESSAGE,
+    };
   }
 
   logger.info("Testing Stash connection", {
@@ -229,35 +228,25 @@ export const testStashConnection = async (
   try {
     const result = await testStash.configuration();
 
-    if (hasConfiguration(result)) {
-      // Also fetch the version
-      let versionString: string | undefined;
-      try {
-        const versionResult = await testStash.version();
-        versionString = emptyToNull(versionResult.version.version) ?? undefined;
-      } catch (versionError) {
-        // Version fetch failed, but connection is still valid
-        logger.warn("Failed to fetch Stash version", { error: versionError });
-      }
-
-      logger.info("Stash connection test successful", {
-        version: versionString,
-      });
-      res.json({
-        success: true,
-        message: "Connection successful",
-        ...(isAdmin &&
-          versionString !== undefined && { version: versionString }),
-      });
-    } else {
+    if (!hasConfiguration(result)) {
       logger.error("Stash connection test got an empty configuration");
-      res.status(400).json({
-        success: false,
-        error: isAdmin
-          ? "Connected but received empty configuration"
-          : CONNECTION_TEST_FAILED,
-      });
+      return { success: false, reason: "empty-configuration" };
     }
+
+    // Also fetch the version
+    let versionString: string | undefined;
+    try {
+      const versionResult = await testStash.version();
+      versionString = emptyToNull(versionResult.version.version) ?? undefined;
+    } catch (versionError) {
+      // Version fetch failed, but connection is still valid
+      logger.warn("Failed to fetch Stash version", { error: versionError });
+    }
+
+    logger.info("Stash connection test successful", {
+      version: versionString,
+    });
+    return { success: true, version: versionString };
   } catch (error) {
     // Get the full error details including cause
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -301,11 +290,125 @@ export const testStashConnection = async (
         "Network error connecting to Stash. Check the URL and ensure Stash is accessible from the server.";
     }
 
-    res.status(400).json({
+    return {
       success: false,
-      error: isAdmin ? friendlyMessage : CONNECTION_TEST_FAILED,
-    });
+      reason: "error",
+      friendly: friendlyMessage,
+      details: describeStashError(error),
+    };
   }
+};
+
+/**
+ * Test connection to a Stash server
+ * POST /api/setup/test-stash-connection
+ *
+ * Public only before any user or instance exists (setupGuards.ts). Only an
+ * admin gets the reason for a failure and the Stash version; everyone else
+ * gets pass or fail. The full error stays in the log.
+ */
+export const testStashConnection = async (
+  req: TypedRequest<TestStashConnectionRequest>,
+  res: TypedResponse<TestStashConnectionResponse | ApiErrorResponse>
+) => {
+  const { url, apiKey } = req.body;
+  const isAdmin = req.user?.role === "ADMIN";
+
+  if (!url || !apiKey) {
+    res.status(400).json({
+      error: "URL and API key are required",
+    });
+    return;
+  }
+
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch {
+    res.status(400).json({ error: INVALID_URL_MESSAGE });
+    return;
+  }
+
+  const probe = await probeStashConnection(url, apiKey);
+
+  if (probe.success) {
+    res.json({
+      success: true,
+      message: "Connection successful",
+      ...(isAdmin && probe.version !== undefined && { version: probe.version }),
+    });
+    return;
+  }
+
+  const reason =
+    probe.reason === "empty-configuration"
+      ? "Connected but received empty configuration"
+      : probe.friendly;
+  res.status(400).json({
+    success: false,
+    error: isAdmin ? reason : CONNECTION_TEST_FAILED,
+  });
+};
+
+/**
+ * Test a saved Stash instance with its stored API key
+ * POST /api/setup/stash-instance/:id/test-connection
+ *
+ * Admin only. The edit form never holds the key, so it tests by id: no body
+ * tests the stored address and key, a `url` tests that address with the
+ * stored key, an `apiKey` tests a replacement the admin typed. The answer
+ * carries the reason and Stash's own error text for the admin, the version on
+ * success, and never a key.
+ */
+export const testSavedStashInstance = async (
+  req: TypedRequest<
+    TestSavedStashInstanceRequest,
+    TestSavedStashInstanceParams
+  >,
+  res: TypedResponse<TestStashConnectionResponse | ApiErrorResponse>
+) => {
+  const { id } = req.params;
+
+  const existing = await prisma.stashInstance.findUnique({
+    where: { id },
+    select: { url: true, apiKey: true },
+  });
+  if (!existing) {
+    res.status(404).json({ error: "Stash instance not found" });
+    return;
+  }
+
+  // Express 5 leaves `req.body` undefined for a request with no body
+  const body = req.body as TestSavedStashInstanceRequest | undefined;
+  const url = emptyToNull(body?.url) ?? existing.url;
+  const apiKey = emptyToNull(body?.apiKey) ?? existing.apiKey;
+
+  try {
+    new URL(url);
+  } catch {
+    res.status(400).json({ error: INVALID_URL_MESSAGE });
+    return;
+  }
+
+  const probe = await probeStashConnection(url, apiKey);
+
+  if (probe.success) {
+    res.json({
+      success: true,
+      message: "Connection successful",
+      ...(probe.version !== undefined && { version: probe.version }),
+    });
+    return;
+  }
+
+  res.status(400).json(
+    probe.reason === "empty-configuration"
+      ? {
+          success: false,
+          error: "Connected but received empty configuration",
+        }
+      : { success: false, error: probe.friendly, details: probe.details }
+  );
 };
 
 /**
@@ -650,8 +753,9 @@ export const updateStashInstance = async (
   // Enabling or disabling changes what its users can see
   const enabledChanged = enabled !== undefined && enabled !== existing.enabled;
 
-  // If URL or API key changed, test connection
-  if (url || apiKey) {
+  // Only a changed address or key can fail a save for want of a connection:
+  // a rename, a priority or a toggle saves while Stash is down
+  if (connectionChanged) {
     const testUrl = emptyToNull(url) ?? existing.url;
     const testApiKey = emptyToNull(apiKey) ?? existing.apiKey;
 
@@ -660,7 +764,9 @@ export const updateStashInstance = async (
       await testStash.configuration();
     } catch (error) {
       throw new ValidationError(
-        "Could not connect to Stash server with new credentials",
+        urlChanged
+          ? "Could not connect to Stash at the new address"
+          : "Could not connect to Stash with the new API key",
         { details: describeStashError(error) }
       );
     }

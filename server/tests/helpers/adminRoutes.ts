@@ -15,6 +15,7 @@ export const ADMIN_ROUTES = [
   "GET /api/setup/stash-instances",
   "POST /api/setup/stash-instance",
   "PUT /api/setup/stash-instance/:id",
+  "POST /api/setup/stash-instance/:id/test-connection",
   "DELETE /api/setup/stash-instance/:id",
   // routes/sync.ts
   "GET /api/sync/status",
