@@ -122,7 +122,9 @@ const Playlists = () => {
     try {
       setLoadingShared(true);
       const response = await getSharedPlaylists();
-      setSharedPlaylists(response.playlists as Record<string, unknown>[]);
+      setSharedPlaylists(
+        response.playlists as unknown as Record<string, unknown>[]
+      );
       setSharedLoaded(true);
     } catch {
       // Silently fail for shared - not critical

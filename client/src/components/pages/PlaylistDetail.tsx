@@ -413,9 +413,7 @@ const PlaylistDetail = () => {
       setDuplicating(true);
       const result = await duplicatePlaylist(parseInt(playlistId!, 10));
       showSuccess("Playlist duplicated!");
-      void navigate(
-        `/playlist/${String((result.playlist as Record<string, unknown>).id)}`
-      );
+      void navigate(`/playlist/${String(result.playlist.id)}`);
     } catch {
       showError("Failed to duplicate playlist");
     } finally {
