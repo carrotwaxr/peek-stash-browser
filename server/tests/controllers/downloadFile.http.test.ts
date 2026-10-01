@@ -307,6 +307,19 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
     ).resolves.toBeUndefined();
   }, 5000);
 
+  it("a Stash 410 answers 404, not 502", async () => {
+    mockGetDownload.mockResolvedValue(sceneDownload());
+    state.handler = (_req, res) => {
+      res.writeHead(410, { "content-type": "text/plain" });
+      res.end("gone");
+    };
+
+    const res = await fetch(`${peekUrl}/api/downloads/20/file`);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "Download not found" });
+  }, 5000);
+
   it("a Stash 500 answers 502", async () => {
     mockGetDownload.mockResolvedValue(sceneDownload());
     state.handler = (_req, res) => {

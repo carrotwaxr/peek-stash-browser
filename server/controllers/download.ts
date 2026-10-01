@@ -457,16 +457,19 @@ export async function getDownloadFile(
   const { response: upstream, abort } = fetched;
 
   // 206, 304 and 416 pass through; a refused body is cancelled, not left open
+  // Stash's 404 and 410 both mean the file is gone; anything else it refuses
+  // is 502
   const failure = stashFailure(upstream.status);
-  if (failure || upstream.status === 410) {
+  if (failure) {
     logger.warn(
       `[DOWNLOAD] Stash returned ${upstream.status} for ${entityType} ${download.entityId}`
     );
     abort.abort();
     await upstream.body?.cancel().catch(() => undefined);
-    throw failure instanceof BadGatewayError
-      ? new BadGatewayError("Stash could not serve the file")
-      : new NotFoundError("Download not found");
+    const gone = upstream.status === 404 || upstream.status === 410;
+    throw gone
+      ? new NotFoundError("Download not found")
+      : new BadGatewayError("Stash could not serve the file");
   }
 
   res.status(upstream.status);
