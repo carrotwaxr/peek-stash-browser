@@ -164,6 +164,8 @@ Share your playlists with other users through user groups. Shared playlists appe
 
 Playlists are shared with **user groups**, not individual users. All members of a shared group can access the playlist. This makes it easy to share with teams or households at once.
 
+A share lasts only while it can: it ends when you leave the group, and it pauses while you do not have the **Can Share** permission (the people you shared with stop seeing the playlist at once, and see it again when the permission returns). A shared playlist shows who shared it.
+
 ### Sharing a Playlist
 
 1. Open a playlist you own

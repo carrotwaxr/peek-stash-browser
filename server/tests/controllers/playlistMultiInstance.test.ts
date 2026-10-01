@@ -19,6 +19,7 @@ import {
 } from "../../controllers/playlist.js";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import {
   type PlaylistPreviews,
@@ -34,9 +35,13 @@ import type {
 } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { userPermissions } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
+type PlaylistWithOwner = Prisma.PlaylistGetPayload<{
+  include: { user: true };
+}>;
 type SharedPlaylistRow = Prisma.PlaylistGetPayload<{
   include: {
     user: true;
@@ -62,7 +67,7 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 }));
 
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(() => Promise.resolve({})),
+  resolveUserPermissions: vi.fn(),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -75,6 +80,7 @@ const mockItems = vi.mocked(loadPlaylistItems);
 const mockQueue = vi.mocked(loadPlaylistQueue);
 const mockUnavailable = vi.mocked(countUnavailableItems);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
+const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 const ALLOWED = ["inst-A", "inst-B"];
@@ -126,6 +132,10 @@ const sceneStub = (id: string, instanceId: string, title: string) =>
 describe("Playlist reads through PlaylistQueryService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Owners may share unless a case says otherwise
+    mockResolvePermissions.mockResolvedValue(
+      userPermissions({ canShare: true })
+    );
   });
   afterEach(() => {
     vi.resetAllMocks();
@@ -194,6 +204,47 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(shared.sharedViaGroups).toEqual(["Group1"]);
   });
 
+  it("getSharedPlaylists leaves out a playlist whose owner lacks Can Share, resolving each owner once", async () => {
+    const sharedRow = (id: number, ownerId: number) =>
+      partialRow<SharedPlaylistRow>({
+        id,
+        userId: ownerId,
+        name: `Shared ${id}`,
+        description: null,
+        user: partialRow({ id: ownerId, username: `owner${ownerId}` }),
+        shares: [
+          partialRow({
+            sharedAt: new Date("2026-01-02T00:00:00Z"),
+            group: partialRow({ name: "Group1" }),
+          }),
+        ],
+      });
+    mockPrisma.playlist.findMany.mockResolvedValueOnce([
+      sharedRow(1, 99),
+      sharedRow(2, 98),
+      sharedRow(3, 99),
+    ]);
+    mockResolvePermissions.mockImplementation((userId) =>
+      Promise.resolve(userPermissions({ canShare: userId === 99 }))
+    );
+    mockPreviews.mockResolvedValueOnce(new Map([[1, MIXED]]));
+
+    const req = reqFor(getSharedPlaylists, {
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
+    const res = resFor(getSharedPlaylists);
+    await getSharedPlaylists(req, res);
+
+    expect(mockResolvePermissions).toHaveBeenCalledTimes(2);
+    expect(mockPreviews).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistIds: [1, 3],
+    });
+    expect(res._getOkBody().playlists.map((p) => p.id)).toEqual([1, 3]);
+  });
+
   it("getPlaylist without page reads page 1 of 50, and the owner's unavailable count", async () => {
     const items = [
       item(20, "42", "inst-A", 0, sceneStub("42", "inst-A", "Scene from A")),
@@ -201,7 +252,12 @@ describe("Playlist reads through PlaylistQueryService", () => {
     ];
     mockGetAccess.mockResolvedValueOnce({ level: "owner" });
     mockPrisma.playlist.findUnique.mockResolvedValueOnce(
-      partialRow({ id: 3, userId: USER.id, name: "Detail Mixed" })
+      partialRow<PlaylistWithOwner>({
+        id: 3,
+        userId: USER.id,
+        name: "Detail Mixed",
+        user: partialRow({ id: USER.id, username: USER.username }),
+      })
     );
     mockItems.mockResolvedValueOnce({ items, totalItems: 2 });
     mockUnavailable.mockResolvedValueOnce(1);
@@ -236,12 +292,25 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(body.sort).toBe("position");
     expect(body.direction).toBe("ASC");
     expect(body.isOwner).toBe(true);
+    expect(body.owner).toEqual({ id: USER.id, username: USER.username });
+    // The owner's row is read with its owner, but the answer carries only
+    // the name and id
+    expect(mockPrisma.playlist.findUnique).toHaveBeenCalledWith({
+      where: { id: 3 },
+      include: { user: { select: { id: true, username: true } } },
+    });
+    expect(body.playlist).not.toHaveProperty("user");
   });
 
   it("getPlaylist with page and per_page reads that page for the viewer", async () => {
     mockGetAccess.mockResolvedValueOnce({ level: "shared", groups: ["G"] });
     mockPrisma.playlist.findUnique.mockResolvedValueOnce(
-      partialRow({ id: 3, userId: 99, name: "Shared" })
+      partialRow<PlaylistWithOwner>({
+        id: 3,
+        userId: 99,
+        name: "Shared",
+        user: partialRow({ id: 99, username: "other" }),
+      })
     );
     mockItems.mockResolvedValueOnce({ items: [], totalItems: 6 });
 
@@ -267,6 +336,7 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(body.perPage).toBe(100);
     expect(body.accessLevel).toBe("shared");
     expect(body.sharedViaGroups).toEqual(["G"]);
+    expect(body.owner).toEqual({ id: 99, username: "other" });
     // A recipient learns nothing of the items they cannot play
     expect(body.unavailableItems).toBe(0);
     expect(mockUnavailable).not.toHaveBeenCalled();

@@ -175,7 +175,7 @@ export const getSharedPlaylists = async (
   const { containsScene } = parsePlaylistsQuery(req.query, { userId });
 
   // Find playlists shared with groups the user belongs to (excluding own playlists)
-  const sharedPlaylists = await prisma.playlist.findMany({
+  const allSharedPlaylists = await prisma.playlist.findMany({
     where: {
       userId: { not: userId },
       shares: {
@@ -210,6 +210,19 @@ export const getSharedPlaylists = async (
     },
     orderBy: { updatedAt: "desc" },
   });
+
+  // A share counts only while its owner may share: each distinct owner is
+  // resolved once, and the shares of one who may not stay stored but unseen
+  const mayShare = new Map<number, boolean>();
+  for (const ownerId of new Set(allSharedPlaylists.map((p) => p.userId))) {
+    mayShare.set(
+      ownerId,
+      Boolean((await resolveUserPermissions(ownerId))?.canShare)
+    );
+  }
+  const sharedPlaylists = allSharedPlaylists.filter((p) =>
+    mayShare.get(p.userId)
+  );
 
   const previews = await loadPlaylistPreviews({
     userId,
@@ -278,14 +291,16 @@ export const getPlaylist = async (
     return;
   }
 
-  const playlist = await prisma.playlist.findUnique({
+  const row = await prisma.playlist.findUnique({
     where: { id: playlistId },
+    include: { user: { select: { id: true, username: true } } },
   });
 
-  if (!playlist) {
+  if (!row) {
     res.status(404).json({ error: "Playlist not found" });
     return;
   }
+  const { user: owner, ...playlist } = row;
 
   const { paging, sort } = request;
   const { items, totalItems } = await loadPlaylistItems({
@@ -316,6 +331,7 @@ export const getPlaylist = async (
     isOwner: access.level === "owner",
     accessLevel: access.level,
     ...(access.level === "shared" ? { sharedViaGroups: access.groups } : {}),
+    owner: { id: owner.id, username: owner.username },
   });
 };
 
@@ -1027,6 +1043,7 @@ export const updatePlaylistShares = async (
   }
 
   // If sharing with any groups, check canShare permission
+  let newGroupIds: number[] = [];
   if (groupIds.length > 0) {
     const permissions = await resolveUserPermissions(userId);
     if (!permissions?.canShare) {
@@ -1036,24 +1053,32 @@ export const updatePlaylistShares = async (
       return;
     }
 
-    // Verify user belongs to all specified groups
+    // Verify user belongs to every group being added. A group already shared
+    // with that the owner has since left is not being added: it is dropped
+    // here (leaving a group deletes its shares, but older shares may remain)
     const userGroups = await getUserGroups(userId);
     const userGroupIds = new Set(userGroups.map((g) => g.id));
-
-    for (const groupId of groupIds) {
-      if (!userGroupIds.has(groupId)) {
+    const strangers = groupIds.filter((groupId) => !userGroupIds.has(groupId));
+    if (strangers.length > 0) {
+      const stored = await prisma.playlistShare.findMany({
+        where: { playlistId, groupId: { in: strangers } },
+        select: { groupId: true },
+      });
+      const alreadyShared = new Set(stored.map((s) => s.groupId));
+      if (strangers.some((groupId) => !alreadyShared.has(groupId))) {
         res
           .status(403)
           .json({ error: "You can only share with groups you belong to" });
         return;
       }
     }
+    newGroupIds = [...new Set(groupIds.filter((id) => userGroupIds.has(id)))];
   }
 
   // Replace all shares with new set
   await dbWriteBatch("playlist.shares", [
     prisma.playlistShare.deleteMany({ where: { playlistId } }),
-    ...groupIds.map((groupId) =>
+    ...newGroupIds.map((groupId) =>
       prisma.playlistShare.create({
         data: { playlistId, groupId },
       })

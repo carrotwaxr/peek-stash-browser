@@ -27,6 +27,7 @@ import type {
   UpdateUserGroupParams,
   UpdateUserGroupResponse,
 } from "../types/api/groups.js";
+import { dbWriteBatch } from "../utils/dbWrite.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 
 /**
@@ -370,14 +371,21 @@ export const removeMember = async (
     return res.status(404).json({ error: "Membership not found" });
   }
 
-  await prisma.userGroupMembership.delete({
-    where: {
-      userId_groupId: {
-        userId,
-        groupId,
+  // The member's playlists stop being shared with the group in the same unit:
+  // a share the owner can no longer see or edit would otherwise stay behind
+  await dbWriteBatch("group.removeMember", [
+    prisma.userGroupMembership.delete({
+      where: {
+        userId_groupId: {
+          userId,
+          groupId,
+        },
       },
-    },
-  });
+    }),
+    prisma.playlistShare.deleteMany({
+      where: { groupId, playlist: { userId } },
+    }),
+  ]);
 
   return res.json({ success: true });
 };

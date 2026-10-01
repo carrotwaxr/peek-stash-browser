@@ -175,6 +175,11 @@ describe("Playlist scenes (integration)", () => {
     }
 
     const ownerUser = await createApiUser("access_it_pl_owner", PASSWORD);
+    // A share counts only while its owner may share
+    await prisma.user.update({
+      where: { id: ownerUser.id },
+      data: { canShareOverride: true },
+    });
     const recipientUser = await createApiUser(
       "access_it_pl_recipient",
       PASSWORD

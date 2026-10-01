@@ -809,6 +809,11 @@ describe("Playlist duplicate visibility", () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
     await seedAccessFixture();
     const owner = await createApiUser("access_it_dup_owner", PASSWORD);
+    // A share counts only while its owner may share
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: { canShareOverride: true },
+    });
     recipient = await createApiUser("access_it_dup_recipient", PASSWORD);
 
     // GLOBAL@A is hidden by the recipient; DELETED is soft-deleted and
@@ -867,5 +872,136 @@ describe("Playlist duplicate visibility", () => {
       [FX_ID.SAME, FX.A, 0],
       [FX_ID.SAME, FX.B, 1],
     ]);
+  });
+});
+
+describe("Playlist shares follow the owner", () => {
+  const PASSWORD = "access_it_pass_1";
+  const GROUP_A = "share-follow-group-a";
+  const GROUP_B = "share-follow-group-b";
+  let owner: Awaited<ReturnType<typeof createApiUser>>;
+  let recipient: Awaited<ReturnType<typeof createApiUser>>;
+  let groupA: number;
+  let groupB: number;
+
+  interface SharedList {
+    playlists: Array<{ id: number }>;
+  }
+
+  async function createSharedPlaylist(groupIds: number[]): Promise<number> {
+    const created = await owner.client.post<PlaylistResponse>(
+      "/api/playlists",
+      { name: `share-follow ${Date.now()}` }
+    );
+    expect(created.status).toBe(201);
+    const shared = await owner.client.put<UpdatePlaylistSharesResponse>(
+      `/api/playlists/${created.data.playlist.id}/shares`,
+      { groupIds }
+    );
+    expect(shared.ok).toBe(true);
+    return created.data.playlist.id;
+  }
+
+  async function recipientSees(playlistId: number): Promise<boolean> {
+    const shared = await recipient.client.get<SharedList>(
+      "/api/playlists/shared"
+    );
+    const listed = shared.data.playlists.some((p) => p.id === playlistId);
+    const detail = await recipient.client.get<ErrorResponse>(
+      `/api/playlists/${playlistId}`
+    );
+    // The list and the page agree
+    expect(detail.ok).toBe(listed);
+    return listed;
+  }
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    await seedAccessFixture();
+    owner = await createApiUser("access_it_share_owner", PASSWORD);
+    recipient = await createApiUser("access_it_share_recipient", PASSWORD);
+    groupA = (
+      await prisma.userGroup.create({
+        data: {
+          name: GROUP_A,
+          canShare: true,
+          members: { create: [{ userId: owner.id }, { userId: recipient.id }] },
+        },
+      })
+    ).id;
+    groupB = (
+      await prisma.userGroup.create({
+        data: {
+          name: GROUP_B,
+          canShare: true,
+          members: { create: [{ userId: owner.id }] },
+        },
+      })
+    ).id;
+  }, 60000);
+
+  afterAll(async () => {
+    await prisma.userGroup.deleteMany({
+      where: { name: { in: [GROUP_A, GROUP_B] } },
+    });
+    await clearAccessFixture();
+  }, 60000);
+
+  it("a recipient's GET /api/playlists/:id names the owner", async () => {
+    const playlistId = await createSharedPlaylist([groupA]);
+
+    const detail = await recipient.client.get<{
+      owner?: { id: number; username: string };
+    }>(`/api/playlists/${playlistId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.data.owner).toEqual({
+      id: owner.id,
+      username: "access_it_share_owner",
+    });
+  });
+
+  it("after the owner leaves group G, G's members no longer see the playlist and the owner can still edit the other shares", async () => {
+    const playlistId = await createSharedPlaylist([groupA, groupB]);
+    expect(await recipientSees(playlistId)).toBe(true);
+
+    const left = await adminClient.delete(
+      `/api/groups/${groupA}/members/${owner.id}`
+    );
+    expect(left.ok).toBe(true);
+
+    expect(await recipientSees(playlistId)).toBe(false);
+    const shares = await owner.client.get<GetPlaylistSharesResponse>(
+      `/api/playlists/${playlistId}/shares`
+    );
+    expect(shares.data.shares.map((s) => s.groupId)).toEqual([groupB]);
+
+    // Editing the shares no longer fails on the group the owner left
+    const edited = await owner.client.put<UpdatePlaylistSharesResponse>(
+      `/api/playlists/${playlistId}/shares`,
+      { groupIds: [groupB] }
+    );
+    expect(edited.status).toBe(200);
+
+    // Put the owner back for the next case
+    await prisma.userGroupMembership.create({
+      data: { userId: owner.id, groupId: groupA },
+    });
+  });
+
+  it("after the owner loses Can Share, recipients no longer see the playlist, and it comes back when Can Share does", async () => {
+    const playlistId = await createSharedPlaylist([groupA]);
+    expect(await recipientSees(playlistId)).toBe(true);
+
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: { canShareOverride: false },
+    });
+    expect(await recipientSees(playlistId)).toBe(false);
+
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: { canShareOverride: null },
+    });
+    expect(await recipientSees(playlistId)).toBe(true);
   });
 });
