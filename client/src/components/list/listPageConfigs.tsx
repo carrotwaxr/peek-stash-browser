@@ -130,8 +130,6 @@ export interface ListPageConfig {
   skeleton: { aspect: SkeletonAspect; heightRem: number };
   /** The table's columns entity, when not the entity type */
   tableEntity?: string;
-  /** The table's headers sort the list (true unless set false) */
-  tableSorts?: boolean;
   /**
    * The grid view, when the page draws its own (the scenes' selection grid,
    * the clips' grid): it shows its loading placeholders and empty state

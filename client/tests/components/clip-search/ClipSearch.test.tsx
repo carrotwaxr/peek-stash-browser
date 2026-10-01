@@ -51,18 +51,22 @@ vi.mock("react-photo-album", () => ({
   ),
 }));
 
-vi.mock("@/hooks/useTableColumns", () => ({
-  useTableColumns: vi.fn(() => ({
-    allColumns: [],
-    visibleColumns: [],
-    visibleColumnIds: [],
-    columnOrder: [],
-    toggleColumn: vi.fn(),
-    hideColumn: vi.fn(),
-    moveColumn: vi.fn(),
-    getColumnConfig: vi.fn(() => ({})),
-  })),
-}));
+// The table shows the clip columns as the app defines them
+vi.mock("@/hooks/useTableColumns", async () => {
+  const { CLIP_COLUMNS } = await import("@/config/tableColumns");
+  return {
+    useTableColumns: vi.fn(() => ({
+      allColumns: CLIP_COLUMNS,
+      visibleColumns: CLIP_COLUMNS,
+      visibleColumnIds: CLIP_COLUMNS.map((column) => column.id),
+      columnOrder: CLIP_COLUMNS.map((column) => column.id),
+      toggleColumn: vi.fn(),
+      hideColumn: vi.fn(),
+      moveColumn: vi.fn(),
+      getColumnConfig: vi.fn(() => ({})),
+    })),
+  };
+});
 
 /** A clip row as the list answers it */
 const clip = (id: string, title: string) => ({
@@ -173,6 +177,74 @@ describe("ClipSearch", () => {
   it("shows 'No clips found' when nothing matches", async () => {
     renderClips("/clips?q=zzz");
     expect(await screen.findByText("No clips found")).toBeInTheDocument();
+  });
+
+  describe("table headers", () => {
+    beforeEach(() => {
+      mockGetClips.mockResolvedValue({
+        clips: [clip("7", "A clip")],
+        total: 1,
+      });
+    });
+
+    const lastCall = () =>
+      must(mockGetClips.mock.calls[mockGetClips.mock.calls.length - 1])[0];
+    const header = (name: string) =>
+      must(
+        screen
+          .getAllByRole("columnheader")
+          .find((th) => th.textContent === name),
+        `the ${name} header`
+      );
+
+    it("clicking Start Time sorts by seconds; clicking it again flips the direction", async () => {
+      renderClips("/clips?view=table");
+      await screen.findByText("A clip");
+
+      fireEvent.click(header("Start Time"));
+      await waitFor(() =>
+        expect(lastCall()).toMatchObject({
+          sortBy: "seconds",
+          sortDir: "desc",
+        })
+      );
+
+      fireEvent.click(header("Start Time"));
+      await waitFor(() =>
+        expect(lastCall()).toMatchObject({ sortBy: "seconds", sortDir: "asc" })
+      );
+    });
+
+    it("clicking Title sorts by title", async () => {
+      renderClips("/clips?view=table");
+      await screen.findByText("A clip");
+
+      fireEvent.click(header("Title"));
+      await waitFor(() =>
+        expect(lastCall()).toMatchObject({ sortBy: "title", sortDir: "desc" })
+      );
+    });
+
+    it("clicking Duration sorts by duration", async () => {
+      renderClips("/clips?view=table");
+      await screen.findByText("A clip");
+
+      fireEvent.click(header("Duration"));
+      await waitFor(() =>
+        expect(lastCall()).toMatchObject({
+          sortBy: "duration",
+          sortDir: "desc",
+        })
+      );
+    });
+
+    it("the arrow marks the active sort", async () => {
+      renderClips("/clips?view=table&sort=seconds&dir=ASC");
+      await screen.findByText("A clip");
+
+      expect(header("Start Time").querySelector("svg")).not.toBeNull();
+      expect(header("Title").querySelector("svg")).toBeNull();
+    });
   });
 
   describe("wall playback", () => {

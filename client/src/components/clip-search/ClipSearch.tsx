@@ -75,8 +75,6 @@ const CLIP_LIST: ListPageConfig = {
     />
   ),
   skeleton: { aspect: "landscape", heightRem: 5 },
-  // The clip list's sorts are not the table's columns
-  tableSorts: false,
   wallPlaybackSetting: true,
   emptyMessage: "No clips found",
   usePage: useClipListPage,
