@@ -9,6 +9,7 @@ import {
 import { ConflictError, ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import { bumpLibrary } from "../services/LibraryStamp.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import {
   LastEnabledInstanceError,
@@ -401,6 +402,7 @@ export const createFirstStashInstance = async (
 
   // Reload the StashInstanceManager to pick up the new instance
   await stashInstanceManager.reload();
+  bumpLibrary();
 
   // Start the scheduler, which the boot left stopped with no instance: its
   // startup sync is a full sync (nothing has synced yet), and it then keeps
@@ -603,6 +605,8 @@ export const createStashInstance = async (
 
   // Reload the StashInstanceManager to pick up the new instance
   await stashInstanceManager.reload();
+  // Open tabs refetch: the setup status names one more server
+  bumpLibrary();
 
   // Sync the new instance in the background, once a running sync ends:
   // the instance is saved, so refusing would only lose its sync
@@ -742,6 +746,9 @@ export const updateStashInstance = async (
   // data, once a running sync ends. An instance enabled before its first
   // sync ever finished (added disabled, say) syncs now too: it is hidden
   // from users until then
+  // After the recompute, so the refetch it triggers sees the new exclusions
+  bumpLibrary();
+
   const firstSyncPending = enabledChanged && instance.firstSyncedAt === null;
   const sync =
     (connectionChanged || firstSyncPending) && instance.enabled
@@ -797,6 +804,9 @@ export const deleteStashInstance = async (
     }
     throw error;
   }
+
+  // Its rows and every user's exclusions for it are gone: open tabs refetch
+  bumpLibrary();
 
   logger.info("Stash instance deleted", {
     instanceId: existing.id,

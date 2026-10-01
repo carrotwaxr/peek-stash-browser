@@ -32,6 +32,7 @@ import {
   type RestrictionRowInput,
   exclusionComputationService,
 } from "../../services/ExclusionComputationService.js";
+import { libraryStampFor } from "../../services/LibraryStamp.js";
 import { getUserInstanceScope } from "../../services/UserInstanceService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
@@ -723,6 +724,37 @@ describe("ExclusionComputationService", () => {
       expect(swap.some((sql) => SWAP_DELETE.test(sql))).toBe(false);
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(disconnectComputeClient).not.toHaveBeenCalled();
+    });
+
+    it("a committed save moves the saved user's library stamp, and no other user's", async () => {
+      setupPipeline();
+      fakeRaw([[RESOLVE_TAG, [{ id: "2", instanceId: "A" }]]]);
+      const saved = libraryStampFor(1);
+      const other = libraryStampFor(2);
+
+      await exclusionComputationService.saveRestrictions(1, ROWS);
+
+      expect(libraryStampFor(1)).not.toBe(saved);
+      expect(libraryStampFor(2)).toBe(other);
+    });
+
+    it("a save that rolls back leaves the user's library stamp", async () => {
+      setupPipeline();
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) =>
+          SWAP_INSERT.test(sql)
+            ? Promise.reject(new Error("disk I/O error"))
+            : 0
+        )
+      );
+      const saved = libraryStampFor(1);
+
+      await expect(
+        exclusionComputationService.saveRestrictions(1, ROWS)
+      ).rejects.toThrow("disk I/O error");
+
+      expect(sqlFrom(/^BEGIN IMMEDIATE$/)).toContain("ROLLBACK");
+      expect(libraryStampFor(1)).toBe(saved);
     });
 
     it("a failing exclusion insert rolls the rows back with it", async () => {

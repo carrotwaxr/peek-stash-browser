@@ -35,6 +35,7 @@ Peek maintains a local cache of your Stash library for fast queries. Three sync 
 - Syncing happens in the background - you can browse while it runs
 - Large libraries (100k+ scenes) may take several minutes for full sync
 - Changes made in Stash appear in Peek after the next sync
+- Open pages pick up a finished sync on their next request; you don't need to reload
 - User data (watch history, playlists, ratings) is stored separately and never affected by sync
 
 See [Sync Architecture](../development/sync-architecture.md) for technical details.

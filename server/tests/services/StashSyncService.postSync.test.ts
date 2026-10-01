@@ -4,6 +4,10 @@
  * (`PRAGMA optimize=0x10002`) and the WAL is emptied into the database file
  * (`PRAGMA wal_checkpoint(TRUNCATE)`), each as its own writer-queue unit.
  *
+ * The run's last step moves the library stamp (`bumpLibrary`), so open tabs
+ * refetch what the recomputed exclusions now allow; a run whose steps were
+ * skipped leaves it.
+ *
  * The post-step services are mocked; Prisma is the shared mock, and the
  * writer queue runs for real with a spy that records which unit each
  * statement ran in. The steps themselves are covered with real SQLite in
@@ -12,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { libraryStampFor } from "../../services/LibraryStamp.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { SyncChangeSet, noChanges } from "../../services/SyncChangeSet.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
@@ -293,5 +298,34 @@ describe("StashSyncService post-sync steps: planner statistics and the WAL", () 
       objectContaining({ error: "disk I/O error" })
     );
     expect(ran(CHECKPOINT)).toHaveLength(1);
+  });
+
+  it("a run that changed the library moves the stamp after the recompute", async () => {
+    const before = libraryStampFor(1);
+    let atRecompute: string | undefined;
+    mockExclusions.recomputeUsersForInstances.mockImplementation(() => {
+      atRecompute = libraryStampFor(1);
+      return Promise.resolve({ success: 1, failed: 0, errors: [] });
+    });
+
+    await stashSyncService["runPostSyncSteps"](oneDeletedScene(), {
+      full: false,
+    });
+
+    expect(atRecompute).toBe(before);
+    expect(libraryStampFor(1)).not.toBe(before);
+  });
+
+  it("a run whose steps were skipped leaves it", async () => {
+    const before = libraryStampFor(1);
+
+    await stashSyncService["runPostSyncSteps"](new SyncChangeSet(), {
+      full: false,
+    });
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      "nothing changed, post-sync steps skipped"
+    );
+    expect(libraryStampFor(1)).toBe(before);
   });
 });

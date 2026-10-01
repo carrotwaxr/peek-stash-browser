@@ -11,6 +11,8 @@ import { getClipPreviewUrl, getClips, getClipsForScene } from "@/api/clips";
 
 vi.mock("@/api/client", () => ({
   apiGet: vi.fn(),
+  // The query client registers its library-stamp listener here
+  setLibraryStampListener: vi.fn(),
 }));
 
 const mockApiGet = vi.mocked(apiGet);

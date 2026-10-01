@@ -6,11 +6,12 @@
  * useLibraryReady re-checks it and refetches once it is ready.
  */
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { ApiError } from "./client";
+import { ApiError, setLibraryStampListener } from "./client";
 import {
   isLibraryInitializing,
   markLibraryNotReady,
 } from "./hooks/useLibraryReady";
+import { invalidateExclusionDependents } from "./invalidateExclusionDependents";
 
 /** The longest Retry-After a query waits out; a longer wait shows the error. */
 const MAX_RETRY_AFTER_SECONDS = 10;
@@ -70,6 +71,11 @@ export function createQueryClient(): QueryClient {
         retry: false,
       },
     },
+  });
+  // A sync, or an admin's change to the user's restrictions, role or the
+  // Stash servers, landed: refetch what is on screen, mark the rest stale
+  setLibraryStampListener(() => {
+    void invalidateExclusionDependents(client);
   });
   return client;
 }

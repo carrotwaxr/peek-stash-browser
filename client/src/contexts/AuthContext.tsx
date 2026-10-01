@@ -4,6 +4,7 @@ import {
   ApiError,
   getErrorMessage,
   readRetryAfterSeconds,
+  resetLibraryStamp,
 } from "../api/client";
 import { queryClient } from "../api/queryClient";
 import { AuthContext } from "./AuthContextProvider";
@@ -89,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // in memory.
       sessionStorage.clear();
       queryClient.clear();
+      resetLibraryStamp();
       window.location.assign("/login");
     }
   };

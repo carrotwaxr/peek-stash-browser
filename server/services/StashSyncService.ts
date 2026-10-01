@@ -70,6 +70,7 @@ import {
   exclusionComputationService,
 } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
+import { bumpLibrary } from "./LibraryStamp.js";
 import { type LinkCountScope, linkCountService } from "./LinkCountService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
@@ -3177,7 +3178,8 @@ class StashSyncService extends EventEmitter {
    * Last, unless the steps were skipped: `PRAGMA optimize`
    * (`refreshPlannerStatistics`) and a best-effort WAL checkpoint, each its
    * own writer-queue unit. A skipped run changed no table's size, and the
-   * daily full pass runs them anyway.
+   * daily full pass runs them anyway. Then the library stamp moves
+   * (`bumpLibrary`), so open tabs refetch what they show.
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
@@ -3274,6 +3276,9 @@ class StashSyncService extends EventEmitter {
     // database file. Each is its own unit, and a failure is only logged
     await refreshPlannerStatistics("sync.optimize");
     await dbWrite("sync.checkpoint", checkpointWal);
+    // Open tabs refetch on their next request, which now sees the
+    // recomputed exclusions
+    bumpLibrary();
   }
 
   /**

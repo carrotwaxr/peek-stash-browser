@@ -39,6 +39,7 @@ import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
 import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { bumpUser, libraryStampFor } from "../../services/LibraryStamp.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import type { UserRestriction } from "../../types/api/index.js";
@@ -1420,6 +1421,20 @@ describe("User Controller", () => {
       expect(logger.warn).toHaveBeenCalled();
     });
 
+    it("drops the deleted user's library stamp", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
+      bumpUser(3);
+      // A user no bump has touched
+      const untouched = libraryStampFor(999);
+      expect(libraryStampFor(3)).not.toBe(untouched);
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      expect(libraryStampFor(3)).toBe(untouched);
+    });
+
     it("a failed delete answers 500 and forgets nothing", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
       mockPrisma.user.delete.mockRejectedValue(new Error("disk I/O error"));
@@ -1550,6 +1565,35 @@ describe("User Controller", () => {
       expect(mockExclusions.recomputeForUser).toHaveBeenCalledWith(3);
       expect(order).toEqual(["update", "recompute"]);
       expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("a role change moves that user's stamp, after the recompute", async () => {
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "USER",
+          updatedAt: new Date(),
+        })
+      );
+      const before = libraryStampFor(3);
+      const other = libraryStampFor(4);
+      let atRecompute: string | undefined;
+      mockExclusions.recomputeForUser.mockImplementation(() => {
+        atRecompute = libraryStampFor(3);
+        return Promise.resolve();
+      });
+      const req = reqFor(updateUserRole, {
+        body: { role: "USER" },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRole);
+      await updateUserRole(req, res);
+
+      expect(atRecompute).toBe(before);
+      expect(libraryStampFor(3)).not.toBe(before);
+      expect(libraryStampFor(4)).toBe(other);
     });
   });
 

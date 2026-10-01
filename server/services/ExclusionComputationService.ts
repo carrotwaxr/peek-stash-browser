@@ -71,6 +71,7 @@ import { compositeKey, entityKey, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { jsonListOrEmpty } from "../utils/sqlJson.js";
+import { bumpUser } from "./LibraryStamp.js";
 import type { BatchChanges } from "./SyncChangeSet.js";
 import {
   getUserInstanceScope,
@@ -820,6 +821,8 @@ class ExclusionComputationService {
     } finally {
       this.forgetPending(userId, savePromise);
     }
+    // The swap has committed: the user's open tabs refetch what they show
+    bumpUser(userId);
   }
 
   /** Drop a finished compute's entry, unless a later one replaced it. */

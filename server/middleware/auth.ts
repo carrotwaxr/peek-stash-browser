@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
+import { libraryStampFor } from "../services/LibraryStamp.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
@@ -137,6 +138,11 @@ export const authenticate = async (
   return await authenticateToken(req, res, next);
 };
 
+/** Every authenticated answer names the user's library stamp (`services/LibraryStamp.ts`). */
+const setLibraryStamp = (res: Response, userId: number): void => {
+  res.setHeader("X-Peek-Library", libraryStampFor(userId));
+};
+
 const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
   prisma.user.findUnique({
     where,
@@ -199,6 +205,7 @@ const authenticateUser = async (
 
   // Cast to AuthenticatedRequest to set user property
   (req as AuthenticatedRequest).user = requestUser;
+  setLibraryStamp(res, requestUser.id);
   next();
 };
 
@@ -265,6 +272,7 @@ export const authenticateToken = async (
 
   // Cast to AuthenticatedRequest to set user property
   (req as AuthenticatedRequest).user = requestUser;
+  setLibraryStamp(res, requestUser.id);
   next();
 };
 

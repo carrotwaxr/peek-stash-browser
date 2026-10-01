@@ -32,6 +32,7 @@ import {
   type RestrictionRowInput,
   exclusionComputationService,
 } from "../services/ExclusionComputationService.js";
+import { bumpUser, forgetUser } from "../services/LibraryStamp.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { rankingComputeService } from "../services/RankingComputeService.js";
@@ -889,6 +890,7 @@ export const deleteUser = async (
   ]);
   rankingComputeService.forget(userIdInt);
   recommendationService.forget(userIdInt);
+  forgetUser(userIdInt);
 
   // Their zips: stop the builds, then remove the folder (the sweep in
   // jobs/downloadCleanup.ts takes whatever this leaves)
@@ -948,6 +950,8 @@ export const updateUserRole = async (
   // Restrictions apply by role (item 13): promotion drops the restricted
   // and empty rows, demotion applies the kept restriction rows again.
   await exclusionComputationService.recomputeForUser(userIdInt);
+  // Their open tabs refetch what the new role lets them see
+  bumpUser(userIdInt);
 
   res.json({
     success: true,
