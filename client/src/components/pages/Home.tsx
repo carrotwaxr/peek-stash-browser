@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { NormalizedScene } from "@peek/shared-types";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import type { CarouselData, NormalizedScene } from "@peek/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useCarousels } from "../../api/hooks/useCarousels";
 import {
   isLibraryInitializing,
   useLibraryReady,
@@ -114,12 +115,15 @@ const buildCustomCarouselUrl = (
 const Home = () => {
   usePageTitle("Home");
   const navigate = useNavigate();
-  const location = useLocation();
   const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
-  const [customCarousels, setCustomCarousels] = useState<
-    Record<string, unknown>[]
-  >([]);
+  // The custom carousels: one query, shared with Settings; a save or a
+  // delete there marks it stale. A failed load shows no custom carousel.
+  const { data: customCarouselList } = useCarousels();
+  const customCarousels = useMemo<CarouselData[]>(
+    () => customCarouselList ?? [],
+    [customCarouselList]
+  );
   const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
   const { user } = useAuth();
 
@@ -135,23 +139,6 @@ const Home = () => {
     }
     return settingsFailed ? migrateCarouselPreferences([]) : [];
   }, [userSettings, settingsFailed]);
-
-  useEffect(() => {
-    const loadCustomCarousels = async () => {
-      try {
-        const { carousels } = (await libraryApi.getCarousels()) as Record<
-          string,
-          any
-        >;
-        setCustomCarousels(carousels || []);
-      } catch (err) {
-        console.error("Failed to load custom carousels:", err);
-      }
-    };
-
-    void loadCustomCarousels();
-    // Re-fetch when navigating to homepage (location.key changes on each navigation)
-  }, [location.key]);
 
   const createSceneClickHandler =
     (scenes: NormalizedScene[], carouselTitle: string) =>
@@ -211,14 +198,13 @@ const Home = () => {
         const customCarousel = customCarousels.find((c) => c.id === carouselId);
         if (customCarousel) {
           const IconComponent =
-            (LucideIcons as Record<string, any>)[
-              customCarousel.icon as string
-            ] || LucideIcons.Film;
+            (LucideIcons as Record<string, any>)[customCarousel.icon] ||
+            LucideIcons.Film;
           return {
             type: "custom",
             id: carouselId,
             prefId: pref.id,
-            title: customCarousel.title as string,
+            title: customCarousel.title,
             iconComponent: IconComponent,
             iconProps: {
               className: "w-6 h-6",
@@ -266,10 +252,7 @@ const Home = () => {
             <CustomCarousel
               key={carousel.prefId}
               carouselId={id!}
-              carousel={
-                customCarousels.find((c) => c.id === id) ??
-                ({} as Record<string, unknown>)
-              }
+              carousel={customCarousels.find((c) => c.id === id)}
               title={title}
               icon={icon}
               createSceneClickHandler={createSceneClickHandler}
@@ -438,7 +421,7 @@ const HomeCarousel = ({
  */
 interface CustomCarouselProps {
   carouselId: string;
-  carousel: Record<string, unknown>;
+  carousel: CarouselData | undefined;
   title: string;
   icon: React.ReactNode;
   createSceneClickHandler: (
@@ -495,9 +478,9 @@ const CustomCarousel = ({
       seeMoreUrl={
         carousel
           ? buildCustomCarouselUrl(
-              carousel.rules as Record<string, unknown>,
-              carousel.sort as string,
-              carousel.direction as string
+              carousel.rules,
+              carousel.sort,
+              carousel.direction
             )
           : undefined
       }

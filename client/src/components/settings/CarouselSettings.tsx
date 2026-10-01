@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { CarouselData } from "@peek/shared-types";
 import {
   ChevronDown,
   ChevronUp,
@@ -11,7 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { getErrorMessage, libraryApi } from "../../api";
+import { getErrorMessage } from "../../api";
+import { useCarousels, useDeleteCarousel } from "../../api/hooks/useCarousels";
 import { showError } from "../../utils/toast";
 import { Button, ErrorMessage } from "../ui/index";
 
@@ -66,50 +68,31 @@ interface Props {
   onSave: (preferences: CarouselPreference[]) => Promise<void>;
 }
 
+const NO_CAROUSELS: CarouselData[] = [];
+
 /**
  * CarouselSettings Component
  * Allows users to enable/disable and reorder homepage carousels using up/down buttons
  * Now supports custom user-defined carousels with edit/delete functionality
  */
-interface CustomCarousel {
-  id: string;
-  title: string;
-  icon: string;
-}
-
 const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   const navigate = useNavigate();
   const [userPreferences, setUserPreferences] = useState<
     CarouselPreference[] | null
   >(null);
-  const [customCarousels, setCustomCarousels] = useState<CustomCarousel[]>([]);
-  const [loadingCustom, setLoadingCustom] = useState(true);
-  // Without the custom carousels the merged list drops their places, and a
-  // save would store it that way: show Retry instead of the list
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
+  // The custom carousels: the query Home reads. Without them the merged
+  // list drops their places, and a save would store it that way: show Retry
+  // instead of the list
+  const carouselsQuery = useCarousels();
+  const customCarousels = carouselsQuery.data ?? NO_CAROUSELS;
+  const loadingCustom = carouselsQuery.isPending;
+  const loadError =
+    carouselsQuery.isError && !carouselsQuery.data
+      ? getErrorMessage(carouselsQuery.error)
+      : null;
+  const deleteCarousel = useDeleteCarousel();
   const [hasChanges, setHasChanges] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Load custom carousels from API
-  useEffect(() => {
-    const loadCustomCarousels = async () => {
-      try {
-        setLoadingCustom(true);
-        setLoadError(null);
-        const { carousels } = (await libraryApi.getCarousels()) as {
-          carousels: CustomCarousel[];
-        };
-        setCustomCarousels(carousels || []);
-      } catch (err) {
-        setLoadError(getErrorMessage(err));
-      } finally {
-        setLoadingCustom(false);
-      }
-    };
-
-    void loadCustomCarousels();
-  }, [loadAttempt]);
 
   // Derive merged preferences at render time instead of via effect
   const preferences = useMemo(() => {
@@ -221,15 +204,13 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
 
     setDeletingId(carouselId);
     try {
-      await libraryApi.deleteCarousel(actualId);
+      // Home drops it and its scenes at once
+      await deleteCarousel.mutateAsync(actualId);
     } catch (err) {
       showError(getErrorMessage(err, "Failed to delete carousel"));
       setDeletingId(null);
       return;
     }
-
-    // Remove from custom carousels list
-    setCustomCarousels((prev) => prev.filter((c) => c.id !== actualId));
 
     // Remove from preferences
     const updatedPrefs = preferences
@@ -322,7 +303,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
         <ErrorMessage
           title="Failed to load your custom carousels"
           error={loadError}
-          onRetry={() => setLoadAttempt((n) => n + 1)}
+          onRetry={() => void carouselsQuery.refetch()}
         />
       </div>
     );

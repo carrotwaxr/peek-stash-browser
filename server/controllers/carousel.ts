@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, UserCarousel } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import {
@@ -7,6 +7,7 @@ import {
 } from "../services/StoredFilterCleaner.js";
 import type {
   ApiErrorResponse,
+  CarouselData,
   CarouselPreference,
   CreateCarouselRequest,
   CreateCarouselResponse,
@@ -44,6 +45,19 @@ const MAX_CAROUSELS_PER_USER = 15;
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
 
+/** The row as the client receives it: the stored rules as saved, dates as ISO strings */
+const toCarouselData = (row: UserCarousel): CarouselData => ({
+  id: row.id,
+  userId: row.userId,
+  title: row.title,
+  icon: row.icon,
+  rules: row.rules as unknown as CarouselData["rules"],
+  sort: row.sort,
+  direction: row.direction,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
+
 /** A new seed each load, so a random carousel varies from visit to visit */
 const perLoadSeed = (userId: number) => userId + Date.now();
 
@@ -61,7 +75,7 @@ export const getUserCarousels = async (
     orderBy: { createdAt: "asc" },
   });
 
-  res.json({ carousels });
+  res.json({ carousels: carousels.map(toCarouselData) });
 };
 
 /**
@@ -86,7 +100,7 @@ export const getCarousel = async (
     return;
   }
 
-  res.json({ carousel });
+  res.json({ carousel: toCarouselData(carousel) });
 };
 
 /**
@@ -177,7 +191,7 @@ export const createCarousel = async (
     });
   }
 
-  res.status(201).json({ carousel });
+  res.status(201).json({ carousel: toCarouselData(carousel) });
 };
 
 /**
@@ -230,7 +244,7 @@ export const updateCarousel = async (
     },
   });
 
-  res.json({ carousel });
+  res.json({ carousel: toCarouselData(carousel) });
 };
 
 /**

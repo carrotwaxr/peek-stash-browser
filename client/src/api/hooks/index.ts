@@ -21,6 +21,11 @@ export {
   defaultPresetsQueryOptions,
   invalidatePresets,
 } from "./usePresets";
+export {
+  useCarousels,
+  useSaveCarousel,
+  useDeleteCarousel,
+} from "./useCarousels";
 export { useUserSettings, useUpdateUserSettings } from "./useUserSettings";
 export {
   usePlaylists,

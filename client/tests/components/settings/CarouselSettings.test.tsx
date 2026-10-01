@@ -5,6 +5,7 @@
  * delete says so.
  */
 import { MemoryRouter } from "react-router-dom";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
   render,
@@ -14,6 +15,8 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../src/api";
+import { createQueryClient } from "../../../src/api/queryClient";
+import { queryKeys } from "../../../src/api/queryKeys";
 import CarouselSettings from "../../../src/components/settings/CarouselSettings";
 import { showError } from "../../../src/utils/toast";
 import { flushPromises, must } from "../../testUtils";
@@ -46,11 +49,15 @@ const PREFERENCES = [
 ];
 const CUSTOM = [{ id: "c1", title: "My Carousel", icon: "Film" }];
 
+let client: QueryClient;
+
 const renderSettings = (onSave = vi.fn().mockResolvedValue(undefined)) => {
   render(
-    <MemoryRouter>
-      <CarouselSettings carouselPreferences={PREFERENCES} onSave={onSave} />
-    </MemoryRouter>
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <CarouselSettings carouselPreferences={PREFERENCES} onSave={onSave} />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
   return onSave;
 };
@@ -58,6 +65,7 @@ const renderSettings = (onSave = vi.fn().mockResolvedValue(undefined)) => {
 describe("CarouselSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    client = createQueryClient();
   });
 
   it("a failed custom carousel load offers Retry and no list to save", async () => {
@@ -103,7 +111,10 @@ describe("CarouselSettings", () => {
   });
 
   it("a delete whose order save fails leaves the order marked unsaved", async () => {
-    mockGetCarousels.mockResolvedValue({ carousels: CUSTOM });
+    // The list as the server holds it: without the carousel once deleted
+    mockGetCarousels
+      .mockResolvedValueOnce({ carousels: CUSTOM })
+      .mockResolvedValue({ carousels: [] });
     mockDeleteCarousel.mockResolvedValue({ success: true });
     const onSave = renderSettings(
       vi.fn().mockRejectedValue(new Error("reported by the tab"))
@@ -123,5 +134,35 @@ describe("CarouselSettings", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
     // The tab reported the failed save; the delete itself worked
     expect(showError).not.toHaveBeenCalled();
+  });
+
+  it("deleting a custom carousel removes it from Home's list and its cached scenes", async () => {
+    mockGetCarousels
+      .mockResolvedValueOnce({ carousels: CUSTOM })
+      .mockResolvedValue({ carousels: [] });
+    mockDeleteCarousel.mockResolvedValue({ success: true });
+    // What Home holds for it
+    client.setQueryData(queryKeys.carousels.execute("c1"), { scenes: [] });
+    renderSettings();
+
+    const row = must(
+      (await screen.findByText("My Carousel")).closest<HTMLElement>(".border"),
+      "the custom carousel's row"
+    );
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Delete carousel" })
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("My Carousel")).not.toBeInTheDocument()
+    );
+    expect(mockDeleteCarousel).toHaveBeenCalledWith("c1");
+    // Home reads the same list: it no longer holds the carousel
+    expect(client.getQueryData(queryKeys.carousels.list())).toEqual({
+      carousels: [],
+    });
+    expect(
+      client.getQueryData(queryKeys.carousels.execute("c1"))
+    ).toBeUndefined();
   });
 });

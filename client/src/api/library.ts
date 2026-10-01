@@ -2,7 +2,11 @@
  * Library API — entity search and lookup endpoints.
  */
 import type {
+  CreateCarouselRequest,
+  CreateCarouselResponse,
+  DeleteCarouselResponse,
   EntityKind,
+  ExecuteCarouselByIdResponse,
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
   FindGalleriesRequest,
@@ -22,11 +26,17 @@ import type {
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
   FindTagsRequest,
+  GetCarouselResponse,
+  GetUserCarouselsResponse,
   ListRequestInput,
   NormalizedImage,
+  PreviewCarouselRequest,
+  PreviewCarouselResponse,
   RatableEntityType,
   RelationCountsResponse,
   RelationCountsType,
+  UpdateCarouselRequest,
+  UpdateCarouselResponse,
   UpdateRatingRequest,
   UpdateRatingResponse,
 } from "@peek/shared-types";
@@ -351,18 +361,21 @@ export const libraryApi = {
   },
 
   // Carousels
-  getCarousels: () => apiGet("/carousels"),
-  getCarousel: (id: string) => apiGet(`/carousels/${id}`),
-  createCarousel: (data: Record<string, unknown>) =>
-    apiPost("/carousels", data),
-  updateCarousel: (id: string, data: Record<string, unknown>) =>
-    apiFetch(`/carousels/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  getCarousels: () => apiGet<GetUserCarouselsResponse>("/carousels"),
+  getCarousel: (id: string) => apiGet<GetCarouselResponse>(`/carousels/${id}`),
+  createCarousel: (data: CreateCarouselRequest) =>
+    apiPost<CreateCarouselResponse>("/carousels", data),
+  updateCarousel: (id: string, data: UpdateCarouselRequest) =>
+    apiFetch<UpdateCarouselResponse>(`/carousels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   deleteCarousel: (id: string) =>
-    apiFetch(`/carousels/${id}`, { method: "DELETE" }),
-  previewCarousel: (data: Record<string, unknown>) =>
-    apiPost("/carousels/preview", data),
+    apiFetch<DeleteCarouselResponse>(`/carousels/${id}`, { method: "DELETE" }),
+  previewCarousel: (data: PreviewCarouselRequest) =>
+    apiPost<PreviewCarouselResponse>("/carousels/preview", data),
   executeCarousel: (id: string, signal?: AbortSignal) =>
-    apiGet(`/carousels/${id}/execute`, signal),
+    apiGet<ExecuteCarouselByIdResponse>(`/carousels/${id}/execute`, signal),
 };
 
 // Internal ratings helper used by libraryApi.updateRating/updateFavorite
