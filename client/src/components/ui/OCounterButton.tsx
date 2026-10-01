@@ -10,7 +10,7 @@ import { useCoarsePointer } from "../../hooks/useHoverCapable";
  *
  * @param {string} sceneId - Stash scene ID (for scene interactive mode)
  * @param {string} imageId - Stash image ID (for image interactive mode)
- * @param {string} instanceId - The entity's Stash instance, sent with the increment
+ * @param {string} instanceId - The entity's Stash instance, sent with the increment; required with sceneId or imageId (there is no press without it)
  * @param {number} initialCount - Initial O counter value
  * @param {Function} onChange - Optional callback after successful increment (receives new count)
  * @param {string} size - Size variant: small, medium, large
@@ -74,6 +74,7 @@ const OCounterButton = ({
 
   // Determine which entity ID to use
   const entityId = sceneId || imageId;
+  const canPress = interactive && !!entityId && !!instanceId;
   const entityType = sceneId ? "scene" : imageId ? "image" : null;
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -82,7 +83,12 @@ const OCounterButton = ({
     e.stopPropagation();
 
     // Only allow incrementing for scenes/images with interactive mode
-    if (!interactive || incrementMutation.isPending || !entityId) {
+    if (
+      !interactive ||
+      incrementMutation.isPending ||
+      !entityId ||
+      !instanceId
+    ) {
       return;
     }
 
@@ -130,21 +136,20 @@ const OCounterButton = ({
           variant === "card" || variant === "lightbox"
             ? "none"
             : "1px solid var(--border-color)",
-        cursor:
-          interactive && entityId
-            ? incrementMutation.isPending
-              ? "not-allowed"
-              : "pointer"
-            : "default",
+        cursor: canPress
+          ? incrementMutation.isPending
+            ? "not-allowed"
+            : "pointer"
+          : "default",
         opacity: incrementMutation.isPending ? 0.7 : 1,
       }}
       aria-label={
-        interactive && entityId
+        canPress
           ? `Increment O counter (current: ${count})`
           : `O Counter: ${count}`
       }
       title={
-        interactive && entityId
+        canPress
           ? `O Counter: ${count} (click to increment)`
           : `O Counter: ${count}`
       }

@@ -4,7 +4,7 @@ import PlayCountIndicator from "./PlayCountIndicator";
 interface Props {
   className?: string;
   /** The scene's instance, sent with an O press */
-  instanceId?: string;
+  instanceId: string;
   isReadOnly?: boolean;
   oCount: number;
   playCount: number;

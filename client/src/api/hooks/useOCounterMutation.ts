@@ -2,14 +2,38 @@ import type {
   DecrementImageOCounterResponse,
   DecrementOCounterResponse,
 } from "@peek/shared-types";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiPost } from "../client";
-import { queryKeys } from "../queryKeys";
+import { cancelEntityQueries, patchEntityInCache } from "../entityCache";
+import { markLibraryStale } from "./useLibraryReady";
+
+/**
+ * After an O write: list requests in flight are cancelled (they may carry
+ * the old count), the server's count goes into every cached row of the
+ * entity, then the library is marked stale without a refetch, so the
+ * press no longer reloads the list behind it.
+ */
+async function showCount(
+  client: QueryClient,
+  type: "scene" | "image",
+  id: string,
+  instanceId: string,
+  oCount: number
+): Promise<void> {
+  // A list fetch begun before the press may answer with the old count
+  await cancelEntityQueries(client, type);
+  patchEntityInCache(client, { type, id, instanceId }, { oCount });
+  await markLibraryStale(client);
+}
 
 interface IncrementOCounterParams {
   sceneId?: string;
   imageId?: string;
-  instanceId?: string;
+  instanceId: string;
 }
 
 interface IncrementOCounterResponse {
@@ -27,7 +51,7 @@ export function useIncrementOCounter() {
           "/watch-history/increment-o",
           {
             sceneId,
-            ...(instanceId && { instanceId }),
+            instanceId,
           }
         );
       }
@@ -36,24 +60,20 @@ export function useIncrementOCounter() {
           "/image-view-history/increment-o",
           {
             imageId,
-            ...(instanceId && { instanceId }),
+            instanceId,
           }
         );
       }
       return Promise.reject(new Error("Either sceneId or imageId is required"));
     },
-    onSuccess: (_data, { sceneId, imageId }) => {
-      if (sceneId) {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.scenes.all(),
-        });
-      }
-      if (imageId) {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.images.all(),
-        });
-      }
-    },
+    onSuccess: (data, { sceneId, imageId, instanceId }) =>
+      showCount(
+        queryClient,
+        sceneId ? "scene" : "image",
+        (sceneId ?? imageId) as string,
+        instanceId,
+        data.oCount
+      ),
   });
 }
 
@@ -72,9 +92,8 @@ export function useDecrementOCounter() {
         sceneId,
         instanceId,
       }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.scenes.all() });
-    },
+    onSuccess: (data, { sceneId, instanceId }) =>
+      showCount(queryClient, "scene", sceneId, instanceId, data.oCount),
   });
 }
 
@@ -93,8 +112,7 @@ export function useDecrementImageOCounter() {
         "/image-view-history/decrement-o",
         { imageId, instanceId }
       ),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.images.all() });
-    },
+    onSuccess: (data, { imageId, instanceId }) =>
+      showCount(queryClient, "image", imageId, instanceId, data.oCount),
   });
 }
