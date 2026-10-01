@@ -376,6 +376,8 @@ describeWithDb("GET /api/library/<type>s/:id/counts (integration)", () => {
       performers: 1,
       studios: 1,
       groups: 1,
+      // The seed holds no clips; the clips statistic is B3's own file
+      clips: 0,
     });
     for (const [key, kind] of TAG_TABS) {
       expect(got[key], `${key} against its tab`).toBe(
@@ -487,6 +489,7 @@ describeWithDb("GET /api/library/<type>s/:id/counts (integration)", () => {
       performers: 2,
       studios: 1,
       groups: 1,
+      clips: 0,
     });
     for (const [key, kind] of TAG_TABS) {
       expect(got[key], `${key} against its tab`).toBe(

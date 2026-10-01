@@ -189,7 +189,6 @@ describe("Tags Controller", () => {
         o_counter: 5,
         play_count: 6,
         scene_count: 42,
-        scene_marker_count: 7,
         parents: [parent],
         children: [child],
       });

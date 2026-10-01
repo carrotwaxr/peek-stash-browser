@@ -54,11 +54,11 @@ import {
 
 // Column list for SELECT - all StashTag fields plus user data; the card's
 // counts as the viewer sees them (query/excludedCounts.ts). The direct and
-// via-performer scene counts and the marker count stay as stored.
+// via-performer scene counts stay as stored.
 const selectColumns = (ctx: QueryContext) =>
   `
     t.id, t.stashInstanceId, t.name, t.favorite AS stashFavorite,
-    t.sceneCount, t.sceneMarkerCount, t.sceneCountViaPerformers,
+    t.sceneCount, t.sceneCountViaPerformers,
     ${visibleCount(ctx, "t.sceneCountAll", "scenes")} AS sceneCountAll,
     ${visibleCount(ctx, "t.imageCount", "images")} AS imageCount,
     ${visibleCount(ctx, "t.galleryCount", "galleries")} AS galleryCount,
@@ -200,6 +200,8 @@ class TagQueryBuilder extends EntityQueryBuilder<
       ),
       studio_count: column(visibleCount(ctx, "t.studioCount", "studios")),
       group_count: column(visibleCount(ctx, "t.groupCount", "groups")),
+      // Stash's count, markers on hidden scenes included: ordering only (the
+      // page's Markers statistic is the viewer's own, `countRelations`)
       scene_marker_count: column("t.sceneMarkerCount"),
 
       // The viewer's rating (TagRating)
@@ -378,7 +380,6 @@ class TagQueryBuilder extends EntityQueryBuilder<
       performer_count: Number(row.performerCount ?? 0),
       studio_count: Number(row.studioCount ?? 0),
       group_count: Number(row.groupCount ?? 0),
-      scene_marker_count: row.sceneMarkerCount ?? 0,
 
       // Timestamps
       created_at: row.stashCreatedAt?.toISOString() ?? null,

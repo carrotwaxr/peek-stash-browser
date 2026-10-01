@@ -1,5 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   GALLERY_FIELDS,
   GROUP_FIELDS,
@@ -23,7 +28,7 @@ import { usePageTitle } from "../../hooks/usePageTitle";
 import type { PageChangeOptions } from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { makeCompositeKey } from "../../utils/compositeKey";
-import { getEntityPath } from "../../utils/entityLinks";
+import { getEntityPath, getFilteredListPath } from "../../utils/entityLinks";
 import {
   GalleryGrid,
   GroupGrid,
@@ -311,6 +316,7 @@ const TagDetail = () => {
             counts={counts}
             activeTab={activeTab}
             defaultTab={effectiveDefaultTab}
+            hasMultipleInstances={hasMultipleInstances}
           />
           <TagDetails tag={tag} hasMultipleInstances={hasMultipleInstances} />
         </div>
@@ -544,10 +550,30 @@ interface TagStatsProps {
   counts: RelationCountsByType["tag"] | undefined;
   activeTab: string;
   defaultTab: string;
+  hasMultipleInstances: boolean;
 }
 
-const TagStats = ({ tag, counts, activeTab, defaultTab }: TagStatsProps) => {
+const TagStats = ({
+  tag,
+  counts,
+  activeTab,
+  defaultTab,
+  hasMultipleInstances,
+}: TagStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // The Markers count is the Clips page's own list for this tag (generated
+  // clips on scenes the viewer can see), so the statistic opens that list
+  const clipsPath = getFilteredListPath(
+    "/clips",
+    "tags",
+    {
+      id: tag?.id as string | undefined,
+      instanceId: tag?.instanceId as string | undefined,
+    },
+    hasMultipleInstances
+  );
 
   const handleTabSwitch = (tabId: string) => {
     setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
@@ -608,8 +634,9 @@ const TagStats = ({ tag, counts, activeTab, defaultTab }: TagStatsProps) => {
         />
         <StatField
           label="Markers:"
-          value={tag?.scene_marker_count as number | undefined}
+          value={counts?.clips}
           valueColor="var(--accent-primary)"
+          onClick={clipsPath ? () => void navigate(clipsPath) : undefined}
         />
         <StatField
           label="Images:"

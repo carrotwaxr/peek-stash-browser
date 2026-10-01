@@ -22,7 +22,8 @@ import {
 } from "@peek/shared-types/filters/index.js";
 import { makeEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { ParsedListRequest } from "../types/parsedFilters.js";
-import { parseListRequest } from "../utils/listRequest.js";
+import { parseClipQuery, parseListRequest } from "../utils/listRequest.js";
+import { clipQueryBuilder } from "./ClipQueryBuilder.js";
 import { galleryQueryBuilder } from "./GalleryQueryBuilder.js";
 import { groupQueryBuilder } from "./GroupQueryBuilder.js";
 import { imageQueryBuilder } from "./ImageQueryBuilder.js";
@@ -34,10 +35,13 @@ import { tagQueryBuilder } from "./TagQueryBuilder.js";
 /** A tab: its list, and the list's filter field naming the page's entity */
 type Tab = readonly [list: EntityKind, field: string];
 
-/** Each page's counted tabs, as its grids filter them */
+/**
+ * Each page's counted tabs, as its grids filter them. A clips count is not a
+ * tab of this kind (clips are not an `EntityKind`): `countClips` adds it.
+ */
 const PAGE_TABS: {
   readonly [T in RelationCountsType]: {
-    readonly [R in keyof RelationCountsByType[T]]: Tab;
+    readonly [R in Exclude<keyof RelationCountsByType[T], "clips">]: Tab;
   };
 } = {
   performer: {
@@ -137,6 +141,28 @@ async function countTab<E extends EntityKind>(
 }
 
 /**
+ * A tag's clips: the Clips page's own count over the request its link sends
+ * (`GET /api/clips?tagIds=<ref>&isGenerated=true`, the page's default), so
+ * the statistic equals the list it opens. The clip's scene's exclusions and
+ * the viewer's instances apply as on that list (invariant 3). Clip tag
+ * filters take no depth.
+ */
+async function countClips(
+  ref: { id: string; instanceId: string },
+  options: RelationCountOptions
+): Promise<number> {
+  const request = parseClipQuery(
+    { tagIds: makeEntityRef(ref.id, ref.instanceId), isGenerated: "true" },
+    { userId: options.userId }
+  );
+  return clipQueryBuilder.count({
+    userId: options.userId,
+    allowedInstanceIds: options.allowedInstanceIds,
+    request,
+  });
+}
+
+/**
  * The page's tab counts for an entity the caller has checked the viewer
  * can see, on its own instance
  */
@@ -150,5 +176,6 @@ export async function countRelations<T extends RelationCountsType>(
   for (const [key, [list, field]] of Object.entries(tabs)) {
     counts[key] = await countTab(list, field, ref, options);
   }
+  if (type === "tag") counts.clips = await countClips(ref, options);
   return counts as RelationCountsByType[T];
 }

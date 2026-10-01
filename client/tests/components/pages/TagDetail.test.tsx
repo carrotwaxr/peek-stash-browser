@@ -3,7 +3,13 @@
  * of a scene, gallery, image, performer, studio and collection) takes a
  * depth in the shared contract, so each tab sends depth -1 while it is on.
  */
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { jsonResponse } from "@tests/helpers/stubApi";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +21,7 @@ import {
 import {
   type DetailPageOptions,
   bodiesTo,
+  currentPath,
   currentSearch,
   lastBody,
   renderDetailPage,
@@ -69,6 +76,7 @@ const ALL_COUNTS = {
   performers: 2,
   studios: 2,
   groups: 1,
+  clips: 2,
 };
 
 const COUNTS_PATH = "/library/tags/5/counts";
@@ -191,6 +199,7 @@ describe("TagDetail: counts", () => {
       performers: 2,
       studios: 0,
       groups: 1,
+      clips: 0,
     };
     const { api } = renderPage("");
 
@@ -343,5 +352,41 @@ describe("TagDetail: title row", () => {
     expect(name).toHaveClass("min-w-0", "break-words");
     const row = must(name.parentElement, "the title row");
     expect(row).toHaveClass("flex", "flex-wrap", "items-center", "min-w-0");
+  });
+});
+
+describe("TagDetail: the Markers statistic", () => {
+  const markers = async () => {
+    await countsShown();
+    const statistics = within(
+      (await screen.findByRole("heading", { name: "Statistics" }))
+        .parentElement as HTMLElement
+    );
+    return statistics.getByText("Markers:").parentElement as HTMLElement;
+  };
+
+  it("shows the counts' clips and opens the Clips list for the tag", async () => {
+    // Stash's own count (the row's, hidden clips included) is not shown
+    renderDetailPage("tag", "/tag/5?instance=inst-a", {
+      entity: { ...tag, scene_marker_count: 9 },
+      counts: ALL_COUNTS,
+    });
+
+    const row = await markers();
+    expect(row).toHaveTextContent(/^Markers:2$/);
+
+    fireEvent.click(within(row).getByRole("button", { name: "2" }));
+
+    expect(currentPath()).toBe("/clips");
+    expect(currentSearch()).toEqual({ tagId: "5", instance: "inst-a" });
+  });
+
+  it("shows no link when the viewer sees no clips", async () => {
+    counts = { ...ALL_COUNTS, clips: 0 };
+    renderPage("");
+
+    const row = await markers();
+    expect(row).toHaveTextContent(/^Markers:0$/);
+    expect(within(row).queryByRole("button")).toBeNull();
   });
 });

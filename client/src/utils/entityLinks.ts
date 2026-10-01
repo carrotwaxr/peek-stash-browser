@@ -6,6 +6,7 @@
  * the same ID across different instances.
  */
 import {
+  CLIP_FILTER_OPTIONS,
   type FilterOption,
   GALLERY_FILTER_OPTIONS,
   GROUP_FILTER_OPTIONS,
@@ -90,6 +91,8 @@ const LIST_PAGE_FILTERS = {
   "/collections": GROUP_FILTER_OPTIONS,
   "/galleries": GALLERY_FILTER_OPTIONS,
   "/images": IMAGE_FILTER_OPTIONS,
+  // The clip's own tags: a tag page's Markers statistic
+  "/clips": CLIP_FILTER_OPTIONS,
 } satisfies Record<string, readonly FilterOption[]>;
 
 type ListPage = keyof typeof LIST_PAGE_FILTERS;

@@ -108,7 +108,6 @@ export function createMockTag(
     aliases: [],
     image_path: null,
     scene_count: 0,
-    scene_marker_count: 0,
     scene_count_via_performers: 0,
     image_count: 0,
     gallery_count: 0,

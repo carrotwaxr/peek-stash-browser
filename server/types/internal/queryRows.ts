@@ -218,7 +218,6 @@ export interface TagQueryRow {
   performerCount: number | bigint | null;
   studioCount: number | bigint | null;
   groupCount: number | bigint | null;
-  sceneMarkerCount: number | null;
   sceneCountViaPerformers: number | null;
   /** Live scenes tagged directly or inheriting the tag, each once */
   sceneCountAll: number | bigint;

@@ -53,6 +53,15 @@ describe("getFilteredListPath", () => {
     );
   });
 
+  it("opens the Clips page filtered by the clip's own tags", () => {
+    expect(getFilteredListPath("/clips", "tags", tag, true)).toBe(
+      "/clips?tagId=5&instance=inst-a"
+    );
+    expect(getFilteredListPath("/clips", "performers", tag, true)).toBe(
+      "/clips?performerId=5&instance=inst-a"
+    );
+  });
+
   it("leaves the instance out with one server", () => {
     expect(getFilteredListPath("/images", "tags", tag, false)).toBe(
       "/images?tagId=5"

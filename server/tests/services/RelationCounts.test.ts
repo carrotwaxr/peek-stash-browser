@@ -3,6 +3,7 @@
  * count over the request the tab's grid sends, parsed by the list parser.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
@@ -13,6 +14,9 @@ import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { must } from "../helpers/must.js";
 
+vi.mock("../../services/ClipQueryBuilder.js", () => ({
+  clipQueryBuilder: { count: vi.fn() },
+}));
 vi.mock("../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: { count: vi.fn() },
 }));
@@ -45,6 +49,8 @@ const builders = {
   image: vi.mocked(imageQueryBuilder),
 };
 
+const clips = vi.mocked(clipQueryBuilder);
+
 const options = { userId: 4, allowedInstanceIds: ["inst-a"] };
 const ref = { id: "12", instanceId: "inst-a" };
 
@@ -65,6 +71,7 @@ describe("countRelations", () => {
     for (const builder of Object.values(builders)) {
       builder.count.mockImplementation(() => Promise.resolve(++n));
     }
+    clips.count.mockImplementation(() => Promise.resolve(40));
   });
 
   it("a tag page counts its six tabs, each list filtered by the tag, with no depth by default", async () => {
@@ -80,7 +87,9 @@ describe("countRelations", () => {
       "performers",
       "studios",
       "groups",
+      "clips",
     ]);
+    expect(counts.clips).toBe(40);
     const tags = { refs: [ref], modifier: "INCLUDES", depth: 0 };
     expect(sentFilters()).toEqual({
       scene: { tags },
@@ -97,6 +106,29 @@ describe("countRelations", () => {
       }))
     );
     expect(asked).toEqual(Array.from({ length: 6 }, () => options));
+  });
+
+  it("a tag's clips are the Clips page's count for the tag: generated clips, the tag alone, no depth", async () => {
+    await countRelations("tag", ref, {
+      ...options,
+      // The toggle's depth is the tabs'; a clip's tag filter takes none
+      depth: -1,
+    });
+
+    expect(clips.count).toHaveBeenCalledTimes(1);
+    const sent = must(clips.count.mock.lastCall)[0];
+    expect(sent.userId).toBe(4);
+    expect(sent.allowedInstanceIds).toEqual(["inst-a"]);
+    expect(sent.request.filter).toEqual({
+      tagIds: { refs: [ref], modifier: "INCLUDES", depth: 0 },
+      isGenerated: true,
+    });
+  });
+
+  it("only a tag page counts clips", async () => {
+    await countRelations("studio", ref, { ...options, depth: undefined });
+    await countRelations("performer", ref, { ...options, depth: undefined });
+    expect(clips.count).not.toHaveBeenCalled();
   });
 
   it("the counts are each builder's answer, in turn", async () => {
