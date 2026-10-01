@@ -9,7 +9,7 @@ import {
   useNavigationType,
   useSearchParams,
 } from "react-router-dom";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createRouterWrapper, must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -445,6 +445,77 @@ describe("usePaginatedLightbox", () => {
       expect(vi.mocked(showInfo)).toHaveBeenCalledWith(
         "That image isn't on this page of the list."
       );
+    });
+
+    it("an image param not on the loaded page opens the viewer on that image alone after one by-id read", async () => {
+      vi.mocked(showInfo).mockClear();
+      const solo = { id: "25", instanceId: "inst-a" };
+      const fetchImage = vi.fn().mockResolvedValue(solo);
+      const { result } = renderLightbox(
+        {
+          perPage: 10,
+          totalCount: 30,
+          externalPage: 1,
+          onExternalPageChange: vi.fn(),
+          images: pageOf(1),
+          ready: true,
+          fetchImage,
+        },
+        "/images?image=25%3Ainst-a"
+      );
+
+      await waitFor(() =>
+        expect(result.current.lightbox.lightboxOpen).toBe(true)
+      );
+      expect(fetchImage).toHaveBeenCalledTimes(1);
+      expect(must(fetchImage.mock.calls[0], "the read")[0]).toBe("25:inst-a");
+      expect(result.current.lightbox.soloImage).toEqual(solo);
+      expect(result.current.lightbox.lightboxIndex).toBe(0);
+      expect(imageParam(result)).toBe("25:inst-a");
+
+      // Alone: no crossing into the list, and the page's first image is
+      // never named for it
+      expect(result.current.lightbox.onPageBoundary("next")).toBe(false);
+      act(() => {
+        result.current.lightbox.onIndexChange(0);
+      });
+      expect(imageParam(result)).toBe("25:inst-a");
+      expect(vi.mocked(showInfo)).not.toHaveBeenCalled();
+
+      // Closing (opened from its address) removes the param by replace
+      act(() => {
+        result.current.lightbox.closeLightbox();
+      });
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(result.current.lightbox.soloImage).toBeNull();
+      expect(imageParam(result)).toBeNull();
+      expect(result.current.navigationType).toBe("REPLACE");
+    });
+
+    it("an image param the by-id read does not find is removed with a replace and says the image is no longer available", async () => {
+      vi.mocked(showError).mockClear();
+      vi.mocked(showInfo).mockClear();
+      const fetchImage = vi.fn().mockResolvedValue(null);
+      const { result } = renderLightbox(
+        {
+          perPage: 10,
+          totalCount: 30,
+          images: pageOf(1),
+          ready: true,
+          fetchImage,
+        },
+        "/images?sort=title&image=99%3Ainst-a"
+      );
+
+      await waitFor(() => expect(imageParam(result)).toBeNull());
+      expect(fetchImage).toHaveBeenCalledTimes(1);
+      expect(result.current.location.search).toBe("?sort=title");
+      expect(result.current.navigationType).toBe("REPLACE");
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(vi.mocked(showError)).toHaveBeenCalledWith(
+        "That image is no longer available"
+      );
+      expect(vi.mocked(showInfo)).not.toHaveBeenCalled();
     });
 
     it("while not ready it waits: an image param not among the images is kept", () => {

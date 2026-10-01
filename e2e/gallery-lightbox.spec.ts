@@ -14,8 +14,9 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  * state and deleted afterwards. The user's view history is deleted with it,
  * so the O press and the recorded view leave the database as it was. The
  * replay library's galleries have images; a dev-stack library without a
- * gallery skips (requireData). An Images page address naming an image not
- * on its page drops the name and says so.
+ * gallery skips (requireData). An Images page address naming an image
+ * beyond its first page opens that image; one naming an image the user
+ * cannot see drops the name and says so.
  */
 
 test.describe("Gallery lightbox", () => {
@@ -280,7 +281,76 @@ test.describe("Gallery lightbox", () => {
     }
   });
 
-  test("a link to an image not on the Images page opens the list and says so", async ({
+  test("a link to an image beyond the Images page's first page opens it in the viewer", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    // Opening an image records a view: a throwaway user's, deleted with it
+    const user = await createUser(page.request, "lightbox-link");
+    userId = user.id;
+
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const userPage = await context.newPage();
+
+      // 1. The Images page's own request, and its first page: a small page,
+      //    so the replay's few images reach a second one
+      const PER_PAGE = 4;
+      const list = new ListPage(userPage);
+      const [firstPage] = await Promise.all([
+        userPage.waitForResponse(
+          (r) =>
+            r.url().includes("/api/library/images") &&
+            r.request().method() === "POST" &&
+            r.ok()
+        ),
+        list.goto(`/images?per_page=${PER_PAGE}`),
+      ]);
+      await list.waitForResults("Image");
+      const request = firstPage.request().postDataJSON() as {
+        filter?: Record<string, unknown>;
+      };
+
+      // 2. The first image of the second page, by the same request
+      const second = await userPage.request.post("/api/library/images", {
+        data: { ...request, filter: { ...request.filter, page: 2 } },
+      });
+      expect(second.ok(), await second.text()).toBeTruthy();
+      const target = requireData(
+        (
+          (await second.json()) as {
+            findImages: { images: { id: string; instanceId: string }[] };
+          }
+        ).findImages.images[0],
+        "a second page of images"
+      );
+
+      // 3. Its link opens the viewer on it
+      await userPage.goto(
+        `/images?per_page=${PER_PAGE}&image=${encodeURIComponent(`${target.id}:${target.instanceId}`)}`
+      );
+      const viewer = userPage.getByRole("dialog", { name: "Image viewer" });
+      await expect(viewer).toBeVisible({ timeout: 15_000 });
+      const src = await userPage
+        .locator(".react-transform-component img")
+        .getAttribute("src");
+      const path = new URL(String(src), userPage.url()).searchParams.get(
+        "path"
+      );
+      expect(path, `the viewer's image (src ${src})`).toMatch(
+        new RegExp(`^/image/${target.id}/`)
+      );
+      expect(new URL(userPage.url()).searchParams.get("image")).toBe(
+        `${target.id}:${target.instanceId}`
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("a link to an image the user cannot see opens the list and says so", async ({
     page,
   }) => {
     // The viewer never opens, so nothing is recorded: the run admin will do
@@ -290,7 +360,7 @@ test.describe("Gallery lightbox", () => {
     requireData(images > 0, "an image");
 
     await expect(
-      page.getByText("That image isn't on this page of the list.")
+      page.getByText("That image is no longer available")
     ).toBeVisible();
     await expect
       .poll(() => new URL(page.url()).searchParams.get("image"))
