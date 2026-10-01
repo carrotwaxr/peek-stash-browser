@@ -3,7 +3,7 @@ import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import type { ListUrlState } from "../../hooks/useListUrlState";
 import type { TagTreeSource } from "../../utils/buildTagTree";
 import { TagHierarchyView } from "../tags/index";
-import { ErrorMessage } from "../ui/index";
+import { StatusMessage } from "../ui/index";
 
 const NO_TAGS: readonly TagTreeSource[] = [];
 
@@ -18,7 +18,13 @@ const TagHierarchyPanel = ({ listState }: { listState: ListUrlState }) => {
   );
 
   if (error && !isLibraryInitializing(error)) {
-    return <ErrorMessage error={error} onRetry={() => void refetch()} />;
+    return (
+      <StatusMessage
+        variant="error"
+        message={error}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
   return (

@@ -7,7 +7,7 @@ import {
   removeGroupMember,
   updateGroup,
 } from "../../api";
-import { Button, Modal } from "../ui/index";
+import { Button, Modal, StatusMessage } from "../ui/index";
 
 interface GroupData {
   id: number;
@@ -221,15 +221,12 @@ const GroupModal = ({
         <div className="space-y-6">
           {/* Error Message */}
           {error && (
-            <div
-              className="p-3 rounded-lg text-sm"
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                color: "rgb(239, 68, 68)",
-              }}
-            >
-              {error}
-            </div>
+            <StatusMessage
+              variant="error"
+              title={null}
+              className="text-sm"
+              message={error}
+            />
           )}
 
           {/* Loading state for edit mode */}
@@ -238,7 +235,7 @@ const GroupModal = ({
               <div
                 className="animate-spin w-8 h-8 border-4 border-t-transparent rounded-full mx-auto mb-2"
                 style={{
-                  borderColor: "rgba(59, 130, 246, 0.3)",
+                  borderColor: "var(--status-info-border)",
                   borderTopColor: "transparent",
                 }}
               ></div>
@@ -258,7 +255,7 @@ const GroupModal = ({
                   className="block text-sm font-medium mb-2"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  Name <span style={{ color: "rgb(239, 68, 68)" }}>*</span>
+                  Name <span style={{ color: "var(--status-error)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -475,8 +472,9 @@ const GroupModal = ({
                               <span
                                 className="ml-2 text-xs px-2 py-0.5 rounded"
                                 style={{
-                                  backgroundColor: "rgba(59, 130, 246, 0.2)",
-                                  color: "rgb(59, 130, 246)",
+                                  backgroundColor:
+                                    "color-mix(in srgb, var(--status-info) 20%, transparent)",
+                                  color: "var(--status-info)",
                                 }}
                               >
                                 Admin

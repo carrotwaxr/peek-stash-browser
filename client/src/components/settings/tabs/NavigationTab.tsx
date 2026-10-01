@@ -7,7 +7,7 @@ import {
 import { migrateCarouselPreferences } from "../../../constants/carousels";
 import { migrateNavPreferences } from "../../../constants/navigation";
 import { showError, showSuccess } from "../../../utils/toast";
-import { ErrorMessage } from "../../ui/index";
+import { StatusMessage } from "../../ui/index";
 import CarouselSettings from "../CarouselSettings";
 import LandingPageSettings from "../LandingPageSettings";
 import NavigationSettings from "../NavigationSettings";
@@ -103,9 +103,10 @@ const NavigationTab = () => {
 
   if (error) {
     return (
-      <ErrorMessage
+      <StatusMessage
+        variant="error"
         title="Failed to load navigation settings"
-        error={getErrorMessage(error)}
+        message={getErrorMessage(error)}
         onRetry={() => void refetch()}
       />
     );

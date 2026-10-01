@@ -10,7 +10,7 @@ import {
   forgotPasswordReset,
   getErrorMessage,
 } from "../../api";
-import { Button } from "../ui/index";
+import { Button, StatusMessage } from "../ui/index";
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
@@ -133,15 +133,12 @@ const ForgotPasswordPage = () => {
         </h1>
 
         {error && (
-          <div
-            className="p-3 rounded-lg mb-4 text-sm"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
-            {error}
-          </div>
+          <StatusMessage
+            variant="error"
+            title={null}
+            className="mb-4 text-sm"
+            message={error}
+          />
         )}
 
         {step === 1 ? (

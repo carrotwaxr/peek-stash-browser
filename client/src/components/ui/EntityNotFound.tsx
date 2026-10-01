@@ -6,7 +6,7 @@ import type { EntityMatch } from "../../api/lookupFailure";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { getEntityPath } from "../../utils/entityLinks";
 import Button from "./Button";
-import ErrorMessage from "./ErrorMessage";
+import StatusMessage from "./StatusMessage";
 
 /** The entity types with a detail page */
 export type DetailEntityType =
@@ -183,9 +183,10 @@ const EntityNotFound = ({
         )}
 
         {status === "error" && (
-          <ErrorMessage
+          <StatusMessage
+            variant="error"
             className="w-full max-w-xl text-left"
-            error={getErrorMessage(error)}
+            message={getErrorMessage(error)}
             onRetry={onRetry}
           />
         )}

@@ -16,7 +16,7 @@ import { getErrorMessage } from "../../api";
 import { useCarousels, useDeleteCarousel } from "../../api/hooks/useCarousels";
 import { showError } from "../../utils/toast";
 import { getCarouselIcon } from "../carousel-builder/carouselIcons";
-import { Button, ErrorMessage } from "../ui/index";
+import { Button, StatusMessage } from "../ui/index";
 
 /**
  * Carousel metadata mapping fetchKey to display information
@@ -292,9 +292,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
         >
           Homepage Carousels
         </h3>
-        <ErrorMessage
+        <StatusMessage
+          variant="error"
           title="Failed to load your custom carousels"
-          error={loadError}
+          message={loadError}
           onRetry={() => void carouselsQuery.refetch()}
         />
       </div>

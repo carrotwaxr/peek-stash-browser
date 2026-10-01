@@ -5,7 +5,7 @@ import {
   useUserSettings,
 } from "../../../api/hooks/useUserSettings";
 import { showError, showSuccess } from "../../../utils/toast";
-import { Button, ErrorMessage } from "../../ui/index";
+import { Button, StatusMessage } from "../../ui/index";
 
 /** The form, mounted once the stored value is known */
 const PlaybackForm = ({ storedPercent }: { storedPercent: number }) => {
@@ -102,9 +102,10 @@ const PlaybackTab = () => {
 
   if (error) {
     return (
-      <ErrorMessage
+      <StatusMessage
+        variant="error"
         title="Failed to load playback settings"
-        error={getErrorMessage(error)}
+        message={getErrorMessage(error)}
         onRetry={() => void refetch()}
       />
     );

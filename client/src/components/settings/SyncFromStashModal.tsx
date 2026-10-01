@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../../api";
 import { invalidateLibraryQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
-import { Button, Modal } from "../ui/index";
+import { Button, Modal, StatusMessage } from "../ui/index";
 
 interface UserData {
   id: number;
@@ -108,14 +108,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
         </p>
 
         {/* Info Message */}
-        <div
-          className="p-4 rounded-lg text-sm"
-          style={{
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
-            border: "1px solid rgba(59, 130, 246, 0.3)",
-            color: "var(--text-secondary)",
-          }}
-        >
+        <StatusMessage variant="info" title={null} className="text-sm">
           <p className="mb-2">
             Select which data to import from Stash. Only fields that exist in
             Stash are shown.
@@ -142,7 +135,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
             </li>
             <li>May take several minutes for large libraries</li>
           </ul>
-        </div>
+        </StatusMessage>
 
         {/* Sync Options */}
         {!syncing && !syncResult && (
@@ -267,15 +260,17 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
           <div
             className="p-6 rounded-lg text-center"
             style={{
-              backgroundColor: "rgba(59, 130, 246, 0.05)",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
+              backgroundColor:
+                "color-mix(in srgb, var(--status-info) 5%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--status-info) 20%, transparent)",
             }}
           >
             <div className="flex flex-col items-center gap-4">
               <div
                 className="animate-spin w-12 h-12 border-4 border-t-transparent rounded-full"
                 style={{
-                  borderColor: "rgba(59, 130, 246, 0.3)",
+                  borderColor: "var(--status-info-border)",
                   borderTopColor: "transparent",
                 }}
               ></div>
@@ -299,25 +294,16 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
 
         {/* Result: the counts of what imported, with a warning when a server failed */}
         {syncResult && !syncing && (
-          <div
-            className="p-4 rounded-lg"
-            style={{
-              backgroundColor: syncResult.success
-                ? "rgba(34, 197, 94, 0.1)"
-                : "rgba(234, 179, 8, 0.1)",
-              border: `1px solid ${
-                syncResult.success
-                  ? "rgba(34, 197, 94, 0.3)"
-                  : "rgba(234, 179, 8, 0.4)"
-              }`,
-            }}
+          <StatusMessage
+            variant={syncResult.success ? "success" : "warning"}
+            title={null}
           >
             <p
               className="font-medium mb-3"
               style={{
                 color: syncResult.success
-                  ? "rgb(34, 197, 94)"
-                  : "rgb(202, 138, 4)",
+                  ? "var(--status-success)"
+                  : "var(--status-warning)",
               }}
             >
               {syncResult.success
@@ -342,20 +328,17 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
               <SyncResultItem label="Groups" stats={syncResult.stats.groups} />
               <SyncResultItem label="Images" stats={syncResult.stats.images} />
             </div>
-          </div>
+          </StatusMessage>
         )}
 
         {/* Error State */}
         {syncError && (
-          <div
-            className="p-3 rounded-lg text-sm"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
-            {syncError}
-          </div>
+          <StatusMessage
+            variant="error"
+            title={null}
+            className="text-sm"
+            message={syncError}
+          />
         )}
 
         {/* Action Buttons */}

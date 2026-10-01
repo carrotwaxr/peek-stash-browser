@@ -16,6 +16,7 @@ import {
   Modal,
   PageLayout,
   Paper,
+  StatusMessage,
   TAB_COUNT_LOADING,
   TabNavigation,
 } from "../ui/index";
@@ -187,16 +188,12 @@ const Playlists = () => {
       {activeTab === "mine" ? (
         <>
           {error && (
-            <div
-              className="mb-6 p-4 rounded-lg"
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "rgb(239, 68, 68)",
-              }}
-            >
-              {error}
-            </div>
+            <StatusMessage
+              variant="error"
+              title={null}
+              className="mb-6"
+              message={error}
+            />
           )}
 
           {/* My Playlists Grid */}

@@ -136,8 +136,8 @@ const UserManagementSection = ({
           key="share"
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
           style={{
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
-            color: "rgb(59, 130, 246)",
+            backgroundColor: "var(--status-info-bg)",
+            color: "var(--status-info)",
           }}
         >
           <Share2 size={12} />
@@ -152,8 +152,8 @@ const UserManagementSection = ({
           key="download-files"
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
           style={{
-            backgroundColor: "rgba(34, 197, 94, 0.1)",
-            color: "rgb(34, 197, 94)",
+            backgroundColor: "var(--status-success-bg)",
+            color: "var(--status-success)",
           }}
         >
           <Download size={12} />
@@ -484,8 +484,8 @@ const UserManagementSection = ({
                           <span
                             className="text-xs px-2 py-0.5 rounded"
                             style={{
-                              backgroundColor: "rgba(59, 130, 246, 0.1)",
-                              color: "rgb(59, 130, 246)",
+                              backgroundColor: "var(--status-info-bg)",
+                              color: "var(--status-info)",
                             }}
                           >
                             You
@@ -540,8 +540,8 @@ const UserManagementSection = ({
                               key={group.id}
                               className="text-xs px-2 py-0.5 rounded"
                               style={{
-                                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                                color: "rgb(59, 130, 246)",
+                                backgroundColor: "var(--status-info-bg)",
+                                color: "var(--status-info)",
                               }}
                             >
                               {group.name}

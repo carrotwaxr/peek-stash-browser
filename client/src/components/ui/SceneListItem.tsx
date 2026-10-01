@@ -294,9 +294,9 @@ const SceneListItem = ({
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
                             style={{
-                              backgroundColor: "rgba(34, 197, 94, 0.1)",
-                              color: "rgb(34, 197, 94)",
-                              border: "1px solid rgba(34, 197, 94, 0.3)",
+                              backgroundColor: "var(--status-success-bg)",
+                              color: "var(--status-success)",
+                              border: "1px solid var(--status-success-border)",
                             }}
                             title="O clicked during this session"
                           >

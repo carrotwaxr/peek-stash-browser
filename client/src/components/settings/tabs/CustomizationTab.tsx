@@ -7,7 +7,7 @@ import {
 import { useUnitPreference } from "../../../contexts/UnitPreferenceContext";
 import { useSaveTableColumns } from "../../../hooks/useTableColumns";
 import { showError, showSuccess } from "../../../utils/toast";
-import { ErrorMessage } from "../../ui/index";
+import { StatusMessage } from "../../ui/index";
 import CardDisplaySettings from "../CardDisplaySettings";
 import TableColumnSettings from "../TableColumnSettings";
 
@@ -67,9 +67,10 @@ const CustomizationTab = () => {
 
   if (error) {
     return (
-      <ErrorMessage
+      <StatusMessage
+        variant="error"
         title="Failed to load customization settings"
-        error={getErrorMessage(error)}
+        message={getErrorMessage(error)}
         onRetry={() => void refetch()}
       />
     );
