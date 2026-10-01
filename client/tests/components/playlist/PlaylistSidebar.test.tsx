@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -42,21 +43,25 @@ vi.mock("@/contexts/ConfigContext", () => ({
 }));
 
 /** The sidebar inside the player, on a queue of these scenes */
-function renderSidebar(titles: string[], currentIndex: number) {
+function renderSidebar(
+  titles: string[],
+  currentIndex: number,
+  instances: string[] = []
+) {
   const queue = buildPlaybackQueue({
     userId: 1,
     id: "virtual-grid",
     name: "Scene Grid",
     scenes: untrusted<NormalizedScene[]>(
       titles.map((title, i) => ({
-        id: String(i + 1),
-        instanceId: "inst-a",
+        id: instances.length > 0 ? "7" : String(i + 1),
+        instanceId: instances[i] ?? "inst-a",
         title,
       }))
     ),
     currentIndex,
   });
-  const sceneId = String(currentIndex + 1);
+  const sceneId = instances.length > 0 ? "7" : String(currentIndex + 1);
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <AuthContext.Provider
@@ -168,5 +173,19 @@ describe("PlaylistSidebar", () => {
     expect(
       within(upNext as HTMLElement).getByText("First")
     ).toBeInTheDocument();
+  });
+
+  it("two entries with the same scene id on two instances render with no duplicate-key warning", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderSidebar(["First", "Second"], 0, ["inst-a", "inst-b"]);
+    await act(async () => {});
+
+    expect(screen.getAllByText("Second").length).toBeGreaterThan(0);
+    const keyWarnings = warn.mock.calls.filter((call) =>
+      call.some((arg) => typeof arg === "string" && arg.includes("key"))
+    );
+    expect(keyWarnings).toEqual([]);
+    warn.mockRestore();
   });
 });
