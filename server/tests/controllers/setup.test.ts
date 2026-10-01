@@ -16,6 +16,7 @@ import {
   getAllStashInstances,
   getSetupStatus,
   getStashInstance,
+  testSavedStashInstance,
   testStashConnection,
   updateStashInstance,
 } from "../../controllers/setup.js";
@@ -600,6 +601,130 @@ describe("Setup Controller", () => {
     });
   });
 
+  describe("testSavedStashInstance", () => {
+    const stored = () =>
+      partialRow<StashInstance>({
+        id: "inst-a",
+        url: "http://stash:9999/graphql",
+        apiKey: "stored-key",
+      });
+
+    it("test-connection by id with no body tests the stored url and key", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(stored());
+      const { StashClient } = await import("../../graphql/StashClient.js");
+
+      const res = resFor(testSavedStashInstance);
+      await testSavedStashInstance(
+        reqFor(testSavedStashInstance, {
+          body: {},
+          params: { id: "inst-a" },
+          user: testUser({ role: "ADMIN" }),
+        }),
+        res
+      );
+
+      expect(StashClient).toHaveBeenCalledWith({
+        url: "http://stash:9999/graphql",
+        apiKey: "stored-key",
+      });
+      expect(res._getOkBody()).toEqual({
+        success: true,
+        message: "Connection successful",
+        version: "0.27.0",
+      });
+      expect(JSON.stringify(res._getBody())).not.toContain("stored-key");
+    });
+
+    it("with a new url only, it uses the new url and the stored key", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(stored());
+      const { StashClient } = await import("../../graphql/StashClient.js");
+
+      const res = resFor(testSavedStashInstance);
+      await testSavedStashInstance(
+        reqFor(testSavedStashInstance, {
+          body: { url: "http://other:9999/graphql" },
+          params: { id: "inst-a" },
+          user: testUser({ role: "ADMIN" }),
+        }),
+        res
+      );
+
+      expect(StashClient).toHaveBeenCalledWith({
+        url: "http://other:9999/graphql",
+        apiKey: "stored-key",
+      });
+      expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("unknown id answers 404", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(null);
+      const { StashClient } = await import("../../graphql/StashClient.js");
+
+      const res = resFor(testSavedStashInstance);
+      await testSavedStashInstance(
+        reqFor(testSavedStashInstance, {
+          body: {},
+          params: { id: "nope" },
+          user: testUser({ role: "ADMIN" }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(StashClient).not.toHaveBeenCalled();
+    });
+
+    it("an invalid new url answers 400 without a connection attempt", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(stored());
+      const { StashClient } = await import("../../graphql/StashClient.js");
+
+      const res = resFor(testSavedStashInstance);
+      await testSavedStashInstance(
+        reqFor(testSavedStashInstance, {
+          body: { url: "not-a-url" },
+          params: { id: "inst-a" },
+          user: testUser({ role: "ADMIN" }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toContain("Invalid URL");
+      expect(StashClient).not.toHaveBeenCalled();
+    });
+
+    it("a failure answers 400 with the friendly message and details, never the key", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(stored());
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(new Error("Stash answered HTTP 401")),
+          version: vi.fn(),
+        })
+      );
+
+      const res = resFor(testSavedStashInstance);
+      await testSavedStashInstance(
+        reqFor(testSavedStashInstance, {
+          body: {},
+          params: { id: "inst-a" },
+          user: testUser({ role: "ADMIN" }),
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getBody()).toEqual({
+        success: false,
+        error: "Authentication failed. Check your API key.",
+        details: "Stash answered HTTP 401",
+      });
+      expect(JSON.stringify(res._getBody())).not.toContain("stored-key");
+    });
+  });
+
   describe("createFirstStashInstance", () => {
     it("creates instance when none exist", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
@@ -1107,12 +1232,124 @@ describe("Setup Controller", () => {
         )
       ).rejects.toMatchObject({
         statusCode: 400,
-        message: "Could not connect to Stash server with new credentials",
+        message: "Could not connect to Stash with the new API key",
         details: "Stash answered HTTP 401",
       });
 
       expect(res.json).not.toHaveBeenCalled();
       expect(mockPrisma.stashInstance.update).not.toHaveBeenCalled();
+    });
+
+    it("updateStashInstance with the same url and no apiKey does not test the connection", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          ...instanceDates,
+          id: "inst-a",
+          name: "Renamed",
+          enabled: true,
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      const connects = vi.mocked(StashClient).getMockImplementation();
+      vi.mocked(StashClient).mockImplementation(() => {
+        throw new Error("Stash is down: no connection may be attempted");
+      });
+
+      const res = resFor(updateStashInstance);
+      try {
+        await updateStashInstance(
+          reqFor(updateStashInstance, {
+            body: { name: "Renamed", url: "http://stash:9999/graphql" },
+            params: { id: "inst-a" },
+          }),
+          res
+        );
+      } finally {
+        if (connects) vi.mocked(StashClient).mockImplementation(connects);
+      }
+
+      expect(StashClient).not.toHaveBeenCalled();
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().sync).toBe("none");
+    });
+
+    it("with a changed url it tests and, on failure, answers 400 'Could not connect to Stash at the new address' with details", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+          version: vi.fn(),
+        })
+      );
+
+      await expect(
+        updateStashInstance(
+          reqFor(updateStashInstance, {
+            body: { url: "http://moved:9999/graphql" },
+            params: { id: "inst-a" },
+          }),
+          resFor(updateStashInstance)
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: "Could not connect to Stash at the new address",
+        details: "ECONNREFUSED",
+      });
+
+      expect(StashClient).toHaveBeenCalledWith({
+        url: "http://moved:9999/graphql",
+        apiKey: "old-key",
+      });
+      expect(mockPrisma.stashInstance.update).not.toHaveBeenCalled();
+    });
+
+    it("with a changed key only, the message names the API key", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(new Error("Stash answered HTTP 401")),
+          version: vi.fn(),
+        })
+      );
+
+      await expect(
+        updateStashInstance(
+          reqFor(updateStashInstance, {
+            body: { url: "http://stash:9999/graphql", apiKey: "new-key" },
+            params: { id: "inst-a" },
+          }),
+          resFor(updateStashInstance)
+        )
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining("API key") as string,
+      });
     });
 
     it("re-pointing an instance during a sync answers sync: queued", async () => {

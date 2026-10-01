@@ -65,6 +65,25 @@ export interface TestStashConnectionResponse {
   message?: string;
   error?: string;
   version?: string;
+  /** Stash's own error text; only the admin-only test of a saved instance sends it */
+  details?: string;
+}
+
+/**
+ * POST /api/setup/stash-instance/:id/test-connection (admin only)
+ *
+ * Tests a saved instance with its stored API key, which never leaves the
+ * server. A `url` tests that address with the stored key; an `apiKey` tests
+ * a new key (a replacement the admin has typed) against the stored or new
+ * address. The answer is `TestStashConnectionResponse`.
+ */
+export interface TestSavedStashInstanceParams extends Record<string, string> {
+  id: string;
+}
+
+export interface TestSavedStashInstanceRequest {
+  url?: string;
+  apiKey?: string;
 }
 
 // =============================================================================

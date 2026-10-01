@@ -167,6 +167,8 @@ export type {
   UpdateStashInstanceResponse,
   DeleteStashInstanceParams,
   DeleteStashInstanceResponse,
+  TestSavedStashInstanceParams,
+  TestSavedStashInstanceRequest,
   // User instance selection
   GetUserStashInstancesResponse,
   UpdateUserStashInstancesRequest,

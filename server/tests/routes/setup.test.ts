@@ -37,6 +37,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     stashInstance: {
       count: vi.fn(),
       create: vi.fn(),
+      findUnique: vi.fn(),
     },
   },
 }));
@@ -239,6 +240,30 @@ describe("setup routes", () => {
     expect(test.status).toBe(401);
     expect(create.status).toBe(401);
     expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
+  });
+
+  it("test-connection by id needs an admin session", async () => {
+    mockPrisma.user.count.mockResolvedValue(1);
+    mockPrisma.stashInstance.findUnique.mockResolvedValue(
+      partialRow({ id: "inst-a", url: STASH_BODY.url, apiKey: "stored-key" })
+    );
+
+    const anonymous = await post("/stash-instance/inst-a/test-connection", {});
+    const asUser = await post(
+      "/stash-instance/inst-a/test-connection",
+      {},
+      sessionFor(USER)
+    );
+    const asAdmin = await post(
+      "/stash-instance/inst-a/test-connection",
+      {},
+      sessionFor(ADMIN)
+    );
+
+    expect(anonymous.status).toBe(401);
+    expect(asUser.status).toBe(403);
+    expect(asAdmin.status).toBe(200);
+    expect(JSON.stringify(await asAdmin.json())).not.toContain("stored-key");
   });
 
   it("a USER session gets 403 from both Stash setup routes", async () => {

@@ -8,6 +8,7 @@ import {
   getAllStashInstances,
   getSetupStatus,
   getStashInstance,
+  testSavedStashInstance,
   testStashConnection,
   updateStashInstance,
 } from "../controllers/setup.js";
@@ -50,6 +51,13 @@ router.put(
   authenticate,
   requireAdmin,
   updateStashInstance
+);
+// Tests a saved instance with its stored key; the key never leaves the server
+router.post(
+  "/stash-instance/:id/test-connection",
+  authenticate,
+  requireAdmin,
+  testSavedStashInstance
 );
 router.delete(
   "/stash-instance/:id",
