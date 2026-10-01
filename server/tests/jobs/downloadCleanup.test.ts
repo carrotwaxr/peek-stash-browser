@@ -137,6 +137,38 @@ describe("download cleanup", () => {
       expect(fs.existsSync(building)).toBe(true);
     });
 
+    it("a zip whose build completes after the rows were read is kept", async () => {
+      const file = writeZip(1, 8);
+      mockPrisma.user.findMany.mockResolvedValue([partialRow({ id: 1 })]);
+      // The build is running while the sweep reads the COMPLETED rows (so
+      // 8 is not among them), then marks its row COMPLETED and leaves the
+      // queue before the sweep reaches the file
+      let building = true;
+      mockQueue.isActive.mockImplementation((id) => id === 8 && building);
+      mockPrisma.download.findMany.mockImplementation(() => {
+        building = false;
+        return Promise.resolve([]) as never;
+      });
+      mockPrisma.download.findFirst.mockImplementation(
+        (args) =>
+          Promise.resolve(
+            args?.where?.id === 8
+              ? downloadRow({
+                  id: 8,
+                  userId: 1,
+                  type: "PLAYLIST",
+                  status: "COMPLETED",
+                  filePath: file,
+                })
+              : null
+          ) as never
+      );
+
+      await sweepOrphanedDownloadFiles();
+
+      expect(fs.existsSync(file)).toBe(true);
+    });
+
     it("the current zip of a completed row is kept", async () => {
       const file = writeZip(2, 9);
       mockPrisma.user.findMany.mockResolvedValue([partialRow({ id: 2 })]);
