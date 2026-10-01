@@ -71,6 +71,11 @@ export interface ListPageData {
   request: ListRequest;
   /** The list request's error, if it failed */
   error: unknown;
+  /**
+   * The rows are not this request's answer yet: it is pending, the library
+   * is on its first sync, or the previous request's rows stand in for it
+   */
+  loading: boolean;
   /** The heading over the list ("" for none) */
   title: string;
   /** Where a card's page says the user came from */
@@ -81,8 +86,13 @@ export interface ListPageData {
 export interface ListPageExtras {
   /** Stable across renders while their inputs are */
   cardHandlers?: CardHandlers;
-  /** Rendered below the list (the Images lightbox) */
+  /** Rendered below the list (the Images lightbox), at one tree position */
   after?: ReactNode;
+  /**
+   * The page's own part covers the list (the open lightbox): a failed page
+   * shows the list, not the error page, and the part reports the failure
+   */
+  holdsPage?: boolean;
 }
 
 export interface ViewContext {

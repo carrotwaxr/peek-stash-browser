@@ -14,7 +14,8 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  * state and deleted afterwards. The user's view history is deleted with it,
  * so the O press and the recorded view leave the database as it was. The
  * replay library's galleries have images; a dev-stack library without a
- * gallery skips (requireData).
+ * gallery skips (requireData). An Images page address naming an image not
+ * on its page drops the name and says so.
  */
 
 test.describe("Gallery lightbox", () => {
@@ -277,5 +278,25 @@ test.describe("Gallery lightbox", () => {
     } finally {
       await context.close();
     }
+  });
+
+  test("a link to an image not on the Images page opens the list and says so", async ({
+    page,
+  }) => {
+    // The viewer never opens, so nothing is recorded: the run admin will do
+    const list = new ListPage(page);
+    await list.goto("/images?image=no-such-image%3Ano-such-instance");
+    const images = await list.waitForResults("Image");
+    requireData(images > 0, "an image");
+
+    await expect(
+      page.getByText("That image isn't on this page of the list.")
+    ).toBeVisible();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("image"))
+      .toBeNull();
+    await expect(
+      page.getByRole("dialog", { name: "Image viewer" })
+    ).toBeHidden();
   });
 });

@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
 import { makeCompositeKey } from "../utils/compositeKey";
-import { showError } from "../utils/toast";
+import { showError, showInfo } from "../utils/toast";
 
 // Number of images to prefetch ahead and behind current position
 export const PREFETCH_COUNT = 3;
@@ -51,7 +51,8 @@ interface PaginatedLightboxOptions<TImage> {
   images?: readonly KeyedImage[];
   /**
    * False until the page's images are loaded (a detail page waits for its
-   * entity too): an `image` param from the address opens nothing before
+   * entity too): an `image` param from the address opens nothing before,
+   * and once ready one not among the images is dropped with a note
    */
   ready?: boolean;
 }
@@ -65,8 +66,9 @@ interface PaginatedLightboxOptions<TImage> {
  * from an address (a reload, a link) closes by removing the param with a
  * replace. Either way, and on Back, the list then shows the page of the last
  * image. An address with the param opens the lightbox on that image once its
- * page is in. A crossing whose page fails to load (`failPendingPage`) returns
- * to the image it left and says why.
+ * page is in, or, when the image is not on that page, drops the param (a
+ * replace) and says so. A crossing whose page fails to load
+ * (`failPendingPage`) returns to the image it left and says why.
  */
 export function usePaginatedLightbox<TImage = unknown>({
   perPage = 100,
@@ -231,8 +233,14 @@ export function usePaginatedLightbox<TImage = unknown>({
     const key = resolveRef.current;
     if (key === null || !ready) return;
     const index = images.findIndex((image) => imageKey(image) === key);
-    if (index < 0) return;
     resolveRef.current = null;
+    if (index < 0) {
+      // The page is in and the image is not on it (gone, hidden, or moved
+      // by a change to the list): the list stays, without the param
+      writeImage(null, "replace");
+      showInfo("That image isn't on this page of the list.");
+      return;
+    }
     openedByPushRef.current = false;
     viewerPageRef.current = currentPage;
     setLightboxIndex(index);
@@ -246,6 +254,7 @@ export function usePaginatedLightbox<TImage = unknown>({
     ready,
     currentPage,
     changePage,
+    writeImage,
   ]);
 
   // After a boundary crossing, name the new page's image once it is in
