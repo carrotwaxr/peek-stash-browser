@@ -294,6 +294,67 @@ describe("Playlist Controller Operations", () => {
       }
     );
 
+    it.each([
+      ["an empty name", { name: "" }, "Playlist name is required"],
+      ["a blank name", { name: "   " }, "Playlist name is required"],
+      ["a null name", { name: null }, "Playlist name is required"],
+      ["a numeric name", { name: 5 }, "Playlist name is required"],
+      [
+        "an unknown repeat",
+        { repeat: "forever" },
+        "repeat must be one of none, all, one",
+      ],
+      [
+        "a numeric repeat",
+        { repeat: 1 },
+        "repeat must be one of none, all, one",
+      ],
+    ])("answers 400 for %s and writes nothing", async (_case, body, error) => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 1, userId: 1 })
+      );
+
+      const req = reqFor(updatePlaylist, {
+        body: malformed(body),
+        params: { id: "1" },
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+      const res = resFor(updatePlaylist);
+
+      await updatePlaylist(req, res);
+
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody()).toEqual({ error });
+      expect(mockPrisma.playlist.update).not.toHaveBeenCalled();
+    });
+
+    it.each(["none", "all", "one"])(
+      "stores repeat %s and a trimmed name",
+      async (repeat) => {
+        mockPrisma.playlist.findFirst.mockResolvedValue(
+          partialRow({ id: 1, userId: 1 })
+        );
+        mockPrisma.playlist.update.mockResolvedValue(
+          partialRow<PlaylistWithItemCount>({ id: 1, _count: { items: 0 } })
+        );
+
+        const req = reqFor(updatePlaylist, {
+          body: { name: "  Road trip  ", repeat },
+          params: { id: "1" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        });
+        await updatePlaylist(req, resFor(updatePlaylist));
+
+        expect(mockPrisma.playlist.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: objectContaining({ name: "Road trip", repeat }),
+          })
+        );
+      }
+    );
+
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
