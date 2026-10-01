@@ -12,53 +12,20 @@ import type { Prisma } from "@prisma/client";
 import { ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
- * Merge two JSON arrays (for oHistory and playHistory).
- * Deduplicates by stringified value and sorts. Returns the array itself, for
- * the Json column; either input may be a JSON-encoded string.
+ * Union of two history columns (oHistory, playHistory): timestamps read
+ * through readHistory, de-duplicated and sorted. Every timestamp is kept,
+ * since the counts are summed, so no near-duplicate window applies.
  */
-function mergeJsonArrays(arr1: unknown, arr2: unknown): Prisma.InputJsonValue {
-  const list1 = parseJsonArray(arr1);
-  const list2 = parseJsonArray(arr2);
-  const merged = [...list1, ...list2];
-  // Deduplicate by stringified value
-  const seen = new Set<string>();
-  const deduped = merged.filter((item) => {
-    const key = JSON.stringify(item);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  // Sort by timestamp/startTime if present
-  deduped.sort((a, b) => {
-    const aRec =
-      typeof a === "string" ? null : (a as Record<string, string | undefined>);
-    const bRec =
-      typeof b === "string" ? null : (b as Record<string, string | undefined>);
-    const aTime =
-      typeof a === "string" ? a : (aRec?.startTime ?? aRec?.time ?? "");
-    const bTime =
-      typeof b === "string" ? b : (bRec?.startTime ?? bRec?.time ?? "");
-    return aTime.localeCompare(bTime);
-  });
-  return deduped as Prisma.InputJsonValue;
-}
-
-function parseJsonArray(value: unknown): unknown[] {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    try {
-      const parsed: unknown = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as unknown[]) : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
+function unionHistory(
+  a: Prisma.JsonValue | null,
+  b: Prisma.JsonValue | null
+): string[] {
+  return [...new Set([...readHistory(a), ...readHistory(b)])].sort();
 }
 
 function laterDate(d1: Date | null, d2: Date | null): Date | null {
@@ -315,11 +282,11 @@ class MergeReconciliationService {
                 playDuration:
                   targetHistory.playDuration + sourceHistory.playDuration,
                 oCount: targetHistory.oCount + sourceHistory.oCount,
-                oHistory: mergeJsonArrays(
+                oHistory: unionHistory(
                   targetHistory.oHistory,
                   sourceHistory.oHistory
                 ),
-                playHistory: mergeJsonArrays(
+                playHistory: unionHistory(
                   targetHistory.playHistory,
                   sourceHistory.playHistory
                 ),
@@ -343,12 +310,8 @@ class MergeReconciliationService {
                 resumeTime: sourceHistory.resumeTime,
                 lastPlayedAt: sourceHistory.lastPlayedAt,
                 oCount: sourceHistory.oCount,
-                oHistory: parseJsonArray(
-                  sourceHistory.oHistory
-                ) as Prisma.InputJsonValue,
-                playHistory: parseJsonArray(
-                  sourceHistory.playHistory
-                ) as Prisma.InputJsonValue,
+                oHistory: readHistory(sourceHistory.oHistory),
+                playHistory: readHistory(sourceHistory.playHistory),
               },
             });
           }

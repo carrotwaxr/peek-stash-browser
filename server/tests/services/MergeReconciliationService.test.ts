@@ -358,6 +358,100 @@ describe("MergeReconciliationService", () => {
       expect(outside).toBe(0);
     });
 
+    it("merging histories with a 1.0 play-session object stores its start time as a string, sorted and de-duplicated", async () => {
+      const findUnique = vi.mocked(prisma.watchHistory.findUnique);
+      const update = vi.mocked(prisma.watchHistory.update);
+      findUnique
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "source",
+            playCount: 2,
+            playDuration: 100,
+            oCount: 2,
+            oHistory: ["2025-01-02T00:00:00.000Z", "2025-01-01T00:00:00.000Z"],
+            playHistory: [
+              { startTime: "2025-01-05T00:00:00.000Z", duration: 30 },
+              "2025-01-03T00:00:00.000Z",
+            ],
+            resumeTime: 10,
+            lastPlayedAt: new Date("2025-01-05"),
+          })
+        )
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "target",
+            playCount: 1,
+            playDuration: 50,
+            oCount: 1,
+            oHistory: ["2025-01-02T00:00:00.000Z"],
+            playHistory: ["2025-01-03T00:00:00.000Z"],
+            resumeTime: 20,
+            lastPlayedAt: new Date("2025-01-03"),
+          })
+        );
+      update.mockResolvedValue(partialRow({}));
+
+      await mergeReconciliationService.transferUserData(
+        source,
+        target,
+        1,
+        null,
+        null
+      );
+
+      expect(update).toHaveBeenCalledWith(
+        objectContaining({
+          data: objectContaining({
+            playCount: 3,
+            oCount: 3,
+            oHistory: ["2025-01-01T00:00:00.000Z", "2025-01-02T00:00:00.000Z"],
+            playHistory: [
+              "2025-01-03T00:00:00.000Z",
+              "2025-01-05T00:00:00.000Z",
+            ],
+          }),
+        })
+      );
+    });
+
+    // Guard: passes before and after the change (the old parser decoded strings)
+    it("a double-encoded source history lands as an array", async () => {
+      const create = vi.mocked(prisma.watchHistory.create);
+      mockPrisma.watchHistory.findUnique.mockResolvedValueOnce(
+        partialRow({
+          userId: 1,
+          sceneId: "source",
+          playCount: 1,
+          playDuration: 100,
+          oCount: 1,
+          oHistory: '["2025-01-01T00:00:00.000Z"]',
+          playHistory: '["2025-01-03T00:00:00.000Z"]',
+          resumeTime: 10,
+          lastPlayedAt: new Date("2025-01-03"),
+        })
+      );
+      create.mockResolvedValue(partialRow({}));
+
+      await mergeReconciliationService.transferUserData(
+        source,
+        target,
+        1,
+        null,
+        null
+      );
+
+      expect(create).toHaveBeenCalledWith(
+        objectContaining({
+          data: objectContaining({
+            oHistory: ["2025-01-01T00:00:00.000Z"],
+            playHistory: ["2025-01-03T00:00:00.000Z"],
+          }),
+        })
+      );
+    });
+
     it("keeps the target's rating and ORs the favorites", async () => {
       mockPrisma.sceneRating.findUnique
         .mockResolvedValueOnce(
