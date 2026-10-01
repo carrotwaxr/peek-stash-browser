@@ -2,6 +2,12 @@ import type { Response } from "express";
 import { Readable, Transform } from "stream";
 import { pipeline } from "stream/promises";
 import type { ReadableStream as WebReadableStream } from "stream/web";
+import {
+  AppError,
+  BadGatewayError,
+  GatewayTimeoutError,
+  NotFoundError,
+} from "../middleware/errorHandler.js";
 import { logger } from "./logger.js";
 
 /** Stash did not answer, or went quiet, within the limit. */
@@ -10,6 +16,41 @@ export class StashTimeoutError extends Error {
     super(message);
     this.name = "StashTimeoutError";
   }
+}
+
+const STASH_MEDIA_FAILED = "Stash could not serve this media";
+
+/**
+ * What Stash's status means for a media answer: null to pass it on (any 2xx,
+ * and 206, 304 and 416, which Range and validators need), a NotFoundError for
+ * 404, and a BadGatewayError for everything else (Stash's own 401, 403 and
+ * 5xx say nothing the browser may act on, and are not the user's to see).
+ */
+export function stashFailure(status: number): AppError | null {
+  if (status >= 200 && status < 300) return null;
+  if (status === 304 || status === 416) return null;
+  if (status === 404) return new NotFoundError();
+  return new BadGatewayError(STASH_MEDIA_FAILED);
+}
+
+/**
+ * The error a failed Stash fetch or read answers with, to be thrown to the
+ * central handler; null when the client's own close caused it, which is
+ * routine (a seek, a refresh). A StashTimeoutError is 504, an AppError stands
+ * and anything else is 502.
+ */
+export function stashFetchError(err: unknown, res: Response): AppError | null {
+  if (err instanceof StashTimeoutError) {
+    return new GatewayTimeoutError("Stash did not answer");
+  }
+  if (err instanceof AppError) return err;
+  const clientLeft =
+    res.destroyed || (err instanceof Error && err.name === "AbortError");
+  if (clientLeft) {
+    logger.debug("Client closed before Stash answered");
+    return null;
+  }
+  return new BadGatewayError(STASH_MEDIA_FAILED);
 }
 
 export interface StashFetchOptions {

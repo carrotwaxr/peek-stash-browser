@@ -3,6 +3,11 @@ import http from "http";
 import https from "https";
 import { pipeline } from "stream";
 import { URL } from "url";
+import {
+  BadGatewayError,
+  GatewayTimeoutError,
+  sendAppError,
+} from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import {
@@ -24,6 +29,7 @@ import {
   SCENE_ID_PATTERN,
   parseStashMediaPath,
 } from "../utils/stashMediaPath.js";
+import { stashFailure } from "../utils/streamProxy.js";
 
 // =============================================================================
 // Connection Pooling
@@ -192,6 +198,19 @@ function proxyHttpRequest({
 
   const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
     upstreamRes = proxyRes;
+
+    // Stash's own 401, 403 and 5xx are 502 here and its 404 is 404 (206, 304
+    // and 416 pass): answer in the central shape, and drain Stash's body so
+    // its socket and our slot are free at once
+    const failure = stashFailure(proxyRes.statusCode ?? 200);
+    if (failure) {
+      logger.warn(`${label} Stash answered ${proxyRes.statusCode}`);
+      proxyRes.resume();
+      releaseOnce();
+      sendAppError(res, failure);
+      return;
+    }
+
     // Forward response headers
     if (proxyRes.headers["content-type"]) {
       res.setHeader("Content-Type", proxyRes.headers["content-type"]);
@@ -265,9 +284,7 @@ function proxyHttpRequest({
       return;
     }
     logger.error(`${label} Error`, { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Proxy request failed" });
-    }
+    sendAppError(res, new BadGatewayError("Stash could not serve this media"));
   });
 
   // Stash sent nothing for `timeoutMs`: before its response, answer 504;
@@ -283,9 +300,7 @@ function proxyHttpRequest({
       res.destroy();
       return;
     }
-    if (!res.headersSent) {
-      res.status(504).json({ error: "Proxy request timeout" });
-    }
+    sendAppError(res, new GatewayTimeoutError("Stash did not answer"));
   });
 }
 
@@ -347,11 +362,9 @@ export const proxyScenePreview = async (
       timeoutMs: 60000,
     });
   } catch (error) {
+    // The central error handler answers; the slot is not left held
     releaseConcurrencySlot();
-    logger.error("Error proxying scene preview", { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    throw error;
   }
 };
 
@@ -409,11 +422,9 @@ export const proxySceneWebp = async (
       timeoutMs: 60000,
     });
   } catch (error) {
+    // The central error handler answers; the slot is not left held
     releaseConcurrencySlot();
-    logger.error("Error proxying scene webp", { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    throw error;
   }
 };
 
@@ -492,11 +503,9 @@ export const proxyStashMedia = async (
       timeoutMs: 30000,
     });
   } catch (error) {
+    // The central error handler answers; the slot is not left held
     releaseConcurrencySlot();
-    logger.error("Error proxying Stash media", { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    throw error;
   }
 };
 
@@ -573,11 +582,9 @@ export const proxyClipPreview = async (
       timeoutMs: 30000,
     });
   } catch (error) {
+    // The central error handler answers; the slot is not left held
     releaseConcurrencySlot();
-    logger.error("Error proxying clip preview", { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    throw error;
   }
 };
 
@@ -684,10 +691,8 @@ export const proxyImage = async (
       timeoutMs: 30000,
     });
   } catch (error) {
+    // The central error handler answers; the slot is not left held
     releaseConcurrencySlot();
-    logger.error("Error proxying image", { error });
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    throw error;
   }
 };

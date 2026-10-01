@@ -9,6 +9,11 @@ import {
   getCaption,
   proxyStashStream,
 } from "../../controllers/video.js";
+import {
+  BadGatewayError,
+  GatewayTimeoutError,
+  NotFoundError,
+} from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -19,7 +24,10 @@ import {
   isStreamLinkSignatureValid,
 } from "../../utils/streamLink.js";
 import type * as streamProxyModule from "../../utils/streamProxy.js";
-import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import {
+  StashTimeoutError,
+  pipeResponseToClient,
+} from "../../utils/streamProxy.js";
 import {
   type MockRes,
   type ReqParts,
@@ -912,18 +920,66 @@ describe("Video Controller", () => {
         expect(global.fetch).not.toHaveBeenCalled();
       });
 
-      it("returns Stash error status when Stash returns non-ok", async () => {
-        const req = createMockReq();
-        const res = resFor(proxyStashStream);
+      it("Stash's 401, 403 and 500 answer 502 `{ error: \"Stash could not serve this media\" }`, never Stash's status", async () => {
+        for (const status of [401, 403, 500]) {
+          const res = resFor(proxyStashStream);
+          vi.mocked(global.fetch).mockResolvedValue(
+            new Response(null, { status })
+          );
 
+          const error = await proxyStashStream(createMockReq(), res).catch(
+            (e: unknown) => e
+          );
+
+          expect(error).toBeInstanceOf(BadGatewayError);
+          expect(error).toMatchObject({
+            statusCode: 502,
+            message: "Stash could not serve this media",
+          });
+          expect(res.status).not.toHaveBeenCalled();
+          expect(res.send).not.toHaveBeenCalled();
+        }
+      });
+
+      it('Stash\'s 404 answers 404 `{ error: "Not found" }`', async () => {
         vi.mocked(global.fetch).mockResolvedValue(
           new Response(null, { status: 404, statusText: "Not Found" })
         );
 
-        await proxyStashStream(req, res);
+        const error = await proxyStashStream(
+          createMockReq(),
+          resFor(proxyStashStream)
+        ).catch((e: unknown) => e);
 
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.send).toHaveBeenCalledWith("Stash stream error: Not Found");
+        expect(error).toBeInstanceOf(NotFoundError);
+        expect(error).toMatchObject({ statusCode: 404, message: "Not found" });
+      });
+
+      it("Stash's 416 passes through with its Content-Range", async () => {
+        const res = resFor(proxyStashStream);
+        vi.mocked(global.fetch).mockResolvedValue(
+          new Response(null, {
+            status: 416,
+            headers: { "content-range": "bytes */1000" },
+          })
+        );
+
+        await proxyStashStream(
+          createMockReq({
+            params: { sceneId: "123", streamPath: "stream.mp4" },
+            headers: { range: "bytes=5000-" },
+          }),
+          res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(416);
+        expect(mockPipeResponseToClient).toHaveBeenCalledWith(
+          expect.anything(),
+          res,
+          "[PROXY]",
+          expect.arrayContaining(["content-range"]),
+          expect.anything()
+        );
       });
 
       it("the stream proxy logs no query string", async () => {
@@ -943,37 +999,59 @@ describe("Video Controller", () => {
           new Response(null, { status: 404, statusText: "Not Found" })
         );
 
-        await proxyStashStream(req, res);
+        await expect(proxyStashStream(req, res)).rejects.toBeInstanceOf(
+          NotFoundError
+        );
 
-        expect(res.status).toHaveBeenCalledWith(404);
         expect(allLogged()).toContain("stream.mp4");
         expect(allLogged()).not.toContain("SECRETSIG");
       });
 
-      it("returns 500 and sends error when fetch throws (headers not sent)", async () => {
-        const req = createMockReq();
+      it("a fetch that fails to connect rejects with BadGatewayError", async () => {
         const res = resFor(proxyStashStream);
-
         vi.mocked(global.fetch).mockRejectedValue(new Error("Network failure"));
 
-        await proxyStashStream(req, res);
+        const error = await proxyStashStream(createMockReq(), res).catch(
+          (e: unknown) => e
+        );
 
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.send).toHaveBeenCalledWith("Stream proxy failed");
-      });
-
-      it("does not send error response when headers already sent", async () => {
-        const req = createMockReq();
-        const res = resFor(proxyStashStream);
-        res.headersSent = true;
-
-        vi.mocked(global.fetch).mockRejectedValue(new Error("Network failure"));
-
-        await proxyStashStream(req, res);
-
-        // status/send should NOT be called since headersSent is true
+        // The handler throws, so Express hands it to the central errorHandler
+        expect(error).toBeInstanceOf(BadGatewayError);
+        expect(error).toMatchObject({
+          statusCode: 502,
+          message: "Stash could not serve this media",
+        });
         expect(res.status).not.toHaveBeenCalled();
         expect(res.send).not.toHaveBeenCalled();
+      });
+
+      it("a StashTimeoutError before headers becomes GatewayTimeoutError", async () => {
+        vi.mocked(global.fetch).mockRejectedValue(new StashTimeoutError());
+
+        const error = await proxyStashStream(
+          createMockReq(),
+          resFor(proxyStashStream)
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(GatewayTimeoutError);
+        expect(error).toMatchObject({ statusCode: 504 });
+      });
+
+      it("a client that left (AbortError from its own close) is neither answered nor logged above debug", async () => {
+        const res = resFor(proxyStashStream);
+        res.destroyed = true;
+        vi.mocked(global.fetch).mockRejectedValue(
+          new DOMException("This operation was aborted", "AbortError")
+        );
+
+        await expect(
+          proxyStashStream(createMockReq(), res)
+        ).resolves.toBeUndefined();
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(res.send).not.toHaveBeenCalled();
+        expect(logger.warn).not.toHaveBeenCalled();
+        expect(logger.error).not.toHaveBeenCalled();
       });
     });
 
@@ -1299,13 +1377,13 @@ describe("Video Controller", () => {
         });
 
         const done = getCaption(req, res);
+        const failure = done.catch((e: unknown) => e);
         await vi.advanceTimersByTimeAsync(14_999);
         expect(signal?.aborted).toBe(false);
         await vi.advanceTimersByTimeAsync(1);
-        await done;
 
+        expect(await failure).toBeInstanceOf(GatewayTimeoutError);
         expect(signal?.aborted).toBe(true);
-        expect(res.status).toHaveBeenCalledWith(500);
         expect(res.send).not.toHaveBeenCalledWith("WEBVTT\n\n");
       } finally {
         vi.useRealTimers();
@@ -1406,10 +1484,25 @@ describe("Video Controller", () => {
         new Response(null, { status: 404 })
       );
 
-      await getCaption(req, res);
+      const error = await getCaption(req, res).catch((e: unknown) => e);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.send).toHaveBeenCalledWith("Caption not found");
+      expect(error).toBeInstanceOf(NotFoundError);
+      expect(error).toMatchObject({ message: "Caption not found" });
+    });
+
+    it("answers 502 when Stash fails on a caption", async () => {
+      const req = reqFor(getCaption, {
+        params: { sceneId: "123" },
+        query: { lang: "en", type: "srt", instanceId: "inst-a" },
+        user: USER,
+      });
+      vi.mocked(global.fetch).mockResolvedValue(
+        new Response(null, { status: 500 })
+      );
+
+      await expect(getCaption(req, resFor(getCaption))).rejects.toBeInstanceOf(
+        BadGatewayError
+      );
     });
 
     it("sends API key in ApiKey header, not in the URL", async () => {
