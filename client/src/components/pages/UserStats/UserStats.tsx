@@ -2,7 +2,7 @@
 import { type ReactNode, useState } from "react";
 import { BarChart3, Info, RefreshCw } from "lucide-react";
 import { usePageTitle } from "../../../hooks/usePageTitle";
-import { useUserStats } from "../../../hooks/useUserStats";
+import { type TopListSortBy, useUserStats } from "../../../hooks/useUserStats";
 import {
   LoadingSpinner,
   PageHeader,
@@ -15,22 +15,6 @@ import {
   LibraryOverview,
   TopList,
 } from "./components/index";
-
-type TopListSortBy = "engagement" | "oCount" | "playCount";
-
-/** Matches TopList's internal TopListItem interface for type-safe prop passing */
-interface TopListItem {
-  id: string;
-  instanceId: string;
-  name?: string;
-  title?: string;
-  filePath?: string;
-  imageUrl?: string;
-  playDuration: number;
-  playCount: number;
-  oCount: number;
-  score: number;
-}
 
 interface SectionInfoProps {
   children: ReactNode;
@@ -156,11 +140,11 @@ const UserStats = () => {
     );
   }
 
+  if (!data) return null;
+
   // Check if user has any engagement data
-  const engagement = data?.engagement as Record<string, unknown> | undefined;
   const hasEngagement =
-    (engagement?.totalPlayCount as number) > 0 ||
-    (engagement?.totalImagesViewed as number) > 0;
+    data.engagement.totalPlayCount > 0 || data.engagement.totalImagesViewed > 0;
 
   return (
     <PageLayout fullHeight>
@@ -195,19 +179,7 @@ const UserStats = () => {
               <LibraryInfoContent />
             </SectionInfo>
           </div>
-          <LibraryOverview
-            library={
-              data.library as {
-                sceneCount: number;
-                performerCount: number;
-                studioCount: number;
-                tagCount: number;
-                galleryCount: number;
-                imageCount: number;
-                clipCount: number;
-              }
-            }
-          />
+          <LibraryOverview library={data.library} />
         </section>
 
         {/* Engagement Stats */}
@@ -226,18 +198,8 @@ const UserStats = () => {
                 </SectionInfo>
               </div>
               <EngagementTotals
-                engagement={
-                  data.engagement as {
-                    totalWatchTime: number;
-                    totalPlayCount: number;
-                    totalOCount: number;
-                    uniqueScenesWatched: number;
-                    totalImagesViewed: number;
-                  }
-                }
-                librarySceneCount={
-                  (data.library as { sceneCount: number }).sceneCount
-                }
+                engagement={data.engagement}
+                librarySceneCount={data.library.sceneCount}
               />
             </section>
 
@@ -258,34 +220,34 @@ const UserStats = () => {
                 <TopList
                   key={`scenes-${sortBy}`}
                   title="Top Scenes"
-                  items={data.topScenes as TopListItem[]}
+                  items={data.topScenes}
                   entityType="scene"
                   sortBy={sortBy}
-                  onSortChange={setSortBy as (sortBy: string) => void}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   key={`performers-${sortBy}`}
                   title="Top Performers"
-                  items={data.topPerformers as TopListItem[]}
+                  items={data.topPerformers}
                   entityType="performer"
                   sortBy={sortBy}
-                  onSortChange={setSortBy as (sortBy: string) => void}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   key={`studios-${sortBy}`}
                   title="Top Studios"
-                  items={data.topStudios as TopListItem[]}
+                  items={data.topStudios}
                   entityType="studio"
                   sortBy={sortBy}
-                  onSortChange={setSortBy as (sortBy: string) => void}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   key={`tags-${sortBy}`}
                   title="Top Tags"
-                  items={data.topTags as TopListItem[]}
+                  items={data.topTags}
                   entityType="tag"
                   sortBy={sortBy}
-                  onSortChange={setSortBy as (sortBy: string) => void}
+                  onSortChange={setSortBy}
                 />
               </div>
             </section>
@@ -306,88 +268,31 @@ const UserStats = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <HighlightCard
                   title="Most Watched Scene"
-                  item={
-                    data.mostWatchedScene as {
-                      id: string;
-                      instanceId: string;
-                      name?: string;
-                      title?: string;
-                      filePath?: string;
-                      imageUrl?: string;
-                    } | null
-                  }
+                  item={data.mostWatchedScene}
                   entityType="scene"
                   statLabel="plays"
-                  statValue={
-                    ((
-                      data.mostWatchedScene as
-                        | Record<string, unknown>
-                        | undefined
-                    )?.playCount as number) || 0
-                  }
+                  statValue={data.mostWatchedScene?.playCount ?? 0}
                 />
                 <HighlightCard
                   title="Most Viewed Image"
-                  item={
-                    data.mostViewedImage as {
-                      id: string;
-                      instanceId: string;
-                      name?: string;
-                      title?: string;
-                      filePath?: string;
-                      imageUrl?: string;
-                    } | null
-                  }
+                  item={data.mostViewedImage}
                   entityType="image"
                   statLabel="views"
-                  statValue={
-                    ((
-                      data.mostViewedImage as
-                        | Record<string, unknown>
-                        | undefined
-                    )?.viewCount as number) || 0
-                  }
+                  statValue={data.mostViewedImage?.viewCount ?? 0}
                 />
                 <HighlightCard
                   title="Most O'd Scene"
-                  item={
-                    data.mostOdScene as {
-                      id: string;
-                      instanceId: string;
-                      name?: string;
-                      title?: string;
-                      filePath?: string;
-                      imageUrl?: string;
-                    } | null
-                  }
+                  item={data.mostOdScene}
                   entityType="scene"
                   statLabel="Os"
-                  statValue={
-                    ((data.mostOdScene as Record<string, unknown> | undefined)
-                      ?.oCount as number) || 0
-                  }
+                  statValue={data.mostOdScene?.oCount ?? 0}
                 />
                 <HighlightCard
                   title="Most O'd Performer"
-                  item={
-                    data.mostOdPerformer as {
-                      id: string;
-                      instanceId: string;
-                      name?: string;
-                      title?: string;
-                      filePath?: string;
-                      imageUrl?: string;
-                    } | null
-                  }
+                  item={data.mostOdPerformer}
                   entityType="performer"
                   statLabel="Os"
-                  statValue={
-                    ((
-                      data.mostOdPerformer as
-                        | Record<string, unknown>
-                        | undefined
-                    )?.oCount as number) || 0
-                  }
+                  statValue={data.mostOdPerformer?.oCount ?? 0}
                 />
               </div>
             </section>

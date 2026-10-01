@@ -1,6 +1,13 @@
 // client/src/components/pages/UserStats/components/TopList.tsx
 import { Link } from "react-router-dom";
+import type {
+  TopPerformer,
+  TopScene,
+  TopStudio,
+  TopTag,
+} from "@peek/shared-types";
 import { useConfig } from "../../../../contexts/ConfigContext";
+import type { TopListSortBy } from "../../../../hooks/useUserStats";
 import { makeCompositeKey } from "../../../../utils/compositeKey";
 import { getEntityPath } from "../../../../utils/entityLinks";
 import {
@@ -10,29 +17,15 @@ import {
 import { Paper } from "../../../ui/index";
 
 type EntityType = "performer" | "studio" | "tag" | "scene";
-type SortBy = "engagement" | "oCount" | "playCount";
-
-interface TopListItem {
-  id: string;
-  /** With `id`, what names the entity: its page is on this instance */
-  instanceId: string;
-  name?: string;
-  title?: string;
-  filePath?: string;
-  imageUrl?: string;
-  playDuration: number;
-  playCount: number;
-  oCount: number;
-  score: number;
-}
+type TopListItem = TopScene | TopPerformer | TopStudio | TopTag;
 
 interface Props {
   title: string;
   items: TopListItem[];
   entityType?: EntityType;
   showImage?: boolean;
-  sortBy?: SortBy;
-  onSortChange?: (sortBy: string) => void;
+  sortBy?: TopListSortBy;
+  onSortChange?: (sortBy: TopListSortBy) => void;
 }
 
 /**
@@ -52,16 +45,18 @@ const getFallbackIcon = (entityType: EntityType): string => {
  * Get display name for item
  */
 const getDisplayName = (item: TopListItem): string => {
-  if (item.name) return item.name;
-  if (item.title) return item.title;
-  if (item.filePath) return getFilenameFromPath(item.filePath) || "Unknown";
+  if ("name" in item && item.name) return item.name;
+  if ("title" in item && item.title) return item.title;
+  if ("filePath" in item && item.filePath) {
+    return getFilenameFromPath(item.filePath) || "Unknown";
+  }
   return "Unknown";
 };
 
 /**
  * Sort options with labels
  */
-const SORT_OPTIONS = [
+const SORT_OPTIONS: { value: TopListSortBy; label: string }[] = [
   { value: "engagement", label: "Engagement" },
   { value: "oCount", label: "O-Count" },
   { value: "playCount", label: "Play Count" },
@@ -146,7 +141,7 @@ const TopList = ({
         {onSortChange && (
           <select
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
+            onChange={(e) => onSortChange(e.target.value as TopListSortBy)}
             className="text-sm px-2 py-1 rounded border cursor-pointer"
             style={{
               backgroundColor: "var(--bg-secondary)",

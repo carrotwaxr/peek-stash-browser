@@ -1,5 +1,6 @@
+import type { UserStatsResponse } from "@peek/shared-types";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { apiGet } from "../../src/api";
 import { useAuth } from "../../src/hooks/useAuth";
@@ -10,7 +11,8 @@ vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
-vi.mock("../../src/api", () => ({
+vi.mock("../../src/api", async (importActual) => ({
+  ...(await importActual<Record<string, unknown>>()),
   apiGet: vi.fn(),
   queryKeys: {
     user: {
@@ -46,7 +48,10 @@ describe("useUserStats", () => {
       });
 
       // Default sortBy is "engagement" — should not add query param
-      expect(apiGetMock).toHaveBeenCalledWith("/user-stats");
+      expect(apiGetMock).toHaveBeenCalledWith(
+        "/user-stats",
+        expect.any(AbortSignal)
+      );
       expect(result.current.data).toEqual(mockStats);
       expect(result.current.error).toBeNull();
     });
@@ -57,7 +62,10 @@ describe("useUserStats", () => {
       });
 
       await waitFor(() => {
-        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
+        expect(apiGetMock).toHaveBeenCalledWith(
+          "/user-stats?sortBy=oCount",
+          expect.any(AbortSignal)
+        );
       });
     });
 
@@ -67,8 +75,32 @@ describe("useUserStats", () => {
       });
 
       await waitFor(() => {
-        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=playCount");
+        expect(apiGetMock).toHaveBeenCalledWith(
+          "/user-stats?sortBy=playCount",
+          expect.any(AbortSignal)
+        );
       });
+    });
+  });
+
+  describe("typed response", () => {
+    it("sends sortBy, keys the query by it, and returns the typed response", async () => {
+      const { result } = renderHook(() => useUserStats({ sortBy: "oCount" }), {
+        wrapper: createQueryWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(apiGetMock).toHaveBeenCalledWith(
+        "/user-stats?sortBy=oCount",
+        expect.any(AbortSignal)
+      );
+      expect(result.current.data).toEqual(mockStats);
+      expectTypeOf(
+        result.current.data
+      ).toEqualTypeOf<UserStatsResponse | null>();
     });
   });
 
@@ -159,13 +191,19 @@ describe("useUserStats", () => {
       );
 
       await waitFor(() => {
-        expect(apiGetMock).toHaveBeenCalledWith("/user-stats");
+        expect(apiGetMock).toHaveBeenCalledWith(
+          "/user-stats",
+          expect.any(AbortSignal)
+        );
       });
 
       rerender({ sortBy: "oCount" });
 
       await waitFor(() => {
-        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
+        expect(apiGetMock).toHaveBeenCalledWith(
+          "/user-stats?sortBy=oCount",
+          expect.any(AbortSignal)
+        );
       });
     });
   });

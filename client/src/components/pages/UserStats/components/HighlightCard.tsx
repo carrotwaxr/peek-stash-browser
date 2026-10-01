@@ -1,19 +1,16 @@
 // client/src/components/pages/UserStats/components/HighlightCard.tsx
 import { Link } from "react-router-dom";
+import type {
+  HighlightImage,
+  HighlightPerformer,
+  HighlightScene,
+} from "@peek/shared-types";
 import { useConfig } from "../../../../contexts/ConfigContext";
 import { getEntityPath } from "../../../../utils/entityLinks";
 import { getFilenameFromPath } from "../../../../utils/format";
 import { Paper } from "../../../ui/index";
 
-interface HighlightItem {
-  id: string;
-  /** With `id`, what names the entity: its page is on this instance */
-  instanceId: string;
-  name?: string;
-  title?: string;
-  filePath?: string;
-  imageUrl?: string;
-}
+type HighlightItem = HighlightScene | HighlightImage | HighlightPerformer;
 
 type EntityType = "scene" | "image" | "performer";
 
@@ -32,11 +29,13 @@ interface Props {
  */
 const getDisplayName = (item: HighlightItem): string => {
   // Performers have name
-  if (item.name) return item.name;
+  if ("name" in item && item.name) return item.name;
   // Scenes/images have title
-  if (item.title) return item.title;
+  if ("title" in item && item.title) return item.title;
   // Fallback to file path basename for scenes/images
-  if (item.filePath) return getFilenameFromPath(item.filePath) || "Unknown";
+  if ("filePath" in item && item.filePath) {
+    return getFilenameFromPath(item.filePath) || "Unknown";
+  }
   return "Unknown";
 };
 

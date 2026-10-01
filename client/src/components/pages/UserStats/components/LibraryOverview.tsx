@@ -1,19 +1,10 @@
 // client/src/components/pages/UserStats/components/LibraryOverview.tsx
+import type { LibraryStats } from "@peek/shared-types";
 import { ENTITY_ICONS } from "../../../../constants/entityIcons";
 import StatCard from "./StatCard";
 
-interface LibraryCounts {
-  sceneCount: number;
-  performerCount: number;
-  studioCount: number;
-  tagCount: number;
-  galleryCount: number;
-  imageCount: number;
-  clipCount: number;
-}
-
 interface Props {
-  library: LibraryCounts;
+  library: LibraryStats;
 }
 
 /**
