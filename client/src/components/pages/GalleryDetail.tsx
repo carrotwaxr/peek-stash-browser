@@ -522,7 +522,7 @@ const GalleryDetail = () => {
               {/* Scenes Tab */}
               {activeTab === "scenes" && (
                 <SceneSearch
-                  context="gallery_scenes"
+                  context="scene_gallery"
                   permanentFilters={{
                     galleries: {
                       value: [

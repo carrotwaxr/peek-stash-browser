@@ -257,6 +257,7 @@ Save your current view configuration for quick access later.
 - Click a preset name to apply it
 - Star icon indicates the default preset
 - Presets are per-entity-type (Scene presets, Performer presets, etc.)
+- A default is kept per page: the Scenes tab of a performer, studio, tag, collection or gallery each has its own default, as does the Clips page
 
 ---
 
