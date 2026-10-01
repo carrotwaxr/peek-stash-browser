@@ -9,6 +9,7 @@ import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as clientModule from "@/api/client";
 import AddToPlaylistButton from "@/components/ui/AddToPlaylistButton";
+import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 import { showError, showSuccess, showWarning } from "@/utils/toast";
 
 const { mockApiGet, mockApiPost } = vi.hoisted(() => ({
@@ -332,5 +333,53 @@ describe("AddToPlaylistButton", () => {
       )
     );
     expect(showSuccess).not.toHaveBeenCalled();
+  });
+  it("the create dialog has role dialog and closes on Escape", async () => {
+    render(
+      <ShortcutScopeProvider>
+        <MemoryRouterWithQuery>
+          <AddToPlaylistButton scenes={[{ id: "1", instanceId: "inst-a" }]} />
+        </MemoryRouterWithQuery>
+      </ShortcutScopeProvider>
+    );
+
+    fireEvent.click(screen.getByTitle("Add to playlist"));
+    fireEvent.click(await screen.findByText("+ Create New Playlist"));
+
+    expect(
+      screen.getByRole("dialog", { name: "Create New Playlist" })
+    ).toBeTruthy();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("the create dialog opened from a card does not navigate the card on a backdrop click", async () => {
+    const onCardClick = vi.fn();
+    const onCardMouseDown = vi.fn();
+    render(
+      <ShortcutScopeProvider>
+        <MemoryRouterWithQuery>
+          <div onClick={onCardClick} onMouseDown={onCardMouseDown}>
+            <AddToPlaylistButton scenes={[{ id: "1", instanceId: "inst-a" }]} />
+          </div>
+        </MemoryRouterWithQuery>
+      </ShortcutScopeProvider>
+    );
+    fireEvent.click(screen.getByTitle("Add to playlist"));
+    fireEvent.click(await screen.findByText("+ Create New Playlist"));
+    onCardClick.mockClear();
+    onCardMouseDown.mockClear();
+
+    const backdrop = screen.getByRole("dialog").parentElement as HTMLElement;
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+
+    expect(onCardClick).not.toHaveBeenCalled();
+    expect(onCardMouseDown).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

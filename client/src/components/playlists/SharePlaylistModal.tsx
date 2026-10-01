@@ -6,7 +6,7 @@ import {
   updatePlaylistShares,
 } from "../../api";
 import { showError, showSuccess } from "../../utils/toast";
-import { Button, Paper } from "../ui/index";
+import { Button, Modal } from "../ui/index";
 
 interface UserGroup {
   id: number;
@@ -104,97 +104,81 @@ const SharePlaylistModal = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={onClose}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      title={
+        <span className="flex items-center gap-2">
+          <Share2 size={20} aria-hidden="true" />
+          Share Playlist
+        </span>
+      }
     >
-      <Paper
-        className="max-w-md w-full m-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Paper.Header>
-          <div className="flex items-center gap-2">
-            <Share2 size={20} />
-            <span
-              className="text-lg font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Share Playlist
-            </span>
-          </div>
-        </Paper.Header>
-        <Paper.Body>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-            </div>
-          ) : userGroups.length === 0 ? (
-            <div className="text-center py-8">
-              <p style={{ color: "var(--text-secondary)" }}>
-                You are not a member of any groups.
-              </p>
-              <p
-                className="text-sm mt-2"
-                style={{ color: "var(--text-muted)" }}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+        </div>
+      ) : userGroups.length === 0 ? (
+        <div className="text-center py-8">
+          <p style={{ color: "var(--text-secondary)" }}>
+            You are not a member of any groups.
+          </p>
+          <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
+            Ask an admin to add you to a group to enable sharing.
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="mb-4" style={{ color: "var(--text-secondary)" }}>
+            Share "{playlistName}" with:
+          </p>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {userGroups.map((group) => (
+              <label
+                key={group.id}
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                style={{
+                  backgroundColor: selectedGroupIds.has(group.id)
+                    ? "rgba(59, 130, 246, 0.1)"
+                    : "var(--bg-secondary)",
+                  border: selectedGroupIds.has(group.id)
+                    ? "1px solid rgba(59, 130, 246, 0.3)"
+                    : "1px solid var(--border-color)",
+                }}
               >
-                Ask an admin to add you to a group to enable sharing.
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="mb-4" style={{ color: "var(--text-secondary)" }}>
-                Share "{playlistName}" with:
-              </p>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {userGroups.map((group) => (
-                  <label
-                    key={group.id}
-                    className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
-                    style={{
-                      backgroundColor: selectedGroupIds.has(group.id)
-                        ? "rgba(59, 130, 246, 0.1)"
-                        : "var(--bg-secondary)",
-                      border: selectedGroupIds.has(group.id)
-                        ? "1px solid rgba(59, 130, 246, 0.3)"
-                        : "1px solid var(--border-color)",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedGroupIds.has(group.id)}
-                      onChange={() => handleToggleGroup(group.id)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span style={{ color: "var(--text-primary)" }}>
-                      {group.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
+                <input
+                  type="checkbox"
+                  checked={selectedGroupIds.has(group.id)}
+                  onChange={() => handleToggleGroup(group.id)}
+                  className="w-4 h-4 rounded"
+                />
+                <span style={{ color: "var(--text-primary)" }}>
+                  {group.name}
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
-          <div className="flex gap-3 justify-end mt-6">
-            <Button onClick={onClose} variant="secondary">
-              Cancel
-            </Button>
-            {userGroups.length > 0 && (
-              <Button
-                onClick={() => void handleSave()}
-                variant="primary"
-                disabled={saving}
-                loading={saving}
-              >
-                {saving ? "Saving..." : "Save"}
-              </Button>
-            )}
-          </div>
-        </Paper.Body>
-      </Paper>
-    </div>
+      <div className="flex gap-3 justify-end mt-6">
+        <Button onClick={onClose} variant="secondary">
+          Cancel
+        </Button>
+        {userGroups.length > 0 && (
+          <Button
+            onClick={() => void handleSave()}
+            variant="primary"
+            disabled={saving}
+            loading={saving}
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        )}
+      </div>
+    </Modal>
   );
 };
 

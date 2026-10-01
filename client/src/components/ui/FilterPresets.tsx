@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LucideBookmark,
@@ -16,6 +16,7 @@ import {
   useFilterPresets,
 } from "../../api/hooks/usePresets";
 import Button from "./Button";
+import Modal from "./Modal";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 
 // Helper to get context label for UI
@@ -108,6 +109,13 @@ const FilterPresets = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const presetNameRef = useRef<HTMLInputElement>(null);
+
+  const closeSaveDialog = () => {
+    setIsSaveDialogOpen(false);
+    setPresetName("");
+    setError(null);
+  };
 
   const handleSavePreset = async () => {
     if (!presetName.trim()) {
@@ -379,100 +387,75 @@ const FilterPresets = ({
       </div>
 
       {/* Save Preset Dialog */}
-      {isSaveDialogOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-40" />
+      <Modal
+        isOpen={isSaveDialogOpen}
+        onClose={closeSaveDialog}
+        size="sm"
+        title="Save Filter Preset"
+        initialFocusRef={presetNameRef}
+        dismissible={!isLoading}
+      >
+        <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+          Give your current filter configuration a name so you can quickly apply
+          it later.
+        </p>
 
-          {/* Dialog */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-md rounded-lg shadow-xl border"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                borderColor: "var(--border-color)",
-              }}
-            >
-              <div className="p-6">
-                <h3
-                  className="text-lg font-semibold mb-4"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  Save Filter Preset
-                </h3>
+        <input
+          ref={presetNameRef}
+          type="text"
+          value={presetName}
+          onChange={(e) => setPresetName(e.target.value)}
+          placeholder="Enter preset name..."
+          className="w-full px-3 py-2 border rounded-md text-sm mb-4"
+          style={{
+            backgroundColor: "var(--bg-secondary)",
+            borderColor: "var(--border-color)",
+            color: "var(--text-primary)",
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleSavePreset();
+          }}
+        />
 
-                <p
-                  className="text-sm mb-4"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Give your current filter configuration a name so you can
-                  quickly apply it later.
-                </p>
+        {/* Set as Default checkbox */}
+        <label
+          className="flex items-center gap-2 mb-4 cursor-pointer"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <input
+            type="checkbox"
+            checked={setAsDefault}
+            onChange={(e) => setSetAsDefault(e.target.checked)}
+            className="w-4 h-4 rounded border cursor-pointer"
+            style={{
+              accentColor: "var(--accent-primary)",
+            }}
+          />
+          <span className="text-sm">
+            Set as default for {getContextLabel(effectiveContext)}
+          </span>
+        </label>
 
-                <input
-                  type="text"
-                  value={presetName}
-                  onChange={(e) => setPresetName(e.target.value)}
-                  placeholder="Enter preset name..."
-                  className="w-full px-3 py-2 border rounded-md text-sm mb-4"
-                  style={{
-                    backgroundColor: "var(--bg-secondary)",
-                    borderColor: "var(--border-color)",
-                    color: "var(--text-primary)",
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleSavePreset();
-                  }}
-                  autoFocus
-                />
-
-                {/* Set as Default checkbox */}
-                <label
-                  className="flex items-center gap-2 mb-4 cursor-pointer"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={setAsDefault}
-                    onChange={(e) => setSetAsDefault(e.target.checked)}
-                    className="w-4 h-4 rounded border cursor-pointer"
-                    style={{
-                      accentColor: "var(--accent-primary)",
-                    }}
-                  />
-                  <span className="text-sm">
-                    Set as default for {getContextLabel(effectiveContext)}
-                  </span>
-                </label>
-
-                <div className="flex justify-end gap-3">
-                  <Button
-                    onClick={() => {
-                      setIsSaveDialogOpen(false);
-                      setPresetName("");
-                      setError(null);
-                    }}
-                    variant="secondary"
-                    size="sm"
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => void handleSavePreset()}
-                    variant="primary"
-                    size="sm"
-                    disabled={isLoading || !presetName.trim()}
-                    loading={isLoading}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+        <div className="flex justify-end gap-3">
+          <Button
+            onClick={closeSaveDialog}
+            variant="secondary"
+            size="sm"
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSavePreset()}
+            variant="primary"
+            size="sm"
+            disabled={isLoading || !presetName.trim()}
+            loading={isLoading}
+          >
+            Save
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
