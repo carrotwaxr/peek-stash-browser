@@ -11,6 +11,8 @@
  * - A request the replay cannot answer gets GraphQL `errors` (or a 404 for an
  *   unknown media path), one line on stderr, and an entry in `unsupported`,
  *   which the integration audit turns into a failed test file.
+ * - A HEAD to a media route gets 405, as Stash answers it, and is recorded
+ *   in `unsupported` too: Peek must ask Stash with GET.
  *
  * GET /healthz and GET /__replay/stats need no key. Stats add `counts`, the
  * entity counts of the library on that port, which E2E waits for.
@@ -259,6 +261,25 @@ async function handle(
     const origin = `http://${req.headers.host ?? fallbackHost}`;
     const body = JSON.stringify(answer.body).replace(ORIGIN_TOKEN, origin);
     sendText(res, answer.status, "application/json", body);
+    return;
+  }
+
+  // Stash's media routes take GET only: it answers HEAD with 405 (Allow:
+  // GET), so a client that probes with HEAD reads every file as missing.
+  // Refused here as Stash does, and recorded, so a HEAD sent to Stash fails
+  // the run instead of passing against a replay kinder than Stash
+  if (
+    method === "HEAD" &&
+    answerMedia(options.library, url.pathname, url.searchParams, undefined)
+  ) {
+    const shape = pathShape(url.pathname);
+    recordUnsupported(
+      stats,
+      `HEAD ${shape}`,
+      `stash-replay refused HEAD ${shape} with 405, as Stash does: Stash serves media to GET only, so ask with GET (a one-byte Range for a probe).`
+    );
+    res.writeHead(405, { Allow: "GET", "Content-Type": "text/plain" });
+    res.end();
     return;
   }
 

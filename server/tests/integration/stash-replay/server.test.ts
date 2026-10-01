@@ -439,4 +439,15 @@ describe("media", () => {
       "stash-replay cannot answer GET /scene/:id/funscript: the replay serves no such route; teach server/integration/stash-replay/media.ts.\n"
     );
   });
+
+  it("refuses HEAD on a media route with 405 and Allow: GET, as Stash does, and records it", async () => {
+    const response = await fetch(
+      `${origin}/scene/100001/preview?apikey=${API_KEY}`,
+      { method: "HEAD" }
+    );
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("GET");
+    expect(replay.stats().unsupported).toContain("HEAD /scene/:id/preview");
+  });
 });

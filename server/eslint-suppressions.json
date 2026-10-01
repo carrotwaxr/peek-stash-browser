@@ -1,7 +1,7 @@
 {
   "controllers/proxy.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     }
   },
   "controllers/video.ts": {

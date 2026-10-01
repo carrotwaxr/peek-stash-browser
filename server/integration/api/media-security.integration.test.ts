@@ -55,18 +55,29 @@ async function loginCookie(
   return `token=${token}`;
 }
 
-/** GET a media URL with raw fetch; only the status and content type matter. */
+/**
+ * GET (or HEAD) a media URL with raw fetch; only the status, content type
+ * and length matter.
+ */
 async function media(
   path: string,
-  init: { cookie?: string; range?: string } = {}
-): Promise<{ status: number; contentType: string }> {
+  init: { cookie?: string; range?: string; method?: "HEAD" } = {}
+): Promise<{
+  status: number;
+  contentType: string;
+  contentLength: string | null;
+}> {
   const headers: Record<string, string> = {};
   if (init.cookie) headers["Cookie"] = init.cookie;
   if (init.range) headers["Range"] = init.range;
-  const res = await fetch(`${TEST_CONFIG.baseUrl}${path}`, { headers });
+  const res = await fetch(`${TEST_CONFIG.baseUrl}${path}`, {
+    headers,
+    method: init.method ?? "GET",
+  });
   const result = {
     status: res.status,
     contentType: res.headers.get("content-type") ?? "",
+    contentLength: res.headers.get("content-length"),
   };
   await res.body?.cancel();
   return result;
@@ -252,6 +263,42 @@ describe("media security", () => {
       });
       expect([200, 206]).toContain(adminStream.status);
     }, 30_000);
+  });
+
+  describe("HEAD probes", () => {
+    // Stash answers HEAD with 405 on its media routes (the replay too), so
+    // the scene card's preview probe and the image cards' type probe read
+    // every file as missing unless Peek asks Stash with GET
+    it.each([
+      ["scene preview", "video/"],
+      ["scene screenshot", "image/"],
+      ["scene sprite", "image/"],
+      ["scene sprite VTT", "text/vtt"],
+      ["image thumbnail", "image/"],
+    ])(
+      "a HEAD to the %s answers 200 with its type and length",
+      async (name, type) => {
+        const scene = TEST_ENTITIES.sceneWithRelations;
+        const image = TEST_ENTITIES.imageWithOwnProperties;
+        const q = `instanceId=${encodeURIComponent(instanceId)}`;
+        const paths: Record<string, string> = {
+          "scene preview": `/api/proxy/scene/${scene}/preview?${q}`,
+          "scene screenshot": `/api/proxy/stash?path=%2Fscene%2F${scene}%2Fscreenshot&${q}`,
+          "scene sprite": `/api/proxy/stash?path=%2Fscene%2F${scene}%2Fvtt%2Fsprite&${q}`,
+          "scene sprite VTT": `/api/proxy/stash?path=%2Fscene%2F${scene}%2Fvtt%2Fthumbs&${q}`,
+          "image thumbnail": `/api/proxy/image/${image}/thumbnail?${q}`,
+        };
+
+        const probe = await media(must(paths[name], name), {
+          cookie: adminCookie,
+          method: "HEAD",
+        });
+
+        expect(probe.status).toBe(200);
+        expect(probe.contentType.startsWith(type)).toBe(true);
+        expect(Number(probe.contentLength)).toBeGreaterThan(1);
+      }
+    );
   });
 
   describe("external-player links", () => {
