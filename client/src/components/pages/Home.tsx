@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CarouselData, NormalizedScene } from "@peek/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCarousels } from "../../api/hooks/useCarousels";
@@ -29,6 +28,7 @@ import {
 } from "../../utils/filterConfig";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import { buildSearchParams } from "../../utils/urlParams";
+import { getCarouselIcon } from "../carousel-builder/carouselIcons";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -197,9 +197,7 @@ const Home = () => {
         const carouselId = pref.id.replace("custom-", "");
         const customCarousel = customCarousels.find((c) => c.id === carouselId);
         if (customCarousel) {
-          const IconComponent =
-            (LucideIcons as Record<string, any>)[customCarousel.icon] ||
-            LucideIcons.Film;
+          const IconComponent = getCarouselIcon(customCarousel.icon);
           return {
             type: "custom",
             id: carouselId,

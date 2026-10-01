@@ -13,7 +13,7 @@ import {
 } from "../../constants/appIcons";
 import { ENTITY_ICON_NAMES } from "../../constants/entityIcons";
 
-const iconSets = {
+export const iconSets = {
   peek: {
     // Default "Peek" theme icons
     name: "peek",
@@ -71,32 +71,17 @@ const iconSets = {
       user: "user",
     },
   },
-
-  treasureMap: {
-    // Pirate/Treasure Map theme icons (placeholder for future)
-    name: "treasureMap",
-    displayName: "Treasure Map",
-    icons: {
-      // These would map to pirate-themed alternatives
-      home: "map",
-      scenes: "compass",
-      performers: "users", // Could be 'skull' or pirate-themed
-      studios: "anchor",
-      tags: "flag",
-      // ... more pirate-themed mappings
-      logo: "compass",
-    },
-  },
 };
 
-const getIconSet = (themeName: string) => {
-  return (
-    (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] ??
-    iconSets.peek
-  );
-};
+const has = (object: object, key: string) =>
+  Object.prototype.hasOwnProperty.call(object, key);
+
+const getIconSet = (themeName: string): (typeof iconSets)["peek"] =>
+  (has(iconSets, themeName)
+    ? (iconSets as Record<string, (typeof iconSets)["peek"]>)[themeName]
+    : undefined) ?? iconSets.peek;
 
 export const getIconName = (iconKey: string, themeName = "peek") => {
-  const iconSet = getIconSet(themeName);
-  return (iconSet.icons as Record<string, string>)[iconKey] || iconKey;
+  const icons = getIconSet(themeName).icons as Record<string, string>;
+  return (has(icons, iconKey) ? icons[iconKey] : undefined) ?? iconKey;
 };
