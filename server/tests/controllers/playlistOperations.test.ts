@@ -137,7 +137,6 @@ describe("Playlist Controller Operations", () => {
         name: "My Playlist",
         description: null,
         userId: 1,
-        isPublic: false,
         _count: { items: 0 },
       });
       mockPrisma.playlist.create.mockResolvedValue(createdPlaylist);
@@ -630,7 +629,7 @@ describe("Playlist Controller Operations", () => {
       mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 5 }));
       await createPlaylist(
         reqFor(createPlaylist, {
-          body: { name: "n", isPublic: true },
+          body: malformed({ name: "n", isPublic: true }),
           user: USER,
         }),
         resFor(createPlaylist)
@@ -644,7 +643,7 @@ describe("Playlist Controller Operations", () => {
       mockPrisma.playlist.update.mockResolvedValue(partialRow({ id: 5 }));
       await updatePlaylist(
         reqFor(updatePlaylist, {
-          body: { name: "m", isPublic: true },
+          body: malformed({ name: "m", isPublic: true }),
           params: { id: "5" },
           user: USER,
           allowedInstanceIds: ALLOWED,
