@@ -7,6 +7,7 @@ import {
   useLibraryReady,
 } from "../../api/hooks/useLibraryReady";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
@@ -32,6 +33,7 @@ const ContinueWatchingCarousel = ({
 }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
+  const { user } = useAuth();
   const { ready } = useLibraryReady();
   const {
     data,
@@ -64,6 +66,7 @@ const ContinueWatchingCarousel = ({
           fromPageTitle: "Home",
           shouldResume: true, // Auto-resume from continue watching
           playlist: buildPlaybackQueue({
+            userId: user?.id,
             id: "virtual-carousel",
             name: "Continue Watching",
             scenes,

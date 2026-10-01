@@ -47,6 +47,7 @@ function withoutControls(state: ScenePlayerReducerState) {
 /** A queue as the grids, carousels and history build it (no autoplayNext) */
 function rowQueue(options: { shuffle?: boolean; repeat?: "none" | "all" }) {
   return buildPlaybackQueue({
+    userId: 1,
     id: "virtual-grid",
     name: "Scene Grid",
     scenes: untrusted<NormalizedScene[]>([

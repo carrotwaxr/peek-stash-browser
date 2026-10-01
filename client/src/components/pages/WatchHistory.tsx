@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { History, Trash2 } from "lucide-react";
 import { apiDelete, getErrorMessage } from "../../api";
 import { queryKeys } from "../../api/queryKeys";
+import { useAuth } from "../../hooks/useAuth";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
@@ -60,6 +61,8 @@ const WatchHistory = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
+  const { user } = useAuth();
+  const userId = user?.id;
   const {
     data,
     isLoading: loading,
@@ -74,12 +77,13 @@ const WatchHistory = () => {
   const queue = useMemo(
     () =>
       buildPlaybackQueue({
+        userId,
         id: "virtual-history",
         name: "Watch History",
         scenes,
         currentIndex: 0,
       }),
-    [scenes]
+    [scenes, userId]
   );
 
   /**

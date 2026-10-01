@@ -161,6 +161,7 @@ function renderPlayer(
 /** A queue as a grid, a carousel or a playlist row builds it: no autoplayNext */
 function rowQueue(shuffle = false) {
   return buildPlaybackQueue({
+    userId: 1,
     id: "virtual-grid",
     name: "Scene Grid",
     scenes: untrusted<NormalizedScene[]>([

@@ -4,6 +4,7 @@ import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext";
+import { useAuth } from "../../hooks/useAuth";
 import { describeLookupFailure } from "../../hooks/useEntityLookup";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
@@ -315,8 +316,11 @@ const Scene = () => {
   // The history entry's state is the only source: the queue a navigation
   // handed over, or the one the player wrote back into this entry (a reload
   // or Back finds it there). An entry opened without state has no queue.
+  // A queue another user left in the entry (sign-out, sign-in, Back) is none.
+  const { user } = useAuth();
   const { playlist, shouldResume, shouldAutoplay } = readSceneLocationState(
-    location.state
+    location.state,
+    user?.id
   );
 
   return (

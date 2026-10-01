@@ -22,6 +22,7 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
+import { SIGNED_IN_USER_ID, SignedIn } from "@tests/helpers/SignedIn";
 import {
   type ApiStub,
   jsonResponse,
@@ -270,18 +271,20 @@ function SceneProbe() {
 function renderPage(entry = "/playlist/5") {
   return render(
     <MemoryRouterWithQuery initialEntries={[entry]}>
-      <Routes>
-        <Route
-          path="/playlist/:playlistId"
-          element={
-            <>
-              <PlaylistDetail />
-              <LocationProbe />
-            </>
-          }
-        />
-        <Route path="/scene/:sceneId" element={<SceneProbe />} />
-      </Routes>
+      <SignedIn>
+        <Routes>
+          <Route
+            path="/playlist/:playlistId"
+            element={
+              <>
+                <PlaylistDetail />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="/scene/:sceneId" element={<SceneProbe />} />
+        </Routes>
+      </SignedIn>
     </MemoryRouterWithQuery>
   );
 }
@@ -650,19 +653,32 @@ describe("PlaylistDetail items on two servers", () => {
 
     await screen.findByText("Scene page /scene/7");
     const state = must(sceneStates.at(-1), "scene page state") as {
-      playlist: { key: string; scenes: unknown[]; currentIndex: number };
+      playlist: {
+        key: string;
+        userId?: number;
+        scenes: unknown[];
+        currentIndex: number;
+      };
     };
     const expected = queueOf(twoServers).entries;
     expect(state.playlist.scenes).toEqual(expected);
     expect(state.playlist.currentIndex).toBe(0);
+    // A queue belongs to the user who made it, on Play and on a row link
+    expect(state.playlist.userId).toBe(SIGNED_IN_USER_ID);
     // A queue has an identity; the player loads the scene itself
     expect(state.playlist.key).toMatch(/^[0-9a-f]{32}$/);
     expect(state).not.toHaveProperty("scene");
 
     // The second row's link carries the same entries, at its own index
     const rowState = must(rowLinkStates.get("7:inst-b"), "row state") as {
-      playlist: { key: string; scenes: unknown[]; currentIndex: number };
+      playlist: {
+        key: string;
+        userId?: number;
+        scenes: unknown[];
+        currentIndex: number;
+      };
     };
+    expect(rowState.playlist.userId).toBe(SIGNED_IN_USER_ID);
     expect(rowState.playlist.scenes).toEqual(expected);
     expect(rowState.playlist.currentIndex).toBe(1);
     expect(rowState.playlist.key).toMatch(/^[0-9a-f]{32}$/);

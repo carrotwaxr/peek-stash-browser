@@ -11,7 +11,7 @@ import {
 } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { actAsync } from "@tests/testUtils";
+import { actAsync, createAuthValue } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 // ---------------------------------------------------------------------------
@@ -22,6 +22,7 @@ import { ApiError } from "@/api/client";
 import { LIBRARY_READY_POLL_MS } from "@/api/hooks/useLibraryReady";
 import { createQueryClient } from "@/api/queryClient";
 import { queryKeys } from "@/api/queryKeys";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 import { useConfig } from "@/contexts/ConfigContext";
 import {
   ScenePlayerProvider,
@@ -84,6 +85,13 @@ const probe: {
   navigate: NavigateFunction | null;
 } = { location: null, navigate: null };
 
+/** The user the tab is signed in as */
+const SIGNED_IN_USER = 1;
+const signedIn = createAuthValue({
+  isAuthenticated: true,
+  user: { id: SIGNED_IN_USER, username: "viewer", role: "USER" },
+});
+
 /** A queue of scenes on inst-1, as `buildPlaybackQueue` makes it */
 function queueOf(
   key: string,
@@ -92,6 +100,7 @@ function queueOf(
 ): PlaybackQueue {
   return {
     key,
+    userId: SIGNED_IN_USER,
     id: "virtual-grid",
     name: "Grid",
     shuffle: false,
@@ -113,13 +122,19 @@ function queueOf(
 
 /** The queue the current history entry holds */
 function entryQueue() {
-  return readSceneLocationState(probe.location?.state).playlist ?? null;
+  return (
+    readSceneLocationState(probe.location?.state, SIGNED_IN_USER).playlist ??
+    null
+  );
 }
 
 type ProviderProps = Omit<
   ComponentProps<typeof ScenePlayerProvider>,
   "children" | "playlist" | "shouldResume" | "initialShouldAutoplay"
 >;
+
+/** What a test hands the provider beyond what the route's entry gives it */
+type RouteProps = Partial<ProviderProps> & { playlist?: PlaybackQueue | null };
 
 /**
  * The Scene route as the page renders it: the provider takes the scene from
@@ -131,13 +146,13 @@ function SceneRoute({
   props,
 }: {
   children: ReactNode;
-  props: Partial<ProviderProps>;
+  props: RouteProps;
 }) {
   const { sceneId } = useParams<{ sceneId: string }>();
   const location = useLocation();
   probe.location = location;
   probe.navigate = useNavigate();
-  const state = readSceneLocationState(location.state);
+  const state = readSceneLocationState(location.state, SIGNED_IN_USER);
   const instanceId = new URLSearchParams(location.search).get("instance");
   return (
     <ScenePlayerProvider
@@ -165,24 +180,26 @@ type Entry = { pathname: string; search?: string; state?: unknown };
 /** A router holding `entries` (the last one current) around the provider */
 function routerWrapper(
   entries: Entry[],
-  props: Partial<ProviderProps> = {},
+  props: RouteProps = {},
   client = createQueryClient()
 ) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={client}>
-        <MemoryRouter
-          initialEntries={entries}
-          initialIndex={entries.length - 1}
-        >
-          <Routes>
-            <Route
-              path="/scene/:sceneId"
-              element={<SceneRoute props={props}>{children}</SceneRoute>}
-            />
-            <Route path="*" element={<OtherPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthContext.Provider value={signedIn}>
+          <MemoryRouter
+            initialEntries={entries}
+            initialIndex={entries.length - 1}
+          >
+            <Routes>
+              <Route
+                path="/scene/:sceneId"
+                element={<SceneRoute props={props}>{children}</SceneRoute>}
+              />
+              <Route path="*" element={<OtherPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
       </QueryClientProvider>
     );
   };
@@ -341,6 +358,7 @@ describe("ScenePlayerContext", () => {
 
     it("initializes with playlist props", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         id: "pl-1",
         scenes: [
           { sceneId: "s-1", instanceId: "i-1" },
@@ -576,6 +594,7 @@ describe("ScenePlayerContext", () => {
 
     it("uses playlist scene ID over prop sceneId", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         scenes: [
           { sceneId: "playlist-scene-1", instanceId: "pl-inst-1" },
           { sceneId: "playlist-scene-2", instanceId: "pl-inst-2" },
@@ -613,6 +632,7 @@ describe("ScenePlayerContext", () => {
       // only through their scene, as a playlist saved before entries
       // carried one does; the player started on A's scene.
       const playlist = {
+        userId: SIGNED_IN_USER,
         scenes: [
           { sceneId: "7", scene: { id: "7", instanceId: "inst-a" } },
           { sceneId: "7", scene: { id: "7", instanceId: "inst-b" } },
@@ -650,6 +670,7 @@ describe("ScenePlayerContext", () => {
 
     it("nextScene dispatches NEXT_SCENE", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         scenes: [
           { sceneId: "s-1", instanceId: "i-1" },
           { sceneId: "s-2", instanceId: "i-2" },
@@ -675,6 +696,7 @@ describe("ScenePlayerContext", () => {
 
     it("prevScene dispatches PREV_SCENE", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         scenes: [
           { sceneId: "s-1", instanceId: "i-1" },
           { sceneId: "s-2", instanceId: "i-2" },
@@ -700,6 +722,7 @@ describe("ScenePlayerContext", () => {
 
     it("gotoSceneIndex dispatches with index and shouldAutoplay", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         scenes: [
           { sceneId: "s-1", instanceId: "i-1" },
           { sceneId: "s-2", instanceId: "i-2" },
@@ -810,6 +833,7 @@ describe("ScenePlayerContext", () => {
 
     it("toggling shuffle, repeat or autoplay posts no second /library/scenes", async () => {
       const playlist = {
+        userId: SIGNED_IN_USER,
         id: "virtual-grid",
         name: "Scene Grid",
         shuffle: false,
@@ -1095,6 +1119,28 @@ describe("ScenePlayerContext", () => {
       });
       expect(probe.location?.pathname).toBe("/scene/1");
       expect(probe.location?.search).toBe("?tab=galleries");
+    });
+
+    it("the queue the player writes into the entry is stamped with the signed-in user", async () => {
+      const { userId: _stamp, ...unstamped } = queueOf("q1", ["1", "2"]);
+      const rendered = renderHook(() => useScenePlayer(), {
+        wrapper: routerWrapper(
+          [{ pathname: "/scene/1", search: "?instance=inst-1" }],
+          { playlist: unstamped }
+        ),
+      });
+      await waitFor(() => {
+        expect(rendered.result.current.scene?.id).toBe("1");
+      });
+
+      // The mount write: the entry now holds the queue, and it is user 1's
+      await waitFor(() => {
+        expect(entryQueue()?.key).toBe("q1");
+      });
+      const written = (
+        probe.location?.state as { playlist: { userId?: number } }
+      ).playlist;
+      expect(written.userId).toBe(SIGNED_IN_USER);
     });
 
     it("a step to an entry of the same scene restarts it without loading it again", async () => {

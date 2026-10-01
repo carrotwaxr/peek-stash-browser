@@ -165,6 +165,7 @@ const Home = () => {
         state: {
           fromPageTitle: "Home",
           playlist: buildPlaybackQueue({
+            userId: user?.id,
             id: "virtual-carousel",
             name: carouselTitle,
             scenes,

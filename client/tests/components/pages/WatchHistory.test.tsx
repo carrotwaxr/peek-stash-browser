@@ -21,6 +21,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { SignedIn } from "@tests/helpers/SignedIn";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
@@ -38,12 +39,16 @@ interface RowProps {
   watchHistory?: { playCount?: number; lastOAt?: string | null };
   linkState?: {
     shouldResume?: boolean;
-    playlist: { scenes: unknown[]; currentIndex: number };
+    playlist: { scenes: unknown[]; currentIndex: number; userId?: number };
   };
 }
 
 const rowStates = vi.hoisted(() => ({
-  queues: [] as Array<{ scenes: unknown[]; currentIndex: number }>,
+  queues: [] as Array<{
+    scenes: unknown[];
+    currentIndex: number;
+    userId?: number;
+  }>,
 }));
 
 vi.mock("@/components/ui/index", () => ({
@@ -152,7 +157,9 @@ describe("WatchHistory", () => {
     const router = createMemoryRouter(routes, { initialEntries: [url] });
     render(
       <QueryClientProvider client={client}>
-        <RouterProvider router={router} />
+        <SignedIn>
+          <RouterProvider router={router} />
+        </SignedIn>
       </QueryClientProvider>
     );
     return router;
@@ -306,6 +313,7 @@ describe("WatchHistory", () => {
     expect(queues[1]?.scenes).toBe(queues[0]?.scenes);
     expect(queues[2]?.scenes).toBe(queues[0]?.scenes);
     expect(queues.map((q) => q.currentIndex)).toEqual([0, 1, 2]);
+    expect(queues.map((q) => q.userId)).toEqual([1, 1, 1]);
     expect(screen.getAllByTestId("row")[0]?.textContent).toBe("1:a:3:resume");
   });
 

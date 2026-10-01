@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useAuth } from "../../hooks/useAuth";
 import { getEntityPath } from "../../utils/entityLinks";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import EntityListPage from "../list/EntityListPage";
@@ -30,6 +31,7 @@ function useSceneListPage({
 }: ListPageData): ListPageExtras {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
+  const { user } = useAuth();
   // The handler reads the page's current scenes without changing identity
   const itemsRef = useRef(items);
   useLayoutEffect(() => {
@@ -48,6 +50,7 @@ function useSceneListPage({
       // Build navigation state
       const navigationState: Record<string, unknown> = {
         playlist: buildPlaybackQueue({
+          userId: user?.id,
           id: "virtual-grid",
           name: title || "Scene Grid",
           scenes: currentScenes as unknown as NormalizedScene[],
@@ -64,7 +67,7 @@ function useSceneListPage({
         state: navigationState,
       });
     },
-    [navigate, hasMultipleInstances, title, fromPageTitle]
+    [navigate, hasMultipleInstances, title, fromPageTitle, user?.id]
   );
 
   const cardHandlers = useMemo<CardHandlers>(
