@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 /**
  * Adaptive metadata drawer that opens on the longer viewport axis:
@@ -80,17 +80,23 @@ const MetadataDrawer = ({
   const resolution =
     image.width && image.height ? `${image.width}×${image.height}` : null;
 
-  // Build subtitle parts
-  const photographerText = effectivePhotographer
-    ? `by ${effectivePhotographer}`
-    : null;
-  const subtitleParts = [
-    effectiveStudio?.name,
-    date,
-    photographerText,
-    resolution,
-  ].filter(Boolean);
-  const subtitle = subtitleParts.join(" • ");
+  // Subtitle parts in order: studio (a link), date, photographer, resolution
+  const subtitleParts: ReactNode[] = [];
+  if (effectiveStudio?.name) {
+    subtitleParts.push(
+      <Link
+        key="studio"
+        to={getEntityPath("studio", effectiveStudio, hasMultipleInstances)}
+        className="hover:underline hover:text-blue-400"
+        onClick={onClose}
+      >
+        {effectiveStudio.name}
+      </Link>
+    );
+  }
+  if (date) subtitleParts.push(date);
+  if (effectivePhotographer) subtitleParts.push(`by ${effectivePhotographer}`);
+  if (resolution) subtitleParts.push(resolution);
 
   return (
     <>
@@ -175,29 +181,18 @@ const MetadataDrawer = ({
             </div>
           </div>
 
-          {/* Subtitle: Studio • Date • Resolution */}
-          {subtitle && (
+          {/* Subtitle: Studio • Date • Photographer • Resolution */}
+          {subtitleParts.length > 0 && (
             <p
               className="text-sm mb-4"
               style={{ color: "var(--text-secondary)" }}
             >
-              {effectiveStudio ? (
-                <Link
-                  to={getEntityPath(
-                    "studio",
-                    effectiveStudio,
-                    hasMultipleInstances
-                  )}
-                  className="hover:underline hover:text-blue-400"
-                  onClick={onClose}
-                >
-                  {effectiveStudio.name}
-                </Link>
-              ) : null}
-              {effectiveStudio && (date || resolution) ? " • " : null}
-              {date}
-              {date && resolution ? " • " : null}
-              {resolution}
+              {subtitleParts.map((part, index) => (
+                <Fragment key={index}>
+                  {index > 0 ? " • " : null}
+                  {part}
+                </Fragment>
+              ))}
             </p>
           )}
 
