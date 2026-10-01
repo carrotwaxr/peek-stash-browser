@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { setupAPI, startServer } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
+import { resumeDownloadsAtStartup } from "./initializers/downloads.js";
 import {
   closeResources,
   installProcessHandlers,
@@ -13,13 +14,9 @@ import {
 import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
-import {
-  scheduleDownloadCleanup,
-  sweepOrphanedDownloadFiles,
-} from "./jobs/downloadCleanup.js";
+import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
 import { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
-import { recoverPendingDownloads } from "./services/DownloadJobQueue.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { getJwtSecret } from "./utils/jwtSecret.js";
 import { logger } from "./utils/logger.js";
@@ -93,10 +90,9 @@ const main = async () => {
 
     // Playlist zips a restart interrupted are built again, once the
     // instances' scenes are loaded (with none configured they wait for the
-    // next start that has one)
-    await recoverPendingDownloads();
-    // Then the zip files no row and no build owns (a crash left them)
-    await sweepOrphanedDownloadFiles();
+    // next start that has one), then stray zip files are removed; a failure
+    // is logged and startup goes on
+    await resumeDownloadsAtStartup();
 
     // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
     await dataMigrationService.runPendingMigrations();
