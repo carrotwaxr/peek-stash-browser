@@ -48,11 +48,21 @@ test.describe("User Group Management", () => {
     ).toBeVisible({ timeout: 10_000 });
   }
 
-  /** The groups table's row for one group */
+  /**
+   * The groups table's row for one group (only groups have Delete: a user's
+   * row whose one group badge is this group has a cell of the same name)
+   */
   const groupRow = (page: Page, name: string) =>
     page
       .getByRole("row")
-      .filter({ has: page.getByRole("cell", { name, exact: true }) });
+      .filter({ has: page.getByRole("cell", { name, exact: true }) })
+      .filter({ has: page.getByRole("button", { name: "Delete" }) });
+
+  /** The users table's row for one user */
+  const userRow = (page: Page, username: string) =>
+    page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: username, exact: true }) });
 
   /** Creates a group through the Create Group modal */
   async function createGroup(
@@ -175,15 +185,31 @@ test.describe("User Group Management", () => {
     ).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText("Members (1)")).toBeVisible();
 
+    // A member edit saves at once: Cancel closes and the tables update
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(
+      groupRow(page, groupName).getByRole("cell", { name: "1", exact: true })
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(userRow(page, member.username)).toContainText(groupName);
+
     // Remove the member (the X button next to their name)
+    await groupRow(page, groupName)
+      .getByRole("button", { name: "Edit" })
+      .click();
+    await expect(page.getByText("Members (1)")).toBeVisible({
+      timeout: 5_000,
+    });
     await page.locator("button[title='Remove from group']").click();
     await expect(
       page.getByText(`Removed ${member.username} from group`)
     ).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText("Members (0)")).toBeVisible();
 
-    // Close the modal
     await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(
+      groupRow(page, groupName).getByRole("cell", { name: "0", exact: true })
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(userRow(page, member.username)).not.toContainText(groupName);
   });
 
   test("can delete a group", async ({ page }) => {

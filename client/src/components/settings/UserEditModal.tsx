@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Key, Lock, Shield, Trash2, User, Users } from "lucide-react";
 import {
   addGroupMember,
@@ -11,7 +11,7 @@ import {
   removeGroupMember,
   updateUserPermissionOverrides,
 } from "../../api";
-import { Button, Modal } from "../ui/index";
+import { Button, ConfirmDialog, Modal } from "../ui/index";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 interface UserData {
@@ -45,10 +45,53 @@ interface UserEditModalContentProps {
   groups?: GroupData[];
   currentUser: UserData | null;
   onClose: () => void;
-  onSave?: () => void;
-  onMessage?: (message: string) => void;
-  onError?: (message: string) => void;
+  /** Called once on close when anything was saved while the dialog was open */
+  onChanged?: (() => void) | undefined;
+  /** Called after the user is deleted (the dialog has closed) */
+  onDeleted?: ((username: string) => void) | undefined;
+  onMessage?: ((message: string) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
 }
+
+/** A control's save state, shown beside it */
+interface ControlState {
+  status: "idle" | "saving" | "saved" | "error";
+  message?: string;
+}
+
+const NOTE_TEXT_COLOR = {
+  idle: "var(--text-muted)",
+  saving: "var(--text-muted)",
+  saved: "var(--status-success)",
+  error: "var(--status-error)",
+} as const;
+
+/**
+ * The note beside a control that saves on change: "Saving...", "Saved" or the
+ * error. The control names it in `aria-describedby`, and it is a polite live
+ * region, so the result is read out too.
+ */
+const ControlNote = ({ id, state }: { id: string; state?: ControlState }) => {
+  const status = state?.status ?? "idle";
+  const text =
+    status === "saving"
+      ? "Saving..."
+      : status === "saved"
+        ? "Saved"
+        : status === "error"
+          ? state?.message
+          : "";
+  return (
+    <span
+      id={id}
+      aria-live="polite"
+      className="text-xs"
+      style={{ color: NOTE_TEXT_COLOR[status] }}
+    >
+      {text}
+    </span>
+  );
+};
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
@@ -60,7 +103,8 @@ const UserEditModalContent = ({
   groups = [],
   currentUser,
   onClose,
-  onSave,
+  onChanged,
+  onDeleted,
   onMessage,
   onError,
 }: UserEditModalContentProps) => {
@@ -84,8 +128,38 @@ const UserEditModalContent = ({
   const [showContentRestrictionsModal, setShowContentRestrictionsModal] =
     useState(false);
 
-  // Track what has changed for save
-  const [hasChanges, setHasChanges] = useState(false);
+  // Every control saves when changed (no Save button). `wroteRef` remembers
+  // that something was saved, so closing tells the list to reload.
+  const wroteRef = useRef(false);
+  const [controls, setControls] = useState<Record<string, ControlState>>({});
+  const noteBaseId = useId();
+  const noteId = (key: string) => `${noteBaseId}-${key}`;
+  const isSaving = (key: string) => controls[key]?.status === "saving";
+  const setControl = (key: string, state: ControlState) =>
+    setControls((prev) => ({ ...prev, [key]: state }));
+
+  // A role change waits for the admin to confirm it
+  const [pendingRole, setPendingRole] = useState<string | null>(null);
+
+  // Saves one control's change. The control shows the stored value until the
+  // write succeeds, so a failed one leaves it as it was, with the error beside it.
+  const saveControl = async (
+    key: string,
+    write: () => Promise<void>,
+    fallback: string
+  ) => {
+    setControl(key, { status: "saving" });
+    try {
+      await write();
+      wroteRef.current = true;
+      setControl(key, { status: "saved" });
+    } catch (err) {
+      setControl(key, {
+        status: "error",
+        message: (err as Error).message || fallback,
+      });
+    }
+  };
 
   // Load user's current group memberships
   useEffect(() => {
@@ -123,41 +197,50 @@ const UserEditModalContent = ({
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
 
-  const handleGroupToggle = async (
-    groupId: number,
-    isCurrentlyMember: boolean
-  ) => {
-    try {
-      if (isCurrentlyMember) {
-        await removeGroupMember(String(groupId), String(user.id));
-        setUserGroups((prev) => prev.filter((id) => id !== groupId));
-        onMessage?.(`Removed ${user.username} from group`);
-      } else {
-        await addGroupMember(String(groupId), user.id);
-        setUserGroups((prev) => [...prev, groupId]);
-        onMessage?.(`Added ${user.username} to group`);
-      }
-      setHasChanges(true);
-    } catch (err: unknown) {
-      setError((err as Error).message || "Failed to update group membership");
-    }
-  };
+  const handleGroupToggle = (groupId: number, isCurrentlyMember: boolean) =>
+    saveControl(
+      `group-${groupId}`,
+      async () => {
+        if (isCurrentlyMember) {
+          await removeGroupMember(String(groupId), String(user.id));
+          setUserGroups((prev) => prev.filter((id) => id !== groupId));
+          onMessage?.(`Removed ${user.username} from group`);
+        } else {
+          await addGroupMember(String(groupId), user.id);
+          setUserGroups((prev) => [...prev, groupId]);
+          onMessage?.(`Added ${user.username} to group`);
+        }
+      },
+      "Failed to update group membership"
+    );
 
-  const handlePermissionOverride = async (
+  const handlePermissionOverride = (
     permissionKey: string,
     newValue: boolean | null
-  ) => {
-    try {
-      const overrideKey = `${permissionKey}Override`;
-      const response = (await updateUserPermissionOverrides(user.id, {
-        [overrideKey]: newValue,
-      })) as { permissions: UserPermissions };
-      setPermissions(response.permissions);
-      onMessage?.(`Permission updated for ${user.username}`);
-      setHasChanges(true);
-    } catch (err: unknown) {
-      setError((err as Error).message || "Failed to update permission");
-    }
+  ) =>
+    saveControl(
+      `perm-${permissionKey}`,
+      async () => {
+        const overrideKey = `${permissionKey}Override`;
+        const response = (await updateUserPermissionOverrides(user.id, {
+          [overrideKey]: newValue,
+        })) as { permissions: UserPermissions };
+        setPermissions(response.permissions);
+        onMessage?.(`Permission updated for ${user.username}`);
+      },
+      "Failed to update permission"
+    );
+
+  const handleRoleConfirmed = (newRole: string) => {
+    setPendingRole(null);
+    void saveControl(
+      "role",
+      async () => {
+        await apiPut(`/user/${user.id}/role`, { role: newRole });
+        setRole(newRole);
+      },
+      "Failed to change the role"
+    );
   };
 
   const handleDeleteUser = async () => {
@@ -177,9 +260,9 @@ const UserEditModalContent = ({
     try {
       setLoading(true);
       await apiDelete(`/user/${user.id}`);
-      onMessage?.(`User "${user.username}" deleted`);
+      // The caller words the message and reloads; nothing else follows
       onClose();
-      onSave?.();
+      onDeleted?.(user.username);
     } catch (err) {
       setError((err as Error).message || "Failed to delete user");
     } finally {
@@ -204,6 +287,7 @@ const UserEditModalContent = ({
     try {
       setLoading(true);
       await adminResetPassword(user.id, newPassword);
+      wroteRef.current = true;
       onMessage?.(`Password reset for ${user.username}`);
       setShowPasswordReset(false);
       setNewPassword("");
@@ -226,6 +310,7 @@ const UserEditModalContent = ({
     try {
       setLoading(true);
       const response = await adminRegenerateRecoveryKey(user.id);
+      wroteRef.current = true;
       setGeneratedKey(response.recoveryKey);
       onMessage?.(`Recovery key regenerated for ${user.username}`);
     } catch (err: unknown) {
@@ -257,29 +342,10 @@ const UserEditModalContent = ({
     );
   };
 
+  // Nothing is ever unsaved, so closing asks nothing
   const handleClose = () => {
-    if (hasChanges) {
-      if (!confirm("You have unsaved changes. Discard them?")) {
-        return;
-      }
-    }
     onClose();
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (role !== user.role) {
-        await apiPut(`/user/${user.id}/role`, { role });
-      }
-      onMessage?.(`User "${user.username}" updated`);
-      onSave?.();
-    } catch (err) {
-      setError((err as Error).message || "Failed to save changes");
-    } finally {
-      setLoading(false);
-    }
+    if (wroteRef.current) onChanged?.();
   };
 
   return (
@@ -298,19 +364,9 @@ const UserEditModalContent = ({
           </span>
         }
         footer={
-          <>
-            <Button variant="secondary" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!hasChanges || loading}
-              loading={loading}
-              onClick={() => void handleSave()}
-            >
-              Save Changes
-            </Button>
-          </>
+          <Button variant="secondary" onClick={handleClose}>
+            Close
+          </Button>
         }
       >
         <div className="space-y-6">
@@ -364,24 +420,32 @@ const UserEditModalContent = ({
 
               {/* Role dropdown */}
               <div>
-                <label
-                  htmlFor="userRole"
-                  className="block text-sm font-medium mb-1"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Role
-                </label>
+                <div className="flex items-baseline justify-between gap-2 mb-1">
+                  <label
+                    htmlFor="userRole"
+                    className="block text-sm font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Role
+                  </label>
+                  <ControlNote id={noteId("role")} state={controls.role} />
+                </div>
                 <select
                   id="userRole"
                   value={role}
+                  aria-describedby={noteId("role")}
+                  disabled={isSaving("role")}
                   onChange={(e) => {
                     if (isCurrentUser) {
-                      setError("You cannot change your own role");
+                      setControl("role", {
+                        status: "error",
+                        message: "You cannot change your own role",
+                      });
                       return;
                     }
-                    const newRole = e.target.value;
-                    setRole(newRole);
-                    setHasChanges(true);
+                    // The select keeps the stored role until the change is
+                    // confirmed and saved
+                    setPendingRole(e.target.value);
                   }}
                   className="w-full px-3 py-2 rounded-lg text-sm"
                   style={{
@@ -421,6 +485,7 @@ const UserEditModalContent = ({
                 <div className="space-y-2">
                   {groups.map((group) => {
                     const isMember = userGroups.includes(group.id);
+                    const key = `group-${group.id}`;
                     return (
                       <label
                         key={group.id}
@@ -434,6 +499,8 @@ const UserEditModalContent = ({
                         <input
                           type="checkbox"
                           checked={isMember}
+                          aria-describedby={noteId(key)}
+                          disabled={isSaving(key)}
                           onChange={() =>
                             void handleGroupToggle(group.id, isMember)
                           }
@@ -456,6 +523,7 @@ const UserEditModalContent = ({
                             </p>
                           )}
                         </div>
+                        <ControlNote id={noteId(key)} state={controls[key]} />
                       </label>
                     );
                   })}
@@ -513,6 +581,8 @@ const UserEditModalContent = ({
                             val === "inherit" ? null : val === "true"
                           );
                         }}
+                        aria-describedby={noteId("perm-canShare")}
+                        disabled={isSaving("perm-canShare")}
                         className="px-2 py-1 rounded text-sm"
                         style={{
                           backgroundColor: "var(--bg-tertiary)",
@@ -526,6 +596,10 @@ const UserEditModalContent = ({
                       </select>
                       <span
                         className={`w-3 h-3 rounded-full ${permissions.canShare ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                      <ControlNote
+                        id={noteId("perm-canShare")}
+                        state={controls["perm-canShare"]}
                       />
                     </div>
                   </div>
@@ -559,6 +633,8 @@ const UserEditModalContent = ({
                             val === "inherit" ? null : val === "true"
                           );
                         }}
+                        aria-describedby={noteId("perm-canDownloadFiles")}
+                        disabled={isSaving("perm-canDownloadFiles")}
                         className="px-2 py-1 rounded text-sm"
                         style={{
                           backgroundColor: "var(--bg-tertiary)",
@@ -572,6 +648,10 @@ const UserEditModalContent = ({
                       </select>
                       <span
                         className={`w-3 h-3 rounded-full ${permissions.canDownloadFiles ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                      <ControlNote
+                        id={noteId("perm-canDownloadFiles")}
+                        state={controls["perm-canDownloadFiles"]}
                       />
                     </div>
                   </div>
@@ -606,6 +686,8 @@ const UserEditModalContent = ({
                             val === "inherit" ? null : val === "true"
                           );
                         }}
+                        aria-describedby={noteId("perm-canDownloadPlaylists")}
+                        disabled={isSaving("perm-canDownloadPlaylists")}
                         className="px-2 py-1 rounded text-sm"
                         style={{
                           backgroundColor: "var(--bg-tertiary)",
@@ -619,6 +701,10 @@ const UserEditModalContent = ({
                       </select>
                       <span
                         className={`w-3 h-3 rounded-full ${permissions.canDownloadPlaylists ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                      <ControlNote
+                        id={noteId("perm-canDownloadPlaylists")}
+                        state={controls["perm-canDownloadPlaylists"]}
                       />
                     </div>
                   </div>
@@ -643,9 +729,9 @@ const UserEditModalContent = ({
                 border: "1px solid var(--border-color)",
               }}
             >
-              {user.role === "ADMIN" ? (
-                // The saved role decides, not the unsaved dropdown: an admin
-                // keeps only their own hidden items (item 13)
+              {role === "ADMIN" ? (
+                // The stored role (a change saves before the select shows it):
+                // an admin keeps only their own hidden items (item 13)
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                   Content restrictions do not apply to administrators.
                 </p>
@@ -789,14 +875,34 @@ const UserEditModalContent = ({
         </div>
       </Modal>
 
+      {/* Role change confirmation: a sibling, stacked above this dialog */}
+      <ConfirmDialog
+        isOpen={pendingRole !== null}
+        onClose={() => setPendingRole(null)}
+        onConfirm={() => pendingRole && handleRoleConfirmed(pendingRole)}
+        title={
+          pendingRole === "ADMIN"
+            ? `Make ${user.username} an admin?`
+            : `Make ${user.username} a regular user?`
+        }
+        message={
+          pendingRole === "ADMIN"
+            ? "Admins manage users, servers and restrictions. Content restrictions stop applying to them."
+            : "They will no longer manage users, servers or restrictions, and any content restrictions saved for them apply again."
+        }
+        confirmText={pendingRole === "ADMIN" ? "Make admin" : "Make user"}
+        confirmStyle="primary"
+      />
+
       {/* Content Restrictions Modal: a sibling, stacked above this dialog */}
       {showContentRestrictionsModal && (
         <ContentRestrictionsModal
           user={user}
           onClose={() => setShowContentRestrictionsModal(false)}
-          onSave={() =>
-            onMessage?.(`Content restrictions updated for ${user.username}`)
-          }
+          onSave={() => {
+            wroteRef.current = true;
+            onMessage?.(`Content restrictions updated for ${user.username}`);
+          }}
         />
       )}
     </>
@@ -811,7 +917,8 @@ const UserEditModalContent = ({
  * @param {Array} props.groups - List of all groups
  * @param {Object} props.currentUser - Currently logged in user (for self-edit prevention)
  * @param {Function} props.onClose - Callback when modal is closed
- * @param {Function} props.onSave - Callback when changes are saved
+ * @param {Function} props.onChanged - Called on close when anything was saved
+ * @param {Function} props.onDeleted - Called with the username after a delete
  * @param {Function} props.onMessage - Callback for success messages
  * @param {Function} props.onError - Callback for error messages
  * @param {Object} props.api - API instance for requests

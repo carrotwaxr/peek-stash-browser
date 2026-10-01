@@ -27,7 +27,11 @@ interface UserItem {
 interface Props {
   group: GroupData | null;
   users?: UserItem[];
-  onClose: (saved?: boolean) => void;
+  /**
+   * `wrote`: something was saved before the close (the group, or a member
+   * added or removed, which saves at once), so the caller reloads its lists
+   */
+  onClose: (wrote: boolean) => void;
   onSave?: () => void;
   onMessage?: (message: string) => void;
 }
@@ -45,6 +49,8 @@ const GroupModal = ({
   const isEditMode = !!group;
 
   const nameRef = useRef<HTMLInputElement>(null);
+  // Set by a member added or removed: those save at once, so Cancel reports them
+  const wroteRef = useRef(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -100,6 +106,7 @@ const GroupModal = ({
     const addedUser = users.find((u) => u.id === userId);
     try {
       await addGroupMember(String(group.id), userId);
+      wroteRef.current = true;
       // Find the user details from the users list
       if (addedUser) {
         setMembers((prev) => [
@@ -128,6 +135,7 @@ const GroupModal = ({
     const removedMember = members.find((m) => m.user.id === userId);
     try {
       await removeGroupMember(String(group.id), String(userId));
+      wroteRef.current = true;
       setMembers((prev) => prev.filter((m) => m.user.id !== userId));
       onMessage?.(
         `Removed ${removedMember?.user?.username || "member"} from group`
@@ -187,7 +195,7 @@ const GroupModal = ({
   };
 
   const handleCancel = () => {
-    onClose(false);
+    onClose(wroteRef.current);
   };
 
   const modalTitle = isEditMode ? `Edit Group: ${group.name}` : "Create Group";

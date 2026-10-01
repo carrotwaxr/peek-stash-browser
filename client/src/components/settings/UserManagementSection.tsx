@@ -103,9 +103,14 @@ const UserManagementSection = ({
     }
   };
 
-  const handleGroupModalClose = () => {
+  // Member edits save at once, so a Cancel after one still reloads
+  const handleGroupModalClose = (wrote: boolean) => {
     setShowGroupModal(false);
     setEditingGroup(null);
+    if (wrote) {
+      void loadGroups();
+      onUsersChanged(); // Refresh users to update their group badges
+    }
   };
 
   const handleGroupModalSave = () => {
@@ -623,9 +628,13 @@ const UserManagementSection = ({
           groups={groups}
           currentUser={currentUser}
           onClose={() => setEditingUser(null)}
-          onSave={() => {
-            setEditingUser(null);
-            onMessage(`User "${editingUser.username}" updated successfully`);
+          onChanged={() => {
+            // Each change was saved as it was made: reload the badges and counts
+            onUsersChanged();
+            void loadGroups();
+          }}
+          onDeleted={(username) => {
+            onMessage(`User "${username}" deleted`);
             onUsersChanged();
             void loadGroups();
           }}

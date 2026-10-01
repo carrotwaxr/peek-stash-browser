@@ -23,9 +23,11 @@ const UserManagementTab = () => {
     void loadUsers();
   }, []);
 
+  // The spinner shows only until the first answer: a reload after an edit
+  // keeps the table and updates it in place, and a failed one shows the error
+  // above the table it leaves as it was
   const loadUsers = async () => {
     try {
-      setLoading(true);
       setError(null);
       const data = await apiGet<{ users: UserItem[] }>("/user/all");
       setUsers(data.users || []);
