@@ -1,22 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import type {
+  DiscardOrphanResponse,
+  OrphanedScene,
+  OrphanedScenesResponse,
+} from "@peek/shared-types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { apiGet, apiPost } from "../../../api";
 import { makeCompositeKey } from "../../../utils/compositeKey";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
-
-/** A deleted scene with activity; its id is meaningful on its instance only */
-interface OrphanScene {
-  id: string;
-  instanceId: string;
-  instanceName: string;
-  title: string | null;
-  deletedAt: string;
-  phash: string | null;
-  totalPlayCount: number;
-  hasRatings: boolean;
-  hasFavorites: boolean;
-}
 
 /** A live scene of the orphan's instance with the same phash */
 interface MatchResult {
@@ -29,14 +21,14 @@ interface MatchResult {
 }
 
 /** The orphan as "id:instanceId": its row key and its ref in the API paths */
-const orphanKey = (orphan: OrphanScene) =>
+const orphanKey = (orphan: OrphanedScene) =>
   makeCompositeKey(orphan.id, orphan.instanceId);
 
-const orphanPath = (orphan: OrphanScene) =>
+const orphanPath = (orphan: OrphanedScene) =>
   `/admin/orphaned-scenes/${encodeURIComponent(orphanKey(orphan))}`;
 
 const MergeRecoveryTab = () => {
-  const [orphans, setOrphans] = useState<OrphanScene[]>([]);
+  const [orphans, setOrphans] = useState<OrphanedScene[]>([]);
   const [loading, setLoading] = useState(true);
   // The orphan key being processed, or "all"
   const [processing, setProcessing] = useState<string | null>(null);
@@ -50,7 +42,7 @@ const MergeRecoveryTab = () => {
   const fetchOrphans = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiGet<{ scenes: OrphanScene[] }>(
+      const data = await apiGet<OrphanedScenesResponse>(
         "/admin/orphaned-scenes"
       );
       setOrphans(data.scenes);
@@ -65,7 +57,7 @@ const MergeRecoveryTab = () => {
     void fetchOrphans();
   }, [fetchOrphans]);
 
-  const fetchMatches = async (orphan: OrphanScene) => {
+  const fetchMatches = async (orphan: OrphanedScene) => {
     const key = orphanKey(orphan);
     if (matches[key]) return;
     try {
@@ -78,7 +70,7 @@ const MergeRecoveryTab = () => {
     }
   };
 
-  const handleExpand = (orphan: OrphanScene) => {
+  const handleExpand = (orphan: OrphanedScene) => {
     const key = orphanKey(orphan);
     if (expandedOrphan === key) {
       setExpandedOrphan(null);
@@ -89,7 +81,7 @@ const MergeRecoveryTab = () => {
   };
 
   /** Transfer to `targetId`, a scene id on the orphan's instance */
-  const handleReconcile = async (orphan: OrphanScene, targetId: string) => {
+  const handleReconcile = async (orphan: OrphanedScene, targetId: string) => {
     try {
       setProcessing(orphanKey(orphan));
       await apiPost(`${orphanPath(orphan)}/reconcile`, {
@@ -104,17 +96,17 @@ const MergeRecoveryTab = () => {
     }
   };
 
-  const handleDiscard = async (orphan: OrphanScene) => {
+  const handleDiscard = async (orphan: OrphanedScene) => {
     if (
       !confirm(
-        "Are you sure you want to discard this orphaned data? This cannot be undone."
+        "Are you sure you want to discard this orphaned data? It also removes the scene from every playlist that holds it. This cannot be undone."
       )
     ) {
       return;
     }
     try {
       setProcessing(orphanKey(orphan));
-      await apiPost(`${orphanPath(orphan)}/discard`);
+      await apiPost<DiscardOrphanResponse>(`${orphanPath(orphan)}/discard`);
       showSuccess("Orphaned data discarded");
       void fetchOrphans();
     } catch {
@@ -241,6 +233,8 @@ const MergeRecoveryTab = () => {
                         Activity: {orphan.totalPlayCount} plays
                         {orphan.hasRatings && " | Has ratings"}
                         {orphan.hasFavorites && " | Favorited"}
+                        {orphan.playlistEntryCount > 0 &&
+                          ` | In ${orphan.playlistEntryCount} playlist${orphan.playlistEntryCount === 1 ? "" : "s"}`}
                       </p>
                     </div>
                     {expanded ? (

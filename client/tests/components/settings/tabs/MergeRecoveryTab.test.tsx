@@ -26,7 +26,8 @@ const ORPHANS = [
     title: "Scene Five",
     deletedAt: "2026-09-23T15:26:31.000Z",
     phash: "abcdef0123456789",
-    userActivityCount: 2,
+    userActivityCount: 4,
+    playlistEntryCount: 2,
     totalPlayCount: 3,
     hasRatings: true,
     hasFavorites: false,
@@ -39,6 +40,7 @@ const ORPHANS = [
     deletedAt: "2026-09-23T15:26:31.000Z",
     phash: "abcdef0123456789",
     userActivityCount: 1,
+    playlistEntryCount: 0,
     totalPlayCount: 10,
     hasRatings: false,
     hasFavorites: false,
@@ -90,6 +92,35 @@ describe("MergeRecoveryTab", () => {
     expect(
       screen.getByPlaceholderText("Scene ID on Stash B")
     ).toBeInTheDocument();
+  });
+
+  it("shows 'In N playlists' for an orphan that playlists still reference", async () => {
+    mockGet.mockImplementation((url: string) =>
+      Promise.resolve(
+        url === "/admin/orphaned-scenes"
+          ? {
+              scenes: [
+                ...ORPHANS,
+                {
+                  ...ORPHANS[1],
+                  id: "6",
+                  title: "Scene Six",
+                  totalPlayCount: 0,
+                  userActivityCount: 1,
+                  playlistEntryCount: 1,
+                },
+              ],
+              totalCount: 3,
+            }
+          : { matches: [] }
+      )
+    );
+    render(<MergeRecoveryTab />);
+
+    expect(await screen.findByText(/In 2 playlists/)).toBeInTheDocument();
+    expect(screen.getByText(/In 1 playlist(?!s)/)).toBeInTheDocument();
+    // The orphan with no playlist entries says nothing about playlists
+    expect(screen.getAllByText(/playlist/)).toHaveLength(2);
   });
 
   it("Transfer and Discard post to /admin/orphaned-scenes/5%3Ainst-b/...", async () => {
