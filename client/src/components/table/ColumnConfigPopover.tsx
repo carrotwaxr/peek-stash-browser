@@ -115,7 +115,7 @@ const ColumnConfigPopover = ({
       {isOpen && (
         <div
           ref={popoverRef}
-          className="absolute left-0 mt-2 w-[320px] rounded-lg shadow-xl z-50"
+          className="absolute right-0 sm:right-auto sm:left-0 mt-2 w-[320px] max-w-[calc(100vw-2rem)] rounded-lg shadow-xl z-50"
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",

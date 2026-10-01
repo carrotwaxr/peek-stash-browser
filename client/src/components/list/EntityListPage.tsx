@@ -338,7 +338,6 @@ const EntityListPage = ({
           onHideColumn={hideColumn}
           entityType={config.tableEntity ?? entityType}
           isLoading={isLoading}
-          columnsPopover={columnsPopover}
         />
       );
     }

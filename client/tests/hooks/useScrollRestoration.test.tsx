@@ -1,8 +1,11 @@
+import { useRef } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useScrollRestoration, {
   RESTORE_TIMEOUT_MS,
+  useElementScrollRestoration,
 } from "@/hooks/useScrollRestoration";
 
 // The tests/setup.ts ResizeObserver stub never calls back, so record every
@@ -291,5 +294,125 @@ describe("useScrollRestoration", () => {
       setItem.mockRestore();
       getItem.mockRestore();
     }
+  });
+});
+
+describe("useElementScrollRestoration", () => {
+  // The table's box: it exists only on /scenes, so leaving the page unmounts it
+  let box: HTMLDivElement | null = null;
+
+  function Box() {
+    const ref = useRef<HTMLDivElement>(null);
+    useElementScrollRestoration(ref);
+    return (
+      <div
+        ref={(el) => {
+          ref.current = el;
+          box = el;
+          if (el) {
+            Object.defineProperty(el, "clientHeight", {
+              configurable: true,
+              value: 500,
+            });
+            Object.defineProperty(el, "scrollHeight", {
+              configurable: true,
+              get: () => boxScrollHeight,
+            });
+          }
+        }}
+      >
+        <table />
+      </div>
+    );
+  }
+
+  function ElementHarness() {
+    const { pathname } = useLocation();
+    return pathname === "/scenes" ? <Box /> : null;
+  }
+
+  let boxScrollHeight = 5000;
+
+  const renderBox = () => {
+    const router = createMemoryRouter(
+      [{ path: "*", element: <ElementHarness /> }],
+      { initialEntries: ["/scenes"] }
+    );
+    return { router, ...render(<RouterProvider router={router} />) };
+  };
+
+  const scrollBox = (top: number) => {
+    if (!box) throw new Error("no box");
+    box.scrollTop = top;
+    box.dispatchEvent(new Event("scroll"));
+  };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    observers = [];
+    box = null;
+    boxScrollHeight = 5000;
+    globalThis.ResizeObserver =
+      RecordingResizeObserver as unknown as typeof ResizeObserver;
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.ResizeObserver = originalResizeObserver;
+    window.scrollTo = originalScrollTo;
+  });
+
+  it("Back to a table view at 1280 px restores the box's scroll position", async () => {
+    const { router } = renderBox();
+    scrollBox(1800);
+
+    await act(() => router.navigate("/scene/1"));
+    expect(box).toBeNull();
+
+    await act(() => router.navigate(-1));
+
+    expect(router.state.location.pathname).toBe("/scenes");
+    expect(box?.scrollTop).toBe(1800);
+  });
+
+  it("waits for the box to be tall enough before it restores", async () => {
+    const { router } = renderBox();
+    scrollBox(1800);
+    await act(() => router.navigate("/scene/1"));
+
+    // Rows not loaded yet: the box is short
+    boxScrollHeight = 600;
+    await act(() => router.navigate(-1));
+    expect(box?.scrollTop).toBe(0);
+
+    boxScrollHeight = 5000;
+    act(() => fireResize());
+    expect(box?.scrollTop).toBe(1800);
+  });
+
+  it("a new entry (a push to the page) starts at the top", async () => {
+    const { router } = renderBox();
+    scrollBox(900);
+    await act(() => router.navigate("/scene/1"));
+
+    await act(() => router.navigate("/scenes"));
+
+    expect(box?.scrollTop).toBe(0);
+  });
+
+  it("an entry left before its box was restored keeps its saved position", async () => {
+    const { router } = renderBox();
+    scrollBox(1800);
+    await act(() => router.navigate("/scene/1"));
+
+    boxScrollHeight = 600;
+    await act(() => router.navigate(-1));
+    // Left again before the rows arrived: the saved 1800 is not overwritten
+    await act(() => router.navigate("/scene/2"));
+    boxScrollHeight = 5000;
+    await act(() => router.navigate(-1));
+
+    expect(box?.scrollTop).toBe(1800);
   });
 });
