@@ -6,6 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
 import {
   getPlaylistAccess,
   getUserGroups,
@@ -13,6 +14,7 @@ import {
 import {
   type MembershipWithGroup,
   type PlaylistShareWithGroup,
+  userPermissions,
 } from "../helpers/fixtures.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -22,11 +24,20 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+// A share counts only while its owner may share; the default owner may
+vi.mock("../../services/PermissionService.js", () => ({
+  resolveUserPermissions: vi.fn(),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 
 describe("PlaylistAccessService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolvePermissions.mockResolvedValue(
+      userPermissions({ canShare: true })
+    );
   });
 
   describe("getPlaylistAccess", () => {
@@ -68,6 +79,46 @@ describe("PlaylistAccessService", () => {
         level: "shared",
         groups: ["Family", "Friends"],
       });
+    });
+
+    it("shared access needs the owner to still hold Can Share", async () => {
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({ userId: 2 })
+      );
+      mockPrisma.playlistShare.findMany.mockResolvedValue([
+        partialRow<PlaylistShareWithGroup>({
+          group: partialRow({ name: "Family" }),
+        }),
+      ]);
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: false })
+      );
+
+      expect(await getPlaylistAccess(1, 1)).toEqual({ level: "none" });
+      expect(mockResolvePermissions).toHaveBeenCalledWith(2);
+
+      // The share was kept: the permission coming back restores it
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: true })
+      );
+      expect(await getPlaylistAccess(1, 1)).toEqual({
+        level: "shared",
+        groups: ["Family"],
+      });
+    });
+
+    it("an owner no longer in the user table shares nothing", async () => {
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({ userId: 2 })
+      );
+      mockPrisma.playlistShare.findMany.mockResolvedValue([
+        partialRow<PlaylistShareWithGroup>({
+          group: partialRow({ name: "Family" }),
+        }),
+      ]);
+      mockResolvePermissions.mockResolvedValue(null);
+
+      expect(await getPlaylistAccess(1, 1)).toEqual({ level: "none" });
     });
 
     it("returns 'none' when user does not own and has no shared access", async () => {

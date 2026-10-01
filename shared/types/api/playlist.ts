@@ -125,9 +125,6 @@ export interface GetPlaylistQuery extends Record<string, string | undefined> {
   direction?: string;
 }
 
-/**
- * `owner` is optional until B8 fills it, and becomes required with it.
- */
 export interface GetPlaylistResponse {
   playlist: PlaylistData & { items: PlaylistItemWithScene[] };
   /** How many of the playlist's items the viewer can see */
@@ -151,7 +148,7 @@ export interface GetPlaylistResponse {
   accessLevel: "owner" | "shared";
   sharedViaGroups?: string[];
   /** Who owns the playlist, for "Shared by" */
-  owner?: { id: number; username: string };
+  owner: { id: number; username: string };
 }
 
 // =============================================================================

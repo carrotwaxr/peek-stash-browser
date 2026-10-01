@@ -740,6 +740,40 @@ describe("Playlist Controller Operations", () => {
       });
     });
 
+    it("updating shares with a stored share for a group the owner left succeeds and drops it", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 1, userId: 1 })
+      );
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: true })
+      );
+      // The owner now belongs to group 10 only; group 99 is a stored share
+      mockGetUserGroups.mockResolvedValue([{ id: 10, name: "Family" }]);
+      mockPrisma.playlistShare.findMany
+        .mockResolvedValueOnce([partialRow({ groupId: 99 })])
+        .mockResolvedValueOnce([
+          partialRow<PlaylistShareWithGroup>({
+            sharedAt: new Date("2025-06-01"),
+            group: partialRow({ id: 10, name: "Family" }),
+          }),
+        ]);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const req = reqFor(updatePlaylistShares, {
+        body: { groupIds: [10, 99] },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
+
+      await updatePlaylistShares(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockPrisma.playlistShare.create).toHaveBeenCalledExactlyOnceWith({
+        data: { playlistId: 1, groupId: 10 },
+      });
+    });
+
     it("returns 403 when user lacks canShare permission", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(
         partialRow({
@@ -777,6 +811,8 @@ describe("Playlist Controller Operations", () => {
         userPermissions({ canShare: true })
       );
       mockGetUserGroups.mockResolvedValue([{ id: 10, name: "Family" }]);
+      // 99 is no stored share, so it is being added
+      mockPrisma.playlistShare.findMany.mockResolvedValue([]);
 
       const req = reqFor(updatePlaylistShares, {
         body: { groupIds: [10, 99] },

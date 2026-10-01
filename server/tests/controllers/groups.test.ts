@@ -572,6 +572,38 @@ describe("Groups Controller", () => {
       expect(mockPrisma.userGroupMembership.delete).toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith({ success: true });
     });
+
+    it("removing a member deletes that member's playlist shares with the group, in one unit with the membership", async () => {
+      mockPrisma.userGroupMembership.findUnique.mockResolvedValue(
+        partialRow({ id: 1 })
+      );
+      mockPrisma.userGroupMembership.delete.mockResolvedValue(
+        partialRow({ id: 1 })
+      );
+      mockPrisma.playlistShare.deleteMany.mockResolvedValue({ count: 1 });
+
+      const res = resFor(removeMember);
+      await removeMember(
+        reqFor(removeMember, {
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "3", userId: "2" },
+        }),
+        res
+      );
+
+      expect(mockPrisma.userGroupMembership.delete).toHaveBeenCalledWith({
+        where: { userId_groupId: { userId: 2, groupId: 3 } },
+      });
+      expect(mockPrisma.playlistShare.deleteMany).toHaveBeenCalledWith({
+        where: { groupId: 3, playlist: { userId: 2 } },
+      });
+      // One transaction holds both writes
+      expect(mockPrisma.$transaction).toHaveBeenCalledExactlyOnceWith([
+        expect.anything(),
+        expect.anything(),
+      ]);
+      expect(res.json).toHaveBeenCalledWith({ success: true });
+    });
   });
 
   describe("getUserGroups", () => {

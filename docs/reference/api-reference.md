@@ -472,8 +472,11 @@ interface GetPlaylistResponse {
   isOwner: boolean;
   accessLevel: "owner" | "shared";
   sharedViaGroups?: string[];
+  owner: { id: number; username: string }; // who owns the playlist
 }
 ```
+
+A share counts only while its owner holds Can Share (an admin has no bypass here): without it a recipient gets 404 here and the playlist leaves `GET /api/playlists/shared`, and both return when the permission does.
 
 **Controller:** `getPlaylist` in `../controllers/playlist.ts`
 
