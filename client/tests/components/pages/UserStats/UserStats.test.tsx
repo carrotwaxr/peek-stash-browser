@@ -1,9 +1,16 @@
 import { MemoryRouter } from "react-router-dom";
 import type { UserStatsResponse } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "@/api";
+import { libraryApi } from "@/api/library";
 import { queryKeys } from "@/api/queryKeys";
 import UserStats from "@/components/pages/UserStats/UserStats";
 import { showError } from "@/utils/toast";
@@ -15,6 +22,29 @@ vi.mock("@/api", async (importActual) => ({
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: true, isLoading: false }),
+}));
+
+// The viewer is its own component's concern: the stub shows what it was given
+vi.mock("@/components/ui/Lightbox", () => ({
+  default: ({
+    isOpen,
+    images,
+    onClose,
+  }: {
+    isOpen: boolean;
+    images: { id: string; instanceId: string; title: string }[];
+    onClose: () => void;
+  }) =>
+    isOpen ? (
+      <div role="dialog" aria-label="Viewer">
+        {images.map((image) => (
+          <span key={image.id}>
+            {image.title} on {image.instanceId}
+          </span>
+        ))}
+        <button onClick={onClose}>Close viewer</button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/utils/toast", () => ({ showError: vi.fn() }));
@@ -159,5 +189,60 @@ describe("UserStats", () => {
     expect(
       button.querySelector("svg")?.classList.contains("animate-spin")
     ).toBe(false);
+  });
+
+  describe("the Most Viewed Image card", () => {
+    const mostViewedImage = {
+      id: "12",
+      instanceId: "inst-b",
+      title: "Sunset",
+      filePath: null,
+      imageUrl: null,
+      viewCount: 4,
+    };
+    const imageRow = { id: "12", instanceId: "inst-b", title: "Sunset" };
+    const findImages = vi.spyOn(libraryApi, "findImages");
+
+    const findImagesAnswer = (images: unknown[]) =>
+      ({ findImages: { count: images.length, images } }) as Awaited<
+        ReturnType<typeof libraryApi.findImages>
+      >;
+
+    it("opens that image in the viewer on the Stats page, read as the viewer's visible image on its instance", async () => {
+      findImages.mockResolvedValue(findImagesAnswer([imageRow]));
+      renderStats({
+        ...response({ totalImagesViewed: 4 }),
+        mostViewedImage,
+      });
+
+      expect(screen.queryByRole("link", { name: /Sunset/ })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /Sunset/ }));
+
+      expect(await screen.findByText("Sunset on inst-b")).toBeTruthy();
+      expect(findImages).toHaveBeenCalledWith(
+        { ids: ["12"], image_filter: { instance_id: "inst-b" } },
+        expect.any(AbortSignal)
+      );
+
+      fireEvent.click(screen.getByText("Close viewer"));
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("an image that is no longer visible opens nothing and says so", async () => {
+      findImages.mockResolvedValue(findImagesAnswer([]));
+      renderStats({
+        ...response({ totalImagesViewed: 4 }),
+        mostViewedImage,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /Sunset/ }));
+
+      await waitFor(() =>
+        expect(showError).toHaveBeenCalledWith(
+          "That image is no longer available"
+        )
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
   });
 });

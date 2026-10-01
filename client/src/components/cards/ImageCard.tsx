@@ -1,8 +1,7 @@
 import { forwardRef, memo, useCallback, useMemo } from "react";
 import type { ImageListItem } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath } from "../../utils/entityLinks";
+import { getImagePath } from "../../utils/entityLinks";
 import { getImageTitle } from "../../utils/imageTitle";
 import { BaseCard } from "../ui/BaseCard";
 import type { CardBadge } from "../ui/CardComponents";
@@ -70,7 +69,6 @@ const ImageCard = memo(
     ) => {
       const { getSettings } = useCardDisplaySettings();
       const imageSettings = getSettings("image");
-      const { hasMultipleInstances } = useConfig();
       // Build subtitle from studio and date (respecting settings)
       const subtitle = (() => {
         const parts = [];
@@ -154,11 +152,7 @@ const ImageCard = memo(
           subtitle={subtitle}
           description={image.details}
           onClick={handleClick}
-          linkTo={
-            onClick
-              ? undefined
-              : getEntityPath("image", image, hasMultipleInstances)
-          }
+          linkTo={onClick ? undefined : getImagePath(image)}
           fromPageTitle={fromPageTitle}
           tabIndex={tabIndex}
           indicators={indicatorsToShow}

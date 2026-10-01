@@ -99,6 +99,9 @@ export const queryKeys = {
     all: (instanceId?: string) => ["images", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["images", instanceId, "list", params] as const,
+    // One image read by id (the Stats page's Most Viewed Image card)
+    detail: (instanceId: string | undefined, id: string | undefined) =>
+      ["images", instanceId, "detail", id] as const,
   },
 
   // Whether the user's library can be shown yet (useLibraryReady)

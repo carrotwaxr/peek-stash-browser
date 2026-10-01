@@ -8,12 +8,10 @@ import {
 import { getErrorMessage } from "../api/client";
 import { makeCompositeKey } from "../utils/compositeKey";
 import { showError, showInfo } from "../utils/toast";
+import { IMAGE_PARAM } from "../utils/urlParams";
 
 // Number of images to prefetch ahead and behind current position
 export const PREFETCH_COUNT = 3;
-
-/** The URL param that names the open image, as "id:instanceId" */
-export const IMAGE_PARAM = "image";
 
 /** An image the lightbox can name in the URL */
 interface KeyedImage {

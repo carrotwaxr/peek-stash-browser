@@ -5,6 +5,7 @@
  * the instance ID as a query parameter to disambiguate entities with
  * the same ID across different instances.
  */
+import { makeCompositeKey } from "./compositeKey";
 import {
   CLIP_FILTER_OPTIONS,
   type FilterOption,
@@ -16,7 +17,7 @@ import {
   STUDIO_FILTER_OPTIONS,
   TAG_FILTER_OPTIONS,
 } from "./filterConfig";
-import { entityParamFor } from "./urlParams";
+import { IMAGE_PARAM, entityParamFor } from "./urlParams";
 
 const ENTITY_PATHS: Record<string, string> = {
   performer: "/performer",
@@ -25,13 +26,12 @@ const ENTITY_PATHS: Record<string, string> = {
   tag: "/tag",
   group: "/collection",
   gallery: "/gallery",
-  image: "/image",
 };
 
 /**
  * Generate a path for an entity detail page.
  *
- * @param {string} entityType - Type of entity (performer, scene, studio, tag, group, gallery, image)
+ * @param {string} entityType - Type of entity (performer, scene, studio, tag, group, gallery); an image has no page, see getImagePath
  * @param {Object|string} entity - Entity object with id and instanceId, or just the id string
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} The path to the entity detail page
@@ -65,6 +65,21 @@ export function getEntityPath(
     return `${base}?instance=${encodeURIComponent(entity.instanceId)}`;
   }
   return base;
+}
+
+/**
+ * The link to one image: images have no page of their own, so it opens the
+ * Images page with the image in its viewer (the list's `image` param, the
+ * image's "id:instanceId"; two servers can hold the same id, so the instance
+ * is always named). "#" for an image without an id.
+ *
+ * @param {Object} image - Image with id and instanceId
+ * @returns {string} The path of the Images page showing the image
+ */
+export function getImagePath(image: EntityLike): string {
+  if (image.id == null) return "#";
+  const key = makeCompositeKey(String(image.id), image.instanceId);
+  return `/images?${IMAGE_PARAM}=${encodeURIComponent(key)}`;
 }
 
 /**

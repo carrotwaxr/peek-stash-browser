@@ -5,6 +5,41 @@ import { describe, expect, it } from "vitest";
 import { getCellRenderer } from "../../../src/components/table/cellRenderers";
 
 describe("cellRenderers", () => {
+  describe("image renderers", () => {
+    const image = {
+      id: "12",
+      instanceId: "inst-a",
+      title: "Sunset",
+      paths: { thumbnail: "/thumb.jpg" },
+    };
+
+    it("an Images table title cell links to the image, not #", () => {
+      const TitleRenderer = getCellRenderer("title", "image");
+      render(
+        <MemoryRouter>
+          <TitleRenderer {...image} />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByRole("link").getAttribute("href")).toBe(
+        "/images?image=12%3Ainst-a"
+      );
+    });
+
+    it("an Images table thumbnail cell links to the image, not #", () => {
+      const ThumbnailRenderer = getCellRenderer("image", "image");
+      render(
+        <MemoryRouter>
+          <ThumbnailRenderer {...image} />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByRole("link").getAttribute("href")).toBe(
+        "/images?image=12%3Ainst-a"
+      );
+    });
+  });
+
   describe("gallery cover renderer", () => {
     it("renders thumbnail from gallery.cover string URL", () => {
       const gallery = {

@@ -15,6 +15,7 @@ import {
   EngagementTotals,
   HighlightCard,
   LibraryOverview,
+  MostViewedImageCard,
   TopList,
 } from "./components/index";
 
@@ -277,13 +278,7 @@ const UserStats = () => {
                   statLabel="plays"
                   statValue={data.mostWatchedScene?.playCount ?? 0}
                 />
-                <HighlightCard
-                  title="Most Viewed Image"
-                  item={data.mostViewedImage}
-                  entityType="image"
-                  statLabel="views"
-                  statValue={data.mostViewedImage?.viewCount ?? 0}
-                />
+                <MostViewedImageCard image={data.mostViewedImage} />
                 <HighlightCard
                   title="Most O'd Scene"
                   item={data.mostOdScene}
