@@ -34,7 +34,17 @@ import {
   getStreamLinkKey,
   signStreamLink,
 } from "../utils/streamLink.js";
-import { pipeResponseToClient } from "../utils/streamProxy.js";
+import {
+  fetchFromStash,
+  pipeResponseToClient,
+  readStashText,
+} from "../utils/streamProxy.js";
+
+/** How long Stash may take to answer, and to go quiet mid-body, on a stream. */
+const STREAM_HEADERS_TIMEOUT_MS = 60_000;
+const STREAM_IDLE_TIMEOUT_MS = 60_000;
+/** A caption is answered and read whole within this. */
+const CAPTION_TIMEOUT_MS = 15_000;
 
 /**
  * The address and key of the instance a request names, or null once the
@@ -302,23 +312,19 @@ export const proxyStashStream = async (
 
     logger.debug(`[PROXY] Proxying stream: scene=${sceneId} ${fullStreamPath}`);
 
-    // Abort the upstream fetch if the client disconnects (seek, refresh, navigate away).
-    // This prevents orphaned connections from downloading entire files into memory.
-    const abortController = new AbortController();
-    res.on("close", () => abortController.abort());
-
-    // Forward request to Stash using fetch
-    const headers: Record<string, string> = { ApiKey: apiKey };
+    // Forward request to Stash. The fetch aborts when the client disconnects
+    // (seek, refresh, navigate away), which keeps orphaned connections from
+    // downloading entire files, and when Stash sends no headers in time.
     // Manifests go whole: Stash honours Range on them, and a slice starting
     // past "apikey=" would carry a bare key through every rewrite below
     const isManifestPath = /\.(m3u8|mpd)$/.test(fullStreamPath);
-    if (req.headers.range && !isManifestPath) {
-      headers["Range"] = req.headers.range;
-    }
-
-    const response = await fetch(stashUrl, {
-      headers,
-      signal: abortController.signal,
+    const { response, abort } = await fetchFromStash(stashUrl, {
+      apiKey,
+      clientRes: res,
+      headersTimeoutMs: STREAM_HEADERS_TIMEOUT_MS,
+      ...(req.headers.range && !isManifestPath
+        ? { headers: { Range: req.headers.range } }
+        : {}),
     });
 
     if (!response.ok) {
@@ -340,7 +346,11 @@ export const proxyStashStream = async (
 
     if (isHlsPlaylist) {
       // For HLS playlists, read the entire response and rewrite URLs
-      const playlistContent = await response.text();
+      const playlistContent = await readStashText(
+        response,
+        abort,
+        STREAM_IDLE_TIMEOUT_MS
+      );
       const rewrittenContent = rewriteHlsPlaylist(
         playlistContent,
         sceneId,
@@ -376,7 +386,9 @@ export const proxyStashStream = async (
       fullStreamPath.endsWith(".mpd") || contentType.includes("dash+xml");
 
     if (isDashManifest) {
-      const manifest = stripDashApiKeys(await response.text());
+      const manifest = stripDashApiKeys(
+        await readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
+      );
       if (API_KEY_ANYWHERE.test(manifest)) {
         logger.warn(
           `[PROXY] Refused a DASH manifest that names apikey: scene=${sceneId} ${fullStreamPath}`
@@ -401,7 +413,10 @@ export const proxyStashStream = async (
       "etag",
     ];
 
-    await pipeResponseToClient(response, res, "[PROXY]", headersToForward);
+    await pipeResponseToClient(response, res, "[PROXY]", headersToForward, {
+      idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
+      abort,
+    });
 
     logger.debug(`[PROXY] Stream proxied successfully: ${fullStreamPath}`);
   } catch (error) {
@@ -485,11 +500,12 @@ export const getCaption = async (
     captionUrl.searchParams.set("type", type);
     logger.debug(`[CAPTION] Fetching from Stash: ${captionUrl.pathname}`);
 
-    // Fetch caption from Stash with API key
-    const response = await fetch(captionUrl.toString(), {
-      headers: {
-        ApiKey: apiKey,
-      },
+    // Fetch caption from Stash with API key; answer and body share 15 s
+    const startedAt = Date.now();
+    const { response, abort } = await fetchFromStash(captionUrl.toString(), {
+      apiKey,
+      clientRes: res,
+      headersTimeoutMs: CAPTION_TIMEOUT_MS,
     });
 
     if (!response.ok) {
@@ -500,7 +516,11 @@ export const getCaption = async (
       return;
     }
 
-    const captionData = await response.text();
+    const captionData = await readStashText(
+      response,
+      abort,
+      CAPTION_TIMEOUT_MS - (Date.now() - startedAt)
+    );
 
     // Stash automatically converts SRT to VTT if needed, so we can just serve it
     res.setHeader("Content-Type", "text/vtt; charset=utf-8");
