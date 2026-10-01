@@ -29,6 +29,7 @@ import prisma from "../../prisma/singleton.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
 import type * as mediaAccessModule from "../../utils/mediaAccess.js";
+import { mediaProxyLimiter } from "../../utils/proxyLimiter.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 import { stringContaining } from "../helpers/matchers.js";
@@ -422,6 +423,7 @@ describe("the media proxy and a browser that reads slowly", () => {
   let peekUrl: string;
   let closePeek: () => Promise<void>;
   let setTimeoutSpy: { mockRestore: () => void } | undefined;
+  let dateNowSpy: { mockRestore: () => void } | undefined;
 
   beforeAll(async () => {
     // A large preview, written as fast as Peek reads it
@@ -477,6 +479,8 @@ describe("the media proxy and a browser that reads slowly", () => {
   afterEach(() => {
     setTimeoutSpy?.mockRestore();
     setTimeoutSpy = undefined;
+    dateNowSpy?.mockRestore();
+    dateNowSpy = undefined;
   });
 
   /** The browser's request, its body left unread once the headers came. */
@@ -510,8 +514,11 @@ describe("the media proxy and a browser that reads slowly", () => {
     });
   }
 
-  it("a browser that stops reading is not taken for a silent Stash", async () => {
-    // The proxy's idle timeout on its request to Stash, fired by the test
+  /**
+   * The proxy's idle timeouts on its request to Stash, in the order armed,
+   * fired by the test rather than after a minute of silence
+   */
+  function fakeUpstreamTimeouts(): { ms: number; fire: () => void }[] {
     const timeouts: { ms: number; fire: () => void }[] = [];
     setTimeoutSpy = vi
       .spyOn(http.ClientRequest.prototype, "setTimeout")
@@ -523,12 +530,15 @@ describe("the media proxy and a browser that reads slowly", () => {
         timeouts.push({ ms, fire: callback ?? (() => undefined) });
         return this;
       });
+    return timeouts;
+  }
 
-    const res = await requestPaused();
-    expect(res.statusCode).toBe(200);
-    // Every buffer between the browser and Stash fills: Peek stops reading
-    // from Stash because the browser stopped reading from Peek, and Stash
-    // sends nothing more
+  /**
+   * Every buffer between the browser and Stash fills: Peek stops reading
+   * from Stash because the browser stopped reading from Peek, and Stash
+   * sends nothing more
+   */
+  async function untilStashStops(): Promise<void> {
     let lastSent = -1;
     await vi.waitFor(
       () => {
@@ -539,6 +549,25 @@ describe("the media proxy and a browser that reads slowly", () => {
       { timeout: 10000, interval: 200 }
     );
     expect(stashSent).toBeLessThan(LARGE_BYTES);
+  }
+
+  /** The clock the proxy reads, set by the test. */
+  function fakeClock(start: number): { set: (ms: number) => void } {
+    let now = start;
+    dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    return {
+      set: (ms) => {
+        now = ms;
+      },
+    };
+  }
+
+  it("a browser that stops reading is not taken for a silent Stash", async () => {
+    const timeouts = fakeUpstreamTimeouts();
+
+    const res = await requestPaused();
+    expect(res.statusCode).toBe(200);
+    await untilStashStops();
 
     // The idle limit passes while the browser holds the transfer back
     must(timeouts[0], "the proxy's upstream timeout").fire();
@@ -546,4 +575,64 @@ describe("the media proxy and a browser that reads slowly", () => {
     expect(await readAll(res)).toBe(LARGE_BYTES);
     expect(logger.warn).not.toHaveBeenCalled();
   }, 15000);
+
+  it("a browser that reads nothing for two minutes is cut off, its slot freed and logged at info", async () => {
+    const timeouts = fakeUpstreamTimeouts();
+    const activeBefore = mediaProxyLimiter.activeCount;
+
+    const res = await requestPaused();
+    await untilStashStops();
+    expect(mediaProxyLimiter.activeCount).toBe(activeBefore + 1);
+
+    // A minute of the browser not reading: the transfer waits on
+    const clock = fakeClock(1_000_000);
+    must(timeouts[0], "the first idle timeout").fire();
+    expect(mediaProxyLimiter.activeCount).toBe(activeBefore + 1);
+
+    // Two minutes: the transfer ends and the slot goes to someone else
+    clock.set(1_000_000 + 60_000);
+    must(timeouts[1], "the idle timeout armed again").fire();
+
+    expect(mediaProxyLimiter.activeCount).toBe(activeBefore);
+    expect(await outcomeWithin(readAll(res), 2000)).toBe("rejected");
+    expect(logger.info).toHaveBeenCalledWith(
+      stringContaining("[PROXY scene preview] The browser read nothing for"),
+      expect.anything()
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  }, 15000);
+
+  it("a browser that reads again starts the two minutes afresh", async () => {
+    const timeouts = fakeUpstreamTimeouts();
+
+    const res = await requestPaused();
+    await untilStashStops();
+
+    const clock = fakeClock(1_000_000);
+    must(timeouts[0], "the first idle timeout").fire();
+
+    // The browser reads a megabyte and stops again
+    const readFirst = await new Promise<number>((resolve) => {
+      let bytes = 0;
+      const onData = (chunk: Buffer): void => {
+        bytes += chunk.length;
+        if (bytes < 1024 * 1024) return;
+        res.off("data", onData);
+        res.pause();
+        resolve(bytes);
+      };
+      res.on("data", onData);
+      res.resume();
+    });
+    await untilStashStops();
+
+    // A minute after the first stall, but the second stall is new
+    clock.set(1_000_000 + 60_000);
+    must(timeouts[1], "the idle timeout armed again").fire();
+
+    expect(readFirst + (await readAll(res))).toBe(LARGE_BYTES);
+    expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
+  }, 20000);
 });

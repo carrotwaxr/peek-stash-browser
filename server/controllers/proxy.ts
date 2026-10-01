@@ -147,6 +147,16 @@ function instanceIdOrRespond(
 // =============================================================================
 
 /**
+ * The longest a transfer may wait on a browser that reads nothing (a paused
+ * preview in a background tab) before it is ended: it holds one of the six
+ * slots to Stash (`mediaProxyLimiter`), and other users' media would queue
+ * behind it until refused. Checked each time Stash's idle timer runs out, so
+ * the transfer ends at the first multiple of the route's `timeoutMs` (30 s
+ * or 60 s) at or past it. A browser that reads again starts afresh.
+ */
+const MAX_UNREAD_MS = 120_000;
+
+/**
  * Shared helper that makes an HTTP(S) request to Stash and pipes the response
  * to the Express client. Handles:
  * - Connection pooling via keep-alive agents
@@ -310,15 +320,37 @@ function proxyHttpRequest(
     sendAppError(res, new BadGatewayError("Stash could not serve this media"));
   });
 
+  // When the browser's side last began holding the transfer back (Stash's
+  // socket idle since then), or undefined while it reads
+  let unreadSince: number | undefined;
+  res.on("drain", () => {
+    unreadSince = undefined;
+  });
+
   // Stash sent nothing for `timeoutMs`: before its response, answer 504;
   // after, the response can only be cut short. The timer is the socket's idle
   // timer, which also runs out when the browser stops reading (a paused
   // preview, a background tab): the pipeline then holds Stash back, so that
   // is not a silent Stash, and the timer is armed again while the browser's
-  // side waits to drain (as `pipeResponseToClient` does)
+  // side waits to drain (as `pipeResponseToClient` does), up to
+  // MAX_UNREAD_MS: the slot is one of six for everyone
   const onIdle = (): void => {
     if (upstreamRes !== undefined && res.writableNeedDrain) {
-      proxyReq.setTimeout(timeoutMs, onIdle);
+      const now = Date.now();
+      unreadSince ??= now - timeoutMs;
+      const unreadMs = now - unreadSince;
+      if (unreadMs < MAX_UNREAD_MS) {
+        proxyReq.setTimeout(timeoutMs, onIdle);
+        return;
+      }
+      endedBy = "client";
+      logger.info(
+        `${label} The browser read nothing for ${unreadMs} ms; ending the transfer to free its slot`,
+        { maxUnreadMs: MAX_UNREAD_MS }
+      );
+      releaseOnce();
+      proxyReq.destroy();
+      res.destroy();
       return;
     }
     endedBy ??= "timeout";
