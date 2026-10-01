@@ -137,7 +137,7 @@ describe("SyncSettingsSection", () => {
     vi.mocked(useAuth).mockReturnValue(
       createAuthValue({
         isAuthenticated: true,
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: { id: 1, username: "admin", role: "ADMIN", setupCompleted: true },
       })
     );
     mockApiPost.mockResolvedValue({ ok: true });

@@ -151,13 +151,18 @@ describe("login()", () => {
   it("calls /api/auth/login, sets user and isAuthenticated, returns success", async () => {
     const credentials = { username: "testuser", password: "secret" };
     const loginUser = { id: "1", username: "testuser", role: "USER" };
+    const landingPagePreference = { pages: ["scenes"], randomize: false };
 
     globalThis.fetch = vi.fn().mockImplementation((url) => {
       if (url === "/api/auth/check") {
         return errorResponse(401);
       }
       if (url === "/api/auth/login") {
-        return okResponse({ user: loginUser });
+        return okResponse({
+          success: true,
+          user: loginUser,
+          landingPagePreference,
+        });
       }
       return errorResponse(404);
     });
@@ -176,7 +181,11 @@ describe("login()", () => {
       loginResult = await result.current.login(credentials);
     });
 
-    expect(loginResult).toEqual({ success: true, user: loginUser });
+    expect(loginResult).toEqual({
+      success: true,
+      user: loginUser,
+      landingPagePreference,
+    });
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user).toEqual(loginUser);
 

@@ -11,6 +11,7 @@ import {
   useHiddenItems,
 } from "../../src/hooks/useHiddenEntities";
 import { showError, showSuccess } from "../../src/utils/toast";
+import { userSettingsResponse } from "../helpers/userSettings";
 
 vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(),
@@ -45,6 +46,20 @@ const DEPENDENTS = [
   queryKeys.user.hiddenItems("all", 1),
 ];
 
+/** The user's stored settings, as the one settings query holds them */
+function seedSettings(hideConfirmationDisabled: boolean) {
+  queryClient.setQueryData(
+    queryKeys.user.settings(),
+    userSettingsResponse({ hideConfirmationDisabled })
+  );
+}
+
+function storedHideConfirmation() {
+  return queryClient.getQueryData<
+    ReturnType<typeof userSettingsResponse> | undefined
+  >(queryKeys.user.settings())?.settings.hideConfirmationDisabled;
+}
+
 function seedDependents() {
   for (const key of DEPENDENTS) queryClient.setQueryData(key, { seeded: true });
 }
@@ -63,10 +78,8 @@ describe("useHiddenEntities", () => {
     vi.clearAllMocks();
     queryClient = new QueryClient();
     (apiDelete as unknown as Mock).mockResolvedValue({});
-    (useAuth as unknown as Mock).mockReturnValue({
-      user: { hideConfirmationDisabled: true },
-      updateUser: vi.fn(),
-    });
+    (useAuth as unknown as Mock).mockReturnValue({ isAuthenticated: true });
+    seedSettings(true);
     (apiPost as unknown as Mock).mockResolvedValue({
       successCount: 2,
       failCount: 0,
@@ -196,12 +209,8 @@ describe("useHiddenEntities", () => {
     });
   });
 
-  it("a hide with 'don't ask again' saves the preference and updates the user", async () => {
-    const updateUser = vi.fn();
-    (useAuth as unknown as Mock).mockReturnValue({
-      user: { hideConfirmationDisabled: false },
-      updateUser,
-    });
+  it("Don't ask again is remembered in the user's settings, and the next hide skips the dialog without a reload", async () => {
+    seedSettings(false);
     const { result } = renderHook(() => useHiddenEntities(), { wrapper });
 
     await act(async () => {
@@ -220,11 +229,13 @@ describe("useHiddenEntities", () => {
       });
     });
 
-    expect(apiPut).toHaveBeenCalledTimes(2);
+    // The second hide finds the preference already saved
+    expect(apiPut).toHaveBeenCalledTimes(1);
     expect(apiPut).toHaveBeenCalledWith("/user/hide-confirmation", {
       hideConfirmationDisabled: true,
     });
-    expect(updateUser).toHaveBeenCalledWith({ hideConfirmationDisabled: true });
+    expect(storedHideConfirmation()).toBe(true);
+    expect(result.current.hideConfirmationDisabled).toBe(true);
   });
 
   it("a failed hide shows the server's message, or a default without one", async () => {
@@ -377,11 +388,7 @@ describe("useHiddenEntities", () => {
 
   it("updateHideConfirmation saves the preference, and reports a failure", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const updateUser = vi.fn();
-    (useAuth as unknown as Mock).mockReturnValue({
-      user: undefined,
-      updateUser,
-    });
+    seedSettings(false);
     const { result } = renderHook(() => useHiddenEntities(), { wrapper });
     expect(result.current.hideConfirmationDisabled).toBe(false);
 
@@ -393,13 +400,14 @@ describe("useHiddenEntities", () => {
     expect(apiPut).toHaveBeenCalledWith("/user/hide-confirmation", {
       hideConfirmationDisabled: true,
     });
-    expect(updateUser).toHaveBeenCalledWith({ hideConfirmationDisabled: true });
+    expect(storedHideConfirmation()).toBe(true);
 
     (apiPut as unknown as Mock).mockRejectedValueOnce(new Error("boom"));
     await act(async () => {
       saved = await result.current.updateHideConfirmation(false);
     });
     expect(saved).toBe(false);
+    expect(storedHideConfirmation()).toBe(true);
     expect(showError).toHaveBeenLastCalledWith("Failed to update preference");
   });
 });

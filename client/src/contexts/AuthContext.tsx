@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import type { AuthCheckResponse, LoginResponse } from "@peek/shared-types";
 import {
   ApiError,
   getErrorMessage,
@@ -8,15 +9,7 @@ import { queryClient } from "../api/queryClient";
 import { AuthContext } from "./AuthContextProvider";
 import type { AuthUser } from "./AuthContextProvider";
 
-/** GET /api/auth/check when signed in */
-interface AuthCheckResponse {
-  user: AuthUser;
-}
-
-/** POST /api/auth/login: the user on success, an error message otherwise */
-interface LoginSuccessResponse {
-  user: AuthUser;
-}
+/** POST /api/auth/login refused: an error message */
 interface LoginErrorResponse {
   error?: string;
 }
@@ -61,10 +54,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const data: unknown = await response.json();
 
     if (response.ok) {
-      const { user } = data as LoginSuccessResponse;
+      const { user, landingPagePreference } = data as LoginResponse;
       setIsAuthenticated(true);
       setUser(user);
-      return { success: true, user };
+      return { success: true, user, landingPagePreference };
     } else {
       const body = data as LoginErrorResponse & Record<string, unknown>;
       // A lockout (423) or rate limit (429) says how long to wait

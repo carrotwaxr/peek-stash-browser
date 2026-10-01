@@ -9,10 +9,8 @@ import { BaseCard } from "../../../src/components/ui/BaseCard";
 import { showSuccess } from "../../../src/utils/toast";
 
 vi.mock("../../../src/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { hideConfirmationDisabled: false },
-    updateUser: vi.fn(),
-  }),
+  // Signed out: the settings query stays off, so the hide dialog is asked
+  useAuth: () => ({ isAuthenticated: false }),
 }));
 vi.mock("../../../src/api", () => ({
   apiDelete: vi.fn(),

@@ -1,5 +1,4 @@
 import type { Prisma } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
@@ -38,10 +37,6 @@ export interface RequestUser {
   id: number;
   username: string;
   role: string;
-  preferredPreviewQuality?: string | null;
-  theme?: string | null;
-  hideConfirmationDisabled?: boolean;
-  landingPagePreference?: JsonValue;
   setupCompleted?: boolean;
 }
 
@@ -149,10 +144,6 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       id: true,
       username: true,
       role: true,
-      preferredPreviewQuality: true,
-      theme: true,
-      hideConfirmationDisabled: true,
-      landingPagePreference: true,
       setupCompleted: true,
       passwordChangedAt: true,
     },

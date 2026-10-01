@@ -1,21 +1,17 @@
 import { createContext } from "react";
-import type { LandingPagePreference } from "@peek/shared-types";
+import type {
+  AuthUserResponse,
+  LandingPagePreference,
+} from "@peek/shared-types";
 
-export interface AuthUser {
-  id: number;
-  username: string;
-  role: string;
-  setupCompleted?: boolean;
-  landingPagePreference?: LandingPagePreference | null;
-  hideConfirmationDisabled?: boolean;
-  preferredPreviewQuality?: string;
-  syncToStash?: boolean;
-  groups?: Array<{ id: number; name: string }>;
-}
+/** Who is signed in. Preferences come from `useUserSettings`. */
+export type AuthUser = AuthUserResponse;
 
 export interface LoginResult {
   success: boolean;
   user?: AuthUser;
+  /** The page to open first, from the login answer */
+  landingPagePreference?: LandingPagePreference;
   error?: string;
 }
 

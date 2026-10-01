@@ -23,7 +23,9 @@ export function SignedInWithQuery({
       <AuthContext.Provider
         value={createAuthValue({
           isAuthenticated: signedIn,
-          user: signedIn ? { id: 1, username: "viewer", role: "USER" } : null,
+          user: signedIn
+            ? { id: 1, username: "viewer", role: "USER", setupCompleted: true }
+            : null,
         })}
       >
         {children}

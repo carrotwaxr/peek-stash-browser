@@ -123,7 +123,12 @@ function page(
   );
   const auth = createAuthValue({
     isAuthenticated: true,
-    user: { id: userId, username: `user${userId}`, role: "USER" },
+    user: {
+      id: userId,
+      username: `user${userId}`,
+      role: "USER",
+      setupCompleted: true,
+    },
   });
   return {
     router,

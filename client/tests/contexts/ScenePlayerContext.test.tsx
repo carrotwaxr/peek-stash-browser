@@ -94,7 +94,12 @@ const probe: {
 const SIGNED_IN_USER = 1;
 const signedIn = createAuthValue({
   isAuthenticated: true,
-  user: { id: SIGNED_IN_USER, username: "viewer", role: "USER" },
+  user: {
+    id: SIGNED_IN_USER,
+    username: "viewer",
+    role: "USER",
+    setupCompleted: true,
+  },
 });
 
 /** A queue of scenes on inst-1, as `buildPlaybackQueue` makes it */
