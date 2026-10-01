@@ -199,7 +199,6 @@ export interface GetPlaylistQueueResponse {
 export interface CreatePlaylistRequest {
   name: string;
   description?: string;
-  isPublic?: boolean;
 }
 
 export interface CreatePlaylistResponse {
@@ -222,7 +221,6 @@ export interface UpdatePlaylistRequest {
   name?: string;
   /** A client may send null to clear the description. */
   description?: string | null;
-  isPublic?: boolean;
   shuffle?: boolean;
   repeat?: string;
 }

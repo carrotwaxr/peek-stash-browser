@@ -522,7 +522,6 @@ interface GetPlaylistQueueResponse {
 interface CreatePlaylistRequest {
   name: string;
   description?: string;
-  isPublic?: boolean;
 }
 ```
 
@@ -548,7 +547,6 @@ interface CreatePlaylistResponse {
 interface UpdatePlaylistRequest {
   name?: string;
   description?: string;
-  isPublic?: boolean;
   shuffle?: boolean;
   repeat?: string;
 }

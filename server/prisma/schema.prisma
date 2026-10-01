@@ -166,7 +166,6 @@ model Playlist {
   name        String
   description String?
   userId      Int
-  isPublic    Boolean  @default(false)
   shuffle     Boolean  @default(false)
   repeat      String   @default("none") // "none", "all", "one"
   createdAt   DateTime @default(now())

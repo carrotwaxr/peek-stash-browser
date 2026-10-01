@@ -49,7 +49,6 @@ interface PlaylistData {
   userId: number;
   name: string;
   description: string | null;
-  isPublic: boolean;
   shuffle: boolean;
   repeat: string;
   createdAt: string;

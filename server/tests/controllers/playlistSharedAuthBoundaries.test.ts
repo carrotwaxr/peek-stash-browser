@@ -92,7 +92,6 @@ const SHARED_PLAYLIST = {
   userId: OWNER_ID,
   name: "Owner Playlist",
   description: "A playlist owned by user 1",
-  isPublic: false,
   shuffle: false,
   repeat: "none",
   createdAt: new Date("2025-01-01"),
@@ -397,10 +396,10 @@ describe("Shared playlist authorization boundaries", () => {
       });
     });
 
-    it("returns 404 when shared user tries to toggle public/shuffle/repeat", async () => {
+    it("returns 404 when shared user tries to toggle shuffle/repeat", async () => {
       const req = reqFor(updatePlaylist, {
         params: { id: "1" },
-        body: { isPublic: true, shuffle: true, repeat: "all" },
+        body: { shuffle: true, repeat: "all" },
         user: SHARED_USER,
       });
       const res = resFor(updatePlaylist);
