@@ -80,9 +80,14 @@ function fakePlayer() {
     minimumPlayPercent: 0,
   };
   const setSources = vi.fn();
+  const vttSrc = vi.fn();
+  const vttDetach = vi.fn();
   const el = document.createElement("div");
   const player = {
     handlers,
+    vttSrc,
+    vttDetach,
+    vttThumbnails: () => ({ src: vttSrc, detach: vttDetach }),
     el: () => el,
     trackActivity: () => trackActivity,
     sourceSelector: () => ({ setSources }),
@@ -126,6 +131,7 @@ vi.mock("video.js", () => {
 interface Scene {
   id: string;
   instanceId: string;
+  paths?: { vtt?: string; sprite?: string };
 }
 
 /** The player's queue and controls, as the context hands them over */
@@ -402,6 +408,33 @@ describe("useVideoPlayer", () => {
       [onB, canDecode],
     ]);
     expect(player.load).toHaveBeenCalledTimes(2);
+  });
+
+  describe("seek thumbnails", () => {
+    const withSprite = {
+      ...onA,
+      paths: { vtt: "/vtt/123", sprite: "/sprite/123" },
+    };
+    const withoutSprite = { ...onA2, paths: {} };
+
+    it("a scene without a sprite clears the last scene's thumbnails", () => {
+      const player = fakePlayer();
+      const { rerender } = renderPlayer(player, withSprite);
+      expect(player.vttDetach).not.toHaveBeenCalled();
+
+      rerender({ current: withoutSprite });
+
+      expect(player.vttDetach).toHaveBeenCalledTimes(1);
+      expect(player.vttSrc).toHaveBeenCalledTimes(1);
+    });
+
+    it("a scene with a sprite still calls src(vtt, sprite)", () => {
+      const player = fakePlayer();
+      renderPlayer(player, withSprite);
+
+      expect(player.vttSrc).toHaveBeenCalledWith("/vtt/123", "/sprite/123");
+      expect(player.vttDetach).not.toHaveBeenCalled();
+    });
   });
 
   describe("focus on a new scene", () => {

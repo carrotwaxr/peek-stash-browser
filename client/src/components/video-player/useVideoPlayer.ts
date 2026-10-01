@@ -272,15 +272,25 @@ export function useVideoPlayer({
   // VTT THUMBNAILS UPDATE (from useVideoPlayerLifecycle)
   // ============================================================================
 
+  const vttUrl = scene?.paths?.vtt as string | undefined;
+  const spriteUrl = scene?.paths?.sprite as string | undefined;
+
   useEffect(() => {
     const player = playerRef.current;
-    if (!player || !scene?.paths?.vtt || !scene?.paths?.sprite) return;
+    if (!player) return;
 
-    const vttPlugin = player.vttThumbnails?.();
-    if (vttPlugin) {
-      vttPlugin.src(scene.paths.vtt, scene.paths.sprite);
+    const vttPlugin = player.vttThumbnails?.() as
+      | { src(vtt: string, sprite: string): void; detach(): void }
+      | undefined;
+    if (!vttPlugin) return;
+
+    // A scene with no sprite shows no previews, not the last scene's
+    if (!vttUrl || !spriteUrl) {
+      vttPlugin.detach();
+      return;
     }
-  }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
+    vttPlugin.src(vttUrl, spriteUrl);
+  }, [vttUrl, spriteUrl, playerRef]);
 
   // ============================================================================
   // MEDIA SESSION METADATA (OS media controls - title, artist, poster)
