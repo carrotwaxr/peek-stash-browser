@@ -4,7 +4,6 @@ import {
   type ReactNode,
   forwardRef,
   memo,
-  useCallback,
   useRef,
   useState,
 } from "react";
@@ -18,6 +17,7 @@ import {
 } from "../../api/hooks";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { useInView } from "../../hooks/useInView";
+import { useMediaFallback } from "../../hooks/useMediaFallback";
 import { CardCountIndicators } from "./CardCountIndicators";
 import EntityMenu from "./EntityMenu";
 import { ExpandableDescription } from "./ExpandableDescription";
@@ -144,45 +144,19 @@ export const CardImage = ({
     once: true,
     skip: !drawsMedia,
   });
-  const [hasError, setHasError] = useState(false);
+  const { isVideo, hasError, onImageError, onVideoError } =
+    useMediaFallback(src);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isVideo, setIsVideo] = useState(false);
 
   // A new src starts over. Adjusted while rendering, not in an effect: an
   // effect's reset leaves React a second render of the card to do
   const [stateFor, setStateFor] = useState(src);
   if (stateFor !== src) {
     setStateFor(src);
-    setHasError(false);
     setIsLoaded(false);
-    setIsVideo(false);
   }
 
   const showPlaceholder = !src || hasError;
-
-  // Handle image error - check if it's actually a video file
-  const handleImageError = useCallback(async () => {
-    if (!src) {
-      setHasError(true);
-      return;
-    }
-
-    // Check Content-Type via HEAD request to determine if it's actually a video
-    // This handles cases where tag images are video files (.mp4, .webm)
-    try {
-      const res = await fetch(src, { method: "HEAD" });
-      const contentType = res.headers.get("Content-Type");
-
-      if (contentType?.startsWith("video/")) {
-        setIsVideo(true);
-        return;
-      }
-    } catch {
-      // Network error or CORS issue - fall through to error state
-    }
-
-    setHasError(true);
-  }, [src]);
 
   const getPlaceholderIcon = () => {
     const icons = {
@@ -259,7 +233,7 @@ export const CardImage = ({
                 }`}
                 style={{ objectFit }}
                 onLoadedData={() => setIsLoaded(true)}
-                onError={() => setHasError(true)}
+                onError={onVideoError}
               />
             ) : (
               <img
@@ -270,7 +244,7 @@ export const CardImage = ({
                 }`}
                 style={{ objectFit }}
                 onLoad={() => setIsLoaded(true)}
-                onError={() => void handleImageError()}
+                onError={onImageError}
               />
             ))}
         </>
