@@ -50,6 +50,17 @@ describe("OCounterButton", () => {
     });
   });
 
+  it("a button without an instance sends no press", () => {
+    render(<OCounterButton sceneId="7" initialCount={3} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("O Counter: 3")).toBeTruthy();
+  });
+
   it("a press shows the server's count until the count passed in moves on", async () => {
     const { rerender } = render(
       <OCounterButton sceneId="7" instanceId="inst-a" initialCount={3} />,
