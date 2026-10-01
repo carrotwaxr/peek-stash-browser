@@ -27,6 +27,8 @@ export {
   useSharedPlaylists,
   usePlaylist,
   usePlaylistQueue,
+  useCreatePlaylist,
+  useDeletePlaylist,
   useAddScenesToPlaylist,
   useMovePlaylistItem,
   useRemovePlaylistItems,

@@ -1,7 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPost, getSharedPlaylists } from "../../api";
+import type { PlaylistPreviewItem, PlaylistSummary } from "@peek/shared-types";
+import {
+  useCreatePlaylist,
+  useDeletePlaylist,
+  usePlaylists,
+  useSharedPlaylists,
+} from "../../api/hooks";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { showError, showSuccess } from "../../utils/toast";
 import {
   Button,
@@ -12,17 +19,8 @@ import {
   TabNavigation,
 } from "../ui/index";
 
-interface PlaylistItem {
-  scene?: {
-    id: string;
-    paths?: {
-      screenshot?: string;
-    };
-  };
-}
-
 interface PlaylistThumbnailGridProps {
-  items: PlaylistItem[];
+  items: PlaylistPreviewItem[];
   totalCount: number;
 }
 
@@ -40,11 +38,11 @@ const PlaylistThumbnailGrid = ({
       <div className="grid grid-cols-2 gap-1 w-full h-full rounded-lg overflow-hidden">
         {items.slice(0, 4).map((item, idx) => (
           <div
-            key={item.scene?.id || idx}
+            key={makeCompositeKey(item.sceneId, item.instanceId)}
             className="aspect-square overflow-hidden"
             style={{ backgroundColor: "var(--bg-tertiary)" }}
           >
-            {item.scene?.paths?.screenshot ? (
+            {item.scene.paths.screenshot ? (
               <img
                 src={item.scene.paths.screenshot}
                 alt=""
@@ -77,69 +75,35 @@ const PlaylistThumbnailGrid = ({
 const Playlists = () => {
   usePageTitle("Playlists");
   const [searchParams] = useSearchParams();
-  const [playlists, setPlaylists] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const ownQuery = usePlaylists();
+  const sharedQuery = useSharedPlaylists();
+  const createPlaylistMutation = useCreatePlaylist();
+  const deletePlaylistMutation = useDeletePlaylist();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
-  const [creating, setCreating] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [playlistToDelete, setPlaylistToDelete] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [sharedPlaylists, setSharedPlaylists] = useState<
-    Record<string, unknown>[]
-  >([]);
-  const [loadingShared, setLoadingShared] = useState(false);
-  const [sharedLoaded, setSharedLoaded] = useState(false);
+  const [playlistToDelete, setPlaylistToDelete] =
+    useState<PlaylistSummary | null>(null);
+
+  const playlists = ownQuery.data?.playlists ?? [];
+  // Shared playlists are not critical: a failed read shows none
+  const sharedPlaylists = sharedQuery.data?.playlists ?? [];
+  const loading = ownQuery.isPending;
+  const loadingShared = sharedQuery.isPending;
+  const sharedLoaded = sharedQuery.isSuccess;
+  const error = ownQuery.isError ? "Failed to load playlists" : null;
+  const creating = createPlaylistMutation.isPending;
 
   // Get active tab from URL or default to "mine"
   const activeTab = searchParams.get("tab") || "mine";
-
-  useEffect(() => {
-    // Load both playlist types on mount
-    void loadPlaylists();
-    void loadSharedPlaylists();
-  }, []);
-
-  const loadPlaylists = async () => {
-    try {
-      setLoading(true);
-      const data = await apiGet<{ playlists: Record<string, unknown>[] }>(
-        "/playlists"
-      );
-      setPlaylists(data.playlists);
-    } catch {
-      setError("Failed to load playlists");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSharedPlaylists = async () => {
-    try {
-      setLoadingShared(true);
-      const response = await getSharedPlaylists();
-      setSharedPlaylists(
-        response.playlists as unknown as Record<string, unknown>[]
-      );
-      setSharedLoaded(true);
-    } catch {
-      // Silently fail for shared - not critical
-    } finally {
-      setLoadingShared(false);
-    }
-  };
 
   const createPlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
     try {
-      setCreating(true);
-      await apiPost("/playlists", {
+      await createPlaylistMutation.mutateAsync({
         name: newPlaylistName.trim(),
         description: newPlaylistDescription.trim() || undefined,
       });
@@ -148,15 +112,12 @@ const Playlists = () => {
       setNewPlaylistName("");
       setNewPlaylistDescription("");
       setShowCreateModal(false);
-      void loadPlaylists();
     } catch {
       showError("Failed to create playlist");
-    } finally {
-      setCreating(false);
     }
   };
 
-  const handleDeleteClick = (playlist: Record<string, unknown>) => {
+  const handleDeleteClick = (playlist: PlaylistSummary) => {
     setPlaylistToDelete(playlist);
     setDeleteConfirmOpen(true);
   };
@@ -165,9 +126,10 @@ const Playlists = () => {
     if (!playlistToDelete) return;
 
     try {
-      await apiDelete(`/playlists/${String(playlistToDelete.id)}`);
+      await deletePlaylistMutation.mutateAsync({
+        playlistId: playlistToDelete.id,
+      });
       showSuccess("Playlist deleted");
-      void loadPlaylists();
     } catch {
       showError("Failed to delete playlist");
     } finally {
@@ -257,24 +219,22 @@ const Playlists = () => {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
               {playlists.map((playlist) => {
-                const _count = playlist._count as
-                  | Record<string, number>
-                  | undefined;
+                const count = playlist._count.items;
                 return (
-                  <Paper key={playlist.id as string}>
+                  <Paper key={playlist.id}>
                     <Paper.Body>
                       <div className="flex gap-4">
                         <PlaylistThumbnailGrid
-                          items={playlist.items as PlaylistItem[]}
-                          totalCount={_count?.items || 0}
+                          items={playlist.items}
+                          totalCount={count}
                         />
                         <div className="flex-1 min-w-0">
-                          <Link to={`/playlist/${playlist.id as string}`}>
+                          <Link to={`/playlist/${playlist.id}`}>
                             <h3
                               className="text-lg font-semibold mb-2 hover:underline"
                               style={{ color: "var(--text-primary)" }}
                             >
-                              {playlist.name as string}
+                              {playlist.name}
                             </h3>
                           </Link>
                           {playlist.description ? (
@@ -282,7 +242,7 @@ const Playlists = () => {
                               className="text-sm mb-4 line-clamp-2"
                               style={{ color: "var(--text-secondary)" }}
                             >
-                              {playlist.description as string}
+                              {playlist.description}
                             </p>
                           ) : null}
                           <div
@@ -290,8 +250,7 @@ const Playlists = () => {
                             style={{ color: "var(--text-muted)" }}
                           >
                             <span>
-                              {_count?.items || 0}{" "}
-                              {(_count?.items || 0) === 1 ? "video" : "videos"}
+                              {count} {count === 1 ? "video" : "videos"}
                             </span>
                             <Button
                               onClick={() => handleDeleteClick(playlist)}
@@ -334,39 +293,35 @@ const Playlists = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
           {sharedPlaylists.map((playlist) => {
-            const owner = playlist.owner as { username: string } | undefined;
-            const sharedViaGroups = playlist.sharedViaGroups as
-              | string[]
-              | undefined;
             return (
-              <Paper key={playlist.id as string}>
+              <Paper key={playlist.id}>
                 <Paper.Body>
                   <div className="flex gap-4">
                     <PlaylistThumbnailGrid
-                      items={playlist.items as PlaylistItem[]}
-                      totalCount={(playlist.sceneCount as number) || 0}
+                      items={playlist.items}
+                      totalCount={playlist.sceneCount}
                     />
                     <div className="flex-1 min-w-0">
-                      <Link to={`/playlist/${playlist.id as string}`}>
+                      <Link to={`/playlist/${playlist.id}`}>
                         <h3
                           className="text-lg font-semibold mb-1 hover:underline"
                           style={{ color: "var(--text-primary)" }}
                         >
-                          {playlist.name as string}
+                          {playlist.name}
                         </h3>
                       </Link>
                       <p
                         className="text-sm mb-2"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        by {owner?.username}
+                        by {playlist.owner.username}
                       </p>
                       {playlist.description ? (
                         <p
                           className="text-sm mb-4 line-clamp-2"
                           style={{ color: "var(--text-secondary)" }}
                         >
-                          {playlist.description as string}
+                          {playlist.description}
                         </p>
                       ) : null}
                       <div
@@ -374,16 +329,14 @@ const Playlists = () => {
                         style={{ color: "var(--text-muted)" }}
                       >
                         <span>
-                          {playlist.sceneCount as number}{" "}
-                          {(playlist.sceneCount as number) === 1
-                            ? "video"
-                            : "videos"}
+                          {playlist.sceneCount}{" "}
+                          {playlist.sceneCount === 1 ? "video" : "videos"}
                         </span>
                         <span
                           className="text-xs px-2 py-1 rounded"
                           style={{ backgroundColor: "var(--bg-tertiary)" }}
                         >
-                          via {sharedViaGroups?.join(", ")}
+                          via {playlist.sharedViaGroups.join(", ")}
                         </span>
                       </div>
                     </div>
@@ -490,7 +443,7 @@ const Playlists = () => {
         }}
         onConfirm={() => void confirmDelete()}
         title="Delete Playlist"
-        message={`Are you sure you want to delete "${typeof playlistToDelete?.name === "string" ? playlistToDelete.name : ""}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${playlistToDelete?.name ?? ""}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         confirmStyle="danger"

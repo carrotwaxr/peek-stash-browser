@@ -1,5 +1,6 @@
 import type {
   AddScenesToPlaylistRequest,
+  CreatePlaylistRequest,
   SortPlaylistRequest,
   UpdatePlaylistRequest,
 } from "@peek/shared-types";
@@ -13,6 +14,8 @@ import {
   type PlaylistPageParams,
   type PlaylistQueueParams,
   addScenesToPlaylist,
+  createPlaylist,
+  deletePlaylist,
   getPlaylist,
   getPlaylistQueue,
   getPlaylists,
@@ -25,23 +28,35 @@ import {
 } from "../playlists";
 import { queryKeys } from "../queryKeys";
 
+/** `enabled: false` reads nothing, for a menu that is closed */
+interface PlaylistReadOptions {
+  enabled?: boolean;
+}
+
 /**
  * The user's playlists, for the playlists page and the add-to-playlist menu.
  * `containsScene` (a scene as `"id:instanceId"`) makes each playlist say
  * whether it holds that scene.
  */
-export function usePlaylists(params: { containsScene?: string } = {}) {
+export function usePlaylists(
+  params: { containsScene?: string } = {},
+  { enabled = true }: PlaylistReadOptions = {}
+) {
   return useQuery({
     queryKey: queryKeys.playlists.list(params),
     queryFn: () => getPlaylists(params),
+    enabled,
   });
 }
 
 /** The playlists other users shared with the viewer */
-export function useSharedPlaylists() {
+export function useSharedPlaylists({
+  enabled = true,
+}: PlaylistReadOptions = {}) {
   return useQuery({
     queryKey: queryKeys.playlists.shared(),
     queryFn: () => getSharedPlaylists(),
+    enabled,
   });
 }
 
@@ -77,7 +92,7 @@ export function usePlaylistQueue(
  * under `queryKeys.playlists.all()`, so one invalidation after a success
  * refetches what is on screen and marks the rest stale.
  */
-function usePlaylistMutation<TVariables extends { playlistId: number }, TData>(
+function usePlaylistMutation<TVariables, TData>(
   mutationFn: (variables: TVariables) => Promise<TData>
 ) {
   const queryClient = useQueryClient();
@@ -86,6 +101,20 @@ function usePlaylistMutation<TVariables extends { playlistId: number }, TData>(
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.playlists.all() }),
   });
+}
+
+/** Create a playlist */
+export function useCreatePlaylist() {
+  return usePlaylistMutation((body: CreatePlaylistRequest) =>
+    createPlaylist(body)
+  );
+}
+
+/** Delete a playlist, with its items and shares */
+export function useDeletePlaylist() {
+  return usePlaylistMutation(({ playlistId }: { playlistId: number }) =>
+    deletePlaylist(playlistId)
+  );
 }
 
 /** Add scenes to a playlist, in the order given */

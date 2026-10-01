@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import type * as routerModule from "react-router-dom";
 import {
   fireEvent,
@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PlaylistDetail from "@/components/pages/PlaylistDetail";
@@ -94,11 +95,11 @@ const sharedPlaylist = {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/playlist/5"]}>
+    <MemoryRouterWithQuery initialEntries={["/playlist/5"]}>
       <Routes>
         <Route path="/playlist/:playlistId" element={<PlaylistDetail />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouterWithQuery>
   );
 }
 
