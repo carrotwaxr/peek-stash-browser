@@ -185,8 +185,8 @@ describe("useWatchHistory", () => {
     });
   });
 
-  describe("updateQuality", () => {
-    it("stores quality value in ref", async () => {
+  describe("returned shape", () => {
+    it("returns watchHistory, loading, error and refresh only", async () => {
       apiGetMock.mockResolvedValue({});
 
       const { result } = renderHook(() => useWatchHistory("scene-1", "inst-1"));
@@ -195,10 +195,12 @@ describe("useWatchHistory", () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // updateQuality doesn't trigger re-render (ref-based), just verify it doesn't throw
-      act(() => {
-        result.current.updateQuality("1080p");
-      });
+      expect(Object.keys(result.current).sort()).toEqual([
+        "error",
+        "loading",
+        "refresh",
+        "watchHistory",
+      ]);
     });
   });
 

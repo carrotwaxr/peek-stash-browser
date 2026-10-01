@@ -3,7 +3,6 @@ import CryptoJS from "crypto-js";
 
 interface MarkerSet {
   dot?: HTMLElement;
-  range?: HTMLElement;
 }
 
 interface Marker {
@@ -143,140 +142,6 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     this.addDotMarkers(markers);
   }
 
-  renderRangeMarkers(markers: Marker[], layer: number) {
-    const duration = this.player.duration();
-    const parent = this.player.el().querySelector(".vjs-progress-control");
-    const seekBar = this.player.el().querySelector(".vjs-progress-holder");
-    if (!seekBar || !parent || !duration) return;
-
-    markers.forEach((marker: Marker) => {
-      this.renderRangeMarker(marker, layer, duration, seekBar, parent);
-    });
-  }
-
-  renderRangeMarker(marker: Marker, layer: number, duration: number, seekBar: HTMLElement, parent: HTMLElement) {
-    if (!marker.end_seconds) return;
-
-    const rangeDiv = videojs.dom.createEl("div");
-    rangeDiv.className = "vjs-marker-range";
-
-    // start/end percent is relative to the parent element, which is the vjs-progress-control
-    // vjs-progress-control has 15px margins on each side
-    const left = seekBar.clientWidth * (marker.seconds / duration) + 15;
-
-    // minimum width of 8px
-    const width = Math.max(
-      seekBar.clientWidth * ((marker.end_seconds - marker.seconds) / duration),
-      8
-    );
-
-    rangeDiv.style.left = `${left}px`;
-    rangeDiv.style.width = `${width}px`;
-    rangeDiv.style.bottom = `${layer * this.layerHeight}px`; // Adjust height based on layer
-    rangeDiv.style.display = "none"; // Initially hidden
-
-    // Set background color based on tag (if available)
-    if (
-      marker.primaryTag &&
-      marker.primaryTag.name &&
-      this.tagColors[marker.primaryTag.name]
-    ) {
-      rangeDiv.style.backgroundColor = this.tagColors[marker.primaryTag.name];
-    }
-
-    const range: HTMLElement = rangeDiv;
-    range.style.display = "block";
-    range.addEventListener("pointermove", (e: Event) => {
-      e.stopPropagation();
-    });
-    range.addEventListener("pointerover", (e: Event) => {
-      e.stopPropagation();
-    });
-    range.addEventListener("pointerout", (e: Event) => {
-      e.stopPropagation();
-    });
-    range.addEventListener("mouseenter", () => {
-      this.showMarkerTooltip(marker.title, layer);
-      range.toggleAttribute("marker-tooltip-shown", true);
-    });
-
-    range.addEventListener("mouseout", () => {
-      this.hideMarkerTooltip();
-      range.toggleAttribute("marker-tooltip-shown", false);
-    });
-    parent.appendChild(rangeDiv);
-    const markerSet: MarkerSet = { range };
-    this.markers.push(marker);
-    this.markerDivs.push(markerSet);
-  }
-
-  addRangeMarkers(markers: Marker[]) {
-    let remainingMarkers = [...markers];
-    let layerNum = 0;
-
-    while (remainingMarkers.length > 0) {
-      // Get the set of markers that currently have the highest total duration that don't overlap. We do this layer by layer to prioritize filling
-      // the lower layers when possible
-      const mwis = this.findMWIS(remainingMarkers);
-      if (!mwis.length) break;
-
-      this.renderRangeMarkers(mwis, layerNum);
-      remainingMarkers = remainingMarkers.filter(
-        (marker) => !mwis.includes(marker)
-      );
-      layerNum++;
-    }
-  }
-
-  // Use dynamic programming to find maximum weight independent set (ie the set of markers that have the highest total duration that don't overlap)
-  findMWIS(markers: Marker[]): Marker[] {
-    if (!markers.length) return [];
-
-    // Sort markers by end time
-    markers = markers
-      .slice()
-      .sort((a: Marker, b: Marker) => (a.end_seconds || 0) - (b.end_seconds || 0));
-    const n = markers.length;
-
-    // Compute p(j) for each marker. This is the index of the marker that has the highest end time that doesn't overlap with marker j
-    const p = new Array(n).fill(-1);
-    for (const [j, markerJ] of markers.entries()) {
-      for (let i = j - 1; i >= 0; i--) {
-        const markerI = markers[i];
-        if (markerI && (markerI.end_seconds || 0) <= markerJ.seconds) {
-          p[j] = i;
-          break;
-        }
-      }
-    }
-
-    // Initialize M[j]
-    // Compute M[j] for each marker. This is the maximum total duration of markers that don't overlap with marker j
-    const M = new Array<number>(n).fill(0);
-    for (const [j, markerJ] of markers.entries()) {
-      const include =
-        (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
-      const exclude = j > 0 ? (M[j - 1] ?? 0) : 0;
-      M[j] = Math.max(include, exclude);
-    }
-
-    // Reconstruct optimal solution
-    const findSolution = (j: number): Marker[] => {
-      const markerJ = markers[j];
-      if (j < 0 || !markerJ) return [];
-      const include =
-        (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
-      const exclude = j > 0 ? (M[j - 1] ?? 0) : 0;
-      if (include >= exclude) {
-        return [...findSolution(p[j]), markerJ];
-      } else {
-        return findSolution(j - 1);
-      }
-    };
-
-    return findSolution(n - 1);
-  }
-
   removeMarker(marker: Marker) {
     const i = this.markers.indexOf(marker);
     if (i === -1) return;
@@ -290,7 +155,6 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     }
 
     if (markerSet.dot) markerSet.dot.remove();
-    if (markerSet.range) markerSet.range.remove();
   }
 
   removeMarkers(markers: Marker[]) {
@@ -306,8 +170,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
       }
 
       if (markerSet.dot) markerSet.dot.remove();
-      if (markerSet.range) markerSet.range.remove();
-    }
+      }
     this.markers = [];
     this.markerDivs = [];
   }

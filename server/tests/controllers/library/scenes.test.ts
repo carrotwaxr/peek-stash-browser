@@ -12,7 +12,7 @@ import {
 // ---------------------------------------------------------------------------
 
 import {
-  addStreamabilityInfo,
+  addStashUrl,
   findScenes,
   findSimilarScenes,
   getRecommendedScenes,
@@ -23,7 +23,6 @@ import rankingComputeService from "../../../services/RankingComputeService.js";
 import { recommendationService } from "../../../services/RecommendationService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { isSceneStreamable } from "../../../utils/codecDetection.js";
 import { logger } from "../../../utils/logger.js";
 import { libraryHandler } from "../../../utils/routeHelpers.js";
 import {
@@ -76,12 +75,6 @@ vi.mock("../../../services/RankingComputeService.js", () => ({
   },
 }));
 
-vi.mock("../../../utils/codecDetection.js", () => ({
-  isSceneStreamable: vi
-    .fn()
-    .mockReturnValue({ isStreamable: true, reasons: [] }),
-}));
-
 vi.mock("../../../utils/seededRandom.js", () => ({
   parseRandomSort: vi
     .fn()
@@ -118,7 +111,6 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockResolveInstance = vi.mocked(resolveAccessibleInstanceId);
@@ -136,69 +128,44 @@ beforeEach(() => {
   mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
 });
 
-// ===== 1. addStreamabilityInfo =====
+// ===== 1. addStashUrl =====
 
 const ADMIN_VIEWER = { role: "ADMIN" };
 
-describe("addStreamabilityInfo", () => {
+describe("addStashUrl", () => {
   it("returns empty array when given empty scenes", () => {
-    expect(addStreamabilityInfo([], ADMIN_VIEWER)).toEqual([]);
+    expect(addStashUrl([], ADMIN_VIEWER)).toEqual([]);
   });
 
-  it("attaches isStreamable, streamabilityReasons, and stashUrl to each scene", () => {
-    mockIsSceneStreamable.mockReturnValue({
-      isStreamable: true,
-      reasons: [],
-    });
-
+  it("gives an admin's scene list item the stashUrl", () => {
     const scenes = [createMockScene({ id: "s1" })];
-    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
+    const result = addStashUrl(scenes, ADMIN_VIEWER);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      isStreamable: true,
-      streamabilityReasons: [],
-      stashUrl: "http://stash/scenes/s1",
-    });
+    expect(result[0]).toMatchObject({ stashUrl: "http://stash/scenes/s1" });
   });
 
   it("gives a regular user no stashUrl", () => {
-    mockIsSceneStreamable.mockReturnValue({ isStreamable: true, reasons: [] });
-
     const scenes = [createMockScene({ id: "s1" })];
-    const result = addStreamabilityInfo(scenes, { role: "USER" });
+    const result = addStashUrl(scenes, { role: "USER" });
 
-    expect(result[0]).toMatchObject({ isStreamable: true, stashUrl: null });
+    expect(result[0]).toMatchObject({ stashUrl: null });
   });
 
-  it("propagates non-streamable info with reasons", () => {
-    mockIsSceneStreamable.mockReturnValue({
-      isStreamable: false,
-      reasons: ["HEVC codec not supported"],
-    });
+  it("a scene list item carries no isStreamable or streamabilityReasons", () => {
+    const scenes = [createMockScene({ id: "s1" })];
+    const result = addStashUrl(scenes, ADMIN_VIEWER);
 
-    const scenes = [createMockScene({ id: "s2" })];
-    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
-
-    expect(result[0]).toMatchObject({
-      isStreamable: false,
-      streamabilityReasons: ["HEVC codec not supported"],
-    });
+    expect(result[0]).not.toHaveProperty("isStreamable");
+    expect(result[0]).not.toHaveProperty("streamabilityReasons");
   });
 
   it("processes multiple scenes independently", () => {
-    mockIsSceneStreamable
-      .mockReturnValueOnce({ isStreamable: true, reasons: [] })
-      .mockReturnValueOnce({
-        isStreamable: false,
-        reasons: ["Unsupported codec"],
-      });
-
     const scenes = [createMockScene({ id: "a" }), createMockScene({ id: "b" })];
-    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
+    const result = addStashUrl(scenes, ADMIN_VIEWER);
 
-    expect(must(result[0]).isStreamable).toBe(true);
-    expect(must(result[1]).isStreamable).toBe(false);
+    expect(must(result[0]).stashUrl).toBe("http://stash/scenes/a");
+    expect(must(result[1]).stashUrl).toBe("http://stash/scenes/b");
   });
 });
 

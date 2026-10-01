@@ -13,11 +13,9 @@ import { useAuth } from "./useAuth";
  * Note: Playback tracking (play duration, play count) is now handled by the
  * track-activity Video.js plugin in useVideoPlayer.js. This hook only provides:
  * - Watch history state (for resume time display)
- * - Quality tracking
  *
  * @param {string} sceneId - Stash scene ID
  * @param {string} instanceId - The scene's Stash instance (the server needs it: ids repeat across servers)
- * @param {Object} playerRef - React ref to Video.js player instance (unused, kept for API compat)
  * @returns {Object} Watch history state and methods
  */
 interface WatchHistoryData {
@@ -25,20 +23,13 @@ interface WatchHistoryData {
   [key: string]: unknown;
 }
 
-export function useWatchHistory(
-  sceneId: string,
-  instanceId: string,
-  _playerRef = { current: null }
-) {
+export function useWatchHistory(sceneId: string, instanceId: string) {
   const { isAuthenticated } = useAuth();
   const [watchHistory, setWatchHistory] = useState<WatchHistoryData | null>(
     null
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Track current quality for logging/debugging
-  const currentQualityRef = useRef("auto");
 
   // The scene the history is for, and the request in flight: a new scene
   // aborts the last request, and an answer for another scene is dropped
@@ -92,13 +83,6 @@ export function useWatchHistory(
     }
   }, [sceneId, instanceId, isAuthenticated]);
 
-  /**
-   * Update current quality setting
-   */
-  const updateQuality = useCallback((quality: string) => {
-    currentQualityRef.current = quality;
-  }, []);
-
   // Fetch watch history on mount and for each scene; leaving aborts it
   useEffect(() => {
     void fetchWatchHistory();
@@ -112,7 +96,6 @@ export function useWatchHistory(
     error,
 
     // Methods
-    updateQuality,
     refresh: fetchWatchHistory,
   };
 }
