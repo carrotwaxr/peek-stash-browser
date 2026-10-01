@@ -5,15 +5,12 @@ import { Link } from "react-router-dom";
  * - Landscape (wider): opens from the right as a side panel
  * - Portrait (taller): opens from the bottom as a sheet
  */
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { useDecrementImageOCounter } from "../../api/hooks";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { getEntityPath } from "../../utils/entityLinks";
-import {
-  getEffectiveImageMetadata,
-  getImageTitle,
-} from "../../utils/imageGalleryInheritance";
+import { getImageTitle } from "../../utils/imageTitle";
 import EntityMenu from "./EntityMenu";
 import FavoriteButton from "./FavoriteButton";
 import OCounterButton from "./OCounterButton";
@@ -25,7 +22,7 @@ import TagChips from "./TagChips";
 interface Props {
   open: boolean;
   onClose: () => void;
-  image: NormalizedImage | null;
+  image: ImageListItem | null;
   rating: number | null;
   isFavorite: boolean;
   oCounter: number;
@@ -35,7 +32,7 @@ interface Props {
 }
 
 interface RemoveLastOMenuProps {
-  image: NormalizedImage;
+  image: ImageListItem;
   oCount: number;
   onRemoved: (count: number) => void;
 }
@@ -90,41 +87,26 @@ const MetadataDrawer = ({
 
   if (!open || !image) return null;
 
-  // Get effective metadata (inherits from galleries if image doesn't have its own)
-  const {
-    effectivePerformers,
-    effectiveTags,
-    effectiveStudio,
-    effectiveDate,
-    effectiveDetails,
-    effectivePhotographer,
-    effectiveUrls,
-  } = getEffectiveImageMetadata(
-    image as Parameters<typeof getEffectiveImageMetadata>[0]
-  );
-
-  const date = effectiveDate
-    ? new Date(effectiveDate).toLocaleDateString()
-    : null;
+  const date = image.date ? new Date(image.date).toLocaleDateString() : null;
   const resolution =
     image.width && image.height ? `${image.width}×${image.height}` : null;
 
   // Subtitle parts in order: studio (a link), date, photographer, resolution
   const subtitleParts: ReactNode[] = [];
-  if (effectiveStudio?.name) {
+  if (image.studio?.name) {
     subtitleParts.push(
       <Link
         key="studio"
-        to={getEntityPath("studio", effectiveStudio, hasMultipleInstances)}
+        to={getEntityPath("studio", image.studio, hasMultipleInstances)}
         className="hover:underline hover:text-blue-400"
         onClick={onClose}
       >
-        {effectiveStudio.name}
+        {image.studio.name}
       </Link>
     );
   }
   if (date) subtitleParts.push(date);
-  if (effectivePhotographer) subtitleParts.push(`by ${effectivePhotographer}`);
+  if (image.photographer) subtitleParts.push(`by ${image.photographer}`);
   if (resolution) subtitleParts.push(resolution);
 
   return (
@@ -182,7 +164,7 @@ const MetadataDrawer = ({
               className="text-lg font-semibold line-clamp-2 flex-1"
               style={{ color: "var(--text-primary)" }}
             >
-              {getImageTitle(image as Parameters<typeof getImageTitle>[0])}
+              {getImageTitle(image)}
             </h2>
             <div className="flex items-center gap-2 flex-shrink-0">
               <div ref={ratingBadgeRef}>
@@ -233,7 +215,7 @@ const MetadataDrawer = ({
           )}
 
           {/* Performers section */}
-          {effectivePerformers.length > 0 && (
+          {image.performers.length > 0 && (
             <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -248,7 +230,7 @@ const MetadataDrawer = ({
                 className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
                 style={{ scrollbarWidth: "thin" }}
               >
-                {effectivePerformers.map((performer) => (
+                {image.performers.map((performer) => (
                   <Link
                     key={performer.id}
                     to={getEntityPath(
@@ -266,7 +248,7 @@ const MetadataDrawer = ({
                       {performer.image_path ? (
                         <img
                           src={performer.image_path}
-                          alt={performer.name ?? undefined}
+                          alt={performer.name}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -293,7 +275,7 @@ const MetadataDrawer = ({
           )}
 
           {/* Tags section */}
-          {effectiveTags.length > 0 && (
+          {image.tags.length > 0 && (
             <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -305,13 +287,13 @@ const MetadataDrawer = ({
                 Tags
               </h3>
               <TagChips
-                tags={effectiveTags as Parameters<typeof TagChips>[0]["tags"]}
+                tags={image.tags as Parameters<typeof TagChips>[0]["tags"]}
               />
             </div>
           )}
 
           {/* Details section (if description exists) */}
-          {effectiveDetails && (
+          {image.details && (
             <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -326,13 +308,13 @@ const MetadataDrawer = ({
                 className="text-sm leading-relaxed"
                 style={{ color: "var(--text-primary)" }}
               >
-                {effectiveDetails}
+                {image.details}
               </p>
             </div>
           )}
 
           {/* URLs section */}
-          {effectiveUrls.length > 0 && (
+          {image.urls.length > 0 && (
             <div>
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -344,7 +326,7 @@ const MetadataDrawer = ({
                 Links
               </h3>
               <div className="flex flex-wrap gap-2">
-                {effectiveUrls.map((url, index) => (
+                {image.urls.map((url, index) => (
                   <SectionLink key={index} url={url} />
                 ))}
               </div>
@@ -360,10 +342,7 @@ const MetadataDrawer = ({
         initialRating={rating}
         onSave={onRatingChange}
         entityType="image"
-        entityTitle={
-          getImageTitle(image as Parameters<typeof getImageTitle>[0]) ??
-          undefined
-        }
+        entityTitle={getImageTitle(image) ?? undefined}
         anchorEl={ratingBadgeRef.current}
       />
     </>

@@ -15,7 +15,11 @@ vi.mock("../../../src/contexts/ConfigContext", () => ({
 }));
 vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   useCardDisplaySettings: () => ({
-    getSettings: () => ({ showRelationshipIndicators: true }),
+    getSettings: () => ({
+      showRelationshipIndicators: true,
+      showStudio: true,
+      showDate: true,
+    }),
   }),
 }));
 // Captures the rating controls the card hands to BaseCard
@@ -33,6 +37,9 @@ describe("ImageCard", () => {
     id: "1",
     title: "Test Image",
     paths: { thumbnail: "/thumb.jpg", image: "/full.jpg" },
+    performers: [],
+    tags: [],
+    galleries: [],
   };
 
   it("is a React forwardRef component", () => {
@@ -147,6 +154,38 @@ describe("ImageCard", () => {
     expect(onOCounterChange).toHaveBeenCalledWith("1", 3, "inst-b");
     expect(onRatingChange).toHaveBeenCalledWith("1", 80, "inst-b");
     expect(onFavoriteChange).toHaveBeenCalledWith("1", true, "inst-b");
+  });
+
+  it("an image card shows the image's own studio, performers and tags from a list row", () => {
+    render(
+      <MemoryRouter>
+        <ImageCard
+          image={
+            {
+              ...mockImage,
+              instanceId: "inst-a",
+              date: null,
+              studio: { id: "s1", instanceId: "inst-a", name: "Acme" },
+              performers: [
+                { id: "p1", instanceId: "inst-a", name: "P One" },
+                { id: "p2", instanceId: "inst-a", name: "P Two" },
+              ],
+              tags: [{ id: "t1", instanceId: "inst-a", name: "T One" }],
+              galleries: [
+                { id: "g1", instanceId: "inst-a", title: "G", cover: null },
+              ],
+            } as never
+          }
+        />
+      </MemoryRouter>
+    );
+
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    expect(props.subtitle).toBe("Acme");
+    const counts = Object.fromEntries(
+      (props.indicators ?? []).map((i) => [i.type, i.count])
+    );
+    expect(counts).toMatchObject({ PERFORMERS: 2, TAGS: 1, GALLERIES: 1 });
   });
 
   it("an image card with a resolution shows a resolution badge", () => {

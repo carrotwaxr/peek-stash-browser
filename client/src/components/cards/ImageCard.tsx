@@ -1,19 +1,16 @@
 import { forwardRef, memo, useCallback, useMemo } from "react";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import {
-  getEffectiveImageMetadata,
-  getImageTitle,
-} from "../../utils/imageGalleryInheritance";
+import { getImageTitle } from "../../utils/imageTitle";
 import { BaseCard } from "../ui/BaseCard";
 import type { CardBadge } from "../ui/CardComponents";
 import { useCardIndicators } from "./cardIndicators";
 
 interface Props {
-  image: NormalizedImage;
-  onClick?: (image: NormalizedImage) => void;
+  image: ImageListItem;
+  onClick?: (image: ImageListItem) => void;
   fromPageTitle?: string;
   tabIndex?: number;
   /** Called once the card's entity is hidden, with its instance */
@@ -74,23 +71,16 @@ const ImageCard = memo(
       const { getSettings } = useCardDisplaySettings();
       const imageSettings = getSettings("image");
       const { hasMultipleInstances } = useConfig();
-      // Get effective metadata (inherits from galleries if image doesn't have its own)
-      const effective = useMemo(
-        () => getEffectiveImageMetadata(image),
-        [image]
-      );
-      const { effectiveStudio, effectiveDate } = effective;
-
       // Build subtitle from studio and date (respecting settings)
       const subtitle = (() => {
         const parts = [];
 
-        if (imageSettings.showStudio && effectiveStudio?.name) {
-          parts.push(effectiveStudio.name);
+        if (imageSettings.showStudio && image.studio?.name) {
+          parts.push(image.studio.name);
         }
 
-        if (imageSettings.showDate && effectiveDate) {
-          parts.push(new Date(effectiveDate).toLocaleDateString());
+        if (imageSettings.showDate && image.date) {
+          parts.push(new Date(image.date).toLocaleDateString());
         }
 
         return parts.length > 0 ? parts.join(" • ") : null;
@@ -99,15 +89,15 @@ const ImageCard = memo(
       // Resolution label
       const resolution = formatResolution(image.width, image.height);
 
-      // The counts, from the image card's table, on the effective relations
+      // The counts, from the image card's table
       const indicatorRow = useMemo(
         () => ({
           instanceId: image.instanceId,
-          galleries: image.galleries || [],
-          performers: effective.effectivePerformers,
-          tags: effective.effectiveTags,
+          galleries: image.galleries,
+          performers: image.performers,
+          tags: image.tags,
         }),
-        [image.instanceId, image.galleries, effective]
+        [image.instanceId, image.galleries, image.performers, image.tags]
       );
       const relationIndicators = useCardIndicators("image", indicatorRow);
       // The resolution is a label beside the counts, not a count
@@ -159,7 +149,7 @@ const ImageCard = memo(
         <BaseCard
           ref={ref}
           entityType="image"
-          imagePath={image.paths?.thumbnail || image.paths?.image}
+          imagePath={image.paths.thumbnail ?? image.paths.image}
           title={getImageTitle(image)}
           subtitle={subtitle}
           description={image.details}
@@ -178,31 +168,21 @@ const ImageCard = memo(
               | boolean
               | undefined,
           }}
-          ratingControlsProps={
-            image.rating100 !== undefined ||
-            image.favorite !== undefined ||
-            image.oCounter !== undefined
-              ? {
-                  entityId: image.id,
-                  instanceId: image.instanceId,
-                  initialRating: image.rating100,
-                  initialFavorite: image.favorite || false,
-                  initialOCounter: image.oCounter ?? 0,
-                  onHideSuccess,
-                  onOCounterChange: onOCounterChange && handleOCounterChange,
-                  onRatingChange: onRatingChange && handleRatingChange,
-                  onFavoriteChange: onFavoriteChange && handleFavoriteChange,
-                  showRating: imageSettings.showRating as boolean | undefined,
-                  showFavorite: imageSettings.showFavorite as
-                    | boolean
-                    | undefined,
-                  showOCounter: imageSettings.showOCounter as
-                    | boolean
-                    | undefined,
-                  showMenu: imageSettings.showMenu as boolean | undefined,
-                }
-              : undefined
-          }
+          ratingControlsProps={{
+            entityId: image.id,
+            instanceId: image.instanceId,
+            initialRating: image.rating100,
+            initialFavorite: image.favorite,
+            initialOCounter: image.oCounter,
+            onHideSuccess,
+            onOCounterChange: onOCounterChange && handleOCounterChange,
+            onRatingChange: onRatingChange && handleRatingChange,
+            onFavoriteChange: onFavoriteChange && handleFavoriteChange,
+            showRating: imageSettings.showRating as boolean | undefined,
+            showFavorite: imageSettings.showFavorite as boolean | undefined,
+            showOCounter: imageSettings.showOCounter as boolean | undefined,
+            showMenu: imageSettings.showMenu as boolean | undefined,
+          }}
           {...rest}
         />
       );

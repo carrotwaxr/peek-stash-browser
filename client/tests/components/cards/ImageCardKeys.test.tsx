@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import { must } from "@tests/testUtils";
@@ -12,6 +12,12 @@ vi.mock("../../../src/contexts/ConfigContext", () => ({
 vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
 }));
+vi.mock("../../../src/hooks/useHiddenEntities", () => ({
+  useHiddenEntities: () => ({
+    hideEntity: vi.fn(),
+    hideConfirmationDisabled: true,
+  }),
+}));
 vi.mock("../../../src/hooks/useTVMode", () => ({
   useTVMode: () => ({ isTVMode: false }),
 }));
@@ -21,6 +27,9 @@ const image = {
   instanceId: "inst-1",
   title: "Test Image",
   paths: { thumbnail: "/thumb.jpg", image: "/full.jpg" },
+  performers: [],
+  tags: [],
+  galleries: [],
 };
 
 const renderCard = (onClick: (image: unknown) => void) => {
@@ -28,7 +37,7 @@ const renderCard = (onClick: (image: unknown) => void) => {
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
         <ImageCard
-          image={image as unknown as NormalizedImage}
+          image={image as unknown as ImageListItem}
           onClick={onClick}
           tabIndex={0}
         />

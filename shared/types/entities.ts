@@ -397,71 +397,6 @@ export interface NormalizedGallery {
   relation_totals?: RelationTotals;
 }
 
-// ─── NormalizedImage ─────────────────────────────────────────────────────────
-
-export interface NormalizedImage {
-  id: string;
-  instanceId: string;
-  title: string | null;
-  code: string | null;
-  details: string | null;
-  photographer: string | null;
-  urls: string[];
-  date: string | null;
-  studio: { id: string; name?: string } | null;
-  studioId: string | null;
-  rating100: number | null;
-  o_counter: number;
-  organized: boolean;
-  filePath: string | null;
-  width: number | null;
-  height: number | null;
-  fileSize: number | null;
-  files: Array<{
-    path: string;
-    width: number | null;
-    height: number | null;
-    size: number | null;
-  }>;
-  paths: { thumbnail: string; preview: string; image: string };
-  performers: Array<{
-    id: string;
-    name: string;
-    gender: string | null;
-    image_path: string | null;
-  }>;
-  tags: Array<{ id: string; name: string }>;
-  galleries: Array<{
-    id: string;
-    title: string | null;
-    date: string | null;
-    details: string | null;
-    photographer: string | null;
-    urls: string[];
-    cover: string | null;
-    studioId: string | null;
-    studio: { id: string; name: string } | null;
-    performers: Array<{
-      id: string;
-      name: string;
-      gender: string | null;
-      image_path: string | null;
-    }>;
-    tags: Array<{ id: string; name: string }>;
-  }>;
-  created_at: string | null;
-  updated_at: string | null;
-  stashCreatedAt?: string | null;
-  stashUpdatedAt?: string | null;
-
-  // User activity fields (optional — not present from all code paths)
-  rating?: number | null;
-  favorite?: boolean;
-  oCounter?: number;
-  viewCount?: number;
-  lastViewedAt?: string | null;
-}
-
 /**
  * An image as the image list returns it (POST /api/library/images): its
  * columns, its media as proxy URLs, the requesting user's rating, favorite,
@@ -471,8 +406,6 @@ export interface NormalizedImage {
 export interface ImageListItem {
   id: string;
   instanceId: string;
-  /** The same as instanceId */
-  stashInstanceId: string;
   /** The title, else the file name without its extension */
   title: string | null;
   code: string | null;
@@ -491,10 +424,6 @@ export interface ImageListItem {
     preview: string | null;
     image: string | null;
   };
-  /** The same as paths.thumbnail, paths.preview and paths.image */
-  pathThumbnail: string | null;
-  pathPreview: string | null;
-  pathImage: string | null;
   stashCreatedAt: string | null;
   stashUpdatedAt: string | null;
 

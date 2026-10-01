@@ -280,7 +280,6 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     return {
       id: row.id,
       instanceId,
-      stashInstanceId: instanceId,
       title: emptyToNull(row.title) ?? getImageFallbackTitle(row.filePath),
       code: row.code,
       details: row.details,
@@ -294,9 +293,6 @@ class ImageQueryBuilder extends EntityQueryBuilder<
       height: row.height,
       fileSize: row.fileSize === null ? null : Number(row.fileSize),
       paths: { thumbnail, preview, image },
-      pathThumbnail: thumbnail,
-      pathPreview: preview,
-      pathImage: image,
       stashCreatedAt: row.stashCreatedAt?.toISOString() ?? null,
       stashUpdatedAt: row.stashUpdatedAt?.toISOString() ?? null,
 

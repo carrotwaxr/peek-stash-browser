@@ -4,9 +4,9 @@
  */
 import type { ReactNode, Ref } from "react";
 import type {
+  ImageListItem,
   NormalizedGallery,
   NormalizedGroup,
-  NormalizedImage,
   NormalizedPerformer,
   NormalizedStudio,
   NormalizedTag,
@@ -286,11 +286,11 @@ export const IMAGE_LIST: ListPageConfig = {
   source: LIST_SOURCES.image,
   renderCard: (item, ctx) => (
     <ImageCard
-      image={item as unknown as NormalizedImage}
+      image={item as unknown as ImageListItem}
       // One click handler for every card: the card passes its image back
       onClick={
         ctx.onItemClick as unknown as
-          | ((image: NormalizedImage) => void)
+          | ((image: ImageListItem) => void)
           | undefined
       }
       fromPageTitle={ctx.fromPageTitle}
