@@ -267,6 +267,11 @@ describe("Playlist queries (integration)", () => {
     });
 
     owner = await createUser("access-it-pq-owner");
+    // A share counts only while its owner may share
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: { canShareOverride: true },
+    });
     recipient = await createUser("access-it-pq-recipient");
     onlyA = await createUser("access-it-pq-only-a");
     many = await createUser("access-it-pq-many");
