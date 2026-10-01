@@ -28,11 +28,25 @@ export { setupApi, userSetupApi } from "./setup";
 
 // Playlists
 export {
+  getPlaylists,
   getSharedPlaylists,
+  getPlaylist,
+  getPlaylistQueue,
+  createPlaylist,
+  updatePlaylist,
+  deletePlaylist,
+  addSceneToPlaylist,
+  addScenesToPlaylist,
+  removeSceneFromPlaylist,
+  movePlaylistItem,
+  removePlaylistItems,
+  sortPlaylist,
+  removeUnavailableItems,
   getPlaylistShares,
   updatePlaylistShares,
   duplicatePlaylist,
 } from "./playlists";
+export type { PlaylistPageParams, PlaylistQueueParams } from "./playlists";
 
 // Admin (groups, permissions, recovery)
 export {

@@ -61,7 +61,6 @@ describe("invalidateExclusionDependents", () => {
     const unrelated = [
       queryKeys.user.permissions(),
       queryKeys.user.filterPresets(),
-      queryKeys.playlists.all(),
       queryKeys.scenes.externalPlayerLink("a", "1"),
     ];
     seed(client, unrelated);
@@ -70,6 +69,23 @@ describe("invalidateExclusionDependents", () => {
 
     for (const key of unrelated) {
       expect(invalidated(client, key), JSON.stringify(key)).toBe(false);
+    }
+  });
+
+  it("a hide marks playlist queries stale", async () => {
+    // A hide changes a playlist's visible count, previews and items
+    const playlistKeys = [
+      queryKeys.playlists.list({ containsScene: "1:a" }),
+      queryKeys.playlists.shared(),
+      queryKeys.playlists.detail(7, { page: 1, perPage: 50 }),
+      queryKeys.playlists.queue(7, "position", "ASC"),
+    ];
+    seed(client, playlistKeys);
+
+    await invalidateExclusionDependents(client);
+
+    for (const key of playlistKeys) {
+      expect(invalidated(client, key), JSON.stringify(key)).toBe(true);
     }
   });
 

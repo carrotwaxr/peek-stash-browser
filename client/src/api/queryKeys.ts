@@ -128,8 +128,18 @@ export const queryKeys = {
 
   // ── Playlists ────────────────────────────────────────────────────────
   playlists: {
+    /** The prefix of every playlist query: one invalidation covers them all */
     all: () => ["playlists"] as const,
+    /** The user's playlists, with `containsScene` when the menu asks */
+    list: (params: { containsScene?: string } = {}) =>
+      ["playlists", "list", params] as const,
     shared: () => ["playlists", "shared"] as const,
+    /** One page of one playlist's items in one order */
+    detail: (playlistId: number, params: object = {}) =>
+      ["playlists", "detail", playlistId, params] as const,
+    /** One playlist's play queue in one order */
+    queue: (playlistId: number, sort?: string, direction?: string) =>
+      ["playlists", "queue", playlistId, sort, direction] as const,
     shares: (playlistId: number) =>
       ["playlists", "shares", playlistId] as const,
   },
