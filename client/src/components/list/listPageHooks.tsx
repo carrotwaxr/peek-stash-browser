@@ -146,20 +146,9 @@ export function useImageListPage({
       updateImageInCache(imageId, instanceId, { oCounter: newCount }),
     [updateImageInCache]
   );
-  const onRatingChange = useCallback(
-    (imageId: string, newRating: number | null, instanceId: string) =>
-      updateImageInCache(imageId, instanceId, { rating100: newRating }),
-    [updateImageInCache]
-  );
-  const onFavoriteChange = useCallback(
-    (imageId: string, newFavorite: boolean, instanceId: string) =>
-      updateImageInCache(imageId, instanceId, { favorite: newFavorite }),
-    [updateImageInCache]
-  );
-
   const cardHandlers = useMemo<CardHandlers>(
-    () => ({ onItemClick, onOCounterChange, onRatingChange, onFavoriteChange }),
-    [onItemClick, onOCounterChange, onRatingChange, onFavoriteChange]
+    () => ({ onItemClick, onOCounterChange }),
+    [onItemClick, onOCounterChange]
   );
 
   const lightboxImages = useMemo(

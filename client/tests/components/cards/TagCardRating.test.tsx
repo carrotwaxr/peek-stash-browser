@@ -3,12 +3,12 @@ import type { NormalizedTag } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as apiModule from "../../../src/api";
-import { libraryApi } from "../../../src/api";
+import type * as apiModule from "../../../src/api/library";
+import { libraryApi } from "../../../src/api/library";
 import TagCard from "../../../src/components/cards/TagCard";
 import { getDefaultSettings } from "../../../src/config/entityDisplayConfig";
 
-vi.mock("../../../src/api", async (importOriginal) => {
+vi.mock("../../../src/api/library", async (importOriginal) => {
   const actual = await importOriginal<typeof apiModule>();
   return {
     ...actual,
@@ -37,7 +37,10 @@ vi.mock("../../../src/hooks/useTVMode", () => ({
 describe("TagCard with the real BaseCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(libraryApi.updateFavorite).mockResolvedValue(undefined);
+    vi.mocked(libraryApi.updateFavorite).mockResolvedValue({
+      success: true,
+      rating: { id: 9, instanceId: "inst-a", rating: null, favorite: true },
+    });
   });
 
   it("a tag card shows its rating badge and favorite button, and favoriting calls updateFavorite for the tag", async () => {

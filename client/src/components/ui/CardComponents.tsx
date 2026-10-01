@@ -9,10 +9,12 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router-dom";
-import { libraryApi } from "../../api";
+import type { RatableEntityType } from "@peek/shared-types";
 import {
   useDecrementImageOCounter,
   useDecrementOCounter,
+  useUpdateFavorite,
+  useUpdateRating,
 } from "../../api/hooks";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { useInView } from "../../hooks/useInView";
@@ -749,7 +751,7 @@ export const CardMenuRow = (props: CardMenuRowProps) => (
  * @param {boolean} showMenu - Whether to show the menu in this row (default: true)
  */
 interface CardRatingRowProps {
-  entityType: string;
+  entityType: RatableEntityType;
   entityId: string;
   instanceId: string;
   initialRating: number | null | undefined;
@@ -806,6 +808,8 @@ export const CardRatingRow = memo(function CardRatingRow({
     useLocalOverride(initialFavorite);
   // The O button and the menu's Remove last O both set it
   const [oCount, setOCount] = useLocalOverride(initialOCounter ?? 0);
+  const { mutateAsync: saveRating } = useUpdateRating();
+  const { mutateAsync: saveFavorite } = useUpdateFavorite();
   const decrementSceneO = useDecrementOCounter();
   const decrementImageO = useDecrementImageOCounter();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -817,12 +821,12 @@ export const CardRatingRow = memo(function CardRatingRow({
   const handleRatingSave = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating(
+      await saveRating({
         entityType,
         entityId,
-        newRating,
-        instanceId
-      );
+        rating: newRating,
+        instanceId,
+      });
       // Notify parent of the change
       onRatingChange?.(entityId, newRating);
     } catch (error) {
@@ -834,12 +838,12 @@ export const CardRatingRow = memo(function CardRatingRow({
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite(
+      await saveFavorite({
         entityType,
         entityId,
-        newValue,
-        instanceId
-      );
+        favorite: newValue,
+        instanceId,
+      });
       // Notify parent of the change
       onFavoriteChange?.(entityId, newValue);
     } catch (error) {

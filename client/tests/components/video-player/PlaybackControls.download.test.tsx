@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -55,7 +56,11 @@ describe("PlaybackControls download", () => {
   });
 
   it("sends the scene's instance with the download request", async () => {
-    render(<PlaybackControls />);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PlaybackControls />
+      </QueryClientProvider>
+    );
 
     const buttons = await screen.findAllByTitle("Download");
     fireEvent.click(must(buttons[0]));

@@ -24,8 +24,11 @@ import type {
   FindTagsRequest,
   ListRequestInput,
   NormalizedImage,
+  RatableEntityType,
   RelationCountsResponse,
   RelationCountsType,
+  UpdateRatingRequest,
+  UpdateRatingResponse,
 } from "@peek/shared-types";
 import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
@@ -327,23 +330,23 @@ export const libraryApi = {
   },
 
   // Rating and favorite (PUT /ratings/:type/:id)
-  updateRating: async (
-    entityType: string,
+  updateRating: (
+    entityType: RatableEntityType,
     entityId: string,
     rating: number | null,
     instanceId: string
   ) => {
-    const data: Record<string, unknown> = { rating, instanceId };
+    const data: UpdateRatingRequest = { rating, instanceId };
     return ratingsApiInternal.update(entityType, entityId, data);
   },
 
-  updateFavorite: async (
-    entityType: string,
+  updateFavorite: (
+    entityType: RatableEntityType,
     entityId: string,
     favorite: boolean,
     instanceId: string
   ) => {
-    const data: Record<string, unknown> = { favorite, instanceId };
+    const data: UpdateRatingRequest = { favorite, instanceId };
     return ratingsApiInternal.update(entityType, entityId, data);
   },
 
@@ -365,16 +368,14 @@ export const libraryApi = {
 // Internal ratings helper used by libraryApi.updateRating/updateFavorite
 const ratingsApiInternal = {
   update: (
-    entityType: string,
+    entityType: RatableEntityType,
     entityId: string,
-    data: Record<string, unknown>
-  ) => {
-    const type = entityType.toLowerCase();
-    return apiFetch(`/ratings/${type}/${entityId}`, {
+    data: UpdateRatingRequest
+  ) =>
+    apiFetch<UpdateRatingResponse>(`/ratings/${entityType}/${entityId}`, {
       method: "PUT",
       body: JSON.stringify(data),
-    });
-  },
+    }),
 };
 
 // ── Filter helpers ─────────────────────────────────────────────────────

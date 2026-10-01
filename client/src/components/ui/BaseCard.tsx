@@ -6,6 +6,7 @@ import {
   forwardRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { isRatableEntityType } from "@peek/shared-types";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
 import {
   type ToggleSelectOptions,
@@ -269,8 +270,11 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
         */}
         {(() => {
           // Extract settings from ratingControlsProps
+          const ratingType = ratingControlsProps?.entityType || entityType;
+          // A clip has nothing to rate: no row, only the menu
           const hasRatingControls =
             ratingControlsProps &&
+            isRatableEntityType(ratingType) &&
             (ratingControlsProps.showRating ||
               ratingControlsProps.showFavorite ||
               ratingControlsProps.showOCounter);
@@ -307,7 +311,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
               {/* Rating Controls - only render if has visible controls */}
               {ratingControlsProps && hasRatingControls && (
                 <CardRatingRow
-                  entityType={ratingControlsProps.entityType || entityType}
+                  entityType={ratingType}
                   entityId={ratingControlsProps.entityId}
                   instanceId={ratingControlsProps.instanceId}
                   entityTitle={entityTitle}

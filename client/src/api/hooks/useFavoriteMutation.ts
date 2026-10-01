@@ -1,16 +1,36 @@
+import type { RatableEntityType } from "@peek/shared-types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { libraryApi } from "../library";
-import { queryKeys } from "../queryKeys";
+import {
+  beginUserDataWrite,
+  confirmUserDataWrite,
+  endUserDataWrite,
+  failUserDataWrite,
+} from "../userDataWrite";
 
 interface UpdateFavoriteParams {
-  entityType: string;
+  entityType: RatableEntityType;
   entityId: string;
   favorite: boolean;
   instanceId: string;
 }
 
+/**
+ * Saves the viewer's favorite flag. Every cached row and detail entry of
+ * the entity shows it at once, a failed save puts the old one back, and
+ * the library is marked stale without a refetch.
+ */
 export function useUpdateFavorite() {
-  const queryClient = useQueryClient();
+  const client = useQueryClient();
+  const refOf = ({
+    entityType,
+    entityId,
+    instanceId,
+  }: UpdateFavoriteParams) => ({
+    type: entityType,
+    id: entityId,
+    instanceId,
+  });
 
   return useMutation({
     mutationFn: ({
@@ -20,19 +40,17 @@ export function useUpdateFavorite() {
       instanceId,
     }: UpdateFavoriteParams) =>
       libraryApi.updateFavorite(entityType, entityId, favorite, instanceId),
-    onSuccess: (_data, { entityType }) => {
-      const keyMap: Record<string, () => readonly unknown[]> = {
-        scene: () => queryKeys.scenes.all(),
-        performer: () => queryKeys.performers.all(),
-        studio: () => queryKeys.studios.all(),
-        tag: () => queryKeys.tags.all(),
-        gallery: () => queryKeys.galleries.all(),
-        group: () => queryKeys.groups.all(),
-      };
-      const keyFn = keyMap[entityType];
-      if (keyFn) {
-        void queryClient.invalidateQueries({ queryKey: keyFn() });
-      }
-    },
+    onMutate: (vars) =>
+      beginUserDataWrite(client, refOf(vars), "favorite", {
+        favorite: vars.favorite,
+      }),
+    onSuccess: (response, vars) =>
+      confirmUserDataWrite(client, refOf(vars), "favorite", {
+        favorite: response.rating.favorite,
+      }),
+    onError: (_error, vars) =>
+      failUserDataWrite(client, refOf(vars), "favorite"),
+    onSettled: (_data, _error, vars) =>
+      endUserDataWrite(client, refOf(vars), "favorite"),
   });
 }

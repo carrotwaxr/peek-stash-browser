@@ -5,6 +5,7 @@
  */
 import type { ComponentType } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -132,11 +133,13 @@ describe.each(PAGES)("%s page rating", (type, _plural, param, Page) => {
 
   function renderPage(search: string) {
     render(
-      <MemoryRouter initialEntries={[`/${type}/5${search}`]}>
-        <Routes>
-          <Route path={`/${type}/:${param}`} element={<Page />} />
-        </Routes>
-      </MemoryRouter>
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={[`/${type}/5${search}`]}>
+          <Routes>
+            <Route path={`/${type}/:${param}`} element={<Page />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
   }
 

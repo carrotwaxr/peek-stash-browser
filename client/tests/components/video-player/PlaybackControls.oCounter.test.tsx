@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,7 +69,11 @@ describe("PlaybackControls Remove last O", () => {
   });
 
   it("the scene page offers Remove last O beside the O counter", async () => {
-    render(<PlaybackControls />);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PlaybackControls />
+      </QueryClientProvider>
+    );
 
     // One per layout; each sits beside an O counter
     const menus = screen.getAllByLabelText("More options");
@@ -92,7 +97,11 @@ describe("PlaybackControls Remove last O", () => {
 
   it("at 0 Os the scene page shows no menu", () => {
     mockOCounter = 0;
-    render(<PlaybackControls />);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PlaybackControls />
+      </QueryClientProvider>
+    );
 
     expect(screen.getAllByTestId("o-counter").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("More options")).toBeNull();
