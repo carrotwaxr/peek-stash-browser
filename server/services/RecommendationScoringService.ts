@@ -22,6 +22,8 @@ export const TAG_SCENE_RATED_WEIGHT = 0.5;
 export const IMPLICIT_PERFORMER_WEIGHT = 3;
 export const IMPLICIT_STUDIO_WEIGHT = 2;
 export const IMPLICIT_TAG_WEIGHT = 0.8;
+/** Rankings below this percentile carry no implicit weight and are not criteria */
+export const IMPLICIT_MIN_PERCENTILE = 50;
 
 /** A user's rating of one scene on one instance */
 export interface SceneRatingInput {
@@ -49,6 +51,11 @@ export interface UserCriteriaCounts {
   ratedTags: number;
   favoritedScenes: number;
   ratedScenes: number;
+  /**
+   * Performers, studios and tags the user's viewing ranks at or above
+   * IMPLICIT_MIN_PERCENTILE: what a user who only watches has
+   */
+  rankedEntities: number;
 }
 
 /**
@@ -102,7 +109,7 @@ export interface EntityRankingData {
  */
 export function buildImplicitWeightsFromRankings(
   rankings: EntityRankingData[],
-  minPercentile: number = 50 // Only include top half by default
+  minPercentile: number = IMPLICIT_MIN_PERCENTILE // Only include top half by default
 ): {
   implicitPerformerWeights: Map<string, number>;
   implicitStudioWeights: Map<string, number>;
@@ -149,7 +156,8 @@ export function countUserCriteria(
   performerRatings: Array<{ favorite: boolean; rating: number | null }>,
   studioRatings: Array<{ favorite: boolean; rating: number | null }>,
   tagRatings: Array<{ favorite: boolean; rating: number | null }>,
-  sceneRatings: Array<{ favorite: boolean; rating: number | null }>
+  sceneRatings: Array<{ favorite: boolean; rating: number | null }>,
+  rankedEntities: number
 ): UserCriteriaCounts {
   return {
     favoritedPerformers: performerRatings.filter((r) => r.favorite).length,
@@ -167,6 +175,7 @@ export function countUserCriteria(
     ratedScenes: sceneRatings.filter(
       (r) => r.rating !== null && r.rating >= SCENE_RATING_FLOOR
     ).length,
+    rankedEntities,
   };
 }
 
@@ -182,7 +191,8 @@ export function hasAnyCriteria(counts: UserCriteriaCounts): boolean {
     counts.favoritedTags > 0 ||
     counts.ratedTags > 0 ||
     counts.favoritedScenes > 0 ||
-    counts.ratedScenes > 0
+    counts.ratedScenes > 0 ||
+    counts.rankedEntities > 0
   );
 }
 

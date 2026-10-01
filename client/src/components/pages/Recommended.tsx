@@ -31,6 +31,7 @@ interface RecommendationCriteria {
   ratedTags: number;
   favoritedScenes: number;
   ratedScenes: number;
+  rankedEntities: number;
 }
 
 /** GET /library/scenes/recommended (`GetRecommendedScenesResponse`) */
@@ -194,14 +195,16 @@ const Recommended = () => {
       criteria.favoritedTags > 0 ||
       criteria.ratedTags > 0 ||
       criteria.favoritedScenes > 0 ||
-      criteria.ratedScenes > 0;
+      criteria.ratedScenes > 0 ||
+      criteria.rankedEntities > 0;
 
     if (!hasAnyActivity) {
       return (
         <div className="text-gray-400 text-sm mt-2">
           <p>
             To get personalized suggestions, try favoriting or rating (7.0+)
-            performers, studios, tags, or scenes you enjoy.
+            performers, studios, tags, or scenes you enjoy. Or just keep
+            watching: the performers, studios and tags you watch most count too.
           </p>
         </div>
       );
@@ -232,6 +235,11 @@ const Recommended = () => {
             rated scene
             {criteria.ratedScenes !== 1 ? "s" : ""}
           </li>
+          <li>
+            {criteria.rankedEntities === 1
+              ? "1 performer, studio or tag from your viewing"
+              : `${criteria.rankedEntities} performers, studios and tags from your viewing`}
+          </li>
         </ul>
         <p className="mt-2 italic">
           Tip: Rating more scenes helps us learn your preferences!
@@ -246,7 +254,7 @@ const Recommended = () => {
         <div className="flex items-start gap-2">
           <PageHeader
             title="Recommended"
-            subtitle="Personalized recommendations based on your favorites and ratings"
+            subtitle="Personalized recommendations based on your favorites, ratings and viewing"
           />
           <Tooltip content={<RecommendationInfoContent />} position="bottom">
             <button

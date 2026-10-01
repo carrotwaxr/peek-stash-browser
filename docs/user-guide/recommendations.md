@@ -1,6 +1,6 @@
 # Recommendations
 
-Get personalized scene suggestions based on your favorites and ratings.
+Get personalized scene suggestions based on your favorites, ratings and what you watch.
 
 ## How It Works
 
@@ -13,8 +13,9 @@ Peek learns your preferences from your activity:
 - **Favorited tags** - Scenes with tags you've favorited
 - **Highly-rated tags** - Scenes with tags you've rated 4+ stars
 - **Scene ratings** - Similar scenes to ones you've rated highly
+- **Watch history** - Scenes with the performers, studios and tags you watch most (the top half by how much you engage with them), even if you never rate or favorite anything
 
-The more you rate and favorite, the better your recommendations become!
+The more you rate, favorite and watch, the better your recommendations become!
 
 ## Accessing Recommendations
 
@@ -63,6 +64,7 @@ Your current activity:
 • 2 favorited studios, 1 highly-rated
 • 8 favorited tags, 4 highly-rated
 • 15 favorited scenes, 42 rated scenes
+• 12 performers, studios and tags from your viewing
 ```
 
 This helps you understand what's driving your recommendations.
@@ -130,7 +132,7 @@ Use **Recommendations** when you want curated content. Use **Random** when you w
 
 ### "No Recommendations Yet"
 
-This appears when you haven't rated or favorited enough content:
+This appears when you haven't rated, favorited or watched enough content (watching alone is enough once Peek has ranked what you watch most, which takes a little while after you start):
 
 1. Browse scenes and rate some 4+ stars
 2. Favorite a few performers you enjoy
