@@ -66,6 +66,9 @@ const BASE_URLS: Record<string, string> = {
 // The file route is requested over real HTTP; Stash is the stubbed fetch
 const realFetch = globalThis.fetch;
 
+/** No zip size cap these tests reach */
+const NO_CAP = { maxBytes: 10n ** 12n };
+
 /** A soft-deleted tag on A, one of SAME@A's tags */
 const TAG_DELETED = "7700009";
 
@@ -236,7 +239,7 @@ describe("Download access (integration)", () => {
       playlistId
     );
 
-    await playlistZipService.createZip(download.id);
+    await playlistZipService.createZip(download.id, NO_CAP);
 
     const row = await prisma.download.findUnique({
       where: { id: download.id },
@@ -265,7 +268,7 @@ describe("Download access (integration)", () => {
       playlistId
     );
 
-    await playlistZipService.createZip(download.id);
+    await playlistZipService.createZip(download.id, NO_CAP);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `http://stash-b.test/scene/${FX_ID.SAME}/stream`,
@@ -281,7 +284,7 @@ describe("Download access (integration)", () => {
         userId,
         playlistId
       );
-      await playlistZipService.createZip(download.id);
+      await playlistZipService.createZip(download.id, NO_CAP);
       const row = await prisma.download.findUnique({
         where: { id: download.id },
       });

@@ -1,7 +1,9 @@
 import archiver from "archiver";
+import type { Archiver, EntryData } from "archiver";
 import * as fs from "fs";
 import * as path from "path";
-import { Readable } from "stream";
+import { Readable, Transform } from "stream";
+import { pipeline } from "stream/promises";
 import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
@@ -15,13 +17,28 @@ import {
   NOTHING_TO_DOWNLOAD,
   PLAYLIST_NOT_FOUND,
   ZIP_FAILED,
+  ZIP_TOO_LARGE,
 } from "../utils/downloadReasons.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
+import { StashTimeoutError, fetchFromStash } from "../utils/streamProxy.js";
 import { downloadService } from "./DownloadService.js";
 import { loadPlaylistItems } from "./PlaylistQueryService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
+
+/** How long a zip waits on Stash for each scene's file */
+export interface ZipStashTimeouts {
+  /** Before the response headers (StashTimeoutError) */
+  headersTimeoutMs: number;
+  /** Between two chunks of the body, while the archive is reading */
+  idleTimeoutMs: number;
+}
+
+const ZIP_STASH_TIMEOUTS: ZipStashTimeouts = {
+  headersTimeoutMs: 60_000,
+  idleTimeoutMs: 60_000,
+};
 
 /**
  * Service for creating zip archives of playlists.
@@ -34,6 +51,12 @@ import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
  * carries that user's rating, never Stash's.
  */
 export class PlaylistZipService {
+  private readonly timeouts: ZipStashTimeouts;
+
+  constructor(timeouts: ZipStashTimeouts = ZIP_STASH_TIMEOUTS) {
+    this.timeouts = timeouts;
+  }
+
   /**
    * Get the downloads directory path
    */
@@ -89,9 +112,39 @@ export class PlaylistZipService {
   }
 
   /**
-   * Create a zip archive for a download
+   * Appends one entry and resolves once archiver has written it; rejects
+   * with the zip's first error. Names are already safe, so archiver keeps
+   * them as given and the `entry` event names this one.
    */
-  async createZip(downloadId: number): Promise<void> {
+  private appendEntry(
+    archive: Archiver,
+    source: Readable | string,
+    name: string,
+    failed: Promise<never>
+  ): Promise<void> {
+    const written = new Promise<void>((resolve) => {
+      const onEntry = (entry: EntryData): void => {
+        if (entry.name !== name) return;
+        archive.off("entry", onEntry);
+        resolve();
+      };
+      archive.on("entry", onEntry);
+    });
+    archive.append(source, { name });
+    return Promise.race([written, failed]);
+  }
+
+  /**
+   * Builds a download's zip, one entry at a time: each scene is fetched
+   * only once the previous file is in the archive. Any failure (Stash,
+   * the disk, the size cap, `options.signal`) aborts the fetch, the archive
+   * and the file, removes the partial file and marks the download FAILED
+   * with a fixed reason; it never throws for one.
+   */
+  async createZip(
+    downloadId: number,
+    options: { signal?: AbortSignal; maxBytes: bigint }
+  ): Promise<void> {
     // Get the download record
     const download = await downloadService.getDownload(downloadId);
     if (!download) {
@@ -109,7 +162,7 @@ export class PlaylistZipService {
 
     if (!playlist) {
       await downloadService.markFailed(downloadId, PLAYLIST_NOT_FOUND);
-      throw new Error(`Playlist not found: ${download.playlistId}`);
+      return;
     }
 
     // Only the scenes the requester may see now, each on its own instance
@@ -133,15 +186,55 @@ export class PlaylistZipService {
     const userDir = this.getUserDir(download.userId);
     await fs.promises.mkdir(userDir, { recursive: true });
 
-    const zipFileName = `download-${downloadId}.zip`;
-    const zipFilePath = path.join(userDir, zipFileName);
+    const zipFilePath = path.join(userDir, `download-${downloadId}.zip`);
     const playlistDirName = safeFileName(playlist.name);
 
-    // Create write stream and archiver
+    // The job's first error, from any part, aborts it: the Stash fetch (its
+    // signal), and through `failed` the entry being awaited
+    const job = new AbortController();
+    const outside = options.signal;
+    const onOutsideAbort = (): void => {
+      job.abort(outside?.reason);
+    };
+    if (outside?.aborted) onOutsideAbort();
+    outside?.addEventListener("abort", onOutsideAbort, { once: true });
+    const failed = new Promise<never>((_resolve, reject) => {
+      const onAbort = (): void => {
+        reject(toError(job.signal.reason));
+      };
+      if (job.signal.aborted) onAbort();
+      job.signal.addEventListener("abort", onAbort, { once: true });
+    });
+    // Read only through the races below; a failure with no entry awaited is
+    // not an unhandled rejection
+    failed.catch(() => undefined);
+    const fail = (error: unknown): void => {
+      job.abort(error);
+    };
+
     const output = fs.createWriteStream(zipFilePath);
     const archive = archiver("zip", {
       zlib: { level: 0 }, // No compression for video files (already compressed)
     });
+    archive.on("warning", (warning) => {
+      logger.warn("Playlist zip warning", {
+        downloadId,
+        error: describeError(warning),
+      });
+    });
+    // pipeline listens for errors on both sides and destroys both on one;
+    // these listeners make sure an error after it settles is never unhandled
+    archive.on("error", fail);
+    output.on("error", fail);
+    const piped = pipeline(archive, output);
+    piped.catch(fail);
+
+    const progress = new ZipProgress(downloadId, scenes);
+    const maxBytes = Number(options.maxBytes);
+    let bytesWritten = 0;
+    // The body being read, to cancel when the job fails
+    let reading: Readable | null = null;
+    let idleTimer: NodeJS.Timeout | undefined;
 
     // Track M3U items for playlist file
     const m3uItems: Array<{
@@ -153,13 +246,6 @@ export class PlaylistZipService {
     const takenNames = new Set<string>();
 
     try {
-      // Pipe archive to file
-      archive.pipe(output);
-
-      // Process each scene
-      const totalItems = scenes.length;
-      let processedItems = 0;
-
       for (const scene of scenes) {
         // The title Peek shows (the title, else the file name), else the id
         const sceneTitle = scene.title ?? scene.id;
@@ -176,7 +262,6 @@ export class PlaylistZipService {
           title: sceneTitle,
         });
 
-        // Generate NFO content
         const nfoContent = generateSceneNfo({
           id: scene.id,
           title: scene.title,
@@ -189,11 +274,12 @@ export class PlaylistZipService {
           tagNames: scene.tags.map((t) => t.name),
           fileName: videoFileName,
         });
-
-        // Add NFO to archive
-        archive.append(nfoContent, {
-          name: `${playlistDirName}/${nfoFileName}`,
-        });
+        await this.appendEntry(
+          archive,
+          nfoContent,
+          `${playlistDirName}/${nfoFileName}`,
+          failed
+        );
 
         // Stream video file from the Stash instance the scene lives on. An
         // instance disabled or deleted since the list was read throws
@@ -208,72 +294,100 @@ export class PlaylistZipService {
           url: streamUrl,
         });
 
-        const response = await fetch(streamUrl, {
-          headers: {
-            ApiKey: apiKey,
-          },
+        const { response, abort } = await fetchFromStash(streamUrl, {
+          apiKey,
+          signal: job.signal,
+          headersTimeoutMs: this.timeouts.headersTimeoutMs,
         });
 
-        if (!response.ok) {
-          logger.error(`Failed to fetch video from Stash`, {
-            sceneId: scene.id,
-            status: response.status,
-            statusText: response.statusText,
-          });
+        if (!response.ok || !response.body) {
+          abort.abort();
           throw new Error(
             `Failed to fetch video for scene ${scene.id}: ${response.status} ${response.statusText}`
           );
         }
 
-        if (!response.body) {
-          throw new Error(`No response body for scene ${scene.id}`);
-        }
-
-        // Convert web stream to node stream and add to archive
-        const nodeStream = Readable.fromWeb(response.body as WebReadableStream);
-        archive.append(nodeStream, {
-          name: `${playlistDirName}/${videoFileName}`,
+        // Count every byte on its way into the archive: the size cap, the
+        // progress and the idle limit all read it
+        const idleTimeoutMs = this.timeouts.idleTimeoutMs;
+        const counter: Transform = new Transform({
+          transform: (chunk: Buffer, _encoding, callback) => {
+            armIdle();
+            bytesWritten += chunk.length;
+            if (bytesWritten > maxBytes) {
+              callback(new ZipTooLargeError());
+              return;
+            }
+            progress.bytes(bytesWritten).then(
+              () => callback(null, chunk),
+              (error: unknown) => callback(toError(error))
+            );
+          },
         });
+        const armIdle = (): void => {
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(onIdle, idleTimeoutMs);
+        };
+        const onIdle = (): void => {
+          // A paused body is the archive or the disk catching up, not a
+          // silent Stash
+          if (
+            counter.writableNeedDrain ||
+            counter.readableLength >= counter.readableHighWaterMark
+          ) {
+            armIdle();
+            return;
+          }
+          fail(
+            new StashTimeoutError(
+              `Stash sent nothing for ${idleTimeoutMs} ms (scene ${scene.id})`
+            )
+          );
+        };
 
-        // Track for M3U
+        const body = Readable.fromWeb(response.body as WebReadableStream);
+        reading = body;
+        body.on("error", fail);
+        counter.on("error", fail);
+        pipeline(body, counter).catch(fail);
+        armIdle();
+
+        await this.appendEntry(
+          archive,
+          counter,
+          `${playlistDirName}/${videoFileName}`,
+          failed
+        );
+        clearTimeout(idleTimer);
+        reading = null;
+        await progress.fileDone(bytesWritten);
+
         m3uItems.push({
           title: sceneTitle,
           duration: scene.files[0]?.duration ?? null,
           fileName: videoFileName,
         });
 
-        // Update progress
-        processedItems++;
-        const progress = Math.floor((processedItems / totalItems) * 95); // Leave 5% for finalization
-        await downloadService.updateProgress(downloadId, progress);
-
-        logger.debug(`Scene added to zip`, {
-          sceneId: scene.id,
-          progress,
-        });
+        logger.debug(`Scene added to zip`, { sceneId: scene.id });
       }
 
-      // Add M3U playlist file
-      const m3uContent = this.generateM3U(m3uItems);
-      archive.append(m3uContent, {
-        name: `${playlistDirName}/playlist.m3u`,
-      });
+      await this.appendEntry(
+        archive,
+        this.generateM3U(m3uItems),
+        `${playlistDirName}/playlist.m3u`,
+        failed
+      );
 
-      // Finalize the archive
-      await archive.finalize();
+      // Finalize the archive, and wait for the file to be written
+      await Promise.race([archive.finalize(), failed]);
+      await Promise.race([piped, failed]);
 
-      // Wait for the output stream to finish
-      await new Promise<void>((resolve, reject) => {
-        output.on("close", resolve);
-        output.on("error", reject);
-      });
-
-      // Get final file size
       const stats = await fs.promises.stat(zipFilePath);
-      const fileSize = BigInt(stats.size);
-
-      // Mark as completed
-      await downloadService.markCompleted(downloadId, zipFilePath, fileSize);
+      await downloadService.markCompleted(
+        downloadId,
+        zipFilePath,
+        BigInt(stats.size)
+      );
 
       logger.info(`Playlist zip creation completed`, {
         downloadId,
@@ -281,25 +395,103 @@ export class PlaylistZipService {
         filePath: zipFilePath,
         fileSize: stats.size,
       });
-    } catch (error) {
-      // Clean up partial file on error
-      try {
-        await fs.promises.unlink(zipFilePath);
-      } catch {
-        // Ignore cleanup errors
-      }
+    } catch (caught) {
+      // The job's first error is the cause; a later one is its echo
+      const error: unknown = job.signal.aborted ? job.signal.reason : caught;
+      job.abort(error);
+      clearTimeout(idleTimer);
+      reading?.destroy();
+      archive.abort();
+      output.destroy();
+      await piped.catch(() => undefined);
+      await fs.promises.unlink(zipFilePath).catch(() => undefined);
 
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
       logger.error(`Playlist zip creation failed`, {
         downloadId,
-        error: errorMessage,
+        error: describeError(error),
       });
 
-      await downloadService.markFailed(downloadId, ZIP_FAILED);
-      throw error;
+      await downloadService.markFailed(
+        downloadId,
+        error instanceof ZipTooLargeError ? ZIP_TOO_LARGE : ZIP_FAILED
+      );
+    } finally {
+      outside?.removeEventListener("abort", onOutsideAbort);
     }
   }
+}
+
+/** The zip passed its size cap while it was written */
+class ZipTooLargeError extends Error {
+  constructor() {
+    super("The zip grew past the size cap");
+    this.name = "ZipTooLargeError";
+  }
+}
+
+/** How often, at most, progress is written while a file streams */
+const PROGRESS_INTERVAL_MS = 2_000;
+
+/**
+ * A zip's progress: bytes written of the bytes planned (each scene's cached
+ * file size), up to 95 (the rest is the finish), or files written of all
+ * when no size is known. It is written when the whole percentage changes,
+ * at most every 2 s while a file streams, and at the end of each file.
+ */
+class ZipProgress {
+  private readonly downloadId: number;
+  private readonly plannedBytes: number;
+  private readonly totalFiles: number;
+  private filesDone = 0;
+  private written = 0;
+  private writtenAt = Date.now();
+
+  constructor(downloadId: number, scenes: NormalizedScene[]) {
+    this.downloadId = downloadId;
+    this.plannedBytes = scenes.reduce(
+      (sum, scene) => sum + (scene.files[0]?.size ?? 0),
+      0
+    );
+    this.totalFiles = scenes.length;
+  }
+
+  /** While a file streams: written if due */
+  async bytes(bytesWritten: number): Promise<void> {
+    if (Date.now() - this.writtenAt < PROGRESS_INTERVAL_MS) return;
+    await this.write(this.percent(bytesWritten));
+  }
+
+  /** At the end of each file */
+  async fileDone(bytesWritten: number): Promise<void> {
+    this.filesDone++;
+    await this.write(this.percent(bytesWritten));
+  }
+
+  private percent(bytesWritten: number): number {
+    const share =
+      this.plannedBytes > 0
+        ? bytesWritten / this.plannedBytes
+        : this.filesDone / this.totalFiles;
+    return Math.min(95, Math.floor(share * 95));
+  }
+
+  private async write(percent: number): Promise<void> {
+    if (percent <= this.written) return;
+    this.written = percent;
+    this.writtenAt = Date.now();
+    await downloadService.updateProgress(this.downloadId, percent);
+  }
+}
+
+// The logger serialises Error to {}, so log the stack as a string.
+function describeError(error: unknown): string {
+  return error instanceof Error
+    ? (error.stack ?? error.message)
+    : String(error);
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 export const playlistZipService = new PlaylistZipService();
