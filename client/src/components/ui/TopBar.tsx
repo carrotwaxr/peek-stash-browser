@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { getOrderedNavItems } from "../../constants/navigation";
+import {
+  getNavKeyForPath,
+  getOrderedNavItems,
+} from "../../constants/navigation";
 import { useScrollDirection } from "../../hooks/useScrollDirection";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { PeekLogo } from "../branding/PeekLogo";
@@ -46,28 +49,9 @@ const TopBar = ({ navPreferences = [] }: Props) => {
     (item): item is NonNullable<typeof item> => item != null
   );
 
-  // Get current page from React Router location
-  const getCurrentPage = () => {
-    const path = location.pathname;
-    if (path === "/") return "Home";
-    if (path.startsWith("/scenes")) return "Scenes";
-    if (path.startsWith("/recommended")) return "Recommended";
-    if (path.startsWith("/performers")) return "Performers";
-    if (path.startsWith("/studios")) return "Studios";
-    if (path.startsWith("/tags")) return "Tags";
-    if (path.startsWith("/collections") || path.startsWith("/collection/"))
-      return "Collections";
-    if (path.startsWith("/galleries") || path.startsWith("/gallery/"))
-      return "Galleries";
-    if (path.startsWith("/images")) return "Images";
-    if (path.startsWith("/playlists") || path.startsWith("/playlist/"))
-      return "Playlists";
-    if (path.startsWith("/clips")) return "Clips";
-    if (path.startsWith("/watch-history")) return "Watch History";
-    return null;
-  };
-
-  const currentPage = getCurrentPage();
+  // The nav item the current path belongs to
+  const currentPage = getNavKeyForPath(location.pathname);
+  const isSettingsActive = currentPage === "Settings";
 
   // Determine if topbar should be visible
   const isVisible = scrollDirection === "top" || scrollDirection === "up";
@@ -171,7 +155,9 @@ const TopBar = ({ navPreferences = [] }: Props) => {
               <li>
                 <Link
                   to="/settings"
-                  className="nav-link block text-base font-medium transition-colors duration-200 px-3 py-2 rounded"
+                  className={`nav-link block text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
+                    isSettingsActive ? "nav-link-active" : ""
+                  }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <div className="flex items-center gap-2">

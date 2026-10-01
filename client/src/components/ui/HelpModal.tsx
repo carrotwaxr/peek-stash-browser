@@ -1,31 +1,13 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
+import { getHelpPageForPath } from "../../constants/navigation";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "./index";
 
 interface Props {
   onClose: () => void;
 }
-
-// Determine current page from URL
-const getCurrentPage = (location: { pathname: string }) => {
-  const path = location.pathname;
-  if (path.startsWith("/scene/")) return "scene";
-  if (path.startsWith("/scenes")) return "scenes";
-  if (path.startsWith("/performer/")) return "performer";
-  if (path.startsWith("/performers")) return "performers";
-  if (path.startsWith("/studio/")) return "studio";
-  if (path.startsWith("/studios")) return "studios";
-  if (path.startsWith("/tag/")) return "tag";
-  if (path.startsWith("/tags")) return "tags";
-  if (path.startsWith("/gallery/")) return "gallery";
-  if (path.startsWith("/galleries")) return "galleries";
-  if (path.startsWith("/group/")) return "group";
-  if (path.startsWith("/groups")) return "groups";
-  if (path.startsWith("/playlists")) return "playlists";
-  return "global";
-};
 
 /**
  * Help Modal - Shows context-aware help documentation
@@ -36,7 +18,7 @@ const HelpModal = ({ onClose }: Props) => {
   const [activeTab, setActiveTab] = useState("hotkeys");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const currentPage = getCurrentPage(location);
+  const currentPage = getHelpPageForPath(location.pathname);
 
   // A modal overlay scope while open: page, player and global keys wait, and
   // Escape closes the dialog. Focus moves into it and returns on close.

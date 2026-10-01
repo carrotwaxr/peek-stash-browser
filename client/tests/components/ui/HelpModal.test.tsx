@@ -18,11 +18,11 @@ function Page({
   return null;
 }
 
-function renderHelp(onClose = vi.fn()) {
+function renderHelp(onClose = vi.fn(), path = "/scene/1") {
   const onPageKey = vi.fn();
   const onGlobalKey = vi.fn();
   render(
-    <MemoryRouter initialEntries={["/scene/1"]}>
+    <MemoryRouter initialEntries={[path]}>
       <ShortcutScopeProvider>
         <Page onPageKey={onPageKey} onGlobalKey={onGlobalKey} />
         <HelpModal onClose={onClose} />
@@ -82,5 +82,18 @@ describe("HelpModal", () => {
     expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(
       true
     );
+  });
+
+  it("on /collection/5 shows Collection Detail Shortcuts with the rating keys", () => {
+    renderHelp(vi.fn(), "/collection/5");
+
+    expect(screen.getByText("Collection Detail Shortcuts")).toBeTruthy();
+    expect(screen.getByText("Toggle Favorite")).toBeTruthy();
+  });
+
+  it("on /collections shows Collections Page Shortcuts", () => {
+    renderHelp(vi.fn(), "/collections");
+
+    expect(screen.getByText("Collections Page Shortcuts")).toBeTruthy();
   });
 });
