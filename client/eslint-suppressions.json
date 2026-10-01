@@ -443,14 +443,6 @@
       "count": 1
     }
   },
-  "src/components/ui/PaginatedImageGrid.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "src/components/ui/Pagination.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -954,11 +946,6 @@
   "src/hooks/useHomeCarouselQueries.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 3
-    }
-  },
-  "src/hooks/useImagesPagination.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
     }
   },
   "src/hooks/usePageTitle.ts": {

@@ -94,14 +94,8 @@ export interface DetailEntityByType {
   gallery: WithStashUrl<NormalizedGallery>;
 }
 
-/** Every by-id lookup's row: the detail pages' and the scene's */
-interface ByIdRowByType extends DetailEntityByType {
-  scene: WithStashUrl<NormalizedScene>;
-}
-
 /** Each list endpoint's response, as the lookup reads it */
 interface ByIdResponseByType {
-  scene: FindScenesResponse;
   performer: FindPerformersResponse;
   studio: FindStudiosResponse;
   tag: FindTagsResponse;
@@ -109,22 +103,15 @@ interface ByIdResponseByType {
   gallery: FindGalleriesResponse;
 }
 
-type ByIdType = keyof ByIdRowByType;
-
 /** The list endpoint each detail page looks its entity up through */
 const BY_ID: {
-  [T in ByIdType]: {
+  [T in DetailType]: {
     path: string;
     filter: string;
     /** The one row of the list's response, if it holds one */
-    pick: (data: ByIdResponseByType[T]) => ByIdRowByType[T] | undefined;
+    pick: (data: ByIdResponseByType[T]) => DetailEntityByType[T] | undefined;
   };
 } = {
-  scene: {
-    path: "/library/scenes",
-    filter: "scene_filter",
-    pick: (data) => data.findScenes.scenes[0],
-  },
   performer: {
     path: "/library/performers",
     filter: "performer_filter",
@@ -158,12 +145,12 @@ const BY_ID: {
  * looks the same). Without an instance, an id found on several servers
  * rejects with the server's 400 (an ApiError whose data lists the matches).
  */
-async function findOneById<T extends ByIdType>(
+async function findOneById<T extends DetailType>(
   type: T,
   id: string,
   instanceId: string | null,
   signal?: AbortSignal
-): Promise<ByIdRowByType[T] | null> {
+): Promise<DetailEntityByType[T] | null> {
   const { path, filter, pick } = BY_ID[type];
   const params: Record<string, unknown> = { ids: [id] };
   if (instanceId) params[filter] = { instance_id: instanceId };
@@ -180,21 +167,6 @@ export function findEntityById<T extends DetailType>(
 ): Promise<DetailEntityByType[T] | null> {
   return findOneById(type, id, instanceId, signal);
 }
-
-/**
- * The untyped form the pages not yet on `findEntityById` read (B15 removes
- * it with the `find*ById` methods below).
- */
-const findRecordById = (
-  type: ByIdType,
-  id: string,
-  instanceId: string | null,
-  signal?: AbortSignal
-) =>
-  findOneById(type, id, instanceId, signal) as Promise<Record<
-    string,
-    unknown
-  > | null>;
 
 // ── Library API ────────────────────────────────────────────────────────
 
@@ -256,45 +228,6 @@ export const libraryApi = {
       body: JSON.stringify(params),
       signal,
     }),
-
-  // Single-entity lookups: each resolves to null when there is no entity
-  // the user can see, and rejects with a 400 ApiError listing the matches
-  // when an id without an instance is on several servers
-  findSceneById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("scene", id, instanceId, signal),
-
-  findPerformerById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("performer", id, instanceId, signal),
-
-  findStudioById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("studio", id, instanceId, signal),
-
-  findTagById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("tag", id, instanceId, signal),
-
-  findGalleryById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("gallery", id, instanceId, signal),
-
-  findGroupById: (
-    id: string,
-    instanceId: string | null = null,
-    signal?: AbortSignal
-  ) => findRecordById("group", id, instanceId, signal),
 
   // Entity pickers: one page in name order, or the ids a picker selected
   findPerformersMinimal: async (
