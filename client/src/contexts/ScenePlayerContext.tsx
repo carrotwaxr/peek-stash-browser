@@ -161,7 +161,6 @@ interface ScenePlayerProviderProps {
   /** The queue the route's history entry holds (`location.state.playlist`) */
   playlist?: PlaybackQueue | null;
   shouldResume?: boolean;
-  initialQuality?: string;
   initialShouldAutoplay?: boolean;
 }
 
@@ -179,7 +178,6 @@ export function ScenePlayerProvider({
   instanceId = null,
   playlist = null,
   shouldResume = false,
-  initialQuality = "direct",
   initialShouldAutoplay = false,
 }: ScenePlayerProviderProps) {
   // The first render starts from the route's entry: the queue a navigation
@@ -190,7 +188,6 @@ export function ScenePlayerProvider({
       payload: {
         playlist,
         currentIndex: playlist?.currentIndex ?? 0,
-        initialQuality,
         initialShouldAutoplay,
       },
     })
@@ -485,7 +482,6 @@ export function ScenePlayerProvider({
         payload: {
           playlist: stateQueue,
           currentIndex: stateQueue.currentIndex,
-          initialQuality,
           initialShouldAutoplay: shouldAutoplay ?? false,
         },
       });
@@ -517,7 +513,7 @@ export function ScenePlayerProvider({
         payload: { shouldAutoplay: shouldAutoplay ?? false },
       });
     }
-  }, [location, initialQuality, writeEntry, entryPath]);
+  }, [location, writeEntry, entryPath]);
 
   // Keep the history entry on the queue: after a step, once the entry's
   // scene has loaded, its URL and index; after a control toggle, the

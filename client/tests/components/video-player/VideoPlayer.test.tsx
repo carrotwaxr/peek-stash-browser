@@ -21,7 +21,6 @@ vi.mock("@/api/hooks/useUserSettings", () => ({
 vi.mock("@/contexts/ScenePlayerContext", () => ({
   useScenePlayer: () => ({
     scene: { id: "1", instanceId: "inst-a", files: [] },
-    quality: "direct",
     ready: true,
     shouldAutoplay: false,
     playlist: null,

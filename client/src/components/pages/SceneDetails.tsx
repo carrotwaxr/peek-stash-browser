@@ -5,6 +5,7 @@ import { getClipsForScene } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { describePlaybackMethod } from "../../utils/browserPlayback";
 import { getEntityPath } from "../../utils/entityLinks";
 import { formatBitRate, formatFileSize } from "../../utils/format";
 import type { Clip } from "../cards/ClipCard";
@@ -483,6 +484,25 @@ const SceneDetails = ({
                           </span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* How the player starts this scene on this browser */}
+                    <div>
+                      <h3
+                        className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                        style={{
+                          color: "var(--text-primary)",
+                          borderBottom: "2px solid var(--accent-primary)",
+                        }}
+                      >
+                        Playback Method
+                      </h3>
+                      <p
+                        className="text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {describePlaybackMethod(scene)}
+                      </p>
                     </div>
                   </>
                 )}

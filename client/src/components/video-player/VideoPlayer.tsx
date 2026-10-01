@@ -30,7 +30,7 @@ import { useVideoPlayer } from "./useVideoPlayer";
  * - Render video element and loading overlay
  *
  * DATA FLOW:
- * - ScenePlayerContext provides scene, quality, playlist and control state
+ * - ScenePlayerContext provides scene, playlist and control state
  * - Hooks manage side effects and player lifecycle
  * - Watch history tracks playback progress
  */
@@ -52,7 +52,6 @@ const VideoPlayer = () => {
   // ============================================================================
   const {
     scene: rawScene,
-    quality,
     ready,
     shouldAutoplay,
     playlist,
@@ -117,11 +116,11 @@ const VideoPlayer = () => {
   // ============================================================================
   // WATCH HISTORY TRACKING
   // ============================================================================
-  const {
-    watchHistory,
-    loading: loadingWatchHistory,
-    updateQuality,
-  } = useWatchHistory(scene?.id ?? "", scene?.instanceId ?? "", playerRef);
+  const { watchHistory, loading: loadingWatchHistory } = useWatchHistory(
+    scene?.id ?? "",
+    scene?.instanceId ?? "",
+    playerRef
+  );
 
   // ============================================================================
   // CUSTOM HOOKS: VIDEO PLAYER LOGIC
@@ -132,7 +131,6 @@ const VideoPlayer = () => {
     videoRef,
     playerRef,
     scene,
-    quality,
     ready,
     shouldAutoplay,
     playlist,
@@ -144,7 +142,6 @@ const VideoPlayer = () => {
     nextScene: next,
     prevScene: prev,
     registerPlayer,
-    updateQuality,
     location,
     hasResumedRef,
     initialResumeTimeRef,

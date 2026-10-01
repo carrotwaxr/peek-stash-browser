@@ -814,19 +814,19 @@
   },
   "src/components/video-player/plugins/source-selector.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 24
+      "count": 19
     },
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 19
+      "count": 11
     },
     "@typescript-eslint/no-unsafe-call": {
-      "count": 52
+      "count": 24
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 55
+      "count": 22
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
@@ -891,25 +891,25 @@
   },
   "src/components/video-player/useVideoPlayer.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 9
-    },
-    "@typescript-eslint/no-unsafe-argument": {
       "count": 8
     },
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 5
+    },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 27
+      "count": 22
     },
     "@typescript-eslint/no-unsafe-call": {
-      "count": 47
+      "count": 39
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 86
+      "count": 73
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 3
     }
   },
   "src/components/video-player/videoPlayerUtils.ts": {
@@ -1031,10 +1031,10 @@
   },
   "src/contexts/scenePlayerReducer.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 3
     }
   },
   "src/hooks/useCardSelection.ts": {
@@ -1161,14 +1161,6 @@
   "src/utils/urlParams.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 15
-    }
-  },
-  "src/utils/videoFormat.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
     }
   },
   "tests/components/cards/GalleryCard.test.tsx": {

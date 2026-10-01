@@ -4,6 +4,7 @@ import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
 import { apiFetch, apiPost, redirectToLogin } from "../../api";
 import { usePlayerHotkeys } from "../../hooks/useMediaKeys";
+import { canDecode } from "../../utils/browserPlayback";
 import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
@@ -12,7 +13,7 @@ import {
   SESSION_EXPIRED_PLAYBACK_MESSAGE,
   isSessionExpired,
 } from "./sessionCheck";
-import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils";
+import { setupSubtitles } from "./videoPlayerUtils";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
 import "./plugins/markers.js";
@@ -23,30 +24,6 @@ import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
 import "./plugins/vrmode.js";
 import "./plugins/media-session.js";
-
-/**
- * Build a scene's stream URL on the scene's own instance
- * @param {string} sceneId - Scene ID
- * @param {string} path - Stream path (e.g., "stream", "stream.m3u8", "proxy-stream/stream.m3u8")
- * @param {string} instanceId - The scene's instance; the server refuses a stream without one
- * @param {Object} params - Additional query parameters
- * @returns {string} The URL's path and query
- */
-function buildStreamUrl(
-  sceneId: string,
-  path: string,
-  instanceId: string,
-  params: Record<string, string | undefined | null> = {}
-) {
-  const url = new URL(`/api/scene/${sceneId}/${path}`, window.location.origin);
-  url.searchParams.set("instanceId", instanceId);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.set(key, value);
-    }
-  });
-  return url.pathname + url.search;
-}
 
 /**
  * Retry a function with exponential backoff
@@ -80,49 +57,6 @@ async function retryWithBackoff(
 }
 
 /**
- * Quality presets in descending order of resolution
- * Must match the presets defined in TranscodingManager.ts
- */
-const QUALITY_PRESETS = [
-  { height: 2160, quality: "2160p" },
-  { height: 1080, quality: "1080p" },
-  { height: 720, quality: "720p" },
-  { height: 480, quality: "480p" },
-  { height: 360, quality: "360p" },
-];
-
-/**
- * Get the best transcode quality for a given source resolution
- * Returns the highest quality preset that is <= source height
- *
- * @param {number} sourceHeight - Height of the source video
- * @returns {string} Quality string (e.g., "1080p", "720p")
- */
-function getBestTranscodeQuality(sourceHeight: number): string {
-  // Find highest preset <= source resolution
-  for (const preset of QUALITY_PRESETS) {
-    if (preset.height <= sourceHeight) {
-      return preset.quality;
-    }
-  }
-  // Fallback to lowest quality if source is very small
-  return "360p";
-}
-
-/**
- * Get available quality options for a given source resolution
- * Only includes presets that are <= source height (no upscaling)
- * Always includes "direct" option
- *
- * @param {number} sourceHeight - Height of the source video
- * @returns {Array<{quality: string, height: number}>} Available quality options
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getAvailableQualities(sourceHeight: number) {
-  return QUALITY_PRESETS.filter((preset) => preset.height <= sourceHeight);
-}
-
-/**
  * useVideoPlayer
  *
  * Consolidated hook that manages all Video.js player operations.
@@ -135,7 +69,6 @@ export function useVideoPlayer({
   videoRef,
   playerRef,
   scene,
-  quality,
   ready,
   shouldAutoplay,
   playlist,
@@ -147,7 +80,6 @@ export function useVideoPlayer({
   nextScene,
   prevScene,
   registerPlayer,
-  updateQuality,
   location,
   hasResumedRef,
   initialResumeTimeRef,
@@ -158,7 +90,6 @@ export function useVideoPlayer({
   videoRef: React.RefObject<HTMLDivElement | null>;
   playerRef: React.RefObject<any>;
   scene: any;
-  quality: string;
   ready: boolean;
   shouldAutoplay: boolean;
   playlist: any;
@@ -174,7 +105,6 @@ export function useVideoPlayer({
   prevScene: () => void;
   /** Tells the player context which player this is (null: it is gone) */
   registerPlayer: (player: { paused(): boolean } | null) => void;
-  updateQuality: (quality: string) => void;
   location: any;
   hasResumedRef: React.RefObject<boolean>;
   initialResumeTimeRef: React.RefObject<number | null>;
@@ -257,7 +187,16 @@ export function useVideoPlayer({
         },
         markers: {},
         pauseOnScrub: {},
-        sourceSelector: {},
+        // The one fallback path: a source that fails moves to the next.
+        // A <video> element cannot see its source's HTTP status, so the
+        // server is asked first: a lost session goes to login instead.
+        sourceSelector: {
+          beforeFallback: async () => {
+            if (!(await isSessionExpired())) return false;
+            redirectToLogin(SESSION_EXPIRED_PLAYBACK_MESSAGE);
+            return true;
+          },
+        },
         persistVolume: {},
         bigButtons: {},
         seekButtons: {
@@ -474,120 +413,6 @@ export function useVideoPlayer({
   ]);
 
   // ============================================================================
-  // AUTO-FALLBACK ERROR HANDLER (set up once per scene)
-  // ============================================================================
-
-  const hasFallbackTriggeredRef = useRef(false);
-  const isAutoFallbackRef = useRef(false); // Use ref instead of state to avoid re-renders
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !scene) return;
-
-    // Reset fallback flags when scene changes
-    hasFallbackTriggeredRef.current = false;
-    isAutoFallbackRef.current = false;
-
-    const handleError = async () => {
-      const error = player.error();
-      if (!error) return;
-
-      // A <video> element cannot see its source's HTTP status, so ask the
-      // server once per error. This runs before the auto-fallback, which
-      // would otherwise take a 401 on direct play for a codec error.
-      if (await isSessionExpired()) {
-        redirectToLogin(SESSION_EXPIRED_PLAYBACK_MESSAGE);
-        return;
-      }
-
-      if (hasFallbackTriggeredRef.current) {
-        console.log(
-          "[AUTO-FALLBACK] Already triggered for this scene, ignoring"
-        );
-        return;
-      }
-
-      // Only handle codec errors (3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED)
-      if (error.code !== 3 && error.code !== 4) return;
-
-      // Only auto-fallback if we're currently on direct play
-      const currentSrc = player.currentSrc();
-      if (!currentSrc || currentSrc.includes(".m3u8")) return; // Already on HLS
-
-      // Determine best transcode quality based on source resolution
-      const sourceHeight = scene?.files?.[0]?.height || 1080;
-      const bestQuality = getBestTranscodeQuality(sourceHeight);
-
-      console.log(
-        `[AUTO-FALLBACK] Codec error detected, falling back to ${bestQuality} transcoding (source: ${sourceHeight}p)`
-      );
-      hasFallbackTriggeredRef.current = true;
-      isAutoFallbackRef.current = true; // Set ref flag (no re-render)
-
-      // Preserve current playback position (exactly like Stash does)
-      const currentTime = player.currentTime();
-
-      // Map quality preset to Stash resolution parameter
-      const qualityToResolution = {
-        "2160p": "FOUR_K",
-        "1080p": "FULL_HD",
-        "720p": "STANDARD_HD",
-        "480p": "STANDARD",
-        "360p": "LOW",
-      };
-      const resolution =
-        (qualityToResolution as Record<string, string>)[bestQuality] ||
-        "STANDARD_HD";
-      const hlsUrl = buildStreamUrl(
-        scene.id,
-        "proxy-stream/stream.m3u8",
-        scene.instanceId,
-        { resolution }
-      );
-
-      console.log(
-        `[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`
-      );
-
-      // Configure transcoded playback
-      togglePlaybackRateControl(player, false);
-
-      // Switch source exactly like Stash does - no clearing, no resetting
-      player.src({
-        src: hlsUrl,
-        type: "application/x-mpegURL",
-      });
-
-      player.load();
-
-      player.one("canplay", () => {
-        console.log("[AUTO-FALLBACK] canplay fired, restoring position");
-        player.currentTime(currentTime);
-        console.log("[AUTO-FALLBACK] Playback started successfully");
-        // Update quality in state (quality selector UI) and track for watch history
-        dispatch({ type: "SET_QUALITY", payload: bestQuality });
-        updateQuality(bestQuality);
-        // Clear auto-fallback flag
-        isAutoFallbackRef.current = false;
-      });
-
-      // Call play() immediately to prevent big play button from showing
-      player
-        .play()
-        .catch((err: any) =>
-          console.error("[AUTO-FALLBACK] Play failed:", err)
-        );
-    };
-
-    player.on("error", handleError);
-
-    return () => {
-      player.off("error", handleError);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sceneKey captures scene changes; playerRef is a stable ref; adding `scene` object would re-initialize error handler on every render
-  }, [sceneKey, playerRef, dispatch]); // Only re-run when scene changes
-
-  // ============================================================================
   // VIDEO SOURCES LOADING (using sourceSelector plugin - Stash pattern)
   // ============================================================================
 
@@ -610,9 +435,6 @@ export function useVideoPlayer({
     // Set ready=false at START of scene loading (Stash line 572)
     dispatch({ type: "SET_READY", payload: false });
 
-    const isDirectPlay = quality === "direct";
-    // const firstFile = scene?.files?.[0]; // Unused - keeping for future use
-
     // Set poster
     const posterUrl = scene?.paths?.screenshot;
     if (posterUrl) {
@@ -622,12 +444,13 @@ export function useVideoPlayer({
     // Get sourceSelector plugin
     const sourceSelector = player.sourceSelector();
 
-    // Sources are the server's stream paths, used unchanged (Stash's list
-    // for this file, as keyless Peek proxy paths)
-    const sources = buildPlayerSources(scene);
+    // Sources are the server's stream paths (Stash's list for this file, as
+    // keyless Peek proxy paths), with Direct and MKV after the transcodes
+    // when this browser cannot decode the file
+    const sources = buildPlayerSources(scene, canDecode);
 
-    // Set sources using sourceSelector plugin
-    // Plugin handles source switching, fallback, and playback state preservation
+    // The plugin loads the first, falls back through the rest and shows the
+    // rate menu only on Direct and MKV
     sourceSelector.setSources(sources);
 
     // Setup subtitles if available (using sourceSelector for track management)
@@ -635,11 +458,8 @@ export function useVideoPlayer({
       setupSubtitles(player, scene.id, scene.captions, scene.instanceId);
     }
 
-    // Configure player
-    togglePlaybackRateControl(player, isDirectPlay);
-    if (isDirectPlay) {
-      player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
-    }
+    // The rates the menu offers where it shows (Direct and MKV)
+    player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
 
     // Load the source (Stash line 693)
     player.load();
@@ -652,11 +472,7 @@ export function useVideoPlayer({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneKey, quality]); // Stateless: only scene and quality matter
-
-  // ============================================================================
-  // QUALITY SWITCHING (from useVideoPlayerSources)
-  // ============================================================================
+  }, [sceneKey]); // Stateless: only the scene matters
 
   // ============================================================================
   // RESTART (a queue step to an entry of the same scene)
@@ -698,8 +514,13 @@ export function useVideoPlayer({
       player.currentTime(resumeTime);
     }
 
-    // Just play - like Stash does
-    player.play();
+    // A browser that blocks autoplay with sound may still play it muted
+    player.play()?.catch((err: unknown) => {
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        player.muted(true);
+        void player.play()?.catch(() => {});
+      }
+    });
 
     // Clear autoplay flag
     dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: false });

@@ -3,8 +3,9 @@
  *
  * The server sends each scene's streams as Peek proxy paths
  * (/api/scene/:id/proxy-stream/...), built from Stash's own choices for the
- * file, with no Stash host and no API key. The player uses them unchanged.
- * Kept free of video.js so it can be unit tested.
+ * file, with no Stash host and no API key. The player uses them unchanged,
+ * in Stash's order unless this browser cannot decode the file. Kept free of
+ * video.js so it can be unit tested.
  */
 
 export interface PlayerSource {
@@ -25,27 +26,63 @@ function needsOffset(src: string): boolean {
   );
 }
 
-export function buildPlayerSources(scene: {
-  id: string;
-  instanceId: string;
-  sceneStreams?: Array<{
-    url: string;
-    mime_type?: string | null;
-    label?: string | null;
-  }>;
-  files?: Array<{ duration?: number | null }>;
-}): PlayerSource[] {
+/** The file's codecs, as `canDecode` (`utils/browserPlayback.ts`) reads them */
+export interface DecodableFile {
+  video_codec?: string | null;
+  audio_codec?: string | null;
+}
+
+/** Can this browser decode the file? Null when it cannot tell */
+export type DecodeCheck = (file: DecodableFile) => boolean | null;
+
+/**
+ * Stash's Direct stream or its MKV remux: the file's own video, which plays
+ * only where the browser decodes its codec. Transcodes are everything else.
+ */
+export function isDirectSource(src: string): boolean {
+  const pathname = new URL(src, "http://peek.invalid").pathname;
+  return (
+    pathname.endsWith("/proxy-stream/stream") ||
+    pathname.endsWith("/proxy-stream/stream.mkv")
+  );
+}
+
+/**
+ * The player's sources, in the order it tries them: Stash's, except that for
+ * a file this browser cannot decode (`canDecode` false) Direct and MKV go
+ * after the transcodes. Nothing is dropped, so the source menu still offers
+ * them.
+ */
+export function buildPlayerSources(
+  scene: {
+    id: string;
+    instanceId: string;
+    sceneStreams?: Array<{
+      url: string;
+      mime_type?: string | null;
+      label?: string | null;
+    }>;
+    files?: Array<DecodableFile & { duration?: number | null }>;
+  },
+  canDecode: DecodeCheck
+): PlayerSource[] {
   if (scene.sceneStreams && scene.sceneStreams.length > 0) {
     // Video duration from the first file (HLS transcodes need it to show the
     // right duration)
-    const duration = scene.files?.[0]?.duration || undefined;
-    return scene.sceneStreams.map((stream) => ({
+    const firstFile = scene.files?.[0];
+    const duration = firstFile?.duration || undefined;
+    const sources = scene.sceneStreams.map((stream) => ({
       src: stream.url,
       type: stream.mime_type || undefined,
       label: stream.label || undefined,
       offset: needsOffset(stream.url),
       duration,
     }));
+    if (!firstFile || canDecode(firstFile) !== false) return sources;
+    return [
+      ...sources.filter((source) => !isDirectSource(source.src)),
+      ...sources.filter((source) => isDirectSource(source.src)),
+    ];
   }
 
   console.warn(
