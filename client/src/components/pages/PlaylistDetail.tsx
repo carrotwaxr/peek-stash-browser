@@ -51,6 +51,7 @@ import {
 } from "../../api/playlists";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { newClientToken } from "../../utils/clientToken";
@@ -219,6 +220,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasMultipleInstances } = useConfig();
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const { sort, direction } = orderOf(view);
   const order = useMemo<PlaylistQueueParams>(
@@ -291,6 +294,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
         ? {
             // New with each read of the queue: a row's link starts this one
             key: newClientToken(),
+            userId,
             id: String(playlistId),
             name: playlistName,
             shuffle,
@@ -299,7 +303,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
             currentIndex: 0,
           }
         : null,
-    [entries, playlistId, playlistName, shuffle, repeat]
+    [entries, playlistId, playlistName, shuffle, repeat, userId]
   );
   const linkStates = useMemo(() => {
     const queueIndex = new Map(
@@ -547,6 +551,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
           shouldAutoplay: true, // Start playing immediately when entering from playlist
           playlist: {
             key: newClientToken(),
+            userId,
             id: String(playlistId),
             name: playlistName,
             shuffle,

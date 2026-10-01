@@ -1,6 +1,10 @@
 import type { NormalizedScene } from "@peek/shared-types";
 import { describe, expect, it } from "vitest";
-import { buildPlaybackQueue, toPlaybackEntry } from "@/utils/playbackQueue";
+import {
+  buildPlaybackQueue,
+  readSceneLocationState,
+  toPlaybackEntry,
+} from "@/utils/playbackQueue";
 
 /**
  * A scene as a list row carries it: performers, tags, files with their codecs,
@@ -122,6 +126,7 @@ describe("buildPlaybackQueue", () => {
       name: "Scene Grid",
       scenes,
       currentIndex: 0,
+      userId: 1,
     });
 
     expect(queue.scenes).toHaveLength(2000);
@@ -134,6 +139,7 @@ describe("buildPlaybackQueue", () => {
       name: "Mine",
       scenes: [fullScene(1), fullScene(2)],
       currentIndex: 1,
+      userId: 1,
       shuffle: true,
       repeat: "all",
     });
@@ -142,6 +148,7 @@ describe("buildPlaybackQueue", () => {
       id: "5",
       name: "Mine",
       currentIndex: 1,
+      userId: 1,
       shuffle: true,
       repeat: "all",
     });
@@ -157,6 +164,7 @@ describe("buildPlaybackQueue", () => {
       name: "Grid",
       scenes: [fullScene(1)],
       currentIndex: 0,
+      userId: 1,
     };
 
     expect(buildPlaybackQueue(options).key).not.toBe(
@@ -170,6 +178,7 @@ describe("buildPlaybackQueue", () => {
       name: "Grid",
       scenes: [fullScene(1)],
       currentIndex: 0,
+      userId: 1,
     });
 
     expect(queue).toEqual({
@@ -180,6 +189,61 @@ describe("buildPlaybackQueue", () => {
       repeat: "none",
       scenes: expect.any(Array) as unknown,
       currentIndex: 0,
+      userId: 1,
     });
+  });
+
+  it("a queue built while user 1 is signed in carries user 1", () => {
+    const queue = buildPlaybackQueue({
+      id: "virtual-grid",
+      name: "Grid",
+      scenes: [fullScene(1)],
+      currentIndex: 0,
+      userId: 1,
+    });
+
+    expect(queue.userId).toBe(1);
+  });
+});
+
+describe("readSceneLocationState", () => {
+  const stamped = (userId?: number) => ({
+    playlist: {
+      ...buildPlaybackQueue({
+        id: "virtual-grid",
+        name: "Grid",
+        scenes: [fullScene(1)],
+        currentIndex: 0,
+        userId,
+      }),
+    },
+    shouldAutoplay: true,
+  });
+
+  it("keeps the queue stamped for the signed-in user", () => {
+    expect(readSceneLocationState(stamped(1), 1).playlist?.scenes).toHaveLength(
+      1
+    );
+  });
+
+  it("drops a queue stamped for another user, and keeps the other fields", () => {
+    const read = readSceneLocationState(stamped(1), 2);
+
+    expect(read.playlist).toBeUndefined();
+    expect(read.shouldAutoplay).toBe(true);
+  });
+
+  it("drops a queue with no stamp", () => {
+    const state = stamped(1);
+    delete (state.playlist as { userId?: number }).userId;
+
+    expect(readSceneLocationState(state, 1).playlist).toBeUndefined();
+  });
+
+  it("drops every queue when nobody is signed in", () => {
+    expect(readSceneLocationState(stamped(1), undefined).playlist).toBe(
+      undefined
+    );
+    expect(readSceneLocationState(stamped(1), null).playlist).toBe(undefined);
   });
 });

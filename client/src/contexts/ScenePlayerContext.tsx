@@ -18,6 +18,7 @@ import {
   markLibraryNotReady,
   useLibraryReady,
 } from "../api/hooks/useLibraryReady";
+import { useAuth } from "../hooks/useAuth";
 import { getEntityPath } from "../utils/entityLinks";
 import { clearInternalPop, takeInternalPop } from "../utils/historyGuard";
 import {
@@ -87,8 +88,12 @@ function isLoadedEntry(
 }
 
 /** Does this history entry's state hold the queue with this key? */
-function holdsQueue(state: unknown, key: unknown): boolean {
-  const held = readSceneLocationState(state).playlist;
+function holdsQueue(
+  state: unknown,
+  key: unknown,
+  userId: number | undefined
+): boolean {
+  const held = readSceneLocationState(state, userId).playlist;
   return held !== undefined && held.key === key;
 }
 
@@ -154,6 +159,8 @@ export function ScenePlayerProvider({
     })
   );
   const { hasMultipleInstances } = useConfig();
+  const { user } = useAuth();
+  const userId = user?.id;
   const queryClient = useQueryClient();
   const { ready } = useLibraryReady();
   const location = useLocation();
@@ -280,6 +287,9 @@ export function ScenePlayerProvider({
   stateRef.current = state;
   const locationRef = useRef(location);
   locationRef.current = location;
+  // The signed-in user: the queue in an entry is theirs, or none
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
   const routeRef = useRef({ sceneId, instanceId, playlist });
   routeRef.current = { sceneId, instanceId, playlist };
   // The router's navigate changes with each location; the effects below
@@ -304,7 +314,9 @@ export function ScenePlayerProvider({
     if (!queue) return;
     const held: unknown = locationRef.current.state;
     const base = (
-      holdsQueue(held, queue.key) ? held : queueStateRef.current
+      holdsQueue(held, queue.key, userIdRef.current)
+        ? held
+        : queueStateRef.current
     ) as Record<string, unknown> | null | undefined;
     const controls = controlsOf(current);
     const write = JSON.stringify([
@@ -319,7 +331,13 @@ export function ScenePlayerProvider({
     lastWriteRef.current = { write, onKey };
     const entryState = {
       ...base,
-      playlist: { ...queue, currentIndex: current.currentIndex, controls },
+      playlist: {
+        ...queue,
+        // The entry outlives a sign-out: it says whose queue this is
+        userId: userIdRef.current,
+        currentIndex: current.currentIndex,
+        controls,
+      },
       keepScroll: true,
     };
     queueStateRef.current = entryState;
@@ -362,7 +380,10 @@ export function ScenePlayerProvider({
       ? isUrlEntry(entry, route.sceneId, route.instanceId)
       : false;
     const stateQueue = route.playlist;
-    const { shouldAutoplay } = readSceneLocationState(location.state);
+    const { shouldAutoplay } = readSceneLocationState(
+      location.state,
+      userIdRef.current
+    );
 
     // The fullscreen guard's own Back: stay on the entry being shown
     if (takeInternalPop()) {
@@ -432,7 +453,10 @@ export function ScenePlayerProvider({
     const shown = locationRef.current;
     const route = routeRef.current;
     if (isUrlEntry(entry, route.sceneId, route.instanceId)) {
-      const held = readSceneLocationState(shown.state).playlist;
+      const held = readSceneLocationState(
+        shown.state,
+        userIdRef.current
+      ).playlist;
       const unchanged =
         held !== undefined &&
         held.key === queue.key &&

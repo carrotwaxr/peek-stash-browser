@@ -8,9 +8,11 @@ import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
+import { createAuthValue } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
 import PlaylistSidebar from "@/components/playlist/PlaylistSidebar";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 import { ScenePlayerProvider } from "@/contexts/ScenePlayerContext";
 import { buildPlaybackQueue } from "@/utils/playbackQueue";
 
@@ -29,6 +31,7 @@ vi.mock("@/contexts/ConfigContext", () => ({
 describe("PlaylistSidebar", () => {
   it("Autoplay shows On for a queue without autoplayNext, and one click turns it Off", async () => {
     const queue = buildPlaybackQueue({
+      userId: 1,
       id: "virtual-grid",
       name: "Scene Grid",
       scenes: untrusted<NormalizedScene[]>([
@@ -40,19 +43,26 @@ describe("PlaylistSidebar", () => {
 
     render(
       <QueryClientProvider client={createQueryClient()}>
-        <MemoryRouter
-          initialEntries={[
-            { pathname: "/scene/1", state: { playlist: queue } },
-          ]}
+        <AuthContext.Provider
+          value={createAuthValue({
+            isAuthenticated: true,
+            user: { id: 1, username: "viewer", role: "USER" },
+          })}
         >
-          <ScenePlayerProvider
-            sceneId="1"
-            instanceId="inst-a"
-            playlist={{ ...queue }}
+          <MemoryRouter
+            initialEntries={[
+              { pathname: "/scene/1", state: { playlist: queue } },
+            ]}
           >
-            <PlaylistSidebar />
-          </ScenePlayerProvider>
-        </MemoryRouter>
+            <ScenePlayerProvider
+              sceneId="1"
+              instanceId="inst-a"
+              playlist={{ ...queue }}
+            >
+              <PlaylistSidebar />
+            </ScenePlayerProvider>
+          </MemoryRouter>
+        </AuthContext.Provider>
       </QueryClientProvider>
     );
 

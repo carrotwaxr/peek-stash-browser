@@ -274,6 +274,8 @@ describe("SceneSearch", () => {
       // Only the queue travels: the player loads the scene by id
       expect(state).not.toHaveProperty("scene");
       expect(playlist.key).toEqual(expect.stringMatching(/^[0-9a-f]{32}$/));
+      // The queue belongs to the signed-in user (renderListPage signs in user 1)
+      expect(playlist.userId).toBe(1);
     });
   });
 

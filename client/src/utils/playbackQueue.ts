@@ -40,6 +40,13 @@ export interface PlaybackQueue {
    * queue, one carrying this key moves within it
    */
   key: string;
+  /**
+   * The user the queue belongs to. A history entry outlives a sign-out, so
+   * the next user to sign in on the tab can step Back onto it; the scene
+   * page shows a queue only to the user who made it, and one with no stamp
+   * to nobody.
+   */
+  userId?: number;
   id: string;
   name: string;
   shuffle: boolean;
@@ -84,6 +91,8 @@ export const toPlaybackEntry = (
  * and repeat off unless the caller sets them, under a new key.
  */
 export const buildPlaybackQueue = (options: {
+  /** The signed-in user (`useAuth().user?.id`) */
+  userId: number | undefined;
   id: string;
   name: string;
   scenes: readonly NormalizedScene[];
@@ -92,6 +101,7 @@ export const buildPlaybackQueue = (options: {
   repeat?: "none" | "one" | "all";
 }): PlaybackQueue => ({
   key: newClientToken(),
+  userId: options.userId,
   id: options.id,
   name: options.name,
   shuffle: options.shuffle ?? false,
@@ -108,15 +118,25 @@ export interface SceneLocationState {
   fromPageTitle?: string;
 }
 
-/** The scene page's part of a history entry's state (none: an empty one) */
-export function readSceneLocationState(state: unknown): SceneLocationState {
+/**
+ * The scene page's part of a history entry's state (none: an empty one). The
+ * queue is kept only when it is stamped for `userId`, the signed-in user: one
+ * left by another user, or by no one, reads as no queue.
+ */
+export function readSceneLocationState(
+  state: unknown,
+  userId: number | null | undefined
+): SceneLocationState {
   if (typeof state !== "object" || state === null) return {};
   const { playlist, shouldResume, shouldAutoplay, fromPageTitle } =
     state as Record<string, unknown>;
   const isQueue =
     typeof playlist === "object" &&
     playlist !== null &&
-    Array.isArray((playlist as { scenes?: unknown }).scenes);
+    Array.isArray((playlist as { scenes?: unknown }).scenes) &&
+    userId !== null &&
+    userId !== undefined &&
+    (playlist as { userId?: unknown }).userId === userId;
   return {
     ...(isQueue && { playlist: playlist as PlaybackQueue }),
     ...(typeof shouldResume === "boolean" && { shouldResume }),

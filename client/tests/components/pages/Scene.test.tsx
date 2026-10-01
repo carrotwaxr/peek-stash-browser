@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { act, render, screen } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
+import { createAuthValue } from "@tests/testUtils";
 import {
   type MockInstance,
   afterAll,
@@ -13,6 +14,7 @@ import {
   vi,
 } from "vitest";
 import Scene from "@/components/pages/Scene";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 import { useScenePlayer } from "@/contexts/ScenePlayerContext";
 
 // The provider shows what it was handed, so a test reads the queue the page
@@ -83,6 +85,7 @@ function playerValue(
 
 const queue = {
   key: "q1",
+  userId: 1,
   id: "virtual-grid",
   name: "Grid",
   shuffle: false,
@@ -104,12 +107,27 @@ const queue = {
   ],
 };
 
-function page(entry: { pathname: string; search?: string; state?: unknown }) {
+/** The scene page at an entry, with the user the tab is signed in as */
+function page(
+  entry: { pathname: string; search?: string; state?: unknown },
+  userId = 1
+) {
   const router = createMemoryRouter(
     [{ path: "/scene/:sceneId", element: <Scene /> }],
     { initialEntries: [entry] }
   );
-  return { router, element: <RouterProvider router={router} /> };
+  const auth = createAuthValue({
+    isAuthenticated: true,
+    user: { id: userId, username: `user${userId}`, role: "USER" },
+  });
+  return {
+    router,
+    element: (
+      <AuthContext.Provider value={auth}>
+        <RouterProvider router={router} />
+      </AuthContext.Provider>
+    ),
+  };
 }
 
 function playlistOf(testId = "provider") {
@@ -176,6 +194,51 @@ describe("Scene page queue", () => {
     render(page({ pathname: "/scene/2", search: "?instance=b" }).element);
 
     expect(playlistOf()).toBeNull();
+  });
+
+  it("a queue another user left in the history entry is not shown to the signed-in user", () => {
+    // User 1 signed out and user 2 signed in on this tab, then pressed Back
+    render(
+      page(
+        {
+          pathname: "/scene/2",
+          search: "?instance=b",
+          state: { playlist: { ...queue, userId: 1 }, shouldAutoplay: true },
+        },
+        2
+      ).element
+    );
+
+    expect(playlistOf()).toBeNull();
+  });
+
+  it("a queue with no user stamp is not shown", () => {
+    const { userId: _stamp, ...unstamped } = queue;
+
+    render(
+      page({
+        pathname: "/scene/2",
+        search: "?instance=b",
+        state: { playlist: unstamped },
+      }).element
+    );
+
+    expect(playlistOf()).toBeNull();
+  });
+
+  it("the signed-in user's own queue stays (reload, Back)", () => {
+    render(
+      page(
+        {
+          pathname: "/scene/2",
+          search: "?instance=b",
+          state: { playlist: { ...queue, userId: 2, currentIndex: 1 } },
+        },
+        2
+      ).element
+    );
+
+    expect(playlistOf()?.currentIndex).toBe(1);
   });
 
   it("?t=120 seeks once: a later tab click does not seek again", async () => {

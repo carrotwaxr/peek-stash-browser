@@ -16,6 +16,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { SignedIn } from "@tests/helpers/SignedIn";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateExclusionDependents } from "@/api/invalidateExclusionDependents";
@@ -84,8 +85,13 @@ function answer(scenes: unknown[]) {
 
 function LocationProbe() {
   const location = useLocation();
+  const queue = (location.state as { playlist?: { userId?: number } } | null)
+    ?.playlist;
   return (
-    <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+    <>
+      <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+      <output data-testid="queue-user">{String(queue?.userId)}</output>
+    </>
   );
 }
 
@@ -105,12 +111,14 @@ describe("ContinueWatchingCarousel", () => {
   function renderCarousel() {
     return render(
       <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <Routes>
-            <Route path="/" element={<ContinueWatchingCarousel />} />
-            <Route path="*" element={<LocationProbe />} />
-          </Routes>
-        </MemoryRouter>
+        <SignedIn>
+          <MemoryRouter>
+            <Routes>
+              <Route path="/" element={<ContinueWatchingCarousel />} />
+              <Route path="*" element={<LocationProbe />} />
+            </Routes>
+          </MemoryRouter>
+        </SignedIn>
       </QueryClientProvider>
     );
   }
@@ -233,6 +241,8 @@ describe("ContinueWatchingCarousel", () => {
         "/scene/2?instance=b"
       );
     });
+    // The queue it hands over belongs to the signed-in user
+    expect(screen.getByTestId("queue-user").textContent).toBe("1");
   });
 
   it("opens a scene without the instance in its link when there is a single server", async () => {
