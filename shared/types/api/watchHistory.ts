@@ -20,23 +20,6 @@ export interface WatchHistoryData {
   lastPlayedAt: Date | null;
 }
 
-/**
- * Full watch history record (includes oCount and history arrays)
- */
-export interface FullWatchHistoryRecord {
-  id: number;
-  userId: number;
-  instanceId: string;
-  sceneId: string;
-  playCount: number;
-  playDuration: number;
-  resumeTime: number | null;
-  lastPlayedAt: Date | null;
-  oCount: number;
-  oHistory: string[];
-  playHistory: string[];
-}
-
 // =============================================================================
 // SAVE ACTIVITY
 // =============================================================================
