@@ -24,7 +24,9 @@ import { imageViewHistoryApi } from "../../api";
 import { useUpdateFavorite, useUpdateRating } from "../../api/hooks";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useFullscreen } from "../../hooks/useFullscreen";
+import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useImageDownload } from "../../hooks/useImageDownload";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import { isVideoImage } from "../../utils/imageMedia";
@@ -82,7 +84,11 @@ const Lightbox = ({
   // New state for enhanced features
   const [controlsVisible, setControlsVisible] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [hasHoverCapability, setHasHoverCapability] = useState(true);
+  const hasHoverCapability = useHoverCapable();
+  // Mobile in portrait: the nav arrows sit lower, clear of the controls
+  const isPortraitMobile = useMediaQuery(
+    "(max-width: 768px) and (orientation: portrait)"
+  );
   const { isFullscreen, toggleFullscreen, supportsFullscreen } = useFullscreen({
     autoOnLandscape: true,
     enabled: isOpen,
@@ -203,35 +209,6 @@ const Lightbox = ({
       setIsPlaying(false);
     }
   }, [isOpen, autoPlay]);
-
-  // Detect hover capability (mouse/trackpad vs touch-only) to hide keyboard hints on mobile
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover)");
-    setHasHoverCapability(mediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) =>
-      setHasHoverCapability(e.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  // Detect portrait orientation on mobile for nav arrow positioning
-  const [isPortraitMobile, setIsPortraitMobile] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      setIsPortraitMobile(
-        window.innerWidth <= 768 &&
-          window.matchMedia("(orientation: portrait)").matches
-      );
-    };
-    check();
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
-    return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
-    };
-  }, []);
 
   // Prefetch images from adjacent pages into browser cache
   useEffect(() => {

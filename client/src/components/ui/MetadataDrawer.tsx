@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 /**
  * Adaptive metadata drawer that opens on the longer viewport axis:
@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useDecrementImageOCounter } from "../../api/hooks";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { getEntityPath } from "../../utils/entityLinks";
 import {
   getEffectiveImageMetadata,
@@ -83,21 +84,9 @@ const MetadataDrawer = ({
   onOCounterChange,
 }: Props) => {
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(
-    () => window.innerWidth > window.innerHeight
-  );
+  const isLandscape = useMediaQuery("(orientation: landscape)");
   const ratingBadgeRef = useRef(null);
   const { hasMultipleInstances } = useConfig();
-
-  // Track viewport orientation via matchMedia (fires only on actual orientation change,
-  // consistent with hover detection pattern in Lightbox.jsx)
-  useEffect(() => {
-    const mq = window.matchMedia("(orientation: landscape)");
-    setIsLandscape(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsLandscape(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
 
   if (!open || !image) return null;
 
