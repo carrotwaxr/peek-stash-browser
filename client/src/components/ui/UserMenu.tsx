@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useTVMode } from "../../hooks/useTVMode";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
 
-const UserMenu = () => {
+const ROLE_LABELS: Record<string, string> = { ADMIN: "Admin", USER: "User" };
+
+interface Props {
+  /** Where the menu opens: under the button (top bar) or beside it (collapsed sidebar). */
+  placement?: "below-end" | "right-end";
+}
+
+const UserMenu = ({ placement = "below-end" }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
 
@@ -35,13 +43,34 @@ const UserMenu = () => {
     };
   }, [isOpen]);
 
+  // A navigation closes the menu, whichever link or route change caused it
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  // Opening moves focus to the first item
+  useEffect(() => {
+    if (isOpen) {
+      menuRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+    }
+  }, [isOpen]);
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape" && isOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+      buttonRef.current?.querySelector("button")?.focus();
+    }
+  };
+
   const handleLogout = () => {
     void logout();
     setIsOpen(false);
   };
 
   return (
-    <div className="relative">
+    <div className="relative" onKeyDown={handleKeyDown}>
       {/* User Menu Button - wrapper div for click-outside ref detection */}
       <div ref={buttonRef} className="inline-flex">
         <Button
@@ -55,6 +84,8 @@ const UserMenu = () => {
           }}
           icon={<ThemedIcon name="circle-user-round" size={20} />}
           aria-label="User menu"
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
         />
       </div>
 
@@ -62,7 +93,11 @@ const UserMenu = () => {
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg border z-50"
+          className={`absolute w-64 rounded-lg shadow-lg border z-50 ${
+            placement === "right-end"
+              ? "left-full bottom-0 ml-2"
+              : "right-0 mt-2"
+          }`}
           style={{
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-color)",
@@ -91,9 +126,7 @@ const UserMenu = () => {
                   {user?.username || "User"}
                 </div>
                 <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {user?.role
-                    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                    : "User"}
+                  {(user?.role && ROLE_LABELS[user.role]) ?? "User"}
                 </div>
               </div>
             </div>

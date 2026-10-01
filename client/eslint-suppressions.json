@@ -583,7 +583,7 @@
   },
   "src/components/ui/Sidebar.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/ui/TabNavigation.tsx": {
