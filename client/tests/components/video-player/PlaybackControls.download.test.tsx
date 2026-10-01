@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { createAuthValue, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/api/queryKeys";
 import type * as uiModule from "@/components/ui/index";
 import PlaybackControls from "@/components/video-player/PlaybackControls";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 
 const mockApiPost = vi.fn();
 const mockGetMyPermissions = vi.fn();
@@ -61,7 +62,11 @@ describe("PlaybackControls download", () => {
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     render(
       <QueryClientProvider client={queryClient}>
-        <PlaybackControls />
+        <AuthContext.Provider
+          value={createAuthValue({ isAuthenticated: true })}
+        >
+          <PlaybackControls />
+        </AuthContext.Provider>
       </QueryClientProvider>
     );
 

@@ -62,6 +62,7 @@ export type {
   UpdateHideConfirmationBody,
   UpdateHideConfirmationResponse,
   GetUserPermissionsParams,
+  GetMyPermissionsResponse,
   UpdatePermissionOverridesBody,
   GetUserGroupMembershipsParams,
   AdminResetPasswordParams,

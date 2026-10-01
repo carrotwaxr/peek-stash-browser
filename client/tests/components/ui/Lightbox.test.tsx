@@ -9,6 +9,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { permissions } from "@tests/helpers/permissions";
 import { createAuthValue, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost, getMyPermissions, libraryApi } from "@/api";
@@ -1036,7 +1037,7 @@ describe("Lightbox", () => {
 
     it("the Download button shows only with Can Download Files", async () => {
       vi.mocked(getMyPermissions).mockResolvedValue({
-        permissions: { canDownloadFiles: false },
+        permissions: permissions({ canDownloadFiles: false }),
       });
       renderOpen();
       await waitFor(() => expect(getMyPermissions).toHaveBeenCalled());
@@ -1045,7 +1046,7 @@ describe("Lightbox", () => {
 
     it("shows the Download button with Can Download Files", async () => {
       vi.mocked(getMyPermissions).mockResolvedValue({
-        permissions: { canDownloadFiles: true },
+        permissions: permissions({ canDownloadFiles: true }),
       });
       renderOpen();
       expect(await screen.findByLabelText("Download image")).toBeTruthy();
@@ -1053,7 +1054,7 @@ describe("Lightbox", () => {
 
     it("Download posts the image's instance and navigates to the file", async () => {
       vi.mocked(getMyPermissions).mockResolvedValue({
-        permissions: { canDownloadFiles: true },
+        permissions: permissions({ canDownloadFiles: true }),
       });
       vi.mocked(apiPost).mockResolvedValue({
         download: { id: 31, status: "COMPLETED" },

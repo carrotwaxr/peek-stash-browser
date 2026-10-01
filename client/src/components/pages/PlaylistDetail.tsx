@@ -35,12 +35,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  ApiError,
-  apiPost,
-  getErrorMessage,
-  getMyPermissions,
-} from "../../api";
+import { ApiError, apiPost, getErrorMessage } from "../../api";
+import { useMyPermissions } from "../../api/hooks/useMyPermissions";
 import {
   useDuplicatePlaylist,
   useMovePlaylistItem,
@@ -270,10 +266,7 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const shuffle = shuffleChoice ?? playlist?.shuffle ?? false;
   const repeat = repeatChoice ?? asRepeat(playlist?.repeat ?? "none");
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const { data: permissions } = useMyPermissions();
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Selection for the bulk bar (not while editing or reordering), by item
@@ -350,20 +343,6 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
 
   // Set page title to playlist name
   usePageTitle(playlistName || "Playlist");
-
-  // Fetch user permissions on mount
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const result = await getMyPermissions();
-        setPermissions(result.permissions);
-      } catch (error) {
-        // Silently fail - permissions will remain null and download button won't show
-        console.error("Failed to fetch permissions:", error);
-      }
-    };
-    void fetchPermissions();
-  }, []);
 
   const updatePlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();

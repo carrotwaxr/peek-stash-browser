@@ -76,6 +76,7 @@ import type {
   GetFilterPresetsResponse,
   GetHiddenEntitiesQuery,
   GetHiddenEntitiesResponse,
+  GetMyPermissionsResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsParams,
   GetUserPermissionsParams,
@@ -1926,7 +1927,7 @@ export const updateHideConfirmation = async (
  */
 export const getUserPermissions = async (
   req: TypedAuthRequest,
-  res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
+  res: TypedResponse<GetMyPermissionsResponse | ApiErrorResponse>
 ) => {
   const permissions = await resolveUserPermissions(req.user.id);
 
@@ -1943,7 +1944,7 @@ export const getUserPermissions = async (
  */
 export const getAnyUserPermissions = async (
   req: TypedAuthRequest<never, GetUserPermissionsParams>,
-  res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
+  res: TypedResponse<GetMyPermissionsResponse | ApiErrorResponse>
 ) => {
   const userId = parseInt(req.params.userId);
   if (isNaN(userId)) {

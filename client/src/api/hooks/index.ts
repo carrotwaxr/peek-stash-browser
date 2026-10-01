@@ -27,6 +27,7 @@ export {
   useDeleteCarousel,
 } from "./useCarousels";
 export { useUserSettings, useUpdateUserSettings } from "./useUserSettings";
+export { useMyPermissions } from "./useMyPermissions";
 export {
   usePlaylists,
   useSharedPlaylists,

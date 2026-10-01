@@ -578,6 +578,24 @@ export interface GetUserPermissionsParams extends Record<string, string> {
   userId: string;
 }
 
+/**
+ * GET /api/user/permissions, and the admin's GET /api/user/:userId/permissions.
+ * Each `sources` entry says where the value comes from: "default", "override"
+ * or the name of the group that grants it.
+ */
+export interface GetMyPermissionsResponse {
+  permissions: {
+    canShare: boolean;
+    canDownloadFiles: boolean;
+    canDownloadPlaylists: boolean;
+    sources: {
+      canShare: string;
+      canDownloadFiles: string;
+      canDownloadPlaylists: string;
+    };
+  };
+}
+
 /** PUT /api/users/:userId/permission-overrides */
 export interface UpdatePermissionOverridesBody {
   canShareOverride?: boolean | null;
