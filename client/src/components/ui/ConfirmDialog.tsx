@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, type RefObject, useRef } from "react";
 import Button from "./Button";
 import Modal from "./Modal";
 
@@ -6,12 +6,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  title?: string;
+  title?: string | undefined;
   message: ReactNode;
-  confirmText?: string;
-  cancelText?: string;
-  confirmStyle?: "danger" | "primary";
+  confirmText?: string | undefined;
+  cancelText?: string | undefined;
+  confirmStyle?: "danger" | "primary" | undefined;
   variant?: string;
+  /** Focused on open; default the Cancel button, a safe answer for a TV
+   * remote's OK button (Modal alone would focus its close button) */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -27,7 +30,10 @@ const ConfirmDialog = ({
   confirmText = "Confirm",
   cancelText = "Cancel",
   confirmStyle = "danger",
+  initialFocusRef,
 }: Props) => {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
   const handleConfirm = (e: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -45,9 +51,10 @@ const ConfirmDialog = ({
       onClose={onClose}
       size="sm"
       title={title}
+      initialFocusRef={initialFocusRef ?? cancelRef}
       footer={
         <>
-          <Button onClick={onClose} variant="secondary">
+          <Button ref={cancelRef} onClick={onClose} variant="secondary">
             {cancelText}
           </Button>
           <Button onClick={handleConfirm} variant={confirmVariant}>

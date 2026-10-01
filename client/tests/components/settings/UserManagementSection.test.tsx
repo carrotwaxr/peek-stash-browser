@@ -168,7 +168,7 @@ describe("UserManagementSection", () => {
   });
 
   it("deleting a user says it was deleted, and nothing after it says updated", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, "confirm");
     api.apiDelete.mockResolvedValue({});
     await renderTab();
     fireEvent.click(
@@ -180,6 +180,12 @@ describe("UserManagementSection", () => {
     api.apiGet.mockResolvedValueOnce({ users: [admin] });
     fireEvent.click(
       within(dialog).getByRole("button", { name: /Delete User/ })
+    );
+    const confirmDialog = await screen.findByRole("dialog", {
+      name: "Delete user?",
+    });
+    fireEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Delete user" })
     );
 
     expect(
@@ -193,7 +199,59 @@ describe("UserManagementSection", () => {
         screen.queryByText("viewer", { selector: "span" })
       ).not.toBeInTheDocument()
     );
+    expect(confirmSpy).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it("Delete group asks in a dialog, and deletes the group on Confirm", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    api.deleteGroup.mockResolvedValue({});
+    await renderTab();
+    const groupRow = must(
+      (await screen.findByText("Family", { selector: "td *, td" })).closest(
+        "tr"
+      ),
+      "Family's row"
+    );
+
+    fireEvent.click(within(groupRow).getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete group?" });
+    expect(dialog).toHaveTextContent(
+      'Delete the group "Family"? Its members lose what it grants, but no user is deleted.'
+    );
+    expect(api.deleteGroup).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete group" })
+    );
+
+    expect(
+      await screen.findByText('Group "Family" deleted successfully')
+    ).toBeInTheDocument();
+    expect(api.deleteGroup).toHaveBeenCalledWith("7");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("Cancel on the Delete group dialog deletes nothing", async () => {
+    await renderTab();
+    const groupRow = must(
+      (await screen.findByText("Family", { selector: "td *, td" })).closest(
+        "tr"
+      ),
+      "Family's row"
+    );
+
+    fireEvent.click(within(groupRow).getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete group?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Delete group?" })
+      ).not.toBeInTheDocument()
+    );
+    expect(api.deleteGroup).not.toHaveBeenCalled();
   });
 
   it("a failed reload keeps the table and shows the error beside it", async () => {

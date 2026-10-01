@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { apiPut, deleteGroup, getGroups } from "../../api";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { formatDate } from "../../utils/date";
 import { Button, Paper } from "../ui/index";
 import CreateUserModal from "./CreateUserModal";
@@ -57,6 +58,7 @@ const UserManagementSection = ({
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupItem | null>(null);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
 
   // Load groups on mount
   const loadGroups = async () => {
@@ -86,9 +88,11 @@ const UserManagementSection = ({
 
   const handleDeleteGroup = async (group: { id: number; name: string }) => {
     if (
-      !confirm(
-        `Are you sure you want to delete the group "${group.name}"?\n\nThis will remove the group from all members but will not delete any users.`
-      )
+      !(await confirm({
+        title: "Delete group?",
+        message: `Delete the group "${group.name}"? Its members lose what it grants, but no user is deleted.`,
+        confirmText: "Delete group",
+      }))
     ) {
       return;
     }
@@ -589,6 +593,8 @@ const UserManagementSection = ({
       </Paper>
 
       {/* Modals */}
+      {confirmDialog}
+
       {showCreateModal && (
         <CreateUserModal
           onClose={() => setShowCreateModal(false)}

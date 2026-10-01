@@ -19,6 +19,7 @@ import {
   useDefaultPresets,
   useFilterPresets,
 } from "../../api/hooks/usePresets";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import Button from "./Button";
 import Modal from "./Modal";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
@@ -88,6 +89,7 @@ const FilterPresets = ({
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const queryClient = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const presetsQuery = useFilterPresets();
   const defaultsQuery = useDefaultPresets();
   const presets = presetsForContext(presetsQuery.data, effectiveContext);
@@ -216,7 +218,13 @@ const FilterPresets = ({
   };
 
   const handleDeletePreset = async (presetId: string, presetName: string) => {
-    if (!confirm(`Delete preset "${presetName}"?`)) {
+    if (
+      !(await confirm({
+        title: "Delete preset?",
+        message: `Delete preset "${presetName}"?`,
+        confirmText: "Delete",
+      }))
+    ) {
       return;
     }
 
@@ -447,6 +455,8 @@ const FilterPresets = ({
           </Button>
         </div>
       </Modal>
+
+      {confirmDialog}
     </div>
   );
 };

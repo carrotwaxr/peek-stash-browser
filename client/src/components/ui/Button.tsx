@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, type Ref } from "react";
 import { cva } from "class-variance-authority";
 import { clsx } from "clsx";
 
@@ -12,6 +12,7 @@ interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   className?: string;
   children?: ReactNode;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 const buttonVariants = cva(

@@ -6,6 +6,7 @@ import type {
 } from "@peek/shared-types";
 import { Trash2 } from "lucide-react";
 import { ApiError, apiDelete, apiGet, apiPost } from "../../../api";
+import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
@@ -64,6 +65,7 @@ const BackupTab = () => {
   const [loadFailed, setLoadFailed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
 
   const fetchBackups = useCallback(async () => {
     try {
@@ -97,9 +99,17 @@ const BackupTab = () => {
 
   const handleDeleteBackup = async (filename: string) => {
     if (
-      !confirm(
-        `Are you sure you want to delete this backup?\n\n${filename}\n\nThis cannot be undone.`
-      )
+      !(await confirm({
+        title: "Delete backup?",
+        message: (
+          <>
+            <p>Are you sure you want to delete this backup?</p>
+            <p className="my-2 font-mono text-sm break-all">{filename}</p>
+            <p>This cannot be undone.</p>
+          </>
+        ),
+        confirmText: "Delete backup",
+      }))
     ) {
       return;
     }
@@ -238,6 +248,7 @@ const BackupTab = () => {
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 };

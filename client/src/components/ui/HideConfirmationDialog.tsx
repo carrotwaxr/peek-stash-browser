@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
@@ -20,6 +20,8 @@ const HideConfirmationDialog = ({
   entityName,
 }: Props) => {
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  // Opens on the checkbox, a safe first stop for a TV remote's OK button
+  const checkboxRef = useRef<HTMLInputElement>(null);
 
   const handleConfirm = () => {
     onConfirm?.(dontAskAgain);
@@ -52,6 +54,7 @@ const HideConfirmationDialog = ({
           </p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
+              ref={checkboxRef}
               type="checkbox"
               checked={dontAskAgain}
               onChange={(e) => setDontAskAgain(e.target.checked)}
@@ -65,6 +68,7 @@ const HideConfirmationDialog = ({
       confirmText="Hide"
       cancelText="Cancel"
       variant="warning"
+      initialFocusRef={checkboxRef}
     />
   );
 };

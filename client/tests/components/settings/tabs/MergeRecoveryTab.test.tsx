@@ -1,5 +1,19 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import {
+  type MockInstance,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { apiGet, apiPost } from "../../../../src/api";
 import MergeRecoveryTab from "../../../../src/components/settings/tabs/MergeRecoveryTab";
 import { must } from "../../../testUtils";
@@ -56,7 +70,16 @@ const MATCH_ON_B = {
   recommended: true,
 };
 
+/** Answers the confirmation dialog named `name` with `button`; returns it */
+const answerConfirm = async (name: string, button: string) => {
+  const dialog = await screen.findByRole("dialog", { name });
+  fireEvent.click(within(dialog).getByRole("button", { name: button }));
+  return dialog;
+};
+
 describe("MergeRecoveryTab", () => {
+  let confirmSpy: MockInstance<typeof window.confirm>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet.mockImplementation((url: string) =>
@@ -67,7 +90,7 @@ describe("MergeRecoveryTab", () => {
       )
     );
     mockPost.mockResolvedValue({ ok: true });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmSpy = vi.spyOn(window, "confirm");
   });
 
   afterEach(() => {
@@ -161,10 +184,49 @@ describe("MergeRecoveryTab", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Discard Activity" })
     );
+    await answerConfirm("Discard orphaned data?", "Discard");
     await waitFor(() =>
       expect(mockPost).toHaveBeenCalledWith(
         "/admin/orphaned-scenes/5%3Ainst-b/discard"
       )
     );
+  });
+
+  it("discard confirms in a dialog that says it also removes the scene from playlists; Cancel posts nothing", async () => {
+    render(<MergeRecoveryTab />);
+    fireEvent.click(await screen.findByText("on Stash B"));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Discard Activity" })
+    );
+
+    const dialog = await answerConfirm("Discard orphaned data?", "Cancel");
+    expect(dialog).toHaveTextContent(
+      "Are you sure you want to discard this orphaned data? It also removes the scene from every playlist that holds it. This cannot be undone."
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it("Auto-Reconcile All confirms in a dialog, then posts", async () => {
+    mockPost.mockResolvedValue({ reconciled: 1, skipped: 0 });
+    render(<MergeRecoveryTab />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Auto-Reconcile All" })
+    );
+
+    const dialog = await answerConfirm(
+      "Auto-reconcile all orphans?",
+      "Reconcile all"
+    );
+    expect(dialog).toHaveTextContent(
+      "This transfers the activity of every orphan with exactly one PHASH match on its instance. Orphans with several matches stay here for you to choose."
+    );
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith("/admin/reconcile-all")
+    );
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });

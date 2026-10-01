@@ -54,17 +54,17 @@ test.describe("Stash instances", () => {
         page.getByRole("heading", { name: instance.name, exact: true })
       ).toBeVisible({ timeout: 10_000 });
 
-      const dialogs: string[] = [];
-      page.once("dialog", (dialog) => {
-        dialogs.push(dialog.message());
-        void dialog.accept();
-      });
       await page.getByRole("button", { name: "Disable", exact: true }).click();
+      // Peek's confirmation dialog, not the browser's
+      const confirm = page.getByRole("dialog", {
+        name: `Disable ${instance.name}?`,
+      });
+      await expect(confirm).toContainText(
+        "Every user stops seeing its content until you enable it again. Ratings, history and playlists are kept."
+      );
+      await confirm.getByRole("button", { name: "Disable instance" }).click();
 
       await expect(page.getByText(REFUSAL).first()).toBeVisible();
-      expect(dialogs).toEqual([
-        `Disable "${instance.name}"? Every user stops seeing its content until you enable it again. Ratings, history and playlists are kept.`,
-      ]);
       // The list stays, the instance still enabled
       await expect(page.getByText("Active", { exact: true })).toBeVisible();
       await expect(

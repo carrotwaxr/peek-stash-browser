@@ -10,6 +10,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import { ApiError, getErrorMessage } from "../../api/client";
 import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
@@ -86,6 +87,7 @@ const StashInstanceSection = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const queryClient = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
 
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -318,11 +320,14 @@ const StashInstanceSection = () => {
 
   const handleDelete = async (instance: { id: string; name: string }) => {
     if (
-      !confirm(
-        `Delete "${instance.name}"? Peek removes its cached library and every ` +
-          "user's ratings, favorites, watch history, playlist entries and " +
-          "hidden items for it. To keep them, disable the instance instead."
-      )
+      !(await confirm({
+        title: `Delete ${instance.name}?`,
+        message:
+          "Peek removes its cached library and every user's ratings, " +
+          "favorites, watch history, playlist entries and hidden items for " +
+          "it. To keep them, disable the instance instead.",
+        confirmText: "Delete instance",
+      }))
     ) {
       return;
     }
@@ -348,10 +353,13 @@ const StashInstanceSection = () => {
   }) => {
     if (
       instance.enabled &&
-      !confirm(
-        `Disable "${instance.name}"? Every user stops seeing its content ` +
-          "until you enable it again. Ratings, history and playlists are kept."
-      )
+      !(await confirm({
+        title: `Disable ${instance.name}?`,
+        message:
+          "Every user stops seeing its content until you enable it again. " +
+          "Ratings, history and playlists are kept.",
+        confirmText: "Disable instance",
+      }))
     ) {
       return;
     }
@@ -790,6 +798,7 @@ const StashInstanceSection = () => {
           </div>
         )}
       </Paper.Body>
+      {confirmDialog}
     </Paper>
   );
 };

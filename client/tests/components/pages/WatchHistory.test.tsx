@@ -29,9 +29,16 @@ import { createQueryClient } from "@/api/queryClient";
 import { queryKeys } from "@/api/queryKeys";
 import WatchHistory from "@/components/pages/WatchHistory";
 import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
+import type * as ToastModule from "@/utils/toast";
 import { jsonResponse, requestsTo, stubApi } from "../../helpers/stubApi";
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
+
+const toast = vi.hoisted(() => ({ showError: vi.fn() }));
+vi.mock("@/utils/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof ToastModule>()),
+  showError: toast.showError,
+}));
 vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: false }),
 }));
@@ -401,5 +408,31 @@ describe("WatchHistory", () => {
 
     await waitFor(() => expect(deletes()).toHaveLength(1));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("a failed clear says so in an error toast, not the browser's alert, and keeps the dialog", async () => {
+    const alertSpy = vi.spyOn(window, "alert");
+    toast.showError.mockClear();
+    stubApi({
+      [WATCHED]: answer([scene("1")], 1),
+      "/watch-history": () => jsonResponse(500, { error: "boom" }),
+    });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("row")).toHaveLength(1);
+    });
+
+    fireEvent.click(screen.getByText("Clear History"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(must(within(dialog).getByText("Clear History")));
+
+    await waitFor(() =>
+      expect(toast.showError).toHaveBeenCalledWith(
+        "Failed to clear watch history. Please try again."
+      )
+    );
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    alertSpy.mockRestore();
   });
 });
