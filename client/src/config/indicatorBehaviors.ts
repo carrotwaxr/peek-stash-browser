@@ -309,13 +309,7 @@ export const CARD_INDICATORS: {
         relationship: "scenes",
         // The scenes the viewer can see, counted by the server: list rows
         // carry no scene list
-        count: (g) =>
-          totalOf(g.relation_totals, "scenes") ?? lengthOf(g.scenes),
-        tooltip: {
-          entityType: "scene",
-          title: "Scenes",
-          entities: (g) => g.scenes,
-        },
+        count: (g) => totalOf(g.relation_totals, "scenes") ?? 0,
         link: { page: "/scenes", filter: "galleries" },
       },
       {

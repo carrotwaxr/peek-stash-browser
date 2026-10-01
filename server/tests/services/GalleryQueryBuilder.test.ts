@@ -485,6 +485,16 @@ describe("GalleryQueryBuilder", () => {
         relation_totals: { scenes: 0 },
       });
     });
+
+    it("a gallery row carries relation_totals.scenes and no scenes list", async () => {
+      answerPage([galleryRow()]);
+
+      const result = await run();
+
+      const gallery = must(result.items[0]);
+      expect(gallery.relation_totals).toEqual({ scenes: 0 });
+      expect((gallery as { scenes?: unknown }).scenes).toBeUndefined();
+    });
   });
 
   describe("scene totals", () => {

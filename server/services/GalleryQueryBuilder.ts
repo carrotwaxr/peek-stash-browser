@@ -360,11 +360,6 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
         : null,
       performers: [] as PerformerRef[],
       tags: [] as TagRef[],
-      scenes: [] as Array<{
-        id: string;
-        title: string | null;
-        paths: { screenshot: string | null };
-      }>,
       // Filled by populateRelations
       relation_totals: { scenes: 0 },
     };

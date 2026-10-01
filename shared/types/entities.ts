@@ -375,11 +375,6 @@ export interface NormalizedGallery {
     gender: string | null;
     image_path: string | null;
   }>;
-  scenes: Array<{
-    id: string;
-    title: string | null;
-    paths: { screenshot: string | null };
-  }>;
   created_at: string | null;
   updated_at: string | null;
 
