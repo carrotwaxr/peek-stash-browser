@@ -20,12 +20,11 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  */
 
 /**
- * The image id a wall tile links to: its href opens the Images page's
- * viewer on the image, `/images?image=<id:instance>`
+ * The image id a wall tile links to: its href opens the viewer on the image
+ * in the list it shows on (its own address with `image=<id:instance>`)
  */
 const linkedImageId = (href: string | null): string | undefined => {
   const url = new URL(href ?? "", "http://peek.invalid");
-  if (url.pathname !== "/images") return undefined;
   return url.searchParams.get("image")?.split(":")[0];
 };
 

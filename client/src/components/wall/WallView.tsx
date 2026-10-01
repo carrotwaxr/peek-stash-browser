@@ -21,6 +21,8 @@ interface Props {
   zoomLevel?: keyof typeof ZOOM_LEVELS;
   playbackMode?: "autoplay" | "hover" | "static";
   onItemClick?: (item: Record<string, unknown>) => void;
+  /** A tile's link in place of its entity's own (an image on its list) */
+  itemPath?: ((item: Record<string, unknown>) => string) | undefined;
   loading?: boolean;
   emptyMessage?: string;
 }
@@ -31,6 +33,7 @@ const WallView = ({
   zoomLevel = DEFAULT_ZOOM as keyof typeof ZOOM_LEVELS,
   playbackMode = "autoplay",
   onItemClick,
+  itemPath,
   loading = false,
   emptyMessage = "No items found",
 }: Props) => {
@@ -97,6 +100,7 @@ const WallView = ({
                 height={height}
                 playbackMode={playbackMode}
                 onClick={onItemClick}
+                itemPath={itemPath}
               />
             ),
           }}

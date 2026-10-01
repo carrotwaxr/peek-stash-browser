@@ -72,6 +72,26 @@ describe("WallItem link", () => {
       "/images?image=7%3Ai1"
     );
   });
+
+  it("a tile on a list that names its own link (the Images list keeping its state) uses it", () => {
+    render(
+      <MemoryRouter>
+        <WallItem
+          item={{ id: "7", instanceId: "i1" }}
+          config={config}
+          entityType="image"
+          width={200}
+          height={120}
+          playbackMode="static"
+          itemPath={(item) => `/images?page=3&image=${String(item.id)}`}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      "/images?page=3&image=7"
+    );
+  });
 });
 
 describe("WallItem preview slots", () => {

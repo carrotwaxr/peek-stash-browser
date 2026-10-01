@@ -3,6 +3,7 @@ import {
   getEntityPath,
   getFilteredListPath,
   getImagePath,
+  getImagePathInList,
   getScenePathWithTime,
 } from "@/utils/entityLinks";
 
@@ -55,6 +56,22 @@ describe("image links", () => {
 
   it("an image without an id links nowhere", () => {
     expect(getImagePath({ instanceId: "inst-a" })).toBe("#");
+  });
+
+  it("an image's link from a list keeps the list's address and state and names the image", () => {
+    const image = { id: "12", instanceId: "inst-a" };
+    expect(
+      getImagePathInList(image, {
+        pathname: "/images",
+        search: "?sort=title&dir=ASC&page=3&image=9%3Ainst-b",
+      })
+    ).toBe("/images?sort=title&dir=ASC&page=3&image=12%3Ainst-a");
+    expect(
+      getImagePathInList(image, { pathname: "/tag/5", search: "?tab=images" })
+    ).toBe("/tag/5?tab=images&image=12%3Ainst-a");
+    expect(getImagePathInList({}, { pathname: "/images", search: "" })).toBe(
+      "#"
+    );
   });
 });
 

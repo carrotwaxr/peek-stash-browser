@@ -25,6 +25,10 @@ interface Props {
   onHideColumn?: (columnId: string) => void;
   entityType: string;
   isLoading?: boolean;
+  /** An image row's link, for a list that shows its images in place */
+  itemPath?: ((item: Record<string, unknown>) => string) | undefined;
+  /** Opens an image row in the list's viewer on a plain click */
+  onItemOpen?: ((item: Record<string, unknown>) => void) | undefined;
 }
 
 /**
@@ -38,6 +42,8 @@ const TableView = ({
   onHideColumn,
   entityType,
   isLoading = false,
+  itemPath,
+  onItemOpen,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
@@ -171,6 +177,8 @@ const TableView = ({
         {columns.map((column) => {
           const renderer = getCellRenderer(column.id, entityType, {
             hasMultipleInstances,
+            itemPath,
+            onItemOpen,
           });
           const hasMaxWidth = column.width?.startsWith("max-w");
           return (

@@ -88,6 +88,22 @@ export function getImagePath(image: EntityLike): string {
 }
 
 /**
+ * The link to one image from a list that shows images (the Images page, a
+ * detail page's Images tab): the list's own address, its filters, sort and
+ * page kept, with the image in its viewer. Links from elsewhere use
+ * `getImagePath`. "#" for an image without an id.
+ */
+export function getImagePathInList(
+  image: EntityLike,
+  list: { pathname: string; search: string }
+): string {
+  if (image.id == null) return "#";
+  const params = new URLSearchParams(list.search);
+  params.set(IMAGE_PARAM, makeCompositeKey(String(image.id), image.instanceId));
+  return `${list.pathname}?${params.toString()}`;
+}
+
+/**
  * Adds the entity's instance to a list link when there are several servers;
  * the list page joins it with the link's entity param into "id:instance".
  */

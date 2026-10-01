@@ -22,6 +22,8 @@ interface Props {
   height: number;
   playbackMode?: "autoplay" | "hover" | "static";
   onClick?: (item: Record<string, unknown>) => void;
+  /** The tile's link in place of its entity's own (an image on its list) */
+  itemPath?: ((item: Record<string, unknown>) => string) | undefined;
 }
 
 /**
@@ -35,6 +37,7 @@ const WallItem = ({
   height,
   playbackMode = "autoplay",
   onClick,
+  itemPath,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
   const hoverCapable = useHoverCapable();
@@ -57,8 +60,9 @@ const WallItem = ({
 
   // Compute link path with multi-instance support
   // Clips are special: they link to scene with timestamp
-  const linkPath =
-    entityType === "clip"
+  const linkPath = itemPath
+    ? itemPath(item)
+    : entityType === "clip"
       ? getScenePathWithTime(
           {
             id: item.sceneId as string,
