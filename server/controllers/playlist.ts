@@ -6,6 +6,7 @@ import {
   getUserGroups,
 } from "../services/PlaylistAccessService.js";
 import {
+  duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
 } from "../services/PlaylistQueryService.js";
@@ -40,7 +41,7 @@ import type {
   UpdatePlaylistSharesRequest,
   UpdatePlaylistSharesResponse,
 } from "../types/api/index.js";
-import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { entityKey } from "../utils/entityRef.js";
 import { parsePlaylistItemsRequest } from "../utils/listRequest.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
@@ -248,35 +249,32 @@ export const createPlaylist = async (
 ) => {
   const userId = req.user.id;
 
-  const { name, description, isPublic } = req.body;
+  const { name, description } = req.body;
 
   if (!name || name.trim() === "") {
     res.status(400).json({ error: "Playlist name is required" });
     return;
   }
 
-  const playlist = await prisma.playlist.create({
-    data: {
-      name: name.trim(),
-      description: emptyToNull(description?.trim()),
-      isPublic: isPublic === true,
-      userId,
-    },
-    include: {
-      _count: {
-        select: { items: true },
+  const playlist = await dbWrite("playlist.create", () =>
+    prisma.playlist.create({
+      data: {
+        name: name.trim(),
+        description: emptyToNull(description?.trim()),
+        userId,
       },
-    },
-  });
+    })
+  );
 
-  res.status(201).json({ playlist });
+  // A new playlist has no items
+  res.status(201).json({ playlist: { ...playlist, _count: { items: 0 } } });
 };
 
 /**
  * Update playlist
  */
 export const updatePlaylist = async (
-  req: TypedAuthRequest<UpdatePlaylistRequest, UpdatePlaylistParams>,
+  req: TypedLibraryRequest<UpdatePlaylistRequest, UpdatePlaylistParams>,
   res: TypedResponse<UpdatePlaylistResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -288,9 +286,8 @@ export const updatePlaylist = async (
   }
 
   const { name, description, repeat } = req.body;
-  // The body is not validated: only a literal true turns these on
-  const { isPublic, shuffle }: { isPublic?: unknown; shuffle?: unknown } =
-    req.body;
+  // The body is not validated: only a literal true turns this on
+  const { shuffle }: { shuffle?: unknown } = req.body;
 
   // Check ownership
   const existing = await prisma.playlist.findFirst({
@@ -305,25 +302,32 @@ export const updatePlaylist = async (
     return;
   }
 
-  const playlist = await prisma.playlist.update({
-    where: { id: playlistId },
-    data: {
-      ...(name !== undefined && { name: name.trim() }),
-      ...(description !== undefined && {
-        description: emptyToNull(description?.trim()),
-      }),
-      ...(isPublic !== undefined && { isPublic: isPublic === true }),
-      ...(shuffle !== undefined && { shuffle: shuffle === true }),
-      ...(repeat !== undefined && { repeat }),
-    },
-    include: {
-      _count: {
-        select: { items: true },
+  const playlist = await dbWrite("playlist.update", () =>
+    prisma.playlist.update({
+      where: { id: playlistId },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(description !== undefined && {
+          description: emptyToNull(description?.trim()),
+        }),
+        ...(shuffle !== undefined && { shuffle: shuffle === true }),
+        ...(repeat !== undefined && { repeat }),
       },
+    })
+  );
+
+  // The count is what the requester can see, not the rows
+  const previews = await loadPlaylistPreviews({
+    userId,
+    allowedInstanceIds: req.allowedInstanceIds,
+    playlistIds: [playlistId],
+  });
+  res.json({
+    playlist: {
+      ...playlist,
+      _count: { items: previews.get(playlistId)?.visibleCount ?? 0 },
     },
   });
-
-  res.json({ playlist });
 };
 
 /**
@@ -355,9 +359,11 @@ export const deletePlaylist = async (
   }
 
   // Delete playlist (items will cascade delete)
-  await prisma.playlist.delete({
-    where: { id: playlistId },
-  });
+  await dbWrite("playlist.delete", () =>
+    prisma.playlist.delete({
+      where: { id: playlistId },
+    })
+  );
 
   res.json({ success: true, message: "Playlist deleted" });
 };
@@ -746,7 +752,7 @@ export const updatePlaylistShares = async (
  * Duplicate a playlist (requires access - owner or shared)
  */
 export const duplicatePlaylist = async (
-  req: TypedAuthRequest<unknown, GetPlaylistParams>,
+  req: TypedLibraryRequest<unknown, GetPlaylistParams>,
   res: TypedResponse<DuplicatePlaylistResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -764,14 +770,8 @@ export const duplicatePlaylist = async (
     return;
   }
 
-  // Fetch original playlist with items
   const original = await prisma.playlist.findUnique({
     where: { id: playlistId },
-    include: {
-      items: {
-        orderBy: { position: "asc" },
-      },
-    },
   });
 
   if (!original) {
@@ -779,29 +779,31 @@ export const duplicatePlaylist = async (
     return;
   }
 
-  // Create duplicate
-  const duplicate = await prisma.playlist.create({
-    data: {
-      name: `${original.name} (Copy)`,
-      description: original.description,
-      userId,
-      isPublic: false,
-      shuffle: original.shuffle,
-      repeat: original.repeat,
-      items: {
-        create: original.items.map((item) => ({
-          sceneId: item.sceneId,
-          instanceId: item.instanceId,
-          position: item.position,
-        })),
-      },
-    },
-    include: {
-      _count: {
-        select: { items: true },
-      },
-    },
-  });
+  // The copy holds the items the requester can see, copied by one statement
+  const items = duplicateVisibleItems(
+    userId,
+    req.allowedInstanceIds,
+    playlistId
+  );
+  const { copy, added } = await dbWriteTransaction(
+    "playlist.duplicate",
+    async (tx) => {
+      const copy = await tx.playlist.create({
+        data: {
+          name: `${original.name} (Copy)`,
+          description: original.description,
+          userId,
+          shuffle: original.shuffle,
+          repeat: original.repeat,
+        },
+      });
+      const added = await tx.$executeRawUnsafe(
+        items.sql,
+        ...items.paramsFor(copy.id)
+      );
+      return { copy, added };
+    }
+  );
 
-  res.status(201).json({ playlist: duplicate });
+  res.status(201).json({ playlist: { ...copy, _count: { items: added } } });
 };

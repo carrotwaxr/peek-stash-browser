@@ -26,6 +26,11 @@ import {
   getPlaylistAccess,
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
+import {
+  duplicateVisibleItems,
+  loadPlaylistPreviews,
+} from "../../services/PlaylistQueryService.js";
+import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import {
@@ -34,7 +39,7 @@ import {
   userPermissions,
 } from "../helpers/fixtures.js";
 import { objectContaining } from "../helpers/matchers.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 type PlaylistWithItemCount = Prisma.PlaylistGetPayload<{
   include: { _count: { select: { items: true } } };
@@ -60,7 +65,36 @@ vi.mock("../../services/EntityAccessService.js", () => ({
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
+  duplicateVisibleItems: vi.fn(),
 }));
+
+// The writer queue runs for real; each unit's label is on `openUnits` while
+// its callback runs, so a test sees which unit a Prisma call ran inside
+const openUnits = vi.hoisted((): string[] => []);
+vi.mock("../../utils/dbWrite.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof dbWriteModule>();
+  const inUnit = async <T>(label: string, run: () => Promise<T>) => {
+    openUnits.push(label);
+    try {
+      return await run();
+    } finally {
+      openUnits.pop();
+    }
+  };
+  return {
+    ...actual,
+    dbWrite: vi.fn(<T>(label: string, fn: () => Promise<T>) =>
+      actual.dbWrite(label, () => inUnit(label, fn))
+    ),
+    dbWriteTransaction: vi.fn(
+      <T>(
+        label: string,
+        fn: (tx: Prisma.TransactionClient) => Promise<T>
+      ): Promise<T> =>
+        actual.dbWriteTransaction(label, (tx) => inUnit(label, () => fn(tx)))
+    ),
+  };
+});
 
 // Mock PermissionService
 vi.mock("../../services/PermissionService.js", () => ({
@@ -77,8 +111,11 @@ const mockGetAccess = vi.mocked(getPlaylistAccess);
 const mockGetUserGroups = vi.mocked(getUserGroups);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 const mockCanAccess = vi.mocked(canUserAccessEntity);
+const mockPreviews = vi.mocked(loadPlaylistPreviews);
+const mockDuplicateItems = vi.mocked(duplicateVisibleItems);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
+const ALLOWED = ["inst-a"];
 
 describe("Playlist Controller Operations", () => {
   beforeEach(() => {
@@ -216,6 +253,7 @@ describe("Playlist Controller Operations", () => {
         body: { name: "Updated" },
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(updatePlaylist);
 
@@ -242,6 +280,7 @@ describe("Playlist Controller Operations", () => {
           body: { description },
           params: { id: "1" },
           user: USER,
+          allowedInstanceIds: ALLOWED,
         });
         await updatePlaylist(req, resFor(updatePlaylist));
 
@@ -260,6 +299,7 @@ describe("Playlist Controller Operations", () => {
         body: { name: "Hijack" },
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(updatePlaylist);
 
@@ -274,6 +314,7 @@ describe("Playlist Controller Operations", () => {
         body: { name: "Test" },
         params: { id: "abc" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(updatePlaylist);
 
@@ -335,72 +376,84 @@ describe("Playlist Controller Operations", () => {
   });
 
   describe("duplicatePlaylist", () => {
+    const COPY_SQL = "INSERT INTO PlaylistItem SELECT ?";
+
+    /** The copy's creation and the item statement run on this fake id */
+    function stubCopy(copyId: number, name: string, added: number) {
+      mockDuplicateItems.mockReturnValue({
+        sql: COPY_SQL,
+        paramsFor: (newPlaylistId) => [newPlaylistId, "bound"],
+      });
+      mockPrisma.playlist.create.mockResolvedValue(
+        partialRow({ id: copyId, name, userId: USER.id })
+      );
+      mockPrisma.$executeRawUnsafe.mockResolvedValue(added);
+    }
+
     it("duplicates playlist when user has owner access", async () => {
       mockGetAccess.mockResolvedValue({ level: "owner" });
       mockPrisma.playlist.findUnique.mockResolvedValue(
-        partialRow<PlaylistWithItems>({
+        partialRow({
           id: 1,
           name: "Original",
           description: "Desc",
           shuffle: false,
           repeat: "none",
-          items: [
-            partialRow({ sceneId: "s1", instanceId: "i1", position: 0 }),
-            partialRow({ sceneId: "s2", instanceId: "i1", position: 1 }),
-          ],
         })
       );
-      mockPrisma.playlist.create.mockResolvedValue(
-        partialRow<PlaylistWithItemCount>({
-          id: 2,
-          name: "Original (Copy)",
-          _count: { items: 2 },
-        })
-      );
+      stubCopy(2, "Original (Copy)", 2);
 
       const req = reqFor(duplicatePlaylist, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(duplicatePlaylist);
 
       await duplicatePlaylist(req, res);
 
       expect(res._getStatus()).toBe(201);
+      expect(mockDuplicateItems).toHaveBeenCalledWith(USER.id, ALLOWED, 1);
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: objectContaining({
+          data: {
             name: "Original (Copy)",
+            description: "Desc",
             userId: USER.id,
-            isPublic: false,
-          }),
+            shuffle: false,
+            repeat: "none",
+          },
         })
       );
+      // The items are copied by the statement, with the new playlist's id
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+        COPY_SQL,
+        2,
+        "bound"
+      );
+      // The answer counts what was copied
+      expect(res._getBody()).toEqual({
+        playlist: objectContaining({ id: 2, _count: { items: 2 } }),
+      });
     });
 
     it("duplicates playlist when user has shared access", async () => {
       mockGetAccess.mockResolvedValue({ level: "shared", groups: ["Family"] });
       mockPrisma.playlist.findUnique.mockResolvedValue(
-        partialRow<PlaylistWithItems>({
+        partialRow({
           id: 1,
           name: "Shared Playlist",
           description: null,
           shuffle: true,
           repeat: "all",
-          items: [],
         })
       );
-      mockPrisma.playlist.create.mockResolvedValue(
-        partialRow<PlaylistWithItemCount>({
-          id: 3,
-          name: "Shared Playlist (Copy)",
-          _count: { items: 0 },
-        })
-      );
+      stubCopy(3, "Shared Playlist (Copy)", 0);
 
       const req = reqFor(duplicatePlaylist, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(duplicatePlaylist);
 
@@ -412,6 +465,8 @@ describe("Playlist Controller Operations", () => {
         expect.objectContaining({
           data: objectContaining({
             userId: USER.id,
+            shuffle: true,
+            repeat: "all",
           }),
         })
       );
@@ -423,6 +478,7 @@ describe("Playlist Controller Operations", () => {
       const req = reqFor(duplicatePlaylist, {
         params: { id: "1" },
         user: USER,
+        allowedInstanceIds: ALLOWED,
       });
       const res = resFor(duplicatePlaylist);
 
@@ -430,6 +486,169 @@ describe("Playlist Controller Operations", () => {
 
       expect(res._getStatus()).toBe(404);
       expect(mockPrisma.playlist.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("writes go through the queue", () => {
+    /** The write units open when each Prisma call ran */
+    const seen: string[][] = [];
+    const note = () => {
+      seen.push([...openUnits]);
+    };
+    const takeSeen = () => seen.splice(0);
+
+    it("create, update, delete and duplicate each run inside one dbWrite unit", async () => {
+      mockPrisma.playlist.create.mockImplementation(
+        prismaImpl(() => {
+          note();
+          return partialRow({ id: 5, name: "n" });
+        })
+      );
+      await createPlaylist(
+        reqFor(createPlaylist, { body: { name: "n" }, user: USER }),
+        resFor(createPlaylist)
+      );
+      expect(takeSeen()).toEqual([["playlist.create"]]);
+
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 5, userId: USER.id })
+      );
+      mockPrisma.playlist.update.mockImplementation(
+        prismaImpl(() => {
+          note();
+          return partialRow({ id: 5, name: "m" });
+        })
+      );
+      await updatePlaylist(
+        reqFor(updatePlaylist, {
+          body: { name: "m" },
+          params: { id: "5" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        }),
+        resFor(updatePlaylist)
+      );
+      expect(takeSeen()).toEqual([["playlist.update"]]);
+
+      mockPrisma.playlist.delete.mockImplementation(
+        prismaImpl(() => {
+          note();
+          return partialRow({});
+        })
+      );
+      await deletePlaylist(
+        reqFor(deletePlaylist, { params: { id: "5" }, user: USER }),
+        resFor(deletePlaylist)
+      );
+      expect(takeSeen()).toEqual([["playlist.delete"]]);
+
+      mockGetAccess.mockResolvedValue({ level: "owner" });
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({ id: 5, name: "m", repeat: "none", shuffle: false })
+      );
+      mockDuplicateItems.mockReturnValue({
+        sql: "INSERT",
+        paramsFor: (id) => [id],
+      });
+      mockPrisma.playlist.create.mockImplementation(
+        prismaImpl(() => {
+          note();
+          return partialRow({ id: 6, name: "m (Copy)" });
+        })
+      );
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl(() => {
+          note();
+          return 1;
+        })
+      );
+      await duplicatePlaylist(
+        reqFor(duplicatePlaylist, {
+          params: { id: "5" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        }),
+        resFor(duplicatePlaylist)
+      );
+      expect(takeSeen()).toEqual([
+        ["playlist.duplicate"],
+        ["playlist.duplicate"],
+      ]);
+    });
+
+    it("update answers the count the requester can see", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 5, userId: USER.id })
+      );
+      mockPrisma.playlist.update.mockResolvedValue(
+        partialRow({ id: 5, name: "m" })
+      );
+      mockPreviews.mockResolvedValue(
+        new Map([[5, { items: [], visibleCount: 2 }]])
+      );
+
+      const res = resFor(updatePlaylist);
+      await updatePlaylist(
+        reqFor(updatePlaylist, {
+          body: { name: "m" },
+          params: { id: "5" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        }),
+        res
+      );
+
+      expect(mockPreviews).toHaveBeenCalledWith({
+        userId: USER.id,
+        allowedInstanceIds: ALLOWED,
+        playlistIds: [5],
+      });
+      expect(res._getBody()).toEqual({
+        playlist: objectContaining({ _count: { items: 2 } }),
+      });
+    });
+
+    it("create answers an empty playlist", async () => {
+      mockPrisma.playlist.create.mockResolvedValue(
+        partialRow({ id: 5, name: "n" })
+      );
+      const res = resFor(createPlaylist);
+      await createPlaylist(
+        reqFor(createPlaylist, { body: { name: "n" }, user: USER }),
+        res
+      );
+      expect(res._getBody()).toEqual({
+        playlist: objectContaining({ _count: { items: 0 } }),
+      });
+    });
+
+    it("create and update ignore an isPublic field and never store it", async () => {
+      mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 5 }));
+      await createPlaylist(
+        reqFor(createPlaylist, {
+          body: { name: "n", isPublic: true },
+          user: USER,
+        }),
+        resFor(createPlaylist)
+      );
+      const [createArgs] = mockPrisma.playlist.create.mock.calls[0] ?? [];
+      expect(createArgs?.data).not.toHaveProperty("isPublic");
+
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({ id: 5, userId: USER.id })
+      );
+      mockPrisma.playlist.update.mockResolvedValue(partialRow({ id: 5 }));
+      await updatePlaylist(
+        reqFor(updatePlaylist, {
+          body: { name: "m", isPublic: true },
+          params: { id: "5" },
+          user: USER,
+          allowedInstanceIds: ALLOWED,
+        }),
+        resFor(updatePlaylist)
+      );
+      const [updateArgs] = mockPrisma.playlist.update.mock.calls[0] ?? [];
+      expect(updateArgs?.data).not.toHaveProperty("isPublic");
     });
   });
 

@@ -521,6 +521,32 @@ interface DeletePlaylistResponse {
 
 ---
 
+### POST /api/playlists/:id/duplicate
+
+**Authentication:** Required
+
+Copies a playlist the user owns or has shared with them into a new playlist they own, named "<name> (Copy)". The copy holds only the scenes the requesting user can see (not deleted, not hidden or restricted for them, on an instance they use), numbered from 0 in the original's order. The response's `_count.items` is the number of scenes copied. Answers 404 when the playlist is neither theirs nor shared with them.
+
+**URL Parameters:**
+
+```typescript
+interface GetPlaylistParams {
+  id: string;
+}
+```
+
+**Response (201):**
+
+```typescript
+interface DuplicatePlaylistResponse {
+  playlist: PlaylistData;
+}
+```
+
+**Controller:** `duplicatePlaylist` in `../controllers/playlist.ts`
+
+---
+
 ### POST /api/playlists/:id/items
 
 **Authentication:** Required

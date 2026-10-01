@@ -195,7 +195,7 @@ A shared playlist shows you only the scenes your own hidden items and restrictio
 | Download playlist | Yes (with permission) | Yes (with permission) |
 
 !!! tip "Duplicating Shared Playlists"
-    Shared users can duplicate a shared playlist to create their own copy, which they can then edit freely.
+    Shared users can duplicate a shared playlist to create their own copy, which they can then edit freely. The copy holds the scenes you can see: scenes you have hidden, that are restricted for you, or that are on a server you do not use are left out.
 
 ## Downloading Playlists
 

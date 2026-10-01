@@ -183,6 +183,45 @@ ORDER BY playlistId, rn`;
 }
 
 /**
+ * The statement that copies a playlist's items the viewer can see into a new
+ * playlist, numbered 0..n-1 in the original's order. The new playlist's id
+ * is known only inside the write unit, so `paramsFor` takes it.
+ */
+export interface DuplicateVisibleItems {
+  readonly sql: string;
+  paramsFor(newPlaylistId: number): SqlParam[];
+}
+
+/**
+ * Builds the copy statement for `sourceId`: one `INSERT ... SELECT` over the
+ * items the viewer can see (the same visibility as every item read; a viewer
+ * with no allowed instance copies nothing). `addedAt` is the copy's time, in
+ * epoch milliseconds, as Prisma stores a DateTime.
+ */
+export function duplicateVisibleItems(
+  userId: number,
+  allowedInstanceIds: readonly string[],
+  sourceId: number
+): DuplicateVisibleItems {
+  const { join, where } = visibleItem(userId, allowedInstanceIds);
+  const sql = `INSERT INTO PlaylistItem (playlistId, instanceId, sceneId, position, addedAt)
+SELECT ?, pi.instanceId, pi.sceneId, ROW_NUMBER() OVER (ORDER BY pi.position, pi.id) - 1, ?
+FROM PlaylistItem pi
+${join.sql}
+WHERE pi.playlistId = ? AND ${where.sql}`;
+  return {
+    sql,
+    paramsFor: (newPlaylistId) => [
+      newPlaylistId,
+      Date.now(),
+      ...join.params,
+      sourceId,
+      ...where.params,
+    ],
+  };
+}
+
+/**
  * The scenes of these items the viewer can see, keyed by entityKey, from the
  * scene builder (exclusions, allowed instances and the viewer's own fields
  * in SQL), REFS_PER_READ refs at a time
