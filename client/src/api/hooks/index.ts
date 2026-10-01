@@ -36,3 +36,9 @@ export {
   useUpdatePlaylist,
   useRemoveUnavailableItems,
 } from "./usePlaylists";
+export {
+  useDownloads,
+  useInvalidateDownloads,
+  useDeleteDownload,
+  useRetryDownload,
+} from "./useDownloads";

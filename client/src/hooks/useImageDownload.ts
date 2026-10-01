@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiPost, getMyPermissions } from "../api";
+import { useInvalidateDownloads } from "../api/hooks/useDownloads";
 import { showError, showSuccess } from "../utils/toast";
 
 interface DownloadableImage {
@@ -24,6 +25,7 @@ interface DownloadResponse {
 export function useImageDownload(enabled: boolean) {
   const [canDownload, setCanDownload] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const invalidateDownloads = useInvalidateDownloads();
 
   useEffect(() => {
     if (!enabled) return;
@@ -41,22 +43,26 @@ export function useImageDownload(enabled: boolean) {
     };
   }, [enabled]);
 
-  const download = useCallback(async (image: DownloadableImage) => {
-    setDownloading(true);
-    try {
-      const response = await apiPost<DownloadResponse>(
-        `/downloads/image/${encodeURIComponent(image.id)}`,
-        { instanceId: image.instanceId }
-      );
-      window.location.href = `/api/downloads/${response.download.id}/file`;
-      showSuccess("Download started");
-    } catch (error) {
-      const err = error as { data?: { error?: string }; message?: string };
-      showError(err.data?.error ?? err.message ?? "Download failed");
-    } finally {
-      setDownloading(false);
-    }
-  }, []);
+  const download = useCallback(
+    async (image: DownloadableImage) => {
+      setDownloading(true);
+      try {
+        const response = await apiPost<DownloadResponse>(
+          `/downloads/image/${encodeURIComponent(image.id)}`,
+          { instanceId: image.instanceId }
+        );
+        void invalidateDownloads();
+        window.location.href = `/api/downloads/${response.download.id}/file`;
+        showSuccess("Download started");
+      } catch (error) {
+        const err = error as { data?: { error?: string }; message?: string };
+        showError(err.data?.error ?? err.message ?? "Download failed");
+      } finally {
+        setDownloading(false);
+      }
+    },
+    [invalidateDownloads]
+  );
 
   return { canDownload, downloading, download };
 }

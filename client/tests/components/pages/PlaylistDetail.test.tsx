@@ -33,6 +33,7 @@ import {
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDownloads } from "@/api/hooks/useDownloads";
 import { usePlaylists } from "@/api/hooks/usePlaylists";
 import PlaylistDetail from "@/components/pages/PlaylistDetail";
 import type * as uiModule from "@/components/ui/index";
@@ -229,6 +230,7 @@ function serve(server: Server): ApiStub {
     "/downloads/playlist/5": () =>
       server.download?.() ??
       jsonResponse(200, { download: { id: 1, status: "PENDING" } }),
+    "/downloads": () => jsonResponse(200, { downloads: [] }),
     "/playlists": () => jsonResponse(200, { playlists: [] }),
     "/playlists/5/duplicate": () =>
       jsonResponse(201, { playlist: { id: 9, name: "Mine (copy)" } }),
@@ -613,6 +615,27 @@ describe("PlaylistDetail download", () => {
 
     await waitFor(() =>
       expect(requestsTo(fetchMock, "/downloads/playlist/5")).toHaveLength(1)
+    );
+  });
+
+  it("a started zip refreshes the downloads list", async () => {
+    serve({
+      page: () => shared({}),
+      queue: { entries: [] },
+      permissions: { canDownloadPlaylists: true },
+    });
+    function DownloadsReader() {
+      useDownloads();
+      return null;
+    }
+    renderPage("/playlist/5", <DownloadsReader />);
+    await waitFor(() =>
+      expect(requestsTo(fetchMock, "/downloads")).toHaveLength(1)
+    );
+    fireEvent.click(await screen.findByTitle("Download Playlist"));
+
+    await waitFor(() =>
+      expect(requestsTo(fetchMock, "/downloads")).toHaveLength(2)
     );
   });
 
