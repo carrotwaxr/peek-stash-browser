@@ -118,9 +118,9 @@ Organize your favorite scenes into custom playlists:
 
 ### Configure Theme
 
-1. Click theme toggle icon (moon/sun)
-2. Choose Dark or Light mode
-3. Theme preference is saved automatically
+1. Open **Settings → User Preferences → Theme**
+2. Choose a built-in theme or create a custom one
+3. The theme is saved to your account at once and follows you to every browser
 
 ## Video Playback Tips
 

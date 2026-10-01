@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { customThemeKey } from "@peek/shared-types/themes.js";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import { apiDelete, apiPost, apiPut } from "../../api";
 import type { CustomTheme } from "../../themes/ThemeContext";
@@ -58,7 +59,7 @@ const CustomThemeManager = () => {
       setIsCreating(false);
 
       // Auto-select the new theme
-      changeTheme(`custom-${data.theme.id}`);
+      changeTheme(customThemeKey(data.theme.id));
     } catch (error) {
       showError((error as Error).message || "Failed to create theme");
     } finally {
@@ -91,7 +92,7 @@ const CustomThemeManager = () => {
       setDeleteConfirm(null);
 
       // If deleted theme was active, switch to default
-      if (currentTheme === `custom-${theme.id}`) {
+      if (currentTheme === customThemeKey(theme.id)) {
         changeTheme("peek");
       }
     } catch (error) {
@@ -208,7 +209,7 @@ const CustomThemeManager = () => {
         <div className="space-y-3">
           {customThemes.map((theme) => {
             const themeWithDates = theme as CustomThemeWithDates;
-            const isActive = currentTheme === `custom-${theme.id}`;
+            const isActive = currentTheme === customThemeKey(theme.id);
             return (
               <Paper key={theme.id}>
                 <Paper.Body>
@@ -276,7 +277,7 @@ const CustomThemeManager = () => {
                       {!isActive && (
                         <Button
                           variant="secondary"
-                          onClick={() => changeTheme(`custom-${theme.id}`)}
+                          onClick={() => changeTheme(customThemeKey(theme.id))}
                           className="text-sm"
                         >
                           Use Theme

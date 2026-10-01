@@ -4,6 +4,64 @@
   box-sizing: border-box;
 }
 
+/*
+ * The peek theme's variables (themes.ts), so a page paints in Peek's colours
+ * before any script runs and whenever no theme applies. ThemeProvider and the
+ * cached theme (themeCache.ts) set the active theme's on the root element,
+ * which wins over these. tests/themes/baseCssDefaults.test.ts keeps the copy
+ * equal to themes.ts.
+ */
+:root {
+  --font-brand: "Lilita One", cursive;
+  --font-heading:
+    "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #1d1d20;
+  --bg-card: #19191b;
+  --bg-tertiary: #28282b;
+  --text-primary: #ffffff;
+  --text-secondary: #d9d9d9;
+  --text-muted: #b3b3b3;
+  --accent-primary: #6d2ce3;
+  --accent-secondary: #fd6b86;
+  --border-color: #2a2a32;
+  --shadow-sm: 0 1px 2px 0 rgba(109, 44, 227, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(109, 44, 227, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(109, 44, 227, 0.15);
+  --focus-ring-color: #6d2ce3;
+  --focus-ring-shadow: 0 0 0 3px rgba(109, 44, 227, 0.3);
+  --selection-color: #6d2ce3;
+  --selection-bg: rgba(109, 44, 227, 0.1);
+  --border-focus: #6d2ce3;
+  --status-success: #0f7173;
+  --status-success-bg: rgba(15, 113, 115, 0.1);
+  --status-success-border: rgba(15, 113, 115, 0.3);
+  --status-error: #fd6b86;
+  --status-error-bg: rgba(253, 107, 134, 0.1);
+  --status-error-border: rgba(253, 107, 134, 0.3);
+  --status-info: #3993dd;
+  --status-info-bg: rgba(57, 147, 221, 0.1);
+  --status-info-border: rgba(57, 147, 221, 0.3);
+  --status-warning: #fa8c2a;
+  --status-warning-bg: rgba(250, 140, 42, 0.1);
+  --status-warning-border: rgba(250, 140, 42, 0.3);
+  --toast-success-bg: #0a4e4f;
+  --toast-success-border: #159da0;
+  --toast-success-shadow: rgba(10, 78, 79, 0.4);
+  --toast-error-bg: #fc4365;
+  --toast-error-border: #fe9daf;
+  --toast-error-shadow: rgba(252, 67, 101, 0.4);
+  --toast-info-bg: #237fca;
+  --toast-info-border: #65abe4;
+  --toast-info-shadow: rgba(35, 127, 202, 0.4);
+  --toast-warning-bg: #f57706;
+  --toast-warning-border: #fba75c;
+  --toast-warning-shadow: rgba(245, 119, 6, 0.4);
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);

@@ -8,7 +8,7 @@ export const userSettingsResponse = (
 ): GetUserSettingsResponse => ({
   settings: {
     preferredPreviewQuality: null,
-    theme: "dark",
+    theme: null,
     carouselPreferences: [],
     navPreferences: null,
     minimumPlayPercent: 20,

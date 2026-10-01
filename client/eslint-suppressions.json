@@ -1026,11 +1026,6 @@
       "count": 2
     }
   },
-  "src/themes/ThemeProvider.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
-    }
-  },
   "src/themes/icons/iconSets.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
