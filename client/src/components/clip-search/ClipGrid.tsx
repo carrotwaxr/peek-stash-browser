@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { getGridClasses } from "../../constants/grids";
+import { useRenderedColumns } from "../../hooks/useRenderedColumns";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import ClipCard, { type Clip } from "../cards/ClipCard";
 import { EmptyState, SkeletonSceneCard } from "../ui/index";
@@ -26,6 +28,8 @@ const ClipGrid = ({
   emptyMessage = "No clips found",
   emptyDescription = "Try adjusting your search filters",
 }: ClipGridProps) => {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const columns = useRenderedColumns(gridRef);
   // Use scene grid classes since clips have same 16:9 aspect ratio
   const gridClasses = getGridClasses("scene", density);
 
@@ -44,7 +48,7 @@ const ClipGrid = ({
   }
 
   return (
-    <div className={gridClasses}>
+    <div ref={gridRef} className={gridClasses}>
       {clips.map((clip: Clip | Record<string, unknown>) => (
         <ClipCard
           // Two servers can hold the same clip id
@@ -53,6 +57,7 @@ const ClipGrid = ({
           onClick={onClipClick as ((clip: Clip) => void) | undefined}
           fromPageTitle={fromPageTitle}
           tabIndex={0}
+          autoplayOnScroll={columns === 1}
         />
       ))}
     </div>
