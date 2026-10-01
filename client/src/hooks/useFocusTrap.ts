@@ -101,7 +101,7 @@ export const useFocusTrap = (
 /**
  * Hook for managing initial focus on page load
  * Focuses the first meaningful interactive element, unless the user has
- * already put focus on another element by then (see `mayTakeFocus`)
+ * moved focus to another element since the load began (see `mayTakeFocus`)
  *
  * @param {Object} containerRef Ref to the container element
  * @param {string} selector Optional CSS selector for the element to focus
@@ -112,7 +112,15 @@ export const useInitialFocus = (
   selector: string | null = null,
   enabled = true
 ) => {
+  // What had focus when the load began: on mount, and each time `enabled`
+  // goes false (the Scene page's next scene starts loading). Undefined until
+  // the first run.
+  const focusAtStartRef = useRef<Element | null | undefined>(undefined);
+
   useEffect(() => {
+    if (!enabled || focusAtStartRef.current === undefined) {
+      focusAtStartRef.current = document.activeElement;
+    }
     if (!enabled || !containerRef?.current) return;
 
     const container = containerRef.current;
@@ -139,7 +147,7 @@ export const useInitialFocus = (
       if (
         elementToFocus &&
         (elementToFocus as HTMLElement).focus &&
-        mayTakeFocus(elementToFocus)
+        mayTakeFocus(elementToFocus, focusAtStartRef.current ?? null)
       ) {
         (elementToFocus as HTMLElement).focus();
       }

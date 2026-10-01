@@ -58,11 +58,15 @@ async function retryWithBackoff(
 }
 
 /**
- * Focus the player, so its keys work, unless the user has put focus on
- * another control while the page or scene loaded (see `mayTakeFocus`)
+ * Focus the player, so its keys work, unless the user has moved focus to
+ * another control since the page or scene change began, `start` being what
+ * had focus then (see `mayTakeFocus`)
  */
-function focusPlayer(player: { el(): Element; focus(): void }) {
-  if (mayTakeFocus(player.el())) player.focus();
+function focusPlayer(
+  player: { el(): Element; focus(): void },
+  start: Element | null
+) {
+  if (mayTakeFocus(player.el(), start)) player.focus();
 }
 
 /**
@@ -137,6 +141,22 @@ export function useVideoPlayer({
 
   // Keys video.js's controls stop go to the shortcut dispatcher (stable)
   const hotkeys = usePlayerHotkeys();
+
+  // What had focus when the page opened or the route last changed (a scene
+  // change begins with its URL, before the scene lands): the player may take
+  // focus from it, the control that started the change. Recorded before the
+  // effects below run, by declaration order. The route, not the history
+  // key: the queue's controls rewrite the entry at the same URL, and a
+  // control the user toggles while a scene loads starts no change.
+  const focusAtStartRef = useRef<Element | null>(null);
+  const { pathname, search } = location as {
+    pathname?: string;
+    search?: string;
+  };
+  const route = `${pathname ?? ""}${search ?? ""}`;
+  useEffect(() => {
+    focusAtStartRef.current = document.activeElement;
+  }, [route]);
 
   // ============================================================================
   // PLAYER INITIALIZATION (from useVideoPlayerLifecycle)
@@ -221,7 +241,10 @@ export function useVideoPlayer({
 
     playerRef.current = player;
     registerPlayer(player as { paused(): boolean });
-    focusPlayer(player as { el(): Element; focus(): void });
+    focusPlayer(
+      player as { el(): Element; focus(): void },
+      focusAtStartRef.current
+    );
 
     // Volume persistence is now handled by persistVolume plugin
     // Watch history tracking is now handled by the trackActivity plugin
@@ -472,7 +495,10 @@ export function useVideoPlayer({
 
     // Load the source (Stash line 693)
     player.load();
-    focusPlayer(player as { el(): Element; focus(): void });
+    focusPlayer(
+      player as { el(): Element; focus(): void },
+      focusAtStartRef.current
+    );
 
     // Use player.ready() callback like Stash does (line 696)
     // This ensures player is truly ready to accept commands

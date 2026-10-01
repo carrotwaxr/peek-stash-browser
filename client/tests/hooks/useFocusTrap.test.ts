@@ -67,4 +67,49 @@ describe("useInitialFocus", () => {
 
     expect(document.activeElement).toBe(outside);
   });
+
+  /** The Scene page: enabled while no scene loads */
+  function renderOnPage(container: HTMLElement) {
+    return renderHook(
+      ({ loading }: { loading: boolean }) =>
+        useInitialFocus(
+          { current: container },
+          ".vjs-big-play-button",
+          !loading
+        ),
+      { initialProps: { loading: false } }
+    );
+  }
+
+  it("a scene change started from a similar-scene card moves focus to the target once the scene lands", () => {
+    const { container, play, outside: card } = page();
+    const { rerender } = renderOnPage(container);
+    vi.advanceTimersByTime(100);
+    expect(document.activeElement).toBe(play);
+
+    // The card is focused when the change starts and keeps focus until the
+    // new scene lands
+    card.focus();
+    rerender({ loading: true });
+    rerender({ loading: false });
+    vi.advanceTimersByTime(100);
+
+    expect(document.activeElement).toBe(play);
+  });
+
+  it("a scene change whose scene lands after the user left the card for another control leaves focus there", () => {
+    const { container, outside: card } = page();
+    const other = document.createElement("button");
+    document.body.appendChild(other);
+    const { rerender } = renderOnPage(container);
+    vi.advanceTimersByTime(100);
+
+    card.focus();
+    rerender({ loading: true });
+    other.focus();
+    rerender({ loading: false });
+    vi.advanceTimersByTime(100);
+
+    expect(document.activeElement).toBe(other);
+  });
 });
