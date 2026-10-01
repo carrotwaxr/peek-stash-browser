@@ -21,6 +21,7 @@ import {
   vi,
 } from "vitest";
 import { _trackedCountForTesting } from "../../middleware/accountLockout.js";
+import { generateToken } from "../../middleware/auth.js";
 import { errorHandler } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import authRoutes from "../../routes/auth.js";
@@ -173,6 +174,49 @@ describe("auth routes", () => {
     expect(res.status).toBe(404);
   });
 
+  describe("GET /check and /me", () => {
+    const signedIn = (path: string) =>
+      fetch(`${baseUrl}/api/auth${path}`, {
+        headers: {
+          Cookie: `token=${generateToken({ id: 1, username: "testuser", role: "USER" })}`,
+        },
+      });
+
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue(userRow());
+    });
+
+    it("GET /auth/check answers id, username, role and setupCompleted, and no preference or password timestamp", async () => {
+      const res = await signedIn("/check");
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        authenticated: boolean;
+        user: object;
+      };
+      expect(body.authenticated).toBe(true);
+      expect(Object.keys(body.user)).toEqual([
+        "id",
+        "username",
+        "role",
+        "setupCompleted",
+      ]);
+    });
+
+    it("GET /auth/me answers the same identity-only user", async () => {
+      const res = await signedIn("/me");
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { user: object };
+      expect(Object.keys(body.user)).toEqual([
+        "id",
+        "username",
+        "role",
+        "setupCompleted",
+      ]);
+    });
+  });
+
   describe("POST /login", () => {
     beforeEach(() => {
       mockPrisma.user.findUnique.mockResolvedValue(
@@ -211,6 +255,31 @@ describe("auth routes", () => {
       expect(res.status).toBe(400);
       expect(_trackedCountForTesting()).toBe(before);
       expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("login answers the landing page beside an identity-only user", async () => {
+      const res = await post("/login", {
+        username: "alice",
+        password: PASSWORD,
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        success: boolean;
+        user: object;
+        landingPagePreference: unknown;
+      };
+      expect(body.success).toBe(true);
+      expect(Object.keys(body.user)).toEqual([
+        "id",
+        "username",
+        "role",
+        "setupCompleted",
+      ]);
+      expect(body.landingPagePreference).toEqual({
+        pages: ["home"],
+        randomize: false,
+      });
     });
 
     it("login no longer writes a recovery key", async () => {

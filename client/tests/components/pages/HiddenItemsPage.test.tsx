@@ -16,7 +16,8 @@ vi.mock("@/api", () => ({
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ user: { hideConfirmationDisabled: false } }),
+  // Signed out: the settings query stays off, so the hide dialog is asked
+  useAuth: () => ({ isAuthenticated: false }),
 }));
 
 vi.mock("@/hooks/useTVMode", () => ({

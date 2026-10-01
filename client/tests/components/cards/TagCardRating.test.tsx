@@ -16,10 +16,8 @@ vi.mock("../../../src/api/library", async (importOriginal) => {
   };
 });
 vi.mock("../../../src/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { hideConfirmationDisabled: false },
-    updateUser: vi.fn(),
-  }),
+  // Signed out: the settings query stays off, so the hide dialog is asked
+  useAuth: () => ({ isAuthenticated: false }),
 }));
 vi.mock("../../../src/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: false }),

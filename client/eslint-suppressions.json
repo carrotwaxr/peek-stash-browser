@@ -1039,11 +1039,8 @@
     }
   },
   "src/hooks/useHiddenEntities.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
+      "count": 3
     }
   },
   "src/hooks/useHomeCarouselQueries.ts": {

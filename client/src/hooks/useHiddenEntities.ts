@@ -3,16 +3,17 @@ import type {
   GetHiddenEntitiesResponse,
   HiddenEntityType,
 } from "@peek/shared-types";
+import type { GetUserSettingsResponse } from "@peek/shared-types";
 import {
   keepPreviousData,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../api";
+import { useUserSettings } from "../api/hooks/useUserSettings";
 import { invalidateExclusionDependents } from "../api/invalidateExclusionDependents";
 import { queryKeys } from "../api/queryKeys";
 import { showError, showSuccess } from "../utils/toast";
-import { useAuth } from "./useAuth";
 
 /** The server's error message on a failed request (`ApiError.data`) */
 interface ApiErrorBody {
@@ -46,9 +47,31 @@ export const useHiddenItems = (type: HiddenEntityType | "all", page: number) =>
  * Hook for managing hidden entities
  */
 export const useHiddenEntities = () => {
-  const { user, updateUser } = useAuth();
   const queryClient = useQueryClient();
+  const { data: settings } = useUserSettings();
+  const hideConfirmationDisabled =
+    settings?.settings.hideConfirmationDisabled ?? false;
   const [isHiding, setIsHiding] = useState(false);
+
+  /**
+   * Save "Don't ask again" (or its reversal). The settings cache takes the
+   * answer, so every reader skips the dialog at once, with no reload.
+   */
+  const saveHideConfirmation = useCallback(
+    async (disabled: boolean) => {
+      await apiPut("/user/hide-confirmation", {
+        hideConfirmationDisabled: disabled,
+      });
+      queryClient.setQueryData<GetUserSettingsResponse>(
+        queryKeys.user.settings(),
+        (old) =>
+          old && {
+            settings: { ...old.settings, hideConfirmationDisabled: disabled },
+          }
+      );
+    },
+    [queryClient]
+  );
 
   /**
    * Hide an entity
@@ -84,13 +107,9 @@ export const useHiddenEntities = () => {
         void invalidateExclusionDependents(queryClient);
         showSuccess(`${entityName} has been hidden`);
 
-        // If "don't ask again" was checked, update user preference
-        if (skipConfirmation && !user?.hideConfirmationDisabled) {
-          await apiPut("/user/hide-confirmation", {
-            hideConfirmationDisabled: true,
-          });
-          // Update user context
-          updateUser?.({ hideConfirmationDisabled: true });
+        // If "don't ask again" was checked, remember it in the settings
+        if (skipConfirmation && !hideConfirmationDisabled) {
+          await saveHideConfirmation(true);
         }
 
         return true;
@@ -105,7 +124,7 @@ export const useHiddenEntities = () => {
         setIsHiding(false);
       }
     },
-    [user, updateUser, queryClient]
+    [hideConfirmationDisabled, saveHideConfirmation, queryClient]
   );
 
   /**
@@ -139,12 +158,9 @@ export const useHiddenEntities = () => {
           void invalidateExclusionDependents(queryClient);
         }
 
-        // If "don't ask again" was checked, update user preference
-        if (skipConfirmation && !user?.hideConfirmationDisabled) {
-          await apiPut("/user/hide-confirmation", {
-            hideConfirmationDisabled: true,
-          });
-          updateUser?.({ hideConfirmationDisabled: true });
+        // If "don't ask again" was checked, remember it in the settings
+        if (skipConfirmation && !hideConfirmationDisabled) {
+          await saveHideConfirmation(true);
         }
 
         return {
@@ -163,7 +179,7 @@ export const useHiddenEntities = () => {
         setIsHiding(false);
       }
     },
-    [user, updateUser, queryClient]
+    [hideConfirmationDisabled, saveHideConfirmation, queryClient]
   );
 
   /**
@@ -236,10 +252,7 @@ export const useHiddenEntities = () => {
   const updateHideConfirmation = useCallback(
     async (disabled: boolean) => {
       try {
-        await apiPut("/user/hide-confirmation", {
-          hideConfirmationDisabled: disabled,
-        });
-        updateUser?.({ hideConfirmationDisabled: disabled });
+        await saveHideConfirmation(disabled);
         return true;
       } catch (error) {
         console.error("Failed to update hide confirmation preference:", error);
@@ -247,7 +260,7 @@ export const useHiddenEntities = () => {
         return false;
       }
     },
-    [updateUser]
+    [saveHideConfirmation]
   );
 
   return {
@@ -257,6 +270,6 @@ export const useHiddenEntities = () => {
     unhideAll,
     updateHideConfirmation,
     isHiding,
-    hideConfirmationDisabled: user?.hideConfirmationDisabled || false,
+    hideConfirmationDisabled,
   };
 };

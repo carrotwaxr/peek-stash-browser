@@ -191,7 +191,7 @@ export const renderListPage = (
   };
   const auth = createAuthValue({
     isAuthenticated: true,
-    user: { id: 1, username: "viewer", role: "USER" },
+    user: { id: 1, username: "viewer", role: "USER", setupCompleted: true },
   });
   const router = createMemoryRouter([{ path: "*", element: ui }], {
     initialEntries,

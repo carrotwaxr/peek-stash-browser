@@ -39,9 +39,7 @@ const Login = () => {
           window.location.href = redirectUrl;
         } else {
           // Use landing page preference if available
-          const destination = getLandingPage(
-            result.user?.landingPagePreference
-          );
+          const destination = getLandingPage(result.landingPagePreference);
           window.location.href = destination;
         }
       } else {

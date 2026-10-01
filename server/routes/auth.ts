@@ -1,3 +1,10 @@
+import type {
+  AuthCheckResponse,
+  AuthMeResponse,
+  AuthUserResponse,
+  LandingPagePreference,
+  LoginResponse,
+} from "@peek/shared-types";
 import bcrypt from "bcryptjs";
 import type { Response } from "express";
 import express from "express";
@@ -22,6 +29,19 @@ import { recoveryKeyMatches } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
+
+/** The identity the client holds for the signed-in user, and nothing else */
+const toAuthUser = (user: {
+  id: number;
+  username: string;
+  role: string;
+  setupCompleted?: boolean;
+}): AuthUserResponse => ({
+  id: user.id,
+  username: user.username,
+  role: user.role,
+  setupCompleted: user.setupCompleted ?? false,
+});
 
 // Login endpoint
 router.post("/login", authRateLimiter, async (req, res) => {
@@ -99,19 +119,16 @@ router.post("/login", authRateLimiter, async (req, res) => {
   // Rankings over an hour old are recomputed in the background
   void rankingComputeService.ensureFresh(user.id);
 
-  res.json({
+  const body: LoginResponse = {
     success: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      landingPagePreference: user.landingPagePreference ?? {
+    user: toAuthUser(user),
+    landingPagePreference:
+      (user.landingPagePreference as LandingPagePreference | null) ?? {
         pages: ["home"],
         randomize: false,
       },
-      setupCompleted: user.setupCompleted,
-    },
-  });
+  };
+  res.json(body);
 });
 
 // Logout endpoint
@@ -125,9 +142,8 @@ router.get(
   "/me",
   authenticate,
   authenticated((req: AuthenticatedRequest, res: Response) => {
-    res.json({
-      user: req.user,
-    });
+    const body: AuthMeResponse = { user: toAuthUser(req.user) };
+    res.json(body);
   })
 );
 
@@ -136,7 +152,11 @@ router.get(
   "/check",
   authenticate,
   authenticated((req: AuthenticatedRequest, res: Response) => {
-    res.json({ authenticated: true, user: req.user });
+    const body: AuthCheckResponse = {
+      authenticated: true,
+      user: toAuthUser(req.user),
+    };
+    res.json(body);
   })
 );
 
