@@ -14,7 +14,6 @@ import {
   removePlaylistItems,
   removeSceneFromPlaylist,
   removeUnavailablePlaylistItems,
-  reorderPlaylist,
   sortPlaylist,
   updatePlaylist,
   updatePlaylistShares,
@@ -85,9 +84,6 @@ router.put(
 
 // Remove scene from playlist
 router.delete("/:id/items/:sceneId", authenticated(removeSceneFromPlaylist));
-
-// Reorder playlist items
-router.put("/:id/reorder", authenticated(reorderPlaylist));
 
 // Save a view sort as the playlist's order (owner only)
 router.post("/:id/sort", withAllowedInstances, libraryHandler(sortPlaylist));

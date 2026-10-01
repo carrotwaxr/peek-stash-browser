@@ -61,32 +61,39 @@ On the Playlists page, each playlist shows thumbnails of the first four scenes y
 3. Change the name or description
 4. Click **Save**
 
+### Sorting a Playlist
+
+Anyone who can see a playlist can sort it with the sort menu above the list (see [Viewing Playlist Contents](#viewing-playlist-contents)). Sorting changes only what you see, not the playlist. Play, and Next and Previous while watching, follow the order shown.
+
+If you own the playlist, a sort other than **Playlist order** also offers **Save as playlist order** (the **Save as order** button above the list). It makes the order shown the playlist's own order, for everyone who opens it. Scenes you can't see in the playlist (hidden, restricted, removed from Stash or on a server you don't use) keep their order after the ones you see; the confirmation says how many there are.
+
+#### Unavailable scenes
+
+If some of your playlist's scenes can't be played here, the owner sees **N unavailable** next to the video count, and a **Remove unavailable** button. It removes only the scenes that were deleted from Stash. Scenes that are hidden, restricted, or on a server you don't use stay in the playlist, since they may come back. People the playlist is shared with see only the scenes they can play, and nothing about the others.
+
 ### Reordering Scenes
 
-Want to change the playback order?
+To change the playlist's own order:
 
-1. Open a playlist
-2. Click **Edit** mode
-3. **Drag and drop** scenes to reorder them
-4. Click **Save** when done
+1. Open a playlist you own, in **Playlist order**
+2. Click **Reorder**
+3. Move a scene with its arrows (to the top, up one, down one, to the bottom), or type its new position in the box and press Enter
+4. Click **Done** when you are finished
 
-The playlist will play scenes in the order you've arranged them.
+Each move is saved as soon as you make it, so there is nothing to save or cancel. Moves work across pages: the position is the scene's place in the whole playlist, and moving the first scene on page 2 up puts it at the end of page 1. Reorder is not offered while the list is sorted another way; use **Save as playlist order** for that.
 
 ### Removing Scenes
 
-1. Open a playlist
-2. Click **Edit** mode
-3. Click the **× (remove)** icon on any scene
-4. Confirm removal
-5. Click **Save**
+- To remove one scene, click **Remove** on its row and confirm.
+- To remove several, select them (press and hold a row to start selecting, then click the others, or **Select All** for the page), then click **Remove** in the bar at the bottom and confirm. They are removed in one step.
 
 ### Deleting a Playlist
 
 !!! warning "Permanent Action"
     Deleting a playlist cannot be undone. The scenes themselves are not deleted, just the playlist.
 
-1. Open the playlist you want to delete
-2. Click the **Delete** button (trash icon)
+1. Go to the **Playlists** page
+2. Click **Delete** on the playlist you want to delete
 3. Confirm deletion
 4. The playlist is permanently removed
 
@@ -96,8 +103,10 @@ The playlist will play scenes in the order you've arranged them.
 
 1. Open a playlist
 2. Click the **Play** button
-3. Playback starts with the first scene
+3. Playback starts with the first scene in the order shown
 4. When a scene ends, the next scene plays automatically
+
+If nothing in the playlist is available to you, Play says so and stays on the page.
 
 ### Shuffle Mode
 
@@ -107,6 +116,8 @@ Randomize the playback order:
 2. Click the **Shuffle** button (shuffle icon)
 3. Playlist will play scenes in random order
 4. Click **Shuffle** again to turn it off
+
+The owner's Shuffle and Repeat choices are saved with the playlist. If the playlist is shared with you, your Shuffle and Repeat are yours: they change how you play it and are not saved.
 
 !!! tip "Shuffle Tip"
     Shuffle is perfect for long playlists when you want variety!
@@ -203,6 +214,9 @@ A shared playlist shows you only the scenes your own hidden items and restrictio
 | Add scenes to playlist | Yes | Yes |
 | Edit name/description | Yes | No |
 | Reorder or remove scenes | Yes | No |
+| Sort the view | Yes | Yes |
+| Save as playlist order | Yes | No |
+| Shuffle and Repeat | Yes (saved) | Yes (for themselves, not saved) |
 | Manage sharing settings | Yes | No |
 | Delete playlist | Yes | No |
 | Download playlist | Yes (with permission) | Yes (with permission) |
@@ -217,8 +231,8 @@ You can download entire playlists as zip archives for offline viewing. The zip i
 **To download a playlist:**
 1. Open a playlist
 2. Click the **Download** button
-3. Wait for the zip to be created (progress shown)
-4. Download starts automatically when ready
+3. Wait for the zip to be created (open **Downloads** to see its progress)
+4. Open **Downloads** and click **Download** when it shows **Completed**
 
 Users a playlist is shared with can download it too. The zip leaves out any scenes hidden or restricted for the person downloading it.
 

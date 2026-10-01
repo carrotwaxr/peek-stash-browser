@@ -396,13 +396,6 @@ export type {
   RemoveUnavailableItemsResponse,
 } from "@peek/shared-types/api/playlist.js";
 
-// Playlist types that stay on the server
-export type {
-  ReorderPlaylistParams,
-  ReorderPlaylistRequest,
-  ReorderPlaylistResponse,
-} from "./playlist.js";
-
 // Carousel endpoint types
 export type {
   CarouselData,
