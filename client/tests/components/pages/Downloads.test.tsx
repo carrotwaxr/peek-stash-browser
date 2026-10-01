@@ -5,6 +5,7 @@ import type {
 } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render as renderPlain,
   screen,
@@ -27,6 +28,12 @@ vi.mock("@/api", () => ({
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
+
+const mockDismiss = vi.fn<(id: string) => void>();
+
+vi.mock("react-hot-toast", () => ({
+  default: { dismiss: (id: string) => mockDismiss(id) },
+}));
 
 vi.mock("@/utils/toast", () => ({
   showError: vi.fn(),
@@ -443,7 +450,9 @@ describe("Downloads page", () => {
     render(<Downloads />);
 
     expect(await screen.findByText("No downloads yet")).toBeInTheDocument();
-    expect(showError).toHaveBeenCalledWith("Failed to load downloads");
+    expect(showError).toHaveBeenCalledWith("Failed to load downloads", {
+      id: "downloads-load",
+    });
   });
 
   it("shows placeholders for a missing name and size", async () => {
@@ -498,6 +507,51 @@ describe("Downloads page", () => {
         vi.advanceTimersByTime(9000);
       });
       expect(mockApiGet).toHaveBeenCalledTimes(3);
+    });
+
+    it("three failing polls show one error toast; a later success clears it", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      let failing = false;
+      mockApiGet.mockImplementation(() =>
+        failing
+          ? Promise.reject(new Error("offline"))
+          : Promise.resolve({
+              downloads: [download({ status: "PENDING", progress: 0 })],
+            })
+      );
+
+      render(<Downloads />);
+      expect(await screen.findByText("Queued")).toBeInTheDocument();
+      expect(showError).not.toHaveBeenCalled();
+
+      mockDismiss.mockClear();
+      failing = true;
+      for (let i = 1; i <= 3; i++) {
+        await actAsync(() => {
+          vi.advanceTimersByTime(3000);
+        });
+        // The query cache notifies on a real timer; waitFor's own polling
+        // uses the faked setInterval
+        await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+        expect(showError).toHaveBeenCalledTimes(i);
+      }
+      expect(mockApiGet).toHaveBeenCalledTimes(4);
+      // Each failed poll asks for the same toast id, so react-hot-toast
+      // shows one
+      for (const call of vi.mocked(showError).mock.calls) {
+        expect(call).toEqual([
+          "Failed to load downloads",
+          { id: "downloads-load" },
+        ]);
+      }
+      expect(mockDismiss).not.toHaveBeenCalledWith("downloads-load");
+
+      failing = false;
+      await actAsync(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+      expect(mockDismiss).toHaveBeenCalledWith("downloads-load");
     });
   });
 
