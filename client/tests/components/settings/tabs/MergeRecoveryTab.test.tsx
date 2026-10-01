@@ -15,7 +15,9 @@ import {
   vi,
 } from "vitest";
 import { apiGet, apiPost } from "../../../../src/api";
+import { ApiError } from "../../../../src/api/client";
 import MergeRecoveryTab from "../../../../src/components/settings/tabs/MergeRecoveryTab";
+import { showError } from "../../../../src/utils/toast";
 import { must } from "../../../testUtils";
 
 vi.mock("../../../../src/api", () => ({
@@ -209,6 +211,45 @@ describe("MergeRecoveryTab", () => {
     expect(mockPost).not.toHaveBeenCalled();
     expect(confirmSpy).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["Discard", "discard"],
+    ["Transfer", "reconcile"],
+  ])(
+    "%s on a scene a sync restored says its data was kept and reloads the list",
+    async (action, path) => {
+      mockPost.mockRejectedValue(
+        new ApiError("Scene 5 is not a deleted scene on Stash B", 409)
+      );
+      const orphanLoads = () =>
+        mockGet.mock.calls.filter(([url]) => url === "/admin/orphaned-scenes")
+          .length;
+      render(<MergeRecoveryTab />);
+      fireEvent.click(await screen.findByText("on Stash B"));
+      if (action === "Discard") {
+        fireEvent.click(
+          await screen.findByRole("button", { name: "Discard Activity" })
+        );
+        await answerConfirm("Discard orphaned data?", "Discard");
+      } else {
+        await screen.findByText("Scene Seven");
+        fireEvent.click(
+          must(screen.getAllByRole("button", { name: "Transfer" })[0], "match")
+        );
+      }
+
+      await waitFor(() =>
+        expect(showError).toHaveBeenCalledWith(
+          "This scene is back in Stash, so its data was kept"
+        )
+      );
+      expect(mockPost).toHaveBeenCalledWith(
+        `/admin/orphaned-scenes/5%3Ainst-b/${path}`,
+        ...(path === "reconcile" ? [{ targetSceneId: "7" }] : [])
+      );
+      await waitFor(() => expect(orphanLoads()).toBe(2));
+    }
+  );
 
   it("Auto-Reconcile All confirms in a dialog, then posts", async () => {
     mockPost.mockResolvedValue({ reconciled: 1, skipped: 0 });

@@ -45,6 +45,10 @@ describe("MergeReconciliationService", () => {
     mockPrisma.sceneRating.findUnique.mockResolvedValue(none);
     mockPrisma.playlistItem.findMany.mockResolvedValue([]);
     mockPrisma.mergeRecord.create.mockResolvedValue(partialRow({ id: "mr-1" }));
+    // The scene being merged or discarded is still soft-deleted
+    mockPrisma.stashScene.findUnique.mockResolvedValue(
+      partialRow({ deletedAt: new Date() })
+    );
   });
 
   describe("findOrphanedScenesWithActivity", () => {
@@ -607,10 +611,21 @@ describe("MergeReconciliationService", () => {
       ).rejects.toThrow(MergeTargetError);
     });
 
+    it("refuses a source a sync restored, before reading any user's data", async () => {
+      mockPrisma.stashScene.findUnique
+        .mockResolvedValueOnce(partialRow({ deletedAt: null })) // target
+        .mockResolvedValueOnce(partialRow({ deletedAt: null })); // source
+
+      await expect(
+        mergeReconciliationService.reconcileScene(source, target, null, 1)
+      ).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockPrisma.watchHistory.findMany).not.toHaveBeenCalled();
+    });
+
     it("transfers for every user with history, a rating or a playlist item on the source", async () => {
-      mockPrisma.stashScene.findUnique.mockResolvedValue(
-        partialRow({ deletedAt: null })
-      );
+      mockPrisma.stashScene.findUnique
+        .mockResolvedValueOnce(partialRow({ deletedAt: null })) // target
+        .mockResolvedValueOnce(partialRow({ deletedAt: new Date() })); // source
       mockPrisma.watchHistory.findMany.mockResolvedValue([
         partialRow({ userId: 1 }),
       ]);
@@ -828,6 +843,22 @@ describe("MergeReconciliationService", () => {
       expect(mockPrisma.playlistItem.deleteMany).toHaveBeenCalledWith({
         where,
       });
+    });
+
+    it("refuses a scene a sync restored: 409, nothing deleted, the library unchanged", async () => {
+      mockPrisma.stashScene.findUnique.mockResolvedValue(
+        partialRow({ deletedAt: null })
+      );
+      const before = libraryStampFor(1);
+
+      await expect(
+        mergeReconciliationService.discardOrphanedData(source)
+      ).rejects.toMatchObject({ statusCode: 409 });
+
+      expect(mockPrisma.watchHistory.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.sceneRating.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+      expect(libraryStampFor(1)).toBe(before);
     });
 
     it("marks the library changed, since playlists lost entries", async () => {
