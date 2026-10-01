@@ -45,6 +45,28 @@ export function safeFileName(name: string): string {
 }
 
 /**
+ * The extension of the file at `filePath` (either kind of separator), with
+ * its dot and lower-cased, so a download keeps the format Stash stores. Any
+ * path without one of 1 to 8 letters or digits after the last dot of its last
+ * segment gives `fallback`.
+ */
+export function fileExtension(
+  filePath: string | null | undefined,
+  fallback: string
+): string {
+  if (!filePath) return fallback;
+  const segment = filePath.slice(
+    Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\")) + 1
+  );
+  const dot = segment.lastIndexOf(".");
+  if (dot < 0) return fallback;
+  const extension = segment.slice(dot + 1);
+  return /^[a-z0-9]{1,8}$/i.test(extension)
+    ? `.${extension.toLowerCase()}`
+    : fallback;
+}
+
+/**
  * `name`, or the first of `name (2)`, `name (3)`, ... that `taken` does not
  * hold yet, compared the way Windows and macOS compare names (case and
  * Unicode normalisation ignored). `taken` holds those comparison keys; the

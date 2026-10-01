@@ -30,7 +30,7 @@ Scene downloads stream directly from your Stash server—there's no waiting for 
 
 ### What's Downloaded
 
-- The original video file in its native format
+- The original video file in its native format, saved with the file's own extension (`.mkv`, `.wmv`, ...), as stored in Stash
 - Filename based on the scene title, made safe on every system: characters a file system does not allow (such as `/`, `:` and `?`) become `_`, control characters and dots or spaces at either end are dropped, and a very long title is shortened
 - Titles and playlist names in any script (accents, curly quotes, emoji, CJK) keep their exact name; very old download tools that ignore the UTF-8 name get an ASCII version with `_` in place of other characters.
 
@@ -72,11 +72,11 @@ Each playlist zip contains:
 
 | File | Description |
 |------|-------------|
-| **Scene videos** | All video files in original quality |
+| **Scene videos** | Each in its own format and extension, in original quality |
 | **playlist.m3u** | M3U playlist file for media players |
 | **{scene}.nfo** | Kodi-compatible metadata for each scene |
 
-Two scenes with the same title are saved as `Title.mp4` and `Title (2).mp4`, each with its own `.nfo`.
+Two scenes with the same title are saved as `Title.mkv` and `Title (2).mp4`, each with its own `.nfo`.
 
 ### M3U Playlist
 

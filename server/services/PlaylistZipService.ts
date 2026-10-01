@@ -6,7 +6,11 @@ import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
 import { getConfigDir } from "../utils/configDir.js";
-import { safeFileName, uniqueFileName } from "../utils/contentDisposition.js";
+import {
+  fileExtension,
+  safeFileName,
+  uniqueFileName,
+} from "../utils/contentDisposition.js";
 import {
   NOTHING_TO_DOWNLOAD,
   PLAYLIST_NOT_FOUND,
@@ -163,7 +167,8 @@ export class PlaylistZipService {
           safeFileName(sceneTitle),
           takenNames
         );
-        const videoFileName = `${sanitizedTitle}.mp4`;
+        const videoFileName =
+          sanitizedTitle + fileExtension(scene.files[0]?.path, ".mp4");
         const nfoFileName = `${sanitizedTitle}.nfo`;
 
         logger.debug(`Processing scene for zip`, {

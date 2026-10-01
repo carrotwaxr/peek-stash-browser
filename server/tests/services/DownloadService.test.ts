@@ -235,7 +235,40 @@ describe("DownloadService", () => {
         vi
           .mocked(prisma.download.create)
           .mock.calls.map(([args]) => args.data.fileName)
-      ).toEqual(["My Clip.v2.mp4", "s2.mp4"]);
+      ).toEqual(["My Clip.v2.mkv", "s2.mp4"]);
+    });
+
+    it("a scene is named with its file's extension", async () => {
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
+        partialRow({ id: "s1", title: "My Scene", filePath: "/v/Scene.wmv" })
+      );
+
+      await service.createSceneDownload(1, "s1", "inst-a");
+
+      expect(createdFileName()).toBe("My Scene.wmv");
+    });
+
+    it("an image is named with its file's extension, .jpg without a path", async () => {
+      vi.mocked(prisma.stashImage.findFirst)
+        .mockResolvedValueOnce(
+          partialRow({ id: "i1", title: "Pic", filePath: "/i/a.png" })
+        )
+        .mockResolvedValueOnce(
+          partialRow({ id: "i2", title: "Pic2", filePath: null })
+        );
+
+      await service.createImageDownload(1, "i1", "inst-a");
+      await service.createImageDownload(1, "i2", "inst-a");
+
+      expect(
+        vi
+          .mocked(prisma.download.create)
+          .mock.calls.map(([args]) => args.data.fileName)
+      ).toEqual(["Pic.png", "Pic2.jpg"]);
+      const query = must(
+        vi.mocked(prisma, true).stashImage.findFirst.mock.calls[0]
+      )[0];
+      expect(query?.select?.filePath).toBe(true);
     });
 
     it("an image titled with a Windows device name is not that device", async () => {

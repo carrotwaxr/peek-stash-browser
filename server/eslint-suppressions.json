@@ -19,11 +19,6 @@
       "count": 5
     }
   },
-  "services/DownloadService.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
-    }
-  },
   "utils/codecDetection.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 3

@@ -1,8 +1,10 @@
 import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
-import { safeFileName } from "../utils/contentDisposition.js";
+import { fileExtension, safeFileName } from "../utils/contentDisposition.js";
 import { entityKey, pairsJson } from "../utils/entityRef.js";
+import { emptyToNull } from "../utils/sqlHelpers.js";
+import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { getVisibleEntityKeys } from "./EntityAccessService.js";
 
 /** 24 hours in milliseconds for download expiry */
@@ -47,15 +49,13 @@ export class DownloadService {
       throw new Error("Scene not found");
     }
 
-    // Use title, or filename from path, or sceneId as fallback
-    let displayName = scene.title;
-    if (!displayName && scene.filePath) {
-      // Extract filename without extension from path
-      const pathParts = scene.filePath.split("/");
-      const fileWithExt = pathParts[pathParts.length - 1] ?? "";
-      displayName = fileWithExt.replace(/\.[^/.]+$/, ""); // Remove extension
-    }
-    const fileName = safeFileName(displayName || sceneId) + ".mp4";
+    // The title Peek shows (the title, else the file's name), else the id,
+    // with the file's own extension
+    const displayName =
+      emptyToNull(scene.title) ?? getSceneFallbackTitle(scene.filePath);
+    const fileName =
+      safeFileName(displayName ?? sceneId) +
+      fileExtension(scene.filePath, ".mp4");
 
     const download = await prisma.download.create({
       data: {
@@ -87,14 +87,16 @@ export class DownloadService {
     // The image on this instance, if not soft-deleted
     const image = await prisma.stashImage.findFirst({
       where: { id: imageId, stashInstanceId: instanceId, deletedAt: null },
-      select: { id: true, title: true, fileSize: true },
+      select: { id: true, title: true, filePath: true, fileSize: true },
     });
 
     if (!image) {
       throw new Error("Image not found");
     }
 
-    const fileName = safeFileName(image.title || imageId) + ".jpg";
+    const fileName =
+      safeFileName(emptyToNull(image.title) ?? imageId) +
+      fileExtension(image.filePath, ".jpg");
 
     const download = await prisma.download.create({
       data: {
