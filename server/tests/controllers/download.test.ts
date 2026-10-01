@@ -20,6 +20,7 @@ import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { authenticated } from "../../utils/routeHelpers.js";
+import type * as streamProxyModule from "../../utils/streamProxy.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { downloadRow } from "../helpers/fixtures.js";
@@ -72,7 +73,8 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-vi.mock("../../utils/streamProxy.js", () => ({
+vi.mock("../../utils/streamProxy.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof streamProxyModule>()),
   pipeResponseToClient: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -820,7 +822,15 @@ describe("Download Controller", () => {
         expect.objectContaining({ ok: true }),
         res,
         "[DOWNLOAD]",
-        ["content-type", "content-length"]
+        [
+          "content-type",
+          "content-length",
+          "content-range",
+          "accept-ranges",
+          "last-modified",
+          "etag",
+        ],
+        { idleTimeoutMs: 60_000, abort: anyOf(AbortController) }
       );
     });
 
@@ -877,7 +887,15 @@ describe("Download Controller", () => {
         expect.objectContaining({ ok: true }),
         res,
         "[DOWNLOAD]",
-        ["content-type", "content-length"]
+        [
+          "content-type",
+          "content-length",
+          "content-range",
+          "accept-ranges",
+          "last-modified",
+          "etag",
+        ],
+        { idleTimeoutMs: 60_000, abort: anyOf(AbortController) }
       );
     });
 

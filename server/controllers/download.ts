@@ -1,4 +1,5 @@
 import { DownloadStatus, DownloadType } from "@prisma/client";
+import { BadGatewayError, NotFoundError } from "../middleware/errorHandler.js";
 import { downloadService } from "../services/DownloadService.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -31,7 +32,36 @@ import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { attachmentContentDisposition } from "../utils/contentDisposition.js";
 import { userFacingReason } from "../utils/downloadReasons.js";
 import { logger } from "../utils/logger.js";
-import { pipeResponseToClient } from "../utils/streamProxy.js";
+import {
+  fetchFromStash,
+  pipeResponseToClient,
+  stashFailure,
+  stashFetchError,
+} from "../utils/streamProxy.js";
+
+/** How long Stash may take to answer, and to go quiet mid-body, on a file. */
+const DEFAULT_STASH_HEADERS_TIMEOUT_MS = 60_000;
+const STASH_IDLE_TIMEOUT_MS = 60_000;
+
+/**
+ * The limit for Stash's response headers; `STASH_HEADERS_TIMEOUT_MS` (read on
+ * each request, for tests) overrides the 60 s default when it is a positive
+ * number.
+ */
+function stashHeadersTimeoutMs(): number {
+  const override = Number(process.env.STASH_HEADERS_TIMEOUT_MS);
+  return override > 0 ? override : DEFAULT_STASH_HEADERS_TIMEOUT_MS;
+}
+
+/** What a download answers the browser with, from Stash's response. */
+const FORWARDED_FILE_HEADERS = [
+  "content-type",
+  "content-length",
+  "content-range",
+  "accept-ranges",
+  "last-modified",
+  "etag",
+];
 
 /**
  * Maximum playlist download size in MB (default: 10GB)
@@ -343,7 +373,7 @@ export async function getDownloadFile(
     }
     // Serve the zip file from filePath
     if (!download.filePath) {
-      return res.status(500).json({ error: "Download file path missing" });
+      throw new NotFoundError("Download not found");
     }
     return res.sendFile(download.filePath, {
       headers: {
@@ -392,31 +422,55 @@ export async function getDownloadFile(
       ? `${baseUrl}/scene/${download.entityId}/stream`
       : `${baseUrl}/image/${download.entityId}/image`;
 
-  // Abort the upstream fetch if the client disconnects
-  const abort = new AbortController();
-  res.on("close", () => abort.abort());
+  // Range and If-Range go to Stash, which answers 206 or 416 itself
+  const rangeHeaders: Record<string, string> = {};
+  const range = req.headers.range;
+  if (range) rangeHeaders.range = range;
+  const ifRange = req.headers["if-range"];
+  if (typeof ifRange === "string") rangeHeaders["if-range"] = ifRange;
 
-  const upstream = await fetch(fileUrl, {
-    headers: { ApiKey: apiKey },
-    signal: abort.signal,
-  });
-
-  if (!upstream.ok) {
-    return res.status(upstream.status).json({
-      error: `Failed to fetch ${entityType} from Stash`,
+  let fetched;
+  try {
+    fetched = await fetchFromStash(fileUrl, {
+      apiKey,
+      clientRes: res,
+      headersTimeoutMs: stashHeadersTimeoutMs(),
+      headers: rangeHeaders,
     });
+  } catch (error) {
+    // Null when the client left, which needs no answer
+    const mapped = stashFetchError(error, res);
+    if (mapped) throw mapped;
+    return;
+  }
+  const { response: upstream, abort } = fetched;
+
+  // 206, 304 and 416 pass through; a refused body is cancelled, not left open
+  const failure = stashFailure(upstream.status);
+  if (failure || upstream.status === 410) {
+    logger.warn(
+      `[DOWNLOAD] Stash returned ${upstream.status} for ${entityType} ${download.entityId}`
+    );
+    abort.abort();
+    await upstream.body?.cancel().catch(() => undefined);
+    throw failure instanceof BadGatewayError
+      ? new BadGatewayError("Stash could not serve the file")
+      : new NotFoundError("Download not found");
   }
 
-  // Set headers for download
+  res.status(upstream.status);
   res.setHeader(
     "Content-Disposition",
     attachmentContentDisposition(download.fileName)
   );
 
-  await pipeResponseToClient(upstream, res, "[DOWNLOAD]", [
-    "content-type",
-    "content-length",
-  ]);
+  await pipeResponseToClient(
+    upstream,
+    res,
+    "[DOWNLOAD]",
+    FORWARDED_FILE_HEADERS,
+    { idleTimeoutMs: STASH_IDLE_TIMEOUT_MS, abort }
+  );
   return;
 }
 
