@@ -1,9 +1,17 @@
 import type { MouseEvent, ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import type { NormalizedScene } from "@peek/shared-types";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type * as api from "../../../src/api";
+import type { NormalizedScene, RatableEntityType } from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  fireEvent,
+  render as renderPlain,
+  screen,
+} from "@testing-library/react";
+import { must } from "@tests/testUtils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as hooksModule from "../../../src/api/hooks";
+import type * as api from "../../../src/api/library";
+import { queryKeys } from "../../../src/api/queryKeys";
 import {
   CardDescription,
   CardImage,
@@ -36,7 +44,9 @@ const mockDecrementImage = vi.fn(
   (_vars: { imageId: string; instanceId: string }) =>
     Promise.resolve({ success: true as const, oCount: 0 })
 );
-vi.mock("../../../src/api/hooks", () => ({
+vi.mock("../../../src/api/hooks", async (importOriginal) => ({
+  // The rating and favorite hooks are the real ones, over the test's cache
+  ...(await importOriginal<typeof hooksModule>()),
   useIncrementOCounter: () => ({
     mutateAsync: mockIncrement,
     isPending: false,
@@ -51,14 +61,26 @@ vi.mock("../../../src/api/hooks", () => ({
   }),
 }));
 
-const mockUpdateFavorite = vi.fn((..._args: unknown[]) => Promise.resolve());
-vi.mock("../../../src/api", async (importOriginal) => {
+const mockUpdateFavorite = vi.fn((..._args: unknown[]) =>
+  Promise.resolve({
+    success: true,
+    rating: { id: 12, instanceId: "A", rating: null, favorite: true },
+  })
+);
+const mockUpdateRating = vi.fn((..._args: unknown[]) =>
+  Promise.resolve({
+    success: true,
+    rating: { id: 7, instanceId: "inst-1", rating: 80, favorite: false },
+  })
+);
+vi.mock("../../../src/api/library", async (importOriginal) => {
   const actual = await importOriginal<typeof api>();
   return {
     ...actual,
     libraryApi: {
       ...actual.libraryApi,
       updateFavorite: (...args: unknown[]) => mockUpdateFavorite(...args),
+      updateRating: (...args: unknown[]) => mockUpdateRating(...args),
     },
   };
 });
@@ -76,6 +98,25 @@ vi.mock("../../../src/components/ui/index", () => ({
   SceneCardPreview: () => null,
   TooltipEntityGrid: () => null,
 }));
+
+/** The cache the card's rating and favorite saves write into */
+let queryClient: QueryClient;
+beforeEach(() => {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+});
+const withClient = (ui: ReactElement) => (
+  <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+);
+/** Renders inside the test's QueryClientProvider; rerender keeps it */
+function render(ui: ReactElement) {
+  const result = renderPlain(withClient(ui));
+  return {
+    ...result,
+    rerender: (next: ReactElement) => result.rerender(withClient(next)),
+  };
+}
 
 /** The props of the overlay's root element */
 interface OverlayRootProps {
@@ -396,7 +437,12 @@ describe("a card's rating row reads its props", () => {
 
   afterEach(() => {
     mockUpdateFavorite.mockReset();
-    mockUpdateFavorite.mockImplementation(() => Promise.resolve());
+    mockUpdateFavorite.mockImplementation(() =>
+      Promise.resolve({
+        success: true,
+        rating: { id: 12, instanceId: "A", rating: null, favorite: true },
+      })
+    );
   });
 
   it("a rating from the server shows at once", () => {
@@ -449,8 +495,63 @@ describe("a card's rating row reads its props", () => {
   });
 });
 
+describe("a card's rating writes the cache", () => {
+  const performerRow = (instanceId: string, rating: number) => ({
+    id: "7",
+    instanceId,
+    name: "Alex",
+    rating,
+    rating100: rating,
+    favorite: false,
+  });
+
+  it("rating a performer card updates the cached Performers page", async () => {
+    const listKey = queryKeys.performers.list(undefined, { page: 1 });
+    queryClient.setQueryData(listKey, {
+      findPerformers: {
+        count: 2,
+        performers: [performerRow("inst-1", 60), performerRow("inst-2", 60)],
+      },
+    });
+    render(
+      <CardRatingRow
+        entityType="performer"
+        entityId="7"
+        instanceId="inst-1"
+        initialRating={60}
+        initialFavorite={false}
+        initialOCounter={0}
+        showMenu={false}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Rating: 6.0"));
+    const slider = must(
+      document.querySelector<HTMLInputElement>('input[type="range"]')
+    );
+    fireEvent.change(slider, { target: { value: "8" } });
+
+    await vi.waitFor(() =>
+      expect(mockUpdateRating).toHaveBeenCalledWith(
+        "performer",
+        "7",
+        80,
+        "inst-1"
+      )
+    );
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryData(listKey)).toEqual({
+        findPerformers: {
+          count: 2,
+          performers: [performerRow("inst-1", 80), performerRow("inst-2", 60)],
+        },
+      })
+    );
+  });
+});
+
 describe("Remove last O in a card's menu", () => {
-  const row = (entityType: string, initialOCounter: number) => (
+  const row = (entityType: RatableEntityType, initialOCounter: number) => (
     <CardRatingRow
       entityType={entityType}
       entityId="12"

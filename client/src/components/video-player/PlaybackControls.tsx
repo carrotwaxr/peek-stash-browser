@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { apiPost, getMyPermissions, libraryApi } from "../../api";
-import { useDecrementOCounter } from "../../api/hooks";
+import { apiPost, getMyPermissions } from "../../api";
+import {
+  useDecrementOCounter,
+  useUpdateFavorite,
+  useUpdateRating,
+} from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -71,6 +75,8 @@ const PlaybackControls = () => {
   // Rating and favorite state
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const { mutateAsync: saveRating } = useUpdateRating();
+  const { mutateAsync: saveFavorite } = useUpdateFavorite();
 
   // Download state
   const [downloading, setDownloading] = useState(false);
@@ -112,12 +118,12 @@ const PlaybackControls = () => {
     setRating(newRating);
 
     try {
-      await libraryApi.updateRating(
-        "scene",
-        scene.id,
-        newRating,
-        scene.instanceId
-      );
+      await saveRating({
+        entityType: "scene",
+        entityId: scene.id,
+        rating: newRating,
+        instanceId: scene.instanceId,
+      });
     } catch (error) {
       console.error("Failed to update scene rating:", error);
       setRating(previousRating);
@@ -132,12 +138,12 @@ const PlaybackControls = () => {
     setIsFavorite(newFavorite);
 
     try {
-      await libraryApi.updateFavorite(
-        "scene",
-        scene.id,
-        newFavorite,
-        scene.instanceId
-      );
+      await saveFavorite({
+        entityType: "scene",
+        entityId: scene.id,
+        favorite: newFavorite,
+        instanceId: scene.instanceId,
+      });
     } catch (error) {
       console.error("Failed to update scene favorite:", error);
       setIsFavorite(previousFavorite);

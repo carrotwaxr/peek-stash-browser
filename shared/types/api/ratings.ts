@@ -10,14 +10,22 @@
 // =============================================================================
 
 /** The entity types a user can rate, favorite or (scenes, images) press O on */
-export type RatableEntityType =
-  | "scene"
-  | "performer"
-  | "studio"
-  | "tag"
-  | "gallery"
-  | "group"
-  | "image";
+export const RATABLE_ENTITY_TYPES = [
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "gallery",
+  "group",
+  "image",
+] as const;
+
+export type RatableEntityType = (typeof RATABLE_ENTITY_TYPES)[number];
+
+/** Whether the entity type takes ratings (a clip does not) */
+export function isRatableEntityType(type: string): type is RatableEntityType {
+  return (RATABLE_ENTITY_TYPES as readonly string[]).includes(type);
+}
 
 /**
  * Common request body for all rating updates

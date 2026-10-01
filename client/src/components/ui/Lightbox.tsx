@@ -20,7 +20,8 @@ import {
   TransformComponent,
   TransformWrapper,
 } from "react-zoom-pan-pinch";
-import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
+import { apiGet, imageViewHistoryApi } from "../../api";
+import { useUpdateFavorite, useUpdateRating } from "../../api/hooks";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useImageDownload } from "../../hooks/useImageDownload";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
@@ -74,6 +75,8 @@ const Lightbox = ({
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [oCounter, setOCounter] = useState(0);
+  const { mutateAsync: saveRating } = useUpdateRating();
+  const { mutateAsync: saveFavorite } = useUpdateFavorite();
 
   // New state for enhanced features
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -324,45 +327,30 @@ const Lightbox = ({
     setIsPlaying((prev) => !prev);
   }, []);
 
-  // Handle rating change
+  // Handle rating change. The mutation shows it in every cached row of the
+  // image (the list the lightbox opened from included) and puts it back
+  // when the save fails.
   const handleRatingChange = useCallback(
     async (newRating: number | null) => {
       const currentImage = images[currentIndex];
       if (!currentImage?.id) return;
 
-      // Optimistic update
       const previousRating = rating;
       setRating(newRating);
 
-      // Update the images array so navigation preserves the change
-      const updatedImages = [...images];
-      updatedImages[currentIndex] = {
-        ...currentImage,
-        rating100: newRating,
-        rating: newRating,
-      };
-      // Call parent update if provided
-      if (onImagesUpdate) {
-        onImagesUpdate(updatedImages);
-      }
-
       try {
-        await libraryApi.updateRating(
-          "image",
-          currentImage.id,
-          newRating,
-          currentImage.instanceId
-        );
+        await saveRating({
+          entityType: "image",
+          entityId: currentImage.id,
+          rating: newRating,
+          instanceId: currentImage.instanceId,
+        });
       } catch (error) {
         console.error("Failed to update image rating:", error);
-        // Revert on error
         setRating(previousRating);
-        if (onImagesUpdate) {
-          onImagesUpdate(images);
-        }
       }
     },
-    [images, currentIndex, rating, onImagesUpdate]
+    [images, currentIndex, rating, saveRating]
   );
 
   // Handle favorite change
@@ -371,38 +359,22 @@ const Lightbox = ({
       const currentImage = images[currentIndex];
       if (!currentImage?.id) return;
 
-      // Optimistic update
       const previousFavorite = isFavorite;
       setIsFavorite(newFavorite);
 
-      // Update the images array so navigation preserves the change
-      const updatedImages = [...images];
-      updatedImages[currentIndex] = {
-        ...currentImage,
-        favorite: newFavorite,
-      };
-      // Call parent update if provided
-      if (onImagesUpdate) {
-        onImagesUpdate(updatedImages);
-      }
-
       try {
-        await libraryApi.updateFavorite(
-          "image",
-          currentImage.id,
-          newFavorite,
-          currentImage.instanceId
-        );
+        await saveFavorite({
+          entityType: "image",
+          entityId: currentImage.id,
+          favorite: newFavorite,
+          instanceId: currentImage.instanceId,
+        });
       } catch (error) {
         console.error("Failed to update image favorite:", error);
-        // Revert on error
         setIsFavorite(previousFavorite);
-        if (onImagesUpdate) {
-          onImagesUpdate(images);
-        }
       }
     },
-    [images, currentIndex, isFavorite, onImagesUpdate]
+    [images, currentIndex, isFavorite, saveFavorite]
   );
 
   // Handle O counter change

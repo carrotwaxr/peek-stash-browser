@@ -24,8 +24,6 @@ interface CardProps {
   onClick?: (image: Record<string, unknown>) => void;
   onHideSuccess?: (id: string, type: string, instanceId: string) => void;
   onOCounterChange?: (id: string, count: number, instanceId: string) => void;
-  onRatingChange?: (id: string, rating: number, instanceId: string) => void;
-  onFavoriteChange?: (id: string, value: boolean, instanceId: string) => void;
 }
 
 const { api, apiGet, cardProps } = vi.hoisted(() => ({
@@ -519,7 +517,7 @@ describe("Images", () => {
     /** The props the last card rendered with */
     const lastCard = () => must(cardProps.mock.lastCall, "a card")[0];
 
-    it("an O, a rating and a favorite change only the image on that instance", async () => {
+    it("an O change reaches only the image on that instance", async () => {
       sharedId();
       renderPage();
       await waitFor(() => expect(cards()).toHaveLength(2));
@@ -529,22 +527,6 @@ describe("Images", () => {
       );
       await waitFor(() => expect(card("5:b")).toHaveAttribute("data-o", "4"));
       expect(card("5:a")).toHaveAttribute("data-o", "0");
-
-      act(() =>
-        must(lastCard().onRatingChange, "onRatingChange")("5", 80, "a")
-      );
-      await waitFor(() =>
-        expect(card("5:a")).toHaveAttribute("data-rating", "80")
-      );
-      expect(card("5:b")).toHaveAttribute("data-rating", "undefined");
-
-      act(() =>
-        must(lastCard().onFavoriteChange, "onFavoriteChange")("5", true, "b")
-      );
-      await waitFor(() =>
-        expect(card("5:b")).toHaveAttribute("data-favorite", "true")
-      );
-      expect(card("5:a")).toHaveAttribute("data-favorite", "undefined");
     });
 
     it("a hide drops only the image on that instance", async () => {

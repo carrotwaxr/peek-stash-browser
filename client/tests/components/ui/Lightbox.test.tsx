@@ -1,33 +1,53 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { NormalizedImage } from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
   fireEvent,
-  render,
+  render as renderPlain,
   screen,
   waitFor,
 } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost, getMyPermissions, libraryApi } from "@/api";
+import { queryKeys } from "@/api/queryKeys";
 import Lightbox from "../../../src/components/ui/Lightbox";
 import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
 
-// Mock the API
+// Mock the API (the rating hooks reach `libraryApi` through its own module)
+const { mockLibraryApi } = vi.hoisted(() => ({
+  mockLibraryApi: {
+    updateRating: vi.fn(),
+    updateFavorite: vi.fn(),
+  },
+}));
+vi.mock("@/api/library", () => ({ libraryApi: mockLibraryApi }));
 vi.mock("@/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ settings: {} }),
   apiPost: vi.fn().mockResolvedValue({}),
   getMyPermissions: vi.fn().mockResolvedValue({ permissions: {} }),
-  libraryApi: {
-    updateRating: vi.fn().mockResolvedValue({}),
-    updateFavorite: vi.fn().mockResolvedValue({}),
-  },
+  libraryApi: mockLibraryApi,
   imageViewHistoryApi: {
     recordView: vi.fn().mockResolvedValue({}),
     incrementO: vi.fn().mockResolvedValue({}),
   },
 }));
+
+/** The cache the lightbox's rating and favorite saves write into */
+let queryClient: QueryClient;
+const withClient = (ui: ReactElement) => (
+  <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+);
+/** Renders inside the test's QueryClientProvider; rerender keeps it */
+function render(ui: ReactElement) {
+  const result = renderPlain(withClient(ui));
+  return {
+    ...result,
+    rerender: (next: ReactElement) => result.rerender(withClient(next)),
+  };
+}
 
 // Mock useFullscreen hook
 vi.mock("../../../hooks/useFullscreen", () => ({
@@ -58,6 +78,20 @@ const createMockImages = (page: number, perPage = 10) => {
 describe("Lightbox", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mockLibraryApi.updateRating.mockResolvedValue({
+      success: true,
+      rating: { id: 1, instanceId: "inst-1", rating: 80, favorite: false },
+    });
+    mockLibraryApi.updateFavorite.mockResolvedValue({
+      success: true,
+      rating: { id: 1, instanceId: "inst-1", rating: null, favorite: true },
+    });
   });
 
   describe("basic rendering", () => {
@@ -624,6 +658,66 @@ describe("Lightbox", () => {
         80,
         "inst-1"
       );
+    });
+
+    it("a favorite set in the lightbox is in the cached Images page after it closes", async () => {
+      const listKey = queryKeys.images.list(undefined, { page: 1 });
+      const row = (instanceId: string, favorite: boolean) => ({
+        id: "img-1",
+        instanceId,
+        title: "Image one",
+        rating100: null,
+        favorite,
+      });
+      queryClient.setQueryData(listKey, {
+        findImages: {
+          count: 2,
+          images: [row("inst-1", false), row("inst-2", false)],
+        },
+      });
+      const lightbox = (isOpen: boolean) => (
+        <Lightbox images={[image]} isOpen={isOpen} onClose={vi.fn()} />
+      );
+      const { rerender } = render(lightbox(true));
+
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "r" });
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "f" });
+      await waitFor(() =>
+        expect(libraryApi.updateFavorite).toHaveBeenCalledWith(
+          "image",
+          "img-1",
+          true,
+          "inst-1"
+        )
+      );
+      rerender(lightbox(false));
+
+      await waitFor(() =>
+        expect(queryClient.getQueryData(listKey)).toEqual({
+          findImages: {
+            count: 2,
+            images: [row("inst-1", true), row("inst-2", false)],
+          },
+        })
+      );
+    });
+
+    it("rating in the lightbox calls the host's onImagesUpdate never: the mutation patches the cache", async () => {
+      const onImagesUpdate = vi.fn();
+      render(
+        <Lightbox
+          images={[image]}
+          isOpen={true}
+          onClose={vi.fn()}
+          onImagesUpdate={onImagesUpdate}
+        />
+      );
+
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "r" });
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "4" });
+      await waitFor(() => expect(libraryApi.updateRating).toHaveBeenCalled());
+
+      expect(onImagesUpdate).not.toHaveBeenCalled();
     });
 
     it("is a modal dialog that holds focus while open", () => {

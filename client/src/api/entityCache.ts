@@ -49,6 +49,24 @@ const FIELD_KEYS: Record<keyof UserDataPatch, readonly string[]> = {
   oCount: ["o_counter", "oCounter"],
 };
 
+/**
+ * Cancels the requests in flight under the roots that hold the entity's
+ * type. Called around a write: a list fetch that began before the server
+ * stored the value would answer with the old one and undo the patch.
+ */
+export function cancelEntityQueries(
+  client: QueryClient,
+  type: RatableEntityType
+): Promise<void> {
+  const roots = ROOTS[type];
+  return client.cancelQueries({
+    predicate: (query) => {
+      const [root] = query.queryKey;
+      return typeof root === "string" && roots.includes(root);
+    },
+  });
+}
+
 const PATCH_FIELDS = Object.keys(FIELD_KEYS) as Array<keyof UserDataPatch>;
 
 type Row = Record<string, unknown>;

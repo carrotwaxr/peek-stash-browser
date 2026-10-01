@@ -1,16 +1,32 @@
+import type { RatableEntityType } from "@peek/shared-types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { libraryApi } from "../library";
-import { queryKeys } from "../queryKeys";
+import {
+  beginUserDataWrite,
+  confirmUserDataWrite,
+  endUserDataWrite,
+  failUserDataWrite,
+} from "../userDataWrite";
 
 interface UpdateRatingParams {
-  entityType: string;
+  entityType: RatableEntityType;
   entityId: string;
   rating: number | null;
   instanceId: string;
 }
 
+/**
+ * Saves the viewer's rating. Every cached row and detail entry of the
+ * entity shows the new rating at once, a failed save puts the old one
+ * back, and the library is marked stale without a refetch.
+ */
 export function useUpdateRating() {
-  const queryClient = useQueryClient();
+  const client = useQueryClient();
+  const refOf = ({ entityType, entityId, instanceId }: UpdateRatingParams) => ({
+    type: entityType,
+    id: entityId,
+    instanceId,
+  });
 
   return useMutation({
     mutationFn: ({
@@ -20,20 +36,17 @@ export function useUpdateRating() {
       instanceId,
     }: UpdateRatingParams) =>
       libraryApi.updateRating(entityType, entityId, rating, instanceId),
-    onSuccess: (_data, { entityType }) => {
-      // Invalidate entity list queries to refresh ratings
-      const keyMap: Record<string, () => readonly unknown[]> = {
-        scene: () => queryKeys.scenes.all(),
-        performer: () => queryKeys.performers.all(),
-        studio: () => queryKeys.studios.all(),
-        tag: () => queryKeys.tags.all(),
-        gallery: () => queryKeys.galleries.all(),
-        group: () => queryKeys.groups.all(),
-      };
-      const keyFn = keyMap[entityType];
-      if (keyFn) {
-        void queryClient.invalidateQueries({ queryKey: keyFn() });
-      }
-    },
+    onMutate: (vars) =>
+      beginUserDataWrite(client, refOf(vars), "rating100", {
+        rating100: vars.rating,
+      }),
+    onSuccess: (response, vars) =>
+      confirmUserDataWrite(client, refOf(vars), "rating100", {
+        rating100: response.rating.rating,
+      }),
+    onError: (_error, vars) =>
+      failUserDataWrite(client, refOf(vars), "rating100"),
+    onSettled: (_data, _error, vars) =>
+      endUserDataWrite(client, refOf(vars), "rating100"),
   });
 }
