@@ -7,7 +7,9 @@ import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import "./VideoPlayer.css";
+import type { ClipMarkerInput } from "./plugins/markers";
 import { useOrientationFullscreen } from "./useOrientationFullscreen";
 import { useVideoPlayer } from "./useVideoPlayer";
 
@@ -45,7 +47,10 @@ const VideoPlayer = () => {
   // The shared user-settings query: one request per session, not one per scene
   const { data: userSettings } = useUserSettings();
   const minimumPlayPercent = userSettings?.settings.minimumPlayPercent ?? 20;
-  const [clips, setClips] = useState<any[]>([]);
+  const [clipSet, setClipSet] = useState<{
+    key: string;
+    clips: ClipMarkerInput[];
+  } | null>(null);
 
   // ============================================================================
   // CONTEXT
@@ -73,27 +78,34 @@ const VideoPlayer = () => {
   const videoHeight = firstFile?.height || 1080;
   const aspectRatio = `${videoWidth} / ${videoHeight}`;
 
-  // Fetch clips when scene changes
+  // Fetch clips when scene changes. An answer for a scene that is no longer
+  // the current one is dropped (abort, and a key check as the second guard).
+  const sceneKey = scene?.id
+    ? makeCompositeKey(scene.id, scene.instanceId)
+    : null;
+  const sceneId = scene?.id;
+  const sceneInstanceId = scene?.instanceId;
   useEffect(() => {
-    async function fetchClips() {
-      if (!scene?.id) {
-        setClips([]);
-        return;
-      }
-      try {
-        const response: any = await getClipsForScene(
-          scene.id,
-          scene.instanceId,
-          true
-        );
-        setClips(response.clips || []);
-      } catch (err) {
-        console.error("Failed to fetch clips for timeline", err);
-        setClips([]);
-      }
+    if (!sceneId || !sceneInstanceId || !sceneKey) {
+      setClipSet(null);
+      return;
     }
-    void fetchClips();
-  }, [scene?.id, scene?.instanceId]);
+    const controller = new AbortController();
+    getClipsForScene(sceneId, sceneInstanceId, true, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        setClipSet({
+          key: sceneKey,
+          clips: (response as { clips?: ClipMarkerInput[] }).clips ?? [],
+        });
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error("Failed to fetch clips for timeline", err);
+        setClipSet({ key: sceneKey, clips: [] });
+      });
+    return () => controller.abort();
+  }, [sceneId, sceneInstanceId, sceneKey]);
 
   // Add clip markers to timeline using the markers plugin
   useEffect(() => {
@@ -106,12 +118,11 @@ const VideoPlayer = () => {
     // Clear existing markers before adding new ones
     markersPlugin.clearMarkers();
 
-    // Filter to only generated clips and add to timeline
-    const generatedClips = clips.filter((c: any) => c.isGenerated);
-    if (generatedClips.length > 0) {
-      markersPlugin.addClipMarkers(generatedClips);
+    // Every clip gets a dot; one with no generated preview is drawn hollow
+    if (clipSet && clipSet.key === sceneKey && clipSet.clips.length > 0) {
+      markersPlugin.addClipMarkers(clipSet.clips);
     }
-  }, [clips]);
+  }, [clipSet, sceneKey]);
 
   // ============================================================================
   // WATCH HISTORY TRACKING

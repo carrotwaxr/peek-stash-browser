@@ -7,10 +7,27 @@ interface MarkerSet {
 
 interface Marker {
   seconds: number;
-  end_seconds?: number;
   title: string;
   primaryTag?: { name: string } | null;
+  /** The clip has no generated preview yet: its dot is hollow */
+  ungenerated?: boolean;
 }
+
+/** A clip as the timeline reads it (`GET /scenes/:id/clips`) */
+export interface ClipMarkerInput {
+  seconds: number;
+  title?: string | null;
+  primaryTag?: { name: string } | null;
+  isGenerated?: boolean;
+}
+
+/** The two calls the timeline placement makes on the (untyped) player */
+interface TimelinePlayer {
+  duration(): number;
+  on(events: string[], handler: () => void): void;
+}
+
+const UNGENERATED_CLASS = "vjs-marker-ungenerated";
 
 class MarkersPlugin extends videojs.getPlugin("plugin") {
   markers: Marker[];
@@ -46,6 +63,25 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
         .el()
         .querySelector(".vjs-progress-holder .vjs-mouse-display .vjs-time-tooltip");
     });
+
+    // The duration is unknown until the source's metadata loads, and a source
+    // swap changes it: place every dot again whenever it does
+    (player as TimelinePlayer).on(["durationchange", "loadedmetadata"], () => {
+      this.positionDots();
+    });
+  }
+
+  /** Put every dot where its second falls on the timeline, once the duration is known */
+  positionDots() {
+    const duration = (this.player as TimelinePlayer).duration();
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    this.markers.forEach((marker, i) => {
+      const dot = this.markerDivs[i]?.dot;
+      if (!dot) return;
+      // marker is 6px wide - adjust by 3px to align to center not left side
+      dot.style.left = `calc(${(marker.seconds / duration) * 100}% - 3px)`;
+      dot.style.visibility = "visible";
+    });
   }
 
   showMarkerTooltip(title: string, layer = 0) {
@@ -63,18 +99,12 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   addDotMarker(marker: Marker) {
-    const duration = this.player.duration();
     const seekBar = this.player.el().querySelector(".vjs-progress-holder");
 
     const dot: HTMLElement = videojs.dom.createEl("div");
-    dot.className = "vjs-marker";
-    if (duration) {
-      // marker is 6px wide - adjust by 3px to align to center not left side
-      dot.style.left = `calc(${
-        (marker.seconds / duration) * 100
-      }% - 3px)`;
-      dot.style.visibility = "visible";
-    }
+    dot.className = marker.ungenerated
+      ? `vjs-marker ${UNGENERATED_CLASS}`
+      : "vjs-marker";
 
     // Add event listeners to dot
     dot.addEventListener("click", () =>
@@ -87,7 +117,9 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
       ? this.tagColors[marker.primaryTag.name]
       : undefined;
     if (dotColor) {
-      dot.style.backgroundColor = dotColor;
+      // A hollow dot keeps its tag color on the outline
+      if (marker.ungenerated) dot.style.borderColor = dotColor;
+      else dot.style.backgroundColor = dotColor;
     }
     dot.addEventListener("mouseenter", () => {
       this.showMarkerTooltip(marker.title);
@@ -105,6 +137,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     }
     this.markers.push(marker);
     this.markerDivs.push(markerSet);
+    this.positionDots();
   }
 
   addDotMarkers(markers: Marker[]) {
@@ -116,27 +149,28 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   /**
    * Add clip markers to the timeline
    * Clips are converted to marker format with generated colors based on tag names
-   * @param {Array} clips - Array of clip objects with seconds, title, and primaryTag
+   * @param clips - Clip objects with seconds, title, primaryTag and isGenerated
    */
-  addClipMarkers(clips: any[]) {
-    if (!clips || clips.length === 0) return;
+  addClipMarkers(clips: ClipMarkerInput[]) {
+    if (clips.length === 0) return;
 
     // Extract unique tag names and generate colors
-    const tagNames = [...new Set(
-      clips
-        .filter((clip: any) => clip.primaryTag?.name)
-        .map((clip: any) => clip.primaryTag.name)
-    )] as string[];
+    const tagNames = [
+      ...new Set(
+        clips.flatMap((clip) => (clip.primaryTag?.name ? [clip.primaryTag.name] : []))
+      ),
+    ];
 
     if (tagNames.length > 0) {
       this.findColors(tagNames);
     }
 
     // Convert clips to marker format and add them
-    const markers = clips.map((clip: any) => ({
+    const markers: Marker[] = clips.map((clip) => ({
       seconds: clip.seconds,
       title: clip.title || "Untitled",
-      primaryTag: clip.primaryTag,
+      primaryTag: clip.primaryTag ?? null,
+      ungenerated: clip.isGenerated === false,
     }));
 
     this.addDotMarkers(markers);

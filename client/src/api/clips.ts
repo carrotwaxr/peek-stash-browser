@@ -73,11 +73,12 @@ export async function getClips(options: GetClipsOptions = {}) {
 export async function getClipsForScene(
   sceneId: string,
   instanceId: string,
-  includeUngenerated = false
+  includeUngenerated = false,
+  signal?: AbortSignal
 ) {
   const params = new URLSearchParams({ instanceId });
   if (includeUngenerated) params.set("includeUngenerated", "true");
-  return apiGet(`/scenes/${sceneId}/clips?${params.toString()}`);
+  return apiGet(`/scenes/${sceneId}/clips?${params.toString()}`, signal);
 }
 
 /**

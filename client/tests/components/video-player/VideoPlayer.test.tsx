@@ -3,8 +3,9 @@
  * (one request per session) and no longer fetches /user/settings itself.
  */
 import { MemoryRouter } from "react-router-dom";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
+import { actAsync } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet, getClipsForScene } from "@/api";
 import { useUserSettings } from "@/api/hooks/useUserSettings";
@@ -18,9 +19,16 @@ vi.mock("@/api", () => ({
 vi.mock("@/api/hooks/useUserSettings", () => ({
   useUserSettings: vi.fn(),
 }));
+const playerState = vi.hoisted(() => ({
+  scene: { id: "1", instanceId: "inst-a", files: [] } as {
+    id: string;
+    instanceId: string;
+    files: never[];
+  },
+}));
 vi.mock("@/contexts/ScenePlayerContext", () => ({
   useScenePlayer: () => ({
-    scene: { id: "1", instanceId: "inst-a", files: [] },
+    scene: playerState.scene,
     ready: true,
     shouldAutoplay: false,
     playlist: null,
@@ -52,6 +60,7 @@ vi.mock("@/components/video-player/useVideoPlayer", () => ({
 describe("VideoPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    playerState.scene = { id: "1", instanceId: "inst-a", files: [] };
   });
 
   it("the minimum play percent comes from the user-settings query", () => {
@@ -70,5 +79,77 @@ describe("VideoPlayer", () => {
     );
     expect(vi.mocked(apiGet)).not.toHaveBeenCalledWith("/user/settings");
     expect(vi.mocked(getClipsForScene)).toHaveBeenCalled();
+  });
+
+  it("the clips of the previous scene never reach the timeline of the next", async () => {
+    vi.mocked(useUserSettings).mockReturnValue({
+      data: userSettingsResponse({}),
+    } as unknown as ReturnType<typeof useUserSettings>);
+    const addClipMarkers = vi.fn();
+    const plugin = { clearMarkers: vi.fn(), addClipMarkers };
+    vi.mocked(useVideoPlayer).mockImplementation(({ playerRef }) => {
+      playerRef.current = { markers: () => plugin };
+    });
+    let resolveSlow: (value: unknown) => void = () => {};
+    vi.mocked(getClipsForScene).mockImplementation((sceneId) =>
+      sceneId === "1"
+        ? new Promise((resolve) => {
+            resolveSlow = resolve;
+          })
+        : Promise.resolve({
+            clips: [{ seconds: 5, title: "Second", isGenerated: true }],
+          })
+    );
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <VideoPlayer />
+      </MemoryRouter>
+    );
+    playerState.scene = { id: "2", instanceId: "inst-a", files: [] };
+    rerender(
+      <MemoryRouter>
+        <VideoPlayer />
+      </MemoryRouter>
+    );
+    await waitFor(() => {
+      expect(addClipMarkers).toHaveBeenCalledWith([
+        { seconds: 5, title: "Second", isGenerated: true },
+      ]);
+    });
+
+    await actAsync(() => {
+      resolveSlow({
+        clips: [{ seconds: 9, title: "First", isGenerated: true }],
+      });
+    });
+
+    expect(addClipMarkers).toHaveBeenCalledTimes(1);
+  });
+
+  it("the timeline gets ungenerated clips too", async () => {
+    vi.mocked(useUserSettings).mockReturnValue({
+      data: userSettingsResponse({}),
+    } as unknown as ReturnType<typeof useUserSettings>);
+    const addClipMarkers = vi.fn();
+    const plugin = { clearMarkers: vi.fn(), addClipMarkers };
+    vi.mocked(useVideoPlayer).mockImplementation(({ playerRef }) => {
+      playerRef.current = { markers: () => plugin };
+    });
+    const clips = [
+      { seconds: 5, title: "Ready", isGenerated: true },
+      { seconds: 9, title: "Pending", isGenerated: false },
+    ];
+    vi.mocked(getClipsForScene).mockResolvedValue({ clips });
+
+    render(
+      <MemoryRouter>
+        <VideoPlayer />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(addClipMarkers).toHaveBeenCalledWith(clips);
+    });
   });
 });

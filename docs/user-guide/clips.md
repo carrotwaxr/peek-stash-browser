@@ -57,6 +57,10 @@ Clicking a clip navigates to the parent scene and automatically seeks to the cli
 !!! tip "Quick Preview"
     On desktop, hover over a clip card to see an animated preview without navigating away. Clips without generated previews show a static screenshot instead.
 
+## Markers on the Timeline
+
+The player's timeline shows a dot for every marker of the scene, placed at its start time on every source. A hollow dot is a marker whose preview has not been generated yet; it still seeks to its start when you click it.
+
 ## Clips Without Previews
 
 Some clips may show a "No preview" badge. This means the clip marker exists in Stash but the preview video hasn't been generated yet. Use the **Has Preview** filter to find these clips, and generate previews in Stash using the "Generate" task.
