@@ -184,8 +184,9 @@ const SceneContent = () => {
             <VideoPlayer />
             <PlaybackControls />
 
-            {/* Mobile-only playlist card (below controls on small screens) */}
-            {playlist && (
+            {/* Below lg only: the sidebar replaces the card from lg up, and a
+                mounted card loads its thumbnails even when hidden */}
+            {playlist && !isDesktop && (
               <div className="lg:hidden">
                 <PlaylistStatusCard />
               </div>

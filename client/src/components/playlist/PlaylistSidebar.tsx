@@ -13,6 +13,7 @@ import {
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { Button, useLazyLoad } from "../ui/index";
 
 interface PlaylistScene {
@@ -289,7 +290,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
 
               return (
                 <div
-                  key={item.sceneId}
+                  key={makeCompositeKey(item.sceneId, item.instanceId)}
                   ref={isCurrent ? setCurrentItemRef : null}
                   onClick={isUnavailable ? undefined : () => goTo(index)}
                   aria-disabled={isUnavailable || undefined}

@@ -52,7 +52,12 @@ vi.mock("@/components/playlist/PlaylistSidebar", () => ({
   default: () => null,
 }));
 vi.mock("@/components/playlist/PlaylistStatusCard", () => ({
-  default: () => null,
+  default: () => <div data-testid="status-card" />,
+}));
+// The page reads the screen width through this hook; a test sets it
+const mockWide = vi.hoisted(() => ({ value: false }));
+vi.mock("@/hooks/useMediaQuery", () => ({
+  useMediaQuery: () => mockWide.value,
 }));
 vi.mock("@/components/ui/ViewInStashButton", () => ({ default: () => null }));
 vi.mock("@/components/grids/index", () => ({
@@ -146,6 +151,7 @@ describe("Scene page queue", () => {
 
   beforeEach(() => {
     sessionStorage.clear();
+    mockWide.value = false;
     // Back to the real methods, with no calls recorded
     getItem.mockReset();
     setItem.mockReset();
@@ -266,5 +272,23 @@ describe("Scene page queue", () => {
     expect(seeks).toHaveBeenCalledTimes(1);
     window.removeEventListener("seekToTime", seeks);
     vi.useRealTimers();
+  });
+
+  it("at 1280 px the status card is not mounted, below lg it is", () => {
+    vi.mocked(useScenePlayer).mockReturnValue({
+      ...playerValue({ id: "1", instanceId: "a" }),
+      playlist: untrusted<ReturnType<typeof useScenePlayer>["playlist"]>(queue),
+    });
+
+    mockWide.value = true;
+    const wide = render(
+      page({ pathname: "/scene/1", state: { playlist: queue } }).element
+    );
+    expect(screen.queryByTestId("status-card")).toBeNull();
+    wide.unmount();
+
+    mockWide.value = false;
+    render(page({ pathname: "/scene/1", state: { playlist: queue } }).element);
+    expect(screen.getByTestId("status-card")).toBeInTheDocument();
   });
 });

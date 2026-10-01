@@ -4,10 +4,16 @@
  */
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { untrusted } from "@tests/helpers/untrusted";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import PlaylistStatusCard from "@/components/playlist/PlaylistStatusCard";
 import { ScenePlayerProvider } from "@/contexts/ScenePlayerContext";
 import { buildPlaybackQueue } from "@/utils/playbackQueue";
@@ -21,6 +27,12 @@ vi.mock("@/api", () => ({
     }),
 }));
 
+// The card shows the tablet strip at md and up, the phone strip below
+const mockMd = vi.hoisted(() => ({ value: true }));
+vi.mock("@/hooks/useMediaQuery", () => ({
+  useMediaQuery: () => mockMd.value,
+}));
+
 vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
 }));
@@ -32,21 +44,30 @@ function Where() {
 }
 
 /** The card inside the player, on a queue of 3 scenes */
-function renderCard(currentIndex: number, queueId = "virtual-grid") {
+function renderCard(
+  currentIndex: number,
+  queueId = "virtual-grid",
+  ids: Array<[string, string]> = [
+    ["1", "inst-a"],
+    ["2", "inst-a"],
+    ["3", "inst-a"],
+  ]
+) {
   const queue = buildPlaybackQueue({
     userId: 1,
     id: queueId,
     name: "Weekend",
     scenes: untrusted<NormalizedScene[]>(
-      ["First", "Second", "Third"].map((title, i) => ({
-        id: String(i + 1),
-        instanceId: "inst-a",
-        title,
+      ids.map(([id, instanceId], i) => ({
+        id,
+        instanceId,
+        title: ["First", "Second", "Third"][i],
+        paths: { screenshot: `/shot/${instanceId}/${id}.jpg` },
       }))
     ),
     currentIndex,
   });
-  const sceneId = String(currentIndex + 1);
+  const sceneId = ids[currentIndex]?.[0] ?? "1";
   return render(
     <SignedInWithQuery>
       <MemoryRouter
@@ -73,6 +94,40 @@ function buttons(label: string) {
 }
 
 describe("PlaylistStatusCard", () => {
+  afterEach(() => {
+    mockMd.value = true;
+  });
+
+  it("renders one strip with a lazy, async-decoded image per queue entry", () => {
+    for (const wide of [true, false]) {
+      mockMd.value = wide;
+      const { container, unmount } = renderCard(0);
+
+      const images = container.querySelectorAll("img");
+      expect(images).toHaveLength(3);
+      expect(container.querySelectorAll("img[loading=lazy]")).toHaveLength(3);
+      expect(container.querySelectorAll("img[decoding=async]")).toHaveLength(3);
+      unmount();
+    }
+  });
+
+  it("two entries with the same scene id on two instances render with no duplicate-key warning", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { container } = renderCard(0, "virtual-grid", [
+      ["7", "inst-a"],
+      ["7", "inst-b"],
+      ["8", "inst-a"],
+    ]);
+    await act(async () => {});
+
+    expect(container.querySelectorAll("img")).toHaveLength(3);
+    const keyWarnings = warn.mock.calls.filter((call) =>
+      call.some((arg) => typeof arg === "string" && arg.includes("key"))
+    );
+    expect(keyWarnings).toEqual([]);
+    warn.mockRestore();
+  });
+
   it("Next is enabled on the last item with Repeat All and in shuffle with unplayed items", async () => {
     renderCard(2);
     await waitFor(() => {

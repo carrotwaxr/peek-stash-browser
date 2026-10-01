@@ -10,8 +10,10 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { Button } from "../ui/index";
 
@@ -49,6 +51,9 @@ const PlaylistStatusCard = () => {
   const { goTo, next, prev, canNext, canPrev } = useQueueNavigation();
   const navigate = useNavigate();
   const playlist = rawPlaylist as Playlist | null;
+  // One thumbnail strip is mounted, not both: a long queue's screenshots
+  // would otherwise load twice
+  const showTabletStrip = useMediaQuery("(min-width: 768px)");
 
   // Auto-scroll to current thumbnail for both md (tablet) and mobile layouts
   // This component is visible from sm to lg breakpoints (lg:hidden wrapper in Scene.jsx)
@@ -451,150 +456,158 @@ const PlaylistStatusCard = () => {
             </Button>
           </div>
 
-          {/* Desktop: Navigation buttons inline with thumbnails */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Previous Button */}
-            <Button
-              onClick={prev}
-              disabled={!canPrev}
-              variant="secondary"
-              icon={<ChevronLeft size={24} />}
-              aria-label="Previous scene"
-            />
+          {/* Tablet: Navigation buttons inline with thumbnails */}
+          {showTabletStrip && (
+            <div className="hidden md:flex items-center gap-2">
+              {/* Previous Button */}
+              <Button
+                onClick={prev}
+                disabled={!canPrev}
+                variant="secondary"
+                icon={<ChevronLeft size={24} />}
+                aria-label="Previous scene"
+              />
 
-            {/* Thumbnail Strip */}
-            <div
-              ref={mdScrollRef}
-              className="flex gap-2 overflow-x-auto flex-1 scroll-smooth playlist-thumbnail-scroll"
-              style={{ cursor: "grab" }}
-            >
-              {playlist.scenes.map((item, index) => {
-                const scene = item.scene;
-                const isCurrent = index === currentIndex;
-                // No longer visible to the user: dimmed and not clickable
-                const isUnavailable = unavailable.includes(index);
-                const title = getSceneTitle(
-                  (scene as Record<string, unknown>) ?? null
-                );
+              {/* Thumbnail Strip */}
+              <div
+                ref={mdScrollRef}
+                className="flex gap-2 overflow-x-auto flex-1 scroll-smooth playlist-thumbnail-scroll"
+                style={{ cursor: "grab" }}
+              >
+                {playlist.scenes.map((item, index) => {
+                  const scene = item.scene;
+                  const isCurrent = index === currentIndex;
+                  // No longer visible to the user: dimmed and not clickable
+                  const isUnavailable = unavailable.includes(index);
+                  const title = getSceneTitle(
+                    (scene as Record<string, unknown>) ?? null
+                  );
 
-                return (
-                  <div
-                    key={item.sceneId}
-                    ref={isCurrent ? setMdCurrentRef : null}
-                    className="flex-shrink-0"
-                  >
-                    <Button
-                      onClick={() => navigateToScene(index)}
-                      disabled={isUnavailable}
-                      variant="tertiary"
-                      className="flex-shrink-0 overflow-hidden !p-0"
-                      style={{
-                        width: isCurrent ? "120px" : "80px",
-                        height: isCurrent ? "68px" : "45px",
-                        border: isCurrent
-                          ? "2px solid var(--accent-color)"
-                          : "1px solid var(--border-color)",
-                        opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
-                      }}
-                      title={isUnavailable ? `Unavailable: ${title}` : title}
-                      aria-label={
-                        isUnavailable ? `Unavailable: ${title}` : undefined
-                      }
+                  return (
+                    <div
+                      key={makeCompositeKey(item.sceneId, item.instanceId)}
+                      ref={isCurrent ? setMdCurrentRef : null}
+                      className="flex-shrink-0"
                     >
-                      {scene?.paths?.screenshot ? (
-                        <img
-                          src={scene.paths.screenshot}
-                          alt={scene.title || `Scene ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center"
-                          style={{ backgroundColor: "var(--bg-secondary)" }}
-                        >
-                          <span style={{ color: "var(--text-muted)" }}>
-                            {index + 1}
-                          </span>
-                        </div>
-                      )}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
+                      <Button
+                        onClick={() => navigateToScene(index)}
+                        disabled={isUnavailable}
+                        variant="tertiary"
+                        className="flex-shrink-0 overflow-hidden !p-0"
+                        style={{
+                          width: isCurrent ? "120px" : "80px",
+                          height: isCurrent ? "68px" : "45px",
+                          border: isCurrent
+                            ? "2px solid var(--accent-color)"
+                            : "1px solid var(--border-color)",
+                          opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
+                        }}
+                        title={isUnavailable ? `Unavailable: ${title}` : title}
+                        aria-label={
+                          isUnavailable ? `Unavailable: ${title}` : undefined
+                        }
+                      >
+                        {scene?.paths?.screenshot ? (
+                          <img
+                            src={scene.paths.screenshot}
+                            alt={scene.title || `Scene ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-full flex items-center justify-center"
+                            style={{ backgroundColor: "var(--bg-secondary)" }}
+                          >
+                            <span style={{ color: "var(--text-muted)" }}>
+                              {index + 1}
+                            </span>
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Next Button */}
-            <Button
-              onClick={next}
-              disabled={!canNext}
-              variant="secondary"
-              icon={<ChevronRight size={24} />}
-              aria-label="Next scene"
-            />
-          </div>
+              {/* Next Button */}
+              <Button
+                onClick={next}
+                disabled={!canNext}
+                variant="secondary"
+                icon={<ChevronRight size={24} />}
+                aria-label="Next scene"
+              />
+            </div>
+          )}
 
           {/* Mobile: Thumbnail strip only (buttons above) */}
-          <div
-            ref={smScrollRef}
-            className="md:hidden overflow-x-auto scroll-smooth playlist-thumbnail-scroll"
-            style={{ cursor: "grab" }}
-          >
-            <div className="flex gap-2">
-              {playlist.scenes.map((item, index) => {
-                const scene = item.scene;
-                const isCurrent = index === currentIndex;
-                // No longer visible to the user: dimmed and not clickable
-                const isUnavailable = unavailable.includes(index);
-                const title = getSceneTitle(
-                  (scene as Record<string, unknown>) ?? null
-                );
+          {!showTabletStrip && (
+            <div
+              ref={smScrollRef}
+              className="md:hidden overflow-x-auto scroll-smooth playlist-thumbnail-scroll"
+              style={{ cursor: "grab" }}
+            >
+              <div className="flex gap-2">
+                {playlist.scenes.map((item, index) => {
+                  const scene = item.scene;
+                  const isCurrent = index === currentIndex;
+                  // No longer visible to the user: dimmed and not clickable
+                  const isUnavailable = unavailable.includes(index);
+                  const title = getSceneTitle(
+                    (scene as Record<string, unknown>) ?? null
+                  );
 
-                return (
-                  <div
-                    key={item.sceneId}
-                    ref={isCurrent ? setSmCurrentRef : null}
-                    className="flex-shrink-0"
-                  >
-                    <Button
-                      onClick={() => navigateToScene(index)}
-                      disabled={isUnavailable}
-                      variant="tertiary"
-                      className="flex-shrink-0 overflow-hidden !p-0"
-                      style={{
-                        width: isCurrent ? "120px" : "80px",
-                        height: isCurrent ? "68px" : "45px",
-                        border: isCurrent
-                          ? "2px solid var(--accent-color)"
-                          : "1px solid var(--border-color)",
-                        opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
-                      }}
-                      title={isUnavailable ? `Unavailable: ${title}` : title}
-                      aria-label={
-                        isUnavailable ? `Unavailable: ${title}` : undefined
-                      }
+                  return (
+                    <div
+                      key={makeCompositeKey(item.sceneId, item.instanceId)}
+                      ref={isCurrent ? setSmCurrentRef : null}
+                      className="flex-shrink-0"
                     >
-                      {scene?.paths?.screenshot ? (
-                        <img
-                          src={scene.paths.screenshot}
-                          alt={scene.title || `Scene ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center"
-                          style={{ backgroundColor: "var(--bg-secondary)" }}
-                        >
-                          <span style={{ color: "var(--text-muted)" }}>
-                            {index + 1}
-                          </span>
-                        </div>
-                      )}
-                    </Button>
-                  </div>
-                );
-              })}
+                      <Button
+                        onClick={() => navigateToScene(index)}
+                        disabled={isUnavailable}
+                        variant="tertiary"
+                        className="flex-shrink-0 overflow-hidden !p-0"
+                        style={{
+                          width: isCurrent ? "120px" : "80px",
+                          height: isCurrent ? "68px" : "45px",
+                          border: isCurrent
+                            ? "2px solid var(--accent-color)"
+                            : "1px solid var(--border-color)",
+                          opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
+                        }}
+                        title={isUnavailable ? `Unavailable: ${title}` : title}
+                        aria-label={
+                          isUnavailable ? `Unavailable: ${title}` : undefined
+                        }
+                      >
+                        {scene?.paths?.screenshot ? (
+                          <img
+                            src={scene.paths.screenshot}
+                            alt={scene.title || `Scene ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-full flex items-center justify-center"
+                            style={{ backgroundColor: "var(--bg-secondary)" }}
+                          >
+                            <span style={{ color: "var(--text-muted)" }}>
+                              {index + 1}
+                            </span>
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
       <style>{`
