@@ -342,6 +342,8 @@ const TagTreeNode = ({
           {/* Navigate button - visible on hover; always on a touch screen */}
           <button
             type="button"
+            // The row is the Tab stop and Enter on it navigates
+            tabIndex={-1}
             onClick={handleNavigateClick}
             className={`p-1 rounded transition-opacity ${
               hoverCapable ? "opacity-0 group-hover:opacity-100" : ""

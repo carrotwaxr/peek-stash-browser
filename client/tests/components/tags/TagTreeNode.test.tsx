@@ -8,7 +8,7 @@
  * - Keyboard navigation
  * - Indicator display (counts, rating, favorite)
  */
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -320,5 +320,41 @@ describe("TagTreeNode open button on touch", () => {
 
     expect(open.className).toContain("opacity-0");
     expect(open.className).toContain("group-hover:opacity-100");
+  });
+});
+
+describe("TagTreeNode keyboard order", () => {
+  const Where = () => <div data-testid="where">{useLocation().pathname}</div>;
+  const renderWithLocation = () =>
+    render(
+      <MemoryRouter initialEntries={["/tags"]}>
+        <TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />
+        <Where />
+      </MemoryRouter>
+    );
+
+  it("the Go to button is not a Tab stop, so the row is the only one", () => {
+    renderWithLocation();
+
+    expect(screen.getByLabelText("Go to Leaf Tag")).toHaveAttribute(
+      "tabindex",
+      "-1"
+    );
+  });
+
+  it("Enter on the row navigates to the tag", () => {
+    renderWithLocation();
+
+    fireEvent.keyDown(screen.getByRole("treeitem"), { key: "Enter" });
+
+    expect(screen.getByTestId("where")).toHaveTextContent("/tag/4");
+  });
+
+  it("a click on Go to still navigates", () => {
+    renderWithLocation();
+
+    fireEvent.click(screen.getByLabelText("Go to Leaf Tag"));
+
+    expect(screen.getByTestId("where")).toHaveTextContent("/tag/4");
   });
 });
