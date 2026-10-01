@@ -1,15 +1,23 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
 import type { ReactNode } from "react";
 import type { NormalizedImage } from "@peek/shared-types";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { libraryApi } from "@/api";
+import { apiPost, getMyPermissions, libraryApi } from "@/api";
 import Lightbox from "../../../src/components/ui/Lightbox";
 import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
 
 // Mock the API
 vi.mock("@/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ settings: {} }),
+  apiPost: vi.fn().mockResolvedValue({}),
+  getMyPermissions: vi.fn().mockResolvedValue({ permissions: {} }),
   libraryApi: {
     updateRating: vi.fn().mockResolvedValue({}),
     updateFavorite: vi.fn().mockResolvedValue({}),
@@ -808,6 +816,79 @@ describe("Lightbox", () => {
       );
 
       expect(created.map((i) => i.src)).toEqual(["", ""]);
+    });
+  });
+
+  describe("download", () => {
+    const realLocation = window.location;
+
+    beforeEach(() => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: realLocation,
+      });
+    });
+
+    const renderOpen = () => {
+      const base = createMockImages(1, 2) as NormalizedImage[];
+      const images = base.map((image, i) => ({
+        ...image,
+        id: `img-${i}`,
+        instanceId: "inst-b",
+      }));
+      render(
+        <Lightbox
+          images={images}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+    };
+
+    it("the Download button shows only with Can Download Files", async () => {
+      vi.mocked(getMyPermissions).mockResolvedValue({
+        permissions: { canDownloadFiles: false },
+      });
+      renderOpen();
+      await waitFor(() => expect(getMyPermissions).toHaveBeenCalled());
+      expect(screen.queryByLabelText("Download image")).toBeNull();
+    });
+
+    it("shows the Download button with Can Download Files", async () => {
+      vi.mocked(getMyPermissions).mockResolvedValue({
+        permissions: { canDownloadFiles: true },
+      });
+      renderOpen();
+      expect(await screen.findByLabelText("Download image")).toBeTruthy();
+    });
+
+    it("Download posts the image's instance and navigates to the file", async () => {
+      vi.mocked(getMyPermissions).mockResolvedValue({
+        permissions: { canDownloadFiles: true },
+      });
+      vi.mocked(apiPost).mockResolvedValue({
+        download: { id: 31, status: "COMPLETED" },
+      });
+      renderOpen();
+
+      fireEvent.click(await screen.findByLabelText("Download image"));
+
+      await waitFor(() => {
+        expect(window.location.href).toBe("/api/downloads/31/file");
+      });
+      expect(apiPost).toHaveBeenCalledWith("/downloads/image/img-0", {
+        instanceId: "inst-b",
+      });
     });
   });
 });
