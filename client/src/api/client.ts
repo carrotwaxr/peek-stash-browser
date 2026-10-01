@@ -148,13 +148,37 @@ function errorMessage(data: Record<string, unknown>, status: number): string {
 
 /**
  * The library stamp: every authenticated answer names one in
- * `X-Peek-Library`, and the server moves it when a sync ends or an admin
- * changes the user's restrictions, role or the Stash servers. The first
- * stamp a page sees is only recorded; a different one calls the listener
- * (`createQueryClient` registers one that refetches what the page shows).
+ * `X-Peek-Library` ("<boot>.<library>.<user>"), and the server moves it
+ * when a sync ends or an admin changes the user's restrictions, role or
+ * the Stash servers. The first stamp a page sees is only recorded; a newer
+ * one calls the listener (`createQueryClient` registers one that refetches
+ * what the page shows). Newer is another boot (a restart starts its
+ * counters again) or, on the same boot, a higher library or user counter;
+ * a late answer to a request asked before a bump carries an older stamp
+ * and changes nothing.
  */
 const LIBRARY_STAMP_HEADER = "X-Peek-Library";
+
+interface LibraryStamp {
+  boot: string;
+  library: number;
+  user: number;
+}
+
+/** A stamp's parts; null for a value of another shape */
+function parseLibraryStamp(stamp: string): LibraryStamp | null {
+  const [boot, library, user, ...rest] = stamp.split(".");
+  if (!boot || library === undefined || user === undefined || rest.length) {
+    return null;
+  }
+  const counters = [Number(library), Number(user)];
+  if (!counters.every((n) => Number.isSafeInteger(n) && n >= 0)) return null;
+  return { boot, library: Number(library), user: Number(user) };
+}
+
+/** The highest stamp seen: its raw text, and its parts when it has them */
 let lastLibraryStamp: string | undefined;
+let lastLibraryParts: LibraryStamp | null = null;
 let libraryStampListener: (() => void) | undefined;
 
 /** Registers what a changed stamp does; a later call replaces it. */
@@ -165,12 +189,30 @@ export function setLibraryStampListener(listener: () => void): void {
 /** Forgets the stamp seen (on logout, and between tests). */
 export function resetLibraryStamp(): void {
   lastLibraryStamp = undefined;
+  lastLibraryParts = null;
 }
 
 function noteLibraryStamp(stamp: string | null): void {
   if (stamp === null || stamp === lastLibraryStamp) return;
   const first = lastLibraryStamp === undefined;
-  lastLibraryStamp = stamp;
+  const parts = parseLibraryStamp(stamp);
+  const seen = lastLibraryParts;
+  if (parts && seen && parts.boot === seen.boot) {
+    // The same boot: only a higher counter is news; keep the highest of each
+    const newer = parts.library > seen.library || parts.user > seen.user;
+    if (!newer) return;
+    const highest = {
+      boot: seen.boot,
+      library: Math.max(parts.library, seen.library),
+      user: Math.max(parts.user, seen.user),
+    };
+    lastLibraryParts = highest;
+    lastLibraryStamp = `${highest.boot}.${highest.library}.${highest.user}`;
+  } else {
+    // The first stamp, another boot, or a value of another shape
+    lastLibraryParts = parts;
+    lastLibraryStamp = stamp;
+  }
   if (!first) libraryStampListener?.();
 }
 

@@ -591,6 +591,45 @@ describe("the library stamp (X-Peek-Library)", () => {
     expect(invalidated(modules.queryClient, keys.settings)).toBe(false);
   });
 
+  it("a late answer with an older stamp invalidates nothing, and the newer one again nothing", async () => {
+    const modules = await setup();
+    seed(modules);
+    answerWith("boot.0.0");
+    await modules.client.apiGet("/library/scenes");
+    answerWith("boot.2.1");
+    await modules.client.apiGet("/library/scenes");
+    const spy = vi.spyOn(modules.queryClient, "invalidateQueries");
+
+    // Asked before the bumps, answered after them
+    answerWith("boot.1.1");
+    await modules.client.apiGet("/library/scenes");
+    answerWith("boot.2.0");
+    await modules.client.apiGet("/library/scenes");
+    answerWith("boot.2.1");
+    await modules.client.apiGet("/library/scenes");
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("a newer library or user counter, or another boot, invalidates", async () => {
+    const modules = await setup();
+    seed(modules);
+    answerWith("boot.3.0");
+    await modules.client.apiGet("/library/scenes");
+    const spy = vi.spyOn(modules.queryClient, "invalidateQueries");
+
+    answerWith("boot.3.1");
+    await modules.client.apiGet("/library/scenes");
+    expect(spy).toHaveBeenCalledTimes(4);
+    answerWith("boot.4.1");
+    await modules.client.apiGet("/library/scenes");
+    expect(spy).toHaveBeenCalledTimes(8);
+    // A restart starts its counters again
+    answerWith("reboot.0.0");
+    await modules.client.apiGet("/library/scenes");
+    expect(spy).toHaveBeenCalledTimes(12);
+  });
+
   it("the same stamp again invalidates nothing", async () => {
     const modules = await setup();
     seed(modules);
