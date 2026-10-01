@@ -51,12 +51,18 @@ interface ScenePlayerContextValue extends ScenePlayerState {
   ) => Promise<void>;
   /** Loads the current scene again (after a failed load) */
   retryScene: () => void;
-  nextScene: () => void;
-  prevScene: () => void;
-  gotoSceneIndex: (index: number, shouldAutoplay?: boolean) => void;
+  /** The video.js player, once it exists (and null when it is gone) */
+  registerPlayer: (player: RegisteredPlayer | null) => void;
+  /** Is the registered player playing right now? */
+  isPlaying: () => boolean;
   toggleAutoplayNext: () => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
+}
+
+/** What the context asks of the player: whether it is paused */
+export interface RegisteredPlayer {
+  paused(): boolean;
 }
 
 const ScenePlayerContext = createContext<ScenePlayerContextValue | null>(null);
@@ -294,24 +300,15 @@ export function ScenePlayerProvider({
     [queryClient]
   );
 
-  // Playlist navigation helpers (kept for convenience)
-  const nextScene = useCallback(() => {
-    dispatch({ type: "NEXT_SCENE" });
+  // The player, for the queue steps that keep playing what is playing
+  const playerRef = useRef<RegisteredPlayer | null>(null);
+  const registerPlayer = useCallback((player: RegisteredPlayer | null) => {
+    playerRef.current = player;
   }, []);
-
-  const prevScene = useCallback(() => {
-    dispatch({ type: "PREV_SCENE" });
+  const isPlaying = useCallback(() => {
+    const player = playerRef.current;
+    return player !== null && !player.paused();
   }, []);
-
-  const gotoSceneIndex = useCallback(
-    (index: number, shouldAutoplay = false) => {
-      dispatch({
-        type: "GOTO_SCENE_INDEX",
-        payload: { index, shouldAutoplay },
-      });
-    },
-    []
-  );
 
   // Playlist control toggles
   const toggleAutoplayNext = useCallback(() => {
@@ -568,10 +565,9 @@ export function ScenePlayerProvider({
     loadScene,
     retryScene,
 
-    // Playlist navigation helpers (kept for convenience)
-    nextScene,
-    prevScene,
-    gotoSceneIndex,
+    // The player, for queue steps (see useQueueNavigation)
+    registerPlayer,
+    isPlaying,
 
     // Playlist control toggles
     toggleAutoplayNext,

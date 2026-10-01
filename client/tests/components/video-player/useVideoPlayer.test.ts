@@ -146,6 +146,7 @@ function renderPlayer(
         dispatch,
         nextScene: noop,
         prevScene: noop,
+        registerPlayer: noop,
         updateQuality: noop,
         location,
         hasResumedRef,

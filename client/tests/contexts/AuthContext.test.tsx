@@ -355,7 +355,7 @@ describe("logout()", () => {
       expect(result.current.isLoading).toBe(false);
     });
     sessionStorage.setItem("peek:scroll:abc", "1200");
-    sessionStorage.setItem("videoPlayerAutoplay", "true");
+    sessionStorage.setItem("peek:scratch", "true");
     globalThis.fetch = vi.fn().mockImplementation(() => okResponse({}));
 
     await act(async () => {

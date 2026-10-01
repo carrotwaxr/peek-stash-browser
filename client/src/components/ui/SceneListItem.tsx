@@ -127,32 +127,6 @@ const SceneListItem = ({
 
     if (!exists || !scene) return;
 
-    // Check if there's a video player currently playing
-    // If navigating within a playlist while video is playing, autoplay the next one
-    const videoElements = document.querySelectorAll("video");
-    let isPlaying = false;
-
-    videoElements.forEach((video) => {
-      if (!video.paused && !video.ended && video.readyState > 2) {
-        isPlaying = true;
-      }
-    });
-
-    if (isPlaying && linkState?.playlist) {
-      sessionStorage.setItem("videoPlayerAutoplay", "true");
-
-      // Also check if video is fullscreen
-      const isFullscreen =
-        (document.fullscreenElement ??
-          (document as unknown as Record<string, unknown>)
-            .webkitFullscreenElement) ||
-        (document as unknown as Record<string, unknown>).mozFullScreenElement ||
-        (document as unknown as Record<string, unknown>).msFullscreenElement;
-      if (isFullscreen) {
-        sessionStorage.setItem("videoPlayerFullscreen", "true");
-      }
-    }
-
     void navigate(
       getEntityPath(
         "scene",

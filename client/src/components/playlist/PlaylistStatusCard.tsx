@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,6 +10,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { getSceneTitle } from "../../utils/format";
 import { Button } from "../ui/index";
@@ -36,10 +38,6 @@ const PlaylistStatusCard = () => {
   const {
     playlist: rawPlaylist,
     currentIndex,
-    gotoSceneIndex,
-    nextScene,
-    prevScene,
-    dispatch,
     autoplayNext,
     shuffle,
     repeat,
@@ -48,6 +46,8 @@ const PlaylistStatusCard = () => {
     toggleRepeat,
     unavailable,
   } = useScenePlayer();
+  const { goTo, next, prev, canNext, canPrev } = useQueueNavigation();
+  const navigate = useNavigate();
   const playlist = rawPlaylist as Playlist | null;
 
   // Auto-scroll to current thumbnail for both md (tablet) and mobile layouts
@@ -151,8 +151,6 @@ const PlaylistStatusCard = () => {
 
   const totalScenes = playlist.scenes.length;
   const position = currentIndex + 1;
-  const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex < totalScenes - 1;
   const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
 
   const navigateToScene = (index: number) => {
@@ -162,65 +160,11 @@ const PlaylistStatusCard = () => {
       return;
     }
 
-    if (index < 0 || index >= totalScenes) return;
-
-    // Check if there's a video player currently playing
-    const videoElements = document.querySelectorAll("video");
-    let isPlaying = false;
-
-    videoElements.forEach((video) => {
-      if (!video.paused && !video.ended && video.readyState > 2) {
-        isPlaying = true;
-      }
-    });
-
-    // Preserve fullscreen state
-    if (isPlaying) {
-      const doc = document as Document & {
-        webkitFullscreenElement?: Element;
-        mozFullScreenElement?: Element;
-        msFullscreenElement?: Element;
-      };
-      const isFullscreen =
-        doc.fullscreenElement ??
-        doc.webkitFullscreenElement ??
-        doc.mozFullScreenElement ??
-        doc.msFullscreenElement;
-      if (isFullscreen) {
-        sessionStorage.setItem("videoPlayerFullscreen", "true");
-      }
-    }
-
-    // Navigate with autoplay flag if video is currently playing
-    gotoSceneIndex(index, isPlaying);
-  };
-
-  // Check if video is currently playing (for autoplay on navigation)
-  const isVideoPlaying = () => {
-    const videoElements = document.querySelectorAll("video");
-    for (const video of videoElements) {
-      if (!video.paused && !video.ended && video.readyState > 2) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const handlePrevious = () => {
-    const shouldAutoplay = isVideoPlaying();
-    dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: shouldAutoplay });
-    prevScene();
-  };
-
-  const handleNext = () => {
-    const shouldAutoplay = isVideoPlaying();
-    dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: shouldAutoplay });
-    nextScene();
+    goTo(index);
   };
 
   const goToPlaylist = () => {
-    // Navigate to playlist page (different route, so we use window.location)
-    window.location.href = `/playlist/${playlist.id}`;
+    void navigate(`/playlist/${playlist.id}`);
   };
 
   return (
@@ -484,8 +428,8 @@ const PlaylistStatusCard = () => {
           {/* Navigation buttons on mobile (stacked above thumbnails) */}
           <div className="flex md:hidden items-center gap-2 mb-3">
             <Button
-              onClick={handlePrevious}
-              disabled={!hasPrevious}
+              onClick={prev}
+              disabled={!canPrev}
               variant="secondary"
               fullWidth
               icon={<ChevronLeft size={20} />}
@@ -495,8 +439,8 @@ const PlaylistStatusCard = () => {
             </Button>
 
             <Button
-              onClick={handleNext}
-              disabled={!hasNext}
+              onClick={next}
+              disabled={!canNext}
               variant="secondary"
               fullWidth
               icon={<ChevronRight size={20} />}
@@ -511,8 +455,8 @@ const PlaylistStatusCard = () => {
           <div className="hidden md:flex items-center gap-2">
             {/* Previous Button */}
             <Button
-              onClick={handlePrevious}
-              disabled={!hasPrevious}
+              onClick={prev}
+              disabled={!canPrev}
               variant="secondary"
               icon={<ChevronLeft size={24} />}
               aria-label="Previous scene"
@@ -581,8 +525,8 @@ const PlaylistStatusCard = () => {
 
             {/* Next Button */}
             <Button
-              onClick={handleNext}
-              disabled={!hasNext}
+              onClick={next}
+              disabled={!canNext}
               variant="secondary"
               icon={<ChevronRight size={24} />}
               aria-label="Next scene"
