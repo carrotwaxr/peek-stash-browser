@@ -1469,38 +1469,120 @@ describe("parseRecommendedRequest", () => {
 });
 
 describe("parsePlaylistItemsRequest", () => {
+  /** The sort a request without one reads in: the playlist's own order */
+  const POSITION = { field: "position", direction: "ASC", seed: undefined };
+
   it("without page and per_page, every item: no paging", () => {
     expect(parsePlaylistItemsRequest({}, opts())).toEqual({
       paging: undefined,
+      sort: POSITION,
     });
   });
 
   it("reads page and per_page: 50 by default, held to 1..100", () => {
     expect(
       parsePlaylistItemsRequest({ page: "2", per_page: "2" }, opts())
-    ).toEqual({ paging: { page: 2, perPage: 2 } });
+    ).toEqual({ paging: { page: 2, perPage: 2 }, sort: POSITION });
     expect(parsePlaylistItemsRequest({ page: "3" }, opts())).toEqual({
       paging: { page: 3, perPage: 50 },
+      sort: POSITION,
     });
     expect(parsePlaylistItemsRequest({ per_page: "10" }, opts())).toEqual({
       paging: { page: 1, perPage: 10 },
+      sort: POSITION,
     });
     expect(
       parsePlaylistItemsRequest({ page: "2", per_page: "500" }, opts())
-    ).toEqual({ paging: { page: 2, perPage: 100 } });
+    ).toEqual({ paging: { page: 2, perPage: 100 }, sort: POSITION });
     expect(
       parsePlaylistItemsRequest({ page: "-1", per_page: "0" }, opts())
-    ).toEqual({ paging: { page: 1, perPage: 1 } });
+    ).toEqual({ paging: { page: 1, perPage: 1 }, sort: POSITION });
+  });
+
+  it("no sort is position ASC", () => {
+    expect(parsePlaylistItemsRequest({ page: "1" }, opts()).sort).toEqual(
+      POSITION
+    );
+  });
+
+  it("sort=title&direction=ASC parses", () => {
+    expect(
+      parsePlaylistItemsRequest(
+        { page: "1", sort: "title", direction: "ASC" },
+        opts()
+      ).sort
+    ).toEqual({ field: "title", direction: "ASC", seed: undefined });
+    // A lower-case direction is read as the lists read it
+    expect(
+      parsePlaylistItemsRequest({ sort: "rating", direction: "desc" }, opts())
+        .sort
+    ).toEqual({ field: "rating", direction: "DESC", seed: undefined });
+  });
+
+  it("a sort or direction alone reads page 1 of 50, never the unpaged list", () => {
+    expect(parsePlaylistItemsRequest({ sort: "title" }, opts()).paging).toEqual(
+      { page: 1, perPage: 50 }
+    );
+    expect(
+      parsePlaylistItemsRequest({ direction: "DESC" }, opts()).paging
+    ).toEqual({ page: 1, perPage: 50 });
+  });
+
+  it("without a direction, position and added_at read ASC and a scene sort the scene list's default", () => {
+    expect(
+      parsePlaylistItemsRequest({ sort: "added_at" }, opts()).sort
+    ).toEqual({ field: "added_at", direction: "ASC", seed: undefined });
+    expect(
+      parsePlaylistItemsRequest({ sort: "position" }, opts()).sort
+    ).toEqual(POSITION);
+    expect(parsePlaylistItemsRequest({ sort: "title" }, opts()).sort).toEqual({
+      field: "title",
+      direction: "DESC",
+      seed: undefined,
+    });
+    expect(
+      parsePlaylistItemsRequest({ direction: "DESC" }, opts()).sort
+    ).toEqual({ field: "position", direction: "DESC", seed: undefined });
+  });
+
+  it("sort=random_42 keeps its seed", () => {
+    expect(
+      parsePlaylistItemsRequest({ sort: "random_42" }, opts()).sort
+    ).toEqual({ field: "random", direction: "DESC", seed: 42 });
+  });
+
+  it("a bare random takes the user's daily seed", () => {
+    expect(parsePlaylistItemsRequest({ sort: "random" }, opts()).sort).toEqual({
+      field: "random",
+      direction: "DESC",
+      seed: generateDailySeed(USER_ID),
+    });
+  });
+
+  it("sort=scene_index answers 400 Unknown sort", () => {
+    expect(
+      issuesOf(() => parsePlaylistItemsRequest({ sort: "scene_index" }, opts()))
+    ).toEqual([{ path: "sort", message: "Unknown sort" }]);
+    expect(
+      paths(
+        issuesOf(() =>
+          parsePlaylistItemsRequest(
+            { sort: "toString", direction: "sideways" },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["sort", "direction"]);
   });
 
   it("page abc and an unknown parameter are invalid", () => {
     expect(
       paths(
         issuesOf(() =>
-          parsePlaylistItemsRequest({ page: "abc", sort: "title" }, opts())
+          parsePlaylistItemsRequest({ page: "abc", bogus: "1" }, opts())
         )
       )
-    ).toEqual(["page", "sort"]);
+    ).toEqual(["page", "bogus"]);
     expect(
       paths(
         issuesOf(() =>

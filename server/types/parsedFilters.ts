@@ -17,8 +17,10 @@ import type {
   InstanceSpec,
   ListKind,
   NumberSpec,
+  PlaylistItemSort,
   RefModifier,
   RefSpec,
+  SortDirection,
   SortOf,
   TextSpec,
 } from "@peek/shared-types/filters/index.js";
@@ -199,16 +201,27 @@ export interface ParsedRecommendedQuery {
   readonly perPage: number;
 }
 
+/** A playlist's item sort: a member of `PLAYLIST_ITEM_SORTS` */
+export interface ParsedPlaylistItemSort {
+  readonly field: PlaylistItemSort;
+  readonly direction: SortDirection;
+  /** Set when the field is `random`, undefined otherwise */
+  readonly seed: number | undefined;
+}
+
 /** `GET /api/playlists/:id` */
 export interface ParsedPlaylistItemsQuery {
   /**
    * One page of the items the viewer can see: page >= 1, perPage
-   * 1..PLAYLIST_ITEMS_PER_PAGE_MAX (50 when absent). Undefined without
-   * `page` and `per_page`: every item.
+   * 1..PLAYLIST_ITEMS_PER_PAGE_MAX (50 when absent). Undefined when the
+   * request sends none of `page`, `per_page`, `sort` and `direction`:
+   * every item, in position order.
    */
   readonly paging:
     | { readonly page: number; readonly perPage: number }
     | undefined;
+  /** Position ASC when the request names none */
+  readonly sort: ParsedPlaylistItemSort;
 }
 
 /** `GET /api/playlists` and `GET /api/playlists/shared` */

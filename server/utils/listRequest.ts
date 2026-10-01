@@ -13,6 +13,7 @@
  */
 import {
   CLIP_PARAMS,
+  DEFAULT_PLAYLIST_ITEM_SORT,
   DEFAULT_SORT,
   type DateSpec,
   type EntityKind,
@@ -26,7 +27,9 @@ import {
   MINIMAL_PER_PAGE_MAX,
   type NumberSpec,
   PER_PAGE_MAX,
+  PLAYLIST_ITEM_SORTS,
   PRESENCE_MODIFIERS,
+  type PlaylistItemSort,
   type PresenceModifier,
   Q_MAX_LENGTH,
   RANGE_MODIFIERS,
@@ -58,6 +61,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
   ParsedMinimalRequest,
+  ParsedPlaylistItemSort,
   ParsedPlaylistItemsQuery,
   ParsedPlaylistsQuery,
   ParsedRecommendedQuery,
@@ -1232,39 +1236,108 @@ export function parseRecommendedRequest(
 // PLAYLIST ITEMS
 // =============================================================================
 
+const PLAYLIST_ITEM_SORT_SET: ReadonlySet<string> = new Set(
+  PLAYLIST_ITEM_SORTS
+);
+
+/** The sorts that read in the playlist's own terms; ASC when no direction is sent */
+const PLAYLIST_OWN_SORTS: ReadonlySet<PlaylistItemSort> = new Set([
+  "position",
+  "added_at",
+]);
+
 /**
- * `GET /api/playlists/:id`: a page of the items the viewer can see, or
- * every item when neither `page` nor `per_page` is sent (the playlist page
- * reads them all until it pages)
+ * A playlist item sort: a member of `PLAYLIST_ITEM_SORTS`, or
+ * `random_<n>` (seed n % 1e8, as the lists read it); absent when missing or
+ * invalid. `scene_index` is not one: a playlist has no collection.
+ */
+function parsePlaylistSort(
+  raw: unknown,
+  path: string,
+  problems: Problems
+): { field: PlaylistItemSort; seed: number | undefined } | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === "string") {
+    const seeded = RANDOM_SEED_PATTERN.exec(raw);
+    if (seeded?.[1] !== undefined) {
+      return { field: "random", seed: Number(seeded[1]) % SEED_MODULUS };
+    }
+    if (PLAYLIST_ITEM_SORT_SET.has(raw)) {
+      return { field: raw as PlaylistItemSort, seed: undefined };
+    }
+  }
+  problems.add(path, "Unknown sort");
+  return undefined;
+}
+
+/**
+ * `GET /api/playlists/:id`: a page of the items the viewer can see, in the
+ * request's sort: the playlist's order (`position`, the default), when each
+ * item was added (`added_at`), or any scene sort as the Scenes page sorts.
+ * Without a direction, `position` and `added_at` read ASC and a scene sort
+ * the scene list's default; a bare `random` takes the user's daily seed, so
+ * the answer can always name `random_<seed>`. A request that sends none of
+ * `page`, `per_page`, `sort` and `direction` reads every item in position
+ * order (the playlist page reads them all until it pages); a sort alone
+ * reads page 1.
  */
 export function parsePlaylistItemsRequest(
   query: unknown,
-  _options: ParseOptions
+  options: ParseOptions
 ): ParsedPlaylistItemsQuery {
   const input = requireObject(query, "query");
   const problems = new Problems();
   let page: number | undefined;
   let perPage: number | undefined;
+  let sortField: ReturnType<typeof parsePlaylistSort>;
+  let direction: SortDirection | undefined;
 
   const handlers = new Map<string, (raw: unknown, path: string) => void>([
     ["page", (raw, path) => (page = parseInteger(raw, path, problems))],
     ["per_page", (raw, path) => (perPage = parseInteger(raw, path, problems))],
+    [
+      "sort",
+      (raw, path) => (sortField = parsePlaylistSort(raw, path, problems)),
+    ],
+    [
+      "direction",
+      (raw, path) => (direction = parseDirection(raw, path, problems)),
+    ],
   ]);
   walk(input, "", handlers, problems, "Unknown query parameter");
   problems.finish();
 
+  const field = sortField?.field ?? DEFAULT_PLAYLIST_ITEM_SORT.field;
+  const sort: ParsedPlaylistItemSort = {
+    field,
+    direction:
+      direction ??
+      (PLAYLIST_OWN_SORTS.has(field)
+        ? DEFAULT_PLAYLIST_ITEM_SORT.direction
+        : DEFAULT_SORT.scene.direction),
+    seed:
+      field === "random"
+        ? (sortField?.seed ?? generateDailySeed(options.userId))
+        : undefined,
+  };
+  const unpaged =
+    page === undefined &&
+    perPage === undefined &&
+    sortField === undefined &&
+    direction === undefined;
+
   return {
-    paging:
-      page === undefined && perPage === undefined
-        ? undefined
-        : {
-            page: clampPage(page),
-            perPage: clampPerPage(
-              perPage,
-              PLAYLIST_ITEMS_PER_PAGE_DEFAULT,
-              PLAYLIST_ITEMS_PER_PAGE_MAX
-            ),
-          },
+    paging: unpaged
+      ? undefined
+      : {
+          page: clampPage(page),
+          perPage: clampPerPage(
+            perPage,
+            PLAYLIST_ITEMS_PER_PAGE_DEFAULT,
+            PLAYLIST_ITEMS_PER_PAGE_MAX
+          ),
+        },
+    sort,
   };
 }
 

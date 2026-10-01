@@ -36,6 +36,7 @@ import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type SqlFragment,
   buildDateFilter,
   buildEpochDateFilter,
   buildFavoriteFilter,
@@ -224,6 +225,38 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   "scene"
 > {
   protected readonly spec = SCENE_SPEC;
+
+  /**
+   * A scene sort's order for rows of `s` read outside the list statement (a
+   * playlist's items): the viewer's rating and history joins on `s`, bound
+   * to `userId` as the list writes them, then the sort's own joins; and the
+   * expression the Scenes page sorts by, from the same sort map with an
+   * empty filter (random through the list's seeded order). Without a
+   * filter `scene_index` has no expression and gives the default sort's;
+   * the playlist parser never sends it. The order holds no tiebreak: the
+   * caller ends it with its own.
+   */
+  sortTerms(
+    userId: number,
+    sort: {
+      field: string;
+      direction: SortDirection;
+      seed: number | undefined;
+    }
+  ): { joins: SqlFragment[]; order: SqlFragment } {
+    const ctx: QueryContext = {
+      userId,
+      applyExclusions: true,
+      allowedInstanceIds: [],
+      specificInstanceId: undefined,
+      sortField: sort.field,
+    };
+    const expr = this.sortExpr(sort.field, sort.direction, sort.seed, {}, ctx);
+    return {
+      joins: [...this.userJoinFragments(userId), ...(expr.joins ?? [])],
+      order: { sql: expr.sql, params: expr.params },
+    };
+  }
 
   /**
    * The sort expressions. title, performer_count and tag_count read the

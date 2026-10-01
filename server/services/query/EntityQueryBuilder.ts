@@ -497,10 +497,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     const x = spec.alias;
 
     const select = spec.selectColumns(ctx);
-    const userJoins = spec.userJoins.map(
-      (join) =>
-        `LEFT JOIN ${join.table} ${join.alias} ON ${x}.id = ${join.alias}.${join.entityIdCol} AND ${x}.stashInstanceId = ${join.alias}.${join.instanceCol ?? "instanceId"} AND ${join.alias}.userId = ?`
-    );
+    const userJoins = this.userJoinFragments(ctx.userId);
     const ownExclusions = ctx.applyExclusions
       ? exclusionJoin("e", spec.entityType, `${x}.id`, `${x}.stashInstanceId`)
       : "";
@@ -559,7 +556,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
       withParams: combined.ctes.flatMap((c) => c.params),
       from: [
         `FROM ${spec.table} ${x}`,
-        ...userJoins,
+        ...userJoins.map((j) => j.sql),
         ...(spec.joins ?? []),
         ...(ownExclusions === "" ? [] : [ownExclusions]),
         ...extraJoins.map((j) => j.sql),
@@ -567,7 +564,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
         ...(sortExpr.joins ?? []).map((j) => j.sql),
       ].join("\n"),
       fromParams: [
-        ...spec.userJoins.map(() => ctx.userId),
+        ...userJoins.flatMap((j) => j.params),
         ...(ctx.applyExclusions ? [ctx.userId] : []),
         ...extraJoins.flatMap((j) => j.params),
         ...combined.joins.flatMap((j) => j.params),
@@ -591,7 +588,24 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     };
   }
 
-  private sortExpr(
+  /**
+   * The spec's per-user joins on the entity's alias, each bound to the
+   * viewer, as the list statement writes them
+   */
+  protected userJoinFragments(userId: number): SqlFragment[] {
+    const x = this.spec.alias;
+    return this.spec.userJoins.map((join) => ({
+      sql: `LEFT JOIN ${join.table} ${join.alias} ON ${x}.id = ${join.alias}.${join.entityIdCol} AND ${x}.stashInstanceId = ${join.alias}.${join.instanceCol ?? "instanceId"} AND ${join.alias}.userId = ?`,
+      params: [userId],
+    }));
+  }
+
+  /**
+   * One sort key's expression with the direction in it, and its joins: the
+   * random order with its seed bound (the default seed when none), else the
+   * sort map's expression, the default sort's for a key the map lacks
+   */
+  protected sortExpr(
     field: string,
     direction: SortDirection,
     seed: number | undefined,

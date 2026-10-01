@@ -20,7 +20,11 @@
  * so the owner sees P1, P2, SAME@B, P3, P4 and P5, and the recipient (a
  * member of a group PQ is shared with) sees X1, P1, X2, SAME@B, P3, P4 and
  * P5. A third user selects only A.
+ *
+ * The owner's playlist SORTED, shared with the same group, holds T3, X1,
+ * T4, T1 and T2 on A (SORTED_ITEMS), for the view sorts.
  */
+import type { PlaylistItemSort } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   duplicatePlaylist,
@@ -42,6 +46,7 @@ import {
   testUser,
 } from "../../tests/helpers/controllerTestUtils.js";
 import { must } from "../../tests/helpers/must.js";
+import type { ParsedPlaylistItemsQuery } from "../../types/parsedFilters.js";
 import { toProxyUrl } from "../../utils/proxyUrl.js";
 import {
   FX,
@@ -50,6 +55,7 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
+import { largeLibraryPlanner } from "../helpers/largeLibraryPlanner.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 
 const { A, B, OFF } = FX;
@@ -63,6 +69,17 @@ const P5 = "7701005";
 const X1 = "7701011";
 const X2 = "7701012";
 const P_IDS = [P1, P2, P3, P4, P5];
+/** The view sorts' scenes on A: T1 and T4 share a displayed title */
+const T1 = "7701021";
+const T2 = "7701022";
+const T3 = "7701023";
+const T4 = "7701024";
+const T_TITLES: Readonly<Record<string, string>> = {
+  [T1]: "Bravo",
+  [T2]: "alpha",
+  [T3]: "Charlie",
+  [T4]: "bravo",
+};
 
 const GROUP_NAME = "access-it-playlist-queries";
 const MANY_PLAYLISTS = 36;
@@ -82,6 +99,15 @@ const PQ_ITEMS = [
 ] as const;
 
 type Ref = readonly [sceneId: string, instanceId: string];
+
+/** SORTED's items in position order, with the day of the month each was added */
+const SORTED_ITEMS: ReadonlyArray<readonly [sceneId: string, day: number]> = [
+  [T3, 3],
+  [X1, 1], // hidden by the owner
+  [T4, 5],
+  [T1, 2],
+  [T2, 4],
+];
 
 const OWNER_SEES: readonly Ref[] = [
   [P1, A],
@@ -169,6 +195,7 @@ describe("Playlist queries (integration)", () => {
   let many: User;
   let pq: number;
   let allHidden: number;
+  let sorted: number;
   const manyPlaylists: Array<{ id: number; items: Ref[] }> = [];
 
   beforeAll(async () => {
@@ -182,6 +209,15 @@ describe("Playlist queries (integration)", () => {
     });
     await prisma.stashScene.createMany({
       data: [...P_IDS, X1, X2].map(scene),
+    });
+    // titleSort as sync stores it: the displayed title, lower-cased
+    await prisma.stashScene.createMany({
+      data: Object.entries(T_TITLES).map(([id, title]) => ({
+        id,
+        stashInstanceId: A,
+        title,
+        titleSort: title.toLowerCase(),
+      })),
     });
     await prisma.stashScene.update({
       where: { id_stashInstanceId: { id: SAME, stashInstanceId: B } },
@@ -216,6 +252,8 @@ describe("Playlist queries (integration)", () => {
           favorite: true,
         },
         { userId: recipient.id, instanceId: A, sceneId: P1, rating: 40 },
+        { userId: owner.id, instanceId: A, sceneId: T1, rating: 80 },
+        { userId: recipient.id, instanceId: A, sceneId: T2, rating: 80 },
       ],
     });
     await prisma.watchHistory.createMany({
@@ -253,6 +291,25 @@ describe("Playlist queries (integration)", () => {
       data: { playlistId: pq, groupId: group.id },
     });
 
+    const playlist = await prisma.playlist.create({
+      data: {
+        userId: owner.id,
+        name: "SORTED",
+        items: {
+          create: SORTED_ITEMS.map(([sceneId, day], position) => ({
+            sceneId,
+            instanceId: A,
+            position,
+            addedAt: new Date(Date.UTC(2026, 0, day)),
+          })),
+        },
+      },
+    });
+    sorted = playlist.id;
+    await prisma.playlistShare.create({
+      data: { playlistId: sorted, groupId: group.id },
+    });
+
     // 36 playlists of P1..P5, each rotated to start at a different scene
     for (let k = 0; k < MANY_PLAYLISTS; k++) {
       const items: Ref[] = P_IDS.map((_, i) => [
@@ -283,13 +340,15 @@ describe("Playlist queries (integration)", () => {
   const itemsFor = async (
     user: User,
     playlistId: number,
-    paging?: { page: number; perPage: number }
+    paging?: { page: number; perPage: number },
+    sort?: ParsedPlaylistItemsQuery["sort"]
   ) =>
     loadPlaylistItems({
       userId: user.id,
       allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
       playlistId,
       paging,
+      sort,
     });
 
   it("previews are the first four items the user can see", async () => {
@@ -669,5 +728,184 @@ describe("Playlist queries (integration)", () => {
     expect(await sharedAs(`${SAME}:${B}`)).toBe(true);
     // PQ holds SAME on B, not on A
     expect(await sharedAs(`${SAME}:${A}`)).toBe(false);
+  });
+  describe("view sorts", () => {
+    const by = (
+      field: PlaylistItemSort,
+      direction: "ASC" | "DESC",
+      seed?: number
+    ): ParsedPlaylistItemsQuery["sort"] => ({ field, direction, seed });
+
+    /** SORTED's items the user sees on one page under the sort, as scene ids */
+    const sortedIds = async (
+      user: User,
+      sort: ParsedPlaylistItemsQuery["sort"] | undefined,
+      paging = { page: 1, perPage: 100 }
+    ) =>
+      (await itemsFor(user, sorted, paging, sort)).items.map((i) => i.sceneId);
+
+    it("sort=title pages the visible items by the displayed title, ties by position", async () => {
+      // T4 "bravo" (position 2) before T1 "Bravo" (position 3), though T1's
+      // id is lower; X1 is hidden by the owner
+      const first = await itemsFor(
+        owner,
+        sorted,
+        { page: 1, perPage: 2 },
+        by("title", "ASC")
+      );
+      const second = await itemsFor(
+        owner,
+        sorted,
+        { page: 2, perPage: 2 },
+        by("title", "ASC")
+      );
+      expect(first.items.map((i) => i.sceneId)).toEqual([T2, T4]);
+      expect(second.items.map((i) => i.sceneId)).toEqual([T1, T3]);
+      expect(first.totalItems).toBe(4);
+      expect(second.totalItems).toBe(4);
+      expect(first.items.map((i) => must(i.scene).title)).toEqual([
+        "alpha",
+        "bravo",
+      ]);
+
+      expect(await sortedIds(owner, by("title", "DESC"))).toEqual([
+        T3,
+        T4,
+        T1,
+        T2,
+      ]);
+    });
+
+    it("sort=rating uses the viewer's own rating", async () => {
+      // The owner rated T1 80 and the recipient T2 80; the rest tie at 0
+      // and come in position order
+      expect(await sortedIds(owner, by("rating", "DESC"))).toEqual([
+        T1,
+        T3,
+        T4,
+        T2,
+      ]);
+      expect(await sortedIds(recipient, by("rating", "DESC"))).toEqual([
+        T2,
+        T3,
+        X1,
+        T4,
+        T1,
+      ]);
+    });
+
+    it("sort=random_7 gives the same order on every page and a different one for random_8", async () => {
+      const whole = await sortedIds(recipient, by("random", "DESC", 7));
+      const pages: string[] = [];
+      for (let page = 1; page <= 3; page++) {
+        pages.push(
+          ...(await sortedIds(recipient, by("random", "DESC", 7), {
+            page,
+            perPage: 2,
+          }))
+        );
+      }
+      expect(pages).toEqual(whole);
+      expect([...whole].sort()).toEqual([T1, T2, T3, T4, X1].sort());
+      expect(await sortedIds(recipient, by("random", "DESC", 7))).toEqual(
+        whole
+      );
+      expect(await sortedIds(recipient, by("random", "DESC", 8))).not.toEqual(
+        whole
+      );
+    });
+
+    it("sort=added_at orders by when each item was added", async () => {
+      expect(await sortedIds(owner, by("added_at", "ASC"))).toEqual([
+        T1,
+        T3,
+        T2,
+        T4,
+      ]);
+      expect(await sortedIds(recipient, by("added_at", "DESC"))).toEqual([
+        T4,
+        T2,
+        T3,
+        T1,
+        X1,
+      ]);
+    });
+
+    it("the default is position order, as before", async () => {
+      expect(await sortedIds(owner, undefined)).toEqual([T3, T4, T1, T2]);
+      expect(await sortedIds(owner, by("position", "DESC"))).toEqual([
+        T2,
+        T1,
+        T4,
+        T3,
+      ]);
+    });
+
+    it("the handler pages by the request's sort and answers it", async () => {
+      const ask = async (viewer: User, query: Record<string, string>) => {
+        const req = reqFor(getPlaylist, {
+          params: { id: String(sorted) },
+          query,
+          user: testUser({ id: viewer.id, username: viewer.username }),
+          allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
+        });
+        const res = resFor(getPlaylist);
+        await getPlaylist(req, res);
+        return res._getOkBody();
+      };
+
+      const titled = await ask(owner, {
+        page: "1",
+        per_page: "2",
+        sort: "title",
+        direction: "ASC",
+      });
+      expect(titled.playlist.items.map((i) => i.sceneId)).toEqual([T2, T4]);
+      expect(titled.totalItems).toBe(4);
+      expect(titled.sort).toBe("title");
+      expect(titled.direction).toBe("ASC");
+
+      // A bare random answers the seed it used, which reads the same order
+      const random = await ask(recipient, { page: "1", sort: "random" });
+      expect(random.sort).toMatch(/^random_\d+$/);
+      const again = await ask(recipient, { page: "1", sort: random.sort });
+      expect(again.playlist.items).toEqual(random.playlist.items);
+
+      const plain = await ask(owner, { page: "1" });
+      expect(plain.sort).toBe("position");
+      expect(plain.direction).toBe("ASC");
+    });
+
+    it("a sorted page drives from the playlist's items", async () => {
+      const planner = await largeLibraryPlanner();
+      try {
+        for (const sort of [by("title", "ASC"), by("rating", "DESC")]) {
+          const recorder = recordStatements();
+          try {
+            await itemsFor(owner, sorted, { page: 1, perPage: 2 }, sort);
+          } finally {
+            recorder.restore();
+          }
+          const page = must(
+            recorder.statements.find(
+              (st) =>
+                st.sql.includes("FROM PlaylistItem pi") &&
+                st.sql.includes("ORDER BY")
+            ),
+            "the page statement"
+          );
+          const plan = await planner.planOf(page.sql, ...page.params);
+          expect(must(plan[0], "the plan's first row")).toMatch(
+            /^SEARCH pi USING (COVERING )?INDEX \w+ \(playlistId=\?/
+          );
+          expect(plan.find((row) => row.startsWith("SEARCH s "))).toMatch(
+            /^SEARCH s USING .*\(id=\? AND stashInstanceId=\?/
+          );
+          expect(plan.filter((row) => /^SCAN s\b/.test(row))).toEqual([]);
+        }
+      } finally {
+        await planner.close();
+      }
+    });
   });
 });

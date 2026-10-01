@@ -112,11 +112,12 @@ export interface GetPlaylistParams extends Record<string, string> {
 }
 
 /**
- * Without `page` and `per_page`, every item, in position order, with null
- * for the scenes the viewer cannot see. With either, one page of the items
- * the viewer can see: `page` from 1, `per_page` 1..100 (50 when absent).
- * `sort` is one of `PLAYLIST_ITEM_SORTS` (also `random_<seed>`); `direction`
- * is ASC or DESC.
+ * Without `page`, `per_page`, `sort` and `direction`, every item, in
+ * position order, with null for the scenes the viewer cannot see. With any,
+ * one page of the items the viewer can see: `page` from 1, `per_page`
+ * 1..100 (50 when absent). `sort` is one of `PLAYLIST_ITEM_SORTS` (also
+ * `random_<seed>`; position when absent); `direction` is ASC or DESC (ASC
+ * for position and added_at when absent, DESC for a scene sort).
  */
 export interface GetPlaylistQuery extends Record<string, string | undefined> {
   page?: string;
@@ -127,8 +128,7 @@ export interface GetPlaylistQuery extends Record<string, string | undefined> {
 
 /**
  * The fields marked optional are filled by later tasks and become required
- * with them: `sort` and `direction` (B4), `page`, `perPage` and
- * `unavailableItems` (B6), `owner` (B8).
+ * with them: `page`, `perPage` and `unavailableItems` (B6), `owner` (B8).
  */
 export interface GetPlaylistResponse {
   playlist: PlaylistData & { items: PlaylistItemWithScene[] };
@@ -139,9 +139,12 @@ export interface GetPlaylistResponse {
   /** The page read, when the request asked for one */
   page?: number;
   perPage?: number;
-  /** The sort the items came back in */
-  sort?: string;
-  direction?: "ASC" | "DESC";
+  /**
+   * The sort the items came back in: one of `PLAYLIST_ITEM_SORTS`, a random
+   * one as `random_<seed>` (a bare `random` names the seed it used)
+   */
+  sort: string;
+  direction: "ASC" | "DESC";
   isOwner: boolean;
   accessLevel: "owner" | "shared";
   sharedViaGroups?: string[];
