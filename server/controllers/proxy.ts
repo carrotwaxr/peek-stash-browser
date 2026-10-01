@@ -97,6 +97,14 @@ function rangeHeaders(req: {
 }
 
 /**
+ * The method sent to Stash: Express hands a HEAD to the GET handlers, and a
+ * HEAD (a card probing whether a preview exists) must not fetch the body
+ */
+function upstreamMethod(req: { method?: string }): "GET" | "HEAD" {
+  return req.method === "HEAD" ? "HEAD" : "GET";
+}
+
+/**
  * The one answer for media the user may not load: a missing entity, a
  * deleted one, one they cannot see and an instance that is not enabled all
  * read the same, so the answer never tells which.
@@ -161,6 +169,7 @@ function proxyHttpRequest(
     defaultCacheControl,
     timeoutMs,
     requestHeaders,
+    method,
   }: ProxyOptions,
   slot: Acquired
 ): void {
@@ -192,65 +201,73 @@ function proxyHttpRequest(
     responseFinished = true;
   });
 
-  const proxyReq = httpModule.get(
-    fullUrl,
-    { agent, headers: requestHeaders },
-    (proxyRes) => {
-      upstreamRes = proxyRes;
+  const onResponse = (proxyRes: http.IncomingMessage): void => {
+    upstreamRes = proxyRes;
 
-      // Stash's own 401, 403 and 5xx are 502 here and its 404 is 404 (206, 304
-      // and 416 pass): answer in the central shape, and drain Stash's body so
-      // its socket and our slot are free at once
-      const failure = stashFailure(proxyRes.statusCode ?? 200);
-      if (failure) {
-        logger.warn(`${label} Stash answered ${proxyRes.statusCode}`);
-        proxyRes.resume();
-        releaseOnce();
-        sendAppError(res, failure);
-        return;
-      }
-
-      // Forward response headers
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      // Range support and cache validators: Stash's 206 is only usable with
-      // its Content-Range, and a browser revalidates with ETag/Last-Modified
-      for (const name of RANGE_RESPONSE_HEADERS) {
-        const value = proxyRes.headers[name];
-        if (value !== undefined) res.setHeader(name, value);
-      }
-      res.setHeader(
-        "Cache-Control",
-        privateCacheControl(
-          proxyRes.headers["cache-control"],
-          defaultCacheControl
-        )
-      );
-
-      // Set status code
-      res.status(proxyRes.statusCode || 200);
-
-      // `pipeline` ends `res` when Stash fails mid-body (a reset, a close, or
-      // our destroy at the timeout) by destroying both sides, so the browser
-      // sees the request fail at once; `pipe` left it waiting for the promised
-      // Content-Length until nginx gave up. On a clean end Stash's socket goes
-      // back to the keep-alive agent.
-      pipeline(proxyRes, res, (error) => {
-        releaseOnce();
-        if (!error) return;
-        if (endedBy === "client") {
-          logger.debug(`${label} Client disconnected mid-transfer`);
-        } else if (endedBy === undefined) {
-          // Stash closed the connection mid-body without a socket error
-          logger.warn(`${label} Stash failed mid-transfer`, { error });
-        }
-      });
+    // Stash's own 401, 403 and 5xx are 502 here and its 404 is 404 (206, 304
+    // and 416 pass): answer in the central shape, and drain Stash's body so
+    // its socket and our slot are free at once
+    const failure = stashFailure(proxyRes.statusCode ?? 200);
+    if (failure) {
+      logger.warn(`${label} Stash answered ${proxyRes.statusCode}`);
+      proxyRes.resume();
+      releaseOnce();
+      sendAppError(res, failure);
+      return;
     }
-  );
+
+    // Forward response headers
+    if (proxyRes.headers["content-type"]) {
+      res.setHeader("Content-Type", proxyRes.headers["content-type"]);
+    }
+    if (proxyRes.headers["content-length"]) {
+      res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+    }
+    // Range support and cache validators: Stash's 206 is only usable with
+    // its Content-Range, and a browser revalidates with ETag/Last-Modified
+    for (const name of RANGE_RESPONSE_HEADERS) {
+      const value = proxyRes.headers[name];
+      if (value !== undefined) res.setHeader(name, value);
+    }
+    res.setHeader(
+      "Cache-Control",
+      privateCacheControl(
+        proxyRes.headers["cache-control"],
+        defaultCacheControl
+      )
+    );
+
+    // Set status code
+    res.status(proxyRes.statusCode || 200);
+
+    // `pipeline` ends `res` when Stash fails mid-body (a reset, a close, or
+    // our destroy at the timeout) by destroying both sides, so the browser
+    // sees the request fail at once; `pipe` left it waiting for the promised
+    // Content-Length until nginx gave up. On a clean end Stash's socket goes
+    // back to the keep-alive agent.
+    pipeline(proxyRes, res, (error) => {
+      releaseOnce();
+      if (!error) return;
+      if (endedBy === "client") {
+        logger.debug(`${label} Client disconnected mid-transfer`);
+      } else if (endedBy === undefined) {
+        // Stash closed the connection mid-body without a socket error
+        logger.warn(`${label} Stash failed mid-transfer`, { error });
+      }
+    });
+  };
+
+  // A HEAD goes to Stash as HEAD: its answer has the headers and no body, so
+  // the slot is free as soon as they arrive
+  const proxyReq =
+    method === "HEAD"
+      ? httpModule.request(
+          fullUrl,
+          { agent, headers: requestHeaders, method: "HEAD" },
+          onResponse
+        )
+      : httpModule.get(fullUrl, { agent, headers: requestHeaders }, onResponse);
+  if (method === "HEAD") proxyReq.end();
 
   // When the client disconnects (seek, refresh, navigate away),
   // destroy the upstream request to stop downloading into memory.
@@ -393,6 +410,7 @@ export const proxyScenePreview = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 60000,
     requestHeaders: rangeHeaders(req),
+    method: upstreamMethod(req),
   });
 };
 
@@ -441,6 +459,7 @@ export const proxySceneWebp = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 60000,
     requestHeaders: rangeHeaders(req),
+    method: upstreamMethod(req),
   });
 };
 
@@ -512,6 +531,7 @@ export const proxyStashMedia = async (
     defaultCacheControl: "private, max-age=31536000, immutable",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
+    method: upstreamMethod(req),
   });
 };
 
@@ -587,6 +607,7 @@ export const proxyClipPreview = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
+    method: upstreamMethod(req),
   });
 };
 
@@ -686,5 +707,6 @@ export const proxyImage = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
+    method: upstreamMethod(req),
   });
 };

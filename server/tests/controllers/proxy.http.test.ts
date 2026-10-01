@@ -261,6 +261,7 @@ describe("the media proxy when Stash fails mid-transfer", () => {
 
 /** What Stash received for one request, in lower-case header names. */
 interface StashRequest {
+  method: string;
   url: string;
   headers: http.IncomingHttpHeaders;
 }
@@ -278,7 +279,11 @@ describe("the media proxy and byte ranges", () => {
     // A Stash that serves byte ranges: "bytes=0-9" gets 206 with 10 bytes,
     // anything else the whole file with its validators
     stashServer = http.createServer((req, res) => {
-      stashRequests.push({ url: req.url ?? "", headers: req.headers });
+      stashRequests.push({
+        method: req.method ?? "",
+        url: req.url ?? "",
+        headers: req.headers,
+      });
       res.setHeader("content-type", "video/mp4");
       res.setHeader("accept-ranges", "bytes");
       res.setHeader("etag", '"abc123"');
@@ -381,6 +386,18 @@ describe("the media proxy and byte ranges", () => {
   });
 
   it.each(Object.entries(ROUTES))(
+    "a HEAD to the %s handler asks Stash with HEAD and gets no body",
+    async (_name, route) => {
+      const res = await fetch(`${peekUrl}${route}`, { method: "HEAD" });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-length")).toBe(String(FILE_BYTES));
+      expect((await res.arrayBuffer()).byteLength).toBe(0);
+      expect(stashRequests.map((request) => request.method)).toEqual(["HEAD"]);
+    }
+  );
+
+  it.each(Object.entries(ROUTES))(
     "the %s handler passes Range and If-Range to Stash and answers 206",
     async (_name, route) => {
       const res = await fetch(`${peekUrl}${route}`, {
@@ -466,10 +483,13 @@ describe("the media proxy and a browser that reads slowly", () => {
   function requestPaused(): Promise<http.IncomingMessage> {
     return new Promise((resolve, reject) => {
       http
-        .get(`${peekUrl}/api/proxy/scene/1/preview?instanceId=inst-a`, (res) => {
-          res.pause();
-          resolve(res);
-        })
+        .get(
+          `${peekUrl}/api/proxy/scene/1/preview?instanceId=inst-a`,
+          (res) => {
+            res.pause();
+            resolve(res);
+          }
+        )
         .on("error", reject);
     });
   }

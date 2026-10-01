@@ -18,4 +18,6 @@ export interface ProxyOptions {
   timeoutMs: number;
   /** Headers sent to Stash: the browser's `Range` and `If-Range`, when it sent them */
   requestHeaders: OutgoingHttpHeaders;
+  /** The browser's HEAD goes to Stash as HEAD, so no body is fetched */
+  method: "GET" | "HEAD";
 }
