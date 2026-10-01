@@ -57,22 +57,9 @@ const TagCard = memo(
               | boolean
               | undefined,
           }}
-          ratingControlsProps={
-            tag.rating100 !== undefined
-              ? {
-                  entityId: tag.id,
-                  instanceId: tag.instanceId,
-                  initialRating: tag.rating100,
-                  initialFavorite: tag.favorite || false,
-                  initialOCounter: tag.o_counter,
-                  onHideSuccess,
-                  showRating: tagSettings.showRating as boolean | undefined,
-                  showFavorite: tagSettings.showFavorite as boolean | undefined,
-                  showOCounter: tagSettings.showOCounter as boolean | undefined,
-                  showMenu: tagSettings.showMenu as boolean | undefined,
-                }
-              : undefined
-          }
+          // A tag row without the viewer's data has no row and no menu
+          ratingEntity={tag.rating100 !== undefined ? tag : undefined}
+          ratingControlsProps={{ onHideSuccess }}
           {...rest}
         />
       );

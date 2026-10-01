@@ -238,24 +238,8 @@ const SceneCard = memo(
           displayPreferences={{
             showDescription: sceneSettings.showDescriptionOnCard as boolean,
           }}
-          ratingControlsProps={
-            !hideRatingControls
-              ? {
-                  entityType: "scene",
-                  entityId: scene.id,
-                  instanceId: scene.instanceId,
-                  initialRating: scene.rating,
-                  initialFavorite: scene.favorite || false,
-                  initialOCounter: scene.o_counter,
-                  entityTitle: title,
-                  onHideSuccess,
-                  showRating: sceneSettings.showRating as boolean,
-                  showFavorite: sceneSettings.showFavorite as boolean,
-                  showOCounter: sceneSettings.showOCounter as boolean,
-                  showMenu: sceneSettings.showMenu as boolean,
-                }
-              : undefined
-          }
+          ratingEntity={hideRatingControls ? undefined : scene}
+          ratingControlsProps={{ entityTitle: title, onHideSuccess }}
           // Render slots
           // Only a card that can select has a checkbox
           renderOverlay={onToggleSelect ? renderOverlay : undefined}

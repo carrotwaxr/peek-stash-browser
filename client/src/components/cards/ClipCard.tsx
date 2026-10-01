@@ -151,17 +151,8 @@ const ClipCard = memo(
           // Clips don't have descriptions
           displayPreferences={{ showDescription: false }}
           // Rating controls - clips could have their own ratings in future
-          ratingControlsProps={{
-            entityType: "clip",
-            entityId: clip.id,
-            instanceId: clip.instanceId,
-            entityTitle: title,
-            onHideSuccess,
-            showRating: clipSettings.showRating as boolean | undefined,
-            showFavorite: clipSettings.showFavorite as boolean | undefined,
-            showOCounter: clipSettings.showOCounter as boolean | undefined,
-            showMenu: clipSettings.showMenu as boolean | undefined,
-          }}
+          ratingEntity={clip}
+          ratingControlsProps={{ entityTitle: title, onHideSuccess }}
           // Render slots
           renderImageContent={renderImageContent}
           // Standard props
