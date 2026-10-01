@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userSetupApi } from "../../../src/api";
 import UserSetupModal from "../../../src/components/modals/UserSetupModal";
+import { ShortcutScopeProvider } from "../../../src/contexts/ShortcutScopeContext";
 import { showError } from "../../../src/utils/toast";
 import { actAsync } from "../../testUtils";
 
@@ -363,6 +364,49 @@ describe("UserSetupModal", () => {
       expect(window.getSelection()?.toString()).toBe(KEY);
       expect(showError).toHaveBeenCalledWith(COPY_FAILED);
       errorSpy.mockRestore();
+    });
+  });
+  describe("Dialog", () => {
+    const renderInScopes = async (onComplete = vi.fn()) => {
+      mockGetSetupStatus.mockResolvedValue({
+        setupCompleted: false,
+        instances: [{ id: "inst-1", name: "Main", description: "" }],
+        instanceCount: 1,
+      });
+      render(
+        <ShortcutScopeProvider>
+          <UserSetupModal onComplete={onComplete} />
+        </ShortcutScopeProvider>
+      );
+      await screen.findByRole("button", { name: "Continue" });
+      return onComplete;
+    };
+
+    it("opens as a dialog named Welcome to Peek", async () => {
+      await renderInScopes();
+
+      expect(
+        screen.getByRole("dialog", { name: "Welcome to Peek" })
+      ).toBeInTheDocument();
+    });
+
+    it("is not dismissible: Escape and a backdrop click leave it open", async () => {
+      const onComplete = await renderInScopes();
+      const dialog = screen.getByRole("dialog", { name: "Welcome to Peek" });
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+      const backdrop = dialog.parentElement as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
+
+      expect(
+        screen.getByRole("dialog", { name: "Welcome to Peek" })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(mockUpdateUser).not.toHaveBeenCalled();
     });
   });
 });
