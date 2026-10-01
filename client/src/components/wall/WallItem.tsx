@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
 import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 import { usePreviewSlot } from "./previewSlots";
@@ -36,6 +37,7 @@ const WallItem = ({
   onClick,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
+  const hoverCapable = useHoverCapable();
   const containerRef = useRef<HTMLAnchorElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovering, setIsHovering] = useState(false);
@@ -49,6 +51,9 @@ const WallItem = ({
   const title = config.getTitle(item);
   const subtitle = config.getSubtitle(item);
   const hasPreview = config.hasPreview && previewUrl;
+  // A touch screen has no hover to wait for: the title is always there. A
+  // mouse shows it 500 ms after the pointer enters.
+  const titleShown = !hoverCapable || showOverlay;
 
   // Compute link path with multi-instance support
   // Clips are special: they link to scene with timestamp
@@ -100,9 +105,9 @@ const WallItem = ({
     }
   }, [hasSlot, hasPreview, previewUrl]);
 
-  // Overlay show delay (500ms)
+  // Overlay show delay (500ms), for a mouse
   useEffect(() => {
-    if (isHovering) {
+    if (isHovering && hoverCapable) {
       overlayTimeoutRef.current = setTimeout(() => {
         setShowOverlay(true);
       }, 500);
@@ -118,7 +123,7 @@ const WallItem = ({
         clearTimeout(overlayTimeoutRef.current);
       }
     };
-  }, [isHovering]);
+  }, [isHovering, hoverCapable]);
 
   const handleClick = (e: React.MouseEvent) => {
     if (onClick) {
@@ -183,14 +188,14 @@ const WallItem = ({
         style={{
           height: "100px",
           background: "linear-gradient(transparent, rgba(0, 0, 0, 0.7))",
-          opacity: showOverlay ? 1 : 0,
+          opacity: titleShown ? 1 : 0,
         }}
       />
 
       {/* Text overlay */}
       <div
         className="absolute bottom-0 left-0 right-0 p-4 transition-opacity duration-300"
-        style={{ opacity: showOverlay ? 1 : 0 }}
+        style={{ opacity: titleShown ? 1 : 0 }}
       >
         <h3 className="text-sm font-medium truncate" style={{ color: "white" }}>
           {title}

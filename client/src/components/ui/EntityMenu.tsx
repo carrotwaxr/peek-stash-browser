@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
+import { useCoarsePointer } from "../../hooks/useHoverCapable";
 
 /**
  * EntityMenu - 3-dot menu for entity cards, the scene page and the image viewer
@@ -40,6 +41,7 @@ const EntityMenu = ({
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const coarsePointer = useCoarsePointer();
 
   // Update menu position when opening (useLayoutEffect prevents position flicker)
   useLayoutEffect(() => {
@@ -130,7 +132,11 @@ const EntityMenu = ({
       <button
         ref={buttonRef}
         onClick={handleButtonClick}
-        className="p-1 rounded hover:bg-opacity-20 hover:bg-white transition-colors"
+        className={`p-1 rounded hover:bg-opacity-20 hover:bg-white transition-colors ${
+          // The 26 px button gets a 44 px hit area from a ::before; its box
+          // (and the card's row) stay as they are
+          coarsePointer ? "relative before:absolute before:-inset-[9px]" : ""
+        }`}
         style={{ color: "var(--text-primary)" }}
         aria-label="More options"
         title="More options"

@@ -109,4 +109,41 @@ describe("BulkActionBar", () => {
     expect(screen.getByTestId("action-1")).toBeInTheDocument();
     expect(screen.getByTestId("action-2")).toBeInTheDocument();
   });
+
+  describe("spacer", () => {
+    // The bar is fixed to the screen bottom: the spacer holds its height in
+    // the page so the last row (the pagination) can scroll above it
+    const withBarHeight = (height: number) =>
+      vi
+        .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+        .mockReturnValue(height);
+
+    it("the bulk bar's spacer keeps the last pagination row above it", () => {
+      const heightSpy = withBarHeight(72);
+      render(
+        <MemoryRouter>
+          <BulkActionBar {...defaultProps} />
+        </MemoryRouter>
+      );
+
+      const spacer = screen.getByTestId("bulk-action-bar-spacer");
+
+      expect(spacer.style.height).toBe("72px");
+      expect(spacer).toHaveAttribute("aria-hidden", "true");
+      heightSpy.mockRestore();
+    });
+
+    it("the spacer leaves with the bar", () => {
+      const heightSpy = withBarHeight(72);
+      const { unmount } = render(
+        <MemoryRouter>
+          <BulkActionBar {...defaultProps} />
+        </MemoryRouter>
+      );
+      unmount();
+
+      expect(screen.queryByTestId("bulk-action-bar-spacer")).toBeNull();
+      heightSpy.mockRestore();
+    });
+  });
 });

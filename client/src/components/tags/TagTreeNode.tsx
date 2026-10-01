@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight, Droplets, ExternalLink, Heart } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { tagTreeKey, tagTreeRowKey } from "../../utils/buildTagTree";
 import { getEntityPath } from "../../utils/entityLinks";
 
@@ -97,6 +98,7 @@ const TagTreeNode = ({
 }: TagTreeNodeProps) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
+  const hoverCapable = useHoverCapable();
   const children = tag.children ?? [];
   const hasChildren = children.length > 0;
   const key = tagTreeKey(tag);
@@ -337,11 +339,13 @@ const TagTreeNode = ({
             </span>
           )}
 
-          {/* Navigate button - visible on hover */}
+          {/* Navigate button - visible on hover; always on a touch screen */}
           <button
             type="button"
             onClick={handleNavigateClick}
-            className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            className={`p-1 rounded transition-opacity ${
+              hoverCapable ? "opacity-0 group-hover:opacity-100" : ""
+            }`}
             style={{ backgroundColor: "var(--bg-tertiary)" }}
             title="Go to tag"
             aria-label={`Go to ${tag.name}`}

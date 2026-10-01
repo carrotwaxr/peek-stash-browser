@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost } from "../../../src/api/client";
 import OCounterButton from "../../../src/components/ui/OCounterButton";
+import {
+  MOUSE_QUERIES,
+  TOUCH_QUERIES,
+  matchMediaQueries,
+} from "../../helpers/matchMedia";
 import { createQueryWrapper } from "../../testUtils";
 
 vi.mock("../../../src/api/client", () => ({
@@ -92,5 +97,35 @@ describe("OCounterButton", () => {
       screen.getByLabelText("Increment O counter (current: 3)")
     ).toBeTruthy();
     consoleError.mockRestore();
+  });
+});
+
+describe("OCounterButton hit area", () => {
+  let restoreMedia: (() => void) | null = null;
+  afterEach(() => {
+    restoreMedia?.();
+    restoreMedia = null;
+  });
+
+  it("on a coarse pointer the O button has a 44 px hit area", () => {
+    restoreMedia = matchMediaQueries(TOUCH_QUERIES);
+    render(<OCounterButton sceneId="7" instanceId="inst-a" />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    const { className } = screen.getByRole("button");
+
+    // A small button is 32 px: 6 px out on each side
+    expect(className).toContain("before:absolute");
+    expect(className).toContain("before:-inset-[6px]");
+  });
+
+  it("with a mouse the O button has no extra hit area", () => {
+    restoreMedia = matchMediaQueries(MOUSE_QUERIES);
+    render(<OCounterButton sceneId="7" instanceId="inst-a" />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    expect(screen.getByRole("button").className).not.toContain("before:");
   });
 });

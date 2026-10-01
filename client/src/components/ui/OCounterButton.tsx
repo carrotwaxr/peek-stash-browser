@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { LucideDroplets } from "lucide-react";
 import { useIncrementOCounter } from "../../api/hooks";
+import { useCoarsePointer } from "../../hooks/useHoverCapable";
 
 /**
  * Interactive O Counter button component
@@ -52,6 +53,7 @@ const OCounterButton = ({
     pressed && pressed.over === shownCount ? pressed.count : shownCount;
   const [isAnimating, setIsAnimating] = useState(false);
   const incrementMutation = useIncrementOCounter();
+  const coarsePointer = useCoarsePointer();
 
   // Size configurations
   const sizes = {
@@ -59,8 +61,16 @@ const OCounterButton = ({
     medium: { icon: 24, text: "text-base", padding: "p-2", gap: "gap-1.5" },
     large: { icon: 28, text: "text-lg", padding: "p-2.5", gap: "gap-2" },
   };
+  // On a finger the button's box (32, 40 and 48 px) gets a 44 px hit area
+  // from a ::before; the box itself does not change
+  const coarseHitAreas = {
+    small: "before:absolute before:-inset-[6px]",
+    medium: "before:absolute before:-inset-0.5",
+    large: "",
+  };
 
   const config = sizes[size] || sizes.small;
+  const hitArea = coarsePointer ? coarseHitAreas[size] : "";
 
   // Determine which entity ID to use
   const entityId = sceneId || imageId;
@@ -108,7 +118,7 @@ const OCounterButton = ({
     <button
       onClick={(e) => void handleClick(e)}
       disabled={incrementMutation.isPending}
-      className={`flex items-center ${config.gap} ${config.padding} rounded transition-all hover:scale-105 active:scale-95 relative ${
+      className={`flex items-center ${config.gap} ${config.padding} rounded transition-all hover:scale-105 active:scale-95 relative ${hitArea} ${
         isAnimating ? "animate-pulse" : ""
       }`}
       style={{
