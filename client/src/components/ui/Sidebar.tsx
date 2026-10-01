@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   getNavKeyForPath,
   getOrderedNavItems,
 } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
+import { useSharedMediaQuery } from "../../hooks/useHoverCapable";
 import { useTVMode } from "../../hooks/useTVMode";
 import { PeekLogo } from "../branding/PeekLogo";
 import { ThemedIcon } from "../icons/index";
@@ -34,12 +35,64 @@ interface Props {
   navPreferences?: NavPreference[];
 }
 
+/** Tailwind's `xl` breakpoint: the sidebar shows labels from here up */
+const EXPANDED_QUERY = "(min-width: 1280px)";
+
+interface NavEntryProps {
+  label: string;
+  icon: ReactNode;
+  /** The sidebar shows labels: no tooltip */
+  expanded: boolean;
+  active?: boolean;
+  /** A link when given, else a button */
+  to?: string;
+  onClick?: () => void;
+}
+
+/**
+ * One sidebar item, rendered once: an icon, and a label that CSS hides below
+ * xl. The tooltip names the item only while the labels are hidden.
+ */
+const NavEntry = ({
+  label,
+  icon,
+  expanded,
+  active = false,
+  to,
+  onClick,
+}: NavEntryProps) => {
+  const className = `flex items-center justify-center xl:justify-start gap-3 h-12 w-12 xl:h-auto xl:w-auto xl:px-4 xl:py-3 rounded-lg transition-colors duration-200 ${
+    active ? "nav-link-active" : "nav-link"
+  }`;
+  const content = (
+    <>
+      {icon}
+      <span className="hidden xl:inline text-sm font-medium">{label}</span>
+    </>
+  );
+
+  return (
+    <Tooltip content={label} position="right" disabled={expanded}>
+      {to ? (
+        <Link to={to} className={className} aria-label={label}>
+          {content}
+        </Link>
+      ) : (
+        <button onClick={onClick} className={className} aria-label={label}>
+          {content}
+        </button>
+      )}
+    </Tooltip>
+  );
+};
+
 const Sidebar = ({ navPreferences = [] }: Props) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { isTVMode, toggleTVMode } = useTVMode();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
+  const expanded = useSharedMediaQuery(EXPANDED_QUERY);
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
@@ -117,31 +170,13 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                   return (
                     <li key={item.name}>
-                      {/* Collapsed view (lg-xl): Icon only with tooltip */}
-                      <div className="xl:hidden">
-                        <Tooltip content={item.name} position="right">
-                          <Link
-                            to={item.path}
-                            className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
-                              isActive ? "nav-link-active" : "nav-link"
-                            }`}
-                            aria-label={item.name}
-                          >
-                            <ThemedIcon name={item.icon} size={20} />
-                          </Link>
-                        </Tooltip>
-                      </div>
-
-                      {/* Expanded view (xl+): Icon + text */}
-                      <Link
+                      <NavEntry
                         to={item.path}
-                        className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                          isActive ? "nav-link-active" : "nav-link"
-                        }`}
-                      >
-                        <ThemedIcon name={item.icon} size={20} />
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </Link>
+                        label={item.name}
+                        icon={<ThemedIcon name={item.icon} size={20} />}
+                        expanded={expanded}
+                        active={isActive}
+                      />
                     </li>
                   );
                 })}
@@ -154,146 +189,97 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
             style={{ borderColor: "var(--border-color)" }}
           >
             <div className="flex flex-col gap-1">
-              {/* Help button */}
-              {(() => {
-                return (
-                  <>
-                    <div className="xl:hidden">
-                      <Tooltip content="Help" position="right">
-                        <button
-                          onClick={() => setIsHelpModalOpen(true)}
-                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
-                          aria-label="Help"
-                        >
-                          <ThemedIcon name="questionCircle" size={20} />
-                        </button>
-                      </Tooltip>
-                    </div>
-                    <button
-                      onClick={() => setIsHelpModalOpen(true)}
-                      className="hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
-                    >
-                      <ThemedIcon name="questionCircle" size={20} />
-                      <span className="text-sm font-medium">Help</span>
-                    </button>
-                  </>
-                );
-              })()}
+              <NavEntry
+                label="Help"
+                icon={<ThemedIcon name="questionCircle" size={20} />}
+                expanded={expanded}
+                onClick={() => setIsHelpModalOpen(true)}
+              />
 
-              {/* Settings (universal) */}
-              {(() => {
-                return (
-                  <>
-                    <div className="xl:hidden">
-                      <Tooltip content="Settings" position="right">
-                        <Link
-                          to="/settings"
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
-                            isSettingsActive ? "nav-link-active" : "nav-link"
-                          }`}
-                          aria-label="Settings"
-                        >
-                          <ThemedIcon name="settings" size={20} />
-                        </Link>
-                      </Tooltip>
-                    </div>
-                    <Link
-                      to="/settings"
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                        isSettingsActive ? "nav-link-active" : "nav-link"
-                      }`}
-                    >
-                      <ThemedIcon name="settings" size={20} />
-                      <span className="text-sm font-medium">Settings</span>
-                    </Link>
-                  </>
-                );
-              })()}
+              <NavEntry
+                to="/settings"
+                label="Settings"
+                icon={<ThemedIcon name="settings" size={20} />}
+                expanded={expanded}
+                active={isSettingsActive}
+              />
 
-              {/* User Menu */}
-              {(() => {
-                return (
-                  <div>
-                    {/* User menu toggle - collapsed view with flyout */}
-                    <div className="xl:hidden">
-                      <UserMenu placement="right-end" />
+              {/* User menu: a flyout while collapsed, the username's own list expanded */}
+              {!expanded ? (
+                <UserMenu placement="right-end" />
+              ) : (
+                <div>
+                  <button
+                    onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
+                    className="flex w-full items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ThemedIcon name="circle-user-round" size={20} />
+                      <span className="text-sm font-medium">
+                        {user?.username || "User"}
+                      </span>
                     </div>
+                    <ThemedIcon
+                      name={isUserMenuExpanded ? "chevron-up" : "chevron-down"}
+                      size={16}
+                    />
+                  </button>
 
-                    {/* User menu toggle - expanded view */}
-                    <button
-                      onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
-                      className="hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 nav-link"
+                  {/* The user's items */}
+                  {isUserMenuExpanded && (
+                    <div
+                      className="mt-1 ml-4 pl-4 border-l"
+                      style={{ borderColor: "var(--border-color)" }}
                     >
-                      <div className="flex items-center gap-3">
-                        <ThemedIcon name="circle-user-round" size={20} />
-                        <span className="text-sm font-medium">
-                          {user?.username || "User"}
-                        </span>
-                      </div>
-                      <ThemedIcon
-                        name={
-                          isUserMenuExpanded ? "chevron-up" : "chevron-down"
+                      {userMenuSubItems.map((subItem) => {
+                        if (subItem.name === "TV Mode") {
+                          return (
+                            <button
+                              key={subItem.name}
+                              onClick={() => {
+                                toggleTVMode();
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
+                            >
+                              <div className="flex items-center gap-3">
+                                <ThemedIcon name="tv" size={16} />
+                                <span>TV Mode</span>
+                              </div>
+                              {isTVMode && <span className="text-sm">✓</span>}
+                            </button>
+                          );
+                        } else if (subItem.name === "Sign Out") {
+                          return (
+                            <button
+                              key={subItem.name}
+                              onClick={() => void logout()}
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 text-red-600 hover:bg-red-50"
+                            >
+                              <ThemedIcon
+                                name="logout"
+                                size={16}
+                                color="currentColor"
+                              />
+                              <span>Sign Out</span>
+                            </button>
+                          );
+                        } else {
+                          return (
+                            <Link
+                              key={subItem.name}
+                              to={subItem.path}
+                              className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
+                            >
+                              <ThemedIcon name={subItem.icon} size={16} />
+                              <span>{subItem.name}</span>
+                            </Link>
+                          );
                         }
-                        size={16}
-                      />
-                    </button>
-
-                    {/* Nested user menu items - only in expanded view */}
-                    {isUserMenuExpanded && (
-                      <div
-                        className="hidden xl:block mt-1 ml-4 pl-4 border-l"
-                        style={{ borderColor: "var(--border-color)" }}
-                      >
-                        {userMenuSubItems.map((subItem) => {
-                          if (subItem.name === "TV Mode") {
-                            return (
-                              <button
-                                key={subItem.name}
-                                onClick={() => {
-                                  toggleTVMode();
-                                }}
-                                className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <ThemedIcon name="tv" size={16} />
-                                  <span>TV Mode</span>
-                                </div>
-                                {isTVMode && <span className="text-sm">✓</span>}
-                              </button>
-                            );
-                          } else if (subItem.name === "Sign Out") {
-                            return (
-                              <button
-                                key={subItem.name}
-                                onClick={() => void logout()}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 text-red-600 hover:bg-red-50"
-                              >
-                                <ThemedIcon
-                                  name="logout"
-                                  size={16}
-                                  color="currentColor"
-                                />
-                                <span>Sign Out</span>
-                              </button>
-                            );
-                          } else {
-                            return (
-                              <Link
-                                key={subItem.name}
-                                to={subItem.path}
-                                className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 nav-link"
-                              >
-                                <ThemedIcon name={subItem.icon} size={16} />
-                                <span>{subItem.name}</span>
-                              </Link>
-                            );
-                          }
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

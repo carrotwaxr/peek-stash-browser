@@ -331,7 +331,7 @@ describe("GlobalLayout and TV mode", () => {
     for (const control of controls) {
       expect(control.getAttribute("tabindex")).toBeNull();
     }
-    expect(screen.getAllByRole("link", { name: /settings/i }).length).toBe(2);
+    expect(screen.getAllByRole("link", { name: /settings/i }).length).toBe(1);
   });
 
   it("on in TV mode: html.tv-mode is set and arrows move focus", () => {
