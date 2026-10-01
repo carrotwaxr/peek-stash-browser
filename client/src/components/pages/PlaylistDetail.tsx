@@ -71,17 +71,15 @@ import {
 import { ThemedIcon } from "../icons/index";
 import PlaylistSortControl from "../playlists/PlaylistSortControl";
 import SharePlaylistModal from "../playlists/SharePlaylistModal";
-import {
-  AddToPlaylistButton,
-  BulkActionBar,
-  Button,
-  ConfirmDialog,
-  PageHeader,
-  PageLayout,
-  Pagination,
-  Paper,
-  SceneListItem,
-} from "../ui/index";
+import AddToPlaylistButton from "../ui/AddToPlaylistButton";
+import BulkActionBar from "../ui/BulkActionBar";
+import Button from "../ui/Button";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import PageHeader from "../ui/PageHeader";
+import PageLayout from "../ui/PageLayout";
+import Pagination from "../ui/Pagination";
+import Paper from "../ui/Paper";
+import SceneListItem from "../ui/SceneListItem";
 
 type Direction = "ASC" | "DESC";
 type Repeat = PlaybackQueue["repeat"];

@@ -6,13 +6,16 @@ import {
   ProtectedRoute,
   SetupGuard,
 } from "./components/guards/RouteGuards";
-import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
 import Login from "./components/pages/Login";
-import SetupWizard from "./components/pages/SetupWizard";
 import GlobalLayout from "./components/ui/GlobalLayout";
 import { PUBLIC_ROUTES } from "./constants/navigation";
 
-// Lazy load page components for code splitting
+// Lazy load page components for code splitting. Login and the layout stay in
+// the entry; the setup wizard and password recovery are rare visits.
+const SetupWizard = lazy(() => import("./components/pages/SetupWizard"));
+const ForgotPasswordPage = lazy(
+  () => import("./components/pages/ForgotPasswordPage")
+);
 const Home = lazy(() => import("./components/pages/Home"));
 const Scenes = lazy(() => import("./components/pages/Scenes"));
 const Recommended = lazy(() => import("./components/pages/Recommended"));

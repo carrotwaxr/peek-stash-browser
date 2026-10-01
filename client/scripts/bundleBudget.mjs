@@ -5,17 +5,18 @@
 // Sizes are in kB of 1,000 bytes, as Vite reports them.
 
 /**
- * Budgets measured on 2026-10-01 (v3.4.0-beta.6 plus PR 8's first tasks), each
- * set at the measured size plus 5%. Later PR 8 tasks (D2 to D4) tighten them.
+ * Budgets measured on 2026-10-01 after PR 8's bundle tasks (D1 to D4), each set
+ * at the measured size plus about 5%. Before them the entry was 545 kB and the
+ * first load 340 kB gzip.
  */
 export const budgets = {
-  // Vite's own chunkSizeWarningLimit, which only warns; this fails the build.
-  maxChunkKB: 1000,
+  // Every chunk not named below; Vite's own chunkSizeWarningLimit only warns.
+  maxChunkKB: 500,
   // Named chunks with their own limit. Chunk names are the file name without
   // the content hash.
   chunkKB: {
-    // 117 kB measured (861 before VR, crypto-js and localforage went).
-    Scene: 123,
+    // 118.6 kB measured (861 before VR, crypto-js and localforage went).
+    Scene: 125,
     // 621 kB measured: video.js with VHS (Peek plays HLS and DASH), which has
     // no smaller build.
     "video-vendor": 650,
@@ -23,22 +24,27 @@ export const budgets = {
     // chunk, so each chunk carries the icons it draws.
     "ui-vendor": 13,
   },
-  // Entry plus its modulepreloads, gzip. 198.4 kB measured (entry 165.7,
-  // react-vendor 17.4, query-vendor 10.6, ui-vendor 4.7; was 340.8 with every
-  // lucide icon in ui-vendor), set at 208.
-  firstLoadGzipKB: 208,
+  // The entry chunk (the script index.html loads): the app shell, login and the
+  // layout; every page, the setup wizard and the help dialog load on demand.
+  // 121.1 kB measured (545 kB before D4).
+  entryKB: 127,
+  // Entry plus its modulepreloads, gzip. 126.8 kB measured (entry 38.6,
+  // react-vendor 72.9 with react-dom/client, query-vendor 10.6, ui-vendor 4.7).
+  firstLoadGzipKB: 133,
 };
 
 const kb = (bytes) => Math.round(bytes / 1000);
 
 /**
  * @param {{ chunks: { name: string, size: number, gzip: number }[],
+ *           entry: { name: string, size: number, gzip: number },
  *           firstLoad: { name: string, size: number, gzip: number }[] }} sizes
- *   sizes in bytes; `firstLoad` is the entry plus its modulepreload chunks
+ *   sizes in bytes; `entry` is the chunk index.html loads (other chunks may
+ *   share its name), `firstLoad` the entry plus its modulepreload chunks
  * @param {typeof budgets} limits
  * @returns {string[]} one line per violation; empty when within budget
  */
-export function checkBudget({ chunks, firstLoad }, limits) {
+export function checkBudget({ chunks, entry, firstLoad }, limits) {
   const violations = [];
 
   for (const chunk of chunks) {
@@ -48,6 +54,12 @@ export function checkBudget({ chunks, firstLoad }, limits) {
         `Chunk ${chunk.name} is ${kb(chunk.size)} kB, over its ${limit} kB limit`
       );
     }
+  }
+
+  if (entry.size > limits.entryKB * 1000) {
+    violations.push(
+      `Entry ${entry.name} is ${kb(entry.size)} kB, over its ${limits.entryKB} kB limit`
+    );
   }
 
   const gzip = firstLoad.reduce((sum, chunk) => sum + chunk.gzip, 0);
@@ -60,4 +72,22 @@ export function checkBudget({ chunks, firstLoad }, limits) {
   }
 
   return violations;
+}
+
+/**
+ * Rollup's warnings that chunks import each other: a module and the barrel
+ * re-exporting it in different chunks ("circular dependency between chunks"),
+ * or manual chunks in a cycle ("Circular chunk: a -> b -> a"). Either may break
+ * execution order; Vite prints them and builds anyway, so the check fails on
+ * them.
+ *
+ * @param {string} log the build's output
+ * @returns {string[]} the warning lines
+ */
+export function circularChunkWarnings(log) {
+  return log
+    .split("\n")
+    .filter((line) =>
+      /circular dependency between chunks|circular chunk:/i.test(line)
+    );
 }

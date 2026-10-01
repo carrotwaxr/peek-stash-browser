@@ -65,10 +65,11 @@ jobs:
         run: npm run lint
 
       - name: Build
-        run: npm run build
+        # The log feeds the budget check, which fails on a circular chunk warning
+        run: set -o pipefail; npm run build 2>&1 | tee build.log
 
       - name: Bundle size budgets
-        run: npm run check:bundle
+        run: npm run check:bundle -- --log build.log
 
       - name: Test with coverage
         run: npm run test:coverage

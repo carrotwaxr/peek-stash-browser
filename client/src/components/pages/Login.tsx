@@ -4,7 +4,7 @@ import { LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } from "../../api";
 import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
-import { Button } from "../ui/index";
+import Button from "../ui/Button";
 
 const Login = () => {
   const { login } = useAuth();

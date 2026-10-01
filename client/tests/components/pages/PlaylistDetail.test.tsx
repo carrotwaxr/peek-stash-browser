@@ -36,7 +36,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDownloads } from "@/api/hooks/useDownloads";
 import { usePlaylists } from "@/api/hooks/usePlaylists";
 import PlaylistDetail from "@/components/pages/PlaylistDetail";
-import type * as uiModule from "@/components/ui/index";
 import { showError, showSuccess, showWarning } from "@/utils/toast";
 
 const { rowLinkStates, sceneStates, addButtonExclusions } = vi.hoisted(() => ({
@@ -65,11 +64,10 @@ vi.mock("@/utils/toast", () => ({
 vi.mock("@/themes/useTheme", () => ({
   useTheme: () => ({ theme: undefined }),
 }));
-vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof uiModule>()),
-  // The row's title, its select box, its reorder handle and its buttons;
-  // its link state is recorded for the queue cases
-  SceneListItem: ({
+// The row's title, its select box, its reorder handle and its buttons; its link
+// state is recorded for the queue cases
+vi.mock("@/components/ui/SceneListItem", () => ({
+  default: ({
     scene,
     dragHandle,
     actionButtons,
@@ -98,8 +96,10 @@ vi.mock("@/components/ui/index", async (importOriginal) => ({
       </div>
     );
   },
-  // The menu reads the user's playlists; here only what it leaves out counts
-  AddToPlaylistButton: ({
+}));
+// The menu reads the user's playlists; here only what it leaves out counts
+vi.mock("@/components/ui/AddToPlaylistButton", () => ({
+  default: ({
     excludePlaylistIds,
   }: {
     excludePlaylistIds?: ReadonlyArray<number | string>;

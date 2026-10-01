@@ -12,6 +12,8 @@ export interface Budgets {
   maxChunkKB: number;
   /** Limits for named chunks, kB; these replace `maxChunkKB`. */
   chunkKB: Record<string, number>;
+  /** The entry chunk (the script index.html loads), kB. */
+  entryKB: number;
   /** Entry plus modulepreloads, gzip kB. */
   firstLoadGzipKB: number;
 }
@@ -19,6 +21,8 @@ export interface Budgets {
 export const budgets: Budgets;
 
 export function checkBudget(
-  sizes: { chunks: ChunkSize[]; firstLoad: ChunkSize[] },
+  sizes: { chunks: ChunkSize[]; entry: ChunkSize; firstLoad: ChunkSize[] },
   limits: Budgets
 ): string[];
+
+export function circularChunkWarnings(log: string): string[];
