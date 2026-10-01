@@ -185,6 +185,24 @@ describe("performer page sections", () => {
     noCard("Links");
   });
 
+  it("a performer page reads typed fields: Born, Career, Height in the viewer's units, Links from url", async () => {
+    render();
+
+    const details = await card("Details");
+    expect(details.getByText("Born").nextSibling).toHaveTextContent(
+      /years old/
+    );
+    expect(details.getByText("Career").nextSibling).toHaveTextContent(
+      "2010 - 2020"
+    );
+    expect(details.getByText("Height").nextSibling).toHaveTextContent("170 cm");
+    const links = await card("Links");
+    expect(links.getByRole("link")).toHaveAttribute(
+      "href",
+      "https://example.com/performer"
+    );
+  });
+
   it("shows the tags as chips, by name, to each tag's page", async () => {
     render();
 
@@ -253,6 +271,52 @@ describe("studio page sections", () => {
 
     await card("Website");
     expect(screen.getAllByText("About the studio")).toHaveLength(1);
+  });
+});
+
+describe.each([
+  ["performer", "performers"],
+  ["studio", "studios"],
+] as const)("%s StashDB links", (type, boxPath) => {
+  const render = (extra: Record<string, unknown> = {}) =>
+    renderDetailPage(type, `/${type}/5`, {
+      entity: { ...base, ...extra },
+      counts: "loading",
+    });
+
+  it("the StashDB card links each stash id to its box", async () => {
+    render({
+      stash_ids: [
+        {
+          endpoint: "https://stashdb.org/graphql",
+          stash_id: "0123456789abcdef",
+        },
+        { endpoint: "https://fansdb.cc/graphql", stash_id: "fedcba9876543210" },
+      ],
+    });
+
+    const links = await card("StashDB Links");
+    expect(
+      links
+        .getAllByRole("link")
+        .map((link) => [link.textContent, link.getAttribute("href")])
+    ).toEqual([
+      [
+        "StashDB: 01234567...",
+        `https://stashdb.org/${boxPath}/0123456789abcdef`,
+      ],
+      [
+        "External: fedcba98...",
+        `https://fansdb.cc/${boxPath}/fedcba9876543210`,
+      ],
+    ]);
+  });
+
+  it("shows no StashDB card without stash ids", async () => {
+    render({ stash_ids: [] });
+    await screen.findByRole("heading", { level: 1 });
+
+    noCard("StashDB Links");
   });
 });
 
@@ -596,11 +660,8 @@ describe("statistics", () => {
       expect(statistics.getByText("60/100")).toBeVisible();
     });
 
-    // DETAIL-17: the studio's bar reads the viewer's rating as the detail
-    // hook holds it; the performer page's still reads the rating as loaded
-    // (B12 moves it onto the layout)
-    const followsSlider = type === "studio" ? it : it.fails;
-    followsSlider("follows the slider after a change", async () => {
+    // DETAIL-17: the bar reads the viewer's rating as the detail hook holds it
+    it("follows the slider after a change", async () => {
       cardSettings.current = { showRating: true };
       const { api } = render();
       const statistics = await card("Statistics");

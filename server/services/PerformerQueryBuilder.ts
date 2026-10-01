@@ -34,6 +34,7 @@ import {
   emptyToNull,
   likeContains,
   parseJsonArray,
+  parseStashIds,
 } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
@@ -58,7 +59,7 @@ const selectColumns = (ctx: QueryContext) =>
     p.details, p.aliasList, p.country, p.ethnicity, p.hairColor, p.eyeColor,
     p.heightCm, p.weightKg, p.measurements, p.fakeTits, p.penisLength, p.circumcised,
     p.tattoos, p.piercings,
-    p.careerLength, p.deathDate, p.url, p.imagePath,
+    p.careerLength, p.deathDate, p.url, p.stashIds, p.imagePath,
     p.stashCreatedAt, p.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
     s.oCounter AS userOCounter, s.playCount AS userPlayCount,
@@ -426,6 +427,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       career_length: emptyToNull(row.careerLength),
       death_date: emptyToNull(row.deathDate),
       url: emptyToNull(row.url),
+      stash_ids: parseStashIds(row.stashIds),
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),

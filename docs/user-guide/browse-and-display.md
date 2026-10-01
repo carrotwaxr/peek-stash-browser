@@ -31,11 +31,11 @@ A justified gallery layout that preserves aspect ratios.
 
 **Wall playback modes** (Settings → Display):
 
-| Mode | Behavior |
-|------|----------|
+| Mode         | Behavior                                                           |
+| ------------ | ------------------------------------------------------------------ |
 | **Autoplay** | Videos play when visible, up to six at once; hover controls volume |
-| **Hover** | Static thumbnail until hover, then plays |
-| **Static** | Thumbnails only, no video playback |
+| **Hover**    | Static thumbnail until hover, then plays                           |
+| **Static**   | Thumbnails only, no video playback                                 |
 
 ### Table View
 
@@ -124,21 +124,21 @@ Adjust how many items appear per row using the S/M/L buttons in the toolbar.
 
 In Grid View, density controls the number of columns:
 
-| Level | Columns (Desktop) | Description |
-|-------|-------------------|-------------|
-| **Small** | 4-6 | More items, smaller cards |
-| **Medium** | 3-5 | Balanced view (default) |
-| **Large** | 2-3 | Fewer items, larger cards |
+| Level      | Columns (Desktop) | Description               |
+| ---------- | ----------------- | ------------------------- |
+| **Small**  | 4-6               | More items, smaller cards |
+| **Medium** | 3-5               | Balanced view (default)   |
+| **Large**  | 2-3               | Fewer items, larger cards |
 
 ### Wall Zoom
 
 In Wall View, zoom controls row height:
 
-| Level | Row Height | Items per Row (1920px) |
-|-------|------------|------------------------|
-| **Small** | 150px | 6-8 items |
-| **Medium** | 220px | 4-5 items (default) |
-| **Large** | 320px | 2-3 items |
+| Level      | Row Height | Items per Row (1920px) |
+| ---------- | ---------- | ---------------------- |
+| **Small**  | 150px      | 6-8 items              |
+| **Medium** | 220px      | 4-5 items (default)    |
+| **Large**  | 320px      | 2-3 items              |
 
 ---
 
@@ -158,14 +158,14 @@ Click the ⚙️ icon in the search toolbar for current entity type settings.
 
 Settings vary by entity type. Common options include:
 
-| Setting | Description |
-|---------|-------------|
-| **Show studio** | Display studio name on cards |
-| **Show date** | Display date on cards |
-| **Show rating** | Display star rating badge |
-| **Show favorite** | Display favorite button |
-| **Show O-counter** | Display O-counter badge |
-| **Show description** | Display description text |
+| Setting                | Description                      |
+| ---------------------- | -------------------------------- |
+| **Show studio**        | Display studio name on cards     |
+| **Show date**          | Display date on cards            |
+| **Show rating**        | Display star rating badge        |
+| **Show favorite**      | Display favorite button          |
+| **Show O-counter**     | Display O-counter badge          |
+| **Show description**   | Display description text         |
 | **Show relationships** | Display performer/tag indicators |
 
 With **Show relationships** on, each indicator shows how many related items you can see, and its tooltip lists them with their pictures. On performer, studio, tag and collection cards a tooltip lists up to 12 and says how many more there are: first those sharing the most scenes with the card (on a tag's card, those with the most scenes), then by name. A card's own tags are always listed in full.
@@ -173,6 +173,8 @@ With **Show relationships** on, each indicator shows how many related items you 
 The counts on performer, studio, tag, collection and gallery cards (scenes, galleries, images, performers, collections) are what the page behind the card lists: Peek counts them from its copy of your library, and every sync keeps them current. They leave out what you cannot see (content restrictions and the items you hid) and equal the totals of the tabs on the page behind the card. A tag's scene count includes the scenes that inherit the tag from a performer, studio or collection, as the tag's Scenes tab does; a studio's counts do not include its sub-studios'. A tag page's marker count still comes from Stash. After a sync, a card may show a changed item for a few seconds until your view is recomputed.
 
 A detail page (performer, studio, tag, collection or gallery) counts its tabs the same way, as you see them: the numbers in its Statistics card and on its tab badges are the totals of the lists under the tabs, and the page opens on the first tab with something in it. With **Include sub-tags** or **Include sub-studios** on, the counts include the sub-tags' or sub-studios' content, as the tabs then list it. A tag's **Markers** figure is the clips you can see with that tag (the Clips page's default list, generated previews only), and clicking it opens that list; markers on scenes you can't see are not counted. A page opened from a link that names no server shows the item on its own server.
+
+A performer or studio page lists its StashDB entries (and those on any other stash-box) in a **StashDB Links** card, each opening the entry on its box. They come from Peek's copy of your library, as of the last sync. A performer's attributes (born, career, height and the rest) are in its **Details** card beside the image, and its biography in **About**; both show while **Show description on detail page** is on.
 
 **Scene-specific:**
 
@@ -202,11 +204,11 @@ Click **Filters** in the search toolbar to open the filter panel, set the filter
 
 A filter that picks performers, tags, studios, collections or galleries has a dropdown above it that says how the picks combine:
 
-| Choice | Matches |
-|--------|---------|
-| **Has ANY of these** | Items with at least one of the picks |
-| **Has ALL of these** | Items with every pick |
-| **Has NONE of these** | Items with none of the picks |
+| Choice                | Matches                              |
+| --------------------- | ------------------------------------ |
+| **Has ANY of these**  | Items with at least one of the picks |
+| **Has ALL of these**  | Items with every pick                |
+| **Has NONE of these** | Items with none of the picks         |
 
 - The dropdown always shows the choice the search uses. Until you change it, that is the filter's default: **Has ALL** for tags, **Has ANY** for the others.
 - A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.

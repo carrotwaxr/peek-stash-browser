@@ -116,6 +116,7 @@ function studioRow(overrides: Partial<StudioQueryRow> = {}): StudioQueryRow {
     stashInstanceId: "inst-a",
     name: "Studio One",
     parentId: "9",
+    stashIds: null,
     stashFavorite: true,
     stashRating100: 80,
     sceneCount: 4,
@@ -331,6 +332,34 @@ describe("StudioQueryBuilder", () => {
   });
 
   describe("rows", () => {
+    it("a row carries its stash ids as a list; an unreadable stored list reads as none", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          studioRow({
+            stashIds: JSON.stringify([
+              { endpoint: "https://stashdb.org/graphql", stash_id: "abc" },
+              { endpoint: "https://stashdb.org/graphql" },
+              "abc",
+            ]),
+          }),
+          studioRow({ id: "2", stashIds: "not json" }),
+          studioRow({ id: "3", stashIds: '{"endpoint":"x"}' }),
+          studioRow({ id: "4", stashIds: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 4n }]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("s.stashIds");
+      expect(items.map((row) => row.stash_ids)).toEqual([
+        [{ endpoint: "https://stashdb.org/graphql", stash_id: "abc" }],
+        [],
+        [],
+        [],
+      ]);
+    });
+
     it("a row reads as the viewer's studio: Peek's own rating and counts, absent text as null", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe

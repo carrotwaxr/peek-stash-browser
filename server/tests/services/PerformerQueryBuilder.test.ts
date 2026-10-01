@@ -99,6 +99,7 @@ function performerRow(
     groupCount: 1,
     details: "",
     aliasList: '["Annie"]',
+    stashIds: null,
     country: null,
     ethnicity: null,
     hairColor: null,
@@ -436,6 +437,34 @@ describe("PerformerQueryBuilder", () => {
   });
 
   describe("rows", () => {
+    it("a row carries its stash ids as a list; an unreadable stored list reads as none", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([
+          performerRow({
+            stashIds: JSON.stringify([
+              { endpoint: "https://stashdb.org/graphql", stash_id: "abc" },
+              { endpoint: "https://stashdb.org/graphql" },
+              "abc",
+            ]),
+          }),
+          performerRow({ id: "2", stashIds: "not json" }),
+          performerRow({ id: "3", stashIds: '{"endpoint":"x"}' }),
+          performerRow({ id: "4", stashIds: null }),
+        ])
+        .mockResolvedValueOnce([{ total: 4n }]);
+
+      const { items } = await run();
+
+      expect(pageStatement().sql).toContain("p.stashIds");
+      expect(items.map((row) => row.stash_ids)).toEqual([
+        [{ endpoint: "https://stashdb.org/graphql", stash_id: "abc" }],
+        [],
+        [],
+        [],
+      ]);
+    });
+
     it("a row reads as the viewer's performer: Peek's own rating and counts, absent text as null", async () => {
       mockPrisma.$queryRawUnsafe.mockReset();
       mockPrisma.$queryRawUnsafe
