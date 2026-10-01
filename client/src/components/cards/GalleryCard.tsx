@@ -2,6 +2,7 @@ import { forwardRef, memo } from "react";
 import type { NormalizedGallery } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { formatDate } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
 import { galleryTitle } from "../../utils/gallery";
 import { BaseCard } from "../ui/BaseCard";
@@ -36,7 +37,7 @@ const GalleryCard = memo(
         }
 
         if (gallerySettings.showDate && gallery.date) {
-          parts.push(new Date(gallery.date).toLocaleDateString());
+          parts.push(formatDate(gallery.date));
         }
 
         return parts.length > 0 ? parts.join(" • ") : null;

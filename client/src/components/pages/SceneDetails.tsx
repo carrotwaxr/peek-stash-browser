@@ -6,8 +6,13 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { describePlaybackMethod } from "../../utils/browserPlayback";
+import { formatDate } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
-import { formatBitRate, formatFileSize } from "../../utils/format";
+import {
+  formatBitRate,
+  formatDuration,
+  formatFileSize,
+} from "../../utils/format";
 import type { Clip } from "../cards/ClipCard";
 import ClipList from "../clips/ClipList";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
@@ -18,20 +23,6 @@ interface SceneDetailsProps {
   showTechnicalDetails: boolean;
   setShowTechnicalDetails: (value: boolean) => void;
 }
-
-const formatDuration = (seconds: number | undefined | null): string => {
-  if (!seconds) return "Unknown";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
-};
 
 /**
  * Merge and deduplicate tags from scene direct tags and inherited tags
@@ -168,7 +159,7 @@ const SceneDetails = ({
                         className="text-base"
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {new Date(scene.date).toLocaleDateString()}
+                        {formatDate(scene.date)}
                       </p>
                     </div>
                   )}
@@ -204,7 +195,9 @@ const SceneDetails = ({
                     className="text-base"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {formatDuration(scene.files?.[0]?.duration)}
+                    {scene.files?.[0]?.duration
+                      ? formatDuration(scene.files[0].duration)
+                      : "Unknown"}
                   </p>
                 </div>
 

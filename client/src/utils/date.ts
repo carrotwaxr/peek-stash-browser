@@ -5,13 +5,19 @@
 /**
  * Format a date string for display
  * For date-only strings (YYYY-MM-DD), formats directly without timezone conversion
- * since these are publication dates, not moments in time.
+ * since these are publication dates, not moments in time. Anything else is a
+ * moment, shown in the viewer's zone. Nothing gives `empty`.
  */
 export function formatDate(
-  dateString: string,
-  options: Intl.DateTimeFormatOptions = {}
+  dateString: string | null | undefined,
+  {
+    empty = "Unknown",
+    ...options
+  }: Intl.DateTimeFormatOptions & {
+    empty?: string;
+  } = {}
 ) {
-  if (!dateString) return "Unknown";
+  if (!dateString) return empty;
 
   try {
     // For date-only strings (YYYY-MM-DD), format directly without Date object
@@ -47,6 +53,19 @@ export function formatDate(
   } catch {
     return "Invalid Date";
   }
+}
+
+/**
+ * Format a moment as the viewer's locale date and time. Nothing gives `empty`.
+ * For a date with no time (a scene's date, a birthdate) use formatDate.
+ */
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  { empty = "Unknown" }: { empty?: string } = {}
+) {
+  if (!value) return empty;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? "Invalid Date" : date.toLocaleString();
 }
 
 /**

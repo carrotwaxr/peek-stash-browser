@@ -9,7 +9,11 @@ import {
 import { useSharedMediaQuery } from "../../hooks/useHoverCapable";
 import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
-import { getSceneDescription } from "../../utils/format";
+import {
+  formatDuration,
+  formatDurationHumanReadable,
+  getSceneDescription,
+} from "../../utils/format";
 import {
   SceneMetadata,
   SceneStats,
@@ -89,23 +93,6 @@ const SceneListItem = ({
     const fiveMinutes = 5 * 60 * 1000;
 
     return timeDiff < fiveMinutes;
-  };
-
-  const formatDuration = (seconds: number) => {
-    if (!seconds || seconds < 1) return "0m";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
-  const formatResumeTime = (seconds: number) => {
-    if (!seconds) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -261,7 +248,7 @@ const SceneListItem = ({
                             scene.files?.[0]?.duration && (
                               <span>
                                 ⏸️ Resume at:{" "}
-                                {formatResumeTime(watchHistory.resumeTime)} (
+                                {formatDuration(watchHistory.resumeTime)} (
                                 {Math.round(
                                   (watchHistory.resumeTime /
                                     scene.files[0].duration) *
@@ -274,7 +261,12 @@ const SceneListItem = ({
                             watchHistory.playDuration > 0 && (
                               <span>
                                 ⏱️ Watched:{" "}
-                                {formatDuration(watchHistory.playDuration)}
+                                {formatDurationHumanReadable(
+                                  watchHistory.playDuration,
+                                  {
+                                    includeDays: false,
+                                  }
+                                )}
                               </span>
                             )}
                         </div>

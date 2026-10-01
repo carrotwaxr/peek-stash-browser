@@ -5,6 +5,7 @@ import { apiDelete, apiPost, apiPut } from "../../api";
 import type { CustomTheme } from "../../themes/ThemeContext";
 import type { ThemeConfig } from "../../themes/themes";
 import { useTheme } from "../../themes/useTheme";
+import { formatDate } from "../../utils/date";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper } from "../ui/index";
 import CustomThemeEditor from "./CustomThemeEditor";
@@ -265,9 +266,9 @@ const CustomThemeManager = () => {
                           {theme.config.mode === "dark" ? "Dark" : "Light"} mode
                           {" • "}
                           Created{" "}
-                          {new Date(
-                            (theme as CustomThemeWithDates).createdAt || ""
-                          ).toLocaleDateString()}
+                          {formatDate(
+                            (theme as CustomThemeWithDates).createdAt
+                          )}
                         </p>
                       </div>
                     </div>

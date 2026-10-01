@@ -4,6 +4,7 @@ import { apiGet, apiPost } from "../../api";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../hooks/useAuth";
 import { useVisibleInterval } from "../../hooks/useVisibleInterval";
+import { formatDateTime } from "../../utils/date";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper, StatusMessage } from "../ui/index";
 
@@ -294,8 +295,7 @@ const ServerStatsSection = ({ onSyncStarted }: Props) => {
             <div className="flex items-center gap-2">
               {stats.cache?.lastRefreshed && (
                 <span>
-                  Last synced:{" "}
-                  {new Date(stats.cache.lastRefreshed).toLocaleString()}
+                  Last synced: {formatDateTime(stats.cache.lastRefreshed)}
                 </span>
               )}
             </div>

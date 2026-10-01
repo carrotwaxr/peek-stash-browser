@@ -1,6 +1,6 @@
 import type { NormalizedScene } from "@peek/shared-types";
 import { AlertCircle, Eye, ImageOff, Loader2 } from "lucide-react";
-import { getSceneTitle } from "../../utils/format";
+import { formatDuration, getSceneTitle } from "../../utils/format";
 import { useLazyLoad } from "../ui/CardComponents";
 
 interface Props {
@@ -167,20 +167,6 @@ const PreviewCard = ({ scene }: PreviewCardProps) => {
       </div>
     </div>
   );
-};
-
-/**
- * Format duration from seconds to HH:MM:SS or MM:SS
- */
-const formatDuration = (seconds: number): string => {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hrs > 0) {
-    return `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  }
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
 export default CarouselPreview;

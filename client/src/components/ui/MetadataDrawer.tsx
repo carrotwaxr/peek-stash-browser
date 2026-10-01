@@ -9,6 +9,7 @@ import type { ImageListItem } from "@peek/shared-types";
 import { useDecrementImageOCounter } from "../../api/hooks";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { formatDate } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getImageTitle } from "../../utils/imageTitle";
 import EntityMenu from "./EntityMenu";
@@ -87,7 +88,7 @@ const MetadataDrawer = ({
 
   if (!open || !image) return null;
 
-  const date = image.date ? new Date(image.date).toLocaleDateString() : null;
+  const date = image.date ? formatDate(image.date) : null;
   const resolution =
     image.width && image.height ? `${image.width}×${image.height}` : null;
 

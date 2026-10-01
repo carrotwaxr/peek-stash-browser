@@ -1,6 +1,10 @@
 import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
-import { formatDate, formatRelativeTime } from "../../src/utils/date";
+import {
+  formatDate,
+  formatDateTime,
+  formatRelativeTime,
+} from "../../src/utils/date";
 
 describe("date utilities", () => {
   describe("formatDate", () => {
@@ -34,6 +38,23 @@ describe("date utilities", () => {
       expect(formatDate("2024-02-01")).toBe("Feb 1, 2024");
       expect(formatDate("2024-07-31")).toBe("Jul 31, 2024");
       expect(formatDate("2024-11-15")).toBe("Nov 15, 2024");
+    });
+  });
+
+  describe("formatDateTime", () => {
+    it("formats a timestamp with its time", () => {
+      const result = formatDateTime("2024-06-15T10:30:00Z");
+      expect(result).toBe(new Date("2024-06-15T10:30:00Z").toLocaleString());
+    });
+
+    it("takes a Date", () => {
+      const date = new Date("2024-06-15T10:30:00Z");
+      expect(formatDateTime(date)).toBe(date.toLocaleString());
+    });
+
+    it("gives the empty text for nothing", () => {
+      expect(formatDateTime(null)).toBe("Unknown");
+      expect(formatDateTime(undefined, { empty: "Never" })).toBe("Never");
     });
   });
 

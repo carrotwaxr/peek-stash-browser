@@ -8,6 +8,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { apiGet, apiPost } from "../../../api";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { makeCompositeKey } from "../../../utils/compositeKey";
+import { formatDate } from "../../../utils/date";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
@@ -229,8 +230,7 @@ const MergeRecoveryTab = () => {
                         className="text-sm"
                         style={{ color: "var(--text-secondary)" }}
                       >
-                        Deleted:{" "}
-                        {new Date(orphan.deletedAt).toLocaleDateString()}
+                        Deleted: {formatDate(orphan.deletedAt)}
                         {orphan.phash
                           ? ` | PHASH: ${orphan.phash.substring(0, 12)}...`
                           : " | No PHASH"}

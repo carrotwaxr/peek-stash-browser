@@ -3,8 +3,9 @@ import type { NormalizedScene } from "@peek/shared-types";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useSimilarScenes } from "../../api/hooks/useScenes";
 import { useConfig } from "../../contexts/ConfigContext";
+import { formatDate } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
-import { getSceneTitle } from "../../utils/format";
+import { formatDuration, getSceneTitle } from "../../utils/format";
 import { useLazyLoad } from "./CardComponents";
 
 /**
@@ -148,7 +149,7 @@ const RecommendedSidebar = ({ sceneId, instanceId, maxHeight }: Props) => {
                       className="text-xs mt-0.5"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      {new Date(scene.date).toLocaleDateString()}
+                      {formatDate(scene.date)}
                     </p>
                   )}
                 </div>
@@ -159,23 +160,6 @@ const RecommendedSidebar = ({ sceneId, instanceId, maxHeight }: Props) => {
       </div>
     </div>
   );
-};
-
-/**
- * Format duration in seconds to HH:MM:SS or MM:SS
- */
-const formatDuration = (seconds: number) => {
-  if (!seconds) return "?:??";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 };
 
 /**
@@ -226,7 +210,7 @@ const SidebarThumbnail = ({
             color: "white",
           }}
         >
-          {formatDuration(duration)}
+          {duration ? formatDuration(duration) : "?:??"}
         </div>
       )}
     </div>
