@@ -15,6 +15,7 @@ import {
   deleteStashInstance,
   getAllStashInstances,
   getSetupStatus,
+  getStashInstance,
   testStashConnection,
   updateStashInstance,
 } from "../../controllers/setup.js";
@@ -144,7 +145,138 @@ function instanceCounts({ enabled, all }: { enabled: number; all: number }) {
   );
 }
 
+/** The dates every stored instance row has; the responses send them as ISO strings */
+const instanceDates = {
+  createdAt: new Date("2026-01-02T03:04:05.000Z"),
+  updatedAt: new Date("2026-01-02T03:04:05.000Z"),
+  firstSyncedAt: null,
+};
+
 describe("Setup Controller", () => {
+  describe("dates in responses", () => {
+    const created = new Date("2026-01-02T03:04:05.000Z");
+    const updated = new Date("2026-02-03T04:05:06.000Z");
+    const synced = new Date("2026-03-04T05:06:07.000Z");
+
+    const instanceRow = (overrides: Record<string, unknown> = {}) =>
+      partialRow<StashInstance>({
+        id: "inst-a",
+        name: "Primary",
+        description: null,
+        url: "http://stash:9999/graphql",
+        uiUrl: null,
+        enabled: true,
+        priority: 0,
+        createdAt: created,
+        updatedAt: updated,
+        firstSyncedAt: synced,
+        ...overrides,
+      });
+
+    it("createFirstAdmin answers createdAt as an ISO string", async () => {
+      mockPrisma.user.count.mockResolvedValue(0);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          username: "admin",
+          role: "ADMIN",
+          createdAt: created,
+        })
+      );
+      const res = resFor(createFirstAdmin);
+      await createFirstAdmin(
+        reqFor(createFirstAdmin, {
+          body: { username: "admin", password: "securepass1" },
+        }),
+        res
+      );
+      expect(res._getOkBody().user.createdAt).toBe(created.toISOString());
+    });
+
+    it("createFirstStashInstance answers createdAt as an ISO string", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(0);
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        instanceRow({ createdAt: created })
+      );
+      const res = resFor(createFirstStashInstance);
+      await createFirstStashInstance(
+        reqFor(createFirstStashInstance, {
+          body: { url: "http://stash:9999/graphql", apiKey: "k" },
+        }),
+        res
+      );
+      expect(res._getOkBody().instance.createdAt).toBe(created.toISOString());
+    });
+
+    it("getStashInstance answers createdAt and updatedAt as ISO strings", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([instanceRow()]);
+      const res = resFor(getStashInstance);
+      await getStashInstance(reqFor(getStashInstance), res);
+      const instance = must(res._getOkBody().instance);
+      expect(instance.createdAt).toBe(created.toISOString());
+      expect(instance.updatedAt).toBe(updated.toISOString());
+    });
+
+    it("getAllStashInstances answers every date as an ISO string, firstSyncedAt null while unsynced", async () => {
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        instanceRow(),
+        instanceRow({ id: "inst-b", firstSyncedAt: null }),
+      ]);
+      const res = resFor(getAllStashInstances);
+      await getAllStashInstances(reqFor(getAllStashInstances), res);
+      const [a, b] = res._getOkBody().instances;
+      expect(must(a).createdAt).toBe(created.toISOString());
+      expect(must(a).updatedAt).toBe(updated.toISOString());
+      expect(must(a).firstSyncedAt).toBe(synced.toISOString());
+      expect(must(b).firstSyncedAt).toBeNull();
+    });
+
+    it("createStashInstance and updateStashInstance answer every date as an ISO string", async () => {
+      mockSync.queueFullSync.mockReturnValue("started");
+      mockPrisma.stashInstance.create.mockResolvedValue(instanceRow());
+      const created201 = resFor(createStashInstance);
+      await createStashInstance(
+        reqFor(createStashInstance, {
+          body: {
+            name: "Primary",
+            url: "http://stash:9999/graphql",
+            apiKey: "k",
+          },
+        }),
+        created201
+      );
+      expect(created201._getOkBody().instance.firstSyncedAt).toBe(
+        synced.toISOString()
+      );
+      expect(created201._getOkBody().instance.createdAt).toBe(
+        created.toISOString()
+      );
+
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Primary",
+          url: "http://stash:9999/graphql",
+          apiKey: "k",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(instanceRow());
+      const updated200 = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { name: "Primary" },
+          params: { id: "inst-a" },
+        }),
+        updated200
+      );
+      const sent = updated200._getOkBody().instance;
+      expect(sent.createdAt).toBe(created.toISOString());
+      expect(sent.updatedAt).toBe(updated.toISOString());
+      expect(sent.firstSyncedAt).toBe(synced.toISOString());
+    });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.user.count.mockResolvedValue(0);
@@ -756,15 +888,20 @@ describe("Setup Controller", () => {
   describe("getAllStashInstances", () => {
     it("returns instances ordered by priority", async () => {
       const instances: StashInstance[] = [
-        partialRow({ id: "a", name: "Primary", priority: 0 }),
-        partialRow({ id: "b", name: "Secondary", priority: 1 }),
+        partialRow({ ...instanceDates, id: "a", name: "Primary", priority: 0 }),
+        partialRow({
+          ...instanceDates,
+          id: "b",
+          name: "Secondary",
+          priority: 1,
+        }),
       ];
       mockPrisma.stashInstance.findMany.mockResolvedValue(instances);
 
       const res = resFor(getAllStashInstances);
       await getAllStashInstances(reqFor(getAllStashInstances), res);
 
-      expect(res._getOkBody().instances).toEqual(instances);
+      expect(res._getOkBody().instances.map((i) => i.id)).toEqual(["a", "b"]);
       expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: { priority: "asc" },
@@ -961,6 +1098,7 @@ describe("Setup Controller", () => {
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
         partialRow({
+          ...instanceDates,
           id: "inst-a",
           url: "http://moved:9999/graphql",
           enabled: true,
@@ -992,7 +1130,12 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", name: "Renamed", enabled: true })
+        partialRow({
+          ...instanceDates,
+          id: "inst-a",
+          name: "Renamed",
+          enabled: true,
+        })
       );
 
       const res = resFor(updateStashInstance);
@@ -1019,7 +1162,7 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", enabled: true })
+        partialRow({ ...instanceDates, id: "inst-a", enabled: true })
       );
       mockUsersSelecting.mockResolvedValue([1, 4]);
 
@@ -1091,7 +1234,7 @@ describe("Setup Controller", () => {
       );
       mockPrisma.stashInstance.count.mockResolvedValue(1);
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", enabled: false })
+        partialRow({ ...instanceDates, id: "inst-a", enabled: false })
       );
       mockUsersSelecting.mockResolvedValue([2, 3]);
 
@@ -1126,7 +1269,7 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", enabled: false })
+        partialRow({ ...instanceDates, id: "inst-a", enabled: false })
       );
       // Another instance stays enabled
       mockPrisma.stashInstance.count.mockResolvedValue(1);
@@ -1162,7 +1305,12 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", enabled: true, firstSyncedAt: null })
+        partialRow({
+          ...instanceDates,
+          id: "inst-a",
+          enabled: true,
+          firstSyncedAt: null,
+        })
       );
       mockSync.queueFullSync.mockReturnValue("started");
       const updateData = () => {
@@ -1206,7 +1354,12 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.update.mockResolvedValue(
-        partialRow({ id: "inst-a", enabled: true, firstSyncedAt: null })
+        partialRow({
+          ...instanceDates,
+          id: "inst-a",
+          enabled: true,
+          firstSyncedAt: null,
+        })
       );
       mockSync.queueFullSync.mockReturnValue("queued");
 
@@ -1226,6 +1379,7 @@ describe("Setup Controller", () => {
       mockSync.queueFullSync.mockClear();
       mockPrisma.stashInstance.update.mockResolvedValue(
         partialRow({
+          ...instanceDates,
           id: "inst-a",
           enabled: true,
           firstSyncedAt: new Date("2026-09-20T08:00:00Z"),

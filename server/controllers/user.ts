@@ -734,6 +734,8 @@ export const getAllUsers = async (
   res.json({
     users: users.map((u) => ({
       ...u,
+      createdAt: u.createdAt.toISOString(),
+      updatedAt: u.updatedAt.toISOString(),
       groups: u.groupMemberships.map((m) => m.group),
       groupMemberships: undefined,
     })),
@@ -800,7 +802,10 @@ export const createUser = async (
     },
   });
 
-  res.status(201).json({ success: true, user: newUser });
+  res.status(201).json({
+    success: true,
+    user: { ...newUser, createdAt: newUser.createdAt.toISOString() },
+  });
 };
 
 /**
@@ -904,7 +909,10 @@ export const updateUserRole = async (
   // and empty rows, demotion applies the kept restriction rows again.
   await exclusionComputationService.recomputeForUser(userIdInt);
 
-  res.json({ success: true, user: updatedUser });
+  res.json({
+    success: true,
+    user: { ...updatedUser, updatedAt: updatedUser.updatedAt.toISOString() },
+  });
 };
 
 /**

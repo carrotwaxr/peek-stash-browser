@@ -8,6 +8,8 @@
  */
 import { ENTITY_KINDS } from "../filters/criteria.js";
 
+// Dates are ISO 8601 strings: that is what JSON carries.
+
 /**
  * Carousel preference configuration for user home page
  */
@@ -219,8 +221,8 @@ export interface GetAllUsersResponse {
     id: number;
     username: string;
     role: string;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
     syncToStash: boolean;
     groups: Array<{ id: number; name: string }>;
   }>;
@@ -239,7 +241,7 @@ export interface CreateUserResponse {
     id: number;
     username: string;
     role: string;
-    createdAt: Date;
+    createdAt: string;
   };
 }
 
@@ -268,7 +270,7 @@ export interface UpdateUserRoleResponse {
     id: number;
     username: string;
     role: string;
-    updatedAt: Date;
+    updatedAt: string;
   };
 }
 
