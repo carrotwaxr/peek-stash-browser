@@ -36,7 +36,7 @@ interface StashConfigStepProps {
   onStashUiUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onStashApiKeyChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTestConnection: () => void;
-  onBack: () => void;
+  onBack?: () => void;
   onSubmit: () => void;
 }
 
@@ -101,8 +101,12 @@ const WelcomeStep = ({ theme, onNext }: WelcomeStepProps) => (
           color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
         }}
       >
-        <li>Create an admin account to manage Peek</li>
-        <li>Complete setup and start browsing your Stash library</li>
+        <li>Create an admin account</li>
+        <li>
+          Connect Peek to your Stash server (its GraphQL address and API key,
+          from Stash's Settings &gt; Security)
+        </li>
+        <li>Start browsing</li>
       </ul>
 
       <div
@@ -126,8 +130,7 @@ const WelcomeStep = ({ theme, onNext }: WelcomeStepProps) => (
             color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
           }}
         >
-          Make sure your Stash server is running and accessible. Peek connects
-          to Stash via the STASH_URL and STASH_API_KEY environment variables.
+          Make sure Stash is running and reachable from this server.
         </p>
       </div>
     </div>
@@ -431,9 +434,11 @@ const StashConfigStep = ({
     </div>
 
     <div className="flex gap-4">
-      <Button onClick={onBack} variant="tertiary" fullWidth>
-        Back
-      </Button>
+      {onBack && (
+        <Button onClick={onBack} variant="tertiary" fullWidth>
+          Back
+        </Button>
+      )}
       <Button
         onClick={onTestConnection}
         disabled={testing || !stashUrl || !stashApiKey}
@@ -615,6 +620,8 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Once the admin exists there is no step to go back to
+  const [adminCreated, setAdminCreated] = useState(false);
 
   // Admin credentials
   const [adminPassword, setAdminPassword] = useState("");
@@ -675,6 +682,7 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
         } catch (loginErr) {
           console.warn("Auto-login failed:", loginErr);
         }
+        setAdminCreated(true);
         // Clear password from memory immediately for security
         setAdminPassword("");
         setConfirmPassword("");
@@ -800,11 +808,15 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
               setTestSuccess(false); // Reset test status when API key changes
             }}
             onTestConnection={() => void testStashConnection()}
-            onBack={() => {
-              setCurrentStep(1);
-              setError("");
-              setTestSuccess(false);
-            }}
+            onBack={
+              setupStatus?.hasUsers || adminCreated
+                ? undefined
+                : () => {
+                    setCurrentStep(1);
+                    setError("");
+                    setTestSuccess(false);
+                  }
+            }
             onSubmit={() => void createStashInstance()}
           />
         );
