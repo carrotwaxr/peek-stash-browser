@@ -47,9 +47,6 @@ import type {
   RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
   RemoveUnavailableItemsResponse,
-  ReorderPlaylistParams,
-  ReorderPlaylistRequest,
-  ReorderPlaylistResponse,
   SortPlaylistRequest,
   SortPlaylistResponse,
   TypedAuthRequest,
@@ -62,7 +59,7 @@ import type {
   UpdatePlaylistSharesResponse,
 } from "../types/api/index.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
-import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import type { EntityRef } from "../utils/entityRef.js";
 import {
   parsePlaylistItemsRequest,
   parsePlaylistQueueRequest,
@@ -499,7 +496,7 @@ export const deletePlaylist = async (
 };
 
 /**
- * Add scene to playlist: owners and shared users alike (remove, reorder and
+ * Add scene to playlist: owners and shared users alike (remove, move and
  * rename stay owner-only). The item takes the next position inside the
  * insert (appendItems), so two adds at once never share one.
  */
@@ -756,7 +753,7 @@ export const movePlaylistItem = async (
  * another playlist's items are ignored and not counted
  */
 export const removePlaylistItems = async (
-  req: TypedAuthRequest<RemovePlaylistItemsRequest, ReorderPlaylistParams>,
+  req: TypedAuthRequest<RemovePlaylistItemsRequest, GetPlaylistParams>,
   res: TypedResponse<RemovePlaylistItemsResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -795,116 +792,13 @@ export const removePlaylistItems = async (
 };
 
 /**
- * Reorder playlist items
- */
-export const reorderPlaylist = async (
-  req: TypedAuthRequest<ReorderPlaylistRequest, ReorderPlaylistParams>,
-  res: TypedResponse<ReorderPlaylistResponse | ApiErrorResponse>
-) => {
-  const userId = req.user.id;
-  const playlistId = parseInt(req.params.id);
-
-  if (isNaN(playlistId)) {
-    res.status(400).json({ error: "Invalid playlist ID" });
-    return;
-  }
-
-  const { items } = req.body; // Array of { sceneId, instanceId, position }
-
-  if (!Array.isArray(items)) {
-    res.status(400).json({ error: "Items must be an array" });
-    return;
-  }
-
-  // Every item names its scene, the scene's instance and a position
-  const moves: { sceneId: string; instanceId: string; position: number }[] = [];
-  for (const [index, item] of (items as unknown[]).entries()) {
-    const where = `items[${index}].`;
-    if (typeof item !== "object" || item === null) {
-      res.status(400).json({ error: `items[${index}] must be an object` });
-      return;
-    }
-    const fields = item as Record<string, unknown>;
-    const ref = parseSceneRef(fields.sceneId, fields.instanceId, where);
-    if ("error" in ref) {
-      res.status(400).json({ error: ref.error });
-      return;
-    }
-    const { position } = fields;
-    if (
-      typeof position !== "number" ||
-      !Number.isInteger(position) ||
-      position < 0
-    ) {
-      res
-        .status(400)
-        .json({ error: `${where}position must be a non-negative integer` });
-      return;
-    }
-    moves.push({ ...ref, position });
-  }
-
-  // Check ownership
-  const playlist = await prisma.playlist.findFirst({
-    where: {
-      id: playlistId,
-      userId,
-    },
-  });
-
-  if (!playlist) {
-    res.status(404).json({ error: "Playlist not found" });
-    return;
-  }
-
-  // Every item must be in this playlist, on the instance it names
-  const stored = await prisma.playlistItem.findMany({
-    where: { playlistId },
-    select: { sceneId: true, instanceId: true },
-  });
-  const inPlaylist = new Set(
-    stored.map((row) => entityKey(row.sceneId, row.instanceId))
-  );
-  const missing = moves.findIndex(
-    (item) => !inPlaylist.has(entityKey(item.sceneId, item.instanceId))
-  );
-  if (missing !== -1) {
-    res
-      .status(400)
-      .json({ error: `items[${missing}] is not in this playlist` });
-    return;
-  }
-
-  // Update every position in one batch
-  await dbWriteBatch(
-    "playlist.reorder",
-    moves.map((item) =>
-      prisma.playlistItem.update({
-        where: {
-          playlistId_instanceId_sceneId: {
-            playlistId,
-            instanceId: item.instanceId,
-            sceneId: item.sceneId,
-          },
-        },
-        data: {
-          position: item.position,
-        },
-      })
-    )
-  );
-
-  res.json({ success: true, message: "Playlist reordered" });
-};
-
-/**
- * Save a view sort as the playlist's order (owner only, as reorder): the
+ * Save a view sort as the playlist's order (owner only, as a move): the
  * owner's visible items take positions 0..n-1 in the sort the page read,
  * the items they cannot see follow in their own order
  * (PlaylistQueryService.sortPlaylistItems). No item list crosses the wire.
  */
 export const sortPlaylist = async (
-  req: TypedLibraryRequest<SortPlaylistRequest, ReorderPlaylistParams>,
+  req: TypedLibraryRequest<SortPlaylistRequest, GetPlaylistParams>,
   res: TypedResponse<SortPlaylistResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;
@@ -942,7 +836,7 @@ export const sortPlaylist = async (
  * .removeUnavailableItems). A recipient gets 404.
  */
 export const removeUnavailablePlaylistItems = async (
-  req: TypedLibraryRequest<unknown, ReorderPlaylistParams>,
+  req: TypedLibraryRequest<unknown, GetPlaylistParams>,
   res: TypedResponse<RemoveUnavailableItemsResponse | ApiErrorResponse>
 ) => {
   const userId = req.user.id;

@@ -809,45 +809,6 @@ interface MovePlaylistItemResponse {
 
 ---
 
-### PUT /api/playlists/:id/reorder
-
-**Authentication:** Required
-
-Sets each item's position (owner only). Every item names its scene and the scene's instance. Answers 400 naming the index (`items[2].instanceId is required`) for an item without a scene, an instance or a non-negative integer position, or one not in the playlist; nothing moves then.
-
-**Request Body:**
-
-```typescript
-interface ReorderPlaylistRequest {
-  items: Array<{
-  sceneId: string;
-  instanceId: string;
-  position: number;
-}>;
-}
-```
-
-**URL Parameters:**
-
-```typescript
-interface ReorderPlaylistParams {
-  id: string;
-}
-```
-
-**Response:**
-
-```typescript
-interface ReorderPlaylistResponse {
-  success: true;
-  message: string;
-}
-```
-
-**Controller:** `reorderPlaylist` in `../controllers/playlist.ts`
-
----
-
 ### POST /api/playlists/:id/sort
 
 **Authentication:** Required
@@ -866,7 +827,7 @@ interface SortPlaylistRequest {
 **URL Parameters:**
 
 ```typescript
-interface ReorderPlaylistParams {
+interface GetPlaylistParams {
   id: string;
 }
 ```

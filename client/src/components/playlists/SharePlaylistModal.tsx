@@ -45,9 +45,17 @@ const SharePlaylistModal = ({
         getPlaylistShares(playlistId),
       ]);
 
-      setUserGroups((groupsResult.groups || []) as UserGroup[]);
+      const groups = (groupsResult.groups || []) as UserGroup[];
+      const mine = new Set(groups.map((group) => group.id));
+      setUserGroups(groups);
+      // A stored share for a group the owner has left is not offered, so a
+      // save drops it rather than being refused for it
       setSelectedGroupIds(
-        new Set((sharesResult.shares as Share[]).map((s) => s.groupId))
+        new Set(
+          (sharesResult.shares as Share[])
+            .map((s) => s.groupId)
+            .filter((groupId) => mine.has(groupId))
+        )
       );
     } catch (error) {
       console.error("Error loading share data:", error);

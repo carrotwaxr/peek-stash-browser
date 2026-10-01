@@ -3,7 +3,6 @@
  *
  * Verifies that shared users CANNOT perform owner-only operations:
  * - Remove a scene from a shared playlist
- * - Reorder scenes in a shared playlist
  * - Move one item, or remove several, in a shared playlist
  * - Save a view sort as a shared playlist's order
  * - Remove a shared playlist's unavailable items
@@ -21,7 +20,6 @@ import {
   removePlaylistItems,
   removeSceneFromPlaylist,
   removeUnavailablePlaylistItems,
-  reorderPlaylist,
   sortPlaylist,
   updatePlaylist,
 } from "../../controllers/playlist.js";
@@ -164,47 +162,6 @@ describe("Shared playlist authorization boundaries", () => {
           sceneId: "scene-123",
         },
       });
-    });
-  });
-
-  describe("reorderPlaylist - shared user rejected", () => {
-    it("returns 404 when shared user tries to reorder scenes", async () => {
-      const req = reqFor(reorderPlaylist, {
-        params: { id: "1" },
-        body: {
-          items: [
-            { sceneId: "scene-1", instanceId: "instance-1", position: 1 },
-            { sceneId: "scene-2", instanceId: "instance-1", position: 0 },
-          ],
-        },
-        user: SHARED_USER,
-      });
-      const res = resFor(reorderPlaylist);
-
-      await reorderPlaylist(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Playlist not found",
-      });
-    });
-
-    it("does not update any playlist item positions", async () => {
-      const req = reqFor(reorderPlaylist, {
-        params: { id: "1" },
-        body: {
-          items: [
-            { sceneId: "scene-1", instanceId: "instance-1", position: 1 },
-            { sceneId: "scene-2", instanceId: "instance-1", position: 0 },
-          ],
-        },
-        user: SHARED_USER,
-      });
-      const res = resFor(reorderPlaylist);
-
-      await reorderPlaylist(req, res);
-
-      expect(mockPrisma.playlistItem.update).not.toHaveBeenCalled();
     });
   });
 

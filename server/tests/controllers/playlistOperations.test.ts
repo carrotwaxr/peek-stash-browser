@@ -4,8 +4,8 @@
  * Tests createPlaylist, updatePlaylist, deletePlaylist, and duplicatePlaylist
  * controller functions. Covers validation, ownership checks, and the
  * access-control-based duplicate flow; and that the item writes (add,
- * remove, reorder) take each scene's instance from the request; a move and
- * a bulk remove name items by item id.
+ * remove) take each scene's instance from the request; a move and a bulk
+ * remove name items by item id.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import type { Playlist, PlaylistItem, Prisma } from "@prisma/client";
@@ -20,7 +20,6 @@ import {
   movePlaylistItem,
   removePlaylistItems,
   removeSceneFromPlaylist,
-  reorderPlaylist,
   updatePlaylist,
   updatePlaylistShares,
 } from "../../controllers/playlist.js";
@@ -1017,118 +1016,6 @@ describe("Playlist Controller Operations", () => {
         where: { playlistId: 1, instanceId: "inst-b", sceneId: "42" },
       });
       expect(res.status).toHaveBeenCalledWith(404);
-    });
-
-    it.each([
-      ["no instance", { sceneId: "42", position: 1 }, "items[1].instanceId"],
-      [
-        "no position",
-        { sceneId: "42", instanceId: "inst-b" },
-        "items[1].position",
-      ],
-      [
-        "a negative position",
-        { sceneId: "42", instanceId: "inst-b", position: -1 },
-        "items[1].position",
-      ],
-      ["not an object", "42", "items[1]"],
-    ])(
-      "reorder with an item of %s answers 400 naming the index",
-      async (_what, second, named) => {
-        const req = reqFor(reorderPlaylist, {
-          params: { id: "1" },
-          body: malformed({
-            items: [
-              { sceneId: "42", instanceId: "inst-a", position: 0 },
-              second,
-            ],
-          }),
-          user: USER,
-        });
-        const res = resFor(reorderPlaylist);
-
-        await reorderPlaylist(req, res);
-
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res._getErrorBody().error).toContain(named);
-        expect(mockPrisma.playlist.findFirst).not.toHaveBeenCalled();
-      }
-    );
-
-    it("reorder updates each item on its own instance", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue(
-        partialRow({ id: 1, userId: USER.id, name: "Mine" })
-      );
-      mockPrisma.playlistItem.findMany.mockResolvedValue([
-        partialRow({ sceneId: "42", instanceId: "inst-a" }),
-        partialRow({ sceneId: "42", instanceId: "inst-b" }),
-      ]);
-      mockPrisma.playlistItem.update.mockResolvedValue(partialRow({}));
-
-      const req = reqFor(reorderPlaylist, {
-        params: { id: "1" },
-        body: {
-          items: [
-            { sceneId: "42", instanceId: "inst-b", position: 0 },
-            { sceneId: "42", instanceId: "inst-a", position: 1 },
-          ],
-        },
-        user: USER,
-      });
-      const res = resFor(reorderPlaylist);
-
-      await reorderPlaylist(req, res);
-
-      expect(res._getOkBody()).toEqual(objectContaining({ success: true }));
-      expect(mockPrisma.playlistItem.update).toHaveBeenNthCalledWith(1, {
-        where: {
-          playlistId_instanceId_sceneId: {
-            playlistId: 1,
-            instanceId: "inst-b",
-            sceneId: "42",
-          },
-        },
-        data: { position: 0 },
-      });
-      expect(mockPrisma.playlistItem.update).toHaveBeenNthCalledWith(2, {
-        where: {
-          playlistId_instanceId_sceneId: {
-            playlistId: 1,
-            instanceId: "inst-a",
-            sceneId: "42",
-          },
-        },
-        data: { position: 1 },
-      });
-    });
-
-    it("reorder naming an item not in the playlist answers 400 and updates nothing", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue(
-        partialRow({ id: 1, userId: USER.id, name: "Mine" })
-      );
-      mockPrisma.playlistItem.findMany.mockResolvedValue([
-        partialRow({ sceneId: "42", instanceId: "inst-a" }),
-      ]);
-
-      const req = reqFor(reorderPlaylist, {
-        params: { id: "1" },
-        body: {
-          items: [
-            { sceneId: "42", instanceId: "inst-a", position: 0 },
-            { sceneId: "42", instanceId: "inst-b", position: 1 },
-          ],
-        },
-        user: USER,
-      });
-      const res = resFor(reorderPlaylist);
-
-      await reorderPlaylist(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getErrorBody().error).toBe(
-        "items[1] is not in this playlist"
-      );
-      expect(mockPrisma.playlistItem.update).not.toHaveBeenCalled();
     });
   });
 

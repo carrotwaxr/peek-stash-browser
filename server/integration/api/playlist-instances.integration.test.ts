@@ -2,9 +2,10 @@
  * Playlist item writes name each scene's instance (item 33).
  *
  * Scene SAME exists on instance A and on instance B (see
- * helpers/accessFixture.ts), so a bare id names two scenes. Add, bulk add,
- * remove and reorder take the instance from the request and never guess
- * one; a move and a bulk remove name items by item id; an add also checks the viewer can see the scene, and the playlist
+ * helpers/accessFixture.ts), so a bare id names two scenes. Add, bulk add
+ * and remove take the instance from the request and never guess one; a
+ * move and a bulk remove name items by item id (the whole-list reorder
+ * route is gone); an add also checks the viewer can see the scene, and the playlist
  * list's `containsScene` names one. The viewer hid GLOBAL on B.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
@@ -304,7 +305,7 @@ describe("Playlist items keep each scene's instance (integration)", () => {
     expect(await itemsOf(playlistId)).toEqual([`${FX_ID.SAME}@${FX.A}`]);
   });
 
-  it("reorder with both SAMEs moves each by its instance", async () => {
+  it("PUT /api/playlists/:id/reorder answers 404 and moves nothing", async () => {
     const playlistId = await playlistWith([
       [FX_ID.SAME, FX.A],
       [FX_ID.SAME, FX.B],
@@ -320,55 +321,7 @@ describe("Playlist items keep each scene's instance (integration)", () => {
       }
     );
 
-    expect(res.status).toBe(200);
-    expect(await itemsOf(playlistId)).toEqual([
-      `${FX_ID.SAME}@${FX.B}`,
-      `${FX_ID.SAME}@${FX.A}`,
-    ]);
-  });
-
-  it("reorder without an item's instance answers 400 naming the index", async () => {
-    const playlistId = await playlistWith([
-      [FX_ID.SAME, FX.A],
-      [FX_ID.SAME, FX.B],
-    ]);
-
-    const res = await viewer.client.put<{ error?: string }>(
-      `/api/playlists/${playlistId}/reorder`,
-      {
-        items: [
-          { sceneId: FX_ID.SAME, instanceId: FX.B, position: 0 },
-          { sceneId: FX_ID.SAME, position: 1 },
-        ],
-      }
-    );
-
-    expect(res.status).toBe(400);
-    expect(res.data.error).toContain("items[1]");
-    expect(await itemsOf(playlistId)).toEqual([
-      `${FX_ID.SAME}@${FX.A}`,
-      `${FX_ID.SAME}@${FX.B}`,
-    ]);
-  });
-
-  it("reorder naming an item that is not in the playlist answers 400 and moves nothing", async () => {
-    const playlistId = await playlistWith([
-      [FX_ID.SAME, FX.A],
-      [FX_ID.SAME, FX.B],
-    ]);
-
-    const res = await viewer.client.put<{ error?: string }>(
-      `/api/playlists/${playlistId}/reorder`,
-      {
-        items: [
-          { sceneId: FX_ID.SAME, instanceId: FX.B, position: 0 },
-          { sceneId: FX_ID.B_ONLY, instanceId: FX.B, position: 1 },
-        ],
-      }
-    );
-
-    expect(res.status).toBe(400);
-    expect(res.data.error).toContain("items[1]");
+    expect(res.status).toBe(404);
     expect(await itemsOf(playlistId)).toEqual([
       `${FX_ID.SAME}@${FX.A}`,
       `${FX_ID.SAME}@${FX.B}`,
