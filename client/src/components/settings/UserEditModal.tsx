@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Key, Lock, Shield, Trash2, User, Users, X } from "lucide-react";
+import { Key, Lock, Shield, Trash2, User, Users } from "lucide-react";
 import {
   addGroupMember,
   adminRegenerateRecoveryKey,
@@ -11,7 +11,7 @@ import {
   removeGroupMember,
   updateUserPermissionOverrides,
 } from "../../api";
-import { Button, Paper } from "../ui/index";
+import { Button, Modal } from "../ui/index";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 interface UserData {
@@ -283,541 +283,523 @@ const UserEditModalContent = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={handleClose}
-    >
-      <Paper
-        className="max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Paper.Header>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <User
-                className="w-5 h-5"
-                style={{ color: "var(--text-secondary)" }}
-              />
-              <Paper.Title>Edit User: {user.username}</Paper.Title>
-            </div>
-            <button
-              onClick={handleClose}
-              className="p-1 rounded hover:bg-opacity-80 transition-colors"
-              style={{ color: "var(--text-muted)" }}
-              aria-label="Close"
+    <>
+      <Modal
+        isOpen
+        onClose={handleClose}
+        title={
+          <span className="flex items-center gap-2">
+            <User
+              className="w-5 h-5"
+              style={{ color: "var(--text-secondary)" }}
+              aria-hidden="true"
+            />
+            Edit User: {user.username}
+          </span>
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!hasChanges || loading}
+              loading={loading}
+              onClick={() => void handleSave()}
             >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </Paper.Header>
+              Save Changes
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          {/* Error display */}
+          {error && (
+            <div
+              className="p-3 rounded-lg text-sm"
+              style={{
+                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                color: "rgb(239, 68, 68)",
+              }}
+            >
+              {error}
+            </div>
+          )}
 
-        <Paper.Body>
-          <div className="space-y-6">
-            {/* Error display */}
-            {error && (
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: "rgba(239, 68, 68, 0.1)",
-                  color: "rgb(239, 68, 68)",
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {/* Section 1: Basic Info */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <User size={16} />
-                Basic Info
-              </h3>
-              <div
-                className="p-4 rounded-lg space-y-4"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {/* Username (read-only) */}
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Username
-                  </label>
-                  <div
-                    className="px-3 py-2 rounded-lg text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {user.username}
-                  </div>
-                </div>
-
-                {/* Role dropdown */}
-                <div>
-                  <label
-                    htmlFor="userRole"
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Role
-                  </label>
-                  <select
-                    id="userRole"
-                    value={role}
-                    onChange={(e) => {
-                      if (isCurrentUser) {
-                        setError("You cannot change your own role");
-                        return;
-                      }
-                      const newRole = e.target.value;
-                      setRole(newRole);
-                      setHasChanges(true);
-                    }}
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <option value="USER">User</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
+          {/* Section 1: Basic Info */}
+          <section>
+            <h3
+              className="text-sm font-medium mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <User size={16} />
+              Basic Info
+            </h3>
+            <div
+              className="p-4 rounded-lg space-y-4"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {/* Username (read-only) */}
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Username
+                </label>
+                <div
+                  className="px-3 py-2 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {user.username}
                 </div>
               </div>
-            </section>
 
-            {/* Section 2: Groups */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Users size={16} />
-                Groups
-              </h3>
-              <div
-                className="p-4 rounded-lg"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {groups.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    No groups available. Create a group first to assign users.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {groups.map((group) => {
-                      const isMember = userGroups.includes(group.id);
-                      return (
-                        <label
-                          key={group.id}
-                          className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-opacity-50"
-                          style={{
-                            backgroundColor: isMember
-                              ? "rgba(59, 130, 246, 0.05)"
-                              : "transparent",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isMember}
-                            onChange={() =>
-                              void handleGroupToggle(group.id, isMember)
-                            }
-                            className="w-4 h-4 rounded cursor-pointer"
-                            style={{ accentColor: "var(--primary-color)" }}
-                          />
-                          <div className="flex-1">
-                            <span
-                              className="text-sm font-medium"
-                              style={{ color: "var(--text-primary)" }}
-                            >
-                              {group.name}
-                            </span>
-                            {group.description && (
-                              <p
-                                className="text-xs mt-0.5"
-                                style={{ color: "var(--text-muted)" }}
-                              >
-                                {group.description}
-                              </p>
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
+              {/* Role dropdown */}
+              <div>
+                <label
+                  htmlFor="userRole"
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Role
+                </label>
+                <select
+                  id="userRole"
+                  value={role}
+                  onChange={(e) => {
+                    if (isCurrentUser) {
+                      setError("You cannot change your own role");
+                      return;
+                    }
+                    const newRole = e.target.value;
+                    setRole(newRole);
+                    setHasChanges(true);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  <option value="USER">User</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
               </div>
-            </section>
+            </div>
+          </section>
 
-            {/* Section 3: Permissions */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Shield size={16} />
-                Permissions
-              </h3>
-              <div
-                className="p-4 rounded-lg space-y-4"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {!permissions ? (
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    Loading permissions...
-                  </p>
-                ) : (
-                  <>
-                    {/* Can Share */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <span
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          Can share playlists
-                        </span>
-                        <div className="mt-1">
-                          {renderInheritanceLabel(permissions.sources.canShare)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={
-                            permissions.sources.canShare === "override"
-                              ? String(permissions.canShare)
-                              : "inherit"
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            void handlePermissionOverride(
-                              "canShare",
-                              val === "inherit" ? null : val === "true"
-                            );
-                          }}
-                          className="px-2 py-1 rounded text-sm"
-                          style={{
-                            backgroundColor: "var(--bg-tertiary)",
-                            border: "1px solid var(--border-color)",
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          <option value="inherit">Inherit from groups</option>
-                          <option value="true">Force enabled</option>
-                          <option value="false">Force disabled</option>
-                        </select>
-                        <span
-                          className={`w-3 h-3 rounded-full ${permissions.canShare ? "bg-green-500" : "bg-gray-400"}`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Can Download Files */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <span
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          Can download files
-                        </span>
-                        <div className="mt-1">
-                          {renderInheritanceLabel(
-                            permissions.sources.canDownloadFiles
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={
-                            permissions.sources.canDownloadFiles === "override"
-                              ? String(permissions.canDownloadFiles)
-                              : "inherit"
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            void handlePermissionOverride(
-                              "canDownloadFiles",
-                              val === "inherit" ? null : val === "true"
-                            );
-                          }}
-                          className="px-2 py-1 rounded text-sm"
-                          style={{
-                            backgroundColor: "var(--bg-tertiary)",
-                            border: "1px solid var(--border-color)",
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          <option value="inherit">Inherit from groups</option>
-                          <option value="true">Force enabled</option>
-                          <option value="false">Force disabled</option>
-                        </select>
-                        <span
-                          className={`w-3 h-3 rounded-full ${permissions.canDownloadFiles ? "bg-green-500" : "bg-gray-400"}`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Can Download Playlists */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <span
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          Can download playlists
-                        </span>
-                        <div className="mt-1">
-                          {renderInheritanceLabel(
-                            permissions.sources.canDownloadPlaylists
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={
-                            permissions.sources.canDownloadPlaylists ===
-                            "override"
-                              ? String(permissions.canDownloadPlaylists)
-                              : "inherit"
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            void handlePermissionOverride(
-                              "canDownloadPlaylists",
-                              val === "inherit" ? null : val === "true"
-                            );
-                          }}
-                          className="px-2 py-1 rounded text-sm"
-                          style={{
-                            backgroundColor: "var(--bg-tertiary)",
-                            border: "1px solid var(--border-color)",
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          <option value="inherit">Inherit from groups</option>
-                          <option value="true">Force enabled</option>
-                          <option value="false">Force disabled</option>
-                        </select>
-                        <span
-                          className={`w-3 h-3 rounded-full ${permissions.canDownloadPlaylists ? "bg-green-500" : "bg-gray-400"}`}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-
-            {/* Section 4: Content Restrictions */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Lock size={16} />
-                Content Restrictions
-              </h3>
-              <div
-                className="p-4 rounded-lg"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {user.role === "ADMIN" ? (
-                  // The saved role decides, not the unsaved dropdown: an admin
-                  // keeps only their own hidden items (item 13)
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    Content restrictions do not apply to administrators.
-                  </p>
-                ) : (
-                  <>
-                    <p
-                      className="text-sm mb-3"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Manage content restrictions for this user. Restrictions
-                      control which content is visible based on collections,
-                      tags, studios, and galleries.
-                    </p>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowContentRestrictionsModal(true)}
-                    >
-                      <Lock size={14} className="mr-1" />
-                      Manage Restrictions
-                    </Button>
-                  </>
-                )}
-              </div>
-            </section>
-
-            {/* Section 5: Account Actions */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Key size={16} />
-                Account Actions
-              </h3>
-              <div
-                className="p-4 rounded-lg"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {isCurrentUser ? (
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    You cannot modify your own account from this modal. Use the
-                    account settings page instead.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Password Reset */}
-                    {showPasswordReset ? (
-                      <div className="flex items-center gap-2">
+          {/* Section 2: Groups */}
+          <section>
+            <h3
+              className="text-sm font-medium mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Users size={16} />
+              Groups
+            </h3>
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {groups.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  No groups available. Create a group first to assign users.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {groups.map((group) => {
+                    const isMember = userGroups.includes(group.id);
+                    return (
+                      <label
+                        key={group.id}
+                        className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-opacity-50"
+                        style={{
+                          backgroundColor: isMember
+                            ? "rgba(59, 130, 246, 0.05)"
+                            : "transparent",
+                        }}
+                      >
                         <input
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="New password (8+ chars, letter, number)"
-                          className="flex-1 px-3 py-2 rounded text-sm"
-                          style={{
-                            backgroundColor: "var(--bg-tertiary)",
-                            border: "1px solid var(--border-color)",
-                            color: "var(--text-primary)",
-                          }}
+                          type="checkbox"
+                          checked={isMember}
+                          onChange={() =>
+                            void handleGroupToggle(group.id, isMember)
+                          }
+                          className="w-4 h-4 rounded cursor-pointer"
+                          style={{ accentColor: "var(--primary-color)" }}
                         />
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => void handleResetPassword()}
-                          disabled={loading}
-                        >
-                          Set
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setShowPasswordReset(false);
-                            setNewPassword("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setShowPasswordReset(true)}
-                        >
-                          Reset Password
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => void handleRegenerateRecoveryKey()}
-                          disabled={loading}
-                        >
-                          <Key size={14} className="mr-1" />
-                          Regenerate Recovery Key
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => void handleDeleteUser()}
-                          disabled={loading}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          Delete User
-                        </Button>
-                      </div>
-                    )}
+                        <div className="flex-1">
+                          <span
+                            className="text-sm font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {group.name}
+                          </span>
+                          {group.description && (
+                            <p
+                              className="text-xs mt-0.5"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              {group.description}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
 
-                    {/* Show generated key */}
-                    {generatedKey && (
-                      <div
-                        className="p-3 rounded"
+          {/* Section 3: Permissions */}
+          <section>
+            <h3
+              className="text-sm font-medium mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Shield size={16} />
+              Permissions
+            </h3>
+            <div
+              className="p-4 rounded-lg space-y-4"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {!permissions ? (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Loading permissions...
+                </p>
+              ) : (
+                <>
+                  {/* Can Share */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Can share playlists
+                      </span>
+                      <div className="mt-1">
+                        {renderInheritanceLabel(permissions.sources.canShare)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={
+                          permissions.sources.canShare === "override"
+                            ? String(permissions.canShare)
+                            : "inherit"
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          void handlePermissionOverride(
+                            "canShare",
+                            val === "inherit" ? null : val === "true"
+                          );
+                        }}
+                        className="px-2 py-1 rounded text-sm"
                         style={{
                           backgroundColor: "var(--bg-tertiary)",
                           border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
                         }}
                       >
-                        <p
-                          className="text-xs mb-1"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          New recovery key (show to user):
-                        </p>
-                        <code
-                          className="text-sm font-mono"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {generatedKey}
-                        </code>
-                      </div>
-                    )}
+                        <option value="inherit">Inherit from groups</option>
+                        <option value="true">Force enabled</option>
+                        <option value="false">Force disabled</option>
+                      </select>
+                      <span
+                        className={`w-3 h-3 rounded-full ${permissions.canShare ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            </section>
-          </div>
-        </Paper.Body>
 
-        {/* Content Restrictions Modal */}
-        {showContentRestrictionsModal && (
-          <ContentRestrictionsModal
-            user={user}
-            onClose={() => setShowContentRestrictionsModal(false)}
-            onSave={() =>
-              onMessage?.(`Content restrictions updated for ${user.username}`)
-            }
-          />
-        )}
+                  {/* Can Download Files */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Can download files
+                      </span>
+                      <div className="mt-1">
+                        {renderInheritanceLabel(
+                          permissions.sources.canDownloadFiles
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={
+                          permissions.sources.canDownloadFiles === "override"
+                            ? String(permissions.canDownloadFiles)
+                            : "inherit"
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          void handlePermissionOverride(
+                            "canDownloadFiles",
+                            val === "inherit" ? null : val === "true"
+                          );
+                        }}
+                        className="px-2 py-1 rounded text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <option value="inherit">Inherit from groups</option>
+                        <option value="true">Force enabled</option>
+                        <option value="false">Force disabled</option>
+                      </select>
+                      <span
+                        className={`w-3 h-3 rounded-full ${permissions.canDownloadFiles ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                    </div>
+                  </div>
 
-        {/* Footer with action buttons */}
-        <div
-          className="px-6 py-4 flex justify-end gap-3"
-          style={{ borderTop: "1px solid var(--border-color)" }}
-        >
-          <Button variant="secondary" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!hasChanges || loading}
-            loading={loading}
-            onClick={() => void handleSave()}
-          >
-            Save Changes
-          </Button>
+                  {/* Can Download Playlists */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Can download playlists
+                      </span>
+                      <div className="mt-1">
+                        {renderInheritanceLabel(
+                          permissions.sources.canDownloadPlaylists
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={
+                          permissions.sources.canDownloadPlaylists ===
+                          "override"
+                            ? String(permissions.canDownloadPlaylists)
+                            : "inherit"
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          void handlePermissionOverride(
+                            "canDownloadPlaylists",
+                            val === "inherit" ? null : val === "true"
+                          );
+                        }}
+                        className="px-2 py-1 rounded text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <option value="inherit">Inherit from groups</option>
+                        <option value="true">Force enabled</option>
+                        <option value="false">Force disabled</option>
+                      </select>
+                      <span
+                        className={`w-3 h-3 rounded-full ${permissions.canDownloadPlaylists ? "bg-green-500" : "bg-gray-400"}`}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Section 4: Content Restrictions */}
+          <section>
+            <h3
+              className="text-sm font-medium mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Lock size={16} />
+              Content Restrictions
+            </h3>
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {user.role === "ADMIN" ? (
+                // The saved role decides, not the unsaved dropdown: an admin
+                // keeps only their own hidden items (item 13)
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Content restrictions do not apply to administrators.
+                </p>
+              ) : (
+                <>
+                  <p
+                    className="text-sm mb-3"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Manage content restrictions for this user. Restrictions
+                    control which content is visible based on collections, tags,
+                    studios, and galleries.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowContentRestrictionsModal(true)}
+                  >
+                    <Lock size={14} className="mr-1" />
+                    Manage Restrictions
+                  </Button>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Section 5: Account Actions */}
+          <section>
+            <h3
+              className="text-sm font-medium mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Key size={16} />
+              Account Actions
+            </h3>
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {isCurrentUser ? (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  You cannot modify your own account from this modal. Use the
+                  account settings page instead.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Password Reset */}
+                  {showPasswordReset ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password (8+ chars, letter, number)"
+                        className="flex-1 px-3 py-2 rounded text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      />
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => void handleResetPassword()}
+                        disabled={loading}
+                      >
+                        Set
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setShowPasswordReset(false);
+                          setNewPassword("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowPasswordReset(true)}
+                      >
+                        Reset Password
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void handleRegenerateRecoveryKey()}
+                        disabled={loading}
+                      >
+                        <Key size={14} className="mr-1" />
+                        Regenerate Recovery Key
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => void handleDeleteUser()}
+                        disabled={loading}
+                      >
+                        <Trash2 size={14} className="mr-1" />
+                        Delete User
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Show generated key */}
+                  {generatedKey && (
+                    <div
+                      className="p-3 rounded"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <p
+                        className="text-xs mb-1"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        New recovery key (show to user):
+                      </p>
+                      <code
+                        className="text-sm font-mono"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {generatedKey}
+                      </code>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
         </div>
-      </Paper>
-    </div>
+      </Modal>
+
+      {/* Content Restrictions Modal: a sibling, stacked above this dialog */}
+      {showContentRestrictionsModal && (
+        <ContentRestrictionsModal
+          user={user}
+          onClose={() => setShowContentRestrictionsModal(false)}
+          onSave={() =>
+            onMessage?.(`Content restrictions updated for ${user.username}`)
+          }
+        />
+      )}
+    </>
   );
 };
 

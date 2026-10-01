@@ -25,6 +25,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../src/api";
 import ContentRestrictionsModal from "../../../src/components/settings/ContentRestrictionsModal";
+import { ShortcutScopeProvider } from "../../../src/contexts/ShortcutScopeContext";
 
 const { mockApiGet, mockApiPut, mockApiDelete } = vi.hoisted(() => ({
   mockApiGet: vi.fn(),
@@ -411,19 +412,25 @@ describe("ContentRestrictionsModal", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Clear all restrictions" })
     );
-    const dialog = screen.getByRole("dialog");
+    const dialog = screen.getByRole("dialog", {
+      name: "Clear all restrictions?",
+    });
     expect(dialog).toHaveTextContent(
       /restricted then sees everything on their servers except what they hid/
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(mockApiDelete).not.toHaveBeenCalled();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Clear all restrictions?" })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Clear all restrictions" })
     );
     fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
+      within(
+        screen.getByRole("dialog", { name: "Clear all restrictions?" })
+      ).getByRole("button", {
         name: "Clear all restrictions",
       })
     );
@@ -460,7 +467,9 @@ describe("ContentRestrictionsModal", () => {
       await screen.findByRole("button", { name: "Clear all restrictions" })
     );
     fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
+      within(
+        screen.getByRole("dialog", { name: "Clear all restrictions?" })
+      ).getByRole("button", {
         name: "Clear all restrictions",
       })
     );
@@ -599,9 +608,10 @@ describe("ContentRestrictionsModal", () => {
     fireEvent.click(screen.getByText("Content Restrictions"));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    const backdrop = screen
-      .getByText("Content Restrictions")
-      .closest(".fixed") as HTMLElement;
+    const backdrop = screen.getByRole("dialog", {
+      name: "Content Restrictions",
+    }).parentElement as HTMLElement;
+    fireEvent.mouseDown(backdrop);
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(2);
   });
@@ -616,5 +626,58 @@ describe("ContentRestrictionsModal", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/must match ALL/)).not.toBeInTheDocument();
     expect(screen.getByText("RECOMMENDED")).toBeInTheDocument();
+  });
+  describe("Dialog", () => {
+    const renderInScopes = async () => {
+      mockApiGet.mockResolvedValue({ restrictions: [] });
+      const onClose = vi.fn();
+      render(
+        <ShortcutScopeProvider>
+          <ContentRestrictionsModal
+            user={user}
+            onClose={onClose}
+            onSave={vi.fn()}
+          />
+        </ShortcutScopeProvider>
+      );
+      await waitFor(() => expect(showOnly("tags")).toBeInTheDocument());
+      return onClose;
+    };
+
+    it("opens as a dialog named Content Restrictions", async () => {
+      await renderInScopes();
+
+      expect(
+        screen.getByRole("dialog", { name: "Content Restrictions" })
+      ).toBeInTheDocument();
+    });
+
+    it("Escape closes it", async () => {
+      const onClose = await renderInScopes();
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("Escape does nothing while saving", async () => {
+      const onClose = await renderInScopes();
+      mockApiPut.mockReturnValue(new Promise(() => {}));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save Restrictions" })
+      );
+      await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole("dialog", { name: "Content Restrictions" })
+      ).toBeInTheDocument();
+    });
   });
 });

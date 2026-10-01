@@ -8,7 +8,7 @@ import {
   Button,
   ConfirmDialog,
   ErrorMessage,
-  Paper,
+  Modal,
   SearchableSelect,
 } from "../ui/index";
 
@@ -407,204 +407,190 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={() => !saving && onClose()}
-    >
-      <Paper
-        className="max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <Modal
+        isOpen
+        onClose={onClose}
+        title="Content Restrictions"
+        size="lg"
+        dismissible={!saving}
       >
-        <Paper.Header>
-          <Paper.Title>Content Restrictions</Paper.Title>
-          <Paper.Subtitle className="mt-1">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Configure content visibility for {user.username}
-          </Paper.Subtitle>
-        </Paper.Header>
+          </p>
 
-        <Paper.Body>
-          <div className="space-y-4">
+          <div
+            className="p-4 rounded-lg text-sm"
+            style={{
+              backgroundColor: "var(--status-info-bg)",
+              border: "1px solid var(--status-info-border)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <p
+              className="mb-2 font-medium"
+              style={{ color: "var(--status-info)" }}
+            >
+              How Content Restrictions Work
+            </p>
+            <ul
+              className="list-disc list-inside space-y-1 text-xs"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <li>
+                <strong>Show only:</strong> the user sees only content with at
+                least one listed item.
+              </li>
+              <li>
+                <strong>Always hide:</strong> listed items and their content are
+                hidden.
+              </li>
+              <li>
+                <strong>Always hide wins</strong> when the same item is listed
+                twice.
+              </li>
+              <li>
+                <strong>Child tags and studios</strong> are covered by their
+                parent in either list; parents are not covered by a child.
+              </li>
+              <li>
+                <strong>Also hide items with no X:</strong> hides content with
+                none of that type. It starts ticked with a Show-only list and
+                unticked with only an Always-hide list.
+              </li>
+              <li>
+                <strong>Reach:</strong> restrictions apply to scenes, galleries,
+                images and clip markers. Performers, studios, collections and
+                tags with no visible content disappear too.
+              </li>
+              <li>
+                <strong>Recommended:</strong> use Collections (Groups) as your
+                primary filtering mechanism since they are the most reliable and
+                static.
+              </li>
+              <li>
+                <strong>Admin accounts:</strong> Administrators are never
+                restricted; this editor is not shown for admin accounts.
+              </li>
+            </ul>
+          </div>
+
+          {loading && (
+            <div className="p-6 text-center">
+              <div
+                className="animate-spin w-8 h-8 border-4 border-t-transparent rounded-full mx-auto mb-2"
+                style={{
+                  borderColor: "var(--status-info-border)",
+                  borderTopColor: "transparent",
+                }}
+              ></div>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                Loading restrictions...
+              </p>
+            </div>
+          )}
+
+          {loadError && (
+            <div className="space-y-2">
+              <ErrorMessage
+                title="Failed to load restrictions"
+                error={loadError}
+                onRetry={() => setLoadAttempt((n) => n + 1)}
+              />
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Nothing can be saved until {user.username}&apos;s restrictions
+                load.
+              </p>
+              {unreadable && (
+                <div className="space-y-2">
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    A stored list that cannot be read cannot be edited. Clear
+                    all of {user.username}&apos;s restrictions to start again.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    loading={clearing}
+                    disabled={clearing}
+                    onClick={() => setConfirmingClear(true)}
+                  >
+                    Clear all restrictions
+                  </Button>
+                  {clearError && (
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--status-error)" }}
+                    >
+                      {clearError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {saveError && (
             <div
-              className="p-4 rounded-lg text-sm"
+              className="p-3 rounded-lg text-sm"
               style={{
-                backgroundColor: "var(--status-info-bg)",
-                border: "1px solid var(--status-info-border)",
-                color: "var(--text-secondary)",
+                backgroundColor: "var(--status-error-bg)",
+                color: "var(--status-error)",
               }}
             >
-              <p
-                className="mb-2 font-medium"
-                style={{ color: "var(--status-info)" }}
-              >
-                How Content Restrictions Work
-              </p>
-              <ul
-                className="list-disc list-inside space-y-1 text-xs"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <li>
-                  <strong>Show only:</strong> the user sees only content with at
-                  least one listed item.
-                </li>
-                <li>
-                  <strong>Always hide:</strong> listed items and their content
-                  are hidden.
-                </li>
-                <li>
-                  <strong>Always hide wins</strong> when the same item is listed
-                  twice.
-                </li>
-                <li>
-                  <strong>Child tags and studios</strong> are covered by their
-                  parent in either list; parents are not covered by a child.
-                </li>
-                <li>
-                  <strong>Also hide items with no X:</strong> hides content with
-                  none of that type. It starts ticked with a Show-only list and
-                  unticked with only an Always-hide list.
-                </li>
-                <li>
-                  <strong>Reach:</strong> restrictions apply to scenes,
-                  galleries, images and clip markers. Performers, studios,
-                  collections and tags with no visible content disappear too.
-                </li>
-                <li>
-                  <strong>Recommended:</strong> use Collections (Groups) as your
-                  primary filtering mechanism since they are the most reliable
-                  and static.
-                </li>
-                <li>
-                  <strong>Admin accounts:</strong> Administrators are never
-                  restricted; this editor is not shown for admin accounts.
-                </li>
-              </ul>
+              {saveError}
             </div>
+          )}
 
-            {loading && (
-              <div className="p-6 text-center">
-                <div
-                  className="animate-spin w-8 h-8 border-4 border-t-transparent rounded-full mx-auto mb-2"
-                  style={{
-                    borderColor: "var(--status-info-border)",
-                    borderTopColor: "transparent",
-                  }}
-                ></div>
-                <p
-                  className="text-sm"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Loading restrictions...
-                </p>
-              </div>
-            )}
-
-            {loadError && (
-              <div className="space-y-2">
-                <ErrorMessage
-                  title="Failed to load restrictions"
-                  error={loadError}
-                  onRetry={() => setLoadAttempt((n) => n + 1)}
-                />
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Nothing can be saved until {user.username}&apos;s restrictions
-                  load.
-                </p>
-                {unreadable && (
-                  <div className="space-y-2">
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      A stored list that cannot be read cannot be edited. Clear
-                      all of {user.username}&apos;s restrictions to start again.
-                    </p>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      loading={clearing}
-                      disabled={clearing}
-                      onClick={() => setConfirmingClear(true)}
-                    >
-                      Clear all restrictions
-                    </Button>
-                    {clearError && (
-                      <p
-                        className="text-xs"
-                        style={{ color: "var(--status-error)" }}
-                      >
-                        {clearError}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {saveError && (
+          {loaded && (
+            <div className="space-y-4">
               <div
-                className="p-3 rounded-lg text-sm"
+                className="p-3 rounded-lg"
                 style={{
-                  backgroundColor: "var(--status-error-bg)",
-                  color: "var(--status-error)",
+                  backgroundColor: "var(--status-success-bg)",
+                  border: "2px solid var(--status-success-border)",
                 }}
               >
-                {saveError}
-              </div>
-            )}
-
-            {loaded && (
-              <div className="space-y-4">
-                <div
-                  className="p-3 rounded-lg"
-                  style={{
-                    backgroundColor: "var(--status-success-bg)",
-                    border: "2px solid var(--status-success-border)",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{
-                        backgroundColor: "var(--status-success-bg)",
-                        color: "var(--status-success)",
-                      }}
-                    >
-                      RECOMMENDED
-                    </span>
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Collections are the most reliable organizational unit for
-                      content restrictions
-                    </p>
-                  </div>
-                  {renderEntitySection("groups")}
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded"
+                    style={{
+                      backgroundColor: "var(--status-success-bg)",
+                      color: "var(--status-success)",
+                    }}
+                  >
+                    RECOMMENDED
+                  </span>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Collections are the most reliable organizational unit for
+                    content restrictions
+                  </p>
                 </div>
-
-                {renderEntitySection("tags")}
-                {renderEntitySection("studios")}
-                {renderEntitySection("galleries")}
+                {renderEntitySection("groups")}
               </div>
-            )}
 
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => void handleSave()}
-                disabled={saving || !loaded || saveBlocked}
-                variant="primary"
-                fullWidth
-                loading={saving}
-              >
-                Save Restrictions
-              </Button>
-              <Button onClick={onClose} disabled={saving} variant="secondary">
-                Cancel
-              </Button>
+              {renderEntitySection("tags")}
+              {renderEntitySection("studios")}
+              {renderEntitySection("galleries")}
             </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              onClick={() => void handleSave()}
+              disabled={saving || !loaded || saveBlocked}
+              variant="primary"
+              fullWidth
+              loading={saving}
+            >
+              Save Restrictions
+            </Button>
+            <Button onClick={onClose} disabled={saving} variant="secondary">
+              Cancel
+            </Button>
           </div>
-        </Paper.Body>
-      </Paper>
+        </div>
+      </Modal>
       <ConfirmDialog
         isOpen={confirmingClear}
         title="Clear all restrictions?"
@@ -613,7 +599,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
         onConfirm={() => void handleClearAll()}
         onClose={() => setConfirmingClear(false)}
       />
-    </div>
+    </>
   );
 };
 

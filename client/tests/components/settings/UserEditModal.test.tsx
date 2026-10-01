@@ -20,6 +20,7 @@ import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import component after mocks
 import UserEditModal from "../../../src/components/settings/UserEditModal";
+import { ShortcutScopeProvider } from "../../../src/contexts/ShortcutScopeContext";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const {
@@ -940,6 +941,70 @@ describe("UserEditModal", () => {
       expect(options.length).toBe(2);
       expect(options[0]).toHaveValue("USER");
       expect(options[1]).toHaveValue("ADMIN");
+    });
+  });
+  describe("Dialog", () => {
+    const renderInScopes = (onClose = vi.fn()) => {
+      render(
+        <ShortcutScopeProvider>
+          <UserEditModal
+            user={mockUser}
+            groups={mockGroups}
+            currentUser={mockCurrentUser}
+            onClose={onClose}
+            onSave={vi.fn()}
+          />
+        </ShortcutScopeProvider>
+      );
+      return onClose;
+    };
+
+    it("opens as a dialog named Edit User", async () => {
+      renderInScopes();
+      await act(async () => {});
+
+      expect(
+        screen.getByRole("dialog", { name: "Edit User: testuser" })
+      ).toBeInTheDocument();
+    });
+
+    it("Escape closes it", async () => {
+      const onClose = renderInScopes();
+      await act(async () => {});
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("Escape closes the restrictions modal first, then the user modal", async () => {
+      mockApiGet.mockResolvedValue({ restrictions: [] });
+      const onClose = renderInScopes();
+      await act(async () => {});
+      fireEvent.click(
+        screen.getByRole("button", { name: /Manage Restrictions/ })
+      );
+      await screen.findByRole("dialog", { name: "Content Restrictions" });
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+
+      expect(
+        screen.queryByRole("dialog", { name: "Content Restrictions" })
+      ).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole("dialog", { name: "Edit User: testuser" })
+      ).toBeInTheDocument();
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 });
