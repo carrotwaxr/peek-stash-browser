@@ -38,6 +38,8 @@ Four ranked lists show your top 10 most-engaged entities:
 - **Top Studios** — By engagement score
 - **Top Tags** — By engagement score
 
+Refresh (the circular arrow at the top of the page) recomputes your Top lists from your latest plays; it can take a few seconds. Without it, the lists are recomputed when they are an hour old.
+
 ### Sorting Top Lists
 
 Use the sort toggle to change how top lists are ranked:

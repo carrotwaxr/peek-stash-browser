@@ -1,8 +1,10 @@
 // client/src/components/pages/UserStats/UserStats.tsx
 import { type ReactNode, useState } from "react";
 import { BarChart3, Info, RefreshCw } from "lucide-react";
+import { getErrorMessage } from "../../../api";
 import { usePageTitle } from "../../../hooks/usePageTitle";
 import { type TopListSortBy, useUserStats } from "../../../hooks/useUserStats";
+import { showError } from "../../../utils/toast";
 import {
   LoadingSpinner,
   PageHeader,
@@ -104,10 +106,12 @@ const UserStats = () => {
   const { data, loading, error, refresh } = useUserStats({ sortBy });
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      refresh();
+      await refresh();
+    } catch (err) {
+      showError(getErrorMessage(err, "Couldn't refresh your stats"));
     } finally {
       setRefreshing(false);
     }
@@ -151,7 +155,7 @@ const UserStats = () => {
       <div className="flex items-start justify-between">
         <PageHeader title="My Stats" subtitle="Your viewing statistics" />
         <button
-          onClick={handleRefresh}
+          onClick={() => void handleRefresh()}
           disabled={refreshing || loading}
           className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors disabled:opacity-50"
           aria-label="Refresh stats"

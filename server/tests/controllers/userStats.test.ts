@@ -6,7 +6,7 @@
  * itself is RankingComputeService.ensureFresh's, tested there), the viewer's
  * allowed instances, and error handling.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserStats } from "../../controllers/userStats.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
@@ -24,6 +24,7 @@ vi.mock("../../services/UserStatsAggregationService.js", () => ({
 vi.mock("../../services/RankingComputeService.js", () => ({
   default: {
     ensureFresh: vi.fn(),
+    forget: vi.fn(),
   },
 }));
 
@@ -203,6 +204,78 @@ describe("UserStats Controller", () => {
 
       expect(res.json).not.toHaveBeenCalled();
       expect(mockStatsService.getUserStats).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Forced refresh ───────────────────────────────────────────────────────
+
+  describe("refresh=1", () => {
+    const refreshReq = (userId: number) =>
+      reqFor(getUserStats, {
+        user: { ...USER, id: userId },
+        allowedInstanceIds: ALLOWED,
+        query: { refresh: "1" },
+      });
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("refresh=1 forgets the user's rankings before waiting for a fresh compute", async () => {
+      const events: string[] = [];
+      mockRankingService.forget.mockImplementation(() => {
+        events.push("forget");
+      });
+      mockRankingService.ensureFresh.mockImplementation(() => {
+        events.push("ensureFresh");
+        return Promise.resolve();
+      });
+
+      await getUserStats(refreshReq(11), resFor(getUserStats));
+
+      expect(mockRankingService.forget).toHaveBeenCalledExactlyOnceWith(11);
+      expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(
+        11,
+        { wait: true }
+      );
+      expect(events).toEqual(["forget", "ensureFresh"]);
+    });
+
+    it("a second refresh=1 from the same user within a minute does not forget again", async () => {
+      await getUserStats(refreshReq(12), resFor(getUserStats));
+      vi.advanceTimersByTime(30_000);
+      await getUserStats(refreshReq(12), resFor(getUserStats));
+
+      expect(mockRankingService.forget).toHaveBeenCalledTimes(1);
+      expect(mockRankingService.ensureFresh).toHaveBeenCalledTimes(2);
+
+      vi.advanceTimersByTime(31_000);
+      await getUserStats(refreshReq(12), resFor(getUserStats));
+
+      expect(mockRankingService.forget).toHaveBeenCalledTimes(2);
+    });
+
+    it("another user's refresh=1 is not held back by this user's", async () => {
+      await getUserStats(refreshReq(13), resFor(getUserStats));
+      await getUserStats(refreshReq(14), resFor(getUserStats));
+
+      expect(mockRankingService.forget).toHaveBeenCalledWith(13);
+      expect(mockRankingService.forget).toHaveBeenCalledWith(14);
+    });
+
+    it("without refresh it does not forget", async () => {
+      const req = reqFor(getUserStats, {
+        user: USER,
+        allowedInstanceIds: ALLOWED,
+      });
+
+      await getUserStats(req, resFor(getUserStats));
+
+      expect(mockRankingService.forget).not.toHaveBeenCalled();
     });
   });
 
