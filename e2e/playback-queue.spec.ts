@@ -59,3 +59,43 @@ test("a grid queue survives Up Next, a reload and Back", async ({ page }) => {
   await expect(heading).toHaveText(nextTitle, { timeout: 15_000 });
   await expect(sidebar.getByText("Browsing", { exact: true })).toHaveCount(0);
 });
+
+test("Next scene pressed from the keyboard moves focus into the new scene's player", async ({
+  page,
+}) => {
+  // Below lg the queue's card holds Previous and Next under the player
+  await page.setViewportSize({ width: 390, height: 844 });
+  const list = new ListPage(page);
+  await list.goto("/scenes");
+  const count = await list.waitForResults("Scene");
+  requireData(count >= 2 ? count : undefined, "two scenes");
+  const cards = list.cards("Scene");
+  const secondHref = requireData(
+    await titleLinkOf(cards.nth(1)).getAttribute("href"),
+    "a link on the second scene card"
+  );
+  const secondPath = new URL(secondHref, "http://peek.invalid").pathname;
+
+  await titleLinkOf(cards.first()).click();
+  await expect(page).toHaveURL(/\/scene\//);
+  const next = page.getByRole("button", { name: "Next scene" }).first();
+  await expect(next).toBeEnabled({ timeout: 15_000 });
+
+  // The button stays on the page while the next scene loads
+  await next.focus();
+  await expect(next).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => new URL(page.url()).pathname, { timeout: 15_000 })
+    .toBe(secondPath);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => document.activeElement?.closest(".video-js") !== null
+        ),
+      { timeout: 15_000 }
+    )
+    .toBe(true);
+});

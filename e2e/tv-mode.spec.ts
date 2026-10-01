@@ -289,6 +289,44 @@ test.describe("TV mode", () => {
     await expect(page.getByText("Up Next")).toBeVisible({ timeout: 15_000 });
   });
 
+  test("Enter on a similar scene card opens that scene with focus in its player", async ({
+    page,
+  }) => {
+    const { cards } = await openScenes(page, "/scenes?per_page=24");
+    await cards.first().focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/scene\//);
+
+    /** Whether focus is inside the player */
+    const inPlayer = () =>
+      page.evaluate(
+        () => document.activeElement?.closest(".video-js") !== null
+      );
+    await expect.poll(inPlayer, { timeout: 15_000 }).toBe(true);
+
+    // The Similar Scenes tab's cards, not the sidebar's
+    const similar = page.locator('main [aria-label="Scene"]:not(aside *)');
+    requireData(
+      await similar
+        .first()
+        .waitFor({ timeout: 15_000 })
+        .then(
+          () => true,
+          () => null
+        ),
+      "a similar scene"
+    );
+    const from = page.url();
+    const card = similar.first();
+    await card.focus();
+    await expect(card).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).not.toHaveURL(from);
+
+    // The new scene's player takes focus from the card that opened it
+    await expect.poll(inPlayer, { timeout: 15_000 }).toBe(true);
+  });
+
   test("PageDown moves to page 2", async ({ page }) => {
     const { list, cards } = await openScenes(page, "/scenes?per_page=12");
     requireData(await list.nextPage.isEnabled(), "more than one page");

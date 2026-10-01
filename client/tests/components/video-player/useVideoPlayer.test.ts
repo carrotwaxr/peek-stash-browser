@@ -139,7 +139,7 @@ interface Controls {
 
 function renderPlayer(
   player: FakePlayer,
-  scene: Scene,
+  scene: Scene | null,
   container: HTMLDivElement | null = null,
   controls: Controls = {}
 ) {
@@ -150,10 +150,15 @@ function renderPlayer(
   const playerRef = { current: player };
   const hasResumedRef = { current: false };
   const initialResumeTimeRef = { current: null };
-  const location = { state: null };
-  type Props = { current: Scene; restartCount?: number };
+  type Props = {
+    /** The loaded scene; null while the page's first scene loads */
+    current: Scene | null;
+    restartCount?: number;
+    /** The route: a new one starts a scene change before its scene lands */
+    pathname?: string;
+  };
   const rendered = renderHook<ReturnType<typeof useVideoPlayer>, Props>(
-    ({ current, restartCount = 0 }) =>
+    ({ current, restartCount = 0, pathname = "/scene/123" }) =>
       useVideoPlayer({
         // No container: the lifecycle effect creates no player, the test's
         // stands in for it
@@ -171,7 +176,7 @@ function renderPlayer(
         nextScene: noop,
         prevScene: noop,
         registerPlayer: noop,
-        location,
+        location: { state: null, pathname, search: "" },
         hasResumedRef,
         initialResumeTimeRef,
         watchHistory: null,
@@ -219,6 +224,7 @@ function requestBody(options: RequestInit | undefined): unknown {
 
 const onA = { id: "123", instanceId: "inst-a" };
 const onB = { id: "123", instanceId: "inst-b" };
+const onA2 = { id: "124", instanceId: "inst-a" };
 
 describe("useVideoPlayer", () => {
   beforeEach(() => {
@@ -416,12 +422,60 @@ describe("useVideoPlayer", () => {
       document.body.appendChild(player.el());
       const outside = document.createElement("button");
       document.body.appendChild(outside);
-      outside.focus();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
 
-      renderPlayer(player, onA);
+      // The page opens on nothing; the user focuses a control while the
+      // scene loads
+      const { rerender } = renderPlayer(player, null);
+      outside.focus();
+      rerender({ current: onA });
 
       expect(player.focus).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(outside);
+      outside.remove();
+      player.el().remove();
+    });
+
+    it("a scene change started from a similar-scene card moves focus into the new player", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const card = document.createElement("button");
+      document.body.appendChild(card);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+      const { rerender } = renderPlayer(player, onA);
+      expect(player.focus).toHaveBeenCalledTimes(1);
+
+      // The card is focused when the change starts and keeps focus until
+      // the new scene lands
+      card.focus();
+      rerender({ current: onA, pathname: "/scene/124" });
+      rerender({ current: onA2, pathname: "/scene/124" });
+
+      expect(player.focus).toHaveBeenCalledTimes(2);
+      card.remove();
+      player.el().remove();
+    });
+
+    it("a scene change whose scene lands after the user left the card for another control leaves focus there", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const card = document.createElement("button");
+      const outside = document.createElement("button");
+      document.body.append(card, outside);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+      const { rerender } = renderPlayer(player, onA);
+
+      card.focus();
+      rerender({ current: onA, pathname: "/scene/124" });
+      outside.focus();
+      rerender({ current: onA2, pathname: "/scene/124" });
+
+      expect(player.focus).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(outside);
+      card.remove();
       outside.remove();
       player.el().remove();
     });
