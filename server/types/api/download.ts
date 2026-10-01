@@ -8,6 +8,7 @@ export type {
   StartImageDownloadResponse,
   StartPlaylistDownloadParams,
   StartPlaylistDownloadResponse,
+  PlaylistTooLargeResponse,
   GetUserDownloadsResponse,
   GetDownloadStatusParams,
   GetDownloadStatusResponse,

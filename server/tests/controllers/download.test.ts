@@ -406,7 +406,7 @@ describe("Download Controller", () => {
   });
 
   describe("startPlaylistDownload", () => {
-    it("should return 400 if playlist exceeds maximum size", async () => {
+    it("should return 400 with both sizes in MiB if playlist exceeds maximum size", async () => {
       const res = resFor(startPlaylistDownload);
 
       mockResolveUserPermissions.mockResolvedValue({
@@ -436,6 +436,8 @@ describe("Download Controller", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "Playlist exceeds maximum download size",
         details: stringContaining("max: 10240MB"),
+        totalSizeMB: 11264,
+        maxSizeMB: 10240,
       });
     });
 
@@ -561,6 +563,8 @@ describe("Download Controller", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "Playlist exceeds maximum download size",
         details: "Total: 12288MB, max: 10240MB",
+        totalSizeMB: 12288,
+        maxSizeMB: 10240,
       });
       expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
     });

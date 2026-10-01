@@ -139,11 +139,6 @@
       "count": 7
     }
   },
-  "src/components/pages/PlaylistDetail.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 2
-    }
-  },
   "src/components/pages/Playlists.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1

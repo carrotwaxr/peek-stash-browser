@@ -13,6 +13,7 @@ import type {
   NormalizedScene,
   PlaylistItemWithScene,
   PlaylistQueueEntry,
+  PlaylistTooLargeResponse,
 } from "@peek/shared-types";
 import {
   fireEvent,
@@ -186,6 +187,8 @@ interface Server {
     | GetPlaylistQueueResponse
     | ((query: URLSearchParams) => GetPlaylistQueueResponse);
   permissions: Record<string, unknown>;
+  /** The answer to a playlist download; a started PENDING zip by default */
+  download?: () => Response;
 }
 
 let fetchMock: ApiStub;
@@ -224,6 +227,7 @@ function serve(server: Server): ApiStub {
     "/playlists/5/sort": () =>
       jsonResponse(200, { success: true, itemCount: 3 }),
     "/downloads/playlist/5": () =>
+      server.download?.() ??
       jsonResponse(200, { download: { id: 1, status: "PENDING" } }),
     "/playlists": () => jsonResponse(200, { playlists: [] }),
     "/playlists/5/duplicate": () =>
@@ -609,6 +613,29 @@ describe("PlaylistDetail download", () => {
 
     await waitFor(() =>
       expect(requestsTo(fetchMock, "/downloads/playlist/5")).toHaveLength(1)
+    );
+  });
+
+  it("a playlist past the size cap shows its size and the cap", async () => {
+    const tooLarge: PlaylistTooLargeResponse = {
+      error: "Playlist exceeds maximum download size",
+      details: "Total: 12288MB, max: 10240MB",
+      totalSizeMB: 12288,
+      maxSizeMB: 10240,
+    };
+    serve({
+      page: () => shared({}),
+      queue: { entries: [] },
+      permissions: { canDownloadPlaylists: true },
+      download: () => jsonResponse(400, tooLarge),
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTitle("Download Playlist"));
+
+    await waitFor(() =>
+      expect(vi.mocked(showError)).toHaveBeenCalledWith(
+        "Playlist exceeds maximum download size (12288MB exceeds 10240MB limit)"
+      )
     );
   });
 
