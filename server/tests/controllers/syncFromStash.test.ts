@@ -332,6 +332,7 @@ function scene(
     play_history?: string[];
     play_duration?: number | null;
     resume_time?: number | null;
+    last_played_at?: string | null;
   }
 ): StashEntity {
   return { ...bare, id, rating100: null, ...history };
@@ -1080,6 +1081,67 @@ describe("syncFromStash", () => {
           update: { playCount: 1, playHistory: [T], lastPlayedAt: new Date(U) },
         })
       );
+    });
+
+    it("a scene with watch time and Stash's last_played_at but no play dates imports lastPlayedAt from Stash", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [scene("1", { play_duration: 300, last_played_at: U })])
+      );
+      await run(only(SCENE, { playCount: true }));
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          create: objectContaining({
+            sceneId: "1",
+            playHistory: [],
+            lastPlayedAt: new Date(U),
+          }),
+        })
+      );
+    });
+
+    it("Stash's last_played_at older than Peek's keeps Peek's", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [
+          scene("1", { play_count: 1, play_history: [T], last_played_at: T }),
+        ])
+      );
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        historyRow({ sceneId: "1", playCount: 1, lastPlayedAt: new Date(U) }),
+      ]);
+      await run(only(SCENE, { playCount: true }));
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          update: { playCount: 1, playHistory: [T], lastPlayedAt: new Date(U) },
+        })
+      );
+    });
+
+    it("a re-run that only raises lastPlayedAt updates the row and counts it as updated", async () => {
+      mockStashClient.findScenes.mockResolvedValue(
+        page(SCENE, [
+          scene("1", { play_count: 1, play_history: [T], last_played_at: U }),
+        ])
+      );
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        historyRow({
+          sceneId: "1",
+          playCount: 1,
+          playHistory: [T],
+          lastPlayedAt: new Date(T),
+        }),
+      ]);
+      const res = await run(only(SCENE, { playCount: true }));
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        objectContaining({
+          update: { playCount: 1, playHistory: [T], lastPlayedAt: new Date(U) },
+        })
+      );
+      expect(res._getOkBody().stats.scenes).toEqual({
+        checked: 1,
+        created: 0,
+        updated: 1,
+      });
     });
 
     it("with O and plays both on, the O pass imports both and the play pass skips the scenes it handled", async () => {

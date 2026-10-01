@@ -18,8 +18,8 @@
  * stored history is `mergeHistory` of Peek's and Stash's dates; the count
  * is the merged length, never lower than Stash's counter (Stash counted
  * before it kept dates) nor than Peek's count (Peek counted plays before it
- * kept dates); `lastPlayedAt` is the latest merged play, never earlier than
- * it was. With the plays come the watch time, the larger of Peek's and
+ * kept dates); `lastPlayedAt` is the latest of the merged plays and Stash's
+ * `last_played_at`, never earlier than it was. With the plays come the watch time, the larger of Peek's and
  * Stash's (Sync to Stash adds Peek's to Stash's, so a sum would count it
  * twice), and the resume point, Peek's own or Stash's when Peek has none.
  * Each page is one `dbWriteTransaction` that reads the rows it merges into,
@@ -159,6 +159,8 @@ interface ImportedScene extends ImportedEntity {
   play_count?: number | null;
   o_history: string[];
   play_history: string[];
+  /** When Stash last saw a play; set with a resume point or watch time even when no play dates exist */
+  last_played_at?: string | null;
   /** Seconds watched in all */
   play_duration?: number | null;
   /** Seconds into the scene where playback left off */
@@ -519,7 +521,16 @@ function historyChange(
       scene.play_count ?? 0,
       row?.playCount ?? 0
     );
-    const lastPlayedAt = latestPlay(playHistory, row?.lastPlayedAt ?? null);
+    // The latest of the merged plays, Peek's own date and Stash's
+    // last_played_at (a scene with watch time or a resume point and no play
+    // dates has only that); never earlier than it was
+    const lastPlayedAt = latestPlay(
+      playHistory,
+      latestPlay(
+        scene.last_played_at ? [scene.last_played_at] : [],
+        row?.lastPlayedAt ?? null
+      )
+    );
     change.playCount = playCount;
     change.playHistory = playHistory;
     change.lastPlayedAt = lastPlayedAt;

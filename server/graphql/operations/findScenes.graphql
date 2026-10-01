@@ -20,6 +20,7 @@ query FindScenes(
       details
       director
       id
+      last_played_at
       o_counter
       o_history
       organized

@@ -395,19 +395,28 @@ const counter = when((c) => c.rng().int(1, 9));
  * A scene's O or play dates: as many as its counter (Stash keeps one date
  * per count), each within 400 days of created_at, in time order.
  */
+const historySeconds = (
+  c: FieldContext,
+  field: string,
+  counterField: string
+): number[] => {
+  const count =
+    c.entity.lengths[field] ??
+    (c.present(counterField) ? c.rng(counterField).int(1, 9) : 0);
+  return numbers(count)
+    .map((n) => c.createdSeconds() + c.rng(`${field}.${n}`).int(0, 400 * DAY))
+    .sort((a, b) => a - b);
+};
 const historyOf =
   (counterField: string): Rule =>
-  (c) => {
-    const count =
-      c.entity.lengths[c.field] ??
-      (c.present(counterField) ? c.rng(counterField).int(1, 9) : 0);
-    return numbers(count)
-      .map(
-        (n) => c.createdSeconds() + c.rng(`${c.field}.${n}`).int(0, 400 * DAY)
-      )
-      .sort((a, b) => a - b)
-      .map(timestamp);
-  };
+  (c) =>
+    historySeconds(c, c.field, counterField).map(timestamp);
+/** A scene's last play: the latest of its play dates, null with none (as Stash). */
+const lastPlayedAt: Rule = (c) => {
+  const plays = historySeconds(c, "play_history", "play_count");
+  const latest = plays[plays.length - 1];
+  return latest === undefined ? null : timestamp(latest);
+};
 const flag = when((c) => c.rng().int(0, 1) === 1);
 const between = (min: number, max: number): Rule =>
   when((c) => c.rng().int(min, max));
@@ -585,6 +594,7 @@ const RULES: Record<EntityType, Record<string, Rule>> = {
     paths: scenePaths,
     o_history: historyOf("o_counter"),
     play_history: historyOf("play_count"),
+    last_played_at: lastPlayedAt,
     sceneStreams: (c) =>
       c.length() > 0
         ? streamLabels(c.dimensions()[1]).map((name) => ({ label: name }))
