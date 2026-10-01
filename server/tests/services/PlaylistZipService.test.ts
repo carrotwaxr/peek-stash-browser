@@ -214,6 +214,47 @@ describe("PlaylistZipService.createZip", () => {
     );
   });
 
+  it("each entry keeps its file's extension and the M3U names it", async () => {
+    const { names, m3u } = await zip("Mix", [
+      scene("s1", "First", {
+        files: [partialRow({ duration: 60, path: "/v/a.mkv" })],
+      }),
+      scene("s2", "Second", {
+        files: [partialRow({ duration: 60, path: "/v/b.avi" })],
+      }),
+    ]);
+
+    expect(names).toEqual([
+      "Mix/First.nfo",
+      "Mix/First.mkv",
+      "Mix/Second.nfo",
+      "Mix/Second.avi",
+      "Mix/playlist.m3u",
+    ]);
+    expect(m3u).toBe(
+      "#EXTM3U\n#EXTINF:60,First\nFirst.mkv\n#EXTINF:60,Second\nSecond.avi\n"
+    );
+  });
+
+  it("two same-title scenes with different extensions still get distinct names", async () => {
+    const { names } = await zip("Mix", [
+      scene("s1", "A", {
+        files: [partialRow({ duration: 60, path: "/v/a.mkv" })],
+      }),
+      scene("s2", "A", {
+        files: [partialRow({ duration: 60, path: "/v/b.mp4" })],
+      }),
+    ]);
+
+    expect(names).toEqual([
+      "Mix/A.nfo",
+      "Mix/A.mkv",
+      "Mix/A (2).nfo",
+      "Mix/A (2).mp4",
+      "Mix/playlist.m3u",
+    ]);
+  });
+
   it("a file name starting with # is listed as a path, not a comment", async () => {
     const { m3u } = await zip("Mix", [scene("s1", "#1 Hit")]);
 

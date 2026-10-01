@@ -2,9 +2,31 @@ import http from "http";
 import { describe, expect, it } from "vitest";
 import {
   attachmentContentDisposition,
+  fileExtension,
   safeFileName,
   uniqueFileName,
 } from "../../utils/contentDisposition.js";
+
+describe("fileExtension", () => {
+  it("takes the last extension of the path, lower-cased", () => {
+    expect(fileExtension("/a/b/Clip.MKV", ".mp4")).toBe(".mkv");
+    expect(fileExtension("/a/x.tar.wmv", ".mp4")).toBe(".wmv");
+    expect(fileExtension("C:\\v\\a.AVI", ".mp4")).toBe(".avi");
+  });
+
+  it("falls back when the path has none, is null, or the extension is not 1 to 8 letters or digits", () => {
+    for (const path of [
+      "/a/noext",
+      null,
+      "/a.b/c",
+      "/a/x.mp4 ",
+      "/a/x.m p4",
+      "/a/x.verylongext",
+    ]) {
+      expect(fileExtension(path, ".jpg")).toBe(".jpg");
+    }
+  });
+});
 
 describe("safeFileName", () => {
   it("names a blank file download", () => {
