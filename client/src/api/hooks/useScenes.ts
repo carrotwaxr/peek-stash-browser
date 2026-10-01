@@ -71,6 +71,10 @@ export interface SimilarScenesResponse {
  * the fetch is cancelled the moment its last observer unmounts, and a
  * remount (StrictMode's double mount, a layout change) sends it again. A
  * page of ids is cheap to let finish and cache.
+ *
+ * While the next page of the same scene loads, the current page stays on
+ * screen; a new scene (or the same id on another instance) shows nothing
+ * until its own answer arrives, never the previous scene's list.
  */
 export function useSimilarScenes(
   sceneId: string,
@@ -87,7 +91,12 @@ export function useSimilarScenes(
         `/library/scenes/${sceneId}/similar?instanceId=${encodeURIComponent(instanceId)}&page=${page}`
       ),
     enabled: !!sceneId && !!instanceId && ready,
-    // Keep the current page on screen while the next one loads
-    placeholderData: keepPreviousData,
+    // Keep the current page on screen while the next one of the same
+    // scene loads (key: ["scenes", instanceId, "similar", sceneId, page])
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[3] === sceneId &&
+      previousQuery.queryKey[1] === instanceId
+        ? previous
+        : undefined,
   });
 }

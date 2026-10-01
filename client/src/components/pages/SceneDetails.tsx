@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { getClipsForScene } from "../../api";
+import { useSceneClips } from "../../api/hooks/useSceneClips";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
@@ -66,32 +66,11 @@ const SceneDetails = ({
   const sceneSettings = getSettings("scene") as Record<string, boolean>;
   const { hasMultipleInstances } = useConfig();
 
-  // Clips state
-  const [clips, setClips] = useState<Record<string, unknown>[]>([]);
-  const [clipsLoading, setClipsLoading] = useState(true);
+  // The scene's clips, shared with the player's timeline
+  const clipsQuery = useSceneClips(scene?.id ?? "", scene?.instanceId ?? "");
+  const clips = clipsQuery.data?.clips ?? [];
+  const clipsLoading = clipsQuery.isLoading;
   const [showClips, setShowClips] = useState(false); // Collapsed by default
-
-  // Fetch clips when scene changes
-  useEffect(() => {
-    async function fetchClips() {
-      if (!scene?.id) return;
-      setClipsLoading(true);
-      try {
-        const response = (await getClipsForScene(
-          scene.id,
-          scene.instanceId,
-          true
-        )) as { clips?: Record<string, unknown>[] };
-        setClips(response.clips ?? []);
-      } catch (err) {
-        console.error("Failed to fetch clips", err);
-        setClips([]);
-      } finally {
-        setClipsLoading(false);
-      }
-    }
-    void fetchClips();
-  }, [scene?.id, scene?.instanceId]);
 
   // Handle clip click - dispatch event to seek video player
   const handleClipClick = (clip: { seconds: number }) => {
@@ -323,7 +302,7 @@ const SceneDetails = ({
               {showClips && (
                 <Paper.Body>
                   <ClipList
-                    clips={clips as unknown as Clip[]}
+                    clips={clips}
                     onClipClick={handleClipClick as (clip: Clip) => void}
                     loading={clipsLoading}
                   />

@@ -1,7 +1,11 @@
 /**
  * Clips API endpoints.
  */
-import type { ClipQueryInput, RefModifier } from "@peek/shared-types";
+import type {
+  ClipQueryInput,
+  GetClipsForSceneResponse,
+  RefModifier,
+} from "@peek/shared-types";
 import { apiGet } from "./client";
 
 /**
@@ -78,7 +82,10 @@ export async function getClipsForScene(
 ) {
   const params = new URLSearchParams({ instanceId });
   if (includeUngenerated) params.set("includeUngenerated", "true");
-  return apiGet(`/scenes/${sceneId}/clips?${params.toString()}`, signal);
+  return apiGet<GetClipsForSceneResponse>(
+    `/scenes/${sceneId}/clips?${params.toString()}`,
+    signal
+  );
 }
 
 /**

@@ -61,8 +61,8 @@ describe("ClipService", () => {
         primaryTagId: "tag-1",
         screenshotPath: "/scene/1/marker/42/screenshot",
         isGenerated: true,
-        stashCreatedAt: new Date(),
-        stashUpdatedAt: new Date(),
+        stashCreatedAt: new Date("2026-01-02T03:04:05.000Z"),
+        stashUpdatedAt: new Date("2026-02-03T04:05:06.000Z"),
         primaryTag: { id: "tag-1", name: "Action", color: "#ff0000" },
         tags: [],
         scene: {
@@ -89,6 +89,9 @@ describe("ClipService", () => {
       );
       // Raw screenshotPath should not be exposed
       expect(clip).not.toHaveProperty("screenshotPath");
+      // Dates are sent as the ISO strings JSON carries
+      expect(must(clip).stashCreatedAt).toBe("2026-01-02T03:04:05.000Z");
+      expect(must(clip).stashUpdatedAt).toBe("2026-02-03T04:05:06.000Z");
       // The clip and its scene carry their instance
       expect(must(clip).instanceId).toBe("default");
       expect(must(clip).scene).toEqual({

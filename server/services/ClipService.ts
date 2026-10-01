@@ -1,3 +1,4 @@
+import type { ClipWithRelations } from "../types/api/clips.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import type {
   ClipByIdOptions,
@@ -7,42 +8,21 @@ import type {
 import { clipQueryBuilder } from "./ClipQueryBuilder.js";
 import type { ListQueryOptions } from "./query/EntityQueryBuilder.js";
 
-/**
- * Clip data returned to the client, with its instance and its scene's.
- * Note: Raw Stash URLs (previewPath, screenshotPath, streamPath) are NOT exposed.
- * The client uses proxy endpoints like /api/proxy/clip/:id/preview for media.
- */
-export interface ClipWithRelations {
-  id: string;
-  instanceId: string;
-  sceneId: string;
-  title: string | null;
-  seconds: number;
-  endSeconds: number | null;
-  primaryTagId: string | null;
-  screenshotUrl: string | null;
-  isGenerated: boolean;
-  stashCreatedAt: Date | null;
-  stashUpdatedAt: Date | null;
-  primaryTag: { id: string; name: string; color: string | null } | null;
-  tags: Array<{ id: string; name: string; color: string | null }>;
-  scene: {
-    id: string;
-    instanceId: string;
-    title: string | null;
-    pathScreenshot: string | null;
-    studioId: string | null;
-  };
-}
+/** The clip row the endpoints answer (`shared/types/api/clips.ts`) */
+export type { ClipWithRelations };
 
 export class ClipService {
   /**
    * Transform clip from query builder to client-safe format with proxy URLs
+   * and its dates as ISO strings
    */
   private transformClip(clip: RawClipWithRelations): ClipWithRelations {
-    const { screenshotPath, scene, ...rest } = clip;
+    const { screenshotPath, scene, stashCreatedAt, stashUpdatedAt, ...rest } =
+      clip;
     return {
       ...rest,
+      stashCreatedAt: stashCreatedAt?.toISOString() ?? null,
+      stashUpdatedAt: stashUpdatedAt?.toISOString() ?? null,
       screenshotUrl: toProxyUrl(screenshotPath, scene.stashInstanceId),
       scene: {
         id: scene.id,
