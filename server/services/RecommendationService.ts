@@ -13,6 +13,11 @@
  * The cache key also carries the day (the daily shuffle seed) and the
  * allowed instances, so a new day or an instance selection change rescores.
  *
+ * Rankings are refreshed (at most once an hour) by page 1 of the
+ * Recommended list, which waits for a recompute, by login and by the stats
+ * page; later pages start none, so a user's pages are scored with one set of
+ * rankings.
+ *
  * The cache holds the 100 most recently served users, in process memory,
  * keyed by user id: no user is ever answered with another's list. Callers
  * arriving while a list is being computed share the computation, and a

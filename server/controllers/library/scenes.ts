@@ -249,9 +249,15 @@ export const getRecommendedScenes = async (
 
   const { page, perPage } = request;
 
-  // Rankings over an hour old are recomputed in the background; this
-  // request scores with the ones stored
-  void rankingComputeService.ensureFresh(userId);
+  // Rankings over an hour old are recomputed here, on page 1 only, so the
+  // pages that follow are scored with the rankings page 1 used. A failed
+  // recompute is logged by the service; this request scores with the stored
+  // rankings.
+  if (page === 1) {
+    await rankingComputeService
+      .ensureFresh(userId, { wait: true })
+      .catch(() => undefined);
+  }
 
   const { allowedInstanceIds } = req;
   const { refs, criteria } = await recommendationService.getRankedRefs(

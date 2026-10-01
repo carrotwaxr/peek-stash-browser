@@ -650,7 +650,16 @@ describe("getRecommendedScenes", () => {
     expect(mockRecommendationService.getRankedRefs).not.toHaveBeenCalled();
   });
 
-  it("starts a ranking refresh without waiting and reads no ranking time itself", async () => {
+  it("page 1 awaits ensureFresh with wait: true before reading the ranked list", async () => {
+    const order: string[] = [];
+    mockRankingService.ensureFresh.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      order.push("ensureFresh");
+    });
+    mockRecommendationService.getRankedRefs.mockImplementationOnce(() => {
+      order.push("getRankedRefs");
+      return Promise.resolve({ refs: [], criteria: noCriteria });
+    });
     const req = reqFor(getRecommendedScenes, {
       user: testUser(),
       query: { page: "1" },
@@ -660,8 +669,49 @@ describe("getRecommendedScenes", () => {
     await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(1);
+    expect(mockRankingService.ensureFresh).toHaveBeenCalledExactlyOnceWith(1, {
+      wait: true,
+    });
+    expect(order).toEqual(["ensureFresh", "getRankedRefs"]);
     expect(mockPrisma.userEntityRanking.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("pages above 1 call no ensureFresh", async () => {
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "2" },
+    });
+    const res = resFor(getRecommendedScenes);
+
+    await getRecommendedScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockRankingService.ensureFresh).not.toHaveBeenCalled();
+    expect(mockRecommendationService.getRankedRefs).toHaveBeenCalledOnce();
+  });
+
+  it("a failed recompute on page 1 still answers with the stored rankings (logged)", async () => {
+    // RankingComputeService.refresh logs the failure before rejecting
+    mockRankingService.ensureFresh.mockRejectedValueOnce(
+      new Error("recompute failed")
+    );
+    mockRecommendationService.getRankedRefs.mockResolvedValue({
+      refs: [ref("s1")],
+      criteria: someCriteria,
+    });
+    mockSceneQueryBuilder.getByRefs.mockResolvedValue([
+      createMockScene({ id: "s1", instanceId: "default" }),
+    ]);
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(getRecommendedScenes);
+
+    await getRecommendedScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(res._getOkBody().scenes.map((s) => s.id)).toEqual(["s1"]);
   });
 
   it("returns empty result with message when user has no criteria", async () => {
