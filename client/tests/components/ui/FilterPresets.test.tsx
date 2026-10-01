@@ -13,11 +13,12 @@ import {
   render as rtlRender,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { must } from "@tests/testUtils";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FilterPresets from "../../../src/components/ui/FilterPresets";
 import { ShortcutScopeProvider } from "../../../src/contexts/ShortcutScopeContext";
 
@@ -47,9 +48,6 @@ const render = (ui: React.ReactElement, options?: RenderOptions) => {
     ...options,
   });
 };
-
-// Mock window.confirm for delete confirmation
-const originalConfirm = window.confirm;
 
 describe("FilterPresets", () => {
   const defaultProps = {
@@ -81,7 +79,6 @@ describe("FilterPresets", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.confirm = vi.fn(() => true);
 
     // Default API responses
     mockApiGet.mockImplementation((url) => {
@@ -98,8 +95,8 @@ describe("FilterPresets", () => {
     mockApiDelete.mockResolvedValue({});
   });
 
-  afterAll(() => {
-    window.confirm = originalConfirm;
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("Rendering", () => {
@@ -552,7 +549,8 @@ describe("FilterPresets", () => {
   });
 
   describe("Delete Preset", () => {
-    it("deletes preset after confirmation", async () => {
+    it("Delete asks in a dialog and deletes on Confirm", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm");
       const user = userEvent.setup();
       render(<FilterPresets {...defaultProps} />);
 
@@ -571,18 +569,23 @@ describe("FilterPresets", () => {
       const deleteButtons = screen.getAllByTitle("Delete preset");
       await user.click(must(deleteButtons[0]));
 
-      expect(window.confirm).toHaveBeenCalledWith('Delete preset "Favorites"?');
+      const dialog = await screen.findByRole("dialog", {
+        name: "Delete preset?",
+      });
+      expect(dialog).toHaveTextContent('Delete preset "Favorites"?');
+      expect(mockApiDelete).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
       await waitFor(() => {
         expect(mockApiDelete).toHaveBeenCalledWith(
           "/user/filter-presets/scene/preset-1"
         );
       });
+      expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it("does not delete when confirmation cancelled", async () => {
-      window.confirm = vi.fn(() => false);
-
+    it("does not delete when the dialog is cancelled", async () => {
       const user = userEvent.setup();
       render(<FilterPresets {...defaultProps} />);
 
@@ -601,7 +604,16 @@ describe("FilterPresets", () => {
       const deleteButtons = screen.getAllByTitle("Delete preset");
       await user.click(must(deleteButtons[0]));
 
-      expect(window.confirm).toHaveBeenCalled();
+      const dialog = await screen.findByRole("dialog", {
+        name: "Delete preset?",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("dialog", { name: "Delete preset?" })
+        ).toBeNull();
+      });
       expect(mockApiDelete).not.toHaveBeenCalled();
     });
   });

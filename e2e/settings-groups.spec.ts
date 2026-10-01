@@ -219,12 +219,14 @@ test.describe("User Group Management", () => {
     const groupName = uniqueName("group");
     await createGroup(page, groupName);
 
-    // Handle the confirmation dialog
-    page.on("dialog", (dialog) => dialog.accept());
-
     await groupRow(page, groupName)
       .getByRole("button", { name: "Delete" })
       .click();
+
+    // Peek's confirmation dialog, not the browser's
+    const confirm = page.getByRole("dialog", { name: "Delete group?" });
+    await expect(confirm).toContainText(`Delete the group "${groupName}"?`);
+    await confirm.getByRole("button", { name: "Delete group" }).click();
 
     // Should see success message
     await expect(

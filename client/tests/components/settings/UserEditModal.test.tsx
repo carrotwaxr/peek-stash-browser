@@ -69,6 +69,13 @@ vi.mock("../../../src/components/ui/SearchableSelect", () => ({
   ),
 }));
 
+/** Answers the confirmation dialog named `name` with `button`; returns it */
+const answerConfirm = async (name: string, button: string) => {
+  const dialog = await screen.findByRole("dialog", { name });
+  fireEvent.click(within(dialog).getByRole("button", { name: button }));
+  return dialog;
+};
+
 describe("UserEditModal", () => {
   const mockUser = {
     id: 1,
@@ -502,8 +509,8 @@ describe("UserEditModal", () => {
   });
 
   describe("Recovery key", () => {
-    it("regenerates the key after confirmation and shows it to the admin", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    it("Regenerate recovery key asks in a dialog, then regenerates the key and shows it to the admin", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm");
       mockAdminRegenerateRecoveryKey.mockResolvedValue({
         success: true,
         recoveryKey: "NEWK-EYAB-CDEF",
@@ -514,14 +521,19 @@ describe("UserEditModal", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /Regenerate Recovery Key/ })
       );
+      const dialog = await answerConfirm(
+        "Regenerate recovery key?",
+        "Regenerate"
+      );
+      expect(dialog).toHaveTextContent(
+        'Regenerate the recovery key for "testuser"? Their old key will no longer work.'
+      );
 
       expect(
         await screen.findByText("New recovery key (show to user):")
       ).toBeInTheDocument();
       expect(screen.getByText("NEWK-EYAB-CDEF")).toBeInTheDocument();
-      expect(confirmSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Regenerate recovery key for "testuser"?')
-      );
+      expect(confirmSpy).not.toHaveBeenCalled();
       expect(mockAdminRegenerateRecoveryKey).toHaveBeenCalledWith(1);
       expect(onMessage).toHaveBeenCalledWith(
         "Recovery key regenerated for testuser"
@@ -530,28 +542,26 @@ describe("UserEditModal", () => {
     });
 
     it("does nothing when the admin cancels the confirmation", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-
       await renderModal();
       fireEvent.click(
         screen.getByRole("button", { name: /Regenerate Recovery Key/ })
       );
+      await answerConfirm("Regenerate recovery key?", "Cancel");
 
       expect(mockAdminRegenerateRecoveryKey).not.toHaveBeenCalled();
       expect(
         screen.queryByText("New recovery key (show to user):")
       ).not.toBeInTheDocument();
-      confirmSpy.mockRestore();
     });
 
     it("shows the error when regenerating fails", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
       mockAdminRegenerateRecoveryKey.mockRejectedValue(new Error(""));
 
       await renderModal();
       fireEvent.click(
         screen.getByRole("button", { name: /Regenerate Recovery Key/ })
       );
+      await answerConfirm("Regenerate recovery key?", "Regenerate");
 
       expect(
         await screen.findByText("Failed to regenerate recovery key")
@@ -559,7 +569,6 @@ describe("UserEditModal", () => {
       expect(
         screen.queryByText("New recovery key (show to user):")
       ).not.toBeInTheDocument();
-      confirmSpy.mockRestore();
     });
   });
 
@@ -638,8 +647,8 @@ describe("UserEditModal", () => {
   });
 
   describe("Deleting a user", () => {
-    it('Delete User DELETEs and reports \'User "x" deleted\' through onDeleted, with no "updated" message after it', async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    it('Delete user asks in a dialog, then DELETEs and reports \'User "x" deleted\' through onDeleted, with no "updated" message after it', async () => {
+      const confirmSpy = vi.spyOn(window, "confirm");
       mockApiDelete.mockResolvedValue({});
       const onClose = vi.fn();
       const onChanged = vi.fn();
@@ -648,6 +657,10 @@ describe("UserEditModal", () => {
 
       await renderModal({ onClose, onChanged, onDeleted, onMessage });
       fireEvent.click(screen.getByRole("button", { name: /Delete User/ }));
+      const dialog = await answerConfirm("Delete user?", "Delete user");
+      expect(dialog).toHaveTextContent(
+        'Delete user "testuser"? This cannot be undone.'
+      );
 
       await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("testuser"));
       expect(mockApiDelete).toHaveBeenCalledWith("/user/1");
@@ -655,32 +668,37 @@ describe("UserEditModal", () => {
       // The section words the message; nothing "updated" follows it
       expect(onMessage).not.toHaveBeenCalled();
       expect(onChanged).not.toHaveBeenCalled();
+      expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
     });
 
-    it("does nothing when the admin cancels the confirmation", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    it("does nothing when the admin cancels the confirmation, and the edit dialog stays", async () => {
       const onClose = vi.fn();
 
       await renderModal({ onClose });
       fireEvent.click(screen.getByRole("button", { name: /Delete User/ }));
+      await answerConfirm("Delete user?", "Cancel");
 
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "Delete user?" })
+        ).toBeNull()
+      );
       expect(mockApiDelete).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
-      confirmSpy.mockRestore();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
     });
 
     it("shows the error when deleting fails", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
       mockApiDelete.mockRejectedValue(new Error("Last admin"));
       const onClose = vi.fn();
 
       await renderModal({ onClose });
       fireEvent.click(screen.getByRole("button", { name: /Delete User/ }));
+      await answerConfirm("Delete user?", "Delete user");
 
       expect(await screen.findByText("Last admin")).toBeInTheDocument();
       expect(onClose).not.toHaveBeenCalled();
-      confirmSpy.mockRestore();
     });
   });
 

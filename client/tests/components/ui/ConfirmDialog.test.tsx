@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 import ConfirmDialog from "../../../src/components/ui/ConfirmDialog";
+import HideConfirmationDialog from "../../../src/components/ui/HideConfirmationDialog";
 
 describe("ConfirmDialog", () => {
   it("the dialog is a child of document.body, not of its parent", () => {
@@ -77,6 +78,38 @@ describe("ConfirmDialog", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("opens with focus on Cancel, not on the close button", () => {
+    render(
+      <ConfirmDialog
+        isOpen
+        onClose={() => {}}
+        onConfirm={() => {}}
+        message="Sure?"
+        confirmText="Delete"
+      />
+    );
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Cancel" })
+    );
+  });
+
+  it("opens with focus on the HideConfirmationDialog's checkbox", () => {
+    render(
+      <HideConfirmationDialog
+        isOpen
+        onClose={() => {}}
+        onConfirm={() => {}}
+        entityType="tag"
+        entityName="Outdoors"
+      />
+    );
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("checkbox", { name: "Don't ask me again" })
+    );
   });
 
   it("renders nothing while closed", () => {

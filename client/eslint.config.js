@@ -84,6 +84,28 @@ export default defineConfig([
       // is style.
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
+
+      // The browser's dialogs block the page, ignore the theme and cannot be
+      // answered with a TV remote: confirmations use Peek's own dialog
+      "no-restricted-globals": [
+        "error",
+        ...["confirm", "alert", "prompt"].map((name) => ({
+          name,
+          message:
+            "Use useConfirmDialog (hooks/useConfirmDialog) for a question and showError/showSuccess (utils/toast) for a message.",
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["confirm", "alert", "prompt"].flatMap((property) =>
+          ["window", "globalThis", "self"].map((object) => ({
+            object,
+            property,
+            message:
+              "Use useConfirmDialog (hooks/useConfirmDialog) for a question and showError/showSuccess (utils/toast) for a message.",
+          }))
+        ),
+      ],
     },
   },
   // Build scripts run in Node

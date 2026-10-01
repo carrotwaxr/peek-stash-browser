@@ -41,10 +41,13 @@ test.describe("Database backups", () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
     await expect(row.getByText("Created in Peek")).toBeVisible();
 
-    page.once("dialog", (dialog) => void dialog.accept());
     await row
       .getByRole("button", { name: `Delete backup ${backup.filename}` })
       .click();
+    // Peek's confirmation dialog, not the browser's
+    const confirm = page.getByRole("dialog", { name: "Delete backup?" });
+    await expect(confirm).toContainText(backup.filename);
+    await confirm.getByRole("button", { name: "Delete backup" }).click();
     await expect(page.getByText("Backup deleted")).toBeVisible({
       timeout: 5_000,
     });

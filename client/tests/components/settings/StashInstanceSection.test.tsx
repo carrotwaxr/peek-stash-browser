@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../src/api/client";
@@ -39,6 +45,13 @@ const renderSection = (client = new QueryClient()) =>
       <StashInstanceSection />
     </QueryClientProvider>
   );
+
+/** Answers the confirmation dialog named `name` with `button`; returns it */
+const answerConfirm = async (name: string, button: string) => {
+  const dialog = await screen.findByRole("dialog", { name });
+  fireEvent.click(within(dialog).getByRole("button", { name: button }));
+  return dialog;
+};
 
 describe("StashInstanceSection", () => {
   const mockInstance = {
@@ -127,7 +140,7 @@ describe("StashInstanceSection", () => {
     it("toggles instance enabled state", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       mockApiPut.mockResolvedValue({});
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, "confirm");
 
       renderSection();
 
@@ -136,6 +149,7 @@ describe("StashInstanceSection", () => {
       });
 
       fireEvent.click(screen.getByText("Disable"));
+      await answerConfirm("Disable Test Stash?", "Disable instance");
 
       await waitFor(() => {
         expect(mockApiPut).toHaveBeenCalledWith(
@@ -146,9 +160,9 @@ describe("StashInstanceSection", () => {
       confirmSpy.mockRestore();
     });
 
-    it("Disable asks to confirm, and a cancel sends nothing", async () => {
+    it("Disable confirms in a dialog, and a cancel sends nothing", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      const confirmSpy = vi.spyOn(window, "confirm");
 
       renderSection();
       await waitFor(() => {
@@ -156,11 +170,16 @@ describe("StashInstanceSection", () => {
       });
       fireEvent.click(screen.getByText("Disable"));
 
-      expect(confirmSpy).toHaveBeenCalledWith(
-        'Disable "Test Stash"? Every user stops seeing its content until you ' +
-          "enable it again. Ratings, history and playlists are kept."
+      const dialog = await answerConfirm("Disable Test Stash?", "Cancel");
+      expect(dialog).toHaveTextContent(
+        "Every user stops seeing its content until you enable it again. " +
+          "Ratings, history and playlists are kept."
       );
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
       expect(mockApiPut).not.toHaveBeenCalled();
+      expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
     });
 
@@ -194,13 +213,14 @@ describe("StashInstanceSection", () => {
       mockApiPut.mockRejectedValue(
         new ApiError(message, 400, { error: message })
       );
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, "confirm");
 
       renderSection();
       await waitFor(() => {
         expect(screen.getByText("Disable")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByText("Disable"));
+      await answerConfirm("Disable Test Stash?", "Disable instance");
 
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith(message);
@@ -321,14 +341,14 @@ describe("StashInstanceSection", () => {
       });
     });
 
-    it("the delete confirmation names what is removed and offers Disable instead", async () => {
+    it("Delete confirms in a dialog that names what is removed and offers Disable instead", async () => {
       mockApiGet.mockResolvedValue({
         instances: [
           mockInstance,
           { ...mockInstance, id: "test-instance-2", name: "Second Instance" },
         ],
       });
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      const confirmSpy = vi.spyOn(window, "confirm");
 
       renderSection();
       await waitFor(() => {
@@ -336,12 +356,17 @@ describe("StashInstanceSection", () => {
       });
       fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
 
-      expect(confirmSpy).toHaveBeenCalledWith(
-        'Delete "Second Instance"? Peek removes its cached library and every ' +
+      const dialog = await answerConfirm("Delete Second Instance?", "Cancel");
+      expect(dialog).toHaveTextContent(
+        "Peek removes its cached library and every " +
           "user's ratings, favorites, watch history, playlist entries and " +
           "hidden items for it. To keep them, disable the instance instead."
       );
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
       expect(mockApiDelete).not.toHaveBeenCalled();
+      expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
     });
 
@@ -357,13 +382,14 @@ describe("StashInstanceSection", () => {
       mockApiDelete.mockRejectedValue(
         new ApiError(message, 409, { error: message })
       );
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, "confirm");
 
       renderSection();
       await waitFor(() => {
         expect(screen.getAllByText("Delete")).toHaveLength(2);
       });
       fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
+      await answerConfirm("Delete Second Instance?", "Delete instance");
 
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith(message);
@@ -388,7 +414,7 @@ describe("StashInstanceSection", () => {
       mockApiPost.mockResolvedValue({ success: true, sync: "started" });
       mockApiPut.mockResolvedValue({ success: true });
       mockApiDelete.mockResolvedValue({ success: true, message: "Deleted" });
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, "confirm");
       const client = new QueryClient();
       const statusKey = queryKeys.setup.status();
       const listKey = queryKeys.scenes.list(undefined, { page: 1 });
@@ -448,11 +474,13 @@ describe("StashInstanceSection", () => {
       fireEvent.click(
         must(screen.getAllByText("Disable")[1], "second Disable")
       );
+      await answerConfirm("Disable Second Instance?", "Disable instance");
       await expectRefreshed();
 
       // Delete
       seed();
       fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
+      await answerConfirm("Delete Second Instance?", "Delete instance");
       await expectRefreshed();
       expect(mockApiDelete).toHaveBeenCalledWith(
         "/setup/stash-instance/test-instance-2"
@@ -463,7 +491,7 @@ describe("StashInstanceSection", () => {
     it("a refused change refreshes nothing", async () => {
       mockApiGet.mockResolvedValue({ instances: [mockInstance] });
       mockApiPut.mockRejectedValue(new ApiError("refused", 400, {}));
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, "confirm");
       const client = new QueryClient();
       client.setQueryData(queryKeys.setup.status(), { stashInstanceCount: 1 });
 
@@ -472,6 +500,7 @@ describe("StashInstanceSection", () => {
         expect(screen.getByText("Disable")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByText("Disable"));
+      await answerConfirm("Disable Test Stash?", "Disable instance");
 
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith("refused");
@@ -1084,13 +1113,13 @@ describe("StashInstanceSection", () => {
         instances: [mockInstance, { ...mockInstance, id: "inst-2", name: "B" }],
       });
       mockApiDelete.mockRejectedValue(new Error(""));
-      vi.spyOn(window, "confirm").mockReturnValue(true);
 
       renderSection();
       await waitFor(() => {
         expect(screen.getAllByText("Delete").length).toBe(2);
       });
       fireEvent.click(must(screen.getAllByText("Delete")[0]));
+      await answerConfirm("Delete Test Stash?", "Delete instance");
 
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith("Failed to delete instance");

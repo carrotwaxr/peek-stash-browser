@@ -16,6 +16,7 @@ import {
   removeGroupMember,
   updateUserPermissionOverrides,
 } from "../../api";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { Button, ConfirmDialog, Modal } from "../ui/index";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
@@ -115,6 +116,7 @@ const UserEditModalContent = ({
 }: UserEditModalContentProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
 
   // Check if editing current user
   const isCurrentUser = user?.id === currentUser?.id;
@@ -189,9 +191,7 @@ const UserEditModalContent = ({
   useEffect(() => {
     const loadPermissions = async () => {
       try {
-        const response = (await getUserPermissions(user.id)) as unknown as {
-          permissions: UserPermissions;
-        };
+        const response = await getUserPermissions(user.id);
         setPermissions(response.permissions);
       } catch (err) {
         console.error("Failed to load user permissions:", err);
@@ -256,9 +256,11 @@ const UserEditModalContent = ({
     }
 
     if (
-      !confirm(
-        `Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone.`
-      )
+      !(await confirm({
+        title: "Delete user?",
+        message: `Delete user "${user.username}"? This cannot be undone.`,
+        confirmText: "Delete user",
+      }))
     ) {
       return;
     }
@@ -299,9 +301,11 @@ const UserEditModalContent = ({
 
   const handleRegenerateRecoveryKey = async () => {
     if (
-      !confirm(
-        `Regenerate recovery key for "${user.username}"?\n\nTheir old key will no longer work.`
-      )
+      !(await confirm({
+        title: "Regenerate recovery key?",
+        message: `Regenerate the recovery key for "${user.username}"? Their old key will no longer work.`,
+        confirmText: "Regenerate",
+      }))
     ) {
       return;
     }
@@ -904,6 +908,9 @@ const UserEditModalContent = ({
         confirmText={pendingRole === "ADMIN" ? "Make admin" : "Make user"}
         confirmStyle="primary"
       />
+
+      {/* Delete and recovery-key confirmations: stacked above this dialog */}
+      {confirmDialog}
 
       {/* Content Restrictions Modal: a sibling, stacked above this dialog */}
       {showContentRestrictionsModal && (

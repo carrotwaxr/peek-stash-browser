@@ -16,6 +16,7 @@ import { usePageTitle } from "../../hooks/usePageTitle";
 import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
+import { showError } from "../../utils/toast";
 import {
   Button,
   ConfirmDialog,
@@ -143,7 +144,7 @@ const WatchHistory = () => {
       setShowConfirmDialog(false);
     } catch (err) {
       console.error("Error clearing watch history:", err);
-      alert("Failed to clear watch history. Please try again.");
+      showError("Failed to clear watch history. Please try again.");
     } finally {
       setIsClearing(false);
     }

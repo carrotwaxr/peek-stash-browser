@@ -2,9 +2,15 @@ import type {
   DatabaseBackup,
   ListDatabaseBackupsResponse,
 } from "@peek/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiGet, apiPost } from "../../../../src/api";
+import { ApiError, apiDelete, apiGet, apiPost } from "../../../../src/api";
 import BackupTab from "../../../../src/components/settings/tabs/BackupTab";
 import { showError, showSuccess } from "../../../../src/utils/toast";
 
@@ -22,6 +28,7 @@ vi.mock("../../../../src/utils/toast", () => ({
 
 const mockGet = vi.mocked(apiGet);
 const mockPost = vi.mocked(apiPost);
+const mockDelete = vi.mocked(apiDelete);
 
 const DIR = "/app/data";
 
@@ -79,6 +86,59 @@ describe("BackupTab", () => {
     expect(await screen.findByText(second.path)).toBeInTheDocument();
     expect(screen.getByText(MANUAL.path)).toBeInTheDocument();
     expect(showSuccess).toHaveBeenCalledWith("Backup created");
+  });
+
+  it("Delete asks in a dialog naming the backup, and deletes on Confirm", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    mockGet.mockResolvedValue(listing(MANUAL));
+    mockDelete.mockResolvedValue({});
+
+    render(<BackupTab />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: `Delete backup ${MANUAL.filename}`,
+      })
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Delete backup?",
+    });
+    expect(dialog).toHaveTextContent(MANUAL.filename);
+    expect(dialog).toHaveTextContent("This cannot be undone.");
+    expect(mockDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete backup" })
+    );
+
+    await waitFor(() =>
+      expect(mockDelete).toHaveBeenCalledWith(
+        `/admin/database/backups/${encodeURIComponent(MANUAL.filename)}`
+      )
+    );
+    expect(showSuccess).toHaveBeenCalledWith("Backup deleted");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("Cancel on the Delete backup dialog deletes nothing", async () => {
+    mockGet.mockResolvedValue(listing(MANUAL));
+
+    render(<BackupTab />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: `Delete backup ${MANUAL.filename}`,
+      })
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Delete backup?",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 
   it("labels a pre-migration backup 'Before upgrading to 3.5.0'", async () => {

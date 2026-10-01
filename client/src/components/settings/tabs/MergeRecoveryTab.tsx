@@ -6,6 +6,7 @@ import type {
 } from "@peek/shared-types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { apiGet, apiPost } from "../../../api";
+import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { makeCompositeKey } from "../../../utils/compositeKey";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
@@ -30,6 +31,7 @@ const orphanPath = (orphan: OrphanedScene) =>
 const MergeRecoveryTab = () => {
   const [orphans, setOrphans] = useState<OrphanedScene[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   // The orphan key being processed, or "all"
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedOrphan, setExpandedOrphan] = useState<string | null>(null);
@@ -98,9 +100,12 @@ const MergeRecoveryTab = () => {
 
   const handleDiscard = async (orphan: OrphanedScene) => {
     if (
-      !confirm(
-        "Are you sure you want to discard this orphaned data? It also removes the scene from every playlist that holds it. This cannot be undone."
-      )
+      !(await confirm({
+        title: "Discard orphaned data?",
+        message:
+          "Are you sure you want to discard this orphaned data? It also removes the scene from every playlist that holds it. This cannot be undone.",
+        confirmText: "Discard",
+      }))
     ) {
       return;
     }
@@ -118,9 +123,13 @@ const MergeRecoveryTab = () => {
 
   const handleReconcileAll = async () => {
     if (
-      !confirm(
-        "This transfers the activity of every orphan with exactly one PHASH match on its instance. Orphans with several matches stay here for you to choose. Continue?"
-      )
+      !(await confirm({
+        title: "Auto-reconcile all orphans?",
+        message:
+          "This transfers the activity of every orphan with exactly one PHASH match on its instance. Orphans with several matches stay here for you to choose.",
+        confirmText: "Reconcile all",
+        confirmStyle: "primary",
+      }))
     ) {
       return;
     }
@@ -364,6 +373,7 @@ const MergeRecoveryTab = () => {
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 };
