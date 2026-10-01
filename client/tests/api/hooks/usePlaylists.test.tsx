@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as clientModule from "@/api/client";
 import {
   useAddScenesToPlaylist,
+  useDuplicatePlaylist,
   useMovePlaylistItem,
   usePlaylist,
   usePlaylistQueue,
@@ -243,6 +244,15 @@ const MUTATIONS = [
     method: mockApiPut,
     path: "/playlists/7",
     body: { description: null, shuffle: true },
+    answer: { playlist: playlistResponse(1).playlist },
+  },
+  {
+    name: "useDuplicatePlaylist",
+    useIt: useDuplicatePlaylist,
+    variables: { playlistId: 7 },
+    method: mockApiPost,
+    path: "/playlists/7/duplicate",
+    body: undefined,
     answer: { playlist: playlistResponse(1).playlist },
   },
   {

@@ -35,8 +35,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { apiPost, duplicatePlaylist, getMyPermissions } from "../../api";
+import { apiPost, getMyPermissions } from "../../api";
 import {
+  useDuplicatePlaylist,
   useMovePlaylistItem,
   usePlaylist,
   usePlaylistQueue,
@@ -242,6 +243,8 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
   const moveItemMutation = useMovePlaylistItem();
   const sortPlaylistMutation = useSortPlaylist();
   const removeUnavailableMutation = useRemoveUnavailableItems();
+  // Through the cache, so the Playlists page lists the copy at once
+  const duplicateMutation = useDuplicatePlaylist();
 
   const playlist = data?.playlist;
   const items = playlist?.items;
@@ -272,7 +275,6 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
     unknown
   > | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
 
   // Selection for the bulk bar (not while editing or reordering), by item
   const [selectedItems, setSelectedItems] = useState<PlaylistItemWithScene[]>(
@@ -587,14 +589,11 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
 
   const handleDuplicate = async () => {
     try {
-      setDuplicating(true);
-      const result = await duplicatePlaylist(playlistId);
+      const result = await duplicateMutation.mutateAsync({ playlistId });
       showSuccess("Playlist duplicated!");
       void navigate(`/playlist/${String(result.playlist.id)}`);
     } catch {
       showError("Failed to duplicate playlist");
-    } finally {
-      setDuplicating(false);
     }
   };
 
@@ -747,12 +746,14 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
                   <Button
                     onClick={() => void handleDuplicate()}
                     variant="secondary"
-                    disabled={duplicating}
+                    disabled={duplicateMutation.isPending}
                     icon={<Copy size={16} />}
                     title="Duplicate to My Playlists"
                   >
                     <span className="hidden sm:inline">
-                      {duplicating ? "Duplicating..." : "Duplicate"}
+                      {duplicateMutation.isPending
+                        ? "Duplicating..."
+                        : "Duplicate"}
                     </span>
                   </Button>
                 )}
