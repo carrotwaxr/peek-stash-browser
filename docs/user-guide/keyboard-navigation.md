@@ -192,8 +192,8 @@ The player's keys work when the player, or nothing, has focus. With focus on a b
 | `Enter` | Save changes |
 
 **Reordering scenes:**
-- Use mouse drag-and-drop for reordering
-- Keyboard reordering not currently supported
+- Click **Reorder**, then `Tab` to a scene's arrow buttons and press `Enter`, or type its new position in the box and press `Enter`
+- Each move is saved at once
 
 ## TV Mode
 
@@ -230,7 +230,7 @@ Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in
 2. **Enable auto-hide cursor** in your OS settings
 3. **Increase font size** in browser settings (Ctrl +)
 4. **Use dark theme** for better viewing in dark rooms
-5. **Keep a mouse nearby** for dragging, such as reordering a playlist
+5. **Keep a keyboard nearby** for typing, such as a search or a playlist position
 
 ## Settings Navigation
 
