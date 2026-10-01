@@ -1,4 +1,5 @@
 // Theme definitions for the media application
+import type { BuiltInThemeKey } from "@peek/shared-types/themes.js";
 import {
   adjustLightness,
   generateFocusRing,
@@ -59,6 +60,11 @@ export const generateThemeCSSVars = (config: ThemeConfig) => {
     ...generateToastColors(config.status, config.mode),
   };
 };
+
+interface BuiltInTheme {
+  name: string;
+  properties: ReturnType<typeof generateThemeCSSVars>;
+}
 
 export const themes = {
   peek: {
@@ -254,7 +260,7 @@ export const themes = {
       return generateThemeCSSVars(config);
     })(),
   },
-};
+} satisfies Record<BuiltInThemeKey, BuiltInTheme>;
 
 interface FontOption {
   value: string;

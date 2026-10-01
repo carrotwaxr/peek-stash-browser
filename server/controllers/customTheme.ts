@@ -1,3 +1,4 @@
+import { customThemeKey } from "@peek/shared-types/themes.js";
 import prisma from "../prisma/singleton.js";
 import type {
   ApiErrorResponse,
@@ -17,6 +18,7 @@ import type {
   UpdateCustomThemeRequest,
   UpdateCustomThemeResponse,
 } from "../types/api/index.js";
+import { dbWriteBatch } from "../utils/dbWrite.js";
 
 /**
  * Validate hex color format
@@ -295,10 +297,15 @@ export const deleteCustomTheme = async (
     return;
   }
 
-  // Delete theme
-  await prisma.customTheme.delete({
-    where: { id: themeId },
-  });
+  // Delete the theme and, in the same unit, clear it from the user's stored
+  // choice so it never points at a theme that is gone
+  await dbWriteBatch("theme.delete", [
+    prisma.customTheme.delete({ where: { id: themeId } }),
+    prisma.user.updateMany({
+      where: { id: userId, theme: customThemeKey(themeId) },
+      data: { theme: null },
+    }),
+  ]);
 
   res.json({ success: true });
 };

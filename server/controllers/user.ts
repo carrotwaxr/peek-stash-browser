@@ -3,6 +3,10 @@ import {
   TABLE_COLUMN_KINDS,
 } from "@peek/shared-types/api/user.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
+import {
+  isBuiltInThemeKey,
+  parseCustomThemeKey,
+} from "@peek/shared-types/themes.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
@@ -143,6 +147,26 @@ const getDefaultCarouselPreferences = (): CarouselPreference[] => [
 ];
 
 /**
+ * A stored theme the user can use, else null: a built-in key, or `custom-<n>`
+ * with `n` one of the user's own custom themes. The column defaults to "dark",
+ * which was never a key, so a user who never chose reads null.
+ */
+async function resolveStoredTheme(
+  stored: string | null | undefined,
+  userId: number
+): Promise<string | null> {
+  if (stored === null || stored === undefined) return null;
+  if (isBuiltInThemeKey(stored)) return stored;
+  const customId = parseCustomThemeKey(stored);
+  if (customId === null) return null;
+  const owned = await prisma.customTheme.findFirst({
+    where: { id: customId, userId },
+    select: { id: true },
+  });
+  return owned ? stored : null;
+}
+
+/**
  * Get user settings
  */
 export const getUserSettings = async (
@@ -182,7 +206,7 @@ export const getUserSettings = async (
   res.json({
     settings: {
       preferredPreviewQuality: user.preferredPreviewQuality ?? null,
-      theme: user.theme ?? "dark",
+      theme: await resolveStoredTheme(user.theme, userId),
       carouselPreferences:
         (user.carouselPreferences as CarouselPreference[] | null) ??
         getDefaultCarouselPreferences(),
@@ -498,6 +522,18 @@ export const updateUserSettings = async (
     }
   }
 
+  // Validate theme if provided: null clears it, anything else must be a
+  // built-in key or one of the target user's own custom themes
+  if (theme !== undefined && theme !== null) {
+    if (
+      typeof theme !== "string" ||
+      (await resolveStoredTheme(theme, targetUserId)) === null
+    ) {
+      res.status(400).json({ error: "Unknown theme" });
+      return;
+    }
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id: targetUserId },
     data: {
@@ -548,7 +584,7 @@ export const updateUserSettings = async (
   res.json({
     success: true as const,
     settings: {
-      theme: updatedUser.theme ?? "dark",
+      theme: await resolveStoredTheme(updatedUser.theme, targetUserId),
       carouselPreferences:
         (updatedUser.carouselPreferences as CarouselPreference[] | null) ??
         getDefaultCarouselPreferences(),

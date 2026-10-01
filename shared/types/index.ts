@@ -30,6 +30,15 @@ export {
   assertEntityRef,
 } from "./instanceAwareId.js";
 
+// Theme keys
+export {
+  BUILT_IN_THEME_KEYS,
+  isBuiltInThemeKey,
+  customThemeKey,
+  parseCustomThemeKey,
+} from "./themes.js";
+export type { BuiltInThemeKey } from "./themes.js";
+
 // API contract types
 export * from "./api/index.js";
 
