@@ -5,6 +5,7 @@ import { getClipsForScene } from "../../api";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
+import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
 import "./VideoPlayer.css";
 import { useOrientationFullscreen } from "./useOrientationFullscreen";
@@ -60,9 +61,9 @@ const VideoPlayer = () => {
     repeat,
     restartCount,
     dispatch,
-    nextScene,
-    prevScene,
+    registerPlayer,
   } = useScenePlayer();
+  const { next, prev } = useQueueNavigation();
 
   const scene = rawScene;
 
@@ -127,7 +128,7 @@ const VideoPlayer = () => {
   // ============================================================================
 
   // Consolidated hook: Manages all Video.js player operations
-  const { playNextInPlaylist, playPreviousInPlaylist } = useVideoPlayer({
+  useVideoPlayer({
     videoRef,
     playerRef,
     scene,
@@ -140,8 +141,9 @@ const VideoPlayer = () => {
     repeat,
     restartCount,
     dispatch,
-    nextScene,
-    prevScene,
+    nextScene: next,
+    prevScene: prev,
+    registerPlayer,
     updateQuality,
     location,
     hasResumedRef,
@@ -156,8 +158,8 @@ const VideoPlayer = () => {
   usePlaylistMediaKeys({
     playerRef,
     playlist,
-    playNext: playNextInPlaylist,
-    playPrevious: playPreviousInPlaylist,
+    playNext: next,
+    playPrevious: prev,
     enabled: true,
     // Keys act only while focus is in the player's element or on nothing
     root: () =>

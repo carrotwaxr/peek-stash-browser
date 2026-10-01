@@ -30,9 +30,11 @@ vi.mock("@/contexts/ScenePlayerContext", () => ({
     shuffle: false,
     repeat: "none",
     dispatch: vi.fn(),
-    nextScene: vi.fn(),
-    prevScene: vi.fn(),
+    registerPlayer: vi.fn(),
   }),
+}));
+vi.mock("@/hooks/useQueueNavigation", () => ({
+  useQueueNavigation: () => ({ next: vi.fn(), prev: vi.fn() }),
 }));
 vi.mock("@/hooks/useMediaKeys", () => ({ usePlaylistMediaKeys: vi.fn() }));
 vi.mock("@/hooks/useWatchHistory", () => ({
@@ -46,10 +48,7 @@ vi.mock("@/components/video-player/useOrientationFullscreen", () => ({
   useOrientationFullscreen: vi.fn(),
 }));
 vi.mock("@/components/video-player/useVideoPlayer", () => ({
-  useVideoPlayer: vi.fn(() => ({
-    playNextInPlaylist: vi.fn(),
-    playPreviousInPlaylist: vi.fn(),
-  })),
+  useVideoPlayer: vi.fn(),
 }));
 
 describe("VideoPlayer", () => {

@@ -6,7 +6,13 @@
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
 import { createAuthValue } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
@@ -139,5 +145,28 @@ describe("PlaylistSidebar", () => {
     fireEvent.click(autoplay);
 
     expect(screen.getByTitle("Autoplay: Off")).toBe(autoplay);
+  });
+
+  it("Up Next is hidden in shuffle", async () => {
+    renderSidebar(["First", "Second", "Third"], 0);
+    expect(await screen.findByText("Up Next")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("Shuffle: Off"));
+
+    expect(screen.queryByText("Up Next")).toBeNull();
+  });
+
+  it("with Repeat All on the last item Up Next shows item 1", async () => {
+    renderSidebar(["First", "Second", "Third"], 2);
+    await screen.findByTitle("Repeat: Off");
+    expect(screen.queryByText("Up Next")).toBeNull();
+
+    fireEvent.click(screen.getByTitle("Repeat: Off"));
+
+    const upNext = (await screen.findByText("Up Next")).parentElement;
+    expect(upNext).not.toBeNull();
+    expect(
+      within(upNext as HTMLElement).getByText("First")
+    ).toBeInTheDocument();
   });
 });

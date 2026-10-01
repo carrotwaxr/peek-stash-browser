@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SceneListItem from "@/components/ui/SceneListItem";
 
@@ -100,6 +100,33 @@ describe("SceneListItem", () => {
 
     expect(thumbnailRenders).toHaveBeenCalledTimes(1);
   });
+
+  it("clicking a row with a queue in its link state writes nothing to sessionStorage", () => {
+    sessionStorage.clear();
+    // A video that is playing, as the old flags looked for
+    const video = document.createElement("video");
+    Object.defineProperty(video, "paused", { value: false });
+    Object.defineProperty(video, "readyState", { value: 4 });
+    document.body.appendChild(video);
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+
+    render(
+      <MemoryRouter>
+        <SceneListItem
+          scene={makeScene("3")}
+          linkState={{ playlist: { key: "q", scenes: [] } }}
+        />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByTestId("thumbnail"));
+    const writes = setItem.mock.calls.length;
+    setItem.mockRestore();
+    video.remove();
+
+    expect(writes).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+  });
+
   describe("the session O indicator", () => {
     const lastPlayedAt = "2024-05-01T20:00:00.000Z";
     const O_TITLE = "O clicked during this session";

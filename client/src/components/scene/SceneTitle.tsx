@@ -52,37 +52,6 @@ const SceneTitle = ({
     return parts.length > 0 ? parts.join(" • ") : null;
   })();
 
-  // Handle click to set autoplay flag if video is playing
-  const handleClick = () => {
-    // Check if there's a video player currently playing and we're in a playlist
-    if (linkState?.playlist) {
-      const videoElements = document.querySelectorAll("video");
-      let isPlaying = false;
-
-      videoElements.forEach((video) => {
-        if (!video.paused && !video.ended && video.readyState > 2) {
-          isPlaying = true;
-        }
-      });
-
-      if (isPlaying) {
-        sessionStorage.setItem("videoPlayerAutoplay", "true");
-
-        // Also check if video is fullscreen
-        const isFullscreen =
-          (document.fullscreenElement ??
-            (document as unknown as Record<string, unknown>)
-              .webkitFullscreenElement) ||
-          (document as unknown as Record<string, unknown>)
-            .mozFullScreenElement ||
-          (document as unknown as Record<string, unknown>).msFullscreenElement;
-        if (isFullscreen) {
-          sessionStorage.setItem("videoPlayerFullscreen", "true");
-        }
-      }
-    }
-  };
-
   const titleStyle: React.CSSProperties = maxLines
     ? {
         color: "var(--text-primary)",
@@ -102,7 +71,6 @@ const SceneTitle = ({
       <Link
         to={getEntityPath("scene", scene, hasMultipleInstances)}
         state={linkState}
-        onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}
         style={titleStyle}
       >

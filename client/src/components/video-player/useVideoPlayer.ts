@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
@@ -145,6 +145,7 @@ export function useVideoPlayer({
   dispatch,
   nextScene,
   prevScene,
+  registerPlayer,
   updateQuality,
   location,
   hasResumedRef,
@@ -167,8 +168,11 @@ export function useVideoPlayer({
   /** Bumped by a queue step to an entry of the scene already loaded */
   restartCount: number;
   dispatch: (action: any) => void;
+  /** The queue's steps (`useQueueNavigation`), which know what is playing */
   nextScene: () => void;
   prevScene: () => void;
+  /** Tells the player context which player this is (null: it is gone) */
+  registerPlayer: (player: { paused(): boolean } | null) => void;
   updateQuality: (quality: string) => void;
   location: any;
   hasResumedRef: React.RefObject<boolean>;
@@ -267,6 +271,7 @@ export function useVideoPlayer({
     });
 
     playerRef.current = player;
+    registerPlayer(player as { paused(): boolean });
     player.focus();
 
     // Volume persistence is now handled by persistVolume plugin
@@ -275,6 +280,7 @@ export function useVideoPlayer({
     // Cleanup
     return () => {
       playerRef.current = null;
+      registerPlayer(null);
 
       try {
         player.dispose();
@@ -684,26 +690,8 @@ export function useVideoPlayer({
   ]);
 
   // ============================================================================
-  // PLAYLIST NAVIGATION (from usePlaylistPlayer)
+  // PLAYLIST NAVIGATION: the end of a video and the skip buttons
   // ============================================================================
-
-  // Navigate to previous scene, preserving autoplay state if playing
-  const playPreviousInPlaylist = useCallback(() => {
-    const player = playerRef.current;
-    if (player && !player.paused()) {
-      dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
-    }
-    prevScene();
-  }, [playerRef, prevScene, dispatch]);
-
-  // Navigate to next scene, preserving autoplay state if playing
-  const playNextInPlaylist = useCallback(() => {
-    const player = playerRef.current;
-    if (player && !player.paused()) {
-      dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
-    }
-    nextScene();
-  }, [playerRef, nextScene, dispatch]);
 
   // At the end of a video: repeat one replays it; otherwise, with autoplay
   // on, the queue steps on through the reducer's one advance path (which
@@ -752,8 +740,8 @@ export function useVideoPlayer({
 
     // Set handlers based on playlist availability
     if (playlist && playlist.scenes && playlist.scenes.length > 1) {
-      skipButtonsPlugin.setForwardHandler(playNextInPlaylist);
-      skipButtonsPlugin.setBackwardHandler(playPreviousInPlaylist);
+      skipButtonsPlugin.setForwardHandler(nextScene);
+      skipButtonsPlugin.setBackwardHandler(prevScene);
     } else {
       // Clear handlers if no playlist or single scene
       skipButtonsPlugin.setForwardHandler(undefined);
@@ -762,10 +750,4 @@ export function useVideoPlayer({
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, playlist]);
-
-  // Return playlist navigation functions for use by media keys hook
-  return {
-    playNextInPlaylist,
-    playPreviousInPlaylist,
-  };
 }

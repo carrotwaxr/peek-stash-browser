@@ -329,9 +329,8 @@ describe("ScenePlayerContext", () => {
 
       // Action creators
       expect(typeof result.current.loadScene).toBe("function");
-      expect(typeof result.current.nextScene).toBe("function");
-      expect(typeof result.current.prevScene).toBe("function");
-      expect(typeof result.current.gotoSceneIndex).toBe("function");
+      expect(typeof result.current.registerPlayer).toBe("function");
+      expect(typeof result.current.isPlaying).toBe("function");
       expect(typeof result.current.toggleAutoplayNext).toBe("function");
       expect(typeof result.current.toggleShuffle).toBe("function");
       expect(typeof result.current.toggleRepeat).toBe("function");
@@ -683,7 +682,7 @@ describe("ScenePlayerContext", () => {
       );
 
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
 
       await waitFor(() => {
@@ -696,85 +695,6 @@ describe("ScenePlayerContext", () => {
           expect.any(AbortSignal)
         );
       });
-    });
-
-    it("nextScene dispatches NEXT_SCENE", async () => {
-      const playlist = {
-        userId: SIGNED_IN_USER,
-        scenes: [
-          { sceneId: "s-1", instanceId: "i-1" },
-          { sceneId: "s-2", instanceId: "i-2" },
-        ],
-        currentIndex: 0,
-      };
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
-      });
-
-      await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
-      });
-
-      act(() => {
-        result.current.nextScene();
-      });
-
-      // After NEXT_SCENE, currentIndex should advance
-      expect(result.current.currentIndex).toBe(1);
-    });
-
-    it("prevScene dispatches PREV_SCENE", async () => {
-      const playlist = {
-        userId: SIGNED_IN_USER,
-        scenes: [
-          { sceneId: "s-1", instanceId: "i-1" },
-          { sceneId: "s-2", instanceId: "i-2" },
-        ],
-        currentIndex: 1,
-      };
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
-      });
-
-      await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
-      });
-
-      act(() => {
-        result.current.prevScene();
-      });
-
-      // After PREV_SCENE, currentIndex should go back
-      expect(result.current.currentIndex).toBe(0);
-    });
-
-    it("gotoSceneIndex dispatches with index and shouldAutoplay", async () => {
-      const playlist = {
-        userId: SIGNED_IN_USER,
-        scenes: [
-          { sceneId: "s-1", instanceId: "i-1" },
-          { sceneId: "s-2", instanceId: "i-2" },
-          { sceneId: "s-3", instanceId: "i-3" },
-        ],
-        currentIndex: 0,
-      };
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ playlist }),
-      });
-
-      await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
-      });
-
-      act(() => {
-        result.current.gotoSceneIndex(2, true);
-      });
-
-      expect(result.current.currentIndex).toBe(2);
-      expect(result.current.shouldAutoplay).toBe(true);
     });
   });
 
@@ -931,7 +851,7 @@ describe("ScenePlayerContext", () => {
       );
 
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
       rerender();
       rerender();
@@ -949,7 +869,7 @@ describe("ScenePlayerContext", () => {
       });
 
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
 
       await waitFor(() => {
@@ -974,7 +894,7 @@ describe("ScenePlayerContext", () => {
     it("a search-only navigation on the current scene (a tab click, no state) keeps the queue and index", async () => {
       const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
       await waitFor(() => {
         expect(probe.location?.pathname).toBe("/scene/2");
@@ -1035,7 +955,7 @@ describe("ScenePlayerContext", () => {
         expect(result.current.scene?.id).toBe("1");
       });
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
       await waitFor(() => {
         expect(probe.location?.pathname).toBe("/scene/2");
@@ -1058,7 +978,7 @@ describe("ScenePlayerContext", () => {
         fromPageTitle: "Home",
       });
       act(() => {
-        first.result.current.nextScene();
+        first.result.current.dispatch({ type: "NEXT_SCENE" });
       });
       await waitFor(() => {
         expect(probe.location?.pathname).toBe("/scene/2");
@@ -1090,7 +1010,7 @@ describe("ScenePlayerContext", () => {
       expect(result.current.shouldResume).toBe(true);
 
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
       await waitFor(() => {
         expect(probe.location?.pathname).toBe("/scene/3");
@@ -1111,7 +1031,7 @@ describe("ScenePlayerContext", () => {
       });
       // Shuffle picks the first scene not yet played: index 1
       act(() => {
-        first.result.current.nextScene();
+        first.result.current.dispatch({ type: "NEXT_SCENE" });
       });
       await waitFor(() => {
         expect(probe.location?.pathname).toBe("/scene/2");
@@ -1182,7 +1102,7 @@ describe("ScenePlayerContext", () => {
       const loads = mockPost.mock.calls.length;
 
       act(() => {
-        result.current.nextScene();
+        result.current.dispatch({ type: "NEXT_SCENE" });
       });
 
       await waitFor(() => {
@@ -1254,10 +1174,10 @@ describe("ScenePlayerContext", () => {
         );
 
         act(() => {
-          result.current.nextScene();
+          result.current.dispatch({ type: "NEXT_SCENE" });
         });
         act(() => {
-          result.current.nextScene();
+          result.current.dispatch({ type: "NEXT_SCENE" });
         });
         await waitFor(() => {
           expect(pending.has("3")).toBe(true);
@@ -1323,7 +1243,7 @@ describe("ScenePlayerContext", () => {
         answerScenes({ "2": "missing" });
 
         act(() => {
-          result.current.prevScene();
+          result.current.dispatch({ type: "PREV_SCENE" });
         });
 
         await waitFor(() => {
@@ -1369,7 +1289,7 @@ describe("ScenePlayerContext", () => {
         answerScenes({ "2": failure });
 
         act(() => {
-          result.current.nextScene();
+          result.current.dispatch({ type: "NEXT_SCENE" });
         });
 
         await waitFor(() => {

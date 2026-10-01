@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   ChevronUp,
@@ -10,6 +11,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { Button, useLazyLoad } from "../ui/index";
 
@@ -42,7 +44,6 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
   const {
     playlist: rawPlaylist,
     currentIndex,
-    gotoSceneIndex,
     autoplayNext,
     shuffle,
     repeat,
@@ -51,6 +52,8 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
     toggleRepeat,
     unavailable,
   } = useScenePlayer();
+  const { goTo, upNextIndex } = useQueueNavigation();
+  const navigate = useNavigate();
   const playlist = rawPlaylist as Playlist | null;
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -67,10 +70,10 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
   const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
   const _currentScene = playlist.scenes[currentIndex];
 
-  // Find next scene for "Up Next" preview
-  const nextSceneIndex = currentIndex + 1;
+  // "Up Next" is where Next goes: none in shuffle, the first on repeat all
+  const nextSceneIndex = upNextIndex;
   const nextScene =
-    nextSceneIndex < totalScenes ? playlist.scenes[nextSceneIndex] : null;
+    nextSceneIndex === null ? null : (playlist.scenes[nextSceneIndex] ?? null);
 
   const formatDuration = (seconds: number | undefined) => {
     if (!seconds) return "?:??";
@@ -86,43 +89,8 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const navigateToScene = (index: number) => {
-    if (index < 0 || index >= totalScenes) return;
-    if (unavailable.includes(index)) return;
-
-    // Check if video is currently playing
-    const videoElements = document.querySelectorAll("video");
-    let isPlaying = false;
-
-    videoElements.forEach((video) => {
-      if (!video.paused && !video.ended && video.readyState > 2) {
-        isPlaying = true;
-      }
-    });
-
-    // Preserve fullscreen state
-    if (isPlaying) {
-      const doc = document as Document & {
-        webkitFullscreenElement?: Element;
-        mozFullScreenElement?: Element;
-        msFullscreenElement?: Element;
-      };
-      const isFullscreen =
-        doc.fullscreenElement ??
-        doc.webkitFullscreenElement ??
-        doc.mozFullScreenElement ??
-        doc.msFullscreenElement;
-      if (isFullscreen) {
-        sessionStorage.setItem("videoPlayerFullscreen", "true");
-      }
-    }
-
-    // Navigate with autoplay flag
-    gotoSceneIndex(index, isPlaying);
-  };
-
   const goToPlaylist = () => {
-    window.location.href = `/playlist/${playlist.id}`;
+    void navigate(`/playlist/${playlist.id}`);
   };
 
   return (
@@ -253,7 +221,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
       {isExpanded && (
         <>
           {/* Up Next Preview (if not last scene) */}
-          {nextScene && (
+          {nextScene && nextSceneIndex !== null && (
             <div
               className="p-3 border-b flex-shrink-0"
               style={{
@@ -268,7 +236,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                 Up Next
               </p>
               <div
-                onClick={() => navigateToScene(nextSceneIndex)}
+                onClick={() => goTo(nextSceneIndex)}
                 className="group cursor-pointer rounded overflow-hidden transition-all hover:scale-[1.02]"
                 style={{
                   backgroundColor: "var(--bg-card)",
@@ -323,9 +291,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                 <div
                   key={item.sceneId}
                   ref={isCurrent ? setCurrentItemRef : null}
-                  onClick={
-                    isUnavailable ? undefined : () => navigateToScene(index)
-                  }
+                  onClick={isUnavailable ? undefined : () => goTo(index)}
                   aria-disabled={isUnavailable || undefined}
                   className={`group p-3 border-b transition-colors ${
                     isUnavailable
