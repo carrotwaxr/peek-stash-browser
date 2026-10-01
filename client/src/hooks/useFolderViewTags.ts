@@ -12,6 +12,7 @@ interface FolderViewFilters {
   tagId?: string;
   studioId?: string;
   groupId?: string;
+  galleryId?: string;
 }
 
 const NO_TAGS: TagTreeRow[] = [];
@@ -24,6 +25,7 @@ function scopeOf(filters: FolderViewFilters | null): TagTreeScope | undefined {
   if (filters.tagId) scope.tag = filters.tagId;
   if (filters.studioId) scope.studio = filters.studioId;
   if (filters.groupId) scope.group = filters.groupId;
+  if (filters.galleryId) scope.gallery = filters.galleryId;
   return Object.keys(scope).length > 0 ? scope : undefined;
 }
 

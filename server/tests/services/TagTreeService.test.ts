@@ -174,6 +174,21 @@ describe("loadTagTree", () => {
     expect(placeholders(sql)).toBe(params.length);
   });
 
+  it("a gallery scope reads the gallery's scenes on its own instance (a gallery's Scenes tab)", async () => {
+    await loadTagTree({
+      userId: 7,
+      allowedInstanceIds: ["a"],
+      scope: { gallery: { id: "9", instanceId: "a" } },
+    });
+
+    const { sql, params } = statement();
+    expect(sql).toContain(
+      "SELECT j.sceneId, j.sceneInstanceId FROM SceneGallery j WHERE j.galleryId = ? AND j.galleryInstanceId = ?"
+    );
+    expect(params.slice(0, 2)).toEqual(["9", "a"]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+
   it("keeps only the parents in the answer, on the tag's own instance", async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([
       row({ id: "1", stashInstanceId: "a", parentIds: "[]" }),

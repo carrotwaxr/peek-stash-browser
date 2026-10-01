@@ -363,7 +363,12 @@ describe("Tags Controller", () => {
 
       const req = reqFor(findTagTree, {
         body: {
-          scope: { performer: "12:inst-a", tag: "7", studio: "3:inst-b" },
+          scope: {
+            performer: "12:inst-a",
+            tag: "7",
+            studio: "3:inst-b",
+            gallery: "9:inst-a",
+          },
         },
         user: defaultUser,
       });
@@ -375,6 +380,7 @@ describe("Tags Controller", () => {
         performer: { id: "12", instanceId: "inst-a" },
         tag: { id: "7", instanceId: undefined },
         studio: { id: "3", instanceId: "inst-b" },
+        gallery: { id: "9", instanceId: "inst-a" },
       });
     });
 

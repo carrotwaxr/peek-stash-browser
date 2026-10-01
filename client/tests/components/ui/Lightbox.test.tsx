@@ -225,8 +225,8 @@ describe("Lightbox", () => {
       });
 
       // Step 2: API returns - images update to page 2, THEN isPageTransitioning becomes false
-      // This simulates what GalleryDetail does:
-      //   setImages(page2Images);
+      // This simulates what a paged image list does:
+      //   its page 2 images arrive;
       //   lightbox.consumePendingLightboxIndex(); // sets isPageTransitioning=false
 
       // In React, these could be batched or could cause separate renders.

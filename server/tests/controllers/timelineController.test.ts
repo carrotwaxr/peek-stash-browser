@@ -78,7 +78,7 @@ describe("timelineController", () => {
       );
     });
 
-    it("passes each of the performer, tag, studio and group filters to the service", async () => {
+    it("passes each of the performer, tag, studio, group and gallery filters to the service", async () => {
       vi.mocked(timelineService.getDistribution).mockResolvedValue([]);
 
       const req = reqFor(getDateDistribution, {
@@ -89,6 +89,7 @@ describe("timelineController", () => {
           tagId: "2:inst-a",
           studioId: "3:inst-a",
           groupId: "4:inst-a",
+          galleryId: "5:inst-a",
         },
         user: testUser({ id: 1 }),
         allowedInstanceIds: ["inst-a"],
@@ -106,6 +107,7 @@ describe("timelineController", () => {
           tagId: { id: "2", instanceId: "inst-a" },
           studioId: { id: "3", instanceId: "inst-a" },
           groupId: { id: "4", instanceId: "inst-a" },
+          galleryId: { id: "5", instanceId: "inst-a" },
         }
       );
     });

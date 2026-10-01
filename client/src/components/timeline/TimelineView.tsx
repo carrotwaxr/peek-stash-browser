@@ -20,6 +20,7 @@ interface TimelineFilters {
   tagId?: string;
   studioId?: string;
   groupId?: string;
+  galleryId?: string;
 }
 
 interface VisibleRange {

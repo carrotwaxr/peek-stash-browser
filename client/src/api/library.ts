@@ -37,7 +37,6 @@ import type {
   ListRequestInput,
   NormalizedGallery,
   NormalizedGroup,
-  NormalizedImage,
   NormalizedPerformer,
   NormalizedScene,
   NormalizedStudio,
@@ -53,7 +52,6 @@ import type {
   UpdateRatingResponse,
   WithStashUrl,
 } from "@peek/shared-types";
-import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -358,30 +356,6 @@ export const libraryApi = {
         signal
       )
     ).galleries,
-
-  // Gallery images: the images search with an instance-aware galleries
-  // filter, so exclusions apply and each image carries the user's own data
-  findGalleryImages: async (
-    galleryId: string,
-    instanceId: string,
-    { page = 1, perPage = 100 }: { page?: number; perPage?: number } = {}
-  ): Promise<{ images: NormalizedImage[]; count: number }> => {
-    const result = await apiPost<{
-      findImages?: { images?: NormalizedImage[]; count?: number };
-    }>("/library/images", {
-      filter: { page, per_page: perPage, sort: "path", direction: "ASC" },
-      image_filter: {
-        galleries: {
-          value: [makeCompositeKey(galleryId, instanceId)],
-          modifier: "INCLUDES",
-        },
-      },
-    });
-    return {
-      images: result?.findImages?.images ?? [],
-      count: result?.findImages?.count ?? 0,
-    };
-  },
 
   /**
    * A detail page's tab counts, as the viewer sees them: each is the total

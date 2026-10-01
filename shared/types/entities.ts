@@ -369,7 +369,8 @@ export interface NormalizedGallery {
   instanceId: string;
   title: string | null;
   date: string | null;
-  studio: { id: string; name?: string } | null;
+  /** Its studio as the viewer may see it (on the gallery's own server) */
+  studio: StudioRef | null;
   rating100: number | null;
   image_count: number;
   details: string | null;
@@ -382,13 +383,8 @@ export interface NormalizedGallery {
   cover: string | null;
   coverWidth?: number | null;
   coverHeight?: number | null;
-  tags: Array<{ id: string; name: string; image_path: string | null }>;
-  performers: Array<{
-    id: string;
-    name: string;
-    gender: string | null;
-    image_path: string | null;
-  }>;
+  tags: TagRef[];
+  performers: PerformerRef[];
   created_at: string | null;
   updated_at: string | null;
 

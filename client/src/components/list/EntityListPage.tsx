@@ -95,6 +95,7 @@ interface PageScope {
   tagId?: string;
   studioId?: string;
   groupId?: string;
+  galleryId?: string;
 }
 
 const SCOPE_FIELDS = [
@@ -102,6 +103,7 @@ const SCOPE_FIELDS = [
   ["tags", "tagId"],
   ["studios", "studioId"],
   ["groups", "groupId"],
+  ["galleries", "galleryId"],
 ] as const;
 
 /** The page's entity from its fixed filters (a performer's Scenes tab: its performer) */

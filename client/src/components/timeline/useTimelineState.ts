@@ -30,6 +30,7 @@ interface TimelineFilters {
   tagId?: string;
   studioId?: string;
   groupId?: string;
+  galleryId?: string;
 }
 
 interface DistributionResponse {
@@ -216,6 +217,7 @@ export function useTimelineState({
         if (filters?.tagId) params.set("tagId", filters.tagId);
         if (filters?.studioId) params.set("studioId", filters.studioId);
         if (filters?.groupId) params.set("groupId", filters.groupId);
+        if (filters?.galleryId) params.set("galleryId", filters.galleryId);
 
         const response = await apiGet<DistributionResponse>(
           `/timeline/${entityType}/distribution?${params.toString()}`

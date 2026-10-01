@@ -8,8 +8,8 @@
  * A parent the user cannot see is left out of a tag's parents, so the tag
  * becomes a root.
  *
- * With a scope (a performer, tag, studio or collection, as "id:instanceId" or
- * a bare id for every instance), only the tags on the scope's visible scenes
+ * With a scope (a performer, tag, studio, collection or gallery, as
+ * "id:instanceId" or a bare id for every instance), only the tags on the scope's visible scenes
  * and their ancestors: the walk up `parentIds` applies the exclusion join,
  * `deletedAt` and the allowed instances at every step, so it stops at a
  * hidden or restricted ancestor, and the child it would have led to becomes a
@@ -86,6 +86,7 @@ const P = "7740201";
 const Q = "7740202";
 const ST = "7740301";
 const G = "7740401";
+const GA = "7740501";
 
 const key = (id: string, instanceId: string) => `${id}:${instanceId}`;
 
@@ -108,6 +109,7 @@ async function clearFixture(): Promise<void> {
   await prisma.stashPerformer.deleteMany({ where });
   await prisma.stashStudio.deleteMany({ where });
   await prisma.stashGroup.deleteMany({ where });
+  await prisma.stashGallery.deleteMany({ where });
   await prisma.userStashInstance.deleteMany({
     where: { instanceId: { in: INSTANCES } },
   });
@@ -195,6 +197,13 @@ async function seedFixture(): Promise<void> {
   await prisma.stashGroup.createMany({
     data: [A, B].map((inst) => named(G, inst)),
   });
+  await prisma.stashGallery.createMany({
+    data: [A, B].map((inst) => ({
+      id: GA,
+      stashInstanceId: inst,
+      title: `${inst}-${GA}`,
+    })),
+  });
 
   await prisma.stashScene.createMany({
     data: [
@@ -270,6 +279,14 @@ async function seedFixture(): Promise<void> {
       sceneInstanceId: inst,
       groupId: G,
       groupInstanceId: inst,
+    })),
+  });
+  await prisma.sceneGallery.createMany({
+    data: [A, B].map((inst) => ({
+      sceneId: S.SCENE,
+      sceneInstanceId: inst,
+      galleryId: GA,
+      galleryInstanceId: inst,
     })),
   });
 }
@@ -502,7 +519,7 @@ describeWithDb("Tag tree (integration)", () => {
     expect(rows.get(key(T.CHILD, B))).toMatchObject({ scene_count: 1 });
   });
 
-  it("a studio, collection or tag scope matches its scenes on its own instance", async () => {
+  it("a studio, collection, gallery or tag scope matches its scenes on its own instance", async () => {
     const onScene = [
       key(T.GRAND, A),
       key(T.CHILD, A),
@@ -517,6 +534,13 @@ describeWithDb("Tag tree (integration)", () => {
 
     const group = await tree({ scope: { group: key(G, A) } });
     expect([...group.rows.keys()].sort()).toEqual(onScene);
+
+    const gallery = await tree({ scope: { gallery: key(GA, A) } });
+    expect([...gallery.rows.keys()].sort()).toEqual(onScene);
+    const galleryOnB = await tree({ scope: { gallery: key(GA, B) } });
+    expect([...galleryOnB.rows.keys()].sort()).toEqual(
+      [key(T.CHILD, B), key(T.ROOT, B)].sort()
+    );
 
     const onB = await tree({ scope: { studio: key(ST, B) } });
     expect([...onB.rows.keys()].sort()).toEqual(

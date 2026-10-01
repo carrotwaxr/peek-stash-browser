@@ -405,6 +405,32 @@ describe("SceneSearch", () => {
       );
     });
 
+    it.each([
+      ["studio", "studios", "scene_studio"],
+      ["group", "groups", "scene_group"],
+      ["gallery", "galleries", "scene_gallery"],
+    ] as const)(
+      "the folder view on a %s page's Scenes tab lists its scenes' tags",
+      async (scope, field, context) => {
+        renderListPage(
+          <SceneSearch
+            context={context}
+            permanentFilters={{
+              [field]: { value: ["9:a"], modifier: "INCLUDES" },
+            }}
+          />,
+          { initialEntries: [`/${scope}/9?tab=scenes&view=folder`] }
+        );
+
+        await waitFor(() =>
+          expect(api.findTagTree).toHaveBeenCalledWith(
+            { scope: { [scope]: "9:a" }, untagged: "scene" },
+            expect.anything()
+          )
+        );
+      }
+    );
+
     it("Untagged on a performer page asks for the performer's scenes with no tag, own or inherited", async () => {
       api.findTagTree.mockResolvedValue({
         tags: [{ id: "5", instanceId: "a", name: "Five", parents: [] }],
