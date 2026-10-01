@@ -57,7 +57,7 @@ For each user with activity on the merged scene (watch history, a rating or favo
 
 ## Admin Recovery Tool
 
-For scenes that were merged before this feature was implemented, or where automatic detection found no match or several, admins can manually recover orphaned data.
+For scenes that were merged before this feature was implemented, or where automatic detection found no match or several, admins can manually recover orphaned data. The tool also lists deleted scenes that are only in someone's playlist (no history, no rating), so those entries can be merged into the re-scanned file too.
 
 ### Accessing the Tool
 
@@ -69,11 +69,11 @@ For scenes that were merged before this feature was implemented, or where automa
 
 The Merge Recovery tab shows:
 
-- **Total orphaned scenes** with user activity
+- **Total orphaned scenes** that someone's play history, rating or playlist still points at
 - For each orphan:
     - Scene title, the Stash instance it was on, and when it was deleted
     - PHASH value (if available)
-    - Activity summary: total plays, ratings, favorites
+    - Activity summary: total plays, ratings, favorites, and how many playlist entries hold the scene
     - Potential PHASH matches, all on the orphan's instance
 
 ### Recovering Orphaned Data
@@ -101,10 +101,10 @@ If an orphaned scene's data is no longer relevant (e.g., you deleted the scene i
 2. Click **Discard Activity**
 3. Confirm the action
 
-Only that scene's activity on its own instance is deleted; a scene with the same ID on another Stash instance keeps its data.
+This also removes the scene from every playlist that holds it. Only that scene's activity on its own instance is deleted; a scene with the same ID on another Stash instance keeps its data.
 
 !!! warning "Permanent Action"
-    Discarding orphaned data permanently deletes the watch history and ratings. This cannot be undone.
+    Discarding orphaned data permanently deletes the watch history, the ratings and the playlist entries. This cannot be undone.
 
 ## Limitations
 

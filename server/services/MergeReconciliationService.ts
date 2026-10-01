@@ -8,12 +8,17 @@
  * Stash instance, and a merge never crosses instances. A merged scene's
  * target is a live scene of the same instance with the same phash.
  */
+import type {
+  DiscardOrphanResponse,
+  OrphanedScene,
+} from "@peek/shared-types/api/mergeRecovery.js";
 import type { Prisma } from "@prisma/client";
 import { ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
+import { bumpLibrary } from "./LibraryStamp.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
@@ -59,19 +64,6 @@ function refLabel(scene: SceneRef): string {
   return `${scene.id}:${scene.instanceId}`;
 }
 
-export interface OrphanedSceneInfo {
-  id: string;
-  instanceId: string;
-  instanceName: string;
-  title: string | null;
-  phash: string | null;
-  deletedAt: Date;
-  userActivityCount: number;
-  totalPlayCount: number;
-  hasRatings: boolean;
-  hasFavorites: boolean;
-}
-
 export interface PhashMatch {
   sceneId: string;
   instanceId: string;
@@ -90,10 +82,12 @@ export interface ReconcileResult {
 
 class MergeReconciliationService {
   /**
-   * Find all soft-deleted scenes that have orphaned user activity data: a
-   * play history or a rating on that scene of that instance.
+   * Find all soft-deleted scenes that users' data still points at: a play
+   * history, a rating or a playlist entry on that scene of that instance.
+   * Each activity table is grouped once and joined on both columns, so the
+   * work follows the activity, not the library.
    */
-  async findOrphanedScenesWithActivity(): Promise<OrphanedSceneInfo[]> {
+  async findOrphanedScenesWithActivity(): Promise<OrphanedScene[]> {
     const orphans = await prisma.$queryRaw<
       Array<{
         id: string;
@@ -106,6 +100,7 @@ class MergeReconciliationService {
         totalPlayCount: bigint;
         ratingCount: bigint;
         favoriteCount: bigint;
+        playlistEntryCount: bigint;
       }>
     >`
       SELECT
@@ -117,7 +112,8 @@ class MergeReconciliationService {
         COALESCE(wh.watchHistoryCount, 0) as watchHistoryCount,
         COALESCE(wh.totalPlayCount, 0) as totalPlayCount,
         COALESCE(r.ratingCount, 0) as ratingCount,
-        COALESCE(r.favoriteCount, 0) as favoriteCount
+        COALESCE(r.favoriteCount, 0) as favoriteCount,
+        COALESCE(p.playlistEntryCount, 0) as playlistEntryCount
       FROM StashScene s
       LEFT JOIN (
         SELECT sceneId, instanceId, COUNT(*) as watchHistoryCount, SUM(playCount) as totalPlayCount
@@ -129,8 +125,13 @@ class MergeReconciliationService {
         FROM SceneRating
         GROUP BY sceneId, instanceId
       ) r ON r.sceneId = s.id AND r.instanceId = s.stashInstanceId
+      LEFT JOIN (
+        SELECT sceneId, instanceId, COUNT(*) as playlistEntryCount
+        FROM PlaylistItem
+        GROUP BY sceneId, instanceId
+      ) p ON p.sceneId = s.id AND p.instanceId = s.stashInstanceId
       WHERE s.deletedAt IS NOT NULL
-        AND (wh.watchHistoryCount > 0 OR r.ratingCount > 0)
+        AND (wh.watchHistoryCount > 0 OR r.ratingCount > 0 OR p.playlistEntryCount > 0)
       ORDER BY s.deletedAt DESC
     `;
 
@@ -140,9 +141,13 @@ class MergeReconciliationService {
       instanceName: instanceName(o.stashInstanceId),
       title: o.title,
       phash: o.phash,
-      deletedAt: o.deletedAt,
-      userActivityCount: Number(o.watchHistoryCount) + Number(o.ratingCount),
+      deletedAt: o.deletedAt.toISOString(),
+      userActivityCount:
+        Number(o.watchHistoryCount) +
+        Number(o.ratingCount) +
+        Number(o.playlistEntryCount),
       totalPlayCount: Number(o.totalPlayCount),
+      playlistEntryCount: Number(o.playlistEntryCount),
       hasRatings: Number(o.ratingCount) > 0,
       hasFavorites: Number(o.favoriteCount) > 0,
     }));
@@ -493,6 +498,9 @@ class MergeReconciliationService {
       }
     }
 
+    // The users' histories, ratings and playlists changed
+    if (userIds.length > 0) bumpLibrary();
+
     logger.info(
       `Reconciled ${mergeRecordsCreated} users from scene ${refLabel(source)} to ${refLabel(target)}`
     );
@@ -609,28 +617,32 @@ class MergeReconciliationService {
   }
 
   /**
-   * Discard orphaned user data for a scene of one instance (delete its
-   * WatchHistory and SceneRating rows).
+   * Discard what users' data still holds on a scene of one instance: its
+   * WatchHistory and SceneRating rows and its PlaylistItem rows, in one
+   * write unit. A playlist keeps a gap where an entry was, which is
+   * harmless (`removeUnavailableItems` leaves the same).
    */
   async discardOrphanedData(
     scene: SceneRef
-  ): Promise<{ watchHistoryDeleted: number; ratingsDeleted: number }> {
+  ): Promise<Omit<DiscardOrphanResponse, "ok">> {
     const where = { sceneId: scene.id, instanceId: scene.instanceId };
-    const [watchHistoryResult, ratingsResult] = await dbWriteBatch(
-      "history.discard",
-      [
+    const [watchHistoryResult, ratingsResult, playlistResult] =
+      await dbWriteBatch("history.discard", [
         prisma.watchHistory.deleteMany({ where }),
         prisma.sceneRating.deleteMany({ where }),
-      ]
-    );
+        prisma.playlistItem.deleteMany({ where }),
+      ]);
+    // Playlists changed for every user holding the scene
+    bumpLibrary();
 
     logger.info(
-      `Discarded orphaned data for scene ${refLabel(scene)}: ${watchHistoryResult.count} watch history, ${ratingsResult.count} ratings`
+      `Discarded orphaned data for scene ${refLabel(scene)}: ${watchHistoryResult.count} watch history, ${ratingsResult.count} ratings, ${playlistResult.count} playlist entries`
     );
 
     return {
       watchHistoryDeleted: watchHistoryResult.count,
       ratingsDeleted: ratingsResult.count,
+      playlistEntriesDeleted: playlistResult.count,
     };
   }
 }

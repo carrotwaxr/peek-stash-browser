@@ -2,15 +2,19 @@
  * Merge Reconciliation Routes (Admin Only)
  *
  * Handles admin endpoints for managing orphaned scene data:
- * - GET /api/admin/orphaned-scenes - List orphaned scenes with user activity
+ * - GET /api/admin/orphaned-scenes - List orphaned scenes (play history, ratings or playlist entries)
  * - GET /api/admin/orphaned-scenes/:ref/matches - Phash matches for an orphan
  * - POST /api/admin/orphaned-scenes/:ref/reconcile - Transfer data to target scene
- * - POST /api/admin/orphaned-scenes/:ref/discard - Delete orphaned user data
+ * - POST /api/admin/orphaned-scenes/:ref/discard - Delete orphaned history, ratings and playlist entries
  * - POST /api/admin/reconcile-all - Reconcile every orphan with exactly one match
  *
  * `:ref` is the orphan as "id:instanceId"; a bare id answers 400. A target
  * is a scene id on the orphan's instance: a merge never crosses instances.
  */
+import type {
+  DiscardOrphanResponse,
+  OrphanedScenesResponse,
+} from "@peek/shared-types/api/mergeRecovery.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import express, { type Response } from "express";
 import {
@@ -52,10 +56,11 @@ router.get(
   authenticated(async (req, res) => {
     const orphans =
       await mergeReconciliationService.findOrphanedScenesWithActivity();
-    res.json({
+    const body: OrphanedScenesResponse = {
       scenes: orphans,
       totalCount: orphans.length,
-    });
+    };
+    res.json(body);
   })
 );
 
@@ -107,7 +112,8 @@ router.post(
 
 /**
  * POST /api/admin/orphaned-scenes/:ref/discard
- * Delete the orphan's user data (on its instance only)
+ * Delete the orphan's history, ratings and playlist entries (on its
+ * instance only)
  */
 router.post(
   "/orphaned-scenes/:ref/discard",
@@ -117,10 +123,8 @@ router.post(
 
     const result = await mergeReconciliationService.discardOrphanedData(orphan);
 
-    res.json({
-      ok: true,
-      ...result,
-    });
+    const body: DiscardOrphanResponse = { ok: true, ...result };
+    res.json(body);
   })
 );
 

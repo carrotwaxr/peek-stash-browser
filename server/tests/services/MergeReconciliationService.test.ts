@@ -4,6 +4,7 @@
 import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { libraryStampFor } from "../../services/LibraryStamp.js";
 import {
   MergeTargetError,
   mergeReconciliationService,
@@ -59,6 +60,7 @@ describe("MergeReconciliationService", () => {
           totalPlayCount: 5n,
           ratingCount: 1n,
           favoriteCount: 1n,
+          playlistEntryCount: 2n,
         },
         {
           id: "scene-1",
@@ -70,6 +72,7 @@ describe("MergeReconciliationService", () => {
           totalPlayCount: 2n,
           ratingCount: 0n,
           favoriteCount: 0n,
+          playlistEntryCount: 0n,
         },
       ]);
 
@@ -81,7 +84,9 @@ describe("MergeReconciliationService", () => {
         id: "scene-1",
         instanceId: A,
         instanceName: "Stash A",
-        userActivityCount: 3,
+        deletedAt: "2025-01-10T00:00:00.000Z",
+        userActivityCount: 5,
+        playlistEntryCount: 2,
         totalPlayCount: 5,
         hasRatings: true,
         hasFavorites: true,
@@ -800,9 +805,10 @@ describe("MergeReconciliationService", () => {
   });
 
   describe("discardOrphanedData", () => {
-    it("deletes the watch history and ratings of that scene on its instance", async () => {
+    it("deletes the watch history, ratings and playlist entries of that scene on its instance", async () => {
       mockPrisma.watchHistory.deleteMany.mockResolvedValue({ count: 3 });
       mockPrisma.sceneRating.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 4 });
 
       const result = await mergeReconciliationService.discardOrphanedData({
         id: "scene-1",
@@ -811,6 +817,7 @@ describe("MergeReconciliationService", () => {
 
       expect(result.watchHistoryDeleted).toBe(3);
       expect(result.ratingsDeleted).toBe(2);
+      expect(result.playlistEntriesDeleted).toBe(4);
       const where = { sceneId: "scene-1", instanceId: B };
       expect(mockPrisma.watchHistory.deleteMany).toHaveBeenCalledWith({
         where,
@@ -818,6 +825,20 @@ describe("MergeReconciliationService", () => {
       expect(mockPrisma.sceneRating.deleteMany).toHaveBeenCalledWith({
         where,
       });
+      expect(mockPrisma.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where,
+      });
+    });
+
+    it("marks the library changed, since playlists lost entries", async () => {
+      mockPrisma.watchHistory.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.sceneRating.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
+      const before = libraryStampFor(1);
+
+      await mergeReconciliationService.discardOrphanedData(source);
+
+      expect(libraryStampFor(1)).not.toBe(before);
     });
   });
 });

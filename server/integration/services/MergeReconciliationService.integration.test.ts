@@ -28,6 +28,7 @@ import { mergeReconciliationService } from "../../services/MergeReconciliationSe
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { objectContaining } from "../../tests/helpers/matchers.js";
+import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -262,7 +263,11 @@ describeWithDb("MergeReconciliationService (integration)", () => {
       instanceId: A,
     });
 
-    expect(result).toEqual({ watchHistoryDeleted: 1, ratingsDeleted: 1 });
+    expect(result).toEqual({
+      watchHistoryDeleted: 1,
+      ratingsDeleted: 1,
+      playlistEntriesDeleted: 0,
+    });
     expect(await history(u, A, "5")).toBeNull();
     expect(await rating(u, A, "5")).toBeNull();
     expect(await history(u, B, "5")).toMatchObject({ playCount: 10 });
@@ -291,6 +296,7 @@ describeWithDb("MergeReconciliationService (integration)", () => {
         instanceName: A,
         phash: PHASH,
         userActivityCount: 2,
+        playlistEntryCount: 0,
         totalPlayCount: 3,
         hasRatings: true,
         hasFavorites: true,
@@ -344,6 +350,128 @@ describeWithDb("MergeReconciliationService (integration)", () => {
     ]);
     expect(await history(u, B, "5")).toMatchObject({ playCount: 10 });
     expect(await history(u, A, "7")).toBeNull();
+  });
+
+  /** V's playlists holding a scene of A, one entry each */
+  async function seedPlaylistEntries(
+    sceneId: string,
+    instanceId: string,
+    playlists: number
+  ): Promise<number[]> {
+    const ids: number[] = [];
+    for (let i = 0; i < playlists; i++) {
+      const playlist = await prisma.playlist.create({
+        data: {
+          userId: v,
+          name: `merge-it playlist ${sceneId}-${instanceId}-${i}`,
+          items: { create: [{ sceneId, instanceId, position: 0 }] },
+        },
+      });
+      ids.push(playlist.id);
+    }
+    return ids;
+  }
+
+  const softDeleteA5 = () =>
+    prisma.stashScene.update({
+      where: { id_stashInstanceId: { id: "5", stashInstanceId: A } },
+      data: { deletedAt: new Date() },
+    });
+
+  const orphansNamed5 = async () =>
+    (await mergeReconciliationService.findOrphanedScenesWithActivity()).filter(
+      (o) => o.id === "5" && o.instanceId === A
+    );
+
+  it("a deleted scene referenced only by a playlist entry is listed with playlistEntryCount 1", async () => {
+    await clearActivity(u, A, "5");
+    await seedPlaylistEntries("5", A, 1);
+    await softDeleteA5();
+
+    expect(await orphansNamed5()).toEqual([
+      objectContaining({
+        id: "5",
+        instanceId: A,
+        phash: PHASH,
+        userActivityCount: 1,
+        playlistEntryCount: 1,
+        totalPlayCount: 0,
+        hasRatings: false,
+        hasFavorites: false,
+      }),
+    ]);
+  });
+
+  it("a live scene only a playlist references is no orphan", async () => {
+    await clearActivity(u, A, "5");
+    await seedPlaylistEntries("5", A, 1);
+
+    expect(await orphansNamed5()).toEqual([]);
+  });
+
+  it("a scene with history, a rating and two playlist entries reports all three counts", async () => {
+    await seedPlaylistEntries("5", A, 2);
+    await softDeleteA5();
+
+    expect(await orphansNamed5()).toEqual([
+      objectContaining({
+        userActivityCount: 4,
+        playlistEntryCount: 2,
+        totalPlayCount: 3,
+        hasRatings: true,
+        hasFavorites: true,
+      }),
+    ]);
+  });
+
+  it("reconcile moves a playlist-only orphan's entries to the target", async () => {
+    await seedScene(A, "7", PHASH);
+    await clearActivity(u, A, "5");
+    const playlistId = must((await seedPlaylistEntries("5", A, 1))[0]);
+    await softDeleteA5();
+
+    await mergeReconciliationService.reconcileScene(
+      { id: "5", instanceId: A },
+      { id: "7", instanceId: A },
+      PHASH,
+      null
+    );
+
+    const items = await prisma.playlistItem.findMany({
+      where: { playlistId },
+      select: { sceneId: true, instanceId: true },
+    });
+    expect(items).toEqual([{ sceneId: "7", instanceId: A }]);
+    expect(await orphansNamed5()).toEqual([]);
+  });
+
+  it("discard deletes the orphan's history, ratings and playlist entries in one write unit, and the scene leaves the list", async () => {
+    const onA = must((await seedPlaylistEntries("5", A, 1))[0]);
+    const onB = must((await seedPlaylistEntries("5", B, 1))[0]);
+    await softDeleteA5();
+    expect(await orphansNamed5()).toHaveLength(1);
+
+    const result = await mergeReconciliationService.discardOrphanedData({
+      id: "5",
+      instanceId: A,
+    });
+
+    expect(result).toEqual({
+      watchHistoryDeleted: 1,
+      ratingsDeleted: 1,
+      playlistEntriesDeleted: 1,
+    });
+    expect(await history(u, A, "5")).toBeNull();
+    expect(await rating(u, A, "5")).toBeNull();
+    expect(
+      await prisma.playlistItem.count({ where: { playlistId: onA } })
+    ).toBe(0);
+    // B:5 is another scene: its playlist entry, history and rating stay
+    expect(
+      await prisma.playlistItem.count({ where: { playlistId: onB } })
+    ).toBe(1);
+    expect(await history(u, B, "5")).toMatchObject({ playCount: 10 });
+    expect(await orphansNamed5()).toEqual([]);
   });
 
   it("a scene soft-deleted by an interrupted cleanup is reconciled by the next one", async () => {

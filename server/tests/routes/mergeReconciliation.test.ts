@@ -13,13 +13,13 @@
  * The handler tests call each route's real handler from the router, with the
  * service and the auth middleware mocked.
  */
+import type { OrphanedScene } from "@peek/shared-types/api/mergeRecovery.js";
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate, requireAdmin } from "../../middleware/auth.js";
 // Import after mocks are set up
 import {
   MergeTargetError,
-  type OrphanedSceneInfo,
   type PhashMatch,
   mergeReconciliationService,
 } from "../../services/MergeReconciliationService.js";
@@ -166,16 +166,17 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("GET /orphaned-scenes handler", () => {
     it("should return list of orphaned scenes", async () => {
-      const mockOrphans: OrphanedSceneInfo[] = [
+      const mockOrphans: OrphanedScene[] = [
         {
           id: "scene-1",
           instanceId: "inst-a",
           instanceName: "Stash A",
           title: "Deleted Scene 1",
           phash: "abc123",
-          deletedAt: new Date("2024-01-01"),
+          deletedAt: "2024-01-01T00:00:00.000Z",
           userActivityCount: 5,
           totalPlayCount: 10,
+          playlistEntryCount: 0,
           hasRatings: true,
           hasFavorites: false,
         },
@@ -185,9 +186,10 @@ describe("Merge Reconciliation Routes", () => {
           instanceName: "Stash B",
           title: "Deleted Scene 1",
           phash: "def456",
-          deletedAt: new Date("2024-01-02"),
+          deletedAt: "2024-01-02T00:00:00.000Z",
           userActivityCount: 3,
           totalPlayCount: 7,
+          playlistEntryCount: 0,
           hasRatings: false,
           hasFavorites: true,
         },
@@ -427,6 +429,7 @@ describe("Merge Reconciliation Routes", () => {
       const mockResult = {
         watchHistoryDeleted: 5,
         ratingsDeleted: 2,
+        playlistEntriesDeleted: 3,
       };
 
       mockService.discardOrphanedData.mockResolvedValue(mockResult);
@@ -447,6 +450,7 @@ describe("Merge Reconciliation Routes", () => {
         ok: true,
         watchHistoryDeleted: 5,
         ratingsDeleted: 2,
+        playlistEntriesDeleted: 3,
       });
     });
 
@@ -492,7 +496,7 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("POST /reconcile-all handler", () => {
     it("reconciles only the orphans with exactly one match, on their own instance", async () => {
-      const mockOrphans: OrphanedSceneInfo[] = [
+      const mockOrphans: OrphanedScene[] = [
         partialRow({ id: "orphan-1", instanceId: "inst-b", phash: "abc123" }),
         partialRow({ id: "orphan-2", instanceId: "inst-b", phash: "def456" }),
         partialRow({ id: "orphan-3", instanceId: "inst-b", phash: null }), // No phash - will be skipped
@@ -553,7 +557,7 @@ describe("Merge Reconciliation Routes", () => {
     });
 
     it("skips an orphan without any match", async () => {
-      const mockOrphans: OrphanedSceneInfo[] = [
+      const mockOrphans: OrphanedScene[] = [
         partialRow({ id: "orphan-1", instanceId: "inst-b", phash: "abc123" }),
       ];
 
