@@ -225,6 +225,12 @@ A studio with sub-studios, or a tag with sub-tags, shows **Include sub-studios**
 
 Filters you set on a tab narrow what that tab lists, on top of the page's studio or tag. The page's own studio or tag is not offered as a filter on its tabs (nor a performer's or collection's own on theirs), so the panel cannot turn the list inside out. Inside a folder, the Tags filter is hidden for the same reason, and in the timeline the date filter is.
 
+### Images Tabs
+
+The Images tab of a performer, studio, tag or gallery page is the Images page's list, kept to that page's item: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size, and the same viewer. It opens sorted by title (a gallery's in file order, on the wall). The tab has its own filter presets and default: a default saved on a tag's Images tab applies to every tag's Images tab and never to the Images page, nor the Images page's default to the tab.
+
+A rating or favorite you set on a detail page, or on a card or in the viewer there, shows on the lists and carousels you go back to without a reload.
+
 ### Clips
 
 The Clips page's **Has Preview** filter lists clips **With preview only** until you pick **Without preview only** or **All clips**.

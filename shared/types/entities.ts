@@ -278,7 +278,9 @@ export interface NormalizedTag {
   scene_count_via_performers: number;
   description: string | null;
   aliases: string[];
-  parents: Array<{ id: string; name?: string }>;
+  // The parent ids from the row; after populateRelations, the refs (with
+  // their instance) of the parents the viewer may see
+  parents: Array<{ id: string; name?: string; instanceId?: string }>;
   image_path: string | null;
   created_at: string | null;
   updated_at: string | null;

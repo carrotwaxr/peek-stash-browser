@@ -34,6 +34,7 @@ import GroupDetail from "@/components/pages/GroupDetail";
 import PerformerDetail from "@/components/pages/PerformerDetail";
 import StudioDetail from "@/components/pages/StudioDetail";
 import TagDetail from "@/components/pages/TagDetail";
+import { TVModeProvider } from "@/contexts/TVModeProvider";
 
 export { requestsTo };
 
@@ -123,6 +124,14 @@ export const DEFAULT_ENTITY: Record<string, unknown> = {
   title: "Thing",
 };
 
+/**
+ * Fields the server always sends on a page's row, under the case's entity:
+ * the pages on `useEntityDetail` read them as their types declare
+ */
+const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
+  tag: { aliases: [], parents: [], description: null, image_path: null },
+};
+
 let latestApi: ApiStub | undefined;
 let navigateRef: ReturnType<typeof useNavigate> | undefined;
 /** The query clients of the pages rendered in this case */
@@ -176,14 +185,15 @@ function countsAnswer(counts: DetailPageOptions["counts"]): Answer {
   return () => jsonResponse(200, { counts });
 }
 
-/** What the lookup answers with these rows */
+/** What the lookup answers with these rows (over the type's row defaults) */
 export function listResponse(
   type: DetailType,
   rows: Record<string, unknown>[]
 ): Response {
   const { plural, result } = PAGES[type];
+  const full = rows.map((row) => ({ ...ROW_DEFAULTS[type], ...row }));
   return jsonResponse(200, {
-    [result]: { [plural]: rows, count: rows.length },
+    [result]: { [plural]: full, count: full.length },
   });
 }
 
@@ -292,12 +302,14 @@ export function renderDetailPage(
   };
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path={`/${type}/:${param}`} element={<Page />} />
-        </Routes>
-        <CurrentSearch />
-      </MemoryRouter>
+      <TVModeProvider>
+        <MemoryRouter initialEntries={[url]}>
+          <Routes>
+            <Route path={`/${type}/:${param}`} element={<Page />} />
+          </Routes>
+          <CurrentSearch />
+        </MemoryRouter>
+      </TVModeProvider>
     </QueryClientProvider>
   );
   return { ...result, api, queryClient };
