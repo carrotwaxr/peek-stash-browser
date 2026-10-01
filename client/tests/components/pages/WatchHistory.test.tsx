@@ -342,4 +342,20 @@ describe("WatchHistory", () => {
     expect(keys).toContainEqual(queryKeys.homeCarousels.all());
     expect(keys).toContainEqual(queryKeys.user.stats());
   });
+
+  it("the dialog says it clears scene watch history only, and that image views and image O counts are kept", async () => {
+    stubApi({ [WATCHED]: answer([scene("1")], 1) });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("row")).toHaveLength(1);
+    });
+
+    fireEvent.click(screen.getByText("Clear History"));
+
+    expect(
+      screen.getByText(
+        "This clears your scene watch history: plays, watch time, resume points and O counts. Image views and image O counts are kept."
+      )
+    ).toBeTruthy();
+  });
 });

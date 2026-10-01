@@ -118,7 +118,6 @@ export type {
 // Watch History endpoint types
 export type {
   WatchHistoryData,
-  FullWatchHistoryRecord,
   SaveActivityRequest,
   SaveActivityResponse,
   IncrementPlayCountRequest,

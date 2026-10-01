@@ -363,10 +363,8 @@ const WatchHistory = () => {
               Clear Watch History?
             </h3>
             <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
-              This will permanently delete all watch history records including
-              resume times, play counts, O counters, and all viewing statistics.
-              This will also reset O counter totals for all Performers, Studios,
-              and Tags. This action cannot be undone.
+              This clears your scene watch history: plays, watch time, resume
+              points and O counts. Image views and image O counts are kept.
             </p>
             <div className="flex gap-3 justify-end">
               <Button
