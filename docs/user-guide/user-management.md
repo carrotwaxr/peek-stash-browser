@@ -28,7 +28,7 @@ Peek has two user roles:
    - **Role** (User or Admin)
 4. Click **Create**
 
-The new user can now log in with these credentials.
+The new user can now log in with these credentials. The setup wizard and accounts created by an admin follow the same password rule as a password change (see [Password Requirements](#password-requirements)).
 
 ---
 
@@ -327,6 +327,7 @@ Passwords must meet these requirements:
 - Minimum 8 characters
 - At least one letter (a-z or A-Z)
 - At least one number (0-9)
+- At most 72 bytes (a longer password is refused, since only the first 72 bytes of a password are used)
 
 ### Account Lockout
 

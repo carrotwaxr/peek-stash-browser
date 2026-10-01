@@ -1,4 +1,9 @@
 import React, { useState } from "react";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES_TEXT,
+  validatePassword,
+} from "@peek/shared-types/password.js";
 import { setupApi } from "../../api";
 import type { LoginResult } from "../../contexts/AuthContextProvider";
 import { useAuth } from "../../hooks/useAuth";
@@ -220,10 +225,11 @@ const AdminPasswordStep = ({
             color: theme?.properties?.["--text-muted"] || "#666666",
           }}
         >
-          8+ characters with at least one letter and one number
+          {PASSWORD_RULES_TEXT}
         </p>
         <input
           type="password"
+          minLength={PASSWORD_MIN_LENGTH}
           value={adminPassword}
           onChange={onAdminPasswordChange}
           className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
@@ -647,16 +653,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
       return;
     }
 
-    if (adminPassword.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[a-zA-Z]/.test(adminPassword)) {
-      setError("Password must contain at least one letter");
-      return;
-    }
-    if (!/[0-9]/.test(adminPassword)) {
-      setError("Password must contain at least one number");
+    const passwordCheck = validatePassword(adminPassword);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.errors.join(". "));
       return;
     }
 

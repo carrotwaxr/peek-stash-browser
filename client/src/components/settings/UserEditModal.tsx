@@ -1,4 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES_TEXT,
+  validatePassword,
+} from "@peek/shared-types/password.js";
 import { Key, Lock, Shield, Trash2, User, Users } from "lucide-react";
 import {
   addGroupMember,
@@ -133,6 +138,7 @@ const UserEditModalContent = ({
   const wroteRef = useRef(false);
   const [controls, setControls] = useState<Record<string, ControlState>>({});
   const noteBaseId = useId();
+  const passwordRulesId = useId();
   const noteId = (key: string) => `${noteBaseId}-${key}`;
   const isSaving = (key: string) => controls[key]?.status === "saving";
   const setControl = (key: string, state: ControlState) =>
@@ -271,16 +277,9 @@ const UserEditModalContent = ({
   };
 
   const handleResetPassword = async () => {
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[a-zA-Z]/.test(newPassword)) {
-      setError("Password must contain at least one letter");
-      return;
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      setError("Password must contain at least one number");
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.errors.join(". "));
       return;
     }
 
@@ -783,37 +782,49 @@ const UserEditModalContent = ({
                 <div className="space-y-4">
                   {/* Password Reset */}
                   {showPasswordReset ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="New password (8+ chars, letter, number)"
-                        className="flex-1 px-3 py-2 rounded text-sm"
-                        style={{
-                          backgroundColor: "var(--bg-tertiary)",
-                          border: "1px solid var(--border-color)",
-                          color: "var(--text-primary)",
-                        }}
-                      />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => void handleResetPassword()}
-                        disabled={loading}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="New password"
+                          aria-label="New password"
+                          aria-describedby={passwordRulesId}
+                          minLength={PASSWORD_MIN_LENGTH}
+                          className="flex-1 px-3 py-2 rounded text-sm"
+                          style={{
+                            backgroundColor: "var(--bg-tertiary)",
+                            border: "1px solid var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => void handleResetPassword()}
+                          disabled={loading}
+                        >
+                          Set
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setShowPasswordReset(false);
+                            setNewPassword("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      <p
+                        id={passwordRulesId}
+                        className="text-xs mt-1"
+                        style={{ color: "var(--text-muted)" }}
                       >
-                        Set
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setShowPasswordReset(false);
-                          setNewPassword("");
-                        }}
-                      >
-                        Cancel
-                      </Button>
+                        {PASSWORD_RULES_TEXT}
+                      </p>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">

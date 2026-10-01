@@ -8,6 +8,7 @@
  * - Current user restrictions
  * - Close/cancel behavior
  */
+import { PASSWORD_RULES_TEXT } from "@peek/shared-types/password.js";
 import {
   act,
   fireEvent,
@@ -565,10 +566,14 @@ describe("UserEditModal", () => {
   describe("Password reset", () => {
     const openReset = () => {
       fireEvent.click(screen.getByRole("button", { name: "Reset Password" }));
-      return screen.getByPlaceholderText(
-        "New password (8+ chars, letter, number)"
-      );
+      return screen.getByPlaceholderText("New password");
     };
+
+    it("states the password rule beside the field", async () => {
+      await renderModal();
+      openReset();
+      expect(screen.getByText(PASSWORD_RULES_TEXT)).toBeInTheDocument();
+    });
 
     it.each([
       ["short1", "Password must be at least 8 characters"],
@@ -596,7 +601,7 @@ describe("UserEditModal", () => {
       );
       expect(mockAdminResetPassword).toHaveBeenCalledWith(1, "NewPass123");
       expect(
-        screen.queryByPlaceholderText("New password (8+ chars, letter, number)")
+        screen.queryByPlaceholderText("New password")
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Reset Password" })
@@ -611,9 +616,7 @@ describe("UserEditModal", () => {
       fireEvent.click(screen.getByRole("button", { name: "Set" }));
 
       expect(await screen.findByText("Too common")).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText("New password (8+ chars, letter, number)")
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("New password")).toBeInTheDocument();
     });
 
     it("Cancel closes the field and clears it", async () => {
@@ -622,13 +625,13 @@ describe("UserEditModal", () => {
       fireEvent.click(
         within(
           screen
-            .getByPlaceholderText("New password (8+ chars, letter, number)")
+            .getByPlaceholderText("New password")
             .closest("div") as HTMLElement
         ).getByRole("button", { name: "Cancel" })
       );
 
       expect(
-        screen.queryByPlaceholderText("New password (8+ chars, letter, number)")
+        screen.queryByPlaceholderText("New password")
       ).not.toBeInTheDocument();
       expect(openReset()).toHaveValue("");
     });

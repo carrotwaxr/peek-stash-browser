@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES_TEXT,
+  validatePassword,
+} from "@peek/shared-types/password.js";
+import {
   forgotPasswordInit,
   forgotPasswordReset,
   getErrorMessage,
@@ -52,16 +57,9 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[a-zA-Z]/.test(newPassword)) {
-      setError("Password must contain at least one letter");
-      return;
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      setError("Password must contain at least one number");
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.errors.join(". "));
       return;
     }
 
@@ -239,13 +237,13 @@ const ForgotPasswordPage = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
               />
               <p
                 className="text-xs mt-1"
                 style={{ color: "var(--text-muted)" }}
               >
-                8+ characters with at least one letter and one number
+                {PASSWORD_RULES_TEXT}
               </p>
             </div>
             <div className="mb-6">
@@ -268,7 +266,7 @@ const ForgotPasswordPage = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
               />
             </div>
             <Button

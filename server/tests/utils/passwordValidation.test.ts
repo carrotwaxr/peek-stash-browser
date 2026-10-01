@@ -81,4 +81,23 @@ describe("validatePassword", () => {
       expect(result.errors).toHaveLength(3);
     });
   });
+
+  describe("length cap", () => {
+    it("should accept a password of exactly 72 bytes", () => {
+      expect(validatePassword("a1" + "x".repeat(70)).valid).toBe(true);
+    });
+
+    it("should reject a password over 72 bytes", () => {
+      const result = validatePassword("a1" + "x".repeat(71));
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("Password must be at most 72 bytes");
+    });
+
+    it("should count bytes, not characters", () => {
+      // 40 two-byte characters plus a digit: 41 characters, 81 bytes
+      const result = validatePassword("é".repeat(40) + "1");
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("Password must be at most 72 bytes");
+    });
+  });
 });

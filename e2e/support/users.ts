@@ -22,6 +22,15 @@ export interface TestUser {
 }
 
 /**
+ * A random password that follows Peek's one password rule (8+ characters with
+ * a letter and a number): a random base64url body alone has no digit in about
+ * 1 draw in 60, so the fixed `E2e-` and `-1` guarantee both.
+ */
+export function randomPassword(): string {
+  return `E2e-${randomBytes(9).toString("base64url")}-1`;
+}
+
+/**
  * Creates a user named `e2e-<runId>-<purpose>-<worker>-<n>`. `api` needs an
  * admin session: a test's `request` or `page.request` fixture has the run
  * admin's, from the storage state.
@@ -32,8 +41,7 @@ export async function createUser(
   role: "USER" | "ADMIN" = "USER"
 ): Promise<TestUser> {
   const username = uniqueName(purpose);
-  // A letter and a digit, as password changes require
-  const password = `E2e-${randomBytes(9).toString("base64url")}-1`;
+  const password = randomPassword();
   const response = await mustOk(
     await api.post("/api/user/create", {
       data: { username, password, role },

@@ -804,8 +804,9 @@ export const createUser = async (
     return;
   }
 
-  if (password.length < 6) {
-    res.status(400).json({ error: "Password must be at least 6 characters" });
+  const passwordCheck = validatePassword(password);
+  if (!passwordCheck.valid) {
+    res.status(400).json({ error: passwordCheck.errors.join(". ") });
     return;
   }
 
