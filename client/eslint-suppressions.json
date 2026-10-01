@@ -565,7 +565,7 @@
   },
   "src/components/ui/SearchInput.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
