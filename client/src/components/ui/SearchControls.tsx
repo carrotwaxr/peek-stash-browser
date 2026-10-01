@@ -138,7 +138,6 @@ const SearchControls = ({
     setZoomLevel,
     setGridDensity,
     loadPreset,
-    activePreset,
   } = listState;
   const sortField = sort.field;
   const sortDirection = sort.direction;
@@ -235,6 +234,8 @@ const SearchControls = ({
     return undefined;
   }, [highlightedFilterKey]);
 
+  // Only loading a preset from the menu shows its table columns; a default
+  // preset applied on a visit leaves the user's saved columns alone
   const handleLoadPreset = useCallback(
     (preset: PresetToLoad) => {
       loadPreset(preset);
@@ -242,16 +243,6 @@ const SearchControls = ({
     },
     [loadPreset, onPresetColumns]
   );
-
-  // The default preset's table columns show when it resolves or changes;
-  // one without columns shows the user's own
-  const defaultPresetIdRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    const id = activePreset?.id ?? null;
-    if (!onPresetColumns || defaultPresetIdRef.current === id) return;
-    defaultPresetIdRef.current = id;
-    onPresetColumns(presetColumnsOf(activePreset?.tableColumns));
-  }, [activePreset, onPresetColumns]);
 
   const handlePageChange = useCallback(
     (page: number) => {

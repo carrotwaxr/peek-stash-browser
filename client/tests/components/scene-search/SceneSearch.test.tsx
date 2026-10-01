@@ -15,7 +15,6 @@ import {
 import { must, renderListPage } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
-import { queryKeys } from "@/api/queryKeys";
 import SceneSearch from "@/components/scene-search/SceneSearch";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
@@ -604,32 +603,30 @@ describe("SceneSearch", () => {
       await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
     });
 
-    it("a default preset changing to one without columns shows your saved columns", async () => {
-      api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
-      const { queryClient } = renderListPage(<SceneSearch title="Scenes" />, {
-        initialEntries: ["/scenes"],
-        presets: { scene: [RATINGS_TABLE, PLAIN_TABLE] },
-        defaultPresets: { scene: "ratings" },
-        userSettings: SAVED_COLUMNS,
-      });
-      await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
-
-      act(() => {
-        queryClient.setQueryData(queryKeys.user.defaultPresets(), {
-          defaults: { scene: "plain" },
-        });
-      });
-
-      await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
-    });
-
-    it("a default preset saved in table view opens with its columns", async () => {
+    it("a default preset with columns opens with your saved columns, not its own", async () => {
       api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
       renderListPage(<SceneSearch title="Scenes" />, {
         initialEntries: ["/scenes"],
         presets: { scene: [RATINGS_TABLE] },
         defaultPresets: { scene: "ratings" },
+        userSettings: SAVED_COLUMNS,
       });
+
+      await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
+    });
+
+    it("loading a default preset from the menu applies its columns over your saved ones", async () => {
+      api.findScenes.mockResolvedValue(scenes(rowsOf("scene")));
+      renderListPage(<SceneSearch title="Scenes" />, {
+        initialEntries: ["/scenes"],
+        presets: { scene: [RATINGS_TABLE] },
+        defaultPresets: { scene: "ratings" },
+        userSettings: SAVED_COLUMNS,
+      });
+      await waitFor(() => expect(headers()).toEqual(["Title", "Duration"]));
+
+      fireEvent.click(screen.getByRole("button", { name: /Load Preset/ }));
+      fireEvent.click(await screen.findByText("Ratings table"));
 
       await waitFor(() => expect(headers()).toEqual(["Rating", "Title"]));
     });
