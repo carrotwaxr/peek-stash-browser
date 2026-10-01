@@ -586,3 +586,16 @@ export interface PlaylistQueueQueryRow {
   /** Null without a studio, or one the viewer may not see */
   studioName: string | null;
 }
+
+/** One watched scene of a page (WatchHistoryQueryService) */
+export interface WatchedSceneQueryRow {
+  id: string;
+  instanceId: string;
+}
+
+/** The totals of a watched-scenes view (WatchHistoryQueryService) */
+export interface WatchedScenesTotalsRow {
+  total: number | bigint;
+  /** NULL-free through COALESCE; SUM of a REAL column comes back as number */
+  totalPlayDuration: number | bigint;
+}

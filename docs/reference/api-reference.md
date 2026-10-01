@@ -1085,6 +1085,25 @@ Watch history tracking endpoints.
 
 ---
 
+### GET /api/watch-history/scenes
+
+**Authentication:** Required (503 `ready: false` while none of the user's instances has finished its first sync)
+
+**Controller:** `getWatchedScenes` in `../controllers/watchHistory.ts`
+
+**Query:**
+
+- `view`: `all` (default: played, watched for any time, or left with a resume point; a scene with only an O is not listed), `in_progress` (a resume point before the final 10% of the scene with at least 2% of it watched; any resume point when the length is unknown) or `completed` (played at least once, and the last session finished or stopped within the final 10% of the scene)
+- `sort`: `recent` (default: last played first, scenes never dated last), `most_watched` (play count) or `longest_duration` (time watched)
+- `page` (default 1), `per_page` (1 to 250, default 24)
+- `count`: `false` skips the totals; default `true`
+
+Unknown parameters or values answer 400 naming each one.
+
+**Response:** `{ scenes: NormalizedScene[], total: number | null, totalPlayDuration: number | null }`. Only scenes the user can see are listed and counted: deleted scenes, hidden or restricted ones and scenes on instances the user does not see are left out. The same scene id on two instances is two entries. `total` and `totalPlayDuration` (seconds) cover the whole view, or are null with `count=false`.
+
+---
+
 ### DELETE /api/watch-history/
 
 **Authentication:** Required
