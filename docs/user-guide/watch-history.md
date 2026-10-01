@@ -117,7 +117,7 @@ Peek has no clear for a single scene. To clear everything:
 3. Confirm the action
 4. All scene progress is reset, and Home's Continue Watching and your stats refresh
 
-Clear History clears **scene history only**: plays, watch time, resume points and O counts. Image views and image O counts are kept.
+Clear History clears **scene history only**: plays, watch time, resume points and O counts, and the performer, studio and tag totals built from them. Image views and image O counts are kept. It cannot be undone.
 
 !!! warning "Cannot Be Undone"
     Clearing watch history is permanent. You cannot restore cleared progress.

@@ -364,7 +364,9 @@ const WatchHistory = () => {
             </h3>
             <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
               This clears your scene watch history: plays, watch time, resume
-              points and O counts. Image views and image O counts are kept.
+              points and O counts, and the performer, studio and tag totals
+              built from them. Image views and image O counts are kept. This
+              cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <Button
