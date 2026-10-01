@@ -11,9 +11,10 @@ import type { NormalizedScene } from "../entities.js";
 // =============================================================================
 
 /**
- * A playlist item with its scene: the viewer's view of the scene (their own
- * rating, favorite, O and play fields), or null when the viewer cannot see
- * it (hidden, restricted, deleted, or on an instance they do not use)
+ * A playlist item the viewer can see, with the viewer's view of its scene
+ * (their own rating, favorite, O and play fields). Items the viewer cannot
+ * see (hidden, restricted, deleted, or on an instance they do not use) are
+ * never listed.
  */
 export interface PlaylistItemWithScene {
   id: number;
@@ -22,7 +23,7 @@ export interface PlaylistItemWithScene {
   sceneId: string;
   position: number;
   addedAt: Date;
-  scene: NormalizedScene | null;
+  scene: NormalizedScene;
 }
 
 /** A preview's scene: what the playlists page shows of it */
@@ -112,12 +113,10 @@ export interface GetPlaylistParams extends Record<string, string> {
 }
 
 /**
- * Without `page`, `per_page`, `sort` and `direction`, every item, in
- * position order, with null for the scenes the viewer cannot see. With any,
- * one page of the items the viewer can see: `page` from 1, `per_page`
- * 1..100 (50 when absent). `sort` is one of `PLAYLIST_ITEM_SORTS` (also
- * `random_<seed>`; position when absent); `direction` is ASC or DESC (ASC
- * for position and added_at when absent, DESC for a scene sort).
+ * One page of the items the viewer can see: `page` from 1 (1 when absent),
+ * `per_page` 1..100 (50 when absent). `sort` is one of `PLAYLIST_ITEM_SORTS`
+ * (also `random_<seed>`; position when absent); `direction` is ASC or DESC
+ * (ASC for position and added_at when absent, DESC for a scene sort).
  */
 export interface GetPlaylistQuery extends Record<string, string | undefined> {
   page?: string;
@@ -127,18 +126,21 @@ export interface GetPlaylistQuery extends Record<string, string | undefined> {
 }
 
 /**
- * The fields marked optional are filled by later tasks and become required
- * with them: `page`, `perPage` and `unavailableItems` (B6), `owner` (B8).
+ * `owner` is optional until B8 fills it, and becomes required with it.
  */
 export interface GetPlaylistResponse {
   playlist: PlaylistData & { items: PlaylistItemWithScene[] };
   /** How many of the playlist's items the viewer can see */
   totalItems: number;
-  /** The owner's count of items that cannot be played (owner only) */
-  unavailableItems?: number;
-  /** The page read, when the request asked for one */
-  page?: number;
-  perPage?: number;
+  /**
+   * The owner's count of items they cannot play (hidden, restricted,
+   * deleted from Stash, or on an instance they do not use); 0 for anyone
+   * else, who is told nothing about them
+   */
+  unavailableItems: number;
+  /** The page read */
+  page: number;
+  perPage: number;
   /**
    * The sort the items came back in: one of `PLAYLIST_ITEM_SORTS`, a random
    * one as `random_<seed>` (a bare `random` names the seed it used)
@@ -177,6 +179,14 @@ export interface PlaylistQueueEntry {
  * The items the viewer can play, in the order the page shows them (`sort`
  * and `direction` as on the item page; a random order is `sort=random_<seed>`)
  */
+export interface GetPlaylistQueueQuery extends Record<
+  string,
+  string | undefined
+> {
+  sort?: string;
+  direction?: string;
+}
+
 export interface GetPlaylistQueueResponse {
   entries: PlaylistQueueEntry[];
 }

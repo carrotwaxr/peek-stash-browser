@@ -8,9 +8,10 @@
  * shared with) on A. The playlist list and the shared list preview the
  * first four items the viewer can see, each as a compact scene from that
  * item's own instance with its proxied screenshot, and count only those.
- * The playlist page attaches to every item the scene from that item's own
- * instance, with proxy paths served from it, and null for the scene the
- * viewer hid; it also carries the viewer's own rating of each scene.
+ * The playlist page lists the items the viewer can see, a page at a time,
+ * each with the scene from that item's own instance, with proxy paths
+ * served from it, and the viewer's own rating of each scene; the play queue
+ * lists the same items.
  *
  * Characterisation for the proxy URL helper: it passed before the playlist
  * handlers stopped re-running the old `transformScene` over the scene
@@ -52,7 +53,14 @@ interface ItemScene {
 interface PlaylistItemBody {
   sceneId: string;
   instanceId: string | null;
-  scene: ItemScene | null;
+  scene: ItemScene;
+}
+
+interface QueueEntryBody {
+  sceneId: string;
+  instanceId: string;
+  position: number;
+  scene: { title: string | null; paths: { screenshot: string | null } };
 }
 
 interface PlaylistBody {
@@ -235,35 +243,35 @@ describe("Playlist scenes (integration)", () => {
     await clearAccessFixture();
   }, 60000);
 
+  /** The items the viewer can see: every item but the GLOBAL they hid */
+  const visibleTo = (viewer: Viewer) =>
+    ITEMS.filter(
+      ([sceneId, instanceId]) =>
+        !(sceneId === FX_ID.GLOBAL && instanceId === viewer.hidGlobalOn)
+    );
+
   /**
-   * Every item with its own instance's scene, and null for the GLOBAL the
-   * viewer hid; the SAME items with their own instance's pictures.
+   * The items the viewer can see, each with its own instance's scene; the
+   * SAME items with their own instance's pictures.
    */
   function expectItemsFromTheirInstance(
     items: PlaylistItemBody[],
     viewer: Viewer
   ): void {
-    expect(items.map((i) => [i.sceneId, i.instanceId])).toEqual(
-      ITEMS.map(([sceneId, instanceId]) => [sceneId, instanceId])
-    );
     const title = (sceneId: string, instanceId: string) =>
       `${instanceId === FX.A ? "A" : "B"}-${sceneId}`;
     expect(
-      items.map((i) =>
-        i.scene === null
-          ? null
-          : {
-              id: i.scene.id,
-              instanceId: i.scene.instanceId,
-              title: i.scene.title,
-            }
-      )
+      items.map((i) => ({
+        id: i.scene.id,
+        instanceId: i.scene.instanceId,
+        title: i.scene.title,
+      }))
     ).toEqual(
-      ITEMS.map(([sceneId, instanceId]) =>
-        sceneId === FX_ID.GLOBAL && instanceId === viewer.hidGlobalOn
-          ? null
-          : { id: sceneId, instanceId, title: title(sceneId, instanceId) }
-      )
+      visibleTo(viewer).map(([sceneId, instanceId]) => ({
+        id: sceneId,
+        instanceId,
+        title: title(sceneId, instanceId),
+      }))
     );
 
     const same = items.slice(0, 2);
@@ -276,7 +284,7 @@ describe("Playlist scenes (integration)", () => {
       ]);
     }
     // The two instances' same scene id keeps two different pictures
-    const [first, second] = same.map((i) => must(i.scene).paths.screenshot);
+    const [first, second] = same.map((i) => i.scene.paths.screenshot);
     expect(first).not.toBe(second);
   }
 
@@ -319,18 +327,16 @@ describe("Playlist scenes (integration)", () => {
     viewer: Viewer
   ): void {
     expect(
-      items.map((i) =>
-        i.scene === null
-          ? null
-          : { rating100: i.scene.rating100, favorite: i.scene.favorite }
-      )
+      items.map((i) => ({
+        rating100: i.scene.rating100,
+        favorite: i.scene.favorite,
+      }))
     ).toEqual(
-      ITEMS.map(([sceneId, instanceId]) => {
-        if (sceneId === FX_ID.SAME) {
-          return viewer.sameRatings.get(instanceId) ?? UNRATED;
-        }
-        return instanceId === viewer.hidGlobalOn ? null : UNRATED;
-      })
+      visibleTo(viewer).map(([sceneId, instanceId]) =>
+        sceneId === FX_ID.SAME
+          ? (viewer.sameRatings.get(instanceId) ?? UNRATED)
+          : UNRATED
+      )
     );
   }
 
@@ -365,17 +371,53 @@ describe("Playlist scenes (integration)", () => {
     expect(playlist.sceneCount).toBe(3);
   });
 
-  it("GET /api/playlists/:id, for the owner and a recipient", async () => {
+  it("GET /api/playlists/:id without page answers page 1 of 50", async () => {
     for (const viewer of [owner, recipient]) {
       const res = await viewer.client.get<{
         playlist: PlaylistBody;
         totalItems: number;
+        page: number;
+        perPage: number;
       }>(`/api/playlists/${playlistId}`);
       expect(res.status).toBe(200);
       expectItemsFromTheirInstance(res.data.playlist.items, viewer);
       expectViewerRatings(res.data.playlist.items, viewer);
       expect(res.data.totalItems).toBe(3);
+      expect(res.data.page).toBe(1);
+      expect(res.data.perPage).toBe(50);
     }
+  });
+
+  it("GET /api/playlists/:id/queue for a recipient lists only their visible items", async () => {
+    const res = await recipient.client.get<{ entries: QueueEntryBody[] }>(
+      `/api/playlists/${playlistId}/queue`
+    );
+    expect(res.status).toBe(200);
+    expect(
+      res.data.entries.map((e) => [e.sceneId, e.instanceId, e.position])
+    ).toEqual(
+      visibleTo(recipient).map(([sceneId, instanceId], n) => [
+        sceneId,
+        instanceId,
+        n,
+      ])
+    );
+    // Each SAME entry with its own instance's screenshot, through the proxy
+    expect(
+      res.data.entries.slice(0, 2).map((e) => e.scene.paths.screenshot)
+    ).toEqual([FX.A, FX.B].map((inst) => must(expected.get(inst)).screenshot));
+  });
+
+  it("a user with no access gets 404 from the queue", async () => {
+    const stranger = await createApiUser("access_it_pl_stranger", PASSWORD);
+    const res = await stranger.client.get(`/api/playlists/${playlistId}/queue`);
+    expect(res.status).toBe(404);
+    // Nor may a recipient clear the owner's unavailable items
+    const removed = await recipient.client.post(
+      `/api/playlists/${playlistId}/items/remove-unavailable`,
+      {}
+    );
+    expect(removed.status).toBe(404);
   });
 
   it("GET /api/playlists/:id?page=2&per_page=2 pages what the viewer can see", async () => {
@@ -399,7 +441,7 @@ describe("Playlist scenes (integration)", () => {
         res.data.playlist.items.map((i) => [
           i.sceneId,
           i.instanceId,
-          must(i.scene).instanceId,
+          i.scene.instanceId,
         ])
       ).toEqual([[shown[0], shown[1], shown[1]]]);
       expect(res.data.totalItems).toBe(3);
@@ -410,7 +452,7 @@ describe("Playlist scenes (integration)", () => {
 
   it("GET /api/playlists/:id refuses an unknown or invalid paging parameter", async () => {
     const res = await owner.client.get(
-      `/api/playlists/${playlistId}?page=abc&sort=title`
+      `/api/playlists/${playlistId}?page=abc&sort=bogus`
     );
     expectRefused(res, ["page", "sort"]);
   });

@@ -5,6 +5,7 @@
  * - Remove a scene from a shared playlist
  * - Reorder scenes in a shared playlist
  * - Save a view sort as a shared playlist's order
+ * - Remove a shared playlist's unavailable items
  * - Rename/update a shared playlist
  * - Delete a shared playlist
  *
@@ -16,13 +17,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deletePlaylist,
   removeSceneFromPlaylist,
+  removeUnavailablePlaylistItems,
   reorderPlaylist,
   sortPlaylist,
   updatePlaylist,
 } from "../../controllers/playlist.js";
 import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
-import { sortPlaylistItems } from "../../services/PlaylistQueryService.js";
+import {
+  removeUnavailableItems,
+  sortPlaylistItems,
+} from "../../services/PlaylistQueryService.js";
 import type { SortPlaylistRequest } from "../../types/api/index.js";
 import {
   type Malformed,
@@ -48,6 +53,7 @@ vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
   sortPlaylistItems: vi.fn(),
+  removeUnavailableItems: vi.fn(),
 }));
 
 // Mock PermissionService
@@ -62,6 +68,7 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockSortPlaylistItems = vi.mocked(sortPlaylistItems);
+const mockRemoveUnavailable = vi.mocked(removeUnavailableItems);
 
 /** User IDs: owner = 1, shared user = 2 */
 const OWNER_ID = 1;
@@ -263,6 +270,49 @@ describe("Shared playlist authorization boundaries", () => {
         sort: { field: "random", direction: "DESC", seed: 7 },
       });
       expect(res._getOkBody()).toEqual({ success: true, itemCount: 6 });
+    });
+  });
+
+  describe("removeUnavailablePlaylistItems - owner only", () => {
+    const removeAs = (user: { id: number; username: string; role: string }) => {
+      const req = reqFor(removeUnavailablePlaylistItems, {
+        params: { id: "1" },
+        user,
+        allowedInstanceIds: ["instance-1"],
+      });
+      const res = resFor(removeUnavailablePlaylistItems);
+      return { run: () => removeUnavailablePlaylistItems(req, res), res };
+    };
+
+    it("a recipient's remove unavailable answers 404 and removes nothing", async () => {
+      const { run, res } = removeAs(SHARED_USER);
+
+      await run();
+
+      expect(mockPrisma.playlist.findFirst).toHaveBeenCalledWith({
+        where: { id: 1, userId: SHARED_USER_ID },
+        select: { id: true },
+      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(mockRemoveUnavailable).not.toHaveBeenCalled();
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      expect(mockPrisma.playlistItem.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("the owner's remove answers how many items went (control test)", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
+      mockRemoveUnavailable.mockResolvedValue(3);
+      const { run, res } = removeAs({
+        id: OWNER_ID,
+        username: "owner",
+        role: "USER",
+      });
+
+      await run();
+
+      expect(mockRemoveUnavailable).toHaveBeenCalledExactlyOnceWith(1);
+      expect(res._getOkBody()).toEqual({ removed: 3 });
     });
   });
 

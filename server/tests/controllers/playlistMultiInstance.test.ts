@@ -13,6 +13,7 @@ import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getPlaylist,
+  getPlaylistQueue,
   getSharedPlaylists,
   getUserPlaylists,
 } from "../../controllers/playlist.js";
@@ -21,15 +22,18 @@ import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import {
   type PlaylistPreviews,
+  countUnavailableItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
+  loadPlaylistQueue,
 } from "../../services/PlaylistQueryService.js";
 import type {
   PlaylistItemWithScene,
   PlaylistPreviewItem,
+  PlaylistQueueEntry,
 } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
-import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -48,6 +52,8 @@ vi.mock(
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(),
   loadPlaylistItems: vi.fn(),
+  loadPlaylistQueue: vi.fn(),
+  countUnavailableItems: vi.fn(),
 }));
 
 vi.mock("../../services/PlaylistAccessService.js", () => ({
@@ -66,6 +72,8 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockPreviews = vi.mocked(loadPlaylistPreviews);
 const mockItems = vi.mocked(loadPlaylistItems);
+const mockQueue = vi.mocked(loadPlaylistQueue);
+const mockUnavailable = vi.mocked(countUnavailableItems);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
@@ -99,7 +107,7 @@ function item(
   sceneId: string,
   instanceId: string,
   position: number,
-  scene: NormalizedScene | null
+  scene: NormalizedScene
 ): PlaylistItemWithScene {
   return {
     id,
@@ -186,17 +194,17 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(shared.sharedViaGroups).toEqual(["Group1"]);
   });
 
-  it("getPlaylist without page returns every item the service gives, with totalItems", async () => {
+  it("getPlaylist without page reads page 1 of 50, and the owner's unavailable count", async () => {
     const items = [
       item(20, "42", "inst-A", 0, sceneStub("42", "inst-A", "Scene from A")),
       item(21, "42", "inst-B", 1, sceneStub("42", "inst-B", "Scene from B")),
-      item(22, "43", "inst-A", 2, null),
     ];
     mockGetAccess.mockResolvedValueOnce({ level: "owner" });
     mockPrisma.playlist.findUnique.mockResolvedValueOnce(
       partialRow({ id: 3, userId: USER.id, name: "Detail Mixed" })
     );
     mockItems.mockResolvedValueOnce({ items, totalItems: 2 });
+    mockUnavailable.mockResolvedValueOnce(1);
 
     const req = reqFor(getPlaylist, {
       params: { id: "3" },
@@ -210,15 +218,21 @@ describe("Playlist reads through PlaylistQueryService", () => {
       userId: USER.id,
       allowedInstanceIds: ALLOWED,
       playlistId: 3,
-      paging: undefined,
+      paging: { page: 1, perPage: 50 },
       sort: { field: "position", direction: "ASC", seed: undefined },
+    });
+    expect(mockUnavailable).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 3,
     });
     const body = res._getOkBody();
     expect(body.playlist.items).toEqual(items);
     expect(body.playlist.name).toBe("Detail Mixed");
     expect(body.totalItems).toBe(2);
-    expect(body.page).toBeUndefined();
-    expect(body.perPage).toBeUndefined();
+    expect(body.unavailableItems).toBe(1);
+    expect(body.page).toBe(1);
+    expect(body.perPage).toBe(50);
     expect(body.sort).toBe("position");
     expect(body.direction).toBe("ASC");
     expect(body.isOwner).toBe(true);
@@ -253,6 +267,9 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(body.perPage).toBe(100);
     expect(body.accessLevel).toBe("shared");
     expect(body.sharedViaGroups).toEqual(["G"]);
+    // A recipient learns nothing of the items they cannot play
+    expect(body.unavailableItems).toBe(0);
+    expect(mockUnavailable).not.toHaveBeenCalled();
   });
 
   it("getPlaylist with an invalid page answers 400 through the central handler, before any read", async () => {
@@ -267,6 +284,65 @@ describe("Playlist reads through PlaylistQueryService", () => {
     await expect(getPlaylist(req, res)).rejects.toBeInstanceOf(ValidationError);
     expect(mockGetAccess).not.toHaveBeenCalled();
     expect(mockItems).not.toHaveBeenCalled();
+  });
+
+  it("getPlaylistQueue reads the viewer's queue in the request's sort", async () => {
+    const entries: PlaylistQueueEntry[] = [
+      {
+        sceneId: "42",
+        instanceId: "inst-B",
+        position: 0,
+        scene: {
+          title: "Scene from B",
+          paths: { screenshot: null },
+          files: [],
+          studio: null,
+        },
+      },
+    ];
+    mockGetAccess.mockResolvedValueOnce({ level: "shared", groups: ["G"] });
+    mockQueue.mockResolvedValueOnce(entries);
+
+    const req = reqFor(getPlaylistQueue, {
+      params: { id: "3" },
+      query: { sort: "random_7", direction: "DESC" },
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
+    const res = resFor(getPlaylistQueue);
+    await getPlaylistQueue(req, res);
+
+    expect(mockQueue).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 3,
+      sort: { field: "random", direction: "DESC", seed: 7 },
+    });
+    expect(res._getOkBody()).toEqual({ entries });
+  });
+
+  it("getPlaylistQueue answers 404 without reading when the viewer has no access, and refuses paging", async () => {
+    mockGetAccess.mockResolvedValueOnce({ level: "none" });
+    const req = reqFor(getPlaylistQueue, {
+      params: { id: "3" },
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
+    const res = resFor(getPlaylistQueue);
+    await getPlaylistQueue(req, res);
+    expect(res._getStatus()).toBe(404);
+    expect(mockQueue).not.toHaveBeenCalled();
+
+    const paged = reqFor(getPlaylistQueue, {
+      params: { id: "3" },
+      query: malformed({ page: "2" }),
+      user: USER,
+      allowedInstanceIds: ALLOWED,
+    });
+    await expect(
+      getPlaylistQueue(paged, resFor(getPlaylistQueue))
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(mockQueue).not.toHaveBeenCalled();
   });
 
   it("getPlaylist answers 404 without reading items when the viewer has no access", async () => {

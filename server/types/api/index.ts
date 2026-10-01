@@ -382,6 +382,7 @@ export type {
   DuplicatePlaylistResponse,
   GetUserPlaylistsQuery,
   PlaylistQueueEntry,
+  GetPlaylistQueueQuery,
   GetPlaylistQueueResponse,
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,

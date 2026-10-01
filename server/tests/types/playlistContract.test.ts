@@ -67,6 +67,16 @@ describe("playlist contract types", () => {
   it("a playlist response carries the sort, the page and the owner flags", () => {
     expectTypeOf<GetPlaylistResponse["isOwner"]>().toEqualTypeOf<boolean>();
     expectTypeOf<GetPlaylistResponse["totalItems"]>().toEqualTypeOf<number>();
+    // Always paged, and the owner's unavailable count (0 for anyone else)
+    expectTypeOf<GetPlaylistResponse["page"]>().toEqualTypeOf<number>();
+    expectTypeOf<GetPlaylistResponse["perPage"]>().toEqualTypeOf<number>();
+    expectTypeOf<
+      GetPlaylistResponse["unavailableItems"]
+    >().toEqualTypeOf<number>();
+    // Every listed item is one the viewer can see, with its scene
+    expectTypeOf<
+      GetPlaylistResponse["playlist"]["items"][number]["scene"]
+    >().not.toBeNullable();
     expectTypeOf<GetPlaylistResponse["playlist"]>().not.toHaveProperty(
       "isPublic"
     );

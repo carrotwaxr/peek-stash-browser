@@ -12,9 +12,14 @@
  * Every playlist's previews come from one statement driven by the playlist
  * ids (`json_each` with `CROSS JOIN`s, so SQLite looks each item and scene up
  * by key). A playlist's items go through `loadPlaylistItems`: a page of the
- * visible items in SQL in the view's sort (`orderTerms`), or every item in
- * position order without paging, and their scenes from the scene builder,
- * whose joins carry the viewer's own rating, favorite, O and play fields.
+ * visible items in SQL in the view's sort (`orderTerms`), or every visible
+ * item without paging (the zip's read), and their scenes from the scene
+ * builder, whose joins carry the viewer's own rating, favorite, O and play
+ * fields. The play queue (`loadPlaylistQueue`) is every visible item in the
+ * same order, in one statement, with the few fields the player's sidebar
+ * shows. Nobody is told about the items they cannot see, except the owner,
+ * who gets their count (`countUnavailableItems`) and can remove the ones
+ * deleted from Stash (`removeUnavailableItems`).
  *
  * Adds go through `appendItems`: the scenes the adder can see, numbered
  * after the playlist's last item inside the insert itself. "Save as
@@ -25,11 +30,13 @@ import prisma from "../prisma/singleton.js";
 import type {
   PlaylistItemWithScene,
   PlaylistPreviewItem,
+  PlaylistQueueEntry,
 } from "../types/api/index.js";
 import type { NormalizedScene } from "../types/index.js";
 import type {
   PlaylistItemQueryRow,
   PlaylistPreviewQueryRow,
+  PlaylistQueueQueryRow,
 } from "../types/internal/queryRows.js";
 import type { ParsedPlaylistItemSort } from "../types/parsedFilters.js";
 import { dbWrite } from "../utils/dbWrite.js";
@@ -46,7 +53,7 @@ import {
   instanceColumnClause,
 } from "../utils/sqlClauses.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
-import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { extractBasename, getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { getVisibleEntityKeys } from "./EntityAccessService.js";
 import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
 
@@ -85,24 +92,30 @@ export interface LoadPlaylistItemsOptions {
   /** `getUserAllowedInstanceIds`: none means nothing is visible */
   readonly allowedInstanceIds: readonly string[];
   readonly playlistId: number;
-  /** A page of the items the viewer can see; every item when absent */
+  /** A page of the items the viewer can see; every one when absent */
   readonly paging?: PlaylistItemsPaging | undefined;
-  /**
-   * The page's order; position ASC when absent. Every item without paging
-   * comes in position order whatever this says.
-   */
+  /** The items' order; position ASC when absent */
   readonly sort?: ParsedPlaylistItemSort | undefined;
 }
 
 export interface PlaylistItems {
-  /**
-   * With paging, the page's visible items, each with its scene. Without,
-   * every item in position order, with null for a scene the viewer cannot
-   * see.
-   */
+  /** The page's visible items (every one without paging), each with its scene */
   readonly items: PlaylistItemWithScene[];
   /** How many of the playlist's items the viewer can see */
   readonly totalItems: number;
+}
+
+/** One playlist as one viewer sees it */
+export interface PlaylistViewerOptions {
+  readonly userId: number;
+  /** `getUserAllowedInstanceIds`: none means nothing is visible */
+  readonly allowedInstanceIds: readonly string[];
+  readonly playlistId: number;
+}
+
+export interface LoadPlaylistQueueOptions extends PlaylistViewerOptions {
+  /** The order the item page shows (`orderTerms`) */
+  readonly sort: ParsedPlaylistItemSort;
 }
 
 const NO_PREVIEWS: PlaylistPreviews = { items: [], visibleCount: 0 };
@@ -464,39 +477,18 @@ async function loadItemScenes(
 }
 
 /**
- * A playlist's items with their scenes, as the viewer sees them. The one
- * read of a playlist's items: a page comes in the view's sort
- * (`orderTerms`), whose joins only the page statement takes; the count
- * reads the visible items alone.
+ * The statement's FROM and WHERE over playlist `playlistId`'s items the
+ * viewer can see (`pi`, its scene `s`), with these joins after the
+ * visibility join
  */
-export async function loadPlaylistItems(
-  options: LoadPlaylistItemsOptions
-): Promise<PlaylistItems> {
-  const { userId, allowedInstanceIds, playlistId, paging } = options;
-  const sort = options.sort ?? POSITION_ASC;
-
-  if (paging === undefined) {
-    // Every item, as the playlist page has always read them
-    const rows = await prisma.playlistItem.findMany({
-      where: { playlistId },
-      orderBy: [{ position: "asc" }, { id: "asc" }],
-    });
-    const scenes = await loadItemScenes(userId, allowedInstanceIds, rows);
-    const items = rows.map((row) => ({
-      ...row,
-      scene: scenes.get(entityKey(row.sceneId, row.instanceId)) ?? null,
-    }));
-    return {
-      items,
-      totalItems: items.filter((item) => item.scene !== null).length,
-    };
-  }
-
-  if (allowedInstanceIds.length === 0) return { items: [], totalItems: 0 };
-
+function visibleItemsFrom(
+  userId: number,
+  allowedInstanceIds: readonly string[],
+  playlistId: number,
+  joins: readonly SqlFragment[]
+): SqlFragment {
   const { join, where } = visibleItem(userId, allowedInstanceIds);
-  const { joins: sortJoins, order } = orderTerms(userId, sort);
-  const fromWith = (joins: readonly SqlFragment[]) => ({
+  return {
     sql: `FROM PlaylistItem pi
 ${[join, ...joins].map((j) => j.sql).join("\n")}
 WHERE pi.playlistId = ? AND ${where.sql}`,
@@ -506,33 +498,189 @@ WHERE pi.playlistId = ? AND ${where.sql}`,
       playlistId,
       ...where.params,
     ],
-  });
+  };
+}
 
-  const counted = fromWith([]);
-  const countRows = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-    `SELECT COUNT(*) AS total ${counted.sql}`,
-    ...counted.params
+/**
+ * A playlist's items with their scenes, as the viewer sees them. The one
+ * read of a playlist's items: a page comes in the view's sort
+ * (`orderTerms`), whose joins only the page statement takes, and the count
+ * reads the visible items alone. Without paging (the zip's read), every
+ * visible item in the sort, with no count.
+ */
+export async function loadPlaylistItems(
+  options: LoadPlaylistItemsOptions
+): Promise<PlaylistItems> {
+  const { userId, allowedInstanceIds, playlistId, paging } = options;
+  const sort = options.sort ?? POSITION_ASC;
+  if (allowedInstanceIds.length === 0) return { items: [], totalItems: 0 };
+
+  let totalItems: number | undefined;
+  if (paging !== undefined) {
+    const counted = visibleItemsFrom(
+      userId,
+      allowedInstanceIds,
+      playlistId,
+      []
+    );
+    const countRows = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
+      `SELECT COUNT(*) AS total ${counted.sql}`,
+      ...counted.params
+    );
+    totalItems = Number(countRows[0]?.total ?? 0n);
+  }
+
+  const { joins: sortJoins, order } = orderTerms(userId, sort);
+  const from = visibleItemsFrom(
+    userId,
+    allowedInstanceIds,
+    playlistId,
+    sortJoins
   );
-  const totalItems = Number(countRows[0]?.total ?? 0n);
-
-  const paged = fromWith(sortJoins);
+  const limit =
+    paging === undefined
+      ? { sql: "", params: [] }
+      : {
+          sql: "\nLIMIT ? OFFSET ?",
+          params: [paging.perPage, (paging.page - 1) * paging.perPage],
+        };
   const rows = await prisma.$queryRawUnsafe<PlaylistItemQueryRow[]>(
     `SELECT pi.id, pi.playlistId, pi.sceneId, pi.instanceId, pi.position, pi.addedAt
-${paged.sql}
-ORDER BY ${order.sql}
-LIMIT ? OFFSET ?`,
-    ...paged.params,
+${from.sql}
+ORDER BY ${order.sql}${limit.sql}`,
+    ...from.params,
     ...order.params,
-    paging.perPage,
-    (paging.page - 1) * paging.perPage
+    ...limit.params
   );
-  if (rows.length === 0) return { items: [], totalItems };
+  if (rows.length === 0) return { items: [], totalItems: totalItems ?? 0 };
 
   const scenes = await loadItemScenes(userId, allowedInstanceIds, rows);
-  // A scene hidden since the page statement leaves its item out
+  // A scene hidden since the statement leaves its item out
   const items = rows.flatMap((row) => {
     const scene = scenes.get(entityKey(row.sceneId, row.instanceId));
     return scene ? [{ ...row, scene }] : [];
   });
-  return { items, totalItems };
+  return { items, totalItems: totalItems ?? items.length };
+}
+
+/**
+ * A scene's studio name, when the viewer may see the studio: live, on the
+ * scene's instance, with no exclusion row for the viewer (a ref the viewer
+ * cannot see is left out). `NOT EXISTS`, not a joined anti-join, since the
+ * row stays either way and two exclusion rows (global and scoped) would
+ * double it.
+ */
+function visibleStudioJoin(userId: number): SqlFragment {
+  return {
+    sql: `LEFT JOIN StashStudio qst ON qst.id = s.studioId AND qst.stashInstanceId = s.stashInstanceId AND qst.deletedAt IS NULL
+  AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity qse WHERE qse.userId = ? AND qse.entityType = 'studio' AND qse.entityId = qst.id AND (qse.instanceId = '' OR qse.instanceId = qst.stashInstanceId))`,
+    params: [userId],
+  };
+}
+
+/**
+ * The play queue (item 86, item 47): every item of the playlist the viewer
+ * can see, in the order the item page shows under `sort` (`orderTerms`),
+ * in one statement, each as the player's entry: `position` is its index in
+ * that order, the title falls back to the file name, the screenshot goes
+ * through the proxy with the instance, and the studio's name only when the
+ * viewer may see the studio. No cap: about 350 bytes an entry (0.67 MB for
+ * 1,900 entries).
+ */
+export async function loadPlaylistQueue(
+  options: LoadPlaylistQueueOptions
+): Promise<PlaylistQueueEntry[]> {
+  const { userId, allowedInstanceIds, playlistId, sort } = options;
+  if (allowedInstanceIds.length === 0) return [];
+
+  const { joins: sortJoins, order } = orderTerms(userId, sort);
+  const from = visibleItemsFrom(userId, allowedInstanceIds, playlistId, [
+    ...sortJoins,
+    visibleStudioJoin(userId),
+  ]);
+  const rows = await prisma.$queryRawUnsafe<PlaylistQueueQueryRow[]>(
+    `SELECT pi.sceneId, pi.instanceId, s.title, s.filePath, s.pathScreenshot, s.duration, qst.name AS studioName
+${from.sql}
+ORDER BY ${order.sql}`,
+    ...from.params,
+    ...order.params
+  );
+
+  return rows.map((row, position) => ({
+    sceneId: row.sceneId,
+    instanceId: row.instanceId,
+    position,
+    scene: {
+      title: emptyToNull(row.title) ?? getSceneFallbackTitle(row.filePath),
+      paths: { screenshot: toProxyUrl(row.pathScreenshot, row.instanceId) },
+      files:
+        row.filePath === null
+          ? []
+          : [
+              {
+                duration: row.duration,
+                basename: extractBasename(row.filePath),
+              },
+            ],
+      studio: row.studioName === null ? null : { name: row.studioName },
+    },
+  }));
+}
+
+/**
+ * How many of the playlist's items the viewer cannot play: its rows minus
+ * the visible ones (hidden, restricted, deleted from Stash, or on an
+ * instance the viewer does not use), one `COUNT(*)` per side in one
+ * statement. Only the owner is told (owner answer, 2026-09-30).
+ */
+export async function countUnavailableItems(
+  options: PlaylistViewerOptions
+): Promise<number> {
+  const { userId, allowedInstanceIds, playlistId } = options;
+  let visible: SqlFragment = { sql: "0", params: [] };
+  if (allowedInstanceIds.length > 0) {
+    const from = visibleItemsFrom(userId, allowedInstanceIds, playlistId, []);
+    visible = { sql: `(SELECT COUNT(*) ${from.sql})`, params: from.params };
+  }
+  const rows = await prisma.$queryRawUnsafe<
+    { total: bigint; visible: bigint }[]
+  >(
+    `SELECT (SELECT COUNT(*) FROM PlaylistItem WHERE playlistId = ?) AS total, ${visible.sql} AS visible`,
+    playlistId,
+    ...visible.params
+  );
+  const row = rows[0];
+  if (row === undefined) return 0;
+  return Math.max(0, Number(row.total) - Number(row.visible));
+}
+
+/**
+ * The items whose scene is deleted from Stash: the cached row is
+ * soft-deleted, or there is none while the item's instance is enabled and
+ * synced (sync purged it; a first sync has no rows yet). Items hidden,
+ * restricted, or on a deselected or disabled instance are not, since they
+ * may come back; nor is an item with no instance.
+ */
+const REMOVE_UNAVAILABLE_SQL = `DELETE FROM PlaylistItem
+WHERE playlistId = ? AND (
+  EXISTS (SELECT 1 FROM StashScene s WHERE s.id = PlaylistItem.sceneId AND s.stashInstanceId = PlaylistItem.instanceId AND s.deletedAt IS NOT NULL)
+  OR (
+    NOT EXISTS (SELECT 1 FROM StashScene s WHERE s.id = PlaylistItem.sceneId AND s.stashInstanceId = PlaylistItem.instanceId)
+    AND EXISTS (SELECT 1 FROM StashInstance i WHERE i.id = PlaylistItem.instanceId AND i.enabled = 1 AND i.firstSyncedAt IS NOT NULL)
+  )
+)`;
+
+/**
+ * "Remove unavailable" (owner answer, 2026-09-30): deletes the playlist's
+ * items whose scene is deleted from Stash, in one statement in one write
+ * unit; the rest keep their positions (a gap is harmless: every read orders
+ * by position, then id). The caller has checked the requester owns the
+ * playlist. Answers how many items went.
+ */
+export async function removeUnavailableItems(
+  playlistId: number
+): Promise<number> {
+  return dbWrite("playlist.removeUnavailable", () =>
+    prisma.$executeRawUnsafe(REMOVE_UNAVAILABLE_SQL, playlistId)
+  );
 }

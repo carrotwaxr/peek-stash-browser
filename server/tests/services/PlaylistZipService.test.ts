@@ -14,6 +14,7 @@ import type { NormalizedScene } from "../../types/index.js";
 import { downloadRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
+import { malformedRow } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -81,12 +82,16 @@ function scene(
   });
 }
 
-/** A playlist item holding `visible`, or one its reader cannot see (null) */
+/**
+ * A playlist item holding `visible`, or one its reader cannot see (null):
+ * the reader lists visible items only, so a null scene is a row it cannot
+ * return, for the zip's guard
+ */
 function item(
   position: number,
   visible: NormalizedScene | null
 ): PlaylistItemWithScene {
-  return partialRow<PlaylistItemWithScene>({
+  return malformedRow<PlaylistItemWithScene>({
     playlistId: 3,
     sceneId: visible?.id ?? `hidden-${position}`,
     instanceId: visible?.instanceId ?? "inst-a",
@@ -112,7 +117,8 @@ function arrange(playlistName: string, items: PlaylistItemWithScene[]) {
   mockAllowedInstanceIds.mockResolvedValue(["inst-a"]);
   mockLoadPlaylistItems.mockResolvedValue({
     items,
-    totalItems: items.filter((i) => i.scene !== null).length,
+    // The zip reads the items alone
+    totalItems: items.length,
   });
 }
 

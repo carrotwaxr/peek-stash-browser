@@ -212,14 +212,10 @@ export interface ParsedPlaylistItemSort {
 /** `GET /api/playlists/:id` */
 export interface ParsedPlaylistItemsQuery {
   /**
-   * One page of the items the viewer can see: page >= 1, perPage
-   * 1..PLAYLIST_ITEMS_PER_PAGE_MAX (50 when absent). Undefined when the
-   * request sends none of `page`, `per_page`, `sort` and `direction`:
-   * every item, in position order.
+   * One page of the items the viewer can see: page >= 1 (1 when absent),
+   * perPage 1..PLAYLIST_ITEMS_PER_PAGE_MAX (50 when absent)
    */
-  readonly paging:
-    | { readonly page: number; readonly perPage: number }
-    | undefined;
+  readonly paging: { readonly page: number; readonly perPage: number };
   /** Position ASC when the request names none */
   readonly sort: ParsedPlaylistItemSort;
 }
