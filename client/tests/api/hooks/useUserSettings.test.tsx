@@ -121,6 +121,35 @@ describe("useUserSettings", () => {
     expect(settingsRequests()).toBe(1);
   });
 
+  it("a save before the first read answers still loads the settings, with the save in them", async () => {
+    // The first read is slow; the server holds the save by the next one
+    let answerFirst: (value: unknown) => void = () => {};
+    mockApiGet.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answerFirst = resolve;
+      })
+    );
+    mockApiGet.mockResolvedValue(
+      userSettingsResponse({ wallPlayback: "hover" })
+    );
+    render(
+      <SignedInWithQuery>
+        <Reader name="a" />
+        <SaveHover />
+      </SignedInWithQuery>
+    );
+    await waitFor(() => expect(settingsRequests()).toBe(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save hover" }));
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
+    answerFirst(userSettingsResponse({ wallPlayback: "static" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("a")).toHaveTextContent("hover")
+    );
+    expect(settingsRequests()).toBe(2);
+  });
+
   it("asks nothing while signed out", async () => {
     render(
       <SignedInWithQuery signedIn={false}>

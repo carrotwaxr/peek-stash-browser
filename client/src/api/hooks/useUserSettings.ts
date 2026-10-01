@@ -49,7 +49,9 @@ function applyPatch(
  * the settings cache at once, so every reader updates before the server
  * answers. A refused save refetches the settings, so every reader shows the
  * server's value again; refetching, rather than restoring a snapshot, keeps
- * two overlapping saves correct.
+ * two overlapping saves correct. A save made before the first read answered
+ * cancels that read (it may carry the value from before the save) and reads
+ * again once the save settles, so the settings still load.
  */
 export function useUpdateUserSettings() {
   const queryClient = useQueryClient();
@@ -58,14 +60,21 @@ export function useUpdateUserSettings() {
       apiPut<UpdateUserSettingsResponse>("/user/settings", patch),
     onMutate: async (patch) => {
       const queryKey = queryKeys.user.settings();
+      const loaded = queryClient.getQueryData(queryKey) !== undefined;
       // A read in flight may carry the value from before this save
       await queryClient.cancelQueries({ queryKey });
       queryClient.setQueryData<GetUserSettingsResponse>(
         queryKey,
         (old) => old && { settings: applyPatch(old.settings, patch) }
       );
+      return { loaded };
     },
-    onError: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.user.settings() }),
+    // Refused, or nothing loaded to patch: read the server's settings
+    onSettled: (_data, error, _patch, context) =>
+      error || !context?.loaded
+        ? queryClient.invalidateQueries({
+            queryKey: queryKeys.user.settings(),
+          })
+        : undefined,
   });
 }
