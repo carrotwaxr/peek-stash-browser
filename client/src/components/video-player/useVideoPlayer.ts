@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import airplay from "@silvermine/videojs-airplay";
-import "@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css";
-import chromecast from "@silvermine/videojs-chromecast";
-import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
@@ -26,10 +22,6 @@ import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
 import "./plugins/vrmode.js";
 import "./plugins/media-session.js";
-
-// Register Video.js plugins
-airplay(videojs);
-chromecast(videojs);
 
 /**
  * Build a scene's stream URL on the scene's own instance
@@ -157,7 +149,6 @@ export function useVideoPlayer({
   initialResumeTimeRef,
   watchHistory,
   loadingWatchHistory,
-  enableCast = true,
   minimumPlayPercent = 20,
 }: {
   videoRef: React.RefObject<HTMLDivElement | null>;
@@ -178,7 +169,6 @@ export function useVideoPlayer({
   initialResumeTimeRef: React.RefObject<number | null>;
   watchHistory: any;
   loadingWatchHistory: boolean;
-  enableCast?: boolean;
   minimumPlayPercent?: number;
 }) {
   // The scene's id with its instance: two servers reuse small ids, so
@@ -236,7 +226,7 @@ export function useVideoPlayer({
       playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
       inactivityTimeout: 2000,
       userActions: { hotkeys },
-      techOrder: enableCast ? ["chromecast", "html5"] : ["html5"],
+      techOrder: ["html5"],
       html5: {
         vhs: {
           overrideNative: !videojs.browser.IS_SAFARI,
@@ -250,8 +240,6 @@ export function useVideoPlayer({
         nativeVideoTracks: false,
       },
       plugins: {
-        ...(enableCast && { airPlay: {} }),
-        ...(enableCast && { chromecast: {} }),
         vttThumbnails: {
           showTimestamp: true,
           spriteUrl: scene?.paths?.sprite || null,

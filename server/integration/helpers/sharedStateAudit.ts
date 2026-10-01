@@ -58,7 +58,6 @@ async function snapshot(): Promise<Snapshot> {
       preferredPlaybackMode: true,
       preferredPreviewQuality: true,
       wallPlayback: true,
-      enableCast: true,
       unitPreference: true,
       lightboxDoubleTapAction: true,
       minimumPlayPercent: true,

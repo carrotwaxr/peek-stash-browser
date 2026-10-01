@@ -70,16 +70,6 @@ declare module "videojs-vtt.js" {
   };
 }
 
-declare module "@silvermine/videojs-airplay" {
-  const plugin: (videojs: any) => void;
-  export default plugin;
-}
-
-declare module "@silvermine/videojs-chromecast" {
-  const plugin: (videojs: any) => void;
-  export default plugin;
-}
-
 declare module "videojs-vr" {
   // Side-effect import only — registers itself on the player prototype
 }

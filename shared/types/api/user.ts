@@ -122,7 +122,6 @@ export interface GetUserSettingsResponse {
     preferredQuality: string;
     preferredPlaybackMode: string;
     preferredPreviewQuality: string | null;
-    enableCast: boolean;
     theme: string;
     carouselPreferences: CarouselPreference[];
     navPreferences: NavPreference[] | null;
@@ -151,7 +150,6 @@ export interface UpdateUserSettingsBody {
   preferredQuality?: string;
   preferredPlaybackMode?: string;
   preferredPreviewQuality?: string;
-  enableCast?: boolean;
   theme?: string;
   carouselPreferences?: CarouselPreference[];
   navPreferences?: NavPreference[];

@@ -28,7 +28,6 @@ vi.mock("../../../../src/utils/toast", () => ({
 const STORED = {
   preferredQuality: "720p",
   preferredPlaybackMode: "direct",
-  enableCast: false,
   minimumPlayPercent: 50,
 };
 
@@ -102,5 +101,20 @@ describe("PlaybackTab", () => {
     );
     expect(showSuccess).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Save Settings" })).toBeEnabled();
+  });
+
+  it("the Playback tab offers no casting toggle", async () => {
+    mockApiGet.mockResolvedValue({ settings: STORED });
+    mockApiPut.mockResolvedValue({ success: true });
+    render(<PlaybackTab />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save Settings" })
+    );
+
+    expect(screen.queryByText(/Chromecast|AirPlay/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Chromecast|AirPlay/)).toBeNull();
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
+    expect(mockApiPut.mock.calls[0]?.[1]).not.toHaveProperty("enableCast");
   });
 });

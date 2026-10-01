@@ -10,7 +10,6 @@ export const userSettingsResponse = (
     preferredQuality: "auto",
     preferredPlaybackMode: "auto",
     preferredPreviewQuality: null,
-    enableCast: true,
     theme: "dark",
     carouselPreferences: [],
     navPreferences: null,
