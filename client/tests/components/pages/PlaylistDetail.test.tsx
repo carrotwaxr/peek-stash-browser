@@ -32,6 +32,7 @@ import {
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { usePlaylists } from "@/api/hooks/usePlaylists";
 import PlaylistDetail from "@/components/pages/PlaylistDetail";
 import type * as uiModule from "@/components/ui/index";
 import { showError, showSuccess, showWarning } from "@/utils/toast";
@@ -224,6 +225,9 @@ function serve(server: Server): ApiStub {
       jsonResponse(200, { success: true, itemCount: 3 }),
     "/downloads/playlist/5": () =>
       jsonResponse(200, { download: { id: 1, status: "PENDING" } }),
+    "/playlists": () => jsonResponse(200, { playlists: [] }),
+    "/playlists/5/duplicate": () =>
+      jsonResponse(201, { playlist: { id: 9, name: "Mine (copy)" } }),
   });
   return fetchMock;
 }
@@ -268,10 +272,11 @@ function SceneProbe() {
   return <p>Scene page {location.pathname}</p>;
 }
 
-function renderPage(entry = "/playlist/5") {
+function renderPage(entry = "/playlist/5", beside?: ReactNode) {
   return render(
     <MemoryRouterWithQuery initialEntries={[entry]}>
       <SignedIn>
+        {beside}
         <Routes>
           <Route
             path="/playlist/:playlistId"
@@ -525,6 +530,37 @@ describe("PlaylistDetail pages and sort", () => {
       // One queue: every row starts the same one, at its own index
       expect(queue.key).toBe(first.key);
     }
+  });
+});
+
+describe("PlaylistDetail duplicate", () => {
+  /** The Playlists page's read, mounted beside the detail page */
+  function PlaylistsReader() {
+    usePlaylists();
+    return null;
+  }
+
+  it("a duplicate refreshes the user's playlists list", async () => {
+    serve({
+      page: () =>
+        playlistPage([item(1, "1")], { isOwner: false, accessLevel: "shared" }),
+      queue: { entries: [] },
+      permissions: {},
+    });
+    renderPage("/playlist/5", <PlaylistsReader />);
+    await waitFor(() =>
+      expect(requestsTo(fetchMock, "/playlists")).toHaveLength(1)
+    );
+
+    fireEvent.click(await screen.findByTitle("Duplicate to My Playlists"));
+
+    await waitFor(() =>
+      expect(requestsTo(fetchMock, "/playlists/5/duplicate")).toHaveLength(1)
+    );
+    await waitFor(() =>
+      expect(requestsTo(fetchMock, "/playlists")).toHaveLength(2)
+    );
+    expect(vi.mocked(showSuccess)).toHaveBeenCalledWith("Playlist duplicated!");
   });
 });
 

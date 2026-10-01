@@ -16,6 +16,7 @@ import {
   addScenesToPlaylist,
   createPlaylist,
   deletePlaylist,
+  duplicatePlaylist,
   getPlaylist,
   getPlaylistQueue,
   getPlaylists,
@@ -107,6 +108,13 @@ function usePlaylistMutation<TVariables, TData>(
 export function useCreatePlaylist() {
   return usePlaylistMutation((body: CreatePlaylistRequest) =>
     createPlaylist(body)
+  );
+}
+
+/** Copy a playlist the viewer can see into their own playlists */
+export function useDuplicatePlaylist() {
+  return usePlaylistMutation(({ playlistId }: { playlistId: number }) =>
+    duplicatePlaylist(playlistId)
   );
 }
 
