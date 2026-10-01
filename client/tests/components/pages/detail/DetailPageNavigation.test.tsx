@@ -17,6 +17,7 @@ import {
   type Answer,
   type DetailType,
   bodiesTo,
+  cleanupDetailPage,
   listResponse,
   navigateTo,
   renderDetailPage,
@@ -52,7 +53,7 @@ beforeEach(() => {
   cardSettings.current = { showRating: true };
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
 });
 
 const TYPES: DetailType[] = ["performer", "studio", "tag", "group", "gallery"];

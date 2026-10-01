@@ -21,6 +21,7 @@ import {
 import {
   type DetailPageOptions,
   bodiesTo,
+  cleanupDetailPage,
   currentPath,
   currentSearch,
   lastBody,
@@ -125,8 +126,9 @@ const findToggle = () =>
   screen.findByRole("checkbox", { name: /Include sub-tags/ });
 
 /** Waits for the counts to have answered and the tabs to show them */
+/** The statistics show the counts (the card is there before they answer) */
 const countsShown = () =>
-  waitFor(() => expect(screen.getByText("Statistics")).toBeInTheDocument());
+  waitFor(() => expect(screen.getByText("Scenes:")).toBeInTheDocument());
 
 const TABS = [
   "scenes",
@@ -142,7 +144,7 @@ beforeEach(() => {
   counts = ALL_COUNTS;
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
 });
 
 describe("TagDetail: Include sub-tags", () => {
@@ -230,10 +232,9 @@ describe("TagDetail: counts", () => {
     counts = "loading";
     const { api } = renderPage("");
 
-    await waitFor(() =>
-      expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/)
-    );
-    expect(requestsTo(api, COUNTS_PATH)).toHaveLength(1);
+    // The counts are asked in an effect after the render that shows the tabs
+    await waitFor(() => expect(requestsTo(api, COUNTS_PATH)).toHaveLength(1));
+    expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/);
     expect(tabButton("Galleries")).toHaveTextContent(/^Galleries$/);
     expect(sceneSearch).not.toHaveBeenCalled();
     expect(grids.GalleryGrid).not.toHaveBeenCalled();

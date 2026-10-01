@@ -3,7 +3,7 @@
  * gender icon, the link to Stash and the rating and favorite controls the
  * viewer keeps on; and the gallery's own subtitle and slideshow button.
  */
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auth,
@@ -14,6 +14,7 @@ import {
 import {
   type DetailType,
   bodiesTo,
+  cleanupDetailPage,
   renderDetailPage,
 } from "./renderDetailPage";
 
@@ -66,7 +67,7 @@ beforeEach(() => {
   cardSettings.current = { showFavorite: true, showRating: true };
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
 });
 
 describe.each(PAGES)("$type page header", ({ type, unnamed }) => {
@@ -100,8 +101,7 @@ describe.each(PAGES)("$type page header", ({ type, unnamed }) => {
       "href",
       "http://stash.test/thing/5"
     );
-    cleanup();
-    vi.unstubAllGlobals();
+    cleanupDetailPage();
 
     render({ stashUrl: undefined });
     await heading();

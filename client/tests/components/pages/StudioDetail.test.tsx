@@ -15,6 +15,7 @@ import {
 import {
   type DetailPageOptions,
   bodiesTo,
+  cleanupDetailPage,
   currentSearch,
   lastBody,
   renderDetailPage,
@@ -116,7 +117,7 @@ beforeEach(() => {
   counts = ALL_COUNTS;
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
 });
 
 describe("StudioDetail: Include sub-studios", () => {
