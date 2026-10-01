@@ -95,6 +95,7 @@ function serializeDownload({
   filePath: string | null;
   progress: number;
   error: string | null;
+  skippedItems: number;
   createdAt: Date;
   completedAt: Date | null;
   expiresAt: Date | null;

@@ -534,6 +534,8 @@ model Download {
   filePath    String?        // Server path to completed zip (playlists only)
   progress    Int            @default(0) // 0-100
   error       String?
+  // Playlist zips: scenes left out because they could not be fetched when it was built
+  skippedItems Int           @default(0)
 
   createdAt   DateTime       @default(now())
   completedAt DateTime?

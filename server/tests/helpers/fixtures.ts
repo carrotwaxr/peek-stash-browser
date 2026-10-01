@@ -118,6 +118,7 @@ export function downloadRow(overrides: Partial<Download> = {}): Download {
     filePath: null,
     progress: 100,
     error: null,
+    skippedItems: 0,
     createdAt: new Date(),
     completedAt: new Date(),
     expiresAt: null,

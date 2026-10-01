@@ -14,6 +14,7 @@ import {
   uniqueFileName,
 } from "../utils/contentDisposition.js";
 import {
+  NOTHING_FETCHED,
   NOTHING_TO_DOWNLOAD,
   PLAYLIST_NOT_FOUND,
   ZIP_FAILED,
@@ -24,7 +25,11 @@ import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { StashTimeoutError, fetchFromStash } from "../utils/streamProxy.js";
 import { downloadService } from "./DownloadService.js";
 import { loadPlaylistItems } from "./PlaylistQueryService.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
+import {
+  type StashCredentials,
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "./StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "./UserInstanceService.js";
 
 /** How long a zip waits on Stash for each scene's file */
@@ -135,11 +140,67 @@ export class PlaylistZipService {
   }
 
   /**
+   * One scene's file from the Stash instance it lives on, or null when it
+   * cannot be fetched now and is left out: its instance is no longer loaded
+   * (disabled or deleted since the list was read), or Stash answers 404 or
+   * 410 (deleted since the last sync). Any other refusal throws, and the
+   * zip fails.
+   */
+  private async fetchScene(
+    scene: NormalizedScene,
+    signal: AbortSignal
+  ): Promise<WebReadableStream | null> {
+    let credentials: StashCredentials;
+    try {
+      credentials = stashInstanceManager.getCredentials(scene.instanceId);
+    } catch (error) {
+      if (!(error instanceof UnknownInstanceError)) throw error;
+      logger.info(`Playlist zip leaves out a scene on an unloaded instance`, {
+        sceneId: scene.id,
+        instanceId: scene.instanceId,
+      });
+      return null;
+    }
+    const streamUrl = `${credentials.baseUrl}/scene/${scene.id}/stream`;
+
+    logger.debug(`Fetching video from Stash`, {
+      sceneId: scene.id,
+      instanceId: scene.instanceId,
+    });
+
+    const { response, abort } = await fetchFromStash(streamUrl, {
+      apiKey: credentials.apiKey,
+      signal,
+      headersTimeoutMs: this.timeouts.headersTimeoutMs,
+    });
+
+    if (response.status === 404 || response.status === 410) {
+      await response.body?.cancel().catch(() => undefined);
+      logger.info(`Playlist zip leaves out a scene Stash no longer has`, {
+        sceneId: scene.id,
+        instanceId: scene.instanceId,
+        status: response.status,
+      });
+      return null;
+    }
+    if (!response.ok || !response.body) {
+      abort.abort();
+      throw new Error(
+        `Failed to fetch video for scene ${scene.id}: ${response.status} ${response.statusText}`
+      );
+    }
+    return response.body as WebReadableStream;
+  }
+
+  /**
    * Builds a download's zip, one entry at a time: each scene is fetched
-   * only once the previous file is in the archive. Any failure (Stash,
-   * the disk, the size cap, `options.signal`) aborts the fetch, the archive
-   * and the file, removes the partial file and marks the download FAILED
-   * with a fixed reason; it never throws for one.
+   * only once the previous file is in the archive. A scene that cannot be
+   * fetched now (Stash answers 404 or 410, or its instance is no longer
+   * loaded) is left out and counted in `skippedItems`; when that leaves
+   * nothing, the download fails with NOTHING_FETCHED. Any other failure
+   * (Stash, the disk, the size cap, `options.signal`) aborts the fetch, the
+   * archive and the file, removes the partial file and marks the download
+   * FAILED with a fixed reason; it never throws for one.
    */
   async createZip(
     downloadId: number,
@@ -244,9 +305,24 @@ export class PlaylistZipService {
     }> = [];
     // Each scene's file names, so two same-title scenes get two entries
     const takenNames = new Set<string>();
+    // Scenes left out because they could not be fetched
+    let skipped = 0;
 
     try {
       for (const scene of scenes) {
+        logger.debug(`Processing scene for zip`, {
+          sceneId: scene.id,
+          title: scene.title,
+        });
+
+        // Fetch first: a scene that cannot be fetched gets no NFO either
+        const stashBody = await this.fetchScene(scene, job.signal);
+        if (!stashBody) {
+          skipped++;
+          await progress.skipped(scene, bytesWritten);
+          continue;
+        }
+
         // The title Peek shows (the title, else the file name), else the id
         const sceneTitle = scene.title ?? scene.id;
         const sanitizedTitle = uniqueFileName(
@@ -256,11 +332,6 @@ export class PlaylistZipService {
         const videoFileName =
           sanitizedTitle + fileExtension(scene.files[0]?.path, ".mp4");
         const nfoFileName = `${sanitizedTitle}.nfo`;
-
-        logger.debug(`Processing scene for zip`, {
-          sceneId: scene.id,
-          title: sceneTitle,
-        });
 
         const nfoContent = generateSceneNfo({
           id: scene.id,
@@ -274,38 +345,17 @@ export class PlaylistZipService {
           tagNames: scene.tags.map((t) => t.name),
           fileName: videoFileName,
         });
+        // The body is read only once the NFO is in; a failure meanwhile
+        // cancels it with the job
+        const body = Readable.fromWeb(stashBody);
+        reading = body;
+        body.on("error", fail);
         await this.appendEntry(
           archive,
           nfoContent,
           `${playlistDirName}/${nfoFileName}`,
           failed
         );
-
-        // Stream video file from the Stash instance the scene lives on. An
-        // instance disabled or deleted since the list was read throws
-        // UnknownInstanceError, and the download fails below.
-        const { baseUrl, apiKey } = stashInstanceManager.getCredentials(
-          scene.instanceId
-        );
-        const streamUrl = `${baseUrl}/scene/${scene.id}/stream`;
-
-        logger.debug(`Fetching video from Stash`, {
-          sceneId: scene.id,
-          url: streamUrl,
-        });
-
-        const { response, abort } = await fetchFromStash(streamUrl, {
-          apiKey,
-          signal: job.signal,
-          headersTimeoutMs: this.timeouts.headersTimeoutMs,
-        });
-
-        if (!response.ok || !response.body) {
-          abort.abort();
-          throw new Error(
-            `Failed to fetch video for scene ${scene.id}: ${response.status} ${response.statusText}`
-          );
-        }
 
         // Count every byte on its way into the archive: the size cap, the
         // progress and the idle limit all read it
@@ -345,9 +395,6 @@ export class PlaylistZipService {
           );
         };
 
-        const body = Readable.fromWeb(response.body as WebReadableStream);
-        reading = body;
-        body.on("error", fail);
         counter.on("error", fail);
         pipeline(body, counter).catch(fail);
         armIdle();
@@ -371,6 +418,8 @@ export class PlaylistZipService {
         logger.debug(`Scene added to zip`, { sceneId: scene.id });
       }
 
+      if (m3uItems.length === 0) throw new NothingFetchedError();
+
       await this.appendEntry(
         archive,
         this.generateM3U(m3uItems),
@@ -386,7 +435,8 @@ export class PlaylistZipService {
       await downloadService.markCompleted(
         downloadId,
         zipFilePath,
-        BigInt(stats.size)
+        BigInt(stats.size),
+        skipped
       );
 
       logger.info(`Playlist zip creation completed`, {
@@ -394,6 +444,7 @@ export class PlaylistZipService {
         playlistId: playlist.id,
         filePath: zipFilePath,
         fileSize: stats.size,
+        skippedItems: skipped,
       });
     } catch (caught) {
       // The job's first error is the cause; a later one is its echo
@@ -406,15 +457,19 @@ export class PlaylistZipService {
       await piped.catch(() => undefined);
       await fs.promises.unlink(zipFilePath).catch(() => undefined);
 
-      logger.error(`Playlist zip creation failed`, {
-        downloadId,
-        error: describeError(error),
-      });
+      if (error instanceof NothingFetchedError) {
+        logger.warn(`Playlist zip has no scene Stash could serve`, {
+          downloadId,
+          skippedItems: skipped,
+        });
+      } else {
+        logger.error(`Playlist zip creation failed`, {
+          downloadId,
+          error: describeError(error),
+        });
+      }
 
-      await downloadService.markFailed(
-        downloadId,
-        error instanceof ZipTooLargeError ? ZIP_TOO_LARGE : ZIP_FAILED
-      );
+      await downloadService.markFailed(downloadId, failureReason(error));
     } finally {
       outside?.removeEventListener("abort", onOutsideAbort);
     }
@@ -429,6 +484,21 @@ class ZipTooLargeError extends Error {
   }
 }
 
+/** Every scene of a zip was left out: there is nothing to zip */
+class NothingFetchedError extends Error {
+  constructor() {
+    super("None of the playlist's scenes could be fetched");
+    this.name = "NothingFetchedError";
+  }
+}
+
+/** The fixed reason a failed zip stores */
+function failureReason(error: unknown): string {
+  if (error instanceof ZipTooLargeError) return ZIP_TOO_LARGE;
+  if (error instanceof NothingFetchedError) return NOTHING_FETCHED;
+  return ZIP_FAILED;
+}
+
 /** How often, at most, progress is written while a file streams */
 const PROGRESS_INTERVAL_MS = 2_000;
 
@@ -440,7 +510,7 @@ const PROGRESS_INTERVAL_MS = 2_000;
  */
 class ZipProgress {
   private readonly downloadId: number;
-  private readonly plannedBytes: number;
+  private plannedBytes: number;
   private readonly totalFiles: number;
   private filesDone = 0;
   private written = 0;
@@ -463,6 +533,13 @@ class ZipProgress {
 
   /** At the end of each file */
   async fileDone(bytesWritten: number): Promise<void> {
+    this.filesDone++;
+    await this.write(this.percent(bytesWritten));
+  }
+
+  /** A scene left out: its planned bytes will never come */
+  async skipped(scene: NormalizedScene, bytesWritten: number): Promise<void> {
+    this.plannedBytes -= scene.files[0]?.size ?? 0;
     this.filesDone++;
     await this.write(this.percent(bytesWritten));
   }

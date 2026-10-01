@@ -78,6 +78,8 @@ Each playlist zip contains:
 
 Two scenes with the same title are saved as `Title.mkv` and `Title (2).mp4`, each with its own `.nfo`.
 
+A scene Peek cannot fetch when the zip is built (deleted from Stash since the last sync, or on a Stash server that was turned off) is left out, and the Downloads page says how many.
+
 ### M3U Playlist
 
 The included `playlist.m3u` file lets you play scenes in order using any media player that supports M3U format (VLC, Plex, Kodi, etc.).

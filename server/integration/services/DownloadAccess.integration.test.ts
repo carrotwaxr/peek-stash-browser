@@ -277,6 +277,45 @@ describe("Download access (integration)", () => {
     ]);
   });
 
+  it("createZip skips a scene whose instance was disabled after the list was read", async () => {
+    const download = await downloadService.createPlaylistDownload(
+      owner,
+      playlistId
+    );
+    // B goes away once the zip has read its list: the zip asks for B's
+    // credentials only when it reaches B's scene
+    const credentials = vi.mocked(stashInstanceManager.getCredentials);
+    const loaded = must(
+      credentials.getMockImplementation(),
+      "the A-and-B credentials stub"
+    );
+    credentials.mockImplementation((id: string) => {
+      if (id === FX.B) throw new UnknownInstanceError(FX.B);
+      return loaded(id);
+    });
+
+    try {
+      await playlistZipService.createZip(download.id, NO_CAP);
+    } finally {
+      credentials.mockImplementation(loaded);
+    }
+
+    const row = await prisma.download.findUnique({
+      where: { id: download.id },
+    });
+    expect(row?.status).toBe("COMPLETED");
+    expect(row?.skippedItems).toBe(1);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `http://stash-a.test/scene/${FX_ID.SAME}/stream`,
+      `http://stash-a.test/scene/${FX_ID.GLOBAL}/stream`,
+    ]);
+    const zip = fs
+      .readFileSync(must(row?.filePath, "the zip's file path"))
+      .toString("latin1");
+    expect(zip).toContain(`A-${FX_ID.SAME}`);
+    expect(zip).not.toContain(`B-${FX_ID.SAME}`);
+  });
+
   describe("the NFO names what the downloading user may see", () => {
     /** Builds this user's zip of the playlist; its bytes as text */
     async function zipText(userId: number): Promise<string> {

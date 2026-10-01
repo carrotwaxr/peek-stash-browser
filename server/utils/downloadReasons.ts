@@ -8,6 +8,8 @@ export const ZIP_FAILED = "The zip could not be created";
 export const PLAYLIST_NOT_FOUND = "Playlist not found";
 export const NOTHING_TO_DOWNLOAD = "No scenes you can download";
 export const ZIP_TOO_LARGE = "The zip grew past the size limit";
+export const NOTHING_FETCHED =
+  "None of the playlist's scenes could be fetched from Stash";
 
 const USER_FACING = new Set([
   DOWNLOAD_FAILED,
@@ -15,6 +17,7 @@ const USER_FACING = new Set([
   PLAYLIST_NOT_FOUND,
   NOTHING_TO_DOWNLOAD,
   ZIP_TOO_LARGE,
+  NOTHING_FETCHED,
 ]);
 
 /** A stored failure reason as the requester may see it; rows written before this kept the caught text */
