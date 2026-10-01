@@ -44,13 +44,14 @@ vi.mock("../../utils/logger.js", () => ({
 interface FakeProxyRes {
   headers: Record<string, string>;
   statusCode: number;
+  resume?: Mock<() => void>;
 }
 
 /** The parts of the upstream request the proxy calls. */
 interface FakeProxyReq {
   destroyed: boolean;
   destroy: Mock<() => void>;
-  on: Mock<(event: string, cb: () => void) => void>;
+  on: Mock<(event: string, cb: (error: Error) => void) => void>;
   setTimeout: Mock<(ms: number, cb: () => void) => void>;
 }
 
@@ -1800,6 +1801,135 @@ describe("Proxy Controller", () => {
         );
         expect(url.endsWith("apikey=test-api-key")).toBe(true);
       }
+    });
+  });
+
+  // ===========================================================================
+  // Stash failing before it answers: 502 and 504 in the central error shape
+  // ===========================================================================
+
+  describe("Stash failing", () => {
+    const THUMBNAIL = { path: "/image/1/thumbnail", instanceId: "inst-a" };
+
+    it("Stash's 401 on a thumbnail answers 502 and drains Stash's body (resume()), freeing the slot", async () => {
+      const { mockProxyRes } = setupHttpGetSuccess();
+      mockProxyRes.statusCode = 401;
+      mockProxyRes.resume = vi.fn();
+
+      const res = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(502);
+      expect(res._getBody()).toEqual({
+        error: "Stash could not serve this media",
+        errorType: "BAD_GATEWAY",
+      });
+      expect(mockProxyRes.resume).toHaveBeenCalledTimes(1);
+      // Stash's body is not piped to the browser
+      expect(mockPipeline).not.toHaveBeenCalled();
+
+      // The slot is free: seven more requests all reach Stash (the seventh
+      // hangs if the failed one kept its slot)
+      setupHttpGetSuccess();
+      mockHttpGet.mockClear();
+      for (let i = 0; i < 7; i++) {
+        await proxyStashMedia(
+          reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+          resFor(proxyStashMedia)
+        );
+      }
+      expect(mockHttpGet).toHaveBeenCalledTimes(7);
+    });
+
+    it("Stash's 404 answers 404 in the central shape", async () => {
+      const { mockProxyRes } = setupHttpGetSuccess();
+      mockProxyRes.statusCode = 404;
+      mockProxyRes.resume = vi.fn();
+
+      const res = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res._getBody()).toEqual({
+        error: "Not found",
+        errorType: "NOT_FOUND",
+      });
+    });
+
+    it("a 206 passes through with its status", async () => {
+      const { mockProxyRes } = setupHttpGetSuccess();
+      mockProxyRes.statusCode = 206;
+
+      const res = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(206);
+      expect(mockPipeline).toHaveBeenCalledTimes(1);
+    });
+
+    it("a connect error before headers answers 502 JSON in the central shape", async () => {
+      const handlers = new Map<string, (error: Error) => void>();
+      const proxyReq: FakeProxyReq = {
+        destroyed: false,
+        destroy: vi.fn(),
+        on: vi.fn((event, cb) => {
+          handlers.set(event, cb);
+        }),
+        setTimeout: vi.fn(),
+      };
+      mockHttpGet.mockReturnValue(proxyReq);
+
+      const res = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+        res
+      );
+      must(
+        handlers.get("error"),
+        "an error handler"
+      )(new Error("ECONNREFUSED"));
+
+      expect(res.status).toHaveBeenCalledWith(502);
+      expect(res._getBody()).toEqual({
+        error: "Stash could not serve this media",
+        errorType: "BAD_GATEWAY",
+      });
+    });
+
+    it("the timeout before headers answers 504 in the central shape", async () => {
+      let onTimeout: (() => void) | undefined;
+      const proxyReq: FakeProxyReq = {
+        destroyed: false,
+        destroy: vi.fn(),
+        on: vi.fn(),
+        setTimeout: vi.fn((_ms, cb) => {
+          onTimeout = cb;
+        }),
+      };
+      mockHttpGet.mockReturnValue(proxyReq);
+
+      const res = resFor(proxyStashMedia);
+      await proxyStashMedia(
+        reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER }),
+        res
+      );
+      must(onTimeout, "a timeout handler")();
+
+      expect(res.status).toHaveBeenCalledWith(504);
+      expect(res._getBody()).toEqual({
+        error: "Stash did not answer",
+        errorType: "GATEWAY_TIMEOUT",
+      });
+      expect(proxyReq.destroy).toHaveBeenCalled();
     });
   });
 });

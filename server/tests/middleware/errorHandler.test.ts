@@ -10,7 +10,9 @@ import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestUser } from "../../middleware/auth.js";
 import {
+  BadGatewayError,
   ConflictError,
+  GatewayTimeoutError,
   NotFoundError,
   ServiceUnavailableError,
   ValidationError,
@@ -279,6 +281,26 @@ describe("errorHandler", () => {
     expect(unavailable._getBody()).toEqual({
       error: "Sync is running",
       errorType: "SERVICE_UNAVAILABLE",
+    });
+  });
+
+  it("BadGatewayError answers 502 with its message and errorType BAD_GATEWAY", () => {
+    const res = handle(new BadGatewayError("Stash could not serve this media"));
+
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res._getBody()).toEqual({
+      error: "Stash could not serve this media",
+      errorType: "BAD_GATEWAY",
+    });
+  });
+
+  it("GatewayTimeoutError answers 504 with its message and errorType GATEWAY_TIMEOUT", () => {
+    const res = handle(new GatewayTimeoutError("Stash did not answer"));
+
+    expect(res.status).toHaveBeenCalledWith(504);
+    expect(res._getBody()).toEqual({
+      error: "Stash did not answer",
+      errorType: "GATEWAY_TIMEOUT",
     });
   });
 

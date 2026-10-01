@@ -76,6 +76,20 @@ export class ServiceUnavailableError extends AppError {
   }
 }
 
+/** Stash (or another upstream) failed or answered something unusable: 502. */
+export class BadGatewayError extends AppError {
+  constructor(message = "Bad gateway") {
+    super(message, 502, "BAD_GATEWAY");
+  }
+}
+
+/** Stash (or another upstream) did not answer in time: 504. */
+export class GatewayTimeoutError extends AppError {
+  constructor(message = "Gateway timeout") {
+    super(message, 504, "GATEWAY_TIMEOUT");
+  }
+}
+
 /** What the handler answers for an error. */
 interface HttpAnswer {
   status: number;
@@ -178,6 +192,20 @@ function appErrorAnswer(err: AppError): HttpAnswer {
     answer.retryAfterSeconds = err.retryAfterSeconds;
   }
   return answer;
+}
+
+/**
+ * Answer `err` in the central handler's shape (`{ error, errorType }`, plus
+ * Retry-After) from code that cannot throw to Express, such as a callback.
+ * Does nothing once headers are out.
+ */
+export function sendAppError(res: Response, err: AppError): void {
+  if (res.headersSent) return;
+  const answer = appErrorAnswer(err);
+  if (answer.retryAfterSeconds !== undefined) {
+    res.setHeader("Retry-After", String(answer.retryAfterSeconds));
+  }
+  res.status(answer.status).json(answer.body);
 }
 
 /**

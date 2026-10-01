@@ -3,6 +3,7 @@ import type {
   ExternalPlayerLinkResponse,
 } from "@peek/shared-types/api/video.js";
 import type { Response } from "express";
+import { NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import {
@@ -38,6 +39,8 @@ import {
   fetchFromStash,
   pipeResponseToClient,
   readStashText,
+  stashFailure,
+  stashFetchError,
 } from "../utils/streamProxy.js";
 
 /** How long Stash may take to answer, and to go quiet mid-body, on a stream. */
@@ -45,6 +48,24 @@ const STREAM_HEADERS_TIMEOUT_MS = 60_000;
 const STREAM_IDLE_TIMEOUT_MS = 60_000;
 /** A caption is answered and read whole within this. */
 const CAPTION_TIMEOUT_MS = 15_000;
+
+/**
+ * Run a Stash fetch or read. A failure is thrown as the error the central
+ * handler answers (502, or 504 for a timeout); undefined when the client's
+ * own close ended it, which needs no answer.
+ */
+async function fromStash<T>(
+  res: Response,
+  work: () => Promise<T>
+): Promise<T | undefined> {
+  try {
+    return await work();
+  } catch (error) {
+    const mapped = stashFetchError(error, res);
+    if (mapped) throw mapped;
+    return undefined;
+  }
+}
 
 /**
  * The address and key of the instance a request names, or null once the
@@ -268,165 +289,162 @@ export const proxyStashStream = async (
   >,
   res: Response
 ) => {
-  try {
-    const { sceneId, streamPath, subPath } = req.params;
-    const instanceId = req.query.instanceId;
+  const { sceneId, streamPath, subPath } = req.params;
+  const instanceId = req.query.instanceId;
 
-    if (
-      !SCENE_ID_PATTERN.test(sceneId) ||
-      !isAllowedStreamPath(streamPath, subPath)
-    ) {
-      res.status(400).send("Invalid stream path");
-      return;
-    }
-    if (!isValidInstanceId(instanceId)) {
-      res.status(400).json({ error: INSTANCE_ID_REQUIRED });
-      return;
-    }
+  if (
+    !SCENE_ID_PATTERN.test(sceneId) ||
+    !isAllowedStreamPath(streamPath, subPath)
+  ) {
+    res.status(400).send("Invalid stream path");
+    return;
+  }
+  if (!isValidInstanceId(instanceId)) {
+    res.status(400).json({ error: INSTANCE_ID_REQUIRED });
+    return;
+  }
 
-    if (
-      !(await canUserLoadMedia(
-        req.user.id,
-        [{ entityType: "scene", entityId: sceneId }],
-        instanceId
-      ))
-    ) {
-      res.status(404).send("Not found");
-      return;
-    }
+  if (
+    !(await canUserLoadMedia(
+      req.user.id,
+      [{ entityType: "scene", entityId: sceneId }],
+      instanceId
+    ))
+  ) {
+    res.status(404).send("Not found");
+    return;
+  }
 
-    // Combine path segments if subPath exists (for HLS segments like stream.m3u8/0.ts)
-    const fullStreamPath = subPath ? `${streamPath}/${subPath}` : streamPath;
+  // Combine path segments if subPath exists (for HLS segments like stream.m3u8/0.ts)
+  const fullStreamPath = subPath ? `${streamPath}/${subPath}` : streamPath;
 
-    // Only Stash's own stream parameters go upstream; instanceId is Peek
-    // routing and uid/exp/sig are the signed link's claims
-    const queryString = pickStreamQuery(
-      new URLSearchParams(req.url.split("?")[1] ?? "")
-    ).toString();
+  // Only Stash's own stream parameters go upstream; instanceId is Peek
+  // routing and uid/exp/sig are the signed link's claims
+  const queryString = pickStreamQuery(
+    new URLSearchParams(req.url.split("?")[1] ?? "")
+  ).toString();
 
-    const creds = credentialsOrRespond(instanceId, res);
-    if (!creds) return;
-    const { baseUrl: stashBaseUrl, apiKey } = creds;
+  const creds = credentialsOrRespond(instanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashBaseUrl, apiKey } = creds;
 
-    const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? "?" + queryString : ""}`;
+  const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? "?" + queryString : ""}`;
 
-    logger.debug(`[PROXY] Proxying stream: scene=${sceneId} ${fullStreamPath}`);
+  logger.debug(`[PROXY] Proxying stream: scene=${sceneId} ${fullStreamPath}`);
 
-    // Forward request to Stash. The fetch aborts when the client disconnects
-    // (seek, refresh, navigate away), which keeps orphaned connections from
-    // downloading entire files, and when Stash sends no headers in time.
-    // Manifests go whole: Stash honours Range on them, and a slice starting
-    // past "apikey=" would carry a bare key through every rewrite below
-    const isManifestPath = /\.(m3u8|mpd)$/.test(fullStreamPath);
-    const { response, abort } = await fetchFromStash(stashUrl, {
+  // Forward request to Stash. The fetch aborts when the client disconnects
+  // (seek, refresh, navigate away), which keeps orphaned connections from
+  // downloading entire files, and when Stash sends no headers in time.
+  // Manifests go whole: Stash honours Range on them, and a slice starting
+  // past "apikey=" would carry a bare key through every rewrite below
+  const isManifestPath = /\.(m3u8|mpd)$/.test(fullStreamPath);
+  const fetched = await fromStash(res, () =>
+    fetchFromStash(stashUrl, {
       apiKey,
       clientRes: res,
       headersTimeoutMs: STREAM_HEADERS_TIMEOUT_MS,
       ...(req.headers.range && !isManifestPath
         ? { headers: { Range: req.headers.range } }
         : {}),
-    });
+    })
+  );
+  if (!fetched) return;
+  const { response, abort } = fetched;
 
-    if (!response.ok) {
-      logger.warn(
-        `[PROXY] Stash returned ${response.status} for scene=${sceneId} ${fullStreamPath}`
-      );
-      res
-        .status(response.status)
-        .send(`Stash stream error: ${response.statusText}`);
-      return;
-    }
+  // Stash's own 401, 403 and 5xx are 502 here and its 404 is 404; 206, 304
+  // and 416 (Range) pass through
+  const failure = stashFailure(response.status);
+  if (failure) {
+    logger.warn(
+      `[PROXY] Stash returned ${response.status} for scene=${sceneId} ${fullStreamPath}`
+    );
+    abort.abort();
+    throw failure;
+  }
 
-    // Check if this is an HLS playlist that needs URL rewriting
-    const contentType = response.headers.get("content-type") || "";
-    const isHlsPlaylist =
-      fullStreamPath.endsWith(".m3u8") ||
-      contentType.includes("mpegurl") ||
-      contentType.includes("x-mpegURL");
+  // Check if this is an HLS playlist that needs URL rewriting
+  const contentType = response.headers.get("content-type") || "";
+  const isHlsPlaylist =
+    fullStreamPath.endsWith(".m3u8") ||
+    contentType.includes("mpegurl") ||
+    contentType.includes("x-mpegURL");
 
-    if (isHlsPlaylist) {
-      // For HLS playlists, read the entire response and rewrite URLs
-      const playlistContent = await readStashText(
-        response,
-        abort,
-        STREAM_IDLE_TIMEOUT_MS
-      );
-      const rewrittenContent = rewriteHlsPlaylist(
-        playlistContent,
-        sceneId,
-        stashBaseUrl,
-        instanceId
-      );
-
-      // Set headers for the rewritten playlist
-      res.status(response.status);
-      res.setHeader("content-type", "application/vnd.apple.mpegurl");
-      res.setHeader("cache-control", "private, no-cache");
-      res.send(rewrittenContent);
-
-      logger.debug(`[PROXY] Rewrote HLS playlist: ${fullStreamPath}`);
-      return;
-    }
-
-    // Forward status code
-    res.status(response.status);
-
-    // The response belongs to a signed-in user: keep Stash's freshness, never
-    // let a shared cache store it
-    res.setHeader(
-      "cache-control",
-      privateCacheControl(
-        response.headers.get("cache-control"),
-        "private, no-cache"
-      )
+  if (isHlsPlaylist) {
+    // For HLS playlists, read the entire response and rewrite URLs
+    const playlistContent = await fromStash(res, () =>
+      readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
+    );
+    if (playlistContent === undefined) return;
+    const rewrittenContent = rewriteHlsPlaylist(
+      playlistContent,
+      sceneId,
+      stashBaseUrl,
+      instanceId
     );
 
-    // A DASH manifest (about 1 KB) is read whole and sent without apikey
-    const isDashManifest =
-      fullStreamPath.endsWith(".mpd") || contentType.includes("dash+xml");
+    // Set headers for the rewritten playlist
+    res.status(response.status);
+    res.setHeader("content-type", "application/vnd.apple.mpegurl");
+    res.setHeader("cache-control", "private, no-cache");
+    res.send(rewrittenContent);
 
-    if (isDashManifest) {
-      const manifest = stripDashApiKeys(
-        await readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
+    logger.debug(`[PROXY] Rewrote HLS playlist: ${fullStreamPath}`);
+    return;
+  }
+
+  // Forward status code
+  res.status(response.status);
+
+  // The response belongs to a signed-in user: keep Stash's freshness, never
+  // let a shared cache store it
+  res.setHeader(
+    "cache-control",
+    privateCacheControl(
+      response.headers.get("cache-control"),
+      "private, no-cache"
+    )
+  );
+
+  // A DASH manifest (about 1 KB) is read whole and sent without apikey
+  const isDashManifest =
+    fullStreamPath.endsWith(".mpd") || contentType.includes("dash+xml");
+
+  if (isDashManifest) {
+    const manifestText = await fromStash(res, () =>
+      readStashText(response, abort, STREAM_IDLE_TIMEOUT_MS)
+    );
+    if (manifestText === undefined) return;
+    const manifest = stripDashApiKeys(manifestText);
+    if (API_KEY_ANYWHERE.test(manifest)) {
+      logger.warn(
+        `[PROXY] Refused a DASH manifest that names apikey: scene=${sceneId} ${fullStreamPath}`
       );
-      if (API_KEY_ANYWHERE.test(manifest)) {
-        logger.warn(
-          `[PROXY] Refused a DASH manifest that names apikey: scene=${sceneId} ${fullStreamPath}`
-        );
-        res.status(502).send("Stash stream error");
-        return;
-      }
-      res.setHeader("content-type", contentType || "application/dash+xml");
-      res.send(manifest);
-
-      logger.debug(`[PROXY] Stripped DASH manifest: ${fullStreamPath}`);
+      res.status(502).send("Stash stream error");
       return;
     }
+    res.setHeader("content-type", contentType || "application/dash+xml");
+    res.send(manifest);
 
-    // Stream response body to client with proper backpressure and cleanup
-    const headersToForward = [
-      "content-type",
-      "content-length",
-      "accept-ranges",
-      "content-range",
-      "last-modified",
-      "etag",
-    ];
-
-    await pipeResponseToClient(response, res, "[PROXY]", headersToForward, {
-      idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
-      abort,
-    });
-
-    logger.debug(`[PROXY] Stream proxied successfully: ${fullStreamPath}`);
-  } catch (error) {
-    logger.error("[PROXY] Error proxying stream", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    if (!res.headersSent) {
-      res.status(500).send("Stream proxy failed");
-    }
+    logger.debug(`[PROXY] Stripped DASH manifest: ${fullStreamPath}`);
+    return;
   }
+
+  // Stream response body to client with proper backpressure and cleanup
+  const headersToForward = [
+    "content-type",
+    "content-length",
+    "accept-ranges",
+    "content-range",
+    "last-modified",
+    "etag",
+  ];
+
+  await pipeResponseToClient(response, res, "[PROXY]", headersToForward, {
+    idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
+    abort,
+  });
+
+  logger.debug(`[PROXY] Stream proxied successfully: ${fullStreamPath}`);
 };
 
 // ============================================================================
@@ -452,90 +470,93 @@ export const getCaption = async (
   >,
   res: Response
 ) => {
-  try {
-    const { sceneId } = req.params;
-    const { lang, type, instanceId } = req.query;
+  const { sceneId } = req.params;
+  const { lang, type, instanceId } = req.query;
 
-    if (!lang || !type) {
-      res.status(400).send("Missing lang or type parameter");
-      return;
-    }
+  if (!lang || !type) {
+    res.status(400).send("Missing lang or type parameter");
+    return;
+  }
 
-    if (
-      !SCENE_ID_PATTERN.test(sceneId) ||
-      typeof lang !== "string" ||
-      typeof type !== "string" ||
-      !isAllowedCaption(lang, type)
-    ) {
-      res.status(400).send("Invalid caption parameters");
-      return;
-    }
-    if (!isValidInstanceId(instanceId)) {
-      res.status(400).json({ error: INSTANCE_ID_REQUIRED });
-      return;
-    }
+  if (
+    !SCENE_ID_PATTERN.test(sceneId) ||
+    typeof lang !== "string" ||
+    typeof type !== "string" ||
+    !isAllowedCaption(lang, type)
+  ) {
+    res.status(400).send("Invalid caption parameters");
+    return;
+  }
+  if (!isValidInstanceId(instanceId)) {
+    res.status(400).json({ error: INSTANCE_ID_REQUIRED });
+    return;
+  }
 
-    if (
-      !(await canUserLoadMedia(
-        req.user.id,
-        [{ entityType: "scene", entityId: sceneId }],
-        instanceId
-      ))
-    ) {
-      res.status(404).send("Not found");
-      return;
-    }
+  if (
+    !(await canUserLoadMedia(
+      req.user.id,
+      [{ entityType: "scene", entityId: sceneId }],
+      instanceId
+    ))
+  ) {
+    res.status(404).send("Not found");
+    return;
+  }
 
-    logger.debug(
-      `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId}`
-    );
+  logger.debug(
+    `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId}`
+  );
 
-    const creds = credentialsOrRespond(instanceId, res);
-    if (!creds) return;
-    const { baseUrl: stashUrl, apiKey } = creds;
+  const creds = credentialsOrRespond(instanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
 
-    // Construct Stash caption URL
-    const captionUrl = new URL(`${stashUrl}/scene/${sceneId}/caption`);
-    captionUrl.searchParams.set("lang", lang);
-    captionUrl.searchParams.set("type", type);
-    logger.debug(`[CAPTION] Fetching from Stash: ${captionUrl.pathname}`);
+  // Construct Stash caption URL
+  const captionUrl = new URL(`${stashUrl}/scene/${sceneId}/caption`);
+  captionUrl.searchParams.set("lang", lang);
+  captionUrl.searchParams.set("type", type);
+  logger.debug(`[CAPTION] Fetching from Stash: ${captionUrl.pathname}`);
 
-    // Fetch caption from Stash with API key; answer and body share 15 s
-    const startedAt = Date.now();
-    const { response, abort } = await fetchFromStash(captionUrl.toString(), {
+  // Fetch caption from Stash with API key; answer and body share 15 s
+  const startedAt = Date.now();
+  const fetched = await fromStash(res, () =>
+    fetchFromStash(captionUrl.toString(), {
       apiKey,
       clientRes: res,
       headersTimeoutMs: CAPTION_TIMEOUT_MS,
-    });
+    })
+  );
+  if (!fetched) return;
+  const { response, abort } = fetched;
 
-    if (!response.ok) {
-      logger.warn(
-        `[CAPTION] Stash returned ${response.status} for scene ${sceneId}`
-      );
-      res.status(response.status).send("Caption not found");
-      return;
-    }
+  const failure = stashFailure(response.status);
+  if (failure) {
+    logger.warn(
+      `[CAPTION] Stash returned ${response.status} for scene ${sceneId}`
+    );
+    abort.abort();
+    throw failure instanceof NotFoundError
+      ? new NotFoundError("Caption not found")
+      : failure;
+  }
 
-    const captionData = await readStashText(
+  const captionData = await fromStash(res, () =>
+    readStashText(
       response,
       abort,
       CAPTION_TIMEOUT_MS - (Date.now() - startedAt)
-    );
+    )
+  );
+  if (captionData === undefined) return;
 
-    // Stash automatically converts SRT to VTT if needed, so we can just serve it
-    res.setHeader("Content-Type", "text/vtt; charset=utf-8");
-    res.setHeader("Cache-Control", "private, max-age=86400");
-    res.send(captionData);
+  // Stash automatically converts SRT to VTT if needed, so we can just serve it
+  res.setHeader("Content-Type", "text/vtt; charset=utf-8");
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.send(captionData);
 
-    logger.debug(
-      `[CAPTION] Served caption: scene=${sceneId}, lang=${lang}, size=${captionData.length} bytes`
-    );
-  } catch (error) {
-    logger.error("[CAPTION] Error serving caption", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    res.status(500).send("Internal server error");
-  }
+  logger.debug(
+    `[CAPTION] Served caption: scene=${sceneId}, lang=${lang}, size=${captionData.length} bytes`
+  );
 };
 
 // ============================================================================
