@@ -81,6 +81,8 @@ const DATE_WINDOWS: Record<string, [string, string]> = {
   updated_at: ["2003-01-01", "2005-02-04"],
   o_history: ["2003-01-01", "2005-02-04"],
   play_history: ["2003-01-01", "2005-02-04"],
+  // the latest of the scene's play history dates
+  last_played_at: ["2003-01-01", "2005-02-04"],
   build_time: ["2000-01-01", "2000-01-01"],
 };
 
