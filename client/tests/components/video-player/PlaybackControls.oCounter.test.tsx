@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { createAuthValue, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as hooksModule from "@/api/hooks";
 import type * as uiModule from "@/components/ui/index";
 import PlaybackControls from "@/components/video-player/PlaybackControls";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 
 const mockDispatch = vi.fn(
   (_action: { type: string; payload?: unknown }) => {}
@@ -71,7 +72,11 @@ describe("PlaybackControls Remove last O", () => {
   it("the scene page offers Remove last O beside the O counter", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <PlaybackControls />
+        <AuthContext.Provider
+          value={createAuthValue({ isAuthenticated: true })}
+        >
+          <PlaybackControls />
+        </AuthContext.Provider>
       </QueryClientProvider>
     );
 
@@ -99,7 +104,11 @@ describe("PlaybackControls Remove last O", () => {
     mockOCounter = 0;
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <PlaybackControls />
+        <AuthContext.Provider
+          value={createAuthValue({ isAuthenticated: true })}
+        >
+          <PlaybackControls />
+        </AuthContext.Provider>
       </QueryClientProvider>
     );
 

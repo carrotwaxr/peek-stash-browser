@@ -6,6 +6,7 @@ import type {
   CreateUserGroupResponse,
   GetAllUserGroupsResponse,
   GetCurrentUserGroupsResponse,
+  GetMyPermissionsResponse,
   GetRecoveryKeyResponse,
   GetUserGroupMembershipsResponse,
   GetUserGroupResponse,
@@ -45,13 +46,11 @@ export const getMyGroups = () =>
 
 // ── Permissions ────────────────────────────────────────────────────────
 
-export const getMyPermissions = () =>
-  apiGet<{ permissions: Record<string, unknown> }>("/user/permissions");
+export const getMyPermissions = (signal?: AbortSignal) =>
+  apiGet<GetMyPermissionsResponse>("/user/permissions", signal);
 
 export const getUserPermissions = (userId: number) =>
-  apiGet<{ permissions: Record<string, unknown> }>(
-    `/user/${userId}/permissions`
-  );
+  apiGet<GetMyPermissionsResponse>(`/user/${userId}/permissions`);
 
 export const updateUserPermissionOverrides = (
   userId: number,

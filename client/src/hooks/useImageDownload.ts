@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { apiPost, getMyPermissions } from "../api";
+import { useCallback, useState } from "react";
+import { apiPost } from "../api";
 import { useInvalidateDownloads } from "../api/hooks/useDownloads";
+import { useMyPermissions } from "../api/hooks/useMyPermissions";
 import { showError, showSuccess } from "../utils/toast";
 
 interface DownloadableImage {
@@ -23,25 +24,12 @@ interface DownloadResponse {
  * @param enabled - fetch the permission only while the lightbox is open
  */
 export function useImageDownload(enabled: boolean) {
-  const [canDownload, setCanDownload] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const invalidateDownloads = useInvalidateDownloads();
 
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    getMyPermissions()
-      .then((result) => {
-        if (!cancelled) setCanDownload(!!result.permissions.canDownloadFiles);
-      })
-      .catch((error: unknown) => {
-        // Without the permission the button stays hidden
-        console.error("Failed to fetch permissions:", error);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
+  // Without the permission (or while it loads) the button stays hidden
+  const { data: permissions } = useMyPermissions(enabled);
+  const canDownload = !!permissions?.canDownloadFiles;
 
   const download = useCallback(
     async (image: DownloadableImage) => {

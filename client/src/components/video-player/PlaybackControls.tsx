@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { apiPost, getMyPermissions } from "../../api";
+import { apiPost } from "../../api";
 import {
   useDecrementOCounter,
   useUpdateFavorite,
   useUpdateRating,
 } from "../../api/hooks";
 import { useInvalidateDownloads } from "../../api/hooks/useDownloads";
+import { useMyPermissions } from "../../api/hooks/useMyPermissions";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -82,10 +83,7 @@ const PlaybackControls = () => {
   // Download state
   const [downloading, setDownloading] = useState(false);
   const invalidateDownloads = useInvalidateDownloads();
-  const [permissions, setPermissions] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const { data: permissions } = useMyPermissions();
 
   // Sync state when scene changes
   const sceneId = scene?.id;
@@ -97,20 +95,6 @@ const PlaybackControls = () => {
       setIsFavorite(sceneFavorite || false);
     }
   }, [sceneId, sceneRating, sceneFavorite]);
-
-  // Fetch user permissions on mount
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const result = await getMyPermissions();
-        setPermissions(result.permissions);
-      } catch (error) {
-        // Silently fail - permissions will remain null and download button won't show
-        console.error("Failed to fetch permissions:", error);
-      }
-    };
-    void fetchPermissions();
-  }, []);
 
   // Handle rating change
   const handleRatingChange = async (newRating: number | null) => {

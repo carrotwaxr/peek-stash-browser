@@ -5,9 +5,12 @@ import {
   renderHook as renderHookPlain,
   waitFor,
 } from "@testing-library/react";
+import { permissions } from "@tests/helpers/permissions";
+import { createAuthValue } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost, getMyPermissions } from "@/api";
 import { queryKeys } from "@/api/queryKeys";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 import { useImageDownload } from "@/hooks/useImageDownload";
 import { showError, showSuccess } from "@/utils/toast";
 
@@ -33,7 +36,21 @@ let queryClient: QueryClient;
 const renderHook = <T,>(callback: () => T) =>
   renderHookPlain(callback, {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider
+          value={createAuthValue({
+            isAuthenticated: true,
+            user: {
+              id: 1,
+              username: "viewer",
+              role: "USER",
+              setupCompleted: true,
+            },
+          })}
+        >
+          {children}
+        </AuthContext.Provider>
+      </QueryClientProvider>
     ),
   });
 
@@ -58,17 +75,30 @@ describe("useImageDownload", () => {
 
   it("canDownload is true only with Can Download Files", async () => {
     mockGetMyPermissions.mockResolvedValue({
-      permissions: { canDownloadFiles: false },
+      permissions: permissions({ canDownloadFiles: false }),
     });
     const denied = renderHook(() => useImageDownload(true));
     await waitFor(() => expect(mockGetMyPermissions).toHaveBeenCalled());
     expect(denied.result.current.canDownload).toBe(false);
 
+    // A new answer needs a new request: the first one is cached
+    queryClient.clear();
     mockGetMyPermissions.mockResolvedValue({
-      permissions: { canDownloadFiles: true },
+      permissions: permissions({ canDownloadFiles: true }),
     });
     const allowed = renderHook(() => useImageDownload(true));
     await waitFor(() => expect(allowed.result.current.canDownload).toBe(true));
+  });
+
+  it("the scene page and the lightbox share one /user/permissions request", async () => {
+    mockGetMyPermissions.mockResolvedValue({
+      permissions: permissions({ canDownloadFiles: true }),
+    });
+    const first = renderHook(() => useImageDownload(true));
+    const second = renderHook(() => useImageDownload(true));
+    await waitFor(() => expect(first.result.current.canDownload).toBe(true));
+    await waitFor(() => expect(second.result.current.canDownload).toBe(true));
+    expect(mockGetMyPermissions).toHaveBeenCalledTimes(1);
   });
 
   it("does not ask for permissions while disabled", () => {
@@ -78,7 +108,7 @@ describe("useImageDownload", () => {
 
   it("posts the image's instance and navigates to the file", async () => {
     mockGetMyPermissions.mockResolvedValue({
-      permissions: { canDownloadFiles: true },
+      permissions: permissions({ canDownloadFiles: true }),
     });
     mockApiPost.mockResolvedValue({
       download: { id: 12, status: "COMPLETED" },
@@ -104,7 +134,7 @@ describe("useImageDownload", () => {
 
   it("shows the server's error text on a refusal and does not navigate", async () => {
     mockGetMyPermissions.mockResolvedValue({
-      permissions: { canDownloadFiles: true },
+      permissions: permissions({ canDownloadFiles: true }),
     });
     mockApiPost.mockRejectedValue(
       Object.assign(new Error("Request failed"), {
