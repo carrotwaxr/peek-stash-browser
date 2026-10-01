@@ -249,9 +249,12 @@ const Lightbox = ({
     // An Image loads at low priority, fills the HTTP cache and frees its
     // connection when done; an unread fetch body would hold it under
     // backpressure. Clearing src on cleanup cancels what is still loading.
+    // A video entry is skipped: its file is the whole clip, which an Image
+    // would download only to fail to decode it.
     const images: HTMLImageElement[] = [];
 
     prefetchImages.forEach((img) => {
+      if (isVideoImage(img)) return;
       const url = img?.paths?.image || img?.paths?.preview;
       if (url) {
         const el = new Image();

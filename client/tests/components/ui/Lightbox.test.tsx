@@ -8,6 +8,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost, getMyPermissions, libraryApi } from "@/api";
 import Lightbox from "../../../src/components/ui/Lightbox";
@@ -789,6 +790,27 @@ describe("Lightbox", () => {
       expect(created.every((i) => i.decoding === "async")).toBe(true);
       expect(created.every((i) => i.fetchPriority === "low")).toBe(true);
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("prefetch skips video entries, whose file is the whole mp4", () => {
+      const current = createMockImages(1, 1) as NormalizedImage[];
+      const next = createMockImages(2, 2) as NormalizedImage[];
+      const photo = must(next[0], "the photo");
+      const video = {
+        ...must(next[1], "the video"),
+        filePath: "/data/clip.mp4",
+      } as NormalizedImage;
+      render(
+        <Lightbox
+          images={current}
+          prefetchImages={[photo, video]}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(created.map((i) => i.src)).toEqual([photo.paths.image]);
     });
 
     it("closing clears the prefetch images' src", () => {
