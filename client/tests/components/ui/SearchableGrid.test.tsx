@@ -9,6 +9,7 @@ import {
 import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
 import { flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet } from "@/api";
 import type SearchControlsType from "../../../src/components/ui/SearchControls";
 import SearchableGrid from "../../../src/components/ui/SearchableGrid";
 import type { ListUrlState } from "../../../src/hooks/useListUrlState";
@@ -171,6 +172,28 @@ describe("SearchableGrid lockedFilters", () => {
       });
     }
   );
+
+  it("a detail tab with presets pending shows its skeleton", async () => {
+    // The saved presets and the default ids never answer
+    vi.mocked(apiGet)
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/tab"]}>
+        <SearchableGrid
+          entityType="performer"
+          lockedFilters={{ performer_filter: { tags: LOCK } }}
+          hideLockedFilters
+          renderItem={() => null}
+        />
+      </MemoryRouter>
+    );
+
+    await flushPromises();
+    expect(container.querySelector(".animate-pulse")).not.toBeNull();
+    expect(api.findPerformers).not.toHaveBeenCalled();
+  });
 
   it("a parent re-render with an equal new lock keeps the filters and sends nothing", async () => {
     const Tab = () => {
