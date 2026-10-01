@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { SerializedDownload } from "@peek/shared-types";
+import toast from "react-hot-toast";
 import {
   useDeleteDownload,
   useDownloads,
@@ -213,17 +214,29 @@ const getDownloadThumbnail = (download: SerializedDownload) => {
   );
 };
 
+/** One id for the load error: a poll that keeps failing shows one toast */
+const LOAD_ERROR_TOAST_ID = "downloads-load";
+
 const Downloads = () => {
   usePageTitle("Downloads");
-  const { data, isPending, isError } = useDownloads();
+  const { data, isPending, errorUpdatedAt, dataUpdatedAt } = useDownloads();
   const deleteDownload = useDeleteDownload();
   const retryDownload = useRetryDownload();
   const downloads = data?.downloads ?? [];
 
-  // A failed read shows the empty state and says why
+  // A failed read shows the empty state and says why. Each failed poll asks
+  // for the same toast id, so a server outage shows one error, not a new one
+  // every 3 s
   useEffect(() => {
-    if (isError) showError("Failed to load downloads");
-  }, [isError]);
+    if (errorUpdatedAt > 0) {
+      showError("Failed to load downloads", { id: LOAD_ERROR_TOAST_ID });
+    }
+  }, [errorUpdatedAt]);
+
+  // A fetch that succeeds clears it
+  useEffect(() => {
+    if (dataUpdatedAt > 0) toast.dismiss(LOAD_ERROR_TOAST_ID);
+  }, [dataUpdatedAt]);
 
   const handleDelete = async (id: number) => {
     try {

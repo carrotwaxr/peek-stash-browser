@@ -21,6 +21,8 @@ type ToastPosition =
 
 interface ToastOptions {
   duration?: number;
+  /** Calls with one id show one toast: a repeating failure does not stack */
+  id?: string;
   position?: ToastPosition;
   onRetry?: () => void;
   [key: string]: unknown;
@@ -54,12 +56,13 @@ export const showError = (
   options: ToastOptions = {}
 ) => {
   return toast.custom(
-    () => (
+    (t) => (
       <ErrorMessage
         error={error}
         mode="toast"
         showRetry={false}
         onRetry={options.onRetry}
+        onClose={() => toast.dismiss(t.id)}
       />
     ),
     {

@@ -43,8 +43,10 @@ export default function Switch({
         {...props}
       />
       <div
-        className="w-11 h-6 rounded-full relative"
+        className="w-11 h-6 rounded-full relative peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2"
         style={{
+          ["--tw-ring-color" as string]: "var(--accent-primary)",
+          ["--tw-ring-offset-color" as string]: "var(--bg-primary)",
           backgroundColor: checked
             ? "var(--accent-primary)"
             : "var(--bg-tertiary)",
