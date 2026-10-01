@@ -545,20 +545,28 @@ describe("SetupWizard", () => {
       }
     );
 
-    it("Back returns to the admin step and clears the error", async () => {
-      mockTestStashConnection.mockResolvedValue({
-        success: false,
-        error: "Bad API key",
-      });
+    it("on Connect to Stash with an existing admin (hasUsers) there is no Back button", () => {
       renderAt({ hasUsers: true, hasStashInstance: false });
-      fillStash();
-      fireEvent.click(screen.getByRole("button", { name: "Test Connection" }));
-      await screen.findByText("Bad API key");
 
-      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(
+        screen.getByPlaceholderText(STASH_URL_PLACEHOLDER)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Back" })
+      ).not.toBeInTheDocument();
+    });
 
-      expect(screen.getByText("Create Admin Account")).toBeInTheDocument();
-      expect(screen.queryByText("Bad API key")).not.toBeInTheDocument();
+    it("after creating the admin in this session, Connect to Stash has no Back button", async () => {
+      mockCreateFirstAdmin.mockResolvedValue(ADMIN_CREATED);
+      mockLogin.mockResolvedValue({ success: true });
+      renderAt({ hasUsers: false, hasStashInstance: false });
+      fireEvent.click(screen.getByRole("button", { name: "Get Started" }));
+      typePasswords("AdminPass1");
+
+      await screen.findByPlaceholderText(STASH_URL_PLACEHOLDER);
+      expect(
+        screen.queryByRole("button", { name: "Back" })
+      ).not.toBeInTheDocument();
     });
 
     it("shows the Stash step while the session is still being checked", () => {
@@ -582,6 +590,22 @@ describe("SetupWizard", () => {
     expect(screen.queryByText("Welcome")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Start Browsing" }));
     expect(onSetupComplete).toHaveBeenCalled();
+  });
+
+  it("the welcome step lists three steps (create admin, connect to Stash, finish) and does not mention STASH_URL", () => {
+    renderAt(null);
+
+    const items = screen.getAllByRole("listitem").map((li) => li.textContent);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatch(/create an admin account/i);
+    expect(items[1]).toMatch(/connect peek to your stash server/i);
+    expect(items[2]).toMatch(/start browsing/i);
+    expect(document.body.textContent).not.toContain("STASH_URL");
+    expect(
+      screen.getByText(
+        "Make sure Stash is running and reachable from this server."
+      )
+    ).toBeInTheDocument();
   });
 
   it("starts at Welcome without a setup status", () => {
