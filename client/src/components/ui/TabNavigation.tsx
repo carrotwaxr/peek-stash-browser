@@ -72,6 +72,7 @@ const TabNavigation = ({
 
   return (
     <div
+      data-tab-bar=""
       className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-rounded"
       style={{
         borderBottom: "2px solid var(--bg-tertiary)",
