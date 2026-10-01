@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   CreateStashInstanceResponse,
   DeleteStashInstanceResponse,
+  TestStashConnectionResponse,
   UpdateStashInstanceResponse,
 } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
-import { getErrorMessage } from "../../api/client";
+import { ApiError, getErrorMessage } from "../../api/client";
 import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
@@ -49,7 +50,37 @@ interface InstanceFormData {
 interface TestResult {
   success: boolean;
   message: string;
+  /** Stash's own error text, when the server sent it */
+  details?: string;
 }
+
+/** Stash's reason for a failure, when the server's answer carries it */
+const errorDetails = (err: unknown): string | undefined =>
+  err instanceof ApiError && typeof err.data.details === "string"
+    ? err.data.details
+    : undefined;
+
+/**
+ * What the form changed on a saved instance: only the keys that differ, so a
+ * rename or a priority change never sends an address or a key. An empty
+ * description or UI address is `null`; the key goes only when typed.
+ */
+const changedFields = (
+  form: InstanceFormData,
+  saved: StashInstance
+): Record<string, unknown> => {
+  const changes: Record<string, unknown> = {};
+  if (form.name !== saved.name) changes.name = form.name;
+  if (form.description !== (saved.description ?? "")) {
+    changes.description = form.description || null;
+  }
+  if (form.url !== saved.url) changes.url = form.url;
+  if (form.uiUrl !== (saved.uiUrl ?? "")) changes.uiUrl = form.uiUrl || null;
+  if (form.apiKey) changes.apiKey = form.apiKey;
+  if (form.enabled !== saved.enabled) changes.enabled = form.enabled;
+  if (form.priority !== saved.priority) changes.priority = form.priority;
+  return changes;
+};
 
 const StashInstanceSection = () => {
   const { user } = useAuth();
@@ -72,7 +103,10 @@ const StashInstanceSection = () => {
     enabled: true,
     priority: 0,
   });
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<{
+    message: string;
+    details?: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
@@ -177,7 +211,7 @@ const StashInstanceSection = () => {
 
   const handleTestConnection = async () => {
     if (!formData.url) {
-      setFormError("URL is required");
+      setFormError({ message: "URL is required" });
       return;
     }
 
@@ -186,13 +220,25 @@ const StashInstanceSection = () => {
       setTestResult(null);
       setFormError(null);
 
-      const data = await apiPost<{ version?: string }>(
-        "/setup/test-stash-connection",
-        {
-          url: formData.url,
-          apiKey: formData.apiKey || undefined,
-        }
-      );
+      // A saved instance tests by id with its stored key, which never reaches
+      // the browser: only a changed address or a typed key goes in the body
+      const data = editingInstance
+        ? await apiPost<TestStashConnectionResponse>(
+            `/setup/stash-instance/${editingInstance.id}/test-connection`,
+            {
+              ...(formData.url !== editingInstance.url && {
+                url: formData.url,
+              }),
+              ...(formData.apiKey && { apiKey: formData.apiKey }),
+            }
+          )
+        : await apiPost<TestStashConnectionResponse>(
+            "/setup/test-stash-connection",
+            {
+              url: formData.url,
+              apiKey: formData.apiKey || undefined,
+            }
+          );
 
       setTestResult({
         success: true,
@@ -202,6 +248,7 @@ const StashInstanceSection = () => {
       setTestResult({
         success: false,
         message: (err as Error).message || "Connection failed",
+        details: errorDetails(err),
       });
     } finally {
       setTesting(false);
@@ -210,7 +257,7 @@ const StashInstanceSection = () => {
 
   const handleSave = async () => {
     if (!formData.name || !formData.url) {
-      setFormError("Name and URL are required");
+      setFormError({ message: "Name and URL are required" });
       return;
     }
 
@@ -220,18 +267,11 @@ const StashInstanceSection = () => {
 
       let result: CreateStashInstanceResponse | UpdateStashInstanceResponse;
       if (editingInstance) {
-        // Update existing instance
-        const updateData: Record<string, unknown> = {
-          name: formData.name,
-          description: formData.description || null,
-          url: formData.url,
-          uiUrl: formData.uiUrl || null,
-          enabled: formData.enabled,
-          priority: formData.priority,
-        };
-        // Only include apiKey if changed
-        if (formData.apiKey) {
-          updateData.apiKey = formData.apiKey;
+        // Update existing instance: send only what changed
+        const updateData = changedFields(formData, editingInstance);
+        if (Object.keys(updateData).length === 0) {
+          handleCancel();
+          return;
         }
 
         result = await apiPut<UpdateStashInstanceResponse>(
@@ -267,7 +307,10 @@ const StashInstanceSection = () => {
       await loadInstances();
       handleCancel();
     } catch (err) {
-      setFormError((err as Error).message || "Failed to save instance");
+      setFormError({
+        message: (err as Error).message || "Failed to save instance",
+        details: errorDetails(err),
+      });
     } finally {
       setSaving(false);
     }
@@ -566,7 +609,12 @@ const StashInstanceSection = () => {
                     : "rgb(239, 68, 68)",
                 }}
               >
-                {testResult.message}
+                <div>{testResult.message}</div>
+                {testResult.details && (
+                  <div className="mt-1 text-xs opacity-80">
+                    {testResult.details}
+                  </div>
+                )}
               </div>
             )}
 
@@ -579,7 +627,12 @@ const StashInstanceSection = () => {
                   color: "rgb(239, 68, 68)",
                 }}
               >
-                {formError}
+                <div>{formError.message}</div>
+                {formError.details && (
+                  <div className="mt-1 text-xs opacity-80">
+                    {formError.details}
+                  </div>
+                )}
               </div>
             )}
 
