@@ -106,7 +106,24 @@ interface ThumbnailCellProps {
   alt?: string;
   linkTo?: string;
   entityType?: string;
+  /** Opens the item in place on a plain click; the link stays for the rest */
+  onOpen?: (() => void) | undefined;
 }
+
+/**
+ * A link's click handler that opens the item in place: a plain left click
+ * calls `onOpen` instead of following the link; a modified or middle click
+ * (a new tab, say) follows it.
+ */
+const openInPlace =
+  (onOpen: (() => void) | undefined) => (event: React.MouseEvent) => {
+    if (!onOpen || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    onOpen();
+  };
 
 /**
  * ThumbnailCell - Small image thumbnail with optional link
@@ -116,6 +133,7 @@ export const ThumbnailCell = ({
   alt = "",
   linkTo,
   entityType,
+  onOpen,
 }: ThumbnailCellProps) => {
   const { width, height } = getThumbnailDimensions(entityType);
   const sizeClasses = `${width} ${height}`;
@@ -147,7 +165,11 @@ export const ThumbnailCell = ({
 
   if (linkTo) {
     return (
-      <Link to={linkTo} className="block hover:opacity-80 transition-opacity">
+      <Link
+        to={linkTo}
+        onClick={openInPlace(onOpen)}
+        className="block hover:opacity-80 transition-opacity"
+      >
         {image}
       </Link>
     );
@@ -159,12 +181,14 @@ export const ThumbnailCell = ({
 interface LinkCellProps {
   text: string | null | undefined;
   linkTo?: string;
+  /** Opens the item in place on a plain click; the link stays for the rest */
+  onOpen?: (() => void) | undefined;
 }
 
 /**
  * LinkCell - Text link to detail page
  */
-export const LinkCell = ({ text, linkTo }: LinkCellProps) => {
+export const LinkCell = ({ text, linkTo, onOpen }: LinkCellProps) => {
   if (!text) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -176,6 +200,7 @@ export const LinkCell = ({ text, linkTo }: LinkCellProps) => {
   return (
     <Link
       to={linkTo}
+      onClick={openInPlace(onOpen)}
       className="hover:underline"
       style={{ color: "var(--accent-primary)" }}
     >
@@ -536,19 +561,21 @@ const galleryRenderers: RendererMap = {
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const imageRenderers: RendererMap = {
-  title: (image) => (
+  title: (image, options = {}) => (
     <LinkCell
       text={
         image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`
       }
-      linkTo={getImagePath(image)}
+      linkTo={options.itemPath?.(image) ?? getImagePath(image)}
+      onOpen={options.onItemOpen && (() => options.onItemOpen?.(image))}
     />
   ),
-  image: (image) => (
+  image: (image, options = {}) => (
     <ThumbnailCell
       src={image.paths?.thumbnail || image.image_path}
       alt={image.title}
-      linkTo={getImagePath(image)}
+      linkTo={options.itemPath?.(image) ?? getImagePath(image)}
+      onOpen={options.onItemOpen && (() => options.onItemOpen?.(image))}
       entityType="image"
     />
   ),
@@ -789,6 +816,10 @@ const entityRenderers: Record<string, RendererMap> = {
 
 interface CellRendererOptions {
   hasMultipleInstances?: boolean;
+  /** An image row's link (the list's own address with the image) */
+  itemPath?: ((item: Entity) => string) | undefined;
+  /** Opens an image row in the list's viewer on a plain click */
+  onItemOpen?: ((item: Entity) => void) | undefined;
 }
 
 /**

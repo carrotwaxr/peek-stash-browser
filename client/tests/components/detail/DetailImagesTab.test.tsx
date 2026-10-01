@@ -423,6 +423,41 @@ describe("DetailImagesTab", () => {
     expect(screen.getByLabelText("Rating: 8.0")).toBeInTheDocument();
   });
 
+  it("in table view an image's links keep the tab's list state and add the image; a click opens it there", async () => {
+    const { router } = tagTab([
+      `/tag/5?tab=images&includeSubTags=true&view=table&page=2&sort=title&dir=ASC`,
+    ]);
+    // The title and the thumbnail both link to it
+    const links = await screen.findAllByRole("link", { name: "Image 25" });
+    expect(links).toHaveLength(2);
+    const title = must(links[0]);
+    const href = new URL(must(title.getAttribute("href")), "http://x");
+    expect(href.pathname).toBe("/tag/5");
+    expect(Object.fromEntries(href.searchParams)).toEqual({
+      tab: "images",
+      includeSubTags: "true",
+      view: "table",
+      page: "2",
+      sort: "title",
+      dir: "ASC",
+      image: `img-25:${INSTANCE}`,
+    });
+    expect(must(links[1]).getAttribute("href")).toBe(
+      title.getAttribute("href")
+    );
+
+    fireEvent.click(title);
+
+    const viewer = await screen.findByRole("dialog", { name: "Image viewer" });
+    expect(within(viewer).getByText("25 / 30")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/tag/5");
+    expect(search(router)).toMatchObject({
+      page: "2",
+      sort: "title",
+      image: `img-25:${INSTANCE}`,
+    });
+  });
+
   it("rating an image in the viewer shows the new rating on the tab's card after the viewer closes", async () => {
     const { api } = tagTab();
     await waitFor(() => expect(cards()).toHaveLength(PER_PAGE));

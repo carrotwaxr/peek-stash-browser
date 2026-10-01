@@ -1,4 +1,5 @@
 import { Fragment, type Ref, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
@@ -17,7 +18,9 @@ import {
   useWallPlayback,
 } from "../../hooks/useWallPlayback";
 import { UNTAGGED_KIND } from "../../utils/buildFolderTree";
+import { getImagePathInList } from "../../utils/entityLinks";
 import { buildListQuery, sortOptionsFor } from "../../utils/listQuery";
+import { IMAGE_PARAM } from "../../utils/urlParams";
 import { FolderView } from "../folder/index";
 import { ColumnConfigPopover, TableView } from "../table/index";
 import TimelineView from "../timeline/TimelineView";
@@ -324,6 +327,34 @@ const EntityListPage = ({
     [renderCard, cardContext]
   );
 
+  // An image row of the table (or tile of the wall) links to this list's
+  // own address with the image (its filters, sort and page kept), and a
+  // plain click opens it in the list's viewer, as a card does. The open
+  // image's own param is left out of the memo, so paging in the viewer
+  // does not render every row again.
+  const { pathname, search } = useLocation();
+  const imageRows = entityType === "image";
+  const listSearch = useMemo(() => {
+    const params = new URLSearchParams(search);
+    params.delete(IMAGE_PARAM);
+    return params.toString();
+  }, [search]);
+  const itemPath = useMemo(
+    () =>
+      imageRows
+        ? (item: ListRow) =>
+            getImagePathInList(
+              {
+                id: item.id as string | undefined,
+                instanceId: item.instanceId as string | undefined,
+              },
+              { pathname, search: listSearch }
+            )
+        : undefined,
+    [imageRows, pathname, listSearch]
+  );
+  const onItemOpen = imageRows ? cardContext.onItemClick : undefined;
+
   const {
     allColumns,
     visibleColumns,
@@ -361,6 +392,8 @@ const EntityListPage = ({
           onHideColumn={hideColumn}
           entityType={config.tableEntity ?? entityType}
           isLoading={isLoading}
+          itemPath={itemPath}
+          onItemOpen={onItemOpen}
         />
       );
     }
@@ -373,6 +406,7 @@ const EntityListPage = ({
           zoomLevel={zoomLevel as WallZoom}
           playbackMode={wallPlayback}
           onItemClick={cardContext.onItemClick}
+          itemPath={itemPath}
           loading={isLoading}
           emptyMessage={emptyMessage}
         />
