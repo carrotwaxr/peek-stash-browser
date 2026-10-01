@@ -566,3 +566,16 @@ export interface PlaylistItemQueryRow {
   position: number;
   addedAt: Date;
 }
+
+/** One play queue entry's columns (PlaylistQueryService.loadPlaylistQueue) */
+export interface PlaylistQueueQueryRow {
+  sceneId: string;
+  /** The join matches it to the scene's instance, so never null */
+  instanceId: string;
+  title: string | null;
+  filePath: string | null;
+  pathScreenshot: string | null;
+  duration: number | null;
+  /** Null without a studio, or one the viewer may not see */
+  studioName: string | null;
+}

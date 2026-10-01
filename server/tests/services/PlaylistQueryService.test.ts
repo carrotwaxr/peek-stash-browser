@@ -204,40 +204,16 @@ describe("loadPlaylistItems without paging", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetByRefs.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
-  it("every item in position order, each with its own instance's scene; an item with an empty instance gets none", async () => {
-    mockPrisma.playlistItem.findMany.mockResolvedValue([
-      partialRow({
-        id: 1,
-        playlistId: 9,
-        sceneId: "42",
-        instanceId: "a",
-        position: 0,
-      }),
-      partialRow({
-        id: 2,
-        playlistId: 9,
-        sceneId: "42",
-        instanceId: "b",
-        position: 1,
-      }),
-      partialRow({
-        id: 3,
-        playlistId: 9,
-        sceneId: "43",
-        instanceId: "",
-        position: 2,
-      }),
-      partialRow({
-        id: 4,
-        playlistId: 9,
-        sceneId: "44",
-        instanceId: "a",
-        position: 3,
-      }),
+  it("the visible items in SQL, in position order, each with its own instance's scene: one statement, no count, no page", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      itemRow({ id: 1, sceneId: "42", instanceId: "a", position: 0 }),
+      itemRow({ id: 2, sceneId: "42", instanceId: "b", position: 1 }),
+      itemRow({ id: 4, sceneId: "44", instanceId: "a", position: 3 }),
     ]);
-    // In no particular order; 44@a is not visible to the user
+    // In no particular order; 44@a was hidden after the statement
     mockGetByRefs.mockResolvedValue([
       scene("42", "b", "From B"),
       scene("42", "a", "From A"),
@@ -249,10 +225,22 @@ describe("loadPlaylistItems without paging", () => {
       playlistId: 9,
     });
 
-    expect(mockPrisma.playlistItem.findMany).toHaveBeenCalledWith({
-      where: { playlistId: 9 },
-      orderBy: [{ position: "asc" }, { id: "asc" }],
-    });
+    const [only, ...rest] = statements();
+    expect(rest).toEqual([]);
+    const { sql, params } = must(only);
+    expect(sql).toContain(
+      "CROSS JOIN StashScene s ON s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId"
+    );
+    expect(sql).toContain(
+      "pi.playlistId = ? AND s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?)"
+    );
+    expect(sql).toContain("ORDER BY pi.position ASC, pi.id ASC");
+    expect(sql).not.toContain("LIMIT");
+    expect(sql).not.toContain("COUNT(*)");
+    expect(params).toEqual([USER_ID, 9, "a", "b"]);
+    expect(placeholders(sql)).toBe(params.length);
+    expect(mockPrisma.playlistItem.findMany).not.toHaveBeenCalled();
+
     expect(mockGetByRefs).toHaveBeenCalledExactlyOnceWith({
       userId: USER_ID,
       refs: [
@@ -262,26 +250,18 @@ describe("loadPlaylistItems without paging", () => {
       ],
       allowedInstanceIds: ALLOWED,
     });
-    expect(items.map((i) => [i.id, i.scene?.title ?? null])).toEqual([
+    // Every item has its scene; one hidden since the statement is left out
+    expect(items.map((i) => [i.id, i.scene.title])).toEqual([
       [1, "From A"],
       [2, "From B"],
-      [3, null],
-      [4, null],
     ]);
     expect(totalItems).toBe(2);
-    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 
   it("reads the scenes a list page (250 refs) at a time", async () => {
-    mockPrisma.playlistItem.findMany.mockResolvedValue(
+    mockPrisma.$queryRawUnsafe.mockResolvedValue(
       Array.from({ length: 600 }, (_, n) =>
-        partialRow({
-          id: n + 1,
-          playlistId: 9,
-          sceneId: String(1000 + n),
-          instanceId: "a",
-          position: n,
-        })
+        itemRow({ id: n + 1, sceneId: String(1000 + n), position: n })
       )
     );
 
@@ -296,25 +276,15 @@ describe("loadPlaylistItems without paging", () => {
     ).toEqual([PER_PAGE_MAX, PER_PAGE_MAX, 100]);
   });
 
-  it("without an allowed instance, every item comes back with no scene and the builder is not asked", async () => {
-    mockPrisma.playlistItem.findMany.mockResolvedValue([
-      partialRow({
-        id: 1,
-        playlistId: 9,
-        sceneId: "42",
-        instanceId: "a",
-        position: 0,
-      }),
-    ]);
-
-    const { items, totalItems } = await loadPlaylistItems({
+  it("without an allowed instance, no item, no statement and the builder is not asked", async () => {
+    const result = await loadPlaylistItems({
       userId: USER_ID,
       allowedInstanceIds: [],
       playlistId: 9,
     });
 
-    expect(items.map((i) => i.scene)).toEqual([null]);
-    expect(totalItems).toBe(0);
+    expect(result).toEqual({ items: [], totalItems: 0 });
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
     expect(mockGetByRefs).not.toHaveBeenCalled();
   });
 });
@@ -381,7 +351,7 @@ describe("loadPlaylistItems with paging", () => {
       ],
       allowedInstanceIds: ALLOWED,
     });
-    expect(items.map((i) => [i.id, i.position, i.scene?.title])).toEqual([
+    expect(items.map((i) => [i.id, i.position, i.scene.title])).toEqual([
       [6, 5, "From B"],
       [7, 6, "Fifty"],
     ]);

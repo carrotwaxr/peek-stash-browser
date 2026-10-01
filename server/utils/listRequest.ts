@@ -1301,10 +1301,8 @@ function playlistItemSort(
  * item was added (`added_at`), or any scene sort as the Scenes page sorts.
  * Without a direction, `position` and `added_at` read ASC and a scene sort
  * the scene list's default; a bare `random` takes the user's daily seed, so
- * the answer can always name `random_<seed>`. A request that sends none of
- * `page`, `per_page`, `sort` and `direction` reads every item in position
- * order (the playlist page reads them all until it pages); a sort alone
- * reads page 1.
+ * the answer can always name `random_<seed>`. It always pages: page 1 of 50
+ * when the request names none.
  */
 export function parsePlaylistItemsRequest(
   query: unknown,
@@ -1332,26 +1330,47 @@ export function parsePlaylistItemsRequest(
   walk(input, "", handlers, problems, "Unknown query parameter");
   problems.finish();
 
-  const sort = playlistItemSort(sortField, direction, options);
-  const unpaged =
-    page === undefined &&
-    perPage === undefined &&
-    sortField === undefined &&
-    direction === undefined;
-
   return {
-    paging: unpaged
-      ? undefined
-      : {
-          page: clampPage(page),
-          perPage: clampPerPage(
-            perPage,
-            PLAYLIST_ITEMS_PER_PAGE_DEFAULT,
-            PLAYLIST_ITEMS_PER_PAGE_MAX
-          ),
-        },
-    sort,
+    paging: {
+      page: clampPage(page),
+      perPage: clampPerPage(
+        perPage,
+        PLAYLIST_ITEMS_PER_PAGE_DEFAULT,
+        PLAYLIST_ITEMS_PER_PAGE_MAX
+      ),
+    },
+    sort: playlistItemSort(sortField, direction, options),
   };
+}
+
+/**
+ * `GET /api/playlists/:id/queue`: the play queue's order, the `sort` and
+ * `direction` the item page reads (as `parsePlaylistItemsRequest` reads
+ * them); no paging, since the queue is every visible item
+ */
+export function parsePlaylistQueueRequest(
+  query: unknown,
+  options: ParseOptions
+): ParsedPlaylistItemSort {
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let sortField: ReturnType<typeof parsePlaylistSort>;
+  let direction: SortDirection | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    [
+      "sort",
+      (raw, path) => (sortField = parsePlaylistSort(raw, path, problems)),
+    ],
+    [
+      "direction",
+      (raw, path) => (direction = parseDirection(raw, path, problems)),
+    ],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+  problems.finish();
+
+  return playlistItemSort(sortField, direction, options);
 }
 
 /**

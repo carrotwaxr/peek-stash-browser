@@ -7,10 +7,13 @@ import {
 } from "../services/PlaylistAccessService.js";
 import {
   appendItems,
+  countUnavailableItems,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
+  loadPlaylistQueue,
   playlistsHoldingScene,
+  removeUnavailableItems,
   sortPlaylistItems,
 } from "../services/PlaylistQueryService.js";
 import type {
@@ -27,6 +30,8 @@ import type {
   DuplicatePlaylistResponse,
   GetPlaylistParams,
   GetPlaylistQuery,
+  GetPlaylistQueueQuery,
+  GetPlaylistQueueResponse,
   GetPlaylistResponse,
   GetPlaylistSharesResponse,
   GetSharedPlaylistsResponse,
@@ -35,6 +40,7 @@ import type {
   RemoveSceneFromPlaylistParams,
   RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
+  RemoveUnavailableItemsResponse,
   ReorderPlaylistParams,
   ReorderPlaylistRequest,
   ReorderPlaylistResponse,
@@ -53,6 +59,7 @@ import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import {
   parsePlaylistItemsRequest,
+  parsePlaylistQueueRequest,
   parsePlaylistsQuery,
   parseSortPlaylistRequest,
 } from "../utils/listRequest.js";
@@ -236,11 +243,12 @@ export const getSharedPlaylists = async (
 };
 
 /**
- * Get single playlist with its items and their scenes as this user sees
- * them: every item in position order without `page`, `per_page`, `sort` and
- * `direction`, else one page of the items the user can see in the
- * request's sort (PlaylistQueryService.loadPlaylistItems). The answer names
- * the sort it read, a random one as `random_<seed>`.
+ * Get single playlist with one page of the items this user can see, with
+ * their scenes, in the request's sort (PlaylistQueryService
+ * .loadPlaylistItems; page 1 of 50 when the request names none). The answer
+ * names the sort it read, a random one as `random_<seed>`. The owner also
+ * gets how many items they cannot play; a recipient is told nothing about
+ * those (0).
  */
 export const getPlaylist = async (
   req: TypedLibraryRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
@@ -281,11 +289,21 @@ export const getPlaylist = async (
     paging,
     sort,
   });
+  const unavailableItems =
+    access.level === "owner"
+      ? await countUnavailableItems({
+          userId,
+          allowedInstanceIds: req.allowedInstanceIds,
+          playlistId,
+        })
+      : 0;
 
   res.json({
     playlist: { ...playlist, items },
     totalItems,
-    ...(paging && { page: paging.page, perPage: paging.perPage }),
+    unavailableItems,
+    page: paging.page,
+    perPage: paging.perPage,
     // The parser always seeds a random sort
     sort: sort.field === "random" ? `random_${sort.seed ?? 0}` : sort.field,
     direction: sort.direction,
@@ -293,6 +311,41 @@ export const getPlaylist = async (
     accessLevel: access.level,
     ...(access.level === "shared" ? { sharedViaGroups: access.groups } : {}),
   });
+};
+
+/**
+ * The play queue: every item of the playlist this user can see, in the
+ * order the item page shows under the same `sort` and `direction`
+ * (PlaylistQueryService.loadPlaylistQueue), with the fields the player's
+ * sidebar shows. Access as `getPlaylist`: the owner or a recipient.
+ */
+export const getPlaylistQueue = async (
+  req: TypedLibraryRequest<unknown, GetPlaylistParams, GetPlaylistQueueQuery>,
+  res: TypedResponse<GetPlaylistQueueResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  // A ValidationError (400) reaches the central error handler
+  const sort = parsePlaylistQueueRequest(req.query, { userId });
+  const playlistId = parseInt(req.params.id);
+
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const access = await getPlaylistAccess(playlistId, userId);
+  if (access.level === "none") {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  const entries = await loadPlaylistQueue({
+    userId,
+    allowedInstanceIds: req.allowedInstanceIds,
+    playlistId,
+    sort,
+  });
+  res.json({ entries });
 };
 
 /**
@@ -741,6 +794,37 @@ export const sortPlaylist = async (
     sort,
   });
   res.json({ success: true, itemCount });
+};
+
+/**
+ * Remove the items whose scene is deleted from Stash (owner only, as
+ * sort): items hidden, restricted or on an instance the owner does not use
+ * stay, since they may come back (PlaylistQueryService
+ * .removeUnavailableItems). A recipient gets 404.
+ */
+export const removeUnavailablePlaylistItems = async (
+  req: TypedLibraryRequest<unknown, ReorderPlaylistParams>,
+  res: TypedResponse<RemoveUnavailableItemsResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  const playlistId = parseInt(req.params.id);
+
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const playlist = await prisma.playlist.findFirst({
+    where: { id: playlistId, userId },
+    select: { id: true },
+  });
+  if (!playlist) {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  const removed = await removeUnavailableItems(playlistId);
+  res.json({ removed });
 };
 
 /**

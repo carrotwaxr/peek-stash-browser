@@ -24,6 +24,7 @@ import {
   parseListRequest,
   parseMinimalRequest,
   parsePlaylistItemsRequest,
+  parsePlaylistQueueRequest,
   parseRecommendedRequest,
   parseSceneClipsRequest,
   parseSimilarScenesRequest,
@@ -1472,9 +1473,9 @@ describe("parsePlaylistItemsRequest", () => {
   /** The sort a request without one reads in: the playlist's own order */
   const POSITION = { field: "position", direction: "ASC", seed: undefined };
 
-  it("without page and per_page, every item: no paging", () => {
+  it("without page and per_page, page 1 of 50: the list always pages", () => {
     expect(parsePlaylistItemsRequest({}, opts())).toEqual({
-      paging: undefined,
+      paging: { page: 1, perPage: 50 },
       sort: POSITION,
     });
   });
@@ -1596,6 +1597,37 @@ describe("parsePlaylistItemsRequest", () => {
     expect(issuesOf(() => parsePlaylistItemsRequest("x", opts()))).toEqual([
       { path: "query", message: "Expected an object" },
     ]);
+  });
+});
+
+describe("parsePlaylistQueueRequest", () => {
+  it("reads sort and direction as the item page does; none is position ASC", () => {
+    expect(parsePlaylistQueueRequest({}, opts())).toEqual({
+      field: "position",
+      direction: "ASC",
+      seed: undefined,
+    });
+    expect(
+      parsePlaylistQueueRequest({ sort: "title", direction: "ASC" }, opts())
+    ).toEqual({ field: "title", direction: "ASC", seed: undefined });
+    expect(parsePlaylistQueueRequest({ sort: "random_42" }, opts())).toEqual({
+      field: "random",
+      direction: "DESC",
+      seed: 42,
+    });
+  });
+
+  it("refuses paging, scene_index and unknown parameters", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parsePlaylistQueueRequest(
+            { page: "1", per_page: "50", sort: "scene_index", bogus: "1" },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["page", "per_page", "sort", "bogus"]);
   });
 });
 

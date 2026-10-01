@@ -6,10 +6,12 @@ import {
   deletePlaylist,
   duplicatePlaylist,
   getPlaylist,
+  getPlaylistQueue,
   getPlaylistShares,
   getSharedPlaylists,
   getUserPlaylists,
   removeSceneFromPlaylist,
+  removeUnavailablePlaylistItems,
   reorderPlaylist,
   sortPlaylist,
   updatePlaylist,
@@ -29,8 +31,15 @@ router.get("/shared", withAllowedInstances, libraryHandler(getSharedPlaylists));
 // Get all user playlists
 router.get("/", withAllowedInstances, libraryHandler(getUserPlaylists));
 
-// Get single playlist with items
+// Get single playlist with a page of its items
 router.get("/:id", withAllowedInstances, libraryHandler(getPlaylist));
+
+// Get the play queue: every visible item in the shown order
+router.get(
+  "/:id/queue",
+  withAllowedInstances,
+  libraryHandler(getPlaylistQueue)
+);
 
 // Create new playlist
 router.post("/", authenticated(createPlaylist));
@@ -53,6 +62,13 @@ router.post(
   "/:id/items/bulk",
   withAllowedInstances,
   libraryHandler(addScenesToPlaylist)
+);
+
+// Remove the items deleted from Stash (owner only)
+router.post(
+  "/:id/items/remove-unavailable",
+  withAllowedInstances,
+  libraryHandler(removeUnavailablePlaylistItems)
 );
 
 // Remove scene from playlist

@@ -451,11 +451,12 @@ interface GetPlaylistParams {
 }
 ```
 
-**Query:** `page` (from 1), `per_page` (1 to 100, default 50), `sort` and `direction`. Anything else answers 400.
+**Query:** `page` (from 1, default 1), `per_page` (1 to 100, default 50), `sort` and `direction`. Anything else answers 400.
 
 - `sort`: `position` (the playlist's own order, the default), `added_at` (when each item was added, ties in playlist order), or any scene sort except `scene_index` (`title`, `rating`, `last_played_at`, ...), which orders the items as the Scenes page orders scenes, with the viewer's own rating and history, ties in playlist order. A random order is `random_<seed>`: the same seed gives the same order on every page. A bare `random` uses the user's daily seed. An unknown sort answers 400 "Unknown sort".
 - `direction`: `ASC` or `DESC`. When absent, `ASC` for `position` and `added_at`, `DESC` for a scene sort.
-- With none of the four, the response holds every item in playlist order, with `scene: null` for the items the viewer cannot see. With any of them, one page of the items the viewer can see.
+- The response always holds one page of the items the viewer can see, each with its scene: page 1 of 50 when the request names no page. Items the viewer cannot see (hidden, restricted, deleted from Stash, or on an instance they do not use) are never listed.
+- `unavailableItems` is how many of the playlist's items the owner cannot see; for a recipient it is always 0 (they are told nothing about those items). `POST /api/playlists/:id/items/remove-unavailable` removes the ones deleted from Stash.
 
 **Response:**
 
@@ -463,8 +464,9 @@ interface GetPlaylistParams {
 interface GetPlaylistResponse {
   playlist: PlaylistData & { items: PlaylistItemWithScene[] };
   totalItems: number; // the items the viewer can see
-  page?: number; // when a page was read
-  perPage?: number;
+  unavailableItems: number; // the owner's items they cannot see; 0 for a recipient
+  page: number;
+  perPage: number;
   sort: string; // the sort read: a random one as random_<seed>
   direction: "ASC" | "DESC";
   isOwner: boolean;
@@ -474,6 +476,36 @@ interface GetPlaylistResponse {
 ```
 
 **Controller:** `getPlaylist` in `../controllers/playlist.ts`
+
+---
+
+### GET /api/playlists/:id/queue
+
+**Authentication:** Required
+
+The play queue: every item of the playlist the viewer can see, in the order `GET /api/playlists/:id` shows them under the same `sort` and `direction` (a random order as `random_<seed>`), each with the fields the player's queue shows. `position` is the entry's index in that order. The title falls back to the file name; the screenshot goes through Peek's proxy; the studio's name is left out (`studio: null`) when the viewer may not see the studio. The owner and the users the playlist is shared with can read it, each seeing only what their own exclusions and instances allow; anyone else gets 404. Takes no paging: anything but `sort` and `direction` answers 400.
+
+**Query:** `sort` and `direction`, as `GET /api/playlists/:id` takes them (position ASC when absent).
+
+**Response:**
+
+```typescript
+interface GetPlaylistQueueResponse {
+  entries: Array<{
+    sceneId: string;
+    instanceId: string;
+    position: number; // 0-based, in the shown order
+    scene: {
+      title: string | null;
+      paths: { screenshot: string | null };
+      files: [{ duration: number | null; basename: string | null }] | [];
+      studio: { name: string } | null;
+    };
+  }>;
+}
+```
+
+**Controller:** `getPlaylistQueue` in `../controllers/playlist.ts`
 
 ---
 
@@ -658,6 +690,24 @@ interface AddScenesToPlaylistResponse {
 ```
 
 **Controller:** `addScenesToPlaylist` in `../controllers/playlist.ts`
+
+---
+
+### POST /api/playlists/:id/items/remove-unavailable
+
+**Authentication:** Required
+
+Removes the playlist's items whose scene is deleted from Stash (owner only): the cached scene is marked deleted, or there is none while the item's server is enabled and synced. Items that are hidden, restricted, or on a server the owner does not use or an admin disabled stay, since they may come back. The other items keep their positions. One statement. Answers 404 when the playlist is not the user's (a recipient's request is refused this way), with nothing removed.
+
+**Response:**
+
+```typescript
+interface RemoveUnavailableItemsResponse {
+  removed: number;
+}
+```
+
+**Controller:** `removeUnavailablePlaylistItems` in `../controllers/playlist.ts`
 
 ---
 

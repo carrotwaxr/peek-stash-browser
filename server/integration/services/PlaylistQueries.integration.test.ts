@@ -24,22 +24,32 @@
  * The owner's playlist SORTED, shared with the same group, holds T3, X1,
  * T4, T1 and T2 on A (SORTED_ITEMS), for the view sorts; "Save as playlist
  * order" saves copies of its own.
+ *
+ * The owner's playlist QUEUE (QUEUE_ITEMS), shared with the group too, holds
+ * Q1 to Q3 on A beside hidden, soft-deleted, B and disabled-instance items,
+ * for the play queue: Q1 has a file, a screenshot and a studio, Q2 only a
+ * file (its title falls back to the file name), Q3 neither, and a studio
+ * the owner hid.
  */
 import type { PlaylistItemSort } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   duplicatePlaylist,
   getPlaylist,
+  getPlaylistQueue,
   getSharedPlaylists,
   getUserPlaylists,
+  removeUnavailablePlaylistItems,
   sortPlaylist,
   updatePlaylist,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import {
   appendItems,
+  countUnavailableItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
+  loadPlaylistQueue,
 } from "../../services/PlaylistQueryService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
@@ -83,6 +93,17 @@ const T_TITLES: Readonly<Record<string, string>> = {
   [T4]: "bravo",
 };
 
+/** The play queue's scenes on A, and a studio the owner hid */
+const Q1 = "7701041";
+const Q2 = "7701042";
+const Q3 = "7701043";
+const HIDDEN_STUDIO = "7701051";
+/** Scenes with no row: deleted from Stash and purged from the cache */
+const GONE = "7701061";
+const GONE_OFF = "7701062";
+/** An instance id no instance has */
+const NOWHERE = "access-it-nowhere";
+
 const GROUP_NAME = "access-it-playlist-queries";
 const MANY_PLAYLISTS = 36;
 
@@ -101,6 +122,17 @@ const PQ_ITEMS = [
 ] as const;
 
 type Ref = readonly [sceneId: string, instanceId: string];
+
+/** QUEUE's items in position order */
+const QUEUE_ITEMS: readonly Ref[] = [
+  [Q2, A],
+  [X1, A], // hidden by the owner
+  [Q1, A],
+  [DELETED, A], // soft-deleted
+  [SAME, B],
+  [Q3, A],
+  [ON_OFF, OFF], // on the disabled instance
+];
 
 /** SORTED's items in position order, with the day of the month each was added */
 const SORTED_ITEMS: ReadonlyArray<readonly [sceneId: string, day: number]> = [
@@ -198,6 +230,7 @@ describe("Playlist queries (integration)", () => {
   let pq: number;
   let allHidden: number;
   let sorted: number;
+  let queue: number;
   const manyPlaylists: Array<{ id: number; items: Ref[] }> = [];
 
   beforeAll(async () => {
@@ -243,6 +276,40 @@ describe("Playlist queries (integration)", () => {
     await hideFor(owner.id, "scene", X2, "");
     await hideFor(owner.id, "scene", SAME, A);
     await hideFor(recipient.id, "scene", P2, A);
+
+    await prisma.stashStudio.create({
+      data: { id: HIDDEN_STUDIO, stashInstanceId: A, name: "Hidden studio" },
+    });
+    await prisma.stashScene.createMany({
+      data: [
+        {
+          id: Q1,
+          stashInstanceId: A,
+          title: "Queue one",
+          titleSort: "queue one",
+          filePath: "/media/queue/one.mp4",
+          duration: 61,
+          pathScreenshot: screenshotOf(Q1, A),
+          studioId: SAME,
+        },
+        {
+          id: Q2,
+          stashInstanceId: A,
+          titleSort: "second clip",
+          filePath: "/media/queue/Second clip.mkv",
+          duration: 30,
+        },
+        {
+          id: Q3,
+          stashInstanceId: A,
+          title: "Queue three",
+          titleSort: "queue three",
+          studioId: HIDDEN_STUDIO,
+        },
+      ],
+    });
+    // The studio alone: Q3 itself stays visible to the owner
+    await hideFor(owner.id, "studio", HIDDEN_STUDIO, A);
 
     await prisma.sceneRating.createMany({
       data: [
@@ -310,6 +377,11 @@ describe("Playlist queries (integration)", () => {
     sorted = playlist.id;
     await prisma.playlistShare.create({
       data: { playlistId: sorted, groupId: group.id },
+    });
+
+    queue = await createPlaylist(owner.id, "QUEUE", QUEUE_ITEMS);
+    await prisma.playlistShare.create({
+      data: { playlistId: queue, groupId: group.id },
     });
 
     // 36 playlists of P1..P5, each rotated to start at a different scene
@@ -523,31 +595,29 @@ describe("Playlist queries (integration)", () => {
     ]);
   });
 
-  it("without page, every item comes back as before", async () => {
+  it("the unpaged read returns visible items only, in order", async () => {
+    // The zip's read: every item the viewer can see, each with its scene
     const { items, totalItems } = await itemsFor(owner, pq);
 
-    // Every item, in position order, with its row's fields
-    expect(refsOf(items)).toEqual(PQ_ITEMS.map(([id, inst]) => [id, inst]));
-    expect(items.map((i) => i.position)).toEqual(PQ_ITEMS.map((_, n) => n));
+    expect(refsOf(items)).toEqual(OWNER_SEES.map(([id, inst]) => [id, inst]));
+    expect(items.map((i) => [i.scene.id, i.scene.instanceId])).toEqual(
+      refsOf(items)
+    );
+    expect(items.map((i) => i.position)).toEqual([1, 3, 5, 6, 8, 9]);
     for (const item of items) {
       expect(item.playlistId).toBe(pq);
       expect(typeof item.id).toBe("number");
       expect(item.addedAt).toBeInstanceOf(Date);
     }
-    // The scene of each item the owner can see; null for the rest
-    const seen = new Set(OWNER_SEES.map(([id, inst]) => `${id}:${inst}`));
-    expect(
-      items.map((i) =>
-        i.scene === null ? null : `${i.scene.id}:${i.scene.instanceId}`
-      )
-    ).toEqual(
-      PQ_ITEMS.map(([id, inst]) =>
-        seen.has(`${id}:${inst}`) ? `${id}:${inst}` : null
-      )
-    );
     expect(totalItems).toBe(OWNER_SEES.length);
 
-    // Through the handler, with the items' full scenes
+    // The recipient's view, never the owner's
+    expect(refsOf((await itemsFor(recipient, pq)).items)).toEqual(
+      RECIPIENT_SEES.map(([id, inst]) => [id, inst])
+    );
+  });
+
+  it("GET /api/playlists/:id without page answers page 1 of 50", async () => {
     const req = reqFor(getPlaylist, {
       params: { id: String(pq) },
       user: testUser({ id: owner.id, username: owner.username }),
@@ -556,16 +626,174 @@ describe("Playlist queries (integration)", () => {
     const res = resFor(getPlaylist);
     await getPlaylist(req, res);
     const body = res._getOkBody();
-    expect(refsOf(must(body.playlist.items))).toEqual(
-      PQ_ITEMS.map(([id, inst]) => [id, inst])
+    expect(refsOf(body.playlist.items)).toEqual(
+      OWNER_SEES.map(([id, inst]) => [id, inst])
     );
     expect(body.totalItems).toBe(OWNER_SEES.length);
-    expect(body.page).toBeUndefined();
-    const sameB = must(must(body.playlist.items)[5]).scene;
+    expect(body.page).toBe(1);
+    expect(body.perPage).toBe(50);
+    const sameB = must(body.playlist.items[2]).scene;
     expect(sameB).toMatchObject({
       id: SAME,
       instanceId: B,
       title: titleOf(SAME, B),
+    });
+  });
+
+  /** The playlist page as `viewer` reads it, through the handler */
+  const pageAs = async (viewer: User, playlistId: number) => {
+    const req = reqFor(getPlaylist, {
+      params: { id: String(playlistId) },
+      user: testUser({ id: viewer.id, username: viewer.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(viewer.id),
+    });
+    const res = resFor(getPlaylist);
+    await getPlaylist(req, res);
+    return res._getOkBody();
+  };
+
+  it("the unavailable count is the playlist's rows minus the visible ones", async () => {
+    // PQ: ten rows, six the owner can see
+    const body = await pageAs(owner, pq);
+    expect(body.unavailableItems).toBe(PQ_ITEMS.length - OWNER_SEES.length);
+
+    // QUEUE: seven rows; the owner sees Q2, Q1, SAME@B and Q3
+    expect(
+      await countUnavailableItems({
+        userId: owner.id,
+        allowedInstanceIds: await getUserAllowedInstanceIds(owner.id),
+        playlistId: queue,
+      })
+    ).toBe(3);
+  });
+
+  it("a recipient's unavailable count is 0", async () => {
+    // The recipient cannot see three of PQ's ten items, and learns nothing
+    const body = await pageAs(recipient, pq);
+    expect(body.totalItems).toBe(RECIPIENT_SEES.length);
+    expect(body.unavailableItems).toBe(0);
+  });
+
+  describe("play queue", () => {
+    const TITLE_ASC = {
+      field: "title",
+      direction: "ASC",
+      seed: undefined,
+    } as const;
+    const POSITION_ASC = {
+      field: "position",
+      direction: "ASC",
+      seed: undefined,
+    } as const;
+
+    const queueFor = async (
+      user: User,
+      sort: ParsedPlaylistItemsQuery["sort"]
+    ) =>
+      loadPlaylistQueue({
+        userId: user.id,
+        allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
+        playlistId: queue,
+        sort,
+      });
+
+    /** One entry by its scene, failing when absent */
+    const entryOf = (
+      entries: Awaited<ReturnType<typeof queueFor>>,
+      sceneId: string,
+      instanceId: string
+    ) =>
+      must(
+        entries.find(
+          (e) => e.sceneId === sceneId && e.instanceId === instanceId
+        ),
+        `${sceneId}@${instanceId} in the queue`
+      );
+
+    it("the queue lists every visible item in the shown order with the sidebar's fields", async () => {
+      const entries = await queueFor(owner, TITLE_ASC);
+
+      // The order the pages show, page after page
+      const pages: Array<[string, string]> = [];
+      for (let page = 1; page <= 3; page++) {
+        const { items } = await itemsFor(
+          owner,
+          queue,
+          { page, perPage: 2 },
+          TITLE_ASC
+        );
+        pages.push(
+          ...items.map((i): [string, string] => [i.sceneId, i.instanceId])
+        );
+      }
+      expect(refsOf(entries)).toEqual(pages);
+      // SAME@B has no stored titleSort, so it sorts first
+      expect(refsOf(entries)).toEqual([
+        [SAME, B],
+        [Q1, A],
+        [Q3, A],
+        [Q2, A],
+      ]);
+      expect(entries.map((e) => e.position)).toEqual([0, 1, 2, 3]);
+
+      expect(entryOf(entries, Q1, A)).toEqual({
+        sceneId: Q1,
+        instanceId: A,
+        position: 1,
+        scene: {
+          title: "Queue one",
+          paths: { screenshot: toProxyUrl(screenshotOf(Q1, A), A) },
+          files: [{ duration: 61, basename: "one.mp4" }],
+          studio: { name: `A-${SAME}` },
+        },
+      });
+      expect(entryOf(entries, Q2, A).scene).toEqual({
+        title: "Second clip",
+        paths: { screenshot: null },
+        files: [{ duration: 30, basename: "Second clip.mkv" }],
+        studio: null,
+      });
+      expect(entryOf(entries, SAME, B).scene).toEqual({
+        title: titleOf(SAME, B),
+        paths: { screenshot: toProxyUrl(screenshotOf(SAME, B), B) },
+        files: [],
+        studio: null,
+      });
+
+      // onlyA deselected B: X1 (which onlyA did not hide) shows, SAME@B not
+      expect(refsOf(await queueFor(onlyA, POSITION_ASC))).toEqual([
+        [Q2, A],
+        [X1, A],
+        [Q1, A],
+        [Q3, A],
+      ]);
+
+      // Through the handler, in the request's sort
+      const req = reqFor(getPlaylistQueue, {
+        params: { id: String(queue) },
+        query: { sort: "title", direction: "ASC" },
+        user: testUser({ id: owner.id, username: owner.username }),
+        allowedInstanceIds: await getUserAllowedInstanceIds(owner.id),
+      });
+      const res = resFor(getPlaylistQueue);
+      await getPlaylistQueue(req, res);
+      expect(res._getOkBody()).toEqual({ entries });
+    });
+
+    it("the queue leaves out a studio name the viewer may not see", async () => {
+      // A guard while hiding a studio also hides its scenes: Q3 stays
+      // visible here, its studio not
+      const owners = await queueFor(owner, POSITION_ASC);
+      expect(entryOf(owners, Q3, A).scene.studio).toBeNull();
+      expect(entryOf(owners, Q1, A).scene.studio).toEqual({
+        name: `A-${SAME}`,
+      });
+
+      // The recipient did not hide it
+      const recipients = await queueFor(recipient, POSITION_ASC);
+      expect(entryOf(recipients, Q3, A).scene.studio).toEqual({
+        name: "Hidden studio",
+      });
     });
   });
 
@@ -644,6 +872,65 @@ describe("Playlist queries (integration)", () => {
         orderBy: [{ position: "asc" }, { id: "asc" }],
       })
     ).map((i) => [i.sceneId, i.instanceId, i.position]);
+
+  it("remove unavailable deletes the soft-deleted and missing scenes' items only; hidden, restricted and deselected-instance items stay", async () => {
+    // Selects A only, hid X2 on A and is restricted from P3 on A
+    const cleaner = await createUser("access-it-pq-cleaner");
+    await prisma.userStashInstance.create({
+      data: { userId: cleaner.id, instanceId: A },
+    });
+    await hideFor(cleaner.id, "scene", X2, A);
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: cleaner.id,
+        entityType: "scene",
+        entityId: P3,
+        instanceId: A,
+        reason: "restricted",
+      },
+    });
+    const playlistId = await createPlaylist(cleaner.id, "cleanup", [
+      [P1, A],
+      [DELETED, A], // soft-deleted
+      [GONE, A], // no row on an enabled, synced instance
+      [X2, A], // hidden
+      [P3, A], // restricted
+      [SAME, B], // on an instance the cleaner deselected
+      [ON_OFF, OFF], // on the disabled instance
+      [GONE_OFF, OFF], // no row, on the disabled instance
+      [GONE, NOWHERE], // no row, on no configured instance
+    ]);
+
+    const req = reqFor(removeUnavailablePlaylistItems, {
+      params: { id: String(playlistId) },
+      user: testUser({ id: cleaner.id, username: cleaner.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(cleaner.id),
+    });
+    const res = resFor(removeUnavailablePlaylistItems);
+    const recorder = recordStatements();
+    try {
+      await removeUnavailablePlaylistItems(req, res);
+    } finally {
+      recorder.restore();
+    }
+
+    expect(res._getOkBody()).toEqual({ removed: 2 });
+    // The rest keep their positions
+    expect(await positioned(playlistId)).toEqual([
+      [P1, A, 0],
+      [X2, A, 3],
+      [P3, A, 4],
+      [SAME, B, 5],
+      [ON_OFF, OFF, 6],
+      [GONE_OFF, OFF, 7],
+      [GONE, NOWHERE, 8],
+    ]);
+    // One statement, outside any transaction
+    expect(
+      recorder.statements.filter((st) => /^\s*DELETE\b/i.test(st.sql))
+    ).toHaveLength(1);
+    expect(recorder.transactions()).toBe(0);
+  });
 
   it("two adds at once get positions n and n+1", async () => {
     const playlistId = await createPlaylist(owner.id, "append race", [
