@@ -229,7 +229,9 @@ export interface NormalizedStudio {
   id: string;
   instanceId: string;
   name: string;
-  parent_studio: { id: string } | null;
+  // The parent's id from the row; after populateRelations, its ref (with
+  // name and instance), or null when the viewer cannot see it
+  parent_studio: { id: string; name?: string; instanceId?: string } | null;
   favorite: boolean;
   rating100: number | null;
   scene_count: number;

@@ -247,8 +247,8 @@ describe("studio page sections", () => {
     expect(tags.getByRole("link", { name: "Alpha" })).toBeVisible();
   });
 
-  // DETAIL-22: the description shows in the right column and again below
-  it.fails("shows the description once", async () => {
+  // DETAIL-22: the description shows once, beside the image
+  it("shows the description once", async () => {
     render();
 
     await card("Website");
@@ -596,8 +596,11 @@ describe("statistics", () => {
       expect(statistics.getByText("60/100")).toBeVisible();
     });
 
-    // DETAIL-17: the bar reads the rating as loaded, not the slider
-    it.fails("follows the slider after a change", async () => {
+    // DETAIL-17: the studio's bar reads the viewer's rating as the detail
+    // hook holds it; the performer page's still reads the rating as loaded
+    // (B12 moves it onto the layout)
+    const followsSlider = type === "studio" ? it : it.fails;
+    followsSlider("follows the slider after a change", async () => {
       cardSettings.current = { showRating: true };
       const { api } = render();
       const statistics = await card("Statistics");
