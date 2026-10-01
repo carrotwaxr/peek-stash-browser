@@ -21,7 +21,11 @@ import {
   TransformWrapper,
 } from "react-zoom-pan-pinch";
 import { imageViewHistoryApi } from "../../api";
-import { useUpdateFavorite, useUpdateRating } from "../../api/hooks";
+import {
+  useIncrementOCounter,
+  useUpdateFavorite,
+  useUpdateRating,
+} from "../../api/hooks";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
@@ -42,7 +46,6 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   autoPlay?: boolean;
-  onImagesUpdate?: (images: ImageListItem[]) => void;
   onPageBoundary?: (direction: "next" | "prev") => boolean;
   totalCount?: number;
   pageOffset?: number;
@@ -58,7 +61,6 @@ const Lightbox = ({
   isOpen,
   onClose,
   autoPlay = false,
-  onImagesUpdate,
   onPageBoundary,
   totalCount,
   pageOffset = 0,
@@ -80,6 +82,7 @@ const Lightbox = ({
   const [oCounter, setOCounter] = useState(0);
   const { mutateAsync: saveRating } = useUpdateRating();
   const { mutateAsync: saveFavorite } = useUpdateFavorite();
+  const { mutate: pressO } = useIncrementOCounter();
 
   // New state for enhanced features
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -342,26 +345,13 @@ const Lightbox = ({
     [images, currentIndex, isFavorite, saveFavorite]
   );
 
-  // Handle O counter change
-  const handleOCounterChange = useCallback(
-    (newCount: number) => {
-      const currentImage = images[currentIndex];
-      if (!currentImage?.id) return;
-
-      setOCounter(newCount);
-
-      // Update the images array so navigation preserves the change
-      const updatedImages = [...images];
-      updatedImages[currentIndex] = {
-        ...currentImage,
-        oCounter: newCount,
-      };
-      if (onImagesUpdate) {
-        onImagesUpdate(updatedImages);
-      }
-    },
-    [images, currentIndex, onImagesUpdate]
-  );
+  // The O count shown. The O writes (the button, Remove last O, the
+  // double tap) put the server's count into every cached row of the image
+  // themselves, so the host's images follow; the viewer writes no copy of
+  // the image back, which could carry an older rating or favorite.
+  const handleOCounterChange = useCallback((newCount: number) => {
+    setOCounter(newCount);
+  }, []);
 
   // Trigger double-tap/double-click action with visual feedback
   const triggerDoubleTapAction = useCallback(() => {
@@ -382,11 +372,14 @@ const Lightbox = ({
     if (doubleTapAction === "o_counter") {
       const newCount = oCounter + 1;
       handleOCounterChange(newCount);
-      imageViewHistoryApi
-        .incrementO(currentImage.id, currentImage.instanceId)
-        .catch((err: unknown) => {
-          console.error("Failed to increment O counter:", err);
-        });
+      pressO(
+        { imageId: currentImage.id, instanceId: currentImage.instanceId },
+        {
+          onError: (err: unknown) => {
+            console.error("Failed to increment O counter:", err);
+          },
+        }
+      );
       setDoubleTapFeedback("o_counter");
     } else if (doubleTapAction === "fullscreen") {
       void toggleFullscreen();
@@ -411,6 +404,7 @@ const Lightbox = ({
     oCounter,
     isFavorite,
     handleOCounterChange,
+    pressO,
     handleFavoriteChange,
     toggleFullscreen,
   ]);

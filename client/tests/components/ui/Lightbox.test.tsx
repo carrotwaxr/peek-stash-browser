@@ -716,24 +716,6 @@ describe("Lightbox", () => {
       );
     });
 
-    it("rating in the lightbox calls the host's onImagesUpdate never: the mutation patches the cache", async () => {
-      const onImagesUpdate = vi.fn();
-      render(
-        <Lightbox
-          images={[image]}
-          isOpen={true}
-          onClose={vi.fn()}
-          onImagesUpdate={onImagesUpdate}
-        />
-      );
-
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "r" });
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "4" });
-      await waitFor(() => expect(libraryApi.updateRating).toHaveBeenCalled());
-
-      expect(onImagesUpdate).not.toHaveBeenCalled();
-    });
-
     it("is a modal dialog that holds focus while open", () => {
       render(<Lightbox images={[image]} isOpen={true} onClose={vi.fn()} />);
 

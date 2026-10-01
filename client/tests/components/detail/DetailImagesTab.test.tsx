@@ -81,6 +81,9 @@ const imageRow = (n: number) => ({
   rating100: null,
   favorite: false,
   oCounter: 0,
+  performers: [],
+  tags: [],
+  urls: [],
 });
 
 /** A request's JSON body */
@@ -116,6 +119,7 @@ const DATE_PRESET = {
 interface Setup {
   presets?: Record<string, unknown[]>;
   defaults?: Record<string, string>;
+  userSettings?: Parameters<typeof userSettingsResponse>[0];
 }
 
 /** The server: 30 images, 24 a page; the rating write answers what it got */
@@ -159,6 +163,20 @@ function stubServer({ presets = {}, defaults = {} }: Setup = {}): ApiStub {
     "/user/settings": () => jsonResponse(200, userSettingsResponse({})),
     "/user/permissions": () => jsonResponse(200, { permissions: {} }),
     "/image-view-history/view": () => jsonResponse(200, { success: true }),
+    "/image-view-history/increment-o": () =>
+      jsonResponse(200, { success: true, oCount: 1 }),
+    "/ratings/image/img-27": (_url, init) => {
+      const sent = jsonBody(init) as { rating?: number };
+      return jsonResponse(200, {
+        success: true,
+        rating: {
+          id: 27,
+          instanceId: INSTANCE,
+          rating: sent.rating ?? null,
+          favorite: false,
+        },
+      });
+    },
     "/ratings/image/img-1": (_url, init) => {
       const sent = jsonBody(init) as { rating?: number };
       return jsonResponse(200, {
@@ -190,6 +208,7 @@ const tagTab = (
       initialEntries,
       ...(setup.presets ? { presets: setup.presets as never } : {}),
       ...(setup.defaults ? { defaultPresets: setup.defaults } : {}),
+      ...(setup.userSettings ? { userSettings: setup.userSettings } : {}),
     }
   );
   return { api, ...rendered };
@@ -354,6 +373,55 @@ describe("DetailImagesTab", () => {
       ).not.toBeInTheDocument();
     }
   );
+
+  it("an image opened alone by its address keeps its new rating after an O press", async () => {
+    const { api } = tagTab([`/tag/5?tab=images&image=img-27:${INSTANCE}`]);
+    const viewer = await screen.findByRole("dialog", { name: "Image viewer" });
+    expect(within(viewer).getByAltText("Image 27")).toBeInTheDocument();
+
+    // r then 4: four stars
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "r" });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "4" });
+    await waitFor(() =>
+      expect(requestsTo(api, "/ratings/image/img-27")).toHaveLength(1)
+    );
+    // The details drawer: its rating badge and O button
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "i" });
+    await screen.findByLabelText("Rating: 8.0");
+
+    fireEvent.click(
+      await screen.findByLabelText("Increment O counter (current: 0)")
+    );
+    await waitFor(() =>
+      expect(requestsTo(api, "/image-view-history/increment-o")).toHaveLength(1)
+    );
+    await screen.findByLabelText("Increment O counter (current: 1)");
+    expect(screen.getByLabelText("Rating: 8.0")).toBeInTheDocument();
+  });
+
+  it("an image opened alone by its address keeps its new rating after a double tap's O", async () => {
+    const { api } = tagTab([`/tag/5?tab=images&image=img-27:${INSTANCE}`], {
+      userSettings: { lightboxDoubleTapAction: "o_counter" },
+    });
+    const viewer = await screen.findByRole("dialog", { name: "Image viewer" });
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "r" });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "4" });
+    await waitFor(() =>
+      expect(requestsTo(api, "/ratings/image/img-27")).toHaveLength(1)
+    );
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "i" });
+    await screen.findByLabelText("Rating: 8.0");
+
+    fireEvent.doubleClick(within(viewer).getByAltText("Image 27"), {
+      clientX: window.innerWidth / 2,
+    });
+    await waitFor(() =>
+      expect(requestsTo(api, "/image-view-history/increment-o")).toHaveLength(1)
+    );
+    await screen.findByLabelText("Increment O counter (current: 1)");
+    expect(screen.getByLabelText("Rating: 8.0")).toBeInTheDocument();
+  });
 
   it("rating an image in the viewer shows the new rating on the tab's card after the viewer closes", async () => {
     const { api } = tagTab();

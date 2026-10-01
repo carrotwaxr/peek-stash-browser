@@ -11,10 +11,11 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ImageFilterInput, ImageListItem } from "@peek/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { libraryApi } from "../../api/library";
+import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
 import {
   type PageChangeOptions,
@@ -144,9 +145,24 @@ export function useImageListPage({
   const { page, perPage, setPage } = listState;
   // An address's image beyond the page is read within the page's locked
   // filter (a detail tab's entity; none on the Images page)
-  const fetchImage = useMemo(
+  const readImage = useMemo(
     () => imageReader(lockedFilters ? buildImageFilter(lockedFilters) : {}),
     [lockedFilters]
+  );
+  // The image it finds goes into the query cache under its own detail key,
+  // so the viewer's rating, favorite and O writes patch it like every row
+  const fetchImage = useCallback(
+    async (key: string, signal: AbortSignal) => {
+      const image = await readImage(key, signal);
+      if (image) {
+        queryClient.setQueryData(
+          queryKeys.images.detail(image.instanceId, image.id),
+          image
+        );
+      }
+      return image;
+    },
+    [readImage, queryClient]
   );
 
   const turnPage = useCallback(
@@ -262,22 +278,19 @@ export function useImageListPage({
     () => (lightboxRows as unknown as ImageListItem[]).map(viewerImage),
     [lightboxRows]
   );
-  const { soloImage, updateSoloImage } = lightbox;
+  // The image shown alone, as the cache holds it now (the read put it
+  // there): the viewer's writes patch it, so it never shows an old value
+  const { soloImage } = lightbox;
+  const soloKey = soloImage ? imageKey(soloImage) : null;
+  const { data: cachedSolo } = useQuery({
+    queryKey: queryKeys.images.detail(soloImage?.instanceId, soloImage?.id),
+    queryFn: soloKey ? ({ signal }) => readImage(soloKey, signal) : skipToken,
+    staleTime: Infinity,
+  });
+  const shownSolo = soloImage ? (cachedSolo ?? soloImage) : null;
   const soloImages = useMemo(
-    () => (soloImage ? [viewerImage(soloImage)] : null),
-    [soloImage]
-  );
-
-  // The lightbox's own changes, back into the cached page
-  const onImagesUpdate = useCallback(
-    (updated: ImageListItem[]) =>
-      updateCachedPage((rows) =>
-        rows.map((row) => {
-          const match = updated.find((u) => imageKey(u) === imageKey(row));
-          return match ? { ...row, ...match } : row;
-        })
-      ),
-    [updateCachedPage]
+    () => (shownSolo ? [viewerImage(shownSolo)] : null),
+    [shownSolo]
   );
 
   const after = soloImages ? (
@@ -288,11 +301,6 @@ export function useImageListPage({
       initialIndex={0}
       autoPlay={lightbox.lightboxAutoPlay}
       onClose={lightbox.closeLightbox}
-      onImagesUpdate={(updated) => {
-        const image = updated[0];
-        if (image) updateSoloImage(image);
-        onImagesUpdate(updated);
-      }}
       transitionKey={lightbox.transitionKey}
     />
   ) : lightboxRows.length > 0 ? (
@@ -302,7 +310,6 @@ export function useImageListPage({
       initialIndex={lightbox.lightboxIndex}
       autoPlay={lightbox.lightboxAutoPlay}
       onClose={lightbox.closeLightbox}
-      onImagesUpdate={onImagesUpdate}
       // Cross-page navigation, by the list's page and page size
       onPageBoundary={lightbox.onPageBoundary}
       totalCount={count}
