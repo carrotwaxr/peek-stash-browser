@@ -368,6 +368,21 @@ export const getPlaylistQueue = async (
   res.json({ entries });
 };
 
+const NAME_REQUIRED = "Playlist name is required";
+const DESCRIPTION_INVALID = "description must be a string or null";
+
+/** A playlist name: text that is not blank once trimmed. */
+function isPlaylistName(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/** A description as sent: text, or null (or left out) for none. */
+function isPlaylistDescription(
+  value: unknown
+): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === "string";
+}
+
 /**
  * Create new playlist
  */
@@ -377,10 +392,16 @@ export const createPlaylist = async (
 ) => {
   const userId = req.user.id;
 
-  const { name, description } = req.body;
+  // Read as unknown: the body is the client's, whatever its type says
+  const { name, description }: { name?: unknown; description?: unknown } =
+    req.body;
 
-  if (!name || name.trim() === "") {
-    res.status(400).json({ error: "Playlist name is required" });
+  if (!isPlaylistName(name)) {
+    res.status(400).json({ error: NAME_REQUIRED });
+    return;
+  }
+  if (!isPlaylistDescription(description)) {
+    res.status(400).json({ error: DESCRIPTION_INVALID });
     return;
   }
 
@@ -413,18 +434,28 @@ export const updatePlaylist = async (
     return;
   }
 
-  const { description } = req.body;
   // Read as unknown: the body is the client's, whatever its type says.
   // Only a literal true turns shuffle on
   const {
     name,
+    description,
     repeat,
     shuffle,
-  }: { name?: unknown; repeat?: unknown; shuffle?: unknown } = req.body;
+  }: {
+    name?: unknown;
+    description?: unknown;
+    repeat?: unknown;
+    shuffle?: unknown;
+  } = req.body;
 
   // A name, when sent, follows the rule of create: a string, not blank
-  if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
-    res.status(400).json({ error: "Playlist name is required" });
+  if (name !== undefined && !isPlaylistName(name)) {
+    res.status(400).json({ error: NAME_REQUIRED });
+    return;
+  }
+  // null clears the description, as a blank one does
+  if (!isPlaylistDescription(description)) {
+    res.status(400).json({ error: DESCRIPTION_INVALID });
     return;
   }
   if (
