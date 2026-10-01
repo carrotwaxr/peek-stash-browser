@@ -145,6 +145,13 @@ const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
     image_path: null,
     stash_ids: [],
   },
+  group: {
+    tags: [],
+    urls: [],
+    synopsis: null,
+    front_image_path: null,
+    back_image_path: null,
+  },
 };
 
 let latestApi: ApiStub | undefined;

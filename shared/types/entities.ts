@@ -325,7 +325,7 @@ export interface NormalizedGroup {
   instanceId: string;
   name: string;
   date: string | null;
-  studio: { id: string; name?: string; image_path?: string | null } | null;
+  studio: StudioRef | null;
   rating100: number | null;
   duration: number | null;
   scene_count: number;
