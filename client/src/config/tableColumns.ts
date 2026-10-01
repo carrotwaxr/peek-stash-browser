@@ -597,7 +597,7 @@ export const CLIP_COLUMNS = [
     label: "Duration",
     mandatory: false,
     defaultVisible: true,
-    sortable: false,
+    sortable: true,
     width: "w-24",
   },
   {
@@ -648,6 +648,9 @@ const ENTITY_COLUMNS_MAP: Record<string, ColumnDefinition[]> = {
 const COLUMN_SORT_FIELD_OVERRIDES: Record<string, string> = {
   "performer:age": "birthdate",
   "performers:age": "birthdate",
+  // The clip list sorts a clip's position in its scene as `seconds`
+  "clip:start_time": "seconds",
+  "clips:start_time": "seconds",
 };
 
 /**

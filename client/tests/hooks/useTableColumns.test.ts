@@ -17,11 +17,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api";
 import { queryKeys } from "@/api/queryKeys";
 import {
+  CLIP_COLUMNS,
+  getColumnSortField,
   getDefaultColumnOrder,
   getDefaultVisibleColumns,
 } from "@/config/tableColumns";
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { useTableColumns } from "@/hooks/useTableColumns";
+import { CLIP_SORT_OPTIONS } from "@/utils/filterConfig";
 import { showError } from "@/utils/toast";
 import { createAuthValue, flushPromises, must } from "../testUtils";
 
@@ -286,5 +289,21 @@ describe("useTableColumns", () => {
     await waitFor(() =>
       expect(result.current.visibleColumnIds).toEqual(SCENE_DEFAULT_VISIBLE)
     );
+  });
+});
+
+describe("clip table columns", () => {
+  it("every sortable clip column maps to a clip sort option", () => {
+    const sortable = CLIP_COLUMNS.filter((column) => column.sortable);
+    expect(sortable.map((column) => column.id).sort()).toEqual([
+      "duration",
+      "start_time",
+      "title",
+    ]);
+    const optionValues = CLIP_SORT_OPTIONS.map((option) => option.value);
+    for (const column of sortable) {
+      expect(optionValues).toContain(getColumnSortField(column.id, "clip"));
+      expect(optionValues).toContain(getColumnSortField(column.id, "clips"));
+    }
   });
 });

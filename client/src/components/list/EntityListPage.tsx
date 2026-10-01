@@ -334,9 +334,7 @@ const EntityListPage = ({
           items={isLoading ? [] : items}
           columns={visibleColumns as TableColumns}
           sort={{ field: sort.field, direction: sort.direction }}
-          {...(config.tableSorts === false
-            ? {}
-            : { onSort: listState.setSort })}
+          onSort={listState.setSort}
           onHideColumn={hideColumn}
           entityType={config.tableEntity ?? entityType}
           isLoading={isLoading}
