@@ -159,7 +159,6 @@ export const getUserSettings = async (
       preferredQuality: true,
       preferredPlaybackMode: true,
       preferredPreviewQuality: true,
-      enableCast: true,
       theme: true,
       carouselPreferences: true,
       navPreferences: true,
@@ -186,7 +185,6 @@ export const getUserSettings = async (
       preferredQuality: user.preferredQuality ?? "auto",
       preferredPlaybackMode: user.preferredPlaybackMode ?? "auto",
       preferredPreviewQuality: user.preferredPreviewQuality ?? null,
-      enableCast: user.enableCast,
       theme: user.theme ?? "dark",
       carouselPreferences:
         (user.carouselPreferences as CarouselPreference[] | null) ??
@@ -243,7 +241,6 @@ export const updateUserSettings = async (
     preferredQuality,
     preferredPlaybackMode,
     preferredPreviewQuality,
-    enableCast,
     theme,
     carouselPreferences,
     navPreferences,
@@ -529,7 +526,6 @@ export const updateUserSettings = async (
       ...(preferredPreviewQuality !== undefined && {
         preferredPreviewQuality,
       }),
-      ...(enableCast !== undefined && { enableCast }),
       ...(theme !== undefined && { theme }),
       ...(carouselPreferences !== undefined && {
         carouselPreferences: carouselPreferences as never,
@@ -560,7 +556,6 @@ export const updateUserSettings = async (
       role: true,
       preferredQuality: true,
       preferredPlaybackMode: true,
-      enableCast: true,
       theme: true,
       carouselPreferences: true,
       navPreferences: true,

@@ -293,13 +293,6 @@ section.video-container {
     line-height: 2;
   }
 
-  /* Smaller cast buttons */
-  .video-js .vjs-airplay-button .vjs-icon-placeholder,
-  .video-js .vjs-chromecast-button .vjs-icon-placeholder {
-    height: 1.4em;
-    width: 1.4em;
-  }
-
   /* Menu adjustments */
   .video-js .vjs-menu-button-popup .vjs-menu {
     width: 8em;

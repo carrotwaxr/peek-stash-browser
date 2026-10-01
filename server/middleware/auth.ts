@@ -41,7 +41,6 @@ export interface RequestUser {
   preferredQuality?: string | null;
   preferredPlaybackMode?: string | null;
   preferredPreviewQuality?: string | null;
-  enableCast?: boolean;
   theme?: string | null;
   hideConfirmationDisabled?: boolean;
   landingPagePreference?: JsonValue;
@@ -155,7 +154,6 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       preferredQuality: true,
       preferredPlaybackMode: true,
       preferredPreviewQuality: true,
-      enableCast: true,
       theme: true,
       hideConfirmationDisabled: true,
       landingPagePreference: true,

@@ -7,6 +7,7 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
+import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
@@ -27,8 +28,6 @@ vi.mock("@/components/video-player/videoPlayerUtils", () => ({
   setupSubtitles: vi.fn(),
   togglePlaybackRateControl: vi.fn(),
 }));
-vi.mock("@silvermine/videojs-airplay", () => ({ default: vi.fn() }));
-vi.mock("@silvermine/videojs-chromecast", () => ({ default: vi.fn() }));
 vi.mock("videojs-seek-buttons", () => ({}));
 vi.mock("@/components/video-player/vtt-thumbnails", () => ({}));
 vi.mock("@/components/video-player/plugins/big-buttons", () => ({}));
@@ -103,11 +102,15 @@ interface Scene {
   instanceId: string;
 }
 
-function renderPlayer(player: FakePlayer, scene: Scene) {
+function renderPlayer(
+  player: FakePlayer,
+  scene: Scene,
+  container: HTMLDivElement | null = null
+) {
   const noop = () => {};
   // Stable across renders, as the reducer's dispatch and the refs are
   const dispatch = vi.fn();
-  const videoRef = { current: null };
+  const videoRef = { current: container };
   const playerRef = { current: player };
   const hasResumedRef = { current: false };
   const initialResumeTimeRef = { current: null };
@@ -196,5 +199,25 @@ describe("useVideoPlayer", () => {
         type: "application/x-mpegURL",
       });
     });
+  });
+
+  it("the player is created with the html5 tech only and no cast plugin", () => {
+    const player = { ...fakePlayer(), dispose: vi.fn() };
+    vi.mocked(videojs).mockReturnValueOnce(player as never);
+    const { unmount } = renderPlayer(
+      player,
+      onA,
+      document.createElement("div")
+    );
+
+    expect(vi.mocked(videojs)).toHaveBeenCalledTimes(1);
+    const options = must(
+      vi.mocked(videojs).mock.calls[0]?.[1],
+      "videojs options"
+    ) as { techOrder: string[]; plugins: Record<string, unknown> };
+    expect(options.techOrder).toEqual(["html5"]);
+    expect(options.plugins).not.toHaveProperty("airPlay");
+    expect(options.plugins).not.toHaveProperty("chromecast");
+    unmount();
   });
 });

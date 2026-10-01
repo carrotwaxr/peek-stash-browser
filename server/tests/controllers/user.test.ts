@@ -163,7 +163,6 @@ describe("User Controller", () => {
           preferredQuality: "1080p",
           preferredPlaybackMode: null,
           preferredPreviewQuality: null,
-          enableCast: false,
           theme: "dark",
           carouselPreferences: null,
           navPreferences: null,
@@ -195,6 +194,22 @@ describe("User Controller", () => {
       }); // default
       expect(body.settings.carouselPreferences).toBeInstanceOf(Array); // default carousel prefs
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
+    });
+
+    it("settings answer no enableCast", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 2, username: "testuser", role: "USER" })
+      );
+      const req = reqFor(getUserSettings, { user: USER });
+      const res = resFor(getUserSettings);
+      await getUserSettings(req, res);
+
+      expect(res._getOkBody().settings).not.toHaveProperty("enableCast");
+      const query = must(
+        mockPrisma.user.findUnique.mock.calls[0],
+        "findUnique call"
+      )[0];
+      expect(query.select).not.toHaveProperty("enableCast");
     });
 
     it("a failure reaches the error handler: database error", async () => {
@@ -266,6 +281,27 @@ describe("User Controller", () => {
       const res = resFor(updateUserSettings);
       await updateUserSettings(req, res);
       expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("an update that still sends enableCast succeeds and changes nothing", async () => {
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
+      // An older open tab still sends the removed field
+      const req = reqFor(updateUserSettings, {
+        body: malformed({ preferredQuality: "720p", enableCast: false }),
+        user: USER,
+      });
+      const res = resFor(updateUserSettings);
+      await updateUserSettings(req, res);
+
+      const body = res._getOkBody();
+      expect(body.success).toBe(true);
+      expect(body.settings).not.toHaveProperty("enableCast");
+      const query = must(
+        mockPrisma.user.update.mock.calls[0],
+        "update call"
+      )[0];
+      expect(query.data).toEqual({ preferredQuality: "720p" });
+      expect(query.select).not.toHaveProperty("enableCast");
     });
 
     // Validation tests

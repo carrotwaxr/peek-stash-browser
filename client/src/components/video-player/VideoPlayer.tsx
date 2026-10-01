@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "video.js/dist/video-js.css";
-import { apiGet, getClipsForScene } from "../../api";
+import { getClipsForScene } from "../../api";
+import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
@@ -24,7 +25,7 @@ import { useVideoPlayer } from "./useVideoPlayer";
  *
  * RESPONSIBILITIES:
  * - Manage refs (videoRef, playerRef, hasResumedRef, initialResumeTimeRef)
- * - Fetch user settings (enableCast preference)
+ * - Read the play threshold from the user-settings query
  * - Render video element and loading overlay
  *
  * DATA FLOW:
@@ -40,24 +41,10 @@ const VideoPlayer = () => {
   const hasResumedRef = useRef(false); // Prevent double-resume
   const initialResumeTimeRef = useRef<number | null>(null); // Capture resume time once
 
-  const [enableCast, setEnableCast] = useState(true); // Default to true
-  const [minimumPlayPercent, setMinimumPlayPercent] = useState(20); // Default to 20%
+  // The shared user-settings query: one request per session, not one per scene
+  const { data: userSettings } = useUserSettings();
+  const minimumPlayPercent = userSettings?.settings.minimumPlayPercent ?? 20;
   const [clips, setClips] = useState<any[]>([]);
-
-  // Fetch user settings for cast preference and playback thresholds
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const data: any = await apiGet("/user/settings");
-        setEnableCast(data.settings.enableCast !== false);
-        setMinimumPlayPercent(data.settings.minimumPlayPercent ?? 20);
-      } catch (error) {
-        // If error, keep defaults
-        console.error("Failed to fetch user settings:", error);
-      }
-    };
-    void fetchSettings();
-  }, []);
 
   // ============================================================================
   // CONTEXT
@@ -164,7 +151,6 @@ const VideoPlayer = () => {
     initialResumeTimeRef,
     watchHistory,
     loadingWatchHistory,
-    enableCast,
     minimumPlayPercent,
   });
 

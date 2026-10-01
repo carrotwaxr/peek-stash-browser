@@ -12,7 +12,8 @@ Peek allows you to open scenes in external media players like VLC for enhanced p
 | **Windows (Firefox)** | ⚠️ Limited | May not work due to Firefox's protocol handling |
 | **macOS** | 🔬 Untested | Should work with protocol handler |
 | **Linux** | 🔬 Untested | Should work with protocol handler |
-| **AirPlay (Safari to Apple TV)** | ❌ Not supported | Media now needs your Peek login, which AirPlay cannot pass on. Casting support arrives in a later release; use this button on the device instead |
+| **Chromecast** | ❌ Not supported | The Chromecast button and the "Enable Chromecast/AirPlay" setting are gone: casting needs your Peek login, which a cast device cannot pass on. Casting returns in a later release; use this button on the device instead |
+| **AirPlay (Safari to Apple TV)** | ❌ Not supported | Removed with Chromecast, for the same reason. It returns with casting in a later release; use this button on the device instead |
 
 !!! note "Help Us Test"
     We need community feedback on platform compatibility. If you test on a platform not marked as "Works", please [report your results on GitHub](https://github.com/carrotwaxr/peek-stash-browser/issues) so we can update this documentation.

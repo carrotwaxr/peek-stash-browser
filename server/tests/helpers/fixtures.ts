@@ -54,7 +54,6 @@ export function userRow(overrides: Partial<User> = {}): User {
     preferredPlaybackMode: "auto",
     preferredPreviewQuality: "sprite",
     wallPlayback: "autoplay",
-    enableCast: true,
     theme: "dark",
     carouselPreferences: null,
     navPreferences: null,
