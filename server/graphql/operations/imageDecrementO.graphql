@@ -1,0 +1,3 @@
+mutation ImageDecrementO($id: ID!) {
+  imageDecrementO(id: $id)
+}

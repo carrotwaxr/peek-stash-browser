@@ -47,6 +47,25 @@ function readEntry(entry: unknown): string | null {
   return null;
 }
 
+/**
+ * The history without its newest entry, for "Remove last O". Entries are not
+ * always in time order (merged and imported lists), so the newest is the
+ * latest time; a list with no time in it loses its last entry. An empty list
+ * stays empty.
+ */
+export function withoutNewest(history: readonly string[]): string[] {
+  let newest = history.length - 1;
+  let newestMs = -Infinity;
+  history.forEach((entry, index) => {
+    const ms = Date.parse(entry);
+    if (Number.isFinite(ms) && ms >= newestMs) {
+      newest = index;
+      newestMs = ms;
+    }
+  });
+  return history.filter((_entry, index) => index !== newest);
+}
+
 /** A Peek timestamp this close to a Stash one is the same event. */
 export const HISTORY_MERGE_WINDOW_MS = 60_000;
 

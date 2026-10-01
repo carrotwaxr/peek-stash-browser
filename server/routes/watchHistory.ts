@@ -1,6 +1,7 @@
 import express from "express";
 import {
   clearAllWatchHistory,
+  decrementOCounter,
   getWatchHistory,
   getWatchedScenes,
   incrementOCounter,
@@ -23,6 +24,9 @@ router.post("/increment-play-count", authenticated(incrementPlayCount));
 
 // Increment O counter
 router.post("/increment-o", authenticated(incrementOCounter));
+
+// Remove the newest O ("Remove last O")
+router.post("/decrement-o", authenticated(decrementOCounter));
 
 // Clear all watch history for current user
 router.delete("/", authenticated(clearAllWatchHistory));

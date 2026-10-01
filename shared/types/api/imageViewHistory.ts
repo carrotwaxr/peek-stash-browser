@@ -25,6 +25,25 @@ export interface IncrementImageOCounterResponse {
 }
 
 // =============================================================================
+// DECREMENT IMAGE O COUNTER
+// =============================================================================
+
+/**
+ * POST /api/image-view-history/decrement-o
+ * Remove the user's newest O on an image ("Remove last O"). At 0 Os it
+ * changes nothing and answers oCount 0.
+ */
+export interface DecrementImageOCounterRequest {
+  instanceId: string;
+  imageId: string;
+}
+
+export interface DecrementImageOCounterResponse {
+  success: true;
+  oCount: number;
+}
+
+// =============================================================================
 // RECORD IMAGE VIEW
 // =============================================================================
 

@@ -86,6 +86,25 @@ export interface IncrementOCounterResponse {
 }
 
 // =============================================================================
+// DECREMENT O COUNTER
+// =============================================================================
+
+/**
+ * POST /api/watch-history/decrement-o
+ * Remove the user's newest O on a scene ("Remove last O"). At 0 Os it
+ * changes nothing and answers oCount 0.
+ */
+export interface DecrementOCounterRequest {
+  instanceId: string;
+  sceneId: string;
+}
+
+export interface DecrementOCounterResponse {
+  success: true;
+  oCount: number;
+}
+
+// =============================================================================
 // GET WATCHED SCENES
 // =============================================================================
 

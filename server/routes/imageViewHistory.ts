@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  decrementImageOCounter,
   getImageViewHistory,
   incrementImageOCounter,
   recordImageView,
@@ -14,6 +15,9 @@ router.use(authenticate);
 
 // Increment O counter for image
 router.post("/increment-o", authenticated(incrementImageOCounter));
+
+// Remove the newest O ("Remove last O")
+router.post("/decrement-o", authenticated(decrementImageOCounter));
 
 // Record image view (when opened in Lightbox)
 router.post("/view", authenticated(recordImageView));

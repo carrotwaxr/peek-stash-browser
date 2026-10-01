@@ -29,9 +29,24 @@ vi.mock("../../../src/hooks/useHiddenEntities", () => ({
 const mockIncrement = vi.fn((_vars: Record<string, unknown>) =>
   Promise.resolve({ success: true, oCount: 1 })
 );
+const mockDecrement = vi.fn((_vars: { sceneId: string; instanceId: string }) =>
+  Promise.resolve({ success: true as const, oCount: 0 })
+);
+const mockDecrementImage = vi.fn(
+  (_vars: { imageId: string; instanceId: string }) =>
+    Promise.resolve({ success: true as const, oCount: 0 })
+);
 vi.mock("../../../src/api/hooks", () => ({
   useIncrementOCounter: () => ({
     mutateAsync: mockIncrement,
+    isPending: false,
+  }),
+  useDecrementOCounter: () => ({
+    mutateAsync: mockDecrement,
+    isPending: false,
+  }),
+  useDecrementImageOCounter: () => ({
+    mutateAsync: mockDecrementImage,
     isPending: false,
   }),
 }));
@@ -431,5 +446,108 @@ describe("a card's rating row reads its props", () => {
     );
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe("Remove last O in a card's menu", () => {
+  const row = (entityType: string, initialOCounter: number) => (
+    <CardRatingRow
+      entityType={entityType}
+      entityId="12"
+      instanceId="B"
+      initialRating={null}
+      initialFavorite={false}
+      initialOCounter={initialOCounter}
+      entityTitle="Item 12"
+      onOCounterChange={mockOCounterChange}
+    />
+  );
+  const mockOCounterChange = vi.fn((_id: string, _count: number) => {});
+
+  afterEach(() => {
+    mockDecrement.mockClear();
+    mockDecrementImage.mockClear();
+    mockOCounterChange.mockClear();
+  });
+
+  it("Remove last O in a scene card's menu calls the decrement and shows the returned count", async () => {
+    mockDecrement.mockResolvedValueOnce({ success: true, oCount: 2 });
+    render(row("scene", 3));
+
+    fireEvent.click(screen.getByLabelText("More options"));
+    fireEvent.click(screen.getByText("Remove last O"));
+
+    await vi.waitFor(() =>
+      expect(
+        screen.getByLabelText("Increment O counter (current: 2)")
+      ).toBeTruthy()
+    );
+    expect(mockDecrement).toHaveBeenCalledWith({
+      sceneId: "12",
+      instanceId: "B",
+    });
+    expect(mockOCounterChange).toHaveBeenCalledWith("12", 2);
+    expect(mockDecrementImage).not.toHaveBeenCalled();
+  });
+
+  it("the menu offers no Remove last O at 0 Os", () => {
+    render(row("scene", 0));
+
+    fireEvent.click(screen.getByLabelText("More options"));
+
+    expect(screen.getByText("Hide Scene")).toBeTruthy();
+    expect(screen.queryByText("Remove last O")).toBeNull();
+  });
+
+  it("an image's Remove last O calls the image decrement", async () => {
+    mockDecrementImage.mockResolvedValueOnce({ success: true, oCount: 0 });
+    render(row("image", 1));
+
+    fireEvent.click(screen.getByLabelText("More options"));
+    fireEvent.click(screen.getByText("Remove last O"));
+
+    await vi.waitFor(() =>
+      expect(mockDecrementImage).toHaveBeenCalledWith({
+        imageId: "12",
+        instanceId: "B",
+      })
+    );
+    await vi.waitFor(() =>
+      expect(
+        screen.getByLabelText("Increment O counter (current: 0)")
+      ).toBeTruthy()
+    );
+    expect(mockDecrement).not.toHaveBeenCalled();
+  });
+
+  it("other entities' menus offer no Remove last O", () => {
+    render(row("performer", 4));
+
+    fireEvent.click(screen.getByLabelText("More options"));
+
+    expect(screen.queryByText("Remove last O")).toBeNull();
+  });
+
+  it("after pressing O on a card at 0, its menu offers Remove last O, and removing it shows 0 on the O button", async () => {
+    mockIncrement.mockResolvedValueOnce({ success: true, oCount: 1 });
+    mockDecrement.mockResolvedValueOnce({ success: true, oCount: 0 });
+    render(row("scene", 0));
+
+    fireEvent.click(screen.getByLabelText("Increment O counter (current: 0)"));
+    await vi.waitFor(() =>
+      expect(
+        screen.getByLabelText("Increment O counter (current: 1)")
+      ).toBeTruthy()
+    );
+
+    fireEvent.click(screen.getByLabelText("More options"));
+    fireEvent.click(screen.getByText("Remove last O"));
+
+    await vi.waitFor(() =>
+      expect(
+        screen.getByLabelText("Increment O counter (current: 0)")
+      ).toBeTruthy()
+    );
+    expect(mockOCounterChange).toHaveBeenLastCalledWith("12", 0);
   });
 });

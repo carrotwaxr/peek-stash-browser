@@ -1,0 +1,6 @@
+mutation SceneDeleteO($id: ID!, $times: [Timestamp!]) {
+  sceneDeleteO(id: $id, times: $times) {
+    count
+    history
+  }
+}

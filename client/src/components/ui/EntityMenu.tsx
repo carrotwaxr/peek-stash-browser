@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 
 /**
- * EntityMenu - 3-dot menu for entity cards
- * Provides "Hide [Entity Type]" option
+ * EntityMenu - 3-dot menu for entity cards, the scene page and the image viewer
+ * Items: "Remove last O" (when `onRemoveLastO` is given and the O count is
+ * above 0) and "Hide [Entity Type]" (when `onHide` is given). A menu with no
+ * item to show renders nothing.
  * Uses portal to render dropdown outside card stacking context
  */
 interface HidePayload {
@@ -20,6 +22,9 @@ interface Props {
   entityName: string;
   instanceId: string;
   onHide?: (payload: HidePayload) => void;
+  /** The entity's O count: Remove last O shows only above 0 */
+  oCount?: number;
+  onRemoveLastO?: () => void;
 }
 
 const EntityMenu = ({
@@ -28,6 +33,8 @@ const EntityMenu = ({
   entityName,
   instanceId,
   onHide,
+  oCount = 0,
+  onRemoveLastO,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
@@ -97,9 +104,25 @@ const EntityMenu = ({
     });
   };
 
+  const handleRemoveLastOClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(false);
+    onRemoveLastO?.();
+  };
+
+  const showRemoveLastO = onRemoveLastO !== undefined && oCount > 0;
+  const showHide = onHide !== undefined;
+
   // Capitalize first letter of entity type
   const capitalizedType =
     entityType.charAt(0).toUpperCase() + entityType.slice(1);
+
+  if (!showRemoveLastO && !showHide) {
+    // Nothing to offer (the last O just went): no button, and closed
+    if (isOpen) setIsOpen(false);
+    return null;
+  }
 
   return (
     <div className="relative">
@@ -130,13 +153,24 @@ const EntityMenu = ({
               zIndex: 9999,
             }}
           >
-            <button
-              onClick={handleHideClick}
-              className="w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-white transition-colors text-sm"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Hide {capitalizedType}
-            </button>
+            {showRemoveLastO && (
+              <button
+                onClick={handleRemoveLastOClick}
+                className="w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-white transition-colors text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Remove last O
+              </button>
+            )}
+            {showHide && (
+              <button
+                onClick={handleHideClick}
+                className="w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-white transition-colors text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Hide {capitalizedType}
+              </button>
+            )}
           </div>,
           document.body
         )}

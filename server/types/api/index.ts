@@ -124,6 +124,8 @@ export type {
   IncrementPlayCountResponse,
   IncrementOCounterRequest,
   IncrementOCounterResponse,
+  DecrementOCounterRequest,
+  DecrementOCounterResponse,
   GetWatchedScenesQuery,
   GetWatchedScenesResponse,
   WatchedScenesSort,
@@ -137,6 +139,8 @@ export type {
 export type {
   IncrementImageOCounterRequest,
   IncrementImageOCounterResponse,
+  DecrementImageOCounterRequest,
+  DecrementImageOCounterResponse,
   RecordImageViewRequest,
   RecordImageViewResponse,
   GetImageViewHistoryParams,

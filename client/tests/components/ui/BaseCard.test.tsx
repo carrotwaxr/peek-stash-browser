@@ -4,7 +4,7 @@ import {
   createMemoryRouter,
 } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { createQueryWrapper, must } from "@tests/testUtils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BaseCard,
@@ -146,7 +146,9 @@ describe("BaseCard menu placement logic", () => {
           indicators={indicators}
           ratingControlsProps={ratingControlsProps}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
+      // A scene's rating row offers Remove last O, a TanStack mutation
+      { wrapper: createQueryWrapper() }
     );
 
   it("shows one menu when only the menu is on, with or without indicators", () => {

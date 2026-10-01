@@ -13,7 +13,11 @@ export { useClipList } from "./useClips";
 export { useRelationCounts } from "./useRelationCounts";
 export { useUpdateRating } from "./useRatingMutation";
 export { useUpdateFavorite } from "./useFavoriteMutation";
-export { useIncrementOCounter } from "./useOCounterMutation";
+export {
+  useDecrementImageOCounter,
+  useDecrementOCounter,
+  useIncrementOCounter,
+} from "./useOCounterMutation";
 export {
   useFilterPresets,
   useDefaultPresets,

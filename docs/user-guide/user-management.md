@@ -260,7 +260,7 @@ When enabled, user activity syncs back to Stash:
 
 | Data | Sync Behavior |
 |------|---------------|
-| **O-Counter** | Aggregates across users (increments add up) |
+| **O-Counter** | Aggregates across users (increments add up), for scenes and images; Remove last O takes away Stash's newest O |
 | **Ratings** | Overwrites (last user to rate wins) |
 | **Favorites** | Overwrites (last user to change it wins), for performers, studios and tags; Stash has no favorite on scenes, galleries, groups or images |
 

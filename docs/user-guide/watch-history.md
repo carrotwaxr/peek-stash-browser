@@ -109,6 +109,10 @@ A scene counts as completed when you have played it and your last session ended 
 2. Play it to the end, or seek into the last 10% and let it play for a few seconds
 3. The scene appears under **Completed** in Watch History
 
+### Removing an O
+
+Pressed the O button by mistake? Choose **Remove last O** in a scene card's menu (⋮), or in the menu beside the O button on the scene page. It takes away your newest O on that scene, and the performer, studio and tag totals built from it. The item shows only while the scene's O count is above 0. With Sync to Stash on, Stash's newest O on the scene is removed too.
+
 ### Clearing Watch History
 
 Peek has no clear for a single scene. To clear everything:
