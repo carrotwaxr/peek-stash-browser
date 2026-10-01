@@ -6,7 +6,6 @@ import type {
   TagRef,
 } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
-import { switchTabParams } from "@/utils/urlParams";
 import { libraryApi } from "../../api";
 import { useRelationCounts } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -14,6 +13,7 @@ import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useEntityLookup } from "../../hooks/useEntityLookup";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
+import { useOpenTabAndScroll } from "../../hooks/useOpenTabAndScroll";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import type { PageChangeOptions } from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -665,13 +665,7 @@ const PerformerStats = ({
   activeTab,
   defaultTab,
 }: PerformerStatsProps) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const handleTabSwitch = (tabId: string) => {
-    setSearchParams(switchTabParams(searchParams, tabId, defaultTab));
-    // Scroll to content area
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  };
+  const handleTabSwitch = useOpenTabAndScroll(defaultTab);
 
   // Calculate O-Count percentage
   const oCountPercentage =

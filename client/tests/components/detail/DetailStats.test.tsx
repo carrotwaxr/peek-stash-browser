@@ -1,8 +1,10 @@
 import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DetailStats, { type DetailStat } from "@/components/detail/DetailStats";
 import { DetailTabContext } from "@/components/detail/detailTabState";
+import TabNavigation from "@/components/ui/TabNavigation";
 import { renderDetailPart } from "./renderDetailPart";
 
 const STATS: DetailStat[] = [
@@ -28,6 +30,7 @@ const row = (label: string) =>
 describe("DetailStats", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("shows each statistic with a value, under Statistics", () => {
@@ -45,8 +48,6 @@ describe("DetailStats", () => {
   });
 
   it("a count with a tab switches to it and clears the list's page", () => {
-    const scrollTo = vi.fn();
-    vi.stubGlobal("scrollTo", scrollTo);
     const { search } = renderDetailPart(
       inLayout(<DetailStats stats={STATS} />),
       { url: "/tag/5?page=4&instance=inst-a" }
@@ -62,7 +63,57 @@ describe("DetailStats", () => {
     );
 
     expect(search()).toEqual({ tab: "galleries", instance: "inst-a" });
-    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("a count scrolls down to the tab bar once its tab has rendered", () => {
+    // Scrolling in the click aims at the old tab's page; the new tab's
+    // shorter content then stops a smooth scroll where it started
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    // What the page shows when it scrolls: the element's tabs, the open content
+    const scrolls: Array<{ tabs: string[]; content: string | null }> = [];
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (
+      this: Element
+    ) {
+      scrolls.push({
+        tabs: within(this as HTMLElement)
+          .queryAllByRole("button")
+          .map((tab) => tab.textContent ?? ""),
+        content: screen.getByTestId("tab-content").textContent,
+      });
+    });
+    const Tabs = () => {
+      const [params] = useSearchParams();
+      return (
+        <>
+          <TabNavigation
+            tabs={[
+              { id: "scenes", label: "Scenes", count: 3 },
+              { id: "galleries", label: "Galleries", count: 4 },
+            ]}
+            defaultTab="scenes"
+          />
+          <p data-testid="tab-content">{params.get("tab") ?? "scenes"}</p>
+        </>
+      );
+    };
+    renderDetailPart(
+      inLayout(
+        <>
+          <DetailStats stats={STATS} />
+          <Tabs />
+        </>
+      )
+    );
+
+    fireEvent.click(
+      within(row("Galleries:")).getByRole("button", { name: "4" })
+    );
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrolls).toEqual([
+      { tabs: ["Scenes3", "Galleries4"], content: "galleries" },
+    ]);
   });
 
   it("a statistic with a path opens it", () => {

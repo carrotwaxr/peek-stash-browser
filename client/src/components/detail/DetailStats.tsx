@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { switchTabParams } from "../../utils/urlParams";
+import { useNavigate } from "react-router-dom";
+import { useOpenTabAndScroll } from "../../hooks/useOpenTabAndScroll";
 import DetailCard from "./DetailCard";
 import { useDetailTab } from "./detailTabState";
 
@@ -106,14 +106,9 @@ interface Props {
  * viewer's rating as a bar.
  */
 const DetailStats = ({ stats, rating, children }: Props) => {
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { activeTab, defaultTab } = useDetailTab();
-
-  const openTab = (tab: string) => {
-    setSearchParams(switchTabParams(searchParams, tab, defaultTab));
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  };
+  const openTab = useOpenTabAndScroll(defaultTab);
   const openPath = (path: string) => {
     void navigate(path);
   };
