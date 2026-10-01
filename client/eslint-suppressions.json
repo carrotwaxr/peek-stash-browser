@@ -903,19 +903,16 @@
   },
   "src/components/video-player/vtt-thumbnails.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 9
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-call": {
-      "count": 13
+      "count": 4
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 19
+      "count": 7
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 3
@@ -1061,7 +1058,7 @@
   },
   "src/types/video.d.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 29
+      "count": 25
     }
   },
   "src/utils/buildFolderTree.ts": {
