@@ -26,6 +26,7 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { compositeKey } from "../utils/entityRef.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { requireInstanceId } from "../utils/routeHelpers.js";
@@ -402,15 +403,48 @@ export async function saveActivity(
   });
 }
 
+/** How long a play token counts as used, and how many are remembered */
+const PLAY_TOKEN_TTL_MS = 10 * 60 * 1000;
+const PLAY_TOKEN_CAP = 5000;
+const PLAY_TOKEN_MAX_LENGTH = 64;
+
+/**
+ * Play tokens already claimed, as user, instance, scene and token to the
+ * time the claim lapses. Insertion order is expiry order (one TTL for all),
+ * so the head is the oldest. In memory: a restart forgets them, which only
+ * costs a retry spanning the restart one more play.
+ */
+const claimedPlayTokens = new Map<string, number>();
+
+/**
+ * Claim a play token. True when it was free (now held until its time is
+ * up); false when it is held, which means the play is already counted or on
+ * its way. The check and the claim are one synchronous step, so two requests
+ * with one token cannot both pass, whatever the write queue is doing.
+ */
+function claimPlayToken(key: string, now: number): boolean {
+  const heldUntil = claimedPlayTokens.get(key);
+  if (heldUntil !== undefined && heldUntil > now) return false;
+  claimedPlayTokens.delete(key);
+  for (const [oldKey, expiry] of claimedPlayTokens) {
+    if (expiry > now && claimedPlayTokens.size < PLAY_TOKEN_CAP) break;
+    claimedPlayTokens.delete(oldKey);
+  }
+  claimedPlayTokens.set(key, now + PLAY_TOKEN_TTL_MS);
+  return true;
+}
+
 /**
  * Increment play count for a scene
- * Called by track-activity plugin when minimum play percentage is reached
+ * Called by track-activity plugin when minimum play percentage is reached.
+ * A `playToken` makes the request safe to retry: the same token (per user,
+ * scene and instance) within 10 minutes adds no second play.
  */
 export async function incrementPlayCount(
   req: TypedAuthRequest<IncrementPlayCountRequest>,
   res: TypedResponse<IncrementPlayCountResponse | ApiErrorResponse>
 ) {
-  const { sceneId, instanceId: requestInstanceId } = req.body;
+  const { sceneId, instanceId: requestInstanceId, playToken } = req.body;
   const userId = req.user.id;
 
   if (!sceneId) {
@@ -419,6 +453,18 @@ export async function incrementPlayCount(
   }
 
   if (!requireInstanceId(requestInstanceId, res)) return;
+
+  if (
+    playToken !== undefined &&
+    (typeof playToken !== "string" ||
+      playToken.length < 1 ||
+      playToken.length > PLAY_TOKEN_MAX_LENGTH)
+  ) {
+    res.status(400).json({
+      error: `playToken must be 1 to ${PLAY_TOKEN_MAX_LENGTH} characters`,
+    });
+    return;
+  }
 
   logger.debug("Increment play count", { userId, sceneId });
 
@@ -442,7 +488,82 @@ export async function incrementPlayCount(
     return;
   }
 
+  // A repeat of a counted (or counting) play answers the row as it stands
+  // and writes nothing. The claim comes before any await, so a retry that
+  // arrives while the first request is still in its write unit is a repeat
+  // too.
+  const tokenKey =
+    playToken === undefined
+      ? undefined
+      : compositeKey(String(userId), instanceId, sceneId, playToken);
+  if (tokenKey !== undefined && !claimPlayToken(tokenKey, Date.now())) {
+    const current = await prisma.watchHistory.findUnique({
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
+    });
+    res.json({
+      success: true,
+      watchHistory: {
+        playCount: current?.playCount ?? 0,
+        playDuration: current?.playDuration ?? 0,
+        resumeTime: current?.resumeTime ?? 0,
+        lastPlayedAt: current?.lastPlayedAt ?? null,
+      },
+    });
+    return;
+  }
+
   const now = new Date();
+  let watchHistory;
+  try {
+    watchHistory = await writePlay(userId, sceneId, instanceId, now);
+  } catch (error) {
+    // Nothing was stored: the client's retry has to count
+    if (tokenKey !== undefined) claimedPlayTokens.delete(tokenKey);
+    throw error;
+  }
+
+  // Sync to Stash if user has sync enabled
+  if (user.syncToStash) {
+    try {
+      const stash = stashInstanceManager.getForSync(instanceId);
+      if (stash) {
+        const addPlayResult = await stash.sceneAddPlay({
+          id: sceneId,
+          times: [now.toISOString()],
+        });
+
+        logger.info("Synced play count to Stash", {
+          userId,
+          sceneId,
+          stashPlayCount: addPlayResult.sceneAddPlay.count,
+        });
+      }
+    } catch (stashError) {
+      logger.error("Failed to sync play count to Stash", {
+        sceneId,
+        error: stashError,
+      });
+    }
+  }
+
+  res.json({
+    success: true,
+    watchHistory: {
+      playCount: watchHistory.playCount,
+      playDuration: watchHistory.playDuration,
+      resumeTime: watchHistory.resumeTime,
+      lastPlayedAt: watchHistory.lastPlayedAt,
+    },
+  });
+}
+
+/** The play's write unit: the history row and the play's stats */
+async function writePlay(
+  userId: number,
+  sceneId: string,
+  instanceId: string,
+  now: Date
+) {
   // The scene's performers, studio and tags, read before the unit
   const statsWrites = await userStatsService.statsWritesForScene(
     userId,
@@ -455,7 +576,7 @@ export async function incrementPlayCount(
   // the play history append needs the row as it is when the write lands,
   // another write to this scene's history waits for it to commit, and the
   // play is stored with its stats or not at all.
-  const watchHistory = await dbWriteTransaction(
+  return dbWriteTransaction(
     "history.play",
     async (tx) => {
       const existing = await tx.watchHistory.findUnique({
@@ -493,38 +614,4 @@ export async function incrementPlayCount(
     // A stats rebuild that read the history before this play reads again
     { afterCommit: () => userStatsService.bumpWriteGeneration(userId) }
   );
-
-  // Sync to Stash if user has sync enabled
-  if (user.syncToStash) {
-    try {
-      const stash = stashInstanceManager.getForSync(instanceId);
-      if (stash) {
-        const addPlayResult = await stash.sceneAddPlay({
-          id: sceneId,
-          times: [now.toISOString()],
-        });
-
-        logger.info("Synced play count to Stash", {
-          userId,
-          sceneId,
-          stashPlayCount: addPlayResult.sceneAddPlay.count,
-        });
-      }
-    } catch (stashError) {
-      logger.error("Failed to sync play count to Stash", {
-        sceneId,
-        error: stashError,
-      });
-    }
-  }
-
-  res.json({
-    success: true,
-    watchHistory: {
-      playCount: watchHistory.playCount,
-      playDuration: watchHistory.playDuration,
-      resumeTime: watchHistory.resumeTime,
-      lastPlayedAt: watchHistory.lastPlayedAt,
-    },
-  });
 }

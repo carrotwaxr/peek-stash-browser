@@ -11,12 +11,13 @@ import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiPost } from "@/api";
+import { apiFetch, apiPost } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
 import { type PlaybackQueue, buildPlaybackQueue } from "@/utils/playbackQueue";
 
 vi.mock("@/api", () => ({
+  apiFetch: vi.fn(() => Promise.resolve({ success: true })),
   apiPost: vi.fn(() => Promise.resolve({ success: true })),
   redirectToLogin: vi.fn(),
 }));
@@ -43,19 +44,32 @@ vi.mock("@/components/video-player/plugins/track-activity", () => ({}));
 vi.mock("@/components/video-player/plugins/vrmode", () => ({}));
 vi.mock("@/components/video-player/plugins/media-session", () => ({}));
 
+interface SendOptions {
+  keepalive?: boolean;
+}
+
 interface TrackActivity {
   setEnabled: (enabled: boolean) => void;
   reset: () => void;
   minimumPlayPercent: number;
-  saveActivity?: (resumeTime: number, playDuration: number) => Promise<void>;
-  incrementPlayCount?: () => Promise<void>;
+  saveActivity?: (
+    resumeTime: number,
+    playDuration: number,
+    options?: SendOptions
+  ) => Promise<void>;
+  incrementPlayCount?: (options?: SendOptions) => Promise<void>;
 }
 
 /** A Video.js player with only what the hook calls. */
 function fakePlayer() {
   const handlers = new Map<string, () => void | Promise<void>>();
   const trackActivity: TrackActivity = {
-    setEnabled: vi.fn(),
+    // The real plugin sends the interval it was playing when it is disabled
+    setEnabled: vi.fn((enabled: boolean) => {
+      if (!enabled) {
+        void trackActivity.saveActivity?.(player.currentTime(), 9);
+      }
+    }),
     reset: vi.fn(),
     minimumPlayPercent: 0,
   };
@@ -188,6 +202,12 @@ function endOfVideo(controls: Controls) {
   };
 }
 
+/** The JSON a request was sent with */
+function requestBody(options: RequestInit | undefined): unknown {
+  const body = options?.body;
+  return typeof body === "string" ? (JSON.parse(body) as unknown) : undefined;
+}
+
 const onA = { id: "123", instanceId: "inst-a" };
 const onB = { id: "123", instanceId: "inst-b" };
 
@@ -205,7 +225,13 @@ describe("useVideoPlayer", () => {
     await must(plugin.saveActivity, "saveActivity")(5, 3);
     await must(plugin.incrementPlayCount, "incrementPlayCount")();
 
-    expect(vi.mocked(apiPost).mock.calls).toEqual([
+    // The move off A:123 flushed A's own interval; these are B's
+    const calls = vi
+      .mocked(apiPost)
+      .mock.calls.filter(
+        ([, body]) => (body as { instanceId: string }).instanceId === "inst-b"
+      );
+    expect(calls).toEqual([
       [
         "/watch-history/save-activity",
         {
@@ -217,9 +243,138 @@ describe("useVideoPlayer", () => {
       ],
       [
         "/watch-history/increment-play-count",
-        { sceneId: "123", instanceId: "inst-b" },
+        {
+          sceneId: "123",
+          instanceId: "inst-b",
+          playToken: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown,
+        },
       ],
     ]);
+  });
+
+  it("a keepalive save posts once with keepalive: true and no retry", async () => {
+    const player = fakePlayer();
+    renderPlayer(player, onA);
+    const plugin = player.trackActivity();
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error("offline"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await must(plugin.saveActivity, "saveActivity")(5, 3, {
+        keepalive: true,
+      });
+
+      expect(vi.mocked(apiFetch).mock.calls).toHaveLength(1);
+      const [endpoint, options] = must(
+        vi.mocked(apiFetch).mock.calls[0],
+        "the request"
+      );
+      expect(endpoint).toBe("/watch-history/save-activity");
+      expect(options?.method).toBe("POST");
+      expect(options?.keepalive).toBe(true);
+      expect(requestBody(options)).toEqual({
+        sceneId: "123",
+        instanceId: "inst-a",
+        resumeTime: 5,
+        playDuration: 3,
+      });
+      expect(apiPost).not.toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it("a keepalive play count posts once with its token and keepalive: true", async () => {
+    const player = fakePlayer();
+    renderPlayer(player, onA);
+    const plugin = player.trackActivity();
+
+    await must(
+      plugin.incrementPlayCount,
+      "incrementPlayCount"
+    )({
+      keepalive: true,
+    });
+
+    expect(vi.mocked(apiFetch).mock.calls).toHaveLength(1);
+    const [endpoint, options] = must(
+      vi.mocked(apiFetch).mock.calls[0],
+      "the request"
+    );
+    expect(endpoint).toBe("/watch-history/increment-play-count");
+    expect(options?.keepalive).toBe(true);
+    expect(requestBody(options)).toEqual({
+      sceneId: "123",
+      instanceId: "inst-a",
+      playToken: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown,
+    });
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  it("the play-count request carries the same playToken on every retry and a new one per scene", async () => {
+    const player = fakePlayer();
+    const { rerender } = renderPlayer(player, onA);
+    const plugin = player.trackActivity();
+    vi.mocked(apiPost)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockRejectedValueOnce(new Error("offline"));
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.useFakeTimers();
+    try {
+      const pending = must(plugin.incrementPlayCount, "incrementPlayCount")();
+      await vi.advanceTimersByTimeAsync(3500);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+      warned.mockRestore();
+    }
+    rerender({ current: onB });
+    await must(plugin.incrementPlayCount, "incrementPlayCount")();
+
+    const bodies = vi
+      .mocked(apiPost)
+      .mock.calls.filter(([endpoint]) => endpoint.endsWith("play-count"))
+      .map(([, body]) => body as { instanceId: string; playToken: string });
+    expect(bodies.map((body) => body.instanceId)).toEqual([
+      "inst-a",
+      "inst-a",
+      "inst-a",
+      "inst-b",
+    ]);
+    expect(new Set(bodies.slice(0, 3).map((body) => body.playToken)).size).toBe(
+      1
+    );
+    expect(bodies[3]?.playToken).toMatch(/^[0-9a-f]{32}$/);
+    expect(bodies[3]?.playToken).not.toBe(bodies[0]?.playToken);
+  });
+
+  it("on a scene change the flush saves the previous scene's id and time, before the new source is set", () => {
+    const player = fakePlayer();
+    player.currentTime.mockReturnValue(42);
+    const { rerender } = renderPlayer(player, onA);
+    vi.mocked(apiPost).mockClear();
+    player.load.mockClear();
+
+    rerender({ current: onB });
+
+    const saves = vi
+      .mocked(apiPost)
+      .mock.calls.filter(([endpoint]) => endpoint.endsWith("save-activity"));
+    expect(saves).toEqual([
+      [
+        "/watch-history/save-activity",
+        {
+          sceneId: "123",
+          instanceId: "inst-a",
+          resumeTime: 42,
+          playDuration: 9,
+        },
+      ],
+    ]);
+    const saved = must(vi.mocked(apiPost).mock.invocationCallOrder[0]);
+    const loaded = must(player.load.mock.invocationCallOrder[0]);
+    expect(saved).toBeLessThan(loaded);
   });
 
   it("moving from A:123 to B:123 loads the new source", () => {

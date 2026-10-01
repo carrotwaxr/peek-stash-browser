@@ -9,6 +9,7 @@ Peek automatically tracks your viewing progress and lets you resume playback exa
 Peek tracks your progress automatically while you watch:
 
 - **Progress is saved every few seconds** during playback
+- **Progress is saved when you leave**: changing scene, switching to another tab or app, or closing the page sends the seconds since the last save, so the last stretch you watched is not lost
 - **No manual action needed** - just watch normally
 - **Per-user tracking** - each user has their own watch history
 - **Syncs across devices** - resume on any device where you're logged in

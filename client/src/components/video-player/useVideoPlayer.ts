@@ -2,8 +2,9 @@ import { useEffect, useRef } from "react";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
-import { apiPost, redirectToLogin } from "../../api";
+import { apiFetch, apiPost, redirectToLogin } from "../../api";
 import { usePlayerHotkeys } from "../../hooks/useMediaKeys";
+import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
 import { buildPlayerSources } from "./playerSources";
@@ -355,40 +356,63 @@ export function useVideoPlayer({
     trackActivityPlugin.setEnabled(true);
     trackActivityPlugin.minimumPlayPercent = minimumPlayPercent;
 
+    // One token per viewing of this scene, the same on every retry of its
+    // play-count request: the server counts a token once, so a retry after
+    // a lost answer cannot count the play twice
+    const playToken = newClientToken();
+
     // Connect plugin callbacks to API endpoints
-    // saveActivity is called periodically (every 10s) during playback
+    // saveActivity is called periodically (every 10s) during playback, when
+    // the scene changes, and when the tab is hidden or the page closes. The
+    // last two send with `keepalive`, so the request outlives the page, and
+    // once: a retry timer would not.
     trackActivityPlugin.saveActivity = async (
       resumeTime: number,
-      playDuration: number
+      playDuration: number,
+      options?: { keepalive?: boolean }
     ) => {
+      const body = {
+        sceneId,
+        instanceId: sceneInstanceId,
+        resumeTime,
+        playDuration,
+      };
       try {
-        await retryWithBackoff(() =>
-          apiPost("/watch-history/save-activity", {
-            sceneId,
-            instanceId: sceneInstanceId,
-            resumeTime,
-            playDuration,
-          })
-        );
+        if (options?.keepalive) {
+          await apiFetch("/watch-history/save-activity", {
+            method: "POST",
+            body: JSON.stringify(body),
+            keepalive: true,
+          });
+        } else {
+          await retryWithBackoff(() =>
+            apiPost("/watch-history/save-activity", body)
+          );
+        }
       } catch (error) {
-        console.error("Failed to save activity after 3 attempts:", error);
+        console.error("Failed to save activity:", error);
       }
     };
 
     // incrementPlayCount is called once per session when threshold is reached
-    trackActivityPlugin.incrementPlayCount = async () => {
+    trackActivityPlugin.incrementPlayCount = async (options?: {
+      keepalive?: boolean;
+    }) => {
+      const body = { sceneId, instanceId: sceneInstanceId, playToken };
       try {
-        await retryWithBackoff(() =>
-          apiPost("/watch-history/increment-play-count", {
-            sceneId,
-            instanceId: sceneInstanceId,
-          })
-        );
+        if (options?.keepalive) {
+          await apiFetch("/watch-history/increment-play-count", {
+            method: "POST",
+            body: JSON.stringify(body),
+            keepalive: true,
+          });
+        } else {
+          await retryWithBackoff(() =>
+            apiPost("/watch-history/increment-play-count", body)
+          );
+        }
       } catch (error) {
-        console.error(
-          "Failed to increment play count after 3 attempts:",
-          error
-        );
+        console.error("Failed to increment play count:", error);
       }
     };
 

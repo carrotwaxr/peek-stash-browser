@@ -1055,6 +1055,8 @@ Watch history tracking endpoints.
 
 **Body:** `sceneId`, `instanceId` (required). Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
 
+Optional `playToken` (1 to 64 characters; anything else answers 400): the player makes one per viewing of a scene and sends the same token on every retry. The server counts a token once per user and scene for 10 minutes, so a retry after a lost answer adds no second play; a repeat answers the current row and writes nothing. A request without a token always counts. Tokens are kept in memory, at most 5,000.
+
 ---
 
 ### POST /api/watch-history/increment-o
