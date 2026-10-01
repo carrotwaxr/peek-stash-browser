@@ -23,7 +23,6 @@ import "./plugins/persist-volume.js";
 import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
-import "./plugins/vrmode.js";
 import "./plugins/media-session.js";
 
 /**
@@ -235,7 +234,6 @@ export function useVideoPlayer({
         skipButtons: {},
         trackActivity: {},
         mediaSession: {},
-        vrMenu: {},
       },
     });
 

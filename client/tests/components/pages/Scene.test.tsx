@@ -39,7 +39,7 @@ vi.mock("@/contexts/ScenePlayerContext", () => ({
   useScenePlayer: vi.fn(),
 }));
 
-// The page imports the player, which pulls in video.js and its VR polyfill
+// The page imports the player, which pulls in video.js
 vi.mock("@/components/video-player/VideoPlayer", () => ({
   default: () => null,
 }));

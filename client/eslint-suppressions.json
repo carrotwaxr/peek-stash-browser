@@ -698,13 +698,13 @@
       "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 8
+      "count": 6
     },
     "@typescript-eslint/no-unsafe-call": {
-      "count": 12
+      "count": 11
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 13
+      "count": 12
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
@@ -755,7 +755,7 @@
   },
   "src/components/video-player/plugins/persist-volume.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
@@ -819,26 +819,6 @@
     },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 12
-    }
-  },
-  "src/components/video-player/plugins/vrmode.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 10
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 22
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 18
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
     }
   },
   "src/components/video-player/useOrientationFullscreen.ts": {
@@ -1058,7 +1038,7 @@
   },
   "src/types/video.d.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 25
+      "count": 18
     }
   },
   "src/utils/buildFolderTree.ts": {

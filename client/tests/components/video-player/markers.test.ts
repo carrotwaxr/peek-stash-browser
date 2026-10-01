@@ -108,4 +108,17 @@ describe("MarkersPlugin", () => {
     expect(ready?.classList.contains("vjs-marker-ungenerated")).toBe(false);
     expect(pending?.classList.contains("vjs-marker-ungenerated")).toBe(true);
   });
+
+  // Hard-coded from the crypto-js implementation this replaced: a tag keeps
+  // the colour it has always had
+  it.each([
+    ["Blowjob", 264],
+    ["Anal", 185],
+    ["日本語", 13],
+    ["", 349],
+  ])("tag hues are unchanged: %j is %i", (tag, hue) => {
+    const { player } = makePlayer();
+    current = player;
+    expect(player.markers().computeBaseHue(tag)).toBe(hue);
+  });
 });
