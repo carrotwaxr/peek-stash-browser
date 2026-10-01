@@ -30,7 +30,10 @@ import {
   type LargeLibraryPlanner,
   largeLibraryPlanner,
 } from "../helpers/largeLibraryPlanner.js";
-import { recordStatements } from "../helpers/statementRecorder.js";
+import {
+  type RecordedStatement,
+  recordStatements,
+} from "../helpers/statementRecorder.js";
 import {
   adminClient,
   restoreInstanceSelection,
@@ -116,6 +119,33 @@ const IMAGES_ON_B = [galleryImage(1), galleryImage(2)];
 
 let u: number;
 let planner: LargeLibraryPlanner;
+
+/**
+ * A scene statement's plan without the page's last-O column: the select
+ * list reads the viewer's latest O time as a scalar subquery over
+ * WatchHistory.oHistory, which SQLite shows as a correlated subquery
+ * reading json_each, after the filter's own subqueries. On the 207k copy
+ * it costs no more than no column (within noise) and leaves the rest of the
+ * plan unchanged. Only that one subquery is removed, so a correlated filter
+ * probe, json_each's included, still shows.
+ */
+async function scenePlanOf(statement: RecordedStatement): Promise<string[]> {
+  const lines = await planner.planOf(statement.sql, ...statement.params);
+  if (!statement.sql.includes("FROM json_each(w.oHistory) j) AS userLastOAt")) {
+    return lines;
+  }
+  for (let i = lines.length - 2; i >= 0; i--) {
+    if (
+      /^CORRELATED SCALAR SUBQUERY \d+$/.test(must(lines[i])) &&
+      lines[i + 1] === "SEARCH j VIRTUAL TABLE INDEX 1:"
+    ) {
+      return [...lines.slice(0, i), ...lines.slice(i + 2)];
+    }
+  }
+  throw new Error(
+    `the last-O column's subquery is not in the plan:\n${lines.join("\n")}`
+  );
+}
 
 const ref = (id: string, instanceId = A): FilterRef => ({ id, instanceId });
 /** A legacy id with no instance */
@@ -435,10 +465,7 @@ describeWithDb("Ref clause shapes", () => {
         statement.sql.includes("FROM StashScene s")
       );
     const plan = async (statement: typeof largeIncludes) => {
-      const lines = await planner.planOf(
-        must(statement).sql,
-        ...must(statement).params
-      );
+      const lines = await scenePlanOf(must(statement));
       return lines.join("\n");
     };
 
@@ -487,9 +514,7 @@ describeWithDb("Ref clause shapes", () => {
       (statement) => statement.sql.includes("FROM StashScene s")
     );
     const plan = async (statement: typeof ratingPage) =>
-      (
-        await planner.planOf(must(statement).sql, ...must(statement).params)
-      ).join("\n");
+      (await scenePlanOf(must(statement))).join("\n");
 
     for (const statement of [ratingPage, ratingCount]) {
       const lines = await plan(statement);
@@ -533,9 +558,7 @@ describeWithDb("Ref clause shapes", () => {
       statement.sql.includes("FROM StashScene s")
     );
     const plan = async (statement: typeof page) =>
-      (
-        await planner.planOf(must(statement).sql, ...must(statement).params)
-      ).join("\n");
+      (await scenePlanOf(must(statement))).join("\n");
 
     expect(must(count).sql).toContain("SELECT COUNT(*) AS total");
     const countPlan = await plan(count);
@@ -574,9 +597,7 @@ describeWithDb("Ref clause shapes", () => {
       statement.sql.includes("FROM StashScene s")
     );
     const plan = async (statement: typeof page) =>
-      (
-        await planner.planOf(must(statement).sql, ...must(statement).params)
-      ).join("\n");
+      (await scenePlanOf(must(statement))).join("\n");
 
     const pagePlan = await plan(page);
     expect(pagePlan).toContain("MATERIALIZE tags_refs");
