@@ -16,8 +16,14 @@ export interface ProxyOptions {
   label: string;
   defaultCacheControl: string;
   timeoutMs: number;
-  /** Headers sent to Stash: the browser's `Range` and `If-Range`, when it sent them */
+  /**
+   * Headers sent to Stash: the browser's `Range`, `If-Range`, `If-None-Match`
+   * and `If-Modified-Since`, when it sent them
+   */
   requestHeaders: OutgoingHttpHeaders;
-  /** The browser's HEAD goes to Stash as HEAD, so no body is fetched */
-  method: "GET" | "HEAD";
+  /**
+   * The browser sent HEAD. Stash refuses HEAD (405), so Stash is asked with a
+   * GET for one byte and the browser gets the headers and no body
+   */
+  headOnly: boolean;
 }

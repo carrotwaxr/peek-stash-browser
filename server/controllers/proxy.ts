@@ -83,25 +83,63 @@ const RANGE_RESPONSE_HEADERS = [
 /**
  * The browser's `Range` and `If-Range`, for Stash: a partial request gets a
  * partial answer (iOS Safari plays `<video>` only from a server that answers
- * ranges). A request without them sends none. These media routes serve files
- * and images, never manifests, so a range is never cut across a key.
+ * ranges). Also its `If-None-Match` and `If-Modified-Since`: Stash sends
+ * `Cache-Control: no-cache` with every file, so the browser revalidates each
+ * time it shows one, and Stash's 304 spares the whole file. A request without
+ * them sends none. These media routes serve files and images, never
+ * manifests, so a range is never cut across a key.
  */
 function rangeHeaders(req: {
   headers: IncomingHttpHeaders;
 }): OutgoingHttpHeaders {
   const headers: OutgoingHttpHeaders = {};
-  const { range, "if-range": ifRange } = req.headers;
+  const {
+    range,
+    "if-range": ifRange,
+    "if-none-match": ifNoneMatch,
+    "if-modified-since": ifModifiedSince,
+  } = req.headers;
   if (range) headers.Range = range;
   if (ifRange) headers["If-Range"] = ifRange;
+  if (ifNoneMatch) headers["If-None-Match"] = ifNoneMatch;
+  if (ifModifiedSince) headers["If-Modified-Since"] = ifModifiedSince;
   return headers;
 }
 
 /**
- * The method sent to Stash: Express hands a HEAD to the GET handlers, and a
- * HEAD (a card probing whether a preview exists) must not fetch the body
+ * True for a HEAD (a card probing whether a preview exists, or what type an
+ * image is): Express hands it to the GET handlers. Stash refuses HEAD on its
+ * media routes (405), so it goes to Stash as a GET for one byte and is
+ * answered with the headers alone (`proxyHttpRequest`).
  */
-function upstreamMethod(req: { method?: string }): "GET" | "HEAD" {
-  return req.method === "HEAD" ? "HEAD" : "GET";
+function isHead(req: { method?: string }): boolean {
+  return req.method === "HEAD";
+}
+
+/** The range a HEAD asks Stash for when the browser named none. */
+const HEAD_PROBE_RANGE = "bytes=0-0";
+
+/**
+ * The status and length to answer a HEAD with, from Stash's answer to its
+ * GET. A 206 (or a 416, for an empty file) to the one-byte range Peek added
+ * is answered as 200 with the whole file's length from `Content-Range`, so
+ * the probe reads what a GET would have; any other answer stands as it is.
+ */
+function headAnswer(
+  proxyRes: http.IncomingMessage,
+  rangeAdded: boolean
+): {
+  status: number;
+  contentLength: string | undefined;
+  keepContentRange: boolean;
+} {
+  const status = proxyRes.statusCode ?? 200;
+  const contentLength = proxyRes.headers["content-length"];
+  if (!rangeAdded || (status !== 206 && status !== 416)) {
+    return { status, contentLength, keepContentRange: true };
+  }
+  const total = /\/(\d+)$/.exec(proxyRes.headers["content-range"] ?? "")?.[1];
+  return { status: 200, contentLength: total, keepContentRange: false };
 }
 
 /**
@@ -179,7 +217,7 @@ function proxyHttpRequest(
     defaultCacheControl,
     timeoutMs,
     requestHeaders,
-    method,
+    headOnly,
   }: ProxyOptions,
   slot: Acquired
 ): void {
@@ -201,9 +239,18 @@ function proxyHttpRequest(
   // Stash's response, once it arrives: from then on the pipeline owns `res`
   let upstreamRes: http.IncomingMessage | undefined;
   // Who ended the transfer before it completed, for the log: the browser
-  // leaving is routine and Peek's own destroy follows it; Stash failing or
-  // going quiet for `timeoutMs` is logged once, where it is seen
-  let endedBy: "client" | "timeout" | "stash" | undefined;
+  // leaving is routine and Peek's own destroy follows it, as is a HEAD's
+  // (its headers were all it wanted); Stash failing or going quiet for
+  // `timeoutMs` is logged once, where it is seen
+  let endedBy: "client" | "timeout" | "stash" | "head" | undefined;
+
+  // Stash answers HEAD with 405 on its media routes: a HEAD asks with a GET
+  // for one byte, unless the browser named its own range
+  const rangeAdded = headOnly && requestHeaders.Range === undefined;
+  const headers: OutgoingHttpHeaders = rangeAdded
+    ? { ...requestHeaders, Range: HEAD_PROBE_RANGE }
+    : requestHeaders;
+
   // The response reached the browser whole (`finish`: every byte handed to
   // the socket), as opposed to closing first
   let responseFinished = false;
@@ -226,18 +273,30 @@ function proxyHttpRequest(
       return;
     }
 
+    // A HEAD reports the file as a GET would; anything else is Stash's own
+    const { status, contentLength, keepContentRange } = headOnly
+      ? headAnswer(proxyRes, rangeAdded)
+      : {
+          status: proxyRes.statusCode ?? 200,
+          contentLength: proxyRes.headers["content-length"],
+          keepContentRange: true,
+        };
+
     // Forward response headers
     if (proxyRes.headers["content-type"]) {
       res.setHeader("Content-Type", proxyRes.headers["content-type"]);
     }
-    if (proxyRes.headers["content-length"]) {
-      res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
     }
     // Range support and cache validators: Stash's 206 is only usable with
-    // its Content-Range, and a browser revalidates with ETag/Last-Modified
+    // its Content-Range, and a browser revalidates with ETag/Last-Modified.
+    // A HEAD's own one-byte range is Peek's, so its Content-Range stays here
     for (const name of RANGE_RESPONSE_HEADERS) {
       const value = proxyRes.headers[name];
-      if (value !== undefined) res.setHeader(name, value);
+      if (value === undefined) continue;
+      if (name === "content-range" && !keepContentRange) continue;
+      res.setHeader(name, value);
     }
     res.setHeader(
       "Cache-Control",
@@ -248,7 +307,17 @@ function proxyHttpRequest(
     );
 
     // Set status code
-    res.status(proxyRes.statusCode || 200);
+    res.status(status);
+
+    // A HEAD has its answer: end it with no body, and drop Stash's response
+    // at once rather than read it, which frees the slot
+    if (headOnly) {
+      endedBy = "head";
+      res.end();
+      proxyRes.destroy();
+      releaseOnce();
+      return;
+    }
 
     // `pipeline` ends `res` when Stash fails mid-body (a reset, a close, or
     // our destroy at the timeout) by destroying both sides, so the browser
@@ -267,17 +336,7 @@ function proxyHttpRequest(
     });
   };
 
-  // A HEAD goes to Stash as HEAD: its answer has the headers and no body, so
-  // the slot is free as soon as they arrive
-  const proxyReq =
-    method === "HEAD"
-      ? httpModule.request(
-          fullUrl,
-          { agent, headers: requestHeaders, method: "HEAD" },
-          onResponse
-        )
-      : httpModule.get(fullUrl, { agent, headers: requestHeaders }, onResponse);
-  if (method === "HEAD") proxyReq.end();
+  const proxyReq = httpModule.get(fullUrl, { agent, headers }, onResponse);
 
   // When the client disconnects (seek, refresh, navigate away),
   // destroy the upstream request to stop downloading into memory.
@@ -442,7 +501,7 @@ export const proxyScenePreview = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 60000,
     requestHeaders: rangeHeaders(req),
-    method: upstreamMethod(req),
+    headOnly: isHead(req),
   });
 };
 
@@ -491,7 +550,7 @@ export const proxySceneWebp = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 60000,
     requestHeaders: rangeHeaders(req),
-    method: upstreamMethod(req),
+    headOnly: isHead(req),
   });
 };
 
@@ -563,7 +622,7 @@ export const proxyStashMedia = async (
     defaultCacheControl: "private, max-age=31536000, immutable",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
-    method: upstreamMethod(req),
+    headOnly: isHead(req),
   });
 };
 
@@ -639,7 +698,7 @@ export const proxyClipPreview = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
-    method: upstreamMethod(req),
+    headOnly: isHead(req),
   });
 };
 
@@ -739,6 +798,6 @@ export const proxyImage = async (
     defaultCacheControl: "private, max-age=86400",
     timeoutMs: 30000,
     requestHeaders: rangeHeaders(req),
-    method: upstreamMethod(req),
+    headOnly: isHead(req),
   });
 };
