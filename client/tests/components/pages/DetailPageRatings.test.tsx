@@ -10,6 +10,7 @@ import { resetDetailPageMocks } from "./detail/detailPageMocks";
 import {
   type DetailType,
   bodiesTo,
+  cleanupDetailPage,
   lastBody,
   renderDetailPage,
   requestsTo,
@@ -76,7 +77,7 @@ describe.each(PAGES)("%s page rating", (type, plural) => {
     hotkeys.mockClear();
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
+    cleanupDetailPage();
   });
 
   function renderPage(search: string) {

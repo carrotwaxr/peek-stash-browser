@@ -5,7 +5,8 @@
  * sends, which stays true whichever hooks the page is built on.
  *
  * The children that are not the subject and the contexts the pages read are
- * module mocks each test file declares (`./detailPageMocks`).
+ * module mocks each test file declares (`./detailPageMocks`). A file ends each
+ * case with `cleanupDetailPage()`.
  */
 import type { ComponentType } from "react";
 import {
@@ -17,7 +18,7 @@ import {
 } from "react-router-dom";
 import type { GetUserSettingsResponse } from "@peek/shared-types";
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import {
   type ApiStub,
   initializingResponse,
@@ -26,6 +27,7 @@ import {
   stubApi,
 } from "@tests/helpers/stubApi";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
+import { vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
 import GalleryDetail from "@/components/pages/GalleryDetail";
 import GroupDetail from "@/components/pages/GroupDetail";
@@ -123,6 +125,29 @@ export const DEFAULT_ENTITY: Record<string, unknown> = {
 
 let latestApi: ApiStub | undefined;
 let navigateRef: ReturnType<typeof useNavigate> | undefined;
+/** The query clients of the pages rendered in this case */
+const queryClients = new Set<QueryClient>();
+/** The writes this case sent that are not answered yet */
+const unansweredWrites = new Set<ReturnType<typeof setTimeout>>();
+
+/**
+ * Ends a case: unmounts the page while fetch is still stubbed, then drops its
+ * queries and the writes not yet answered, then unstubs fetch. The unmount
+ * first runs the effects of the page's last render, which may still ask the
+ * server, so unstubbing first sends those requests to the real network; and
+ * a write answered after the case ends would answer after the test
+ * environment is gone. Call it in `afterEach`, and between two renders in
+ * one case, in place of `cleanup()` and `vi.unstubAllGlobals()`.
+ */
+export function cleanupDetailPage(): void {
+  cleanup();
+  for (const client of queryClients) client.clear();
+  queryClients.clear();
+  for (const timer of unansweredWrites) clearTimeout(timer);
+  unansweredWrites.clear();
+  navigateRef = undefined;
+  vi.unstubAllGlobals();
+}
 
 /** Moves the rendered page to `url` inside the router, as a link does */
 export function navigateTo(url: string): void {
@@ -200,7 +225,7 @@ function lookupAnswer(
  * (`GET /library/<entities>/<id>/counts`), the rating and favorite write
  * (`PUT /ratings/<type>/<id>`), the library's readiness, the images list
  * (`POST /library/images`, empty), the filter presets and the settings.
- * Any other request rejects, naming it. Undo with `vi.unstubAllGlobals()`.
+ * Any other request rejects, naming it. Undo with `cleanupDetailPage()`.
  */
 export function renderDetailPage(
   type: DetailType,
@@ -216,16 +241,18 @@ export function renderDetailPage(
   const idRoutes: Record<string, Answer> = {};
   for (const other of [entityId, ...(options.otherIds ?? [])]) {
     // Answered after a round trip: a failure then lands in a render of its own
-    idRoutes[`/ratings/${type}/${other}`] = () =>
-      new Promise<Response>((resolve) =>
-        setTimeout(
-          () =>
-            resolve(
-              jsonResponse(options.ratingAnswer ?? 200, { success: true })
-            ),
-          20
-        )
-      );
+    idRoutes[`/ratings/${type}/${other}`] = () => {
+      const response = jsonResponse(options.ratingAnswer ?? 200, {
+        success: true,
+      });
+      return new Promise<Response>((resolve) => {
+        const timer = setTimeout(() => {
+          unansweredWrites.delete(timer);
+          resolve(response);
+        }, 20);
+        unansweredWrites.add(timer);
+      });
+    };
   }
   for (const other of [id, ...(options.otherIds ?? [])]) {
     idRoutes[`/library/${plural}/${encodeURIComponent(other)}/counts`] =
@@ -252,6 +279,7 @@ export function renderDetailPage(
   latestApi = api;
 
   const queryClient = createQueryClient();
+  queryClients.add(queryClient);
   // The URL's query, for `currentSearch()`, and the router's `navigate`
   const CurrentSearch = () => {
     navigateRef = useNavigate();

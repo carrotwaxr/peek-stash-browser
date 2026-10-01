@@ -3,7 +3,7 @@
  * there is nothing to show, and stand aside for a lookup that is loading,
  * not found or failed.
  */
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cardSettings, resetDetailPageMocks } from "./detail/detailPageMocks";
@@ -11,6 +11,7 @@ import {
   type DetailPageOptions,
   type DetailType,
   bodiesTo,
+  cleanupDetailPage,
   renderDetailPage,
   requestsTo,
 } from "./detail/renderDetailPage";
@@ -193,7 +194,7 @@ describe.each(PAGES)("$type page tabs", ({ type, plural, tabs, emptyText }) => {
     counts = ALL_COUNTS;
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
+    cleanupDetailPage();
   });
 
   it.each(tabs)("opens the %s tab the URL names", async (tab, content) => {
@@ -223,8 +224,7 @@ describe.each(PAGES)("$type page tabs", ({ type, plural, tabs, emptyText }) => {
     renderPage();
     await tabShown(firstContent);
     const withRating = screen.queryAllByRole("slider").length;
-    cleanup();
-    vi.unstubAllGlobals();
+    cleanupDetailPage();
 
     cardSettings.current = {};
     renderPage();

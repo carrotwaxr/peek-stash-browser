@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cardSettings, resetDetailPageMocks, unit } from "./detailPageMocks";
 import {
   type DetailType,
+  cleanupDetailPage,
   currentSearch,
   lastBody,
   renderDetailPage,
@@ -49,7 +50,7 @@ beforeEach(() => {
   cardSettings.current = { showDescriptionOnDetail: true };
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
 });
 
 /** A card by its title: the element holding its heading and its content */

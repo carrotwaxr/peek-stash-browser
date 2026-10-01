@@ -17,6 +17,7 @@ import { cardSettings, resetDetailPageMocks } from "./detailPageMocks";
 import {
   type DetailType,
   bodiesTo,
+  cleanupDetailPage,
   renderDetailPage,
   requestsTo,
 } from "./renderDetailPage";
@@ -70,13 +71,23 @@ beforeEach(() => {
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  cleanupDetailPage();
   consoleError.mockRestore();
 });
 
 /** Presses keys one after the other on the page; false when the page took one */
 function press(...keys: string[]): boolean[] {
   return keys.map((key) => fireEvent.keyDown(document.body, { key }));
+}
+
+/**
+ * Presses `r` until the page takes it, then the next key. The page registers
+ * its hotkeys in an effect that runs after the render showing the entity, so
+ * the slider can be on screen a moment before `r` is taken.
+ */
+async function pressOnceTaken(next?: string): Promise<void> {
+  await waitFor(() => expect(press("r")[0]).toBe(false));
+  if (next !== undefined) press(next);
 }
 
 describe.each(TYPES)("%s page writes", (type) => {
@@ -146,7 +157,7 @@ describe.each(TYPES)("%s page writes", (type) => {
     const { api } = render();
     await slider();
 
-    press("r", "4");
+    await pressOnceTaken("4");
 
     await waitFor(() => expect(written(api)).toHaveLength(1));
     expect(written(api)).toEqual([{ rating: 80, instanceId: "inst-b" }]);
@@ -157,7 +168,7 @@ describe.each(TYPES)("%s page writes", (type) => {
     const { api } = render();
     await slider();
 
-    press("r", "f");
+    await pressOnceTaken("f");
 
     await waitFor(() => expect(written(api)).toHaveLength(1));
     expect(written(api)).toEqual([{ favorite: true, instanceId: "inst-b" }]);
@@ -204,6 +215,6 @@ describe.each(TYPES)("%s page writes", (type) => {
     render();
     await slider();
 
-    expect(press("r")[0]).toBe(false);
+    await pressOnceTaken();
   });
 });

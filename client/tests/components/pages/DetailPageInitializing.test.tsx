@@ -7,7 +7,11 @@ import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LIBRARY_READY_POLL_MS } from "@/api/hooks/useLibraryReady";
 import { config, resetDetailPageMocks } from "./detail/detailPageMocks";
-import { renderDetailPage, requestsTo } from "./detail/renderDetailPage";
+import {
+  cleanupDetailPage,
+  renderDetailPage,
+  requestsTo,
+} from "./detail/renderDetailPage";
 
 vi.mock("@/components/grids/index", () =>
   import("./detail/detailPageMocks").then((m) => m.gridsModule)
@@ -44,8 +48,8 @@ describe("a detail page while the library is initializing", () => {
     vi.useFakeTimers();
   });
   afterEach(() => {
+    cleanupDetailPage();
     vi.useRealTimers();
-    vi.unstubAllGlobals();
   });
 
   it("shows the notice, not the error page, and loads once the library is ready", async () => {
