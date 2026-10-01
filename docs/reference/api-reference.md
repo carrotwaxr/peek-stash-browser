@@ -1069,6 +1069,20 @@ Optional `playToken` (1 to 64 characters; anything else answers 400): the player
 
 ---
 
+### POST /api/watch-history/decrement-o
+
+**Authentication:** Required
+
+**Controller:** `decrementOCounter` in `../controllers/watchHistory.ts`
+
+**Body:** `sceneId`, `instanceId` (required), as for `increment-o`: a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
+
+Removes the user's newest O on the scene ("Remove last O"): its time leaves the O history, and the O count and the scene's performer, studio and tag O totals drop by 1. A count imported from Stash with no O times still drops by 1. At 0 Os nothing changes. With Sync to Stash on, Stash's newest O on the scene is removed too (`sceneDeleteO`); a Stash failure is logged and does not fail the request.
+
+**Response:** `{ success: true, oCount: number }`, the user's count left (0 when there was none).
+
+---
+
 ### GET /api/watch-history/scenes
 
 **Authentication:** Required (503 `ready: false` while none of the user's instances has finished its first sync)
@@ -1117,6 +1131,22 @@ Image view history tracking endpoints.
 **Body:** `imageId`, `instanceId` (required). Image ids repeat across Stash servers, so the write names the image's instance; a missing or empty `instanceId` answers 400, and an image the user cannot see on that instance answers 404.
 
 **Controller:** `incrementImageOCounter` in `../controllers/imageViewHistory.ts`
+
+With Sync to Stash on, the O is added in Stash too (`imageIncrementO`); a Stash failure is logged and does not fail the request.
+
+---
+
+### POST /api/image-view-history/decrement-o
+
+**Authentication:** Required
+
+**Body:** `imageId`, `instanceId` (required), as for `increment-o`: a missing or empty `instanceId` answers 400, and an image the user cannot see on that instance answers 404.
+
+**Controller:** `decrementImageOCounter` in `../controllers/imageViewHistory.ts`
+
+Removes the user's newest O on the image ("Remove last O"): its time leaves the O history and the O count drops by 1. At 0 Os nothing changes. With Sync to Stash on, Stash's image O counter drops too (`imageDecrementO`); a Stash failure is logged and does not fail the request.
+
+**Response:** `{ success: true, oCount: number }`, the user's count left (0 when there was none).
 
 ---
 

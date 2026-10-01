@@ -6,12 +6,14 @@ import { Link } from "react-router-dom";
  * - Portrait (taller): opens from the bottom as a sheet
  */
 import type { NormalizedImage } from "@peek/shared-types";
+import { useDecrementImageOCounter } from "../../api/hooks";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import {
   getEffectiveImageMetadata,
   getImageTitle,
 } from "../../utils/imageGalleryInheritance";
+import EntityMenu from "./EntityMenu";
 import FavoriteButton from "./FavoriteButton";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
@@ -30,6 +32,44 @@ interface Props {
   onFavoriteChange: (isFavorite: boolean) => void;
   onOCounterChange: (count: number) => void;
 }
+
+interface RemoveLastOMenuProps {
+  image: NormalizedImage;
+  oCount: number;
+  onRemoved: (count: number) => void;
+}
+
+/** The menu beside the O counter, holding only Remove last O (none at 0 Os) */
+const RemoveLastOMenu = ({
+  image,
+  oCount,
+  onRemoved,
+}: RemoveLastOMenuProps) => {
+  const decrement = useDecrementImageOCounter();
+
+  const handleRemoveLastO = async () => {
+    try {
+      const response = await decrement.mutateAsync({
+        imageId: image.id,
+        instanceId: image.instanceId,
+      });
+      onRemoved(response.oCount);
+    } catch (error) {
+      console.error("Failed to remove the last O:", error);
+    }
+  };
+
+  return (
+    <EntityMenu
+      entityType="image"
+      entityId={image.id}
+      entityName={image.title ?? ""}
+      instanceId={image.instanceId}
+      oCount={oCount}
+      onRemoveLastO={() => void handleRemoveLastO()}
+    />
+  );
+};
 
 const MetadataDrawer = ({
   open,
@@ -163,15 +203,22 @@ const MetadataDrawer = ({
                   size="medium"
                 />
               </div>
-              <OCounterButton
-                imageId={image.id}
-                instanceId={image.instanceId}
-                initialCount={oCounter}
-                onChange={onOCounterChange}
-                size="medium"
-                variant="card"
-                interactive={true}
-              />
+              <div className="flex items-center">
+                <OCounterButton
+                  imageId={image.id}
+                  instanceId={image.instanceId}
+                  initialCount={oCounter}
+                  onChange={onOCounterChange}
+                  size="medium"
+                  variant="card"
+                  interactive={true}
+                />
+                <RemoveLastOMenu
+                  image={image}
+                  oCount={oCounter}
+                  onRemoved={onOCounterChange}
+                />
+              </div>
               <FavoriteButton
                 isFavorite={isFavorite}
                 onChange={onFavoriteChange}

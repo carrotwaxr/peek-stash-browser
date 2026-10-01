@@ -84,7 +84,8 @@ Your ratings and favorites are saved to Peek (separate from Stash ratings). Filt
 Track special moments:
 
 - Press **O** or click the O button to increment
-- Counter syncs with Stash if enabled in settings
+- Pressed it by mistake? **Remove last O**, in the menu (⋮) beside the O button in the info drawer or on an image card, takes your newest O away. It shows only while the count is above 0.
+- With Sync to Stash on (an admin sets it in User Management), the O is added to and removed from the image in Stash too
 - View your O history in the info drawer
 
 ### Info Drawer

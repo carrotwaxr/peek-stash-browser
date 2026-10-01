@@ -55,6 +55,10 @@ import {
   type GalleryUpdateMutationVariables,
   GroupUpdateDocument,
   type GroupUpdateMutationVariables,
+  ImageDecrementODocument,
+  type ImageDecrementOMutationVariables,
+  ImageIncrementODocument,
+  type ImageIncrementOMutationVariables,
   ImageUpdateDocument,
   type ImageUpdateMutationVariables,
   MetadataScanDocument,
@@ -67,8 +71,8 @@ import {
   type PerformersDestroyMutationVariables,
   SceneAddPlayDocument,
   type SceneAddPlayMutationVariables,
-  SceneDecrementODocument,
-  type SceneDecrementOMutationVariables,
+  SceneDeleteODocument,
+  type SceneDeleteOMutationVariables,
   SceneDestroyDocument,
   type SceneDestroyMutationVariables,
   SceneIncrementODocument,
@@ -421,10 +425,19 @@ export class StashClient {
     variables: SceneIncrementOMutationVariables,
     signal?: AbortSignal
   ) => this.run(SceneIncrementODocument, "SceneIncrementO", variables, signal);
-  sceneDecrementO = (
-    variables: SceneDecrementOMutationVariables,
+  /** Removes the given O times, or Stash's newest when `times` is omitted */
+  sceneDeleteO = (
+    variables: SceneDeleteOMutationVariables,
     signal?: AbortSignal
-  ) => this.run(SceneDecrementODocument, "SceneDecrementO", variables, signal);
+  ) => this.run(SceneDeleteODocument, "SceneDeleteO", variables, signal);
+  imageIncrementO = (
+    variables: ImageIncrementOMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(ImageIncrementODocument, "ImageIncrementO", variables, signal);
+  imageDecrementO = (
+    variables: ImageDecrementOMutationVariables,
+    signal?: AbortSignal
+  ) => this.run(ImageDecrementODocument, "ImageDecrementO", variables, signal);
   sceneSaveActivity = (
     variables: SceneSaveActivityMutationVariables,
     signal?: AbortSignal

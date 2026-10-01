@@ -10,6 +10,10 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { libraryApi } from "../../api";
+import {
+  useDecrementImageOCounter,
+  useDecrementOCounter,
+} from "../../api/hooks";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { useInView } from "../../hooks/useInView";
 import { CardCountIndicators } from "./CardCountIndicators";
@@ -800,6 +804,10 @@ export const CardRatingRow = memo(function CardRatingRow({
   const [rating, setRating, revertRating] = useLocalOverride(initialRating);
   const [isFavorite, setIsFavorite, revertFavorite] =
     useLocalOverride(initialFavorite);
+  // The O button and the menu's Remove last O both set it
+  const [oCount, setOCount] = useLocalOverride(initialOCounter ?? 0);
+  const decrementSceneO = useDecrementOCounter();
+  const decrementImageO = useDecrementImageOCounter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
   const [pendingHide, setPendingHide] = useState<HideInfo | null>(null);
@@ -840,9 +848,26 @@ export const CardRatingRow = memo(function CardRatingRow({
     }
   };
 
-  // The O button shows its own presses; the parent hears of each
+  // The O button's presses and the menu's removals: the row shows the count,
+  // the parent hears of each
   const handleOCounterChange = (newCount: number) => {
+    setOCount(newCount);
     onOCounterChange?.(entityId, newCount);
+  };
+
+  const handleRemoveLastO = async () => {
+    try {
+      const response =
+        entityType === "image"
+          ? await decrementImageO.mutateAsync({ imageId: entityId, instanceId })
+          : await decrementSceneO.mutateAsync({
+              sceneId: entityId,
+              instanceId,
+            });
+      handleOCounterChange(response.oCount);
+    } catch (error) {
+      console.error("Failed to remove the last O:", error);
+    }
   };
 
   const handleHideClick = async (hideInfo: HideInfo) => {
@@ -940,7 +965,7 @@ export const CardRatingRow = memo(function CardRatingRow({
               sceneId={entityType === "scene" ? entityId : undefined}
               imageId={entityType === "image" ? entityId : undefined}
               instanceId={instanceId}
-              initialCount={initialOCounter ?? 0}
+              initialCount={oCount}
               onChange={handleOCounterChange}
               size="small"
               variant="card"
@@ -962,6 +987,10 @@ export const CardRatingRow = memo(function CardRatingRow({
               entityName={entityTitle || ""}
               instanceId={instanceId}
               onHide={(hideInfo) => void handleHideClick(hideInfo)}
+              {...(isSceneOrImage && {
+                oCount,
+                onRemoveLastO: () => void handleRemoveLastO(),
+              })}
             />
           )}
         </div>

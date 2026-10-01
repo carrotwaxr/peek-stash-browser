@@ -8,6 +8,7 @@ import {
   CardRatingRow,
   CardTitle,
 } from "../../../src/components/ui/CardComponents";
+import { createQueryWrapper } from "../../testUtils";
 
 // Mock hooks used by CardRatingRow
 vi.mock("../../../src/hooks/useHiddenEntities", () => ({
@@ -73,7 +74,9 @@ describe("CardComponents density", () => {
           showRating={false}
           showFavorite={false}
           showOCounter={false}
-        />
+        />,
+        // A scene's rating row offers Remove last O, a TanStack mutation
+        { wrapper: createQueryWrapper() }
       );
       const menuButton = screen.getByRole("button", { name: /more options/i });
       // Find the row container (parent of parent - button > div.relative > div.flex > div.flex (row))

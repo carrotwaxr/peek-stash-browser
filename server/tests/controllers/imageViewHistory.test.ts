@@ -7,17 +7,25 @@
  * - getImageViewHistory (single image history retrieval)
  * - the entity access check on both writes
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  decrementImageOCounter,
   getImageViewHistory,
   incrementImageOCounter,
   recordImageView,
 } from "../../controllers/imageViewHistory.js";
+import type { StashClient } from "../../graphql/StashClient.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
-import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import {
+  findHandler,
+  malformed,
+  reqFor,
+  resFor,
+} from "../helpers/controllerTestUtils.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -33,6 +41,11 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   resolveAccessibleInstanceId: vi.fn(),
 }));
 
+// The instance's Stash client, for Sync to Stash
+vi.mock("../../services/StashInstanceManager.js", () => ({
+  stashInstanceManager: { getForSync: vi.fn() },
+}));
+
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -40,6 +53,13 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
+const mockInstanceManager = vi.mocked(stashInstanceManager, true);
+
+/** The image O mutations Sync to Stash sends */
+const stash = {
+  imageIncrementO: vi.fn<StashClient["imageIncrementO"]>(),
+  imageDecrementO: vi.fn<StashClient["imageDecrementO"]>(),
+};
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -49,6 +69,9 @@ describe("Image View History Controller", () => {
     mockResolve.mockImplementation((_userId, _type, _id, requested) =>
       Promise.resolve(requested)
     );
+    stash.imageIncrementO.mockResolvedValue({ imageIncrementO: 1 });
+    stash.imageDecrementO.mockResolvedValue({ imageDecrementO: 0 });
+    mockInstanceManager.getForSync.mockReturnValue(partialRow(stash));
   });
 
   // ==========================================================================
@@ -296,32 +319,69 @@ describe("Image View History Controller", () => {
       );
     });
 
-    it("logs warning when user has syncToStash enabled", async () => {
-      const { logger } = await import("../../utils/logger.js");
+    it("with Sync to Stash on, increment of an image calls imageIncrementO", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          syncToStash: true,
-        })
+        partialRow({ id: 1, syncToStash: true })
       );
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
       mockPrisma.imageViewHistory.create.mockResolvedValue(
-        partialRow({
-          id: 1,
-          oCount: 1,
-          oHistory: [],
-        })
+        partialRow({ id: 1, oCount: 1, oHistory: [] })
       );
 
-      const req = reqFor(incrementImageOCounter, {
-        body: { imageId: "img-1", instanceId: "instance-1" },
-        user: USER,
-      });
       const res = resFor(incrementImageOCounter);
-      await incrementImageOCounter(req, res);
+      await incrementImageOCounter(
+        reqFor(incrementImageOCounter, {
+          body: { imageId: "img-1", instanceId: "instance-1" },
+          user: USER,
+        }),
+        res
+      );
 
-      expect(logger.warn).toHaveBeenCalled();
-      expect(res._getOkBody().success).toBe(true);
+      expect(mockInstanceManager.getForSync).toHaveBeenCalledWith("instance-1");
+      expect(stash.imageIncrementO).toHaveBeenCalledWith({ id: "img-1" });
+      expect(res._getOkBody().oCount).toBe(1);
+    });
+
+    it("with Sync to Stash off, increment of an image calls no Stash", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({ id: 1, oCount: 1, oHistory: [] })
+      );
+
+      await incrementImageOCounter(
+        reqFor(incrementImageOCounter, {
+          body: { imageId: "img-1", instanceId: "instance-1" },
+          user: USER,
+        }),
+        resFor(incrementImageOCounter)
+      );
+
+      expect(stash.imageIncrementO).not.toHaveBeenCalled();
+    });
+
+    it("a Stash failure does not fail an image increment", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({ id: 1, oCount: 1, oHistory: [] })
+      );
+      stash.imageIncrementO.mockRejectedValue(new Error("Stash is down"));
+
+      const res = resFor(incrementImageOCounter);
+      await incrementImageOCounter(
+        reqFor(incrementImageOCounter, {
+          body: { imageId: "img-1", instanceId: "instance-1" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res._getOkBody().oCount).toBe(1);
     });
 
     it("handles oHistory stored as JSON string", async () => {
@@ -386,6 +446,142 @@ describe("Image View History Controller", () => {
       );
 
       expect(res.json).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // decrementImageOCounter Tests
+  // ==========================================================================
+
+  describe("decrementImageOCounter", () => {
+    // The rows these tests store stay out of the tests after them
+    afterEach(() => {
+      mockPrisma.imageViewHistory.findUnique.mockReset();
+      mockPrisma.imageViewHistory.update.mockReset();
+    });
+
+    async function decrement() {
+      const res = resFor(decrementImageOCounter);
+      await decrementImageOCounter(
+        reqFor(decrementImageOCounter, {
+          body: { imageId: "img-1", instanceId: "instance-1" },
+          user: USER,
+        }),
+        res
+      );
+      return res;
+    }
+
+    function storedRow(oCount: number, oHistory: string[]) {
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({ id: 1, oCount, oHistory })
+      );
+      mockPrisma.imageViewHistory.update.mockResolvedValue(
+        partialRow({ id: 1, oCount: oCount - 1 })
+      );
+    }
+
+    it("removes the newest O time and lowers oCount by 1 in one unit", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      storedRow(3, [
+        "2024-03-01T00:00:00.000Z",
+        "2024-01-01T00:00:00.000Z",
+        "2024-02-01T00:00:00.000Z",
+      ]);
+
+      const res = await decrement();
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        DB_WRITE_TX
+      );
+      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          oCount: { decrement: 1 },
+          oHistory: ["2024-01-01T00:00:00.000Z", "2024-02-01T00:00:00.000Z"],
+        },
+      });
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 2 });
+      expect(stash.imageDecrementO).not.toHaveBeenCalled();
+    });
+
+    it("at 0 answers 200 with oCount 0 and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
+
+      const res = await decrement();
+
+      expect(res._getStatus()).toBe(200);
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.imageViewHistory.update).not.toHaveBeenCalled();
+      expect(stash.imageDecrementO).not.toHaveBeenCalled();
+    });
+
+    it("on an image the user cannot see is 404", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockResolve.mockResolvedValueOnce(null);
+
+      const res = await decrement();
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody()).toEqual({ error: "Image not found" });
+      expect(mockPrisma.imageViewHistory.update).not.toHaveBeenCalled();
+      expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 without an instance", async () => {
+      const res = resFor(decrementImageOCounter);
+      await decrementImageOCounter(
+        reqFor(decrementImageOCounter, {
+          body: malformed({ imageId: "img-1" }),
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res._getStatus()).toBe(400);
+      expect(mockResolve).not.toHaveBeenCalled();
+    });
+
+    it("with Sync to Stash on, decrement calls imageDecrementO", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      storedRow(1, ["2024-01-01T00:00:00.000Z"]);
+
+      const res = await decrement();
+
+      expect(mockInstanceManager.getForSync).toHaveBeenCalledWith("instance-1");
+      expect(stash.imageDecrementO).toHaveBeenCalledWith({ id: "img-1" });
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+    });
+
+    it("a Stash failure does not fail the request", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      storedRow(2, ["2024-01-01T00:00:00.000Z", "2024-02-01T00:00:00.000Z"]);
+      stash.imageDecrementO.mockRejectedValue(new Error("Stash is down"));
+
+      const res = await decrement();
+
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 1 });
+    });
+
+    it("POST /decrement-o is routed", async () => {
+      const { default: router } =
+        await import("../../routes/imageViewHistory.js");
+
+      expect(() => findHandler(router, "post", "/decrement-o")).not.toThrow();
     });
   });
 

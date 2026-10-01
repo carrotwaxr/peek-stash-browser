@@ -15,11 +15,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import {
   clearAllWatchHistory,
+  decrementOCounter,
   getWatchHistory,
   incrementOCounter,
   incrementPlayCount,
   saveActivity,
 } from "../../controllers/watchHistory.js";
+import type { StashClient } from "../../graphql/StashClient.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
@@ -982,6 +984,269 @@ describe("Watch History Controller", () => {
       ).rejects.toThrow("stats refused");
       expect(res.json).not.toHaveBeenCalled();
       expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================================
+  // decrementOCounter Tests
+  // ============================================================================
+
+  describe("decrementOCounter", () => {
+    const stash = {
+      sceneIncrementO: vi.fn<StashClient["sceneIncrementO"]>(),
+      sceneDeleteO: vi.fn<StashClient["sceneDeleteO"]>(),
+    };
+
+    beforeEach(() => {
+      stash.sceneDeleteO.mockResolvedValue({
+        sceneDeleteO: { count: 2, history: [] },
+      });
+      stash.sceneIncrementO.mockResolvedValue({ sceneIncrementO: 1 });
+      mockInstanceManager.getForSync.mockReturnValue(partialRow(stash));
+    });
+
+    async function decrement(sceneId = "123") {
+      const res = resFor(decrementOCounter);
+      await decrementOCounter(
+        reqFor(decrementOCounter, {
+          body: { sceneId, instanceId: "test-instance" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+      return res;
+    }
+
+    function storedRow(oCount: number, oHistory: string[]) {
+      const row = partialRow<WatchHistory>({ id: 1, oCount, oHistory });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(row);
+      mockPrisma.watchHistory.update.mockResolvedValue(
+        partialRow({ id: 1, oCount: oCount - 1 })
+      );
+    }
+
+    it("decrement removes the newest O time, lowers oCount by 1 and the performers', studio's and tags' oCounter by 1 in one unit", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      // Not in time order: the newest is in the middle
+      storedRow(3, [
+        "2024-01-01T00:00:00.000Z",
+        "2024-03-01T00:00:00.000Z",
+        "2024-02-01T00:00:00.000Z",
+      ]);
+
+      const res = await decrement();
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        DB_WRITE_TX
+      );
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          oCount: { decrement: 1 },
+          oHistory: ["2024-01-01T00:00:00.000Z", "2024-02-01T00:00:00.000Z"],
+        },
+      });
+      expect(mockStats.statsWritesForScene).toHaveBeenCalledWith(
+        1,
+        "123",
+        "test-instance",
+        { oCount: -1, playCount: 0 }
+      );
+      // On the transaction's client, after the history write
+      expect(mockStatsWrites).toHaveBeenCalledWith(mockPrisma);
+      expect(must(mockStatsWrites.mock.invocationCallOrder[0])).toBeGreaterThan(
+        must(mockPrisma.watchHistory.update.mock.invocationCallOrder[0])
+      );
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 2 });
+    });
+
+    it("an imported count with no O times still loses 1", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      storedRow(2, []);
+
+      const res = await decrement();
+
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { oCount: { decrement: 1 }, oHistory: [] },
+      });
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 1 });
+    });
+
+    it("decrement at 0 answers 200 with oCount 0 and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({ id: 1, oCount: 0, oHistory: [] })
+      );
+
+      const res = await decrement();
+
+      expect(res._getStatus()).toBe(200);
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+      expect(mockStats.statsWritesForScene).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+      expect(stash.sceneDeleteO).not.toHaveBeenCalled();
+    });
+
+    it("decrement of a scene with no history answers oCount 0 and writes nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+
+      const res = await decrement();
+
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+      expect(stash.sceneDeleteO).not.toHaveBeenCalled();
+    });
+
+    it("decrement on a scene the user cannot see is 404", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      mockResolve.mockResolvedValueOnce(null);
+
+      const res = await decrement();
+
+      expect(res._getStatus()).toBe(404);
+      expect(res._getErrorBody()).toEqual({ error: "Scene not found" });
+      expect(mockPrisma.watchHistory.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+      expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 without a sceneId or an instance", async () => {
+      const noScene = resFor(decrementOCounter);
+      await decrementOCounter(
+        reqFor(decrementOCounter, {
+          body: malformed({ instanceId: "test-instance" }),
+          user: testUser({ id: 1 }),
+        }),
+        noScene
+      );
+      const noInstance = resFor(decrementOCounter);
+      await decrementOCounter(
+        reqFor(decrementOCounter, {
+          body: malformed({ sceneId: "123" }),
+          user: testUser({ id: 1 }),
+        }),
+        noInstance
+      );
+
+      expect(noScene._getStatus()).toBe(400);
+      expect(noInstance._getStatus()).toBe(400);
+      expect(mockResolve).not.toHaveBeenCalled();
+    });
+
+    it("with Sync to Stash on, decrement calls sceneDeleteO for the scene (times omitted: Stash's newest)", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      storedRow(1, ["2024-01-01T00:00:00.000Z"]);
+
+      const res = await decrement();
+
+      expect(mockInstanceManager.getForSync).toHaveBeenCalledWith(
+        "test-instance"
+      );
+      expect(stash.sceneDeleteO).toHaveBeenCalledWith({ id: "123" });
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+    });
+
+    it("with Sync to Stash off, no Stash call", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      storedRow(1, ["2024-01-01T00:00:00.000Z"]);
+
+      await decrement();
+
+      expect(stash.sceneDeleteO).not.toHaveBeenCalled();
+    });
+
+    it("a Stash failure does not fail the request", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      storedRow(2, ["2024-01-01T00:00:00.000Z", "2024-02-01T00:00:00.000Z"]);
+      stash.sceneDeleteO.mockRejectedValue(new Error("Stash is down"));
+
+      const res = await decrement();
+
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 1 });
+    });
+
+    it("decrement bumps the write generation after commit", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: false })
+      );
+      storedRow(1, ["2024-01-01T00:00:00.000Z"]);
+
+      await decrement();
+
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(1);
+      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledWith(1);
+      expect(
+        must(mockStats.bumpWriteGeneration.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(must(mockStatsWrites.mock.invocationCallOrder[0]));
+    });
+
+    it("a failed stats write fails the removal: nothing answers and nothing bumps", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      storedRow(1, ["2024-01-01T00:00:00.000Z"]);
+      mockStatsWrites.mockRejectedValue(new Error("stats refused"));
+
+      const res = resFor(decrementOCounter);
+      await expect(
+        decrementOCounter(
+          reqFor(decrementOCounter, {
+            body: { sceneId: "123", instanceId: "test-instance" },
+            user: testUser({ id: 1 }),
+          }),
+          res
+        )
+      ).rejects.toThrow("stats refused");
+      expect(res.json).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+      expect(stash.sceneDeleteO).not.toHaveBeenCalled();
+    });
+
+    it("an O removed meanwhile leaves the unit writing nothing and bumping nothing", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 1, syncToStash: true })
+      );
+      // 1 O when read, none left when the unit runs
+      mockPrisma.watchHistory.findUnique
+        .mockResolvedValueOnce(partialRow({ id: 1, oCount: 1, oHistory: [] }))
+        .mockResolvedValueOnce(partialRow({ id: 1, oCount: 0, oHistory: [] }));
+
+      const res = await decrement();
+
+      expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+      expect(mockStatsWrites).not.toHaveBeenCalled();
+      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+      expect(stash.sceneDeleteO).not.toHaveBeenCalled();
+      expect(res._getOkBody()).toEqual({ success: true, oCount: 0 });
+    });
+
+    it("POST /decrement-o is routed", async () => {
+      const { default: router } = await import("../../routes/watchHistory.js");
+
+      expect(() => findHandler(router, "post", "/decrement-o")).not.toThrow();
     });
   });
 

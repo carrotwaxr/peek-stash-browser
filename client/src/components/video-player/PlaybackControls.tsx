@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiPost, getMyPermissions, libraryApi } from "../../api";
+import { useDecrementOCounter } from "../../api/hooks";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -8,10 +9,49 @@ import { ThemedIcon } from "../icons/index";
 import {
   AddToPlaylistButton,
   Button,
+  EntityMenu,
   FavoriteButton,
   OCounterButton,
   RatingSlider,
 } from "../ui/index";
+
+interface RemoveLastOMenuProps {
+  scene: { id: string; instanceId: string; title?: string | null };
+  oCount: number;
+  onRemoved: (count: number) => void;
+}
+
+/** The menu beside the O counter, holding only Remove last O (none at 0 Os) */
+const RemoveLastOMenu = ({
+  scene,
+  oCount,
+  onRemoved,
+}: RemoveLastOMenuProps) => {
+  const decrement = useDecrementOCounter();
+
+  const handleRemoveLastO = async () => {
+    try {
+      const response = await decrement.mutateAsync({
+        sceneId: scene.id,
+        instanceId: scene.instanceId,
+      });
+      onRemoved(response.oCount);
+    } catch (error) {
+      console.error("Failed to remove the last O:", error);
+    }
+  };
+
+  return (
+    <EntityMenu
+      entityType="scene"
+      entityId={scene.id}
+      entityName={scene.title ?? ""}
+      instanceId={scene.instanceId}
+      oCount={oCount}
+      onRemoveLastO={() => void handleRemoveLastO()}
+    />
+  );
+};
 
 const PlaybackControls = () => {
   const {
@@ -141,6 +181,8 @@ const PlaybackControls = () => {
   }
 
   const isLoading = sceneLoading;
+  const setOCounter = (count: number) =>
+    dispatch({ type: "SET_O_COUNTER", payload: count });
   return (
     <section>
       <div
@@ -177,15 +219,20 @@ const PlaybackControls = () => {
             style={{ opacity: isLoading ? 0.6 : 1 }}
           >
             {sceneSettings.showOCounter && (
-              <OCounterButton
-                sceneId={scene.id}
-                instanceId={scene.instanceId}
-                initialCount={oCounter}
-                onChange={(newCount: number) =>
-                  dispatch({ type: "SET_O_COUNTER", payload: newCount })
-                }
-                disabled={isLoading}
-              />
+              <div className="flex items-center">
+                <OCounterButton
+                  sceneId={scene.id}
+                  instanceId={scene.instanceId}
+                  initialCount={oCounter}
+                  onChange={setOCounter}
+                  disabled={isLoading}
+                />
+                <RemoveLastOMenu
+                  scene={scene}
+                  oCount={oCounter}
+                  onRemoved={setOCounter}
+                />
+              </div>
             )}
             {sceneSettings.showFavorite && (
               <FavoriteButton
@@ -237,15 +284,20 @@ const PlaybackControls = () => {
               style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               {sceneSettings.showOCounter && (
-                <OCounterButton
-                  sceneId={scene.id}
-                  instanceId={scene.instanceId}
-                  initialCount={oCounter}
-                  onChange={(newCount: number) =>
-                    dispatch({ type: "SET_O_COUNTER", payload: newCount })
-                  }
-                  disabled={isLoading}
-                />
+                <div className="flex items-center">
+                  <OCounterButton
+                    sceneId={scene.id}
+                    instanceId={scene.instanceId}
+                    initialCount={oCounter}
+                    onChange={setOCounter}
+                    disabled={isLoading}
+                  />
+                  <RemoveLastOMenu
+                    scene={scene}
+                    oCount={oCounter}
+                    onRemoved={setOCounter}
+                  />
+                </div>
               )}
               {sceneSettings.showFavorite && (
                 <FavoriteButton
@@ -287,15 +339,20 @@ const PlaybackControls = () => {
             style={{ opacity: isLoading ? 0.6 : 1 }}
           >
             {sceneSettings.showOCounter && (
-              <OCounterButton
-                sceneId={scene.id}
-                instanceId={scene.instanceId}
-                initialCount={oCounter}
-                onChange={(newCount: number) =>
-                  dispatch({ type: "SET_O_COUNTER", payload: newCount })
-                }
-                disabled={isLoading}
-              />
+              <div className="flex items-center">
+                <OCounterButton
+                  sceneId={scene.id}
+                  instanceId={scene.instanceId}
+                  initialCount={oCounter}
+                  onChange={setOCounter}
+                  disabled={isLoading}
+                />
+                <RemoveLastOMenu
+                  scene={scene}
+                  oCount={oCounter}
+                  onRemoved={setOCounter}
+                />
+              </div>
             )}
             {sceneSettings.showFavorite && (
               <FavoriteButton

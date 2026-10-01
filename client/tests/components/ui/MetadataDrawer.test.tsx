@@ -1,6 +1,6 @@
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MetadataDrawer from "../../../src/components/ui/MetadataDrawer";
 
@@ -9,6 +9,16 @@ vi.mock("@/contexts/ConfigContext", () => ({
 }));
 vi.mock("../../../src/components/ui/OCounterButton", () => ({
   default: () => <div data-testid="o-counter" />,
+}));
+const mockDecrementImage = vi.fn(
+  (_vars: { imageId: string; instanceId: string }) =>
+    Promise.resolve({ success: true as const, oCount: 2 })
+);
+vi.mock("../../../src/api/hooks", () => ({
+  useDecrementImageOCounter: () => ({
+    mutateAsync: mockDecrementImage,
+    isPending: false,
+  }),
 }));
 vi.mock("../../../src/components/ui/FavoriteButton", () => ({
   default: () => <div data-testid="favorite" />,
@@ -48,7 +58,11 @@ function makeImage(overrides: Partial<NormalizedImage> = {}): NormalizedImage {
   } as NormalizedImage;
 }
 
-function renderDrawer(image: NormalizedImage) {
+function renderDrawer(
+  image: NormalizedImage,
+  oCounter = 0,
+  onOCounterChange: (count: number) => void = vi.fn()
+) {
   return render(
     <MemoryRouter>
       <MetadataDrawer
@@ -57,10 +71,10 @@ function renderDrawer(image: NormalizedImage) {
         image={image}
         rating={null}
         isFavorite={false}
-        oCounter={0}
+        oCounter={oCounter}
         onRatingChange={vi.fn()}
         onFavoriteChange={vi.fn()}
-        onOCounterChange={vi.fn()}
+        onOCounterChange={onOCounterChange}
       />
     </MemoryRouter>
   );
@@ -90,5 +104,33 @@ describe("MetadataDrawer subtitle", () => {
     );
     const link = screen.getByRole("link", { name: "Acme" });
     expect(link).toHaveAttribute("href", "/studio/9");
+  });
+});
+
+describe("MetadataDrawer Remove last O", () => {
+  it("the image viewer offers Remove last O beside the O counter, which calls the image decrement", async () => {
+    const onOCounterChange = vi.fn((_count: number) => {});
+    renderDrawer(
+      makeImage({ id: "5", instanceId: "inst-b" }),
+      3,
+      onOCounterChange
+    );
+
+    expect(screen.getByTestId("o-counter")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("More options"));
+    expect(screen.queryByText("Hide Image")).toBeNull();
+    fireEvent.click(screen.getByText("Remove last O"));
+
+    await waitFor(() => expect(onOCounterChange).toHaveBeenCalledWith(2));
+    expect(mockDecrementImage).toHaveBeenCalledWith({
+      imageId: "5",
+      instanceId: "inst-b",
+    });
+  });
+
+  it("at 0 Os the image viewer shows no menu", () => {
+    renderDrawer(makeImage(), 0);
+
+    expect(screen.queryByLabelText("More options")).toBeNull();
   });
 });

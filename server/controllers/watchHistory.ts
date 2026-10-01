@@ -11,6 +11,8 @@ import {
 import type {
   ApiErrorResponse,
   ClearAllWatchHistoryResponse,
+  DecrementOCounterRequest,
+  DecrementOCounterResponse,
   GetWatchHistoryParams,
   GetWatchHistoryResponse,
   GetWatchedScenesQuery,
@@ -27,7 +29,7 @@ import type {
 } from "../types/api/index.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { compositeKey } from "../utils/entityRef.js";
-import { readHistory } from "../utils/historyJson.js";
+import { readHistory, withoutNewest } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { requireInstanceId } from "../utils/routeHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
@@ -145,6 +147,117 @@ export async function incrementOCounter(
     oCount: watchHistory.oCount,
     timestamp: now.toISOString(),
   });
+}
+
+/**
+ * Remove the user's newest O on a scene ("Remove last O"): its time comes off
+ * oHistory, oCount and the scene's performers', studio's and tags' oCounter
+ * drop by 1, in one unit. A row whose oCount is above 0 with no O times
+ * (counts imported from Stash) still loses 1. At 0 Os nothing is written and
+ * Stash is not called.
+ *
+ * Each entity's stats `lastOAt` may stay newer than the Os left until the next
+ * stats rebuild, which every sync runs: recomputing it here would read every
+ * scene of every entity, where the undo is one small write.
+ */
+export async function decrementOCounter(
+  req: TypedAuthRequest<DecrementOCounterRequest>,
+  res: TypedResponse<DecrementOCounterResponse | ApiErrorResponse>
+) {
+  const { sceneId, instanceId: requestInstanceId } = req.body;
+  const userId = req.user.id;
+
+  if (!sceneId) {
+    res.status(400).json({ error: "Missing required field: sceneId" });
+    return;
+  }
+
+  if (!requireInstanceId(requestInstanceId, res)) return;
+
+  const [user, instanceId] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    }),
+    resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
+  ]);
+
+  if (!user) {
+    res.status(401).json({ error: "User not found" });
+    return;
+  }
+
+  if (!instanceId) {
+    res.status(404).json({ error: "Scene not found" });
+    return;
+  }
+
+  const where = {
+    userId_instanceId_sceneId: { userId, instanceId, sceneId },
+  };
+  const current = await prisma.watchHistory.findUnique({ where });
+  if (!current || current.oCount <= 0) {
+    res.json({ success: true, oCount: 0 });
+    return;
+  }
+
+  // The scene's performers, studio and tags, read before the unit
+  const statsWrites = await userStatsService.statsWritesForScene(
+    userId,
+    sceneId,
+    instanceId,
+    { oCount: -1, playCount: 0 }
+  );
+
+  // Read again inside the unit: a removal queued ahead of this one may have
+  // taken the last O, and then this one writes nothing.
+  const { oCount, removed } = await dbWriteTransaction(
+    "history.oRemove",
+    async (tx) => {
+      const existing = await tx.watchHistory.findUnique({ where });
+      if (!existing || existing.oCount <= 0) {
+        return { oCount: 0, removed: false };
+      }
+      const row = await tx.watchHistory.update({
+        where: { id: existing.id },
+        data: {
+          oCount: { decrement: 1 },
+          oHistory: withoutNewest(readHistory(existing.oHistory)),
+        },
+      });
+      await statsWrites(tx);
+      return { oCount: row.oCount, removed: true };
+    },
+    {
+      // A stats rebuild that read the history before this removal reads again
+      afterCommit: (result) => {
+        if (result.removed) userStatsService.bumpWriteGeneration(userId);
+      },
+    }
+  );
+
+  if (removed && user.syncToStash) {
+    try {
+      const stash = stashInstanceManager.getForSync(instanceId);
+      if (stash) {
+        // No times: Stash removes its newest O
+        const result = await stash.sceneDeleteO({ id: sceneId });
+        logger.info("Removed the last O in Stash", {
+          sceneId,
+          stashGlobalCount: result.sceneDeleteO.count,
+          peekUserCount: oCount,
+        });
+      }
+    } catch (stashError) {
+      // Don't fail the request if Stash sync fails - Peek DB is source of truth
+      logger.error("Failed to sync O counter removal to Stash", {
+        sceneId,
+        error: stashError,
+      });
+    }
+  }
+
+  res.json({ success: true, oCount });
 }
 
 /**

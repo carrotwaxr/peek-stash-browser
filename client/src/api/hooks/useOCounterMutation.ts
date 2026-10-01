@@ -1,3 +1,7 @@
+import type {
+  DecrementImageOCounterResponse,
+  DecrementOCounterResponse,
+} from "@peek/shared-types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../client";
 import { queryKeys } from "../queryKeys";
@@ -49,6 +53,48 @@ export function useIncrementOCounter() {
           queryKey: queryKeys.images.all(),
         });
       }
+    },
+  });
+}
+
+interface DecrementSceneOParams {
+  sceneId: string;
+  instanceId: string;
+}
+
+/** Remove the user's newest O on a scene; answers the count left */
+export function useDecrementOCounter() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sceneId, instanceId }: DecrementSceneOParams) =>
+      apiPost<DecrementOCounterResponse>("/watch-history/decrement-o", {
+        sceneId,
+        instanceId,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.scenes.all() });
+    },
+  });
+}
+
+interface DecrementImageOParams {
+  imageId: string;
+  instanceId: string;
+}
+
+/** Remove the user's newest O on an image; answers the count left */
+export function useDecrementImageOCounter() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ imageId, instanceId }: DecrementImageOParams) =>
+      apiPost<DecrementImageOCounterResponse>(
+        "/image-view-history/decrement-o",
+        { imageId, instanceId }
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.images.all() });
     },
   });
 }

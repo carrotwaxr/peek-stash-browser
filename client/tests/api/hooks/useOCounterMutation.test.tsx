@@ -3,7 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost } from "../../../src/api/client";
-import { useIncrementOCounter } from "../../../src/api/hooks/useOCounterMutation";
+import {
+  useDecrementImageOCounter,
+  useDecrementOCounter,
+  useIncrementOCounter,
+} from "../../../src/api/hooks/useOCounterMutation";
 import { actAsync } from "../../testUtils";
 
 vi.mock("../../../src/api/client", () => ({
@@ -168,5 +172,57 @@ describe("useIncrementOCounter", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe("useDecrementOCounter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("posts the scene and its instance to the scene decrement and invalidates scenes", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ success: true, oCount: 2 });
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useDecrementOCounter(), { wrapper });
+
+    await actAsync(() => {
+      result.current.mutate({ sceneId: "scene-1", instanceId: "inst-1" });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(apiPost).toHaveBeenCalledWith("/watch-history/decrement-o", {
+      sceneId: "scene-1",
+      instanceId: "inst-1",
+    });
+    expect(result.current.data).toEqual({ success: true, oCount: 2 });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["scenes"] });
+  });
+});
+
+describe("useDecrementImageOCounter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("posts the image and its instance to the image decrement and invalidates images", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ success: true, oCount: 0 });
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useDecrementImageOCounter(), {
+      wrapper,
+    });
+
+    await actAsync(() => {
+      result.current.mutate({ imageId: "image-1", instanceId: "inst-1" });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(apiPost).toHaveBeenCalledWith("/image-view-history/decrement-o", {
+      imageId: "image-1",
+      instanceId: "inst-1",
+    });
+    expect(result.current.data).toEqual({ success: true, oCount: 0 });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["images"] });
   });
 });
