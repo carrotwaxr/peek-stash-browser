@@ -21,9 +21,15 @@ interface Props {
  */
 const MostViewedImageCard = ({ image }: Props) => {
   const [opened, setOpened] = useState(false);
-  // One read per opening: the image can be hidden or restricted since
+  // One read per opening: the image can be hidden or restricted since, or
+  // a read that failed can work now. Each opening has its own entry, so it
+  // starts with no answer and judges only its own read.
+  const [opening, setOpening] = useState(0);
   const imageQuery = useQuery({
-    queryKey: queryKeys.images.detail(image?.instanceId, image?.id),
+    queryKey: [
+      ...queryKeys.images.detail(image?.instanceId, image?.id),
+      opening,
+    ],
     queryFn:
       opened && image
         ? async ({ signal }) => {
@@ -62,7 +68,10 @@ const MostViewedImageCard = ({ image }: Props) => {
         entityType="image"
         statLabel="views"
         statValue={image?.viewCount ?? 0}
-        onOpen={() => setOpened(true)}
+        onOpen={() => {
+          setOpening((n) => n + 1);
+          setOpened(true);
+        }}
         opening={opened && !found}
       />
       {found ? (

@@ -244,5 +244,36 @@ describe("UserStats", () => {
       );
       expect(screen.queryByRole("dialog")).toBeNull();
     });
+
+    it.each([
+      [
+        "finds nothing",
+        () => findImages.mockResolvedValueOnce(findImagesAnswer([])),
+      ],
+      [
+        "fails",
+        () => findImages.mockRejectedValueOnce(new Error("Server unavailable")),
+      ],
+    ])(
+      "after a read that %s, the next click reads again and opens the image",
+      async (_case, failFirst) => {
+        failFirst();
+        findImages.mockResolvedValue(findImagesAnswer([imageRow]));
+        renderStats({
+          ...response({ totalImagesViewed: 4 }),
+          mostViewedImage,
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /Sunset/ }));
+        await waitFor(() => expect(showError).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+        fireEvent.click(screen.getByRole("button", { name: /Sunset/ }));
+
+        expect(await screen.findByText("Sunset on inst-b")).toBeTruthy();
+        expect(findImages).toHaveBeenCalledTimes(2);
+        expect(showError).toHaveBeenCalledTimes(1);
+      }
+    );
   });
 });
