@@ -16,6 +16,7 @@ import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
 import { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
+import { recoverPendingDownloads } from "./services/DownloadJobQueue.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { getJwtSecret } from "./utils/jwtSecret.js";
 import { logger } from "./utils/logger.js";
@@ -86,6 +87,11 @@ const main = async () => {
     await initializeCache();
     // A stop signal during the startup sync: no data migration starts
     if (isShuttingDown()) return;
+
+    // Playlist zips a restart interrupted are built again, once the
+    // instances' scenes are loaded (with none configured they wait for the
+    // next start that has one)
+    await recoverPendingDownloads();
 
     // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
     await dataMigrationService.runPendingMigrations();

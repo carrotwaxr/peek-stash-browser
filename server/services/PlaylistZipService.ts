@@ -1,21 +1,27 @@
 import archiver from "archiver";
 import type { Archiver, EntryData } from "archiver";
 import * as fs from "fs";
-import * as path from "path";
 import { Readable, Transform } from "stream";
 import { pipeline } from "stream/promises";
 import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
-import { getConfigDir } from "../utils/configDir.js";
 import {
   fileExtension,
   safeFileName,
   uniqueFileName,
 } from "../utils/contentDisposition.js";
+import { DISK_MARGIN_BYTES, plannedZipBytes } from "../utils/downloadLimits.js";
+import {
+  downloadsDir,
+  userDownloadsDir,
+  zipPath,
+} from "../utils/downloadPaths.js";
 import {
   NOTHING_FETCHED,
   NOTHING_TO_DOWNLOAD,
+  NO_DISK_SPACE,
+  NO_PLAYLIST_PERMISSION,
   PLAYLIST_NOT_FOUND,
   ZIP_FAILED,
   ZIP_TOO_LARGE,
@@ -24,6 +30,8 @@ import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
 import { StashTimeoutError, fetchFromStash } from "../utils/streamProxy.js";
 import { downloadService } from "./DownloadService.js";
+import { resolveUserPermissions } from "./PermissionService.js";
+import { getPlaylistAccess } from "./PlaylistAccessService.js";
 import { loadPlaylistItems } from "./PlaylistQueryService.js";
 import {
   type StashCredentials,
@@ -63,20 +71,6 @@ export class PlaylistZipService {
   }
 
   /**
-   * Get the downloads directory path
-   */
-  private getDownloadsDir(): string {
-    return path.join(getConfigDir(), "downloads");
-  }
-
-  /**
-   * Get the user's download directory path
-   */
-  private getUserDir(userId: number): string {
-    return path.join(this.getDownloadsDir(), `user-${userId}`);
-  }
-
-  /**
    * M3U playlist content: one #EXTINF line and one file line per item. A
    * line break in a title becomes a space, and a file line that would start
    * with "#" (a comment to players) is written as "./#...".
@@ -101,9 +95,10 @@ export class PlaylistZipService {
 
   /**
    * The playlist's scenes this user may see, in playlist order, read through
-   * the playlist's one item read (the scene builder, a page of refs a call)
+   * the playlist's one item read (the scene builder, a page of refs a call).
+   * The request sizes a zip from these, and the build zips them.
    */
-  private async readScenes(
+  async readDownloadableScenes(
     userId: number,
     playlistId: number
   ): Promise<NormalizedScene[]> {
@@ -193,62 +188,110 @@ export class PlaylistZipService {
   }
 
   /**
+   * What a build checks again when its turn comes, in order: the user may
+   * still download playlists, may still open the playlist, it still holds a
+   * scene they may see, within the size cap, and the disk has room for it
+   * plus DISK_MARGIN_BYTES. The scenes and the playlist's name, or the fixed
+   * reason the download fails with.
+   */
+  private async recheck(
+    userId: number,
+    playlistId: number,
+    maxBytes: bigint
+  ): Promise<
+    { scenes: NormalizedScene[]; name: string } | { refused: string }
+  > {
+    if (!(await resolveUserPermissions(userId))?.canDownloadPlaylists) {
+      return { refused: NO_PLAYLIST_PERMISSION };
+    }
+    if ((await getPlaylistAccess(playlistId, userId)).level === "none") {
+      return { refused: PLAYLIST_NOT_FOUND };
+    }
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: playlistId },
+      select: { name: true },
+    });
+    if (!playlist) return { refused: PLAYLIST_NOT_FOUND };
+
+    // Only the scenes the requester may see now, each on its own instance
+    const scenes = await this.readDownloadableScenes(userId, playlistId);
+    if (scenes.length === 0) return { refused: NOTHING_TO_DOWNLOAD };
+
+    const planned = plannedZipBytes(scenes);
+    if (planned > maxBytes) return { refused: ZIP_TOO_LARGE };
+
+    // statfs needs the folder to exist: a fresh install has none yet
+    await fs.promises.mkdir(userDownloadsDir(userId), { recursive: true });
+    const disk = await fs.promises.statfs(downloadsDir());
+    const free = BigInt(disk.bavail) * BigInt(disk.bsize);
+    if (free < planned + DISK_MARGIN_BYTES) {
+      logger.warn("Playlist zip refused: not enough free disk", {
+        plannedBytes: planned.toString(),
+        freeBytes: free.toString(),
+      });
+      return { refused: NO_DISK_SPACE };
+    }
+
+    return { scenes, name: playlist.name };
+  }
+
+  /**
    * Builds a download's zip, one entry at a time: each scene is fetched
-   * only once the previous file is in the archive. A scene that cannot be
-   * fetched now (Stash answers 404 or 410, or its instance is no longer
-   * loaded) is left out and counted in `skippedItems`; when that leaves
-   * nothing, the download fails with NOTHING_FETCHED. Any other failure
-   * (Stash, the disk, the size cap, `options.signal`) aborts the fetch, the
-   * archive and the file, removes the partial file and marks the download
-   * FAILED with a fixed reason; it never throws for one.
+   * only once the previous file is in the archive. Access is checked again
+   * first (`recheck`); a refusal marks the download FAILED with its reason.
+   * A scene that cannot be fetched now (Stash answers 404 or 410, or its
+   * instance is no longer loaded) is left out and counted in
+   * `skippedItems`; when that leaves nothing, the download fails with
+   * NOTHING_FETCHED. Any other failure (Stash, the disk, the size cap,
+   * `options.signal`) aborts the fetch, the archive and the file, removes
+   * the partial file and marks the download FAILED with a fixed reason; it
+   * never throws for one. An abort for "shutdown" or "cancelled", and a row
+   * deleted meanwhile (a write that finds no row), remove the file and
+   * write nothing.
    */
   async createZip(
     downloadId: number,
     options: { signal?: AbortSignal; maxBytes: bigint }
   ): Promise<void> {
-    // Get the download record
+    // Deleted since it was queued: nothing to build
     const download = await downloadService.getDownload(downloadId);
-    if (!download) {
-      throw new Error(`Download not found: ${downloadId}`);
-    }
+    if (!download) return;
 
-    if (!download.playlistId) {
-      throw new Error(`Download ${downloadId} has no associated playlist`);
-    }
-
-    // Get the playlist for its name
-    const playlist = await prisma.playlist.findUnique({
-      where: { id: download.playlistId },
-    });
-
-    if (!playlist) {
+    if (download.playlistId === null) {
       await downloadService.markFailed(downloadId, PLAYLIST_NOT_FOUND);
       return;
     }
 
-    // Only the scenes the requester may see now, each on its own instance
-    const scenes = await this.readScenes(download.userId, download.playlistId);
-    if (scenes.length === 0) {
-      await downloadService.markFailed(downloadId, NOTHING_TO_DOWNLOAD);
+    const checked = await this.recheck(
+      download.userId,
+      download.playlistId,
+      options.maxBytes
+    );
+    if ("refused" in checked) {
+      logger.info("Playlist zip refused when its turn came", {
+        downloadId,
+        reason: checked.refused,
+      });
+      await downloadService.markFailed(downloadId, checked.refused);
       return;
     }
+    const { scenes, name: playlistName } = checked;
+
+    // Stopped or cancelled while it was checked: the row is left as it is
+    if (isQuietAbort(options.signal)) return;
 
     logger.info(`Starting playlist zip creation`, {
       downloadId,
-      playlistId: playlist.id,
-      playlistName: playlist.name,
+      playlistId: download.playlistId,
+      playlistName,
       itemCount: scenes.length,
     });
 
-    // Mark as processing
-    await downloadService.updateProgress(downloadId, 0);
+    // Mark as processing; no row means it was deleted
+    if (!(await downloadService.updateProgress(downloadId, 0))) return;
 
-    // Ensure directories exist
-    const userDir = this.getUserDir(download.userId);
-    await fs.promises.mkdir(userDir, { recursive: true });
-
-    const zipFilePath = path.join(userDir, `download-${downloadId}.zip`);
-    const playlistDirName = safeFileName(playlist.name);
+    const zipFilePath = zipPath(download.userId, downloadId);
+    const playlistDirName = safeFileName(playlistName);
 
     // The job's first error, from any part, aborts it: the Stash fetch (its
     // signal), and through `failed` the entry being awaited
@@ -432,16 +475,17 @@ export class PlaylistZipService {
       await Promise.race([piped, failed]);
 
       const stats = await fs.promises.stat(zipFilePath);
-      await downloadService.markCompleted(
+      const completed = await downloadService.markCompleted(
         downloadId,
         zipFilePath,
         BigInt(stats.size),
         skipped
       );
+      if (!completed) throw new RowGoneError();
 
       logger.info(`Playlist zip creation completed`, {
         downloadId,
-        playlistId: playlist.id,
+        playlistId: download.playlistId,
         filePath: zipFilePath,
         fileSize: stats.size,
         skippedItems: skipped,
@@ -456,6 +500,19 @@ export class PlaylistZipService {
       output.destroy();
       await piped.catch(() => undefined);
       await fs.promises.unlink(zipFilePath).catch(() => undefined);
+
+      // The next start resumes a zip stopped for the shutdown; a cancelled
+      // or deleted one is not built at all
+      if (error === "shutdown" || error === "cancelled") {
+        logger.info(`Playlist zip stopped`, { downloadId, reason: error });
+        return;
+      }
+      if (error instanceof RowGoneError) {
+        logger.info(`Playlist zip stopped: its download was deleted`, {
+          downloadId,
+        });
+        return;
+      }
 
       if (error instanceof NothingFetchedError) {
         logger.warn(`Playlist zip has no scene Stash could serve`, {
@@ -482,6 +539,22 @@ class ZipTooLargeError extends Error {
     super("The zip grew past the size cap");
     this.name = "ZipTooLargeError";
   }
+}
+
+/** The download's row was deleted while its zip was built */
+class RowGoneError extends Error {
+  constructor() {
+    super("The download was deleted");
+    this.name = "RowGoneError";
+  }
+}
+
+/** An abort that writes nothing: the shutdown, or a cancel */
+function isQuietAbort(signal: AbortSignal | undefined): boolean {
+  return (
+    signal?.aborted === true &&
+    (signal.reason === "shutdown" || signal.reason === "cancelled")
+  );
 }
 
 /** Every scene of a zip was left out: there is nothing to zip */
@@ -556,7 +629,9 @@ class ZipProgress {
     if (percent <= this.written) return;
     this.written = percent;
     this.writtenAt = Date.now();
-    await downloadService.updateProgress(this.downloadId, percent);
+    if (!(await downloadService.updateProgress(this.downloadId, percent))) {
+      throw new RowGoneError();
+    }
   }
 }
 

@@ -58,11 +58,15 @@ Anyone a playlist is shared with can download it too, with the Can Download Play
 
 1. Open a playlist
 2. Click the **Download** button
-3. A progress indicator shows the zip creation status
-4. When complete, the download starts automatically
+3. The zip waits its turn (**Pending**), then is built (**Processing**, with its progress) on the Downloads page
+4. Open Downloads and click **Download** when it shows **Completed**
 
 !!! info "Processing Time"
     Playlist downloads require server-side processing to create the zip file. Large playlists may take several minutes.
+
+Zips are built one at a time, in the order they were asked for. You can have 3 playlist downloads in progress (pending or processing) at once; wait for one to finish before starting a fourth. Clicking Download again on a playlist whose zip is still in progress shows that same zip.
+
+When its turn comes, the zip is checked again: if your Can Download Playlists permission was removed, or the playlist was unshared or deleted, it fails instead of being built. If the server restarts while a zip is waiting or being built, it is built again after the restart.
 
 ### What's Included
 
@@ -118,7 +122,7 @@ View all your downloads in one place.
 
 | Status | Description |
 |--------|-------------|
-| **Pending** | Download queued, waiting to start |
+| **Pending** | Waiting its turn; zips are built one at a time |
 | **Processing** | Playlist zip being created (shows progress %) |
 | **Completed** | Ready to download |
 | **Failed** | Something went wrong |
@@ -159,14 +163,23 @@ The playlist is too large. Options:
 - Download individual scenes instead
 - Ask an admin to increase the size limit
 
-### Download stuck on "Processing"
+### "You have 3 playlist downloads in progress"
 
-Playlist zip creation can take time for large playlists. If it seems stuck:
-1. Check the Downloads page for the current progress percentage
-2. For very large playlists, processing may take 10+ minutes
-3. If progress doesn't change for extended periods, try:
-   - Refreshing the page
-   - Deleting and retrying the download
+Each user can have 3 playlist zips pending or processing at once. Wait for one to complete or fail, or delete one, then start the next.
+
+### A playlist download failed
+
+The Downloads page shows why:
+
+- **You no longer have permission to download playlists**: your Can Download Playlists permission was removed after you asked for the zip.
+- **Playlist not found**: the playlist was deleted or is no longer shared with you.
+- **The zip grew past the size limit**: the playlist is now larger than the size limit (see [Size Limits](#size-limits)).
+- **Not enough space on the server for this zip; try again later**: the server's disk does not have room for the zip plus 1 GB. Retry later, or ask an admin to free space.
+- **None of the playlist's scenes could be fetched from Stash**: every scene was deleted from Stash or is on a Stash server that was turned off.
+
+### Download stuck on "Pending" or "Processing"
+
+Zips are built one at a time, so a zip can wait while another user's is built. Large playlists can take 10+ minutes. A server restart does not leave a zip stuck: it is built again after the restart. If progress doesn't change for a long time, delete the download and start it again.
 
 ### Downloaded file won't play
 

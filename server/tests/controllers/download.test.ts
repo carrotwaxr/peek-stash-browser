@@ -14,11 +14,13 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../../middleware/errorHandler.js";
+import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
+import type { NormalizedScene } from "../../types/index.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import type * as streamProxyModule from "../../utils/streamProxy.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
@@ -30,6 +32,7 @@ import {
   stringContaining,
 } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -37,8 +40,9 @@ vi.mock("../../services/DownloadService.js", () => ({
     createSceneDownload: vi.fn(),
     createImageDownload: vi.fn(),
     createPlaylistDownload: vi.fn(),
-    calculatePlaylistSize: vi.fn(),
-    getDownloadablePlaylistItems: vi.fn(),
+    findActivePlaylistDownload: vi.fn(),
+    countActivePlaylistDownloads: vi.fn(),
+    requeueFailedDownload: vi.fn(),
     getUserDownloads: vi.fn(),
     getDownload: vi.fn(),
     deleteDownload: vi.fn(),
@@ -49,6 +53,13 @@ vi.mock("../../services/DownloadService.js", () => ({
 vi.mock("../../services/PlaylistZipService.js", () => ({
   playlistZipService: {
     createZip: vi.fn(),
+    readDownloadableScenes: vi.fn(),
+  },
+}));
+
+vi.mock("../../services/DownloadJobQueue.js", () => ({
+  downloadJobQueue: {
+    enqueue: vi.fn(),
   },
 }));
 
@@ -89,6 +100,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 const mockDownloadService = vi.mocked(downloadService);
 const mockPlaylistZipService = vi.mocked(playlistZipService);
+const mockDownloadJobQueue = vi.mocked(downloadJobQueue);
 const mockResolveUserPermissions = vi.mocked(resolveUserPermissions);
 const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
@@ -104,6 +116,32 @@ const ALL_DOWNLOAD_PERMISSIONS = {
     canDownloadPlaylists: "override",
   },
 };
+
+/** A scene the requester may download, its file `size` bytes */
+const sceneOfSize = (id: string, size: number | null) =>
+  partialRow<NormalizedScene>({
+    id,
+    instanceId: "inst-a",
+    files: [partialRow({ size })],
+  });
+
+const GIB = 1024 * 1024 * 1024;
+
+/** A playlist zip row as createPlaylistDownload returns it */
+const pendingZip = (id: number) =>
+  downloadRow({
+    id,
+    type: "PLAYLIST",
+    status: "PENDING",
+    entityType: null,
+    entityId: null,
+    instanceId: "",
+    fileName: "p.zip",
+    fileSize: null,
+    progress: 0,
+    playlistId: 5,
+    completedAt: null,
+  });
 
 const okStream = () =>
   new Response(new ReadableStream(), {
@@ -123,9 +161,11 @@ describe("Download Controller", () => {
     mockResolveUserPermissions.mockResolvedValue(ALL_DOWNLOAD_PERMISSIONS);
     mockCanUserAccessEntity.mockResolvedValue(true);
     mockGetPlaylistAccess.mockResolvedValue({ level: "owner" });
-    mockDownloadService.getDownloadablePlaylistItems.mockResolvedValue([
-      { sceneId: "scene-1", instanceId: "inst-a" },
+    mockPlaylistZipService.readDownloadableScenes.mockResolvedValue([
+      sceneOfSize("scene-1", 100),
     ]);
+    mockDownloadService.findActivePlaylistDownload.mockResolvedValue(null);
+    mockDownloadService.countActivePlaylistDownloads.mockResolvedValue(0);
   });
 
   describe("startSceneDownload", () => {
@@ -377,11 +417,10 @@ describe("Download Controller", () => {
           canDownloadPlaylists: "override",
         },
       });
-      // Mock size exceeds limit (default is 10GB = 10 * 1024 * 1024 * 1024 bytes)
-      const oversizedBytes = BigInt(11 * 1024 * 1024 * 1024); // 11GB
-      mockDownloadService.calculatePlaylistSize.mockResolvedValue(
-        oversizedBytes
-      );
+      // Over the default limit of 10 GiB
+      mockPlaylistZipService.readDownloadableScenes.mockResolvedValue([
+        sceneOfSize("s1", 11 * GIB),
+      ]);
 
       await startPlaylistDownload(
         reqFor(startPlaylistDownload, {
@@ -454,21 +493,9 @@ describe("Download Controller", () => {
         level: "shared",
         groups: ["friends"],
       });
-      mockDownloadService.calculatePlaylistSize.mockResolvedValue(BigInt(100));
       mockDownloadService.createPlaylistDownload.mockResolvedValue(
-        downloadRow({
-          type: "PLAYLIST",
-          status: "PENDING",
-          entityType: null,
-          entityId: null,
-          instanceId: "",
-          fileName: "p.zip",
-          fileSize: null,
-          progress: 0,
-          playlistId: 5,
-        })
+        pendingZip(1)
       );
-      mockPlaylistZipService.createZip.mockResolvedValue(undefined);
 
       await startPlaylistDownload(
         reqFor(startPlaylistDownload, {
@@ -490,7 +517,7 @@ describe("Download Controller", () => {
     it("returns 400 when no scene is downloadable", async () => {
       const res = resFor(startPlaylistDownload);
 
-      mockDownloadService.getDownloadablePlaylistItems.mockResolvedValue([]);
+      mockPlaylistZipService.readDownloadableScenes.mockResolvedValue([]);
 
       await startPlaylistDownload(
         reqFor(startPlaylistDownload, {
@@ -501,26 +528,45 @@ describe("Download Controller", () => {
       );
 
       expect(
-        mockDownloadService.getDownloadablePlaylistItems
+        mockPlaylistZipService.readDownloadableScenes
       ).toHaveBeenCalledWith(1, 5);
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
         error: "This playlist has no scenes you can download",
       });
-      expect(mockDownloadService.calculatePlaylistSize).not.toHaveBeenCalled();
       expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
     });
 
-    it("sizes only the downloadable items", async () => {
+    it("start sizes the zip from the scenes the user may see", async () => {
       const res = resFor(startPlaylistDownload);
 
-      const items = [
-        { sceneId: "s1", instanceId: "inst-a" },
-        { sceneId: "s1", instanceId: "inst-b" },
-      ];
-      mockDownloadService.getDownloadablePlaylistItems.mockResolvedValue(items);
-      mockDownloadService.calculatePlaylistSize.mockResolvedValue(
-        BigInt(11 * 1024 * 1024 * 1024)
+      // Each under the limit, together over it
+      mockPlaylistZipService.readDownloadableScenes.mockResolvedValue([
+        sceneOfSize("s1", 6 * GIB),
+        sceneOfSize("s1", 6 * GIB),
+        sceneOfSize("s2", null),
+      ]);
+
+      await startPlaylistDownload(
+        reqFor(startPlaylistDownload, {
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Playlist exceeds maximum download size",
+        details: "Total: 12288MB, max: 10240MB",
+      });
+      expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
+    });
+
+    it("start enqueues the download and answers PENDING", async () => {
+      const res = resFor(startPlaylistDownload);
+      mockDownloadService.createPlaylistDownload.mockResolvedValue(
+        pendingZip(42)
       );
 
       await startPlaylistDownload(
@@ -531,9 +577,64 @@ describe("Download Controller", () => {
         res
       );
 
-      expect(mockDownloadService.calculatePlaylistSize).toHaveBeenCalledWith(
-        items
+      expect(mockDownloadJobQueue.enqueue).toHaveBeenCalledExactlyOnceWith(
+        42,
+        1
       );
+      expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ id: 42, status: "PENDING" }),
+      });
+    });
+
+    it("start returns the active download for the same playlist instead of a second one", async () => {
+      const res = resFor(startPlaylistDownload);
+      mockDownloadService.findActivePlaylistDownload.mockResolvedValue({
+        ...pendingZip(42),
+        status: "PROCESSING",
+        progress: 30,
+      });
+
+      await startPlaylistDownload(
+        reqFor(startPlaylistDownload, {
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
+        res
+      );
+
+      expect(
+        mockDownloadService.findActivePlaylistDownload
+      ).toHaveBeenCalledWith(1, 5);
+      expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.enqueue).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ id: 42, status: "PROCESSING" }),
+      });
+    });
+
+    it("a user with 3 active zips is refused with 429", async () => {
+      const res = resFor(startPlaylistDownload);
+      mockDownloadService.countActivePlaylistDownloads.mockResolvedValue(3);
+
+      await startPlaylistDownload(
+        reqFor(startPlaylistDownload, {
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
+        res
+      );
+
+      expect(
+        mockDownloadService.countActivePlaylistDownloads
+      ).toHaveBeenCalledWith(1);
+      expect(res.status).toHaveBeenCalledWith(429);
+      expect(res.json).toHaveBeenCalledWith({
+        error:
+          "You have 3 playlist downloads in progress; wait for one to finish",
+      });
+      expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.enqueue).not.toHaveBeenCalled();
     });
   });
 
@@ -1279,7 +1380,7 @@ describe("Download Controller", () => {
       };
       const retriedDownload: Download = {
         ...failedDownload,
-        status: "PROCESSING",
+        status: "PENDING",
         progress: 0,
         error: null,
       };
@@ -1287,8 +1388,7 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload
         .mockResolvedValueOnce(failedDownload)
         .mockResolvedValueOnce(retriedDownload);
-      mockDownloadService.updateProgress.mockResolvedValue(downloadRow());
-      mockPlaylistZipService.createZip.mockResolvedValue(undefined);
+      mockDownloadService.requeueFailedDownload.mockResolvedValue(true);
 
       await retryDownload(
         reqFor(retryDownload, {
@@ -1298,9 +1398,14 @@ describe("Download Controller", () => {
         res
       );
 
-      expect(mockDownloadService.updateProgress).toHaveBeenCalledWith(1, 0);
+      expect(mockDownloadService.requeueFailedDownload).toHaveBeenCalledWith(1);
+      expect(mockDownloadJobQueue.enqueue).toHaveBeenCalledExactlyOnceWith(
+        1,
+        1
+      );
+      expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith({
-        download: objectContaining({ id: 1, status: "PROCESSING" }),
+        download: objectContaining({ id: 1, status: "PENDING" }),
       });
     });
 
@@ -1421,8 +1526,8 @@ describe("Download Controller", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "Playlist not found",
       });
-      expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();
-      expect(mockDownloadService.updateProgress).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.enqueue).not.toHaveBeenCalled();
+      expect(mockDownloadService.requeueFailedDownload).not.toHaveBeenCalled();
     });
 
     it("returns 403 when the playlist permission was revoked", async () => {
@@ -1447,8 +1552,59 @@ describe("Download Controller", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download playlists",
       });
-      expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();
-      expect(mockDownloadService.updateProgress).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.enqueue).not.toHaveBeenCalled();
+      expect(mockDownloadService.requeueFailedDownload).not.toHaveBeenCalled();
+    });
+
+    it("retry of a FAILED download enqueues it once; a second retry answers 409", async () => {
+      mockDownloadService.getDownload.mockReset();
+      mockDownloadService.getDownload.mockResolvedValue(failedZip());
+      // The conditional update finds the row FAILED once
+      mockDownloadService.requeueFailedDownload
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+      const retry = async () => {
+        const res = resFor(retryDownload);
+        await retryDownload(
+          reqFor(retryDownload, {
+            user: { id: 1, username: "testuser", role: "USER" },
+            params: { id: "1" },
+          }),
+          res
+        );
+        return res;
+      };
+
+      await retry();
+      const second = await retry();
+
+      expect(mockDownloadJobQueue.enqueue).toHaveBeenCalledExactlyOnceWith(
+        1,
+        1
+      );
+      expect(second.status).toHaveBeenCalledWith(409);
+      expect(second.json).toHaveBeenCalledWith({
+        error: "This download is already being retried",
+      });
+    });
+
+    it("a retry is refused with 429 while the user has 3 active zips", async () => {
+      const res = resFor(retryDownload);
+      mockDownloadService.getDownload.mockReset();
+      mockDownloadService.getDownload.mockResolvedValue(failedZip());
+      mockDownloadService.countActivePlaylistDownloads.mockResolvedValue(3);
+
+      await retryDownload(
+        reqFor(retryDownload, {
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(429);
+      expect(mockDownloadService.requeueFailedDownload).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.enqueue).not.toHaveBeenCalled();
     });
   });
 });

@@ -58,6 +58,7 @@ async function unhideFor(
 async function setPermissions(
   userId: number,
   overrides: {
+    canShareOverride?: boolean;
     canDownloadFilesOverride?: boolean;
     canDownloadPlaylistsOverride?: boolean;
   }
@@ -116,6 +117,8 @@ describe("Downloads access (integration)", () => {
     await seedAccessFixture();
     dl = await createApiUser("access_it_dl", DL_PASSWORD);
     owner = await createApiUser("access_it_dl_owner", DL_PASSWORD);
+    // A playlist is shared only while its owner holds Can Share
+    await setPermissions(owner.id, { canShareOverride: true });
     await hideFixtureDefaults(dl.id);
     await setPermissions(dl.id, {
       canDownloadFilesOverride: true,
@@ -319,8 +322,8 @@ describe("Downloads access (integration)", () => {
 
     expect(res.status).toBe(200);
     expect(res.data.download?.type).toBe("PLAYLIST");
-    // The server's background zip then fails on the made-up instance, by
-    // design. Let it settle so it doesn't outlive the fixture.
+    // The server's zip queue then builds it, and it fails on the made-up
+    // instance, by design. Let it settle so it doesn't outlive the fixture.
     await waitForZipJob(must(res.data.download).id);
   });
 

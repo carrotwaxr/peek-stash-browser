@@ -10,6 +10,10 @@ export const NOTHING_TO_DOWNLOAD = "No scenes you can download";
 export const ZIP_TOO_LARGE = "The zip grew past the size limit";
 export const NOTHING_FETCHED =
   "None of the playlist's scenes could be fetched from Stash";
+export const NO_PLAYLIST_PERMISSION =
+  "You no longer have permission to download playlists";
+export const NO_DISK_SPACE =
+  "Not enough space on the server for this zip; try again later";
 
 const USER_FACING = new Set([
   DOWNLOAD_FAILED,
@@ -18,6 +22,8 @@ const USER_FACING = new Set([
   NOTHING_TO_DOWNLOAD,
   ZIP_TOO_LARGE,
   NOTHING_FETCHED,
+  NO_PLAYLIST_PERMISSION,
+  NO_DISK_SPACE,
 ]);
 
 /** A stored failure reason as the requester may see it; rows written before this kept the caught text */

@@ -2,10 +2,8 @@ import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { fileExtension, safeFileName } from "../utils/contentDisposition.js";
-import { entityKey, pairsJson } from "../utils/entityRef.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-import { getVisibleEntityKeys } from "./EntityAccessService.js";
 
 /** 24 hours in milliseconds for download expiry */
 const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -152,55 +150,46 @@ export class DownloadService {
   }
 
   /**
-   * The playlist's items this user may download, in position order: the scene
-   * exists on the item's instance, is not soft-deleted, the instance is
-   * enabled and allowed, and the user's exclusions allow it.
+   * This user's zip of this playlist still waiting or being built, if any
+   * (the oldest).
    */
-  async getDownloadablePlaylistItems(
+  async findActivePlaylistDownload(
     userId: number,
     playlistId: number
-  ): Promise<Array<{ sceneId: string; instanceId: string }>> {
-    const items = await prisma.playlistItem.findMany({
-      where: { playlistId },
-      orderBy: { position: "asc" },
-      select: { sceneId: true, instanceId: true },
+  ): Promise<Download | null> {
+    return prisma.download.findFirst({
+      where: {
+        userId,
+        type: "PLAYLIST",
+        playlistId,
+        status: { in: ["PENDING", "PROCESSING"] },
+      },
+      orderBy: { createdAt: "asc" },
     });
+  }
 
-    const visible = await getVisibleEntityKeys(
-      userId,
-      "scene",
-      items.map((item) => ({ id: item.sceneId, instanceId: item.instanceId }))
-    );
-    return items.filter((item) =>
-      visible.has(entityKey(item.sceneId, item.instanceId))
-    );
+  /** How many of this user's zips are waiting or being built */
+  async countActivePlaylistDownloads(userId: number): Promise<number> {
+    return prisma.download.count({
+      where: {
+        userId,
+        type: "PLAYLIST",
+        status: { in: ["PENDING", "PROCESSING"] },
+      },
+    });
   }
 
   /**
-   * Total file size of the given scenes, each on its own instance. Soft-deleted
-   * scenes don't count. One query with one bound JSON parameter.
+   * Sets a FAILED download back to PENDING for a retry, in one conditional
+   * update: false when the row is no longer FAILED (a retry already took it)
+   * or is gone.
    */
-  async calculatePlaylistSize(
-    items: ReadonlyArray<{ sceneId: string; instanceId: string }>
-  ): Promise<bigint> {
-    if (items.length === 0) {
-      return BigInt(0);
-    }
-
-    // CROSS JOIN keeps json_each as the outer loop, so each pair probes the
-    // StashScene primary key (.claude/rules/server-sql.md).
-    const rows = await prisma.$queryRawUnsafe<
-      Array<{ total: bigint | number | null }>
-    >(
-      `SELECT COALESCE(SUM(s.fileSize), 0) AS total
-FROM json_each(?) j
-CROSS JOIN StashScene s ON s.id = json_extract(j.value, '$[0]') AND s.stashInstanceId = json_extract(j.value, '$[1]')
-WHERE s.deletedAt IS NULL`,
-      pairsJson(items.map((i) => ({ id: i.sceneId, instanceId: i.instanceId })))
-    );
-
-    const total = rows[0]?.total;
-    return typeof total === "bigint" ? total : BigInt(Math.round(total ?? 0));
+  async requeueFailedDownload(downloadId: number): Promise<boolean> {
+    const { count } = await prisma.download.updateMany({
+      where: { id: downloadId, status: "FAILED" },
+      data: { status: "PENDING", progress: 0, error: null, skippedItems: 0 },
+    });
+    return count > 0;
   }
 
   /**
@@ -227,16 +216,16 @@ WHERE s.deletedAt IS NULL`,
   }
 
   /**
-   * Update the progress of a download (for playlist zipping).
+   * Update the progress of a download (for playlist zipping). This and the
+   * two below report whether the row was written: false means it was
+   * deleted, and the zip being built stops.
    */
-  async updateProgress(
-    downloadId: number,
-    progress: number
-  ): Promise<Download> {
-    return prisma.download.update({
+  async updateProgress(downloadId: number, progress: number): Promise<boolean> {
+    const { count } = await prisma.download.updateMany({
       where: { id: downloadId },
       data: { progress, status: "PROCESSING" },
     });
+    return count > 0;
   }
 
   /**
@@ -248,11 +237,11 @@ WHERE s.deletedAt IS NULL`,
     filePath: string,
     fileSize: bigint,
     skippedItems: number
-  ): Promise<Download> {
+  ): Promise<boolean> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + DOWNLOAD_EXPIRY_MS);
 
-    return prisma.download.update({
+    const { count } = await prisma.download.updateMany({
       where: { id: downloadId },
       data: {
         status: "COMPLETED",
@@ -264,16 +253,18 @@ WHERE s.deletedAt IS NULL`,
         expiresAt,
       },
     });
+    return count > 0;
   }
 
   /**
    * Mark a download as failed with an error message.
    */
-  async markFailed(downloadId: number, error: string): Promise<Download> {
-    return prisma.download.update({
+  async markFailed(downloadId: number, error: string): Promise<boolean> {
+    const { count } = await prisma.download.updateMany({
       where: { id: downloadId },
       data: { status: "FAILED", error },
     });
+    return count > 0;
   }
 
   /**

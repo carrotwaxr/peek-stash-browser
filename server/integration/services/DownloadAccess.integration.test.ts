@@ -12,6 +12,10 @@
  * SAME@A, Stash's own rating 90 and the viewer's rating 40 (the owner has
  * none).
  *
+ * Both users may download playlists, and the owner shares P with a group
+ * holding the viewer (the owner holds Can Share), so a zip passes the
+ * build's rechecks.
+ *
  * The zip and the file route run in this worker: CONFIG_DIR points at a temp
  * directory, fetch is stubbed, and the instance manager answers only for A
  * and B.
@@ -25,6 +29,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -35,6 +40,10 @@ import {
 import { getDownloadFile } from "../../controllers/download.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import {
+  downloadJobQueue,
+  recoverPendingDownloads,
+} from "../../services/DownloadJobQueue.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import {
@@ -42,6 +51,9 @@ import {
   stashInstanceManager,
 } from "../../services/StashInstanceManager.js";
 import { must } from "../../tests/helpers/must.js";
+import { plannedZipBytes } from "../../utils/downloadLimits.js";
+import { zipPath } from "../../utils/downloadPaths.js";
+import { NO_PLAYLIST_PERMISSION } from "../../utils/downloadReasons.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import {
   FX,
@@ -68,6 +80,9 @@ const realFetch = globalThis.fetch;
 
 /** No zip size cap these tests reach */
 const NO_CAP = { maxBytes: 10n ** 12n };
+
+/** The group the owner shares P with; it holds the viewer */
+const SHARE_GROUP = "access-it-zip-group";
 
 /** A soft-deleted tag on A, one of SAME@A's tags */
 const TAG_DELETED = "7700009";
@@ -98,12 +113,15 @@ describe("Download access (integration)", () => {
 
   beforeAll(async () => {
     await seedAccessFixture();
+    await prisma.userGroup.deleteMany({ where: { name: SHARE_GROUP } });
     owner = (
       await prisma.user.create({
         data: {
           username: "access-it-owner",
           password: "not-a-real-hash",
           role: "USER",
+          canDownloadPlaylistsOverride: true,
+          canShareOverride: true,
         },
       })
     ).id;
@@ -113,6 +131,7 @@ describe("Download access (integration)", () => {
           username: "access-it-viewer",
           password: "not-a-real-hash",
           role: "USER",
+          canDownloadPlaylistsOverride: true,
         },
       })
     ).id;
@@ -139,6 +158,13 @@ describe("Download access (integration)", () => {
       },
     });
     playlistId = playlist.id;
+    await prisma.userGroup.create({
+      data: {
+        name: SHARE_GROUP,
+        members: { create: [{ userId: viewer }] },
+        playlistShares: { create: [{ playlistId }] },
+      },
+    });
 
     // What SAME@A's NFO names. Junction rows go with the fixture's scenes.
     await prisma.stashTag.create({
@@ -155,6 +181,19 @@ describe("Download access (integration)", () => {
       },
       data: { studioId: FX_ID.SAME, rating100: 90 },
     });
+    // A file for each sized scene: the scene builder reads a file's size
+    // only beside its path
+    for (const [id, instanceId] of [
+      [FX_ID.SAME, FX.A],
+      [FX_ID.SAME, FX.B],
+      [FX_ID.GLOBAL, FX.A],
+      [FX_ID.GLOBAL, FX.B],
+    ] as const) {
+      await prisma.stashScene.update({
+        where: { id_stashInstanceId: { id, stashInstanceId: instanceId } },
+        data: { filePath: `/fixture/${id}-${instanceId}.mp4` },
+      });
+    }
     const onSameA = { sceneId: FX_ID.SAME, sceneInstanceId: FX.A };
     await prisma.scenePerformer.createMany({
       data: [FX_ID.VISIBLE_A, FX_ID.HIDDEN_A].map((performerId) => ({
@@ -197,6 +236,7 @@ describe("Download access (integration)", () => {
     if (previousConfigDir === undefined) delete process.env.CONFIG_DIR;
     else process.env.CONFIG_DIR = previousConfigDir;
     if (configDir) fs.rmSync(configDir, { recursive: true, force: true });
+    await prisma.userGroup.deleteMany({ where: { name: SHARE_GROUP } });
     // Users cascade to their playlists and Download rows.
     await clearAccessFixture();
   }, 60000);
@@ -205,32 +245,27 @@ describe("Download access (integration)", () => {
     fetchMock.mockClear();
   });
 
-  it("getDownloadablePlaylistItems filters by the requesting user", async () => {
-    expect(
-      await downloadService.getDownloadablePlaylistItems(viewer, playlistId)
-    ).toEqual([{ sceneId: FX_ID.SAME, instanceId: FX.A }]);
+  it("readDownloadableScenes reads the requester's scenes in position order, and plannedZipBytes sums them per (id, instance)", async () => {
+    const ref = (scene: { id: string; instanceId: string }) =>
+      `${scene.id}@${scene.instanceId}`;
 
-    expect(
-      await downloadService.getDownloadablePlaylistItems(owner, playlistId)
-    ).toEqual([
-      { sceneId: FX_ID.SAME, instanceId: FX.B },
-      { sceneId: FX_ID.SAME, instanceId: FX.A },
-      { sceneId: FX_ID.GLOBAL, instanceId: FX.A },
-    ]);
-  });
-
-  it("calculatePlaylistSize sums only the given (id, instance) pairs", async () => {
-    const viewerItems = await downloadService.getDownloadablePlaylistItems(
+    const viewerScenes = await playlistZipService.readDownloadableScenes(
       viewer,
       playlistId
     );
-    const ownerItems = await downloadService.getDownloadablePlaylistItems(
+    const ownerScenes = await playlistZipService.readDownloadableScenes(
       owner,
       playlistId
     );
 
-    expect(await downloadService.calculatePlaylistSize(viewerItems)).toBe(100n);
-    expect(await downloadService.calculatePlaylistSize(ownerItems)).toBe(1110n);
+    expect(viewerScenes.map(ref)).toEqual([`${FX_ID.SAME}@${FX.A}`]);
+    expect(ownerScenes.map(ref)).toEqual([
+      `${FX_ID.SAME}@${FX.B}`,
+      `${FX_ID.SAME}@${FX.A}`,
+      `${FX_ID.GLOBAL}@${FX.A}`,
+    ]);
+    expect(plannedZipBytes(viewerScenes)).toBe(100n);
+    expect(plannedZipBytes(ownerScenes)).toBe(1110n);
   });
 
   it("createZip streams each scene from its own instance and leaves out what the requester cannot see", async () => {
@@ -385,6 +420,125 @@ describe("Download access (integration)", () => {
       const ownerNfo = nfoTitled(await zipText(owner), `A-${FX_ID.SAME}`);
       expect(ownerNfo).toContain("<criticrating></criticrating>");
       expect(ownerNfo).toContain("<rating></rating>");
+    });
+  });
+
+  it("a zip whose permission was removed before its build fails when it is built", async () => {
+    const download = await downloadService.createPlaylistDownload(
+      viewer,
+      playlistId
+    );
+    await prisma.user.update({
+      where: { id: viewer },
+      data: { canDownloadPlaylistsOverride: false },
+    });
+    try {
+      await playlistZipService.createZip(download.id, {
+        signal: new AbortController().signal,
+        ...NO_CAP,
+      });
+    } finally {
+      await prisma.user.update({
+        where: { id: viewer },
+        data: { canDownloadPlaylistsOverride: true },
+      });
+    }
+
+    const row = await prisma.download.findUnique({
+      where: { id: download.id },
+    });
+    expect(row?.status).toBe("FAILED");
+    expect(row?.error).toBe(NO_PLAYLIST_PERMISSION);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe("startup recovery", () => {
+    /** A zip row of the viewer's, and a partial file for it */
+    async function interruptedZip(
+      status: "PENDING" | "PROCESSING",
+      progress: number,
+      createdAt: Date
+    ): Promise<{ id: number; file: string }> {
+      const row = await prisma.download.create({
+        data: {
+          userId: viewer,
+          type: "PLAYLIST",
+          status,
+          playlistId,
+          fileName: "access-it-playlist.zip",
+          progress,
+          createdAt,
+        },
+      });
+      const file = zipPath(viewer, row.id);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, "partial");
+      return { id: row.id, file };
+    }
+
+    /** The queue spies a test made, restored after it */
+    const queueSpies: Array<{ mockRestore: () => void }> = [];
+
+    afterEach(async () => {
+      for (const spy of queueSpies.splice(0)) spy.mockRestore();
+      await prisma.download.deleteMany({
+        where: { userId: viewer, fileName: "access-it-playlist.zip" },
+      });
+    });
+
+    it("startup recovery re-queues PENDING and PROCESSING zips and removes their partial files", async () => {
+      const enqueue = vi
+        .spyOn(downloadJobQueue, "enqueue")
+        .mockImplementation(() => undefined);
+      queueSpies.push(enqueue);
+      const older = await interruptedZip(
+        "PROCESSING",
+        40,
+        new Date(Date.now() - 60_000)
+      );
+      const newer = await interruptedZip("PENDING", 0, new Date());
+
+      await recoverPendingDownloads();
+
+      const rows = await prisma.download.findMany({
+        where: { id: { in: [older.id, newer.id] } },
+        orderBy: { id: "asc" },
+      });
+      expect(rows.map((r) => [r.status, r.progress])).toEqual([
+        ["PENDING", 0],
+        ["PENDING", 0],
+      ]);
+      expect(fs.existsSync(older.file)).toBe(false);
+      expect(fs.existsSync(newer.file)).toBe(false);
+      const ours = enqueue.mock.calls.filter(
+        ([id]) => id === older.id || id === newer.id
+      );
+      expect(ours).toEqual([
+        [older.id, viewer],
+        [newer.id, viewer],
+      ]);
+    });
+
+    it("recovery leaves alone a zip enqueued before it ran (its file and row are untouched)", async () => {
+      const enqueue = vi
+        .spyOn(downloadJobQueue, "enqueue")
+        .mockImplementation(() => undefined);
+      queueSpies.push(enqueue);
+      const held = await interruptedZip("PROCESSING", 30, new Date());
+      // Queued in this process while the startup sync ran
+      queueSpies.push(
+        vi
+          .spyOn(downloadJobQueue, "isActive")
+          .mockImplementation((id) => id === held.id)
+      );
+
+      await recoverPendingDownloads();
+
+      const row = await prisma.download.findUnique({ where: { id: held.id } });
+      expect(row?.status).toBe("PROCESSING");
+      expect(row?.progress).toBe(30);
+      expect(fs.readFileSync(held.file, "utf8")).toBe("partial");
+      expect(enqueue.mock.calls.filter(([id]) => id === held.id)).toEqual([]);
     });
   });
 
