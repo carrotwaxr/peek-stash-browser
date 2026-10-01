@@ -175,8 +175,17 @@ export async function sweepOrphanedDownloadFiles(): Promise<void> {
         for (const id of files) {
           if (kept.has(id)) continue;
           try {
-            // Checked as late as possible: a build may have started since
-            // the rows were read
+            // Checked again just before the unlink: since the rows were read
+            // a build may have started, or finished. A build leaves the queue
+            // only after its row is COMPLETED, so a row read after the queue
+            // let go of the id shows a finished zip; the queue is asked again
+            // after the read for a build that started meanwhile.
+            if (downloadJobQueue.isActive(id)) continue;
+            const row = await prisma.download.findFirst({
+              where: { id, userId: folder.userId, status: "COMPLETED" },
+              select: { filePath: true },
+            });
+            if (row?.filePath === zipPath(folder.userId, id)) continue;
             if (downloadJobQueue.isActive(id)) continue;
             await fs.unlink(zipPath(folder.userId, id));
             removedFiles++;
