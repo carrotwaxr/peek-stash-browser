@@ -108,7 +108,7 @@ export class PlaylistZipService {
       allowedInstanceIds,
       playlistId,
     });
-    return items.flatMap((item) => (item.scene ? [item.scene] : []));
+    return items.map((item) => item.scene);
   }
 
   /**

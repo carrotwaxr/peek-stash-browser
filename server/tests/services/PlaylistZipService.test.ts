@@ -23,7 +23,6 @@ import type { NormalizedScene } from "../../types/index.js";
 import { downloadRow, userPermissions } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
-import { malformedRow } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -108,22 +107,20 @@ function scene(
   });
 }
 
-/**
- * A playlist item holding `visible`, or one its reader cannot see (null):
- * the reader lists visible items only, so a null scene is a row it cannot
- * return, for the zip's guard
- */
+/** A playlist item holding `visible` (the reader lists visible items only) */
 function item(
   position: number,
-  visible: NormalizedScene | null
+  visible: NormalizedScene
 ): PlaylistItemWithScene {
-  return malformedRow<PlaylistItemWithScene>({
+  return {
+    id: position + 1,
     playlistId: 3,
-    sceneId: visible?.id ?? `hidden-${position}`,
-    instanceId: visible?.instanceId ?? "inst-a",
+    sceneId: visible.id,
+    instanceId: visible.instanceId,
     position,
+    addedAt: new Date(0),
     scene: visible,
-  });
+  };
 }
 
 /** Download 7 of playlist 3, named `playlistName`, holding these items */
@@ -373,30 +370,9 @@ describe("PlaylistZipService.createZip", () => {
     });
   });
 
-  it("an item the requester cannot see gets no entry and is not fetched", async () => {
-    arrange("Mix", [
-      item(0, null),
-      item(1, scene("s2", "Second")),
-      item(2, null),
-    ]);
-
-    await playlistZipService.createZip(7, NO_CAP);
-
-    expect(appended.map((e) => e.name)).toEqual([
-      "Mix/Second.nfo",
-      "Mix/Second.mp4",
-      "Mix/playlist.m3u",
-    ]);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(
-      "http://stash-a.test/scene/s2/stream",
-      expect.anything()
-    );
-    expect(downloadService.markCompleted).toHaveBeenCalledTimes(1);
-  });
-
   it("a playlist with nothing the requester can see fails without a zip", async () => {
-    arrange("Mix", [item(0, null)]);
+    // The reader returns only the scenes the requester can see
+    arrange("Mix", []);
 
     await playlistZipService.createZip(7, NO_CAP);
 
