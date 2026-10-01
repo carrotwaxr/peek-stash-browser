@@ -24,7 +24,8 @@ interface WatchHistoryData {
   playDuration?: number;
   lastPlayedAt?: string | null;
   oCount?: number;
-  oHistory?: string[] | string;
+  /** When the last O was pressed (the scene's `last_o_at`) */
+  lastOAt?: string | null;
 }
 
 interface Props {
@@ -76,33 +77,18 @@ const SceneListItem = ({
   // Uses md breakpoint (768px) since list items stack vertically below this
   const isMobileWidth = useSharedMediaQuery("(max-width: 767px)");
 
-  // Check if an O was clicked during the last viewing session
+  // Check if an O was clicked during the last viewing session: the last O
+  // within 5 minutes of the last play
   const hadOInLastSession = () => {
-    if (!watchHistory?.oHistory || !watchHistory?.lastPlayedAt) return false;
+    if (!watchHistory?.lastOAt || !watchHistory.lastPlayedAt) return false;
 
-    try {
-      const oHistory = Array.isArray(watchHistory.oHistory)
-        ? watchHistory.oHistory
-        : (JSON.parse(watchHistory.oHistory) as string[]);
+    const timeDiff = Math.abs(
+      new Date(watchHistory.lastOAt).getTime() -
+        new Date(watchHistory.lastPlayedAt).getTime()
+    );
+    const fiveMinutes = 5 * 60 * 1000;
 
-      // The most recent O timestamp; none when the history is empty
-      const lastO = oHistory[oHistory.length - 1];
-      if (lastO === undefined) return false;
-
-      const lastOTimestamp = new Date(lastO);
-      const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
-
-      // Check if the last O was within 5 minutes of the last play session
-      const timeDiff = Math.abs(
-        lastOTimestamp.getTime() - lastPlayedAt.getTime()
-      );
-      const fiveMinutes = 5 * 60 * 1000;
-
-      return timeDiff < fiveMinutes;
-    } catch (error) {
-      console.error("Error checking O history:", error);
-      return false;
-    }
+    return timeDiff < fiveMinutes;
   };
 
   const formatDuration = (seconds: number) => {

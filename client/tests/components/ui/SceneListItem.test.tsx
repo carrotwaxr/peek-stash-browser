@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SceneListItem from "@/components/ui/SceneListItem";
 
@@ -99,5 +99,42 @@ describe("SceneListItem", () => {
     act(() => bump());
 
     expect(thumbnailRenders).toHaveBeenCalledTimes(1);
+  });
+  describe("the session O indicator", () => {
+    const lastPlayedAt = "2024-05-01T20:00:00.000Z";
+    const O_TITLE = "O clicked during this session";
+
+    function renderRow(lastOAt: string | null | undefined) {
+      render(
+        <MemoryRouter>
+          <SceneListItem
+            scene={makeScene("1")}
+            watchHistory={{
+              lastPlayedAt,
+              ...(lastOAt !== undefined && { lastOAt }),
+            }}
+            showSessionOIndicator
+          />
+        </MemoryRouter>
+      );
+    }
+
+    it("shows when the last O is within 5 minutes of the last play", () => {
+      renderRow("2024-05-01T20:03:00.000Z");
+
+      expect(screen.getByTitle(O_TITLE)).toBeTruthy();
+    });
+
+    it("stays away when the last O is further from the last play", () => {
+      renderRow("2024-05-01T20:10:00.000Z");
+
+      expect(screen.queryByTitle(O_TITLE)).toBeNull();
+    });
+
+    it("stays away for a scene with no O", () => {
+      renderRow(null);
+
+      expect(screen.queryByTitle(O_TITLE)).toBeNull();
+    });
   });
 });

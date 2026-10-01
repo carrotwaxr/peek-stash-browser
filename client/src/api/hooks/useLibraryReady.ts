@@ -40,12 +40,17 @@ const LIBRARY_ENTITY_ROOTS = new Set([
   "images",
 ]);
 
-/** The queries that read the library: entity lists, details, pickers, clips and carousels. */
+/** The queries that read the library: entity lists, details, pickers, clips, carousels and the watched scenes. */
 function isLibraryQuery(queryKey: QueryKey): boolean {
   const [root, , kind] = queryKey;
   if (typeof root !== "string") return false;
   if (LIBRARY_ENTITY_ROOTS.has(root)) return kind !== "externalPlayerLink";
-  return root === "clips" || root === "homeCarousel" || root === "carousels";
+  return (
+    root === "clips" ||
+    root === "homeCarousel" ||
+    root === "carousels" ||
+    root === "watchHistory"
+  );
 }
 
 /**

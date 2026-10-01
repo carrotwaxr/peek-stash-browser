@@ -1,35 +1,37 @@
 /**
- * Continue Watching pairs each scene with its own history: with two Stash
- * servers that share a scene id, the history is asked for and matched by the
- * (id, instance) pair, never by the bare id.
+ * Continue Watching asks the server for one page of in-progress scenes
+ * (`GET /watch-history/scenes?view=in_progress&sort=recent&per_page=12`) and
+ * shows what it returns, in the server's order. The scenes carry the viewer's
+ * own resume point and play count, so no second scene request is made.
+ *
+ * The network is stubbed, not the hook: the behaviour under test is which
+ * requests the carousel sends and when it asks again.
  */
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { libraryApi } from "@/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { invalidateExclusionDependents } from "@/api/invalidateExclusionDependents";
+import { createQueryClient } from "@/api/queryClient";
 import ContinueWatchingCarousel from "@/components/ui/ContinueWatchingCarousel";
-import { useAllWatchHistory } from "@/hooks/useWatchHistory";
+import {
+  initializingResponse,
+  jsonResponse,
+  requestsTo,
+  stubApi,
+} from "../../helpers/stubApi";
 
-vi.mock("@/api", () => ({
-  libraryApi: { findScenes: vi.fn() },
-}));
-
-const libraryState = vi.hoisted(() => ({ ready: true, initializing: false }));
 const configState = vi.hoisted(() => ({ hasMultipleInstances: true }));
-
-vi.mock("@/api/hooks/useLibraryReady", () => ({
-  useLibraryReady: () => ({ ready: libraryState.ready }),
-  isLibraryInitializing: () => libraryState.initializing,
-}));
 
 vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: configState.hasMultipleInstances }),
-}));
-
-vi.mock("@/hooks/useWatchHistory", () => ({
-  useAllWatchHistory: vi.fn(),
 }));
 
 vi.mock("@/components/ui/SceneCarousel", () => ({
@@ -43,8 +45,8 @@ vi.mock("@/components/ui/SceneCarousel", () => ({
     scenes: Array<{
       id: string;
       instanceId: string;
-      resumeTime: number;
-      playCount: number;
+      resume_time: number;
+      play_count: number;
     }>;
   }) => (
     <ul data-loading={String(loading)} data-testid="carousel">
@@ -54,117 +56,55 @@ vi.mock("@/components/ui/SceneCarousel", () => ({
           data-testid="scene"
           onClick={() => onSceneClick(s)}
         >
-          {`${s.id}:${s.instanceId}:${s.resumeTime}:${s.playCount}`}
+          {`${s.id}:${s.instanceId}:${s.resume_time}:${s.play_count}`}
         </li>
       ))}
     </ul>
   ),
 }));
 
-const files = [{ duration: 1000 }];
+const WATCHED = "/watch-history/scenes";
+
+function scene(id: string, instanceId: string, overrides = {}) {
+  return {
+    id,
+    instanceId,
+    resume_time: 100,
+    play_count: 1,
+    play_duration: 500,
+    files: [{ duration: 1000 }],
+    ...overrides,
+  };
+}
+
+function answer(scenes: unknown[]) {
+  return () =>
+    jsonResponse(200, { scenes, total: null, totalPlayDuration: null });
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+  );
+}
 
 describe("ContinueWatchingCarousel", () => {
+  let client: QueryClient;
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    libraryState.ready = true;
-    libraryState.initializing = false;
+    client = createQueryClient();
     configState.hasMultipleInstances = true;
   });
 
-  it("asks findScenes for id:instance refs and pairs each scene with its own history when two servers share a scene id", async () => {
-    vi.mocked(useAllWatchHistory).mockReturnValue({
-      data: [
-        {
-          sceneId: "7",
-          instanceId: "b",
-          resumeTime: 200,
-          playCount: 2,
-          playDuration: 500,
-          lastPlayedAt: "2024-01-02T00:00:00.000Z",
-        },
-        {
-          sceneId: "7",
-          instanceId: "a",
-          resumeTime: 100,
-          playCount: 1,
-          playDuration: 500,
-          lastPlayedAt: "2024-01-01T00:00:00.000Z",
-        },
-      ],
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
-    });
-    vi.mocked(libraryApi.findScenes).mockResolvedValue({
-      findScenes: {
-        scenes: [
-          { id: "7", instanceId: "a", files },
-          { id: "7", instanceId: "b", files },
-        ],
-      },
-    });
-
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <ContinueWatchingCarousel />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId("scene")).toHaveLength(2);
-    });
-
-    expect(libraryApi.findScenes).toHaveBeenCalledWith(
-      { ids: ["7:b", "7:a"] },
-      expect.anything()
-    );
-    // Most recently played first, each with its own server's numbers
-    expect(screen.getAllByTestId("scene").map((li) => li.textContent)).toEqual([
-      "7:b:200:2",
-      "7:a:100:1",
-    ]);
+  afterEach(() => {
+    client.clear();
+    vi.unstubAllGlobals();
   });
-
-  function history(overrides: Record<string, unknown> = {}) {
-    return {
-      sceneId: "1",
-      instanceId: "a",
-      resumeTime: 10,
-      playCount: 1,
-      playDuration: 500,
-      lastPlayedAt: "2024-01-01T00:00:00.000Z",
-      ...overrides,
-    };
-  }
-
-  function mockHistory(
-    data: Array<Record<string, unknown>>,
-    extra: { loading?: boolean; error?: Error } = {}
-  ) {
-    vi.mocked(useAllWatchHistory).mockReturnValue({
-      data,
-      loading: extra.loading ?? false,
-      error: extra.error instanceof Error ? extra.error.message : null,
-      refresh: vi.fn(),
-    });
-  }
-
-  function LocationProbe() {
-    const location = useLocation();
-    return (
-      <div data-testid="location">{`${location.pathname}${location.search}`}</div>
-    );
-  }
 
   function renderCarousel() {
     return render(
-      <QueryClientProvider
-        client={
-          new QueryClient({ defaultOptions: { queries: { retry: false } } })
-        }
-      >
+      <QueryClientProvider client={client}>
         <MemoryRouter>
           <Routes>
             <Route path="/" element={<ContinueWatchingCarousel />} />
@@ -175,25 +115,12 @@ describe("ContinueWatchingCarousel", () => {
     );
   }
 
-  it("leaves out scenes watched under 2% of their length or with no recorded play time, and orders undated ones last", async () => {
-    mockHistory([
-      history({ sceneId: "1", playDuration: 500 }),
-      history({ sceneId: "2", playDuration: 10 }),
-      history({ sceneId: "3", playDuration: 0 }),
-      history({ sceneId: "4", lastPlayedAt: null, playDuration: 500 }),
-      history({ sceneId: "6", instanceId: "a" }),
-    ]);
-    vi.mocked(libraryApi.findScenes).mockResolvedValue({
-      findScenes: {
-        scenes: [
-          { id: "1", instanceId: "a", files },
-          { id: "2", instanceId: "a", files },
-          { id: "3", instanceId: "a", files },
-          { id: "4", instanceId: "a", files },
-          { id: "5", instanceId: "a", files },
-          { id: "6", instanceId: "a", files: [] },
-        ],
-      },
+  it("asks once for in_progress, recent, per_page 12 and shows what it returns", async () => {
+    const fetchMock = stubApi({
+      [WATCHED]: answer([
+        scene("7", "b", { resume_time: 200, play_count: 2 }),
+        scene("7", "a", { resume_time: 100, play_count: 1 }),
+      ]),
     });
 
     renderCarousel();
@@ -201,88 +128,98 @@ describe("ContinueWatchingCarousel", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("scene")).toHaveLength(2);
     });
+    const requests = requestsTo(fetchMock, WATCHED);
+    expect(requests).toHaveLength(1);
+    const params = new URL(must(requests[0], "a request"), "http://x")
+      .searchParams;
+    expect(params.get("view")).toBe("in_progress");
+    expect(params.get("sort")).toBe("recent");
+    expect(params.get("per_page")).toBe("12");
+    // The server's order and each server's own numbers, nothing re-sorted
     expect(screen.getAllByTestId("scene").map((li) => li.textContent)).toEqual([
-      "1:a:10:1",
-      "4:a:10:1",
+      "7:b:200:2",
+      "7:a:100:1",
     ]);
   });
 
-  it("shows nothing when nothing was watched, and asks Stash for nothing", () => {
-    mockHistory([]);
+  it("makes no second scene request", async () => {
+    const fetchMock = stubApi({ [WATCHED]: answer([scene("1", "a")]) });
+
+    renderCarousel();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("scene")).toHaveLength(1);
+    });
+
+    // Any other route would reject with "No stubbed route"
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(requestsTo(fetchMock, "/library/scenes")).toHaveLength(0);
+  });
+
+  it("hides when the answer is empty", async () => {
+    const fetchMock = stubApi({ [WATCHED]: answer([]) });
 
     renderCarousel();
 
-    expect(screen.queryByTestId("carousel")).toBeNull();
-    expect(libraryApi.findScenes).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(requestsTo(fetchMock, WATCHED)).toHaveLength(1);
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("carousel")).toBeNull();
+    });
   });
 
-  it("shows nothing when the watch history failed to load", () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mockHistory([], { error: new Error("boom") });
+  it("a hide refetches Continue Watching", async () => {
+    let scenes = [scene("1", "a"), scene("2", "a")];
+    const fetchMock = stubApi({
+      [WATCHED]: () =>
+        jsonResponse(200, { scenes, total: null, totalPlayDuration: null }),
+    });
+
+    renderCarousel();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("scene")).toHaveLength(2);
+    });
+
+    // Scene 1 is hidden: what useHiddenEntities does after a hide
+    scenes = [scene("2", "a")];
+    await act(async () => {
+      await invalidateExclusionDependents(client);
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("scene")).toHaveLength(1);
+    });
+    expect(requestsTo(fetchMock, WATCHED)).toHaveLength(2);
+  });
+
+  it("shows the loading state and asks nothing more while the library is initializing", async () => {
+    const fetchMock = stubApi({
+      [WATCHED]: initializingResponse,
+      "/library/ready": () => jsonResponse(200, { ready: false }),
+    });
 
     renderCarousel();
 
-    expect(screen.queryByTestId("carousel")).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("carousel").dataset["loading"]).toBe("true");
+    });
+    expect(requestsTo(fetchMock, WATCHED)).toHaveLength(1);
   });
 
-  it("shows nothing when the scenes fail to load for a reason other than the library starting", async () => {
+  it("shows nothing when the request fails for another reason", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mockHistory([history()]);
-    vi.mocked(libraryApi.findScenes).mockRejectedValue(new Error("boom"));
+    stubApi({ [WATCHED]: () => jsonResponse(500, { error: "boom" }) });
 
     renderCarousel();
 
     await waitFor(() => {
       expect(screen.queryByTestId("carousel")).toBeNull();
     });
-  });
-
-  it("shows the loading state and asks nothing while the library is not ready", () => {
-    libraryState.ready = false;
-    mockHistory([history()]);
-
-    renderCarousel();
-
-    expect(screen.getByTestId("carousel").dataset["loading"]).toBe("true");
-    expect(libraryApi.findScenes).not.toHaveBeenCalled();
-  });
-
-  it("shows the loading state while the watch history loads", () => {
-    mockHistory([], { loading: true });
-
-    renderCarousel();
-
-    expect(screen.getByTestId("carousel").dataset["loading"]).toBe("true");
-  });
-
-  it("treats a scenes answer without a findScenes body as no scenes", async () => {
-    mockHistory([history()]);
-    vi.mocked(libraryApi.findScenes).mockResolvedValue({});
-
-    renderCarousel();
-
-    await waitFor(() => {
-      expect(screen.queryByTestId("carousel")).toBeNull();
-    });
-    expect(libraryApi.findScenes).toHaveBeenCalled();
   });
 
   it("opens the clicked scene on its own server", async () => {
-    mockHistory([
-      history({ sceneId: "1", instanceId: "a" }),
-      history({
-        sceneId: "2",
-        instanceId: "b",
-        lastPlayedAt: "2023-01-01T00:00:00.000Z",
-      }),
-    ]);
-    vi.mocked(libraryApi.findScenes).mockResolvedValue({
-      findScenes: {
-        scenes: [
-          { id: "1", instanceId: "a", files },
-          { id: "2", instanceId: "b", files },
-        ],
-      },
+    stubApi({
+      [WATCHED]: answer([scene("1", "a"), scene("2", "b")]),
     });
 
     renderCarousel();
@@ -300,10 +237,7 @@ describe("ContinueWatchingCarousel", () => {
 
   it("opens a scene without the instance in its link when there is a single server", async () => {
     configState.hasMultipleInstances = false;
-    mockHistory([history()]);
-    vi.mocked(libraryApi.findScenes).mockResolvedValue({
-      findScenes: { scenes: [{ id: "1", instanceId: "a", files }] },
-    });
+    stubApi({ [WATCHED]: answer([scene("1", "a")]) });
 
     renderCarousel();
     await waitFor(() => {

@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
-import type React from "react";
-import type { NormalizedScene } from "@peek/shared-types";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  type NormalizedScene,
+  WATCHED_SCENES_SORTS,
+  WATCHED_SCENES_VIEWS,
+  type WatchedScenesSort,
+  type WatchedScenesView,
+} from "@peek/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { History, Trash2 } from "lucide-react";
-import { apiDelete, libraryApi } from "../../api";
+import { apiDelete, getErrorMessage } from "../../api";
+import { queryKeys } from "../../api/queryKeys";
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { useAllWatchHistory } from "../../hooks/useWatchHistory";
+import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import {
@@ -12,165 +20,91 @@ import {
   LoadingSpinner,
   PageHeader,
   PageLayout,
+  Pagination,
   SceneListItem,
 } from "../ui/index";
 
-interface WatchHistoryEntry {
-  sceneId: string;
-  instanceId: string;
-  resumeTime?: number;
-  playCount?: number;
-  playDuration?: number;
-  lastPlayedAt?: string | null;
-  oCount?: number;
-  oHistory?: string[];
-}
+/** Scenes per page; the page has no per-page selector. */
+const PER_PAGE = 24;
 
-interface SceneWithHistory extends Record<string, unknown> {
-  id: string;
-  instanceId: string;
-  watchHistory: WatchHistoryEntry | null;
-  resumeTime: number;
-  playCount: number;
-  playDuration: number;
-  lastPlayedAt: string | null;
-  oCount: number;
-  oHistory: string[];
-  isCompleted: boolean;
-  files?: Array<{ duration?: number }>;
+const DEFAULT_VIEW: WatchedScenesView = "all";
+const DEFAULT_SORT: WatchedScenesSort = "recent";
+
+/** A URL value that is one of the allowed ones, else the default. */
+function pick<T extends string>(
+  allowed: readonly T[],
+  value: string | null,
+  fallback: T
+): T {
+  return allowed.find((candidate) => candidate === value) ?? fallback;
 }
 
 const WatchHistory = () => {
   usePageTitle("Watch History");
 
-  const [sortBy, setSortBy] = useState("recent"); // recent, most_watched, longest_duration
-  const [filterBy, setFilterBy] = useState("all"); // all, in_progress, completed
-  const [scenes, setScenes] = useState<SceneWithHistory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // View, sort and page live in the URL; the defaults stay out of it
+  const view = pick(
+    WATCHED_SCENES_VIEWS,
+    searchParams.get("view"),
+    DEFAULT_VIEW
+  );
+  const sort = pick(
+    WATCHED_SCENES_SORTS,
+    searchParams.get("sort"),
+    DEFAULT_SORT
+  );
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Fetch all watch history (not limited)
   const {
-    data: watchHistoryList,
-    loading: loadingHistory,
+    data,
+    isLoading: loading,
     error,
-    refresh: refreshWatchHistory,
-  } = useAllWatchHistory({
-    inProgress: filterBy === "in_progress",
-    limit: 100,
-  });
+  } = useWatchedScenes({ view, sort, page, perPage: PER_PAGE });
+  const scenes = useMemo(() => data?.scenes ?? [], [data]);
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-  // Fetch full scene data for watch history
-  useEffect(() => {
-    const fetchScenes = async () => {
-      const historyList = watchHistoryList as unknown as
-        | WatchHistoryEntry[]
-        | null;
-      if (!historyList || historyList.length === 0) {
-        setScenes([]);
-        setLoading(false);
-        return;
-      }
+  // One queue for the page, each row at its own index
+  const queue = useMemo(
+    () =>
+      buildPlaybackQueue({
+        id: "virtual-history",
+        name: "Watch History",
+        scenes,
+        currentIndex: 0,
+      }),
+    [scenes]
+  );
 
-      try {
-        setLoading(true);
-
-        // "id:instanceId" refs: scene ids repeat across servers
-        const sceneRefs: string[] = historyList.map((wh) =>
-          makeCompositeKey(wh.sceneId, wh.instanceId)
-        );
-        const historyByScene = new Map(
-          historyList.map((wh) => [
-            makeCompositeKey(wh.sceneId, wh.instanceId),
-            wh,
-          ])
-        );
-
-        // Fetch scenes in bulk - must set per_page to match number of IDs
-        const response = (await libraryApi.findScenes({
-          ids: sceneRefs,
-          filter: { per_page: sceneRefs.length },
-        })) as Record<string, Record<string, unknown>>;
-        const fetchedScenes = (response?.findScenes?.scenes || []) as Record<
-          string,
-          unknown
-        >[];
-
-        // Match scenes with watch history data
-        const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map(
-          (scene: Record<string, unknown>) => {
-            const watchHistory =
-              historyByScene.get(
-                makeCompositeKey(scene.id as string, scene.instanceId as string)
-              ) ?? null;
-            const files = scene.files as
-              | Array<{ duration?: number }>
-              | undefined;
-            const duration = files?.[0]?.duration || 0;
-            const resumeTime = watchHistory?.resumeTime || 0;
-            const isCompleted =
-              duration > 0 && resumeTime > 0 && resumeTime / duration > 0.9;
-
-            return {
-              ...scene,
-              id: scene.id as string,
-              instanceId: scene.instanceId as string,
-              watchHistory: watchHistory,
-              resumeTime: resumeTime,
-              playCount: watchHistory?.playCount || 0,
-              playDuration: watchHistory?.playDuration || 0,
-              lastPlayedAt: watchHistory?.lastPlayedAt || null,
-              oCount: watchHistory?.oCount || 0,
-              oHistory: watchHistory?.oHistory ?? [],
-              isCompleted: isCompleted,
-            };
-          }
-        );
-
-        // Apply filtering
-        let filtered = scenesWithHistory;
-        if (filterBy === "in_progress") {
-          filtered = scenesWithHistory.filter(
-            (s: SceneWithHistory) => !s.isCompleted && s.resumeTime > 0
-          );
-        } else if (filterBy === "completed") {
-          filtered = scenesWithHistory.filter(
-            (s: SceneWithHistory) => s.isCompleted
-          );
-        }
-
-        // Apply sorting
-        const sorted = [...filtered];
-        if (sortBy === "recent") {
-          sorted.sort((a, b) => {
-            const dateA = a.lastPlayedAt
-              ? new Date(a.lastPlayedAt).getTime()
-              : 0;
-            const dateB = b.lastPlayedAt
-              ? new Date(b.lastPlayedAt).getTime()
-              : 0;
-            return dateB - dateA;
-          });
-        } else if (sortBy === "most_watched") {
-          sorted.sort((a, b) => b.playCount - a.playCount);
-        } else if (sortBy === "longest_duration") {
-          sorted.sort((a, b) => b.playDuration - a.playDuration);
-        }
-
-        setScenes(sorted);
-      } catch (err) {
-        console.error("Error fetching watch history scenes:", err);
-        setScenes([]);
-      } finally {
-        setLoading(false);
-      }
+  /**
+   * Writes the URL as a new history entry (Back undoes the change). The page
+   * is dropped unless the change is to the page itself; a default stays out.
+   */
+  const updateUrl = (changes: {
+    view?: WatchedScenesView;
+    sort?: WatchedScenesSort;
+    page?: number;
+  }) => {
+    const next = {
+      view: changes.view ?? view,
+      sort: changes.sort ?? sort,
+      page: changes.page ?? 1,
     };
-
-    if (!loadingHistory) {
-      void fetchScenes();
-    }
-  }, [watchHistoryList, loadingHistory, sortBy, filterBy]);
+    const params = new URLSearchParams(searchParams);
+    const set = (key: string, value: string, isDefault: boolean) => {
+      if (isDefault) params.delete(key);
+      else params.set(key, value);
+    };
+    set("view", next.view, next.view === DEFAULT_VIEW);
+    set("sort", next.sort, next.sort === DEFAULT_SORT);
+    set("page", String(next.page), next.page === 1);
+    setSearchParams(params);
+  };
 
   const formatDuration = (seconds: number | null | undefined): string => {
     if (!seconds) return "0m";
@@ -187,8 +121,17 @@ const WatchHistory = () => {
       setIsClearing(true);
       await apiDelete("/watch-history");
 
-      // Refresh watch history data from API
-      await refreshWatchHistory();
+      // What the history fed is stale: this page, Home's Continue Watching
+      // and the stats
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.watchHistory.all(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.homeCarousels.all(),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.user.stats() }),
+      ]);
 
       // Close dialog
       setShowConfirmDialog(false);
@@ -215,14 +158,24 @@ const WatchHistory = () => {
             {/* Sort */}
             <div className="flex items-center gap-2">
               <label
+                htmlFor="watch-history-sort"
                 className="text-sm font-medium whitespace-nowrap"
                 style={{ color: "var(--text-secondary)" }}
               >
                 Sort:
               </label>
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                id="watch-history-sort"
+                value={sort}
+                onChange={(e) =>
+                  updateUrl({
+                    sort: pick(
+                      WATCHED_SCENES_SORTS,
+                      e.target.value,
+                      DEFAULT_SORT
+                    ),
+                  })
+                }
                 className="px-3 py-2 rounded-lg border text-sm"
                 style={{
                   backgroundColor: "var(--bg-card)",
@@ -239,14 +192,24 @@ const WatchHistory = () => {
             {/* Filter */}
             <div className="flex items-center gap-2">
               <label
+                htmlFor="watch-history-view"
                 className="text-sm font-medium whitespace-nowrap"
                 style={{ color: "var(--text-secondary)" }}
               >
                 Filter:
               </label>
               <select
-                value={filterBy}
-                onChange={(e) => setFilterBy(e.target.value)}
+                id="watch-history-view"
+                value={view}
+                onChange={(e) =>
+                  updateUrl({
+                    view: pick(
+                      WATCHED_SCENES_VIEWS,
+                      e.target.value,
+                      DEFAULT_VIEW
+                    ),
+                  })
+                }
                 className="px-3 py-2 rounded-lg border text-sm"
                 style={{
                   backgroundColor: "var(--bg-card)",
@@ -267,13 +230,10 @@ const WatchHistory = () => {
               className="flex items-center gap-3 md:gap-4"
               style={{ color: "var(--text-muted)" }}
             >
-              <span>{scenes.length} scenes</span>
-              {scenes.length > 0 && (
+              <span>{total} scenes</span>
+              {total > 0 && (
                 <span>
-                  Total watch time:{" "}
-                  {formatDuration(
-                    scenes.reduce((sum, s) => sum + s.playDuration, 0)
-                  )}
+                  Total watch time: {formatDuration(data?.totalPlayDuration)}
                 </span>
               )}
             </div>
@@ -310,7 +270,8 @@ const WatchHistory = () => {
             }}
           >
             <p style={{ color: "var(--status-error)" }}>
-              Error loading watch history: {error as React.ReactNode}
+              Error loading watch history:{" "}
+              {getErrorMessage(error, "Please try again.")}
             </p>
           </div>
         ) : scenes.length === 0 ? (
@@ -329,10 +290,14 @@ const WatchHistory = () => {
               className="text-lg mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              No watch history yet
+              {view === "all"
+                ? "No watch history yet"
+                : "No scenes in this view"}
             </p>
             <p style={{ color: "var(--text-muted)" }}>
-              Start watching some scenes to see them here
+              {view === "all"
+                ? "Start watching some scenes to see them here"
+                : "Try another view to see more of your history"}
             </p>
           </div>
         ) : (
@@ -340,33 +305,42 @@ const WatchHistory = () => {
             {scenes.map((scene, index) => (
               <SceneListItem
                 key={makeCompositeKey(scene.id, scene.instanceId)}
-                scene={scene as unknown as NormalizedScene}
+                scene={scene}
                 watchHistory={{
-                  resumeTime: scene.resumeTime as number | undefined,
-                  playCount: scene.playCount as number | undefined,
-                  playDuration: scene.playDuration as number | undefined,
-                  lastPlayedAt: scene.lastPlayedAt as string | null | undefined,
-                  oCount: scene.oCount as number | undefined,
-                  oHistory: scene.oHistory as string | string[] | undefined,
+                  resumeTime: scene.resume_time,
+                  playCount: scene.play_count,
+                  playDuration: scene.play_duration,
+                  lastPlayedAt: scene.last_played_at,
+                  oCount: scene.o_counter,
+                  lastOAt: scene.last_o_at,
                 }}
                 showSessionOIndicator={true}
                 linkState={{
                   scene,
                   shouldResume: true, // Auto-resume from watch history
-                  playlist: buildPlaybackQueue({
-                    id: "virtual-history",
-                    name: "Watch History",
-                    scenes: scenes as unknown as NormalizedScene[],
-                    currentIndex: index,
-                  }),
+                  playlist: { ...queue, currentIndex: index },
                 }}
                 exists={true}
-                sceneId={scene.id as string | undefined}
+                sceneId={scene.id}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Pages */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(next) => updateUrl({ page: next })}
+            perPage={PER_PAGE}
+            totalCount={total}
+            showPerPageSelector={false}
+          />
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (

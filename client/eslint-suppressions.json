@@ -229,14 +229,6 @@
       "count": 1
     }
   },
-  "src/components/pages/WatchHistory.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 7
-    }
-  },
   "src/components/playlist/PlaylistSidebar.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
@@ -474,14 +466,6 @@
       "count": 5
     }
   },
-  "src/components/ui/ContinueWatchingCarousel.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
-    }
-  },
   "src/components/ui/EmptyState.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -590,7 +574,7 @@
   },
   "src/components/ui/SceneListItem.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
