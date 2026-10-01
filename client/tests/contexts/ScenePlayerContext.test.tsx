@@ -11,7 +11,7 @@ import {
 } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { actAsync, createAuthValue } from "@tests/testUtils";
+import { actAsync, createAuthValue, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 // ---------------------------------------------------------------------------
@@ -42,6 +42,11 @@ import { jsonResponse, stubApi } from "../helpers/stubApi";
 const mockPost = vi.fn<(...args: unknown[]) => unknown>();
 vi.mock("@/api", () => ({
   apiPost: (...args: unknown[]) => mockPost(...args),
+}));
+
+const mockWarning = vi.fn<(message: string) => void>();
+vi.mock("@/utils/toast", () => ({
+  showWarning: (message: string) => mockWarning(message),
 }));
 
 vi.mock("@/contexts/ConfigContext", () => ({
@@ -432,10 +437,14 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.scene).toEqual(mockScene);
       expect(result.current.oCounter).toBe(5);
-      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
-        ids: ["scene-42"],
-        scene_filter: { instance_id: "inst-1" },
-      });
+      expect(mockPost).toHaveBeenCalledWith(
+        "/library/scenes",
+        {
+          ids: ["scene-42"],
+          scene_filter: { instance_id: "inst-1" },
+        },
+        expect.any(AbortSignal)
+      );
     });
 
     it("dispatches LOAD_SCENE_ERROR when scene is not found", async () => {
@@ -536,10 +545,14 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
-        ids: ["scene-42"],
-        scene_filter: { instance_id: "inst-abc" },
-      });
+      expect(mockPost).toHaveBeenCalledWith(
+        "/library/scenes",
+        {
+          ids: ["scene-42"],
+          scene_filter: { instance_id: "inst-abc" },
+        },
+        expect.any(AbortSignal)
+      );
     });
 
     it("omits scene_filter when instanceId is null", async () => {
@@ -551,9 +564,13 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
-        ids: ["scene-42"],
-      });
+      expect(mockPost).toHaveBeenCalledWith(
+        "/library/scenes",
+        {
+          ids: ["scene-42"],
+        },
+        expect.any(AbortSignal)
+      );
     });
 
     it("sets oCounter to 0 when scene has no o_counter", async () => {
@@ -588,7 +605,8 @@ describe("ScenePlayerContext", () => {
 
       expect(mockPost).toHaveBeenCalledWith(
         "/library/scenes",
-        expect.objectContaining({ ids: ["scene-99"] })
+        expect.objectContaining({ ids: ["scene-99"] }),
+        expect.any(AbortSignal)
       );
     });
 
@@ -615,10 +633,14 @@ describe("ScenePlayerContext", () => {
       });
 
       // Should use playlist scene ID, not prop sceneId
-      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
-        ids: ["playlist-scene-1"],
-        scene_filter: { instance_id: "pl-inst-1" },
-      });
+      expect(mockPost).toHaveBeenCalledWith(
+        "/library/scenes",
+        {
+          ids: ["playlist-scene-1"],
+          scene_filter: { instance_id: "pl-inst-1" },
+        },
+        expect.any(AbortSignal)
+      );
     });
   });
 
@@ -651,20 +673,28 @@ describe("ScenePlayerContext", () => {
       await waitFor(() => {
         expect(result.current.sceneLoading).toBe(false);
       });
-      expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
-        ids: ["7"],
-        scene_filter: { instance_id: "inst-a" },
-      });
+      expect(mockPost).toHaveBeenLastCalledWith(
+        "/library/scenes",
+        {
+          ids: ["7"],
+          scene_filter: { instance_id: "inst-a" },
+        },
+        expect.any(AbortSignal)
+      );
 
       act(() => {
         result.current.nextScene();
       });
 
       await waitFor(() => {
-        expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
-          ids: ["7"],
-          scene_filter: { instance_id: "inst-b" },
-        });
+        expect(mockPost).toHaveBeenLastCalledWith(
+          "/library/scenes",
+          {
+            ids: ["7"],
+            scene_filter: { instance_id: "inst-b" },
+          },
+          expect.any(AbortSignal)
+        );
       });
     });
 
@@ -970,9 +1000,13 @@ describe("ScenePlayerContext", () => {
         expect(result.current.scene?.id).toBe("9");
       });
       expect(result.current.playlist).toBeNull();
-      expect(mockPost).toHaveBeenLastCalledWith("/library/scenes", {
-        ids: ["9"],
-      });
+      expect(mockPost).toHaveBeenLastCalledWith(
+        "/library/scenes",
+        {
+          ids: ["9"],
+        },
+        expect.any(AbortSignal)
+      );
       expect(probe.location?.pathname).toBe("/scene/9");
     });
 
@@ -1156,6 +1190,207 @@ describe("ScenePlayerContext", () => {
       });
       expect(result.current.restartCount).toBe(1);
       expect(mockPost.mock.calls.length).toBe(loads);
+    });
+
+    describe("stale loads, unknown scenes and unavailable entries", () => {
+      /**
+       * Answers each scene load by its id: the scene, none (unknown, hidden
+       * or restricted alike: the server leaves it out) or a failure
+       */
+      function answerScenes(answers: Record<string, "missing" | Error>) {
+        mockPost.mockImplementation((_path: unknown, body: unknown) => {
+          const id = must((body as { ids: string[] }).ids[0], "the scene id");
+          const answer = answers[id];
+          if (answer instanceof Error) return Promise.reject(answer);
+          return Promise.resolve(
+            answer === "missing"
+              ? { findScenes: { scenes: [] } }
+              : mockApiResponse({
+                  id,
+                  title: `Scene ${id}`,
+                  instanceId: "inst-1",
+                })
+          );
+        });
+      }
+
+      /** The scene id each /library/scenes request asked for, in order */
+      function requestedIds() {
+        return mockPost.mock.calls.map(
+          (call) => (call[1] as { ids: string[] }).ids[0]
+        );
+      }
+
+      /** Lets any further loads and steps run */
+      async function settle() {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        });
+      }
+
+      it("a slower answer for an earlier scene never replaces a later one", async () => {
+        const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+        const pending = new Map<
+          string,
+          { answer: () => void; signal: AbortSignal | undefined }
+        >();
+        mockPost.mockImplementation(
+          (_path: unknown, body: unknown, signal: unknown) => {
+            const id = must((body as { ids: string[] }).ids[0], "the scene id");
+            return new Promise((resolve) => {
+              pending.set(id, {
+                answer: () =>
+                  resolve(
+                    mockApiResponse({
+                      id,
+                      title: `Scene ${id}`,
+                      instanceId: "inst-1",
+                    })
+                  ),
+                signal: signal as AbortSignal | undefined,
+              });
+            });
+          }
+        );
+
+        act(() => {
+          result.current.nextScene();
+        });
+        act(() => {
+          result.current.nextScene();
+        });
+        await waitFor(() => {
+          expect(pending.has("3")).toBe(true);
+        });
+        await actAsync(() => must(pending.get("3"), "scene 3's load").answer());
+        await actAsync(() => must(pending.get("2"), "scene 2's load").answer());
+        await settle();
+
+        expect(result.current.scene?.id).toBe("3");
+        expect(result.current.currentIndex).toBe(2);
+        expect(pending.get("2")?.signal?.aborted).toBe(true);
+      });
+
+      it("moving from a loaded scene to an unknown id shows not found", async () => {
+        const { result } = renderHook(() => useScenePlayer(), {
+          wrapper: routerWrapper([{ pathname: "/scene/1" }]),
+        });
+        await waitFor(() => {
+          expect(result.current.scene?.id).toBe("1");
+        });
+        answerScenes({ "404": "missing" });
+
+        await go("/scene/404");
+
+        await waitFor(() => {
+          expect(result.current.sceneError).toBeInstanceOf(ApiError);
+        });
+        expect(result.current.scene).toBeNull();
+        expect((result.current.sceneError as ApiError).status).toBe(404);
+        expect(mockWarning).not.toHaveBeenCalled();
+      });
+
+      it("a queue entry that is no longer visible is skipped with a toast and the next entry loads", async () => {
+        const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+        answerScenes({ "2": "missing" });
+
+        act(() => {
+          result.current.dispatch({
+            type: "NEXT_SCENE",
+            payload: { autoplay: true },
+          });
+        });
+
+        await waitFor(() => {
+          expect(result.current.scene?.id).toBe("3");
+        });
+        expect(result.current.currentIndex).toBe(2);
+        expect(result.current.unavailable).toEqual([1]);
+        expect(result.current.sceneError).toBeNull();
+        // The skip keeps the step's autoplay
+        expect(result.current.shouldAutoplay).toBe(true);
+        expect(mockWarning).toHaveBeenCalledExactlyOnceWith(
+          'Skipped "Scene 2": it is no longer available'
+        );
+        await waitFor(() => {
+          expect(probe.location?.pathname).toBe("/scene/3");
+        });
+        expect(entryQueue()?.currentIndex).toBe(2);
+      });
+
+      it("after Prev it skips backwards", async () => {
+        const { result } = await startQueue(queueOf("q1", ["1", "2", "3"], 2));
+        answerScenes({ "2": "missing" });
+
+        act(() => {
+          result.current.prevScene();
+        });
+
+        await waitFor(() => {
+          expect(result.current.scene?.id).toBe("1");
+        });
+        expect(result.current.currentIndex).toBe(0);
+        expect(mockWarning).toHaveBeenCalledExactlyOnceWith(
+          'Skipped "Scene 2": it is no longer available'
+        );
+      });
+
+      it("when every remaining entry is unavailable, playback stops on the not-found view with no request loop", async () => {
+        // Repeat all would wrap back to the start: the loop guard stops it
+        const queue: PlaybackQueue = {
+          ...queueOf("q1", ["1", "2", "3"]),
+          repeat: "all",
+        };
+        answerScenes({ "1": "missing", "2": "missing", "3": "missing" });
+
+        const { result } = renderHook(() => useScenePlayer(), {
+          wrapper: routerWrapper(queueEntries(queue)),
+        });
+
+        await waitFor(() => {
+          expect(requestedIds()).toEqual(["1", "2", "3"]);
+        });
+        await settle();
+
+        expect(mockPost.mock.calls.length).toBeLessThanOrEqual(
+          queue.scenes.length
+        );
+        expect(result.current.scene).toBeNull();
+        expect(result.current.sceneLoading).toBe(false);
+        expect((result.current.sceneError as ApiError).status).toBe(404);
+        expect(result.current.unavailable).toEqual([0, 1, 2]);
+        // A notice for each skip; the last one stops on the not-found view
+        expect(mockWarning).toHaveBeenCalledTimes(2);
+      });
+
+      it("a network error on a queue entry shows Retry and does not skip", async () => {
+        const { result } = await startQueue(queueOf("q1", ["1", "2", "3"]));
+        const failure = new Error("Network error");
+        answerScenes({ "2": failure });
+
+        act(() => {
+          result.current.nextScene();
+        });
+
+        await waitFor(() => {
+          expect(result.current.sceneError).toBe(failure);
+        });
+        await settle();
+        // The page's error view (with Retry), not the previous scene
+        expect(result.current.scene).toBeNull();
+        expect(result.current.currentIndex).toBe(1);
+        expect(result.current.unavailable).toEqual([]);
+        expect(mockWarning).not.toHaveBeenCalled();
+        expect(requestedIds()).not.toContain("3");
+
+        answerScenes({});
+        await actAsync(() => result.current.retryScene());
+
+        await waitFor(() => {
+          expect(result.current.scene?.id).toBe("2");
+        });
+        expect(result.current.sceneError).toBeNull();
+      });
     });
   });
 });

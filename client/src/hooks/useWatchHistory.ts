@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../api";
 import { useLibraryReady } from "../api/hooks/useLibraryReady";
 import { type WatchedScenesKeyParams, queryKeys } from "../api/queryKeys";
+import { makeCompositeKey } from "../utils/compositeKey";
 import { useAuth } from "./useAuth";
 
 /**
@@ -39,29 +40,55 @@ export function useWatchHistory(
   // Track current quality for logging/debugging
   const currentQualityRef = useRef("auto");
 
+  // The scene the history is for, and the request in flight: a new scene
+  // aborts the last request, and an answer for another scene is dropped
+  const sceneKey = makeCompositeKey(sceneId, instanceId);
+  const sceneKeyRef = useRef(sceneKey);
+  sceneKeyRef.current = sceneKey;
+  const controllerRef = useRef<AbortController | null>(null);
+
+  // A new scene starts with no history: the last scene's resume point must
+  // never show (or seek) for it
+  const [historyKey, setHistoryKey] = useState(sceneKey);
+  if (historyKey !== sceneKey) {
+    setHistoryKey(sceneKey);
+    setWatchHistory(null);
+    setLoading(true);
+    setError(null);
+  }
+
   /**
    * Fetch watch history for this scene
    */
   const fetchWatchHistory = useCallback(async () => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
     if (!sceneId || !instanceId || !isAuthenticated) {
       setLoading(false);
       return;
     }
 
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const requestKey = makeCompositeKey(sceneId, instanceId);
+    const isCurrent = () =>
+      !controller.signal.aborted && sceneKeyRef.current === requestKey;
     try {
       setLoading(true);
       setError(null);
       const data = await apiGet<WatchHistoryData>(
-        `/watch-history/${sceneId}?instanceId=${encodeURIComponent(instanceId)}`
+        `/watch-history/${sceneId}?instanceId=${encodeURIComponent(instanceId)}`,
+        controller.signal
       );
-      setWatchHistory(data);
+      if (isCurrent()) setWatchHistory(data);
     } catch (err) {
+      if (!isCurrent()) return;
       console.error("Error fetching watch history:", err);
       setError(
         err instanceof Error ? err.message : "Failed to fetch watch history"
       );
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [sceneId, instanceId, isAuthenticated]);
 
@@ -72,9 +99,10 @@ export function useWatchHistory(
     currentQualityRef.current = quality;
   }, []);
 
-  // Fetch watch history on mount
+  // Fetch watch history on mount and for each scene; leaving aborts it
   useEffect(() => {
     void fetchWatchHistory();
+    return () => controllerRef.current?.abort();
   }, [fetchWatchHistory]);
 
   return {

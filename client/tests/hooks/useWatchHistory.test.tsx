@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { untrusted } from "@tests/helpers/untrusted";
-import { actAsync } from "@tests/testUtils";
+import { actAsync, must } from "@tests/testUtils";
 import {
   type Mock,
   afterEach,
@@ -51,7 +51,8 @@ describe("useWatchHistory", () => {
       });
 
       expect(apiGet).toHaveBeenCalledWith(
-        "/watch-history/scene-1?instanceId=inst-1"
+        "/watch-history/scene-1?instanceId=inst-1",
+        expect.any(AbortSignal)
       );
       expect(result.current.watchHistory).toEqual(mockHistory);
       expect(result.current.error).toBeNull();
@@ -92,7 +93,8 @@ describe("useWatchHistory", () => {
       });
 
       expect(apiGet).toHaveBeenCalledWith(
-        "/watch-history/7?instanceId=server-b"
+        "/watch-history/7?instanceId=server-b",
+        expect.any(AbortSignal)
       );
     });
 
@@ -116,6 +118,70 @@ describe("useWatchHistory", () => {
       });
 
       expect(apiGet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a scene change", () => {
+    it("an answer for the previous scene never sets this scene's history", async () => {
+      const pending = new Map<
+        string,
+        { answer: () => void; signal: AbortSignal | undefined }
+      >();
+      apiGetMock.mockImplementation((url: string, signal?: AbortSignal) => {
+        return new Promise((resolve) => {
+          pending.set(url, {
+            answer: () => resolve({ resumeTime: url.length }),
+            signal,
+          });
+        });
+      });
+      const first = "/watch-history/scene-1?instanceId=inst-1";
+      const second = "/watch-history/scene-2?instanceId=inst-1";
+
+      const { result, rerender } = renderHook(
+        ({ sceneId }) => useWatchHistory(sceneId, "inst-1"),
+        { initialProps: { sceneId: "scene-1" } }
+      );
+      await waitFor(() => {
+        expect(pending.has(first)).toBe(true);
+      });
+      rerender({ sceneId: "scene-2" });
+      await waitFor(() => {
+        expect(pending.has(second)).toBe(true);
+      });
+      // Moving on aborts the previous scene's request
+      expect(pending.get(first)?.signal?.aborted).toBe(true);
+
+      // The previous scene's answer arrives late: dropped
+      await actAsync(() =>
+        must(pending.get(first), "scene 1's fetch").answer()
+      );
+      expect(result.current.watchHistory).toBeNull();
+      expect(result.current.loading).toBe(true);
+
+      await actAsync(() =>
+        must(pending.get(second), "scene 2's fetch").answer()
+      );
+      expect(result.current.watchHistory).toEqual({
+        resumeTime: second.length,
+      });
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("a new scene starts with no history: the last scene's is not shown for it", async () => {
+      apiGetMock.mockResolvedValueOnce({ resumeTime: 120 });
+      const { result, rerender } = renderHook(
+        ({ sceneId }) => useWatchHistory(sceneId, "inst-1"),
+        { initialProps: { sceneId: "scene-1" } }
+      );
+      await waitFor(() => {
+        expect(result.current.watchHistory).toEqual({ resumeTime: 120 });
+      });
+      apiGetMock.mockReturnValueOnce(new Promise(() => {}));
+
+      rerender({ sceneId: "scene-2" });
+
+      expect(result.current.watchHistory).toBeNull();
     });
   });
 

@@ -1,4 +1,4 @@
-import type { NormalizedScene } from "@peek/shared-types";
+import type { NormalizedScene, WithStashUrl } from "@peek/shared-types";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -156,6 +156,10 @@ describe("scenePlayerReducer", () => {
         shuffleHistory: [],
         restartCount: 0,
 
+        requested: null,
+        unavailable: [],
+        direction: "next",
+
         oCounter: 0,
       });
       expect(initialState).not.toHaveProperty("compatibility");
@@ -301,6 +305,74 @@ describe("scenePlayerReducer", () => {
       ).toBe(true);
     });
 
+    it("nextIndex skips unavailable entries, including in shuffle and repeat all", () => {
+      const at = (
+        mode: Mode,
+        repeat: Repeat,
+        where: Where,
+        unavailable: number[],
+        shuffleHistory: number[] = []
+      ) => ({
+        ...tableState(mode, repeat, where),
+        unavailable,
+        shuffleHistory,
+      });
+
+      // Sequential: past the unavailable ones, and none past the last
+      expect(nextIndex(at("sequential", "none", "first", [1, 2]))).toEqual({
+        index: 3,
+        history: [],
+      });
+      expect(nextIndex(at("sequential", "none", "middle", [3, 4]))).toBeNull();
+      // Repeat all wraps past an unavailable first entry
+      expect(nextIndex(at("sequential", "all", "middle", [3, 4, 0]))).toEqual({
+        index: 1,
+        history: [],
+      });
+      // Nothing available at all: no step, even with repeat all
+      const none = [0, 1, 2, 3, 4];
+      expect(nextIndex(at("sequential", "all", "first", none))).toBeNull();
+
+      // Shuffle picks only available entries not yet played
+      expect(
+        nextIndex(at("shuffle", "none", "first", [1, 2]), () => 0)
+      ).toEqual({ index: 3, history: [0] });
+      // Every available one played: repeat all starts again among them
+      expect(
+        nextIndex(at("shuffle", "all", "first", [1, 2], [3, 4]), () => 0)
+      ).toEqual({ index: 3, history: [0] });
+      expect(
+        nextIndex(at("shuffle", "all", "first", none), () => 0)
+      ).toBeNull();
+
+      // prevIndex the same way
+      expect(prevIndex(at("sequential", "none", "last", [2, 3]))).toEqual({
+        index: 1,
+        history: [],
+      });
+      expect(prevIndex(at("sequential", "all", "first", [4]))).toEqual({
+        index: 3,
+        history: [],
+      });
+      expect(prevIndex(at("sequential", "all", "first", none))).toBeNull();
+      // Shuffle goes back past an unavailable entry in its history
+      expect(
+        prevIndex(at("shuffle", "none", "middle", [4], [1, 4]), () => 0)
+      ).toEqual({ index: 1, history: [] });
+
+      // NEXT_SCENE and PREV_SCENE step through them
+      const next = scenePlayerReducer(at("sequential", "none", "first", [1]), {
+        type: "NEXT_SCENE",
+      });
+      expect(next.currentIndex).toBe(2);
+      expect(next.direction).toBe("next");
+      const prev = scenePlayerReducer(at("sequential", "none", "last", [3]), {
+        type: "PREV_SCENE",
+      });
+      expect(prev.currentIndex).toBe(2);
+      expect(prev.direction).toBe("prev");
+    });
+
     it("toggles change only the control fields; state.playlist keeps its identity", () => {
       const prev: ScenePlayerReducerState = {
         ...initialState,
@@ -361,11 +433,186 @@ describe("scenePlayerReducer", () => {
       const state = { ...initialState, sceneLoading: true };
       const result = scenePlayerReducer(state, {
         type: "LOAD_SCENE_ERROR",
-        payload: "Something went wrong",
+        payload: { error: "Something went wrong" },
       });
 
       expect(result.sceneLoading).toBe(false);
       expect(result.sceneError).toBe("Something went wrong");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Stale answers, unknown scenes and unavailable queue entries
+  // -------------------------------------------------------------------------
+  describe("Stale answers and unavailable entries", () => {
+    const request = (sceneId: string) => ({ sceneId, instanceId: "inst-a" });
+    const sceneOf = (id: string) =>
+      untrusted<WithStashUrl<NormalizedScene>>({
+        id,
+        instanceId: "inst-a",
+        files: [],
+      });
+    const failure = new Error("Scene not found");
+
+    /** A queue of these scenes on inst-a, the first loaded */
+    function queueState(sceneIds: string[]): ScenePlayerReducerState {
+      return {
+        ...initialState,
+        playlist: {
+          scenes: sceneIds.map((sceneId) => ({
+            sceneId,
+            instanceId: "inst-a",
+            scene: { title: `Scene ${sceneId}` },
+          })),
+        },
+        scene: sceneOf(must(sceneIds[0], "the first scene")),
+        requested: request(must(sceneIds[0], "the first scene")),
+      };
+    }
+
+    it("an answer for any request but the latest is ignored", () => {
+      let state = scenePlayerReducer(initialState, {
+        type: "LOAD_SCENE_START",
+        payload: request("1"),
+      });
+      state = scenePlayerReducer(state, {
+        type: "LOAD_SCENE_START",
+        payload: request("2"),
+      });
+      expect(state.requested).toEqual(request("2"));
+
+      expect(
+        scenePlayerReducer(state, {
+          type: "LOAD_SCENE_SUCCESS",
+          payload: { request: request("1"), scene: sceneOf("1") },
+        })
+      ).toBe(state);
+      expect(
+        scenePlayerReducer(state, {
+          type: "LOAD_SCENE_ERROR",
+          payload: { request: request("1"), error: failure },
+        })
+      ).toBe(state);
+      expect(
+        scenePlayerReducer(state, {
+          type: "ENTRY_UNAVAILABLE",
+          payload: { index: 0, request: request("1"), error: failure },
+        })
+      ).toBe(state);
+
+      const loaded = scenePlayerReducer(state, {
+        type: "LOAD_SCENE_SUCCESS",
+        payload: { request: request("2"), scene: sceneOf("2") },
+      });
+      expect(loaded.scene?.id).toBe("2");
+      expect(loaded.sceneLoading).toBe(false);
+    });
+
+    it("a failed load of another scene leaves no scene; a failed retry of the shown scene keeps it", () => {
+      const shown = { ...initialState, scene: sceneOf("1") };
+
+      const other = scenePlayerReducer(
+        scenePlayerReducer(shown, {
+          type: "LOAD_SCENE_START",
+          payload: request("2"),
+        }),
+        {
+          type: "LOAD_SCENE_ERROR",
+          payload: { request: request("2"), error: failure },
+        }
+      );
+      expect(other.scene).toBeNull();
+      expect(other.sceneError).toBe(failure);
+      expect(other.sceneLoading).toBe(false);
+
+      const retry = scenePlayerReducer(
+        scenePlayerReducer(shown, {
+          type: "LOAD_SCENE_START",
+          payload: request("1"),
+        }),
+        {
+          type: "LOAD_SCENE_ERROR",
+          payload: { request: request("1"), error: failure },
+        }
+      );
+      expect(retry.scene?.id).toBe("1");
+      expect(retry.sceneError).toBe(failure);
+    });
+
+    it("ENTRY_UNAVAILABLE marks every entry of the scene and steps on in the last step's direction, keeping autoplay", () => {
+      let state = scenePlayerReducer(queueState(["1", "2", "3", "2", "4"]), {
+        type: "NEXT_SCENE",
+        payload: { autoplay: true },
+      });
+      state = scenePlayerReducer(state, {
+        type: "LOAD_SCENE_START",
+        payload: request("2"),
+      });
+
+      state = scenePlayerReducer(state, {
+        type: "ENTRY_UNAVAILABLE",
+        payload: { index: 1, request: request("2"), error: failure },
+      });
+
+      expect(state.unavailable).toEqual([1, 3]);
+      expect(state.currentIndex).toBe(2);
+      expect(state.shouldAutoplay).toBe(true);
+      expect(state.sceneError).toBeNull();
+      // The shown scene stays until the next entry's loads
+      expect(state.scene?.id).toBe("1");
+      // The duplicate of the unavailable scene is skipped too
+      expect(
+        scenePlayerReducer(state, { type: "NEXT_SCENE" }).currentIndex
+      ).toBe(4);
+
+      // Backwards after Prev
+      let back = scenePlayerReducer(
+        { ...queueState(["1", "2", "3"]), currentIndex: 2 },
+        { type: "PREV_SCENE" }
+      );
+      back = scenePlayerReducer(back, {
+        type: "LOAD_SCENE_START",
+        payload: request("2"),
+      });
+      back = scenePlayerReducer(back, {
+        type: "ENTRY_UNAVAILABLE",
+        payload: { index: 1, request: request("2"), error: failure },
+      });
+      expect(back.currentIndex).toBe(0);
+    });
+
+    it("ENTRY_UNAVAILABLE with nothing left to step to stops on the error with no scene", () => {
+      let state = scenePlayerReducer(queueState(["1", "2"]), {
+        type: "NEXT_SCENE",
+      });
+      state = scenePlayerReducer(state, {
+        type: "LOAD_SCENE_START",
+        payload: request("2"),
+      });
+
+      state = scenePlayerReducer(state, {
+        type: "ENTRY_UNAVAILABLE",
+        payload: { index: 1, request: request("2"), error: failure },
+      });
+
+      expect(state.currentIndex).toBe(1);
+      expect(state.unavailable).toEqual([1]);
+      expect(state.scene).toBeNull();
+      expect(state.sceneError).toBe(failure);
+      expect(state.sceneLoading).toBe(false);
+    });
+
+    it("a new queue or leaving the queue forgets the unavailable entries", () => {
+      const state = { ...queueState(["1", "2"]), unavailable: [1] };
+      expect(
+        scenePlayerReducer(state, { type: "LEAVE_QUEUE" }).unavailable
+      ).toEqual([]);
+      expect(
+        scenePlayerReducer(state, {
+          type: "INITIALIZE",
+          payload: { playlist: makePlaylist(2) },
+        }).unavailable
+      ).toEqual([]);
     });
   });
 

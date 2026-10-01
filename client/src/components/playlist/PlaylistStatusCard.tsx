@@ -46,6 +46,7 @@ const PlaylistStatusCard = () => {
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
+    unavailable,
   } = useScenePlayer();
   const playlist = rawPlaylist as Playlist | null;
 
@@ -526,6 +527,11 @@ const PlaylistStatusCard = () => {
               {playlist.scenes.map((item, index) => {
                 const scene = item.scene;
                 const isCurrent = index === currentIndex;
+                // No longer visible to the user: dimmed and not clickable
+                const isUnavailable = unavailable.includes(index);
+                const title = getSceneTitle(
+                  (scene as Record<string, unknown>) ?? null
+                );
 
                 return (
                   <div
@@ -535,6 +541,7 @@ const PlaylistStatusCard = () => {
                   >
                     <Button
                       onClick={() => navigateToScene(index)}
+                      disabled={isUnavailable}
                       variant="tertiary"
                       className="flex-shrink-0 overflow-hidden !p-0"
                       style={{
@@ -543,11 +550,12 @@ const PlaylistStatusCard = () => {
                         border: isCurrent
                           ? "2px solid var(--accent-color)"
                           : "1px solid var(--border-color)",
-                        opacity: isCurrent ? 1 : 0.6,
+                        opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
                       }}
-                      title={getSceneTitle(
-                        (scene as Record<string, unknown>) ?? null
-                      )}
+                      title={isUnavailable ? `Unavailable: ${title}` : title}
+                      aria-label={
+                        isUnavailable ? `Unavailable: ${title}` : undefined
+                      }
                     >
                       {scene?.paths?.screenshot ? (
                         <img
@@ -591,6 +599,11 @@ const PlaylistStatusCard = () => {
               {playlist.scenes.map((item, index) => {
                 const scene = item.scene;
                 const isCurrent = index === currentIndex;
+                // No longer visible to the user: dimmed and not clickable
+                const isUnavailable = unavailable.includes(index);
+                const title = getSceneTitle(
+                  (scene as Record<string, unknown>) ?? null
+                );
 
                 return (
                   <div
@@ -600,6 +613,7 @@ const PlaylistStatusCard = () => {
                   >
                     <Button
                       onClick={() => navigateToScene(index)}
+                      disabled={isUnavailable}
                       variant="tertiary"
                       className="flex-shrink-0 overflow-hidden !p-0"
                       style={{
@@ -608,11 +622,12 @@ const PlaylistStatusCard = () => {
                         border: isCurrent
                           ? "2px solid var(--accent-color)"
                           : "1px solid var(--border-color)",
-                        opacity: isCurrent ? 1 : 0.6,
+                        opacity: isUnavailable ? 0.3 : isCurrent ? 1 : 0.6,
                       }}
-                      title={getSceneTitle(
-                        (scene as Record<string, unknown>) ?? null
-                      )}
+                      title={isUnavailable ? `Unavailable: ${title}` : title}
+                      aria-label={
+                        isUnavailable ? `Unavailable: ${title}` : undefined
+                      }
                     >
                       {scene?.paths?.screenshot ? (
                         <img

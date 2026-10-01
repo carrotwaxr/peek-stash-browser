@@ -49,6 +49,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
+    unavailable,
   } = useScenePlayer();
   const playlist = rawPlaylist as Playlist | null;
   const [isExpanded, setIsExpanded] = useState(true);
@@ -87,6 +88,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
 
   const navigateToScene = (index: number) => {
     if (index < 0 || index >= totalScenes) return;
+    if (unavailable.includes(index)) return;
 
     // Check if video is currently playing
     const videoElements = document.querySelectorAll("video");
@@ -314,13 +316,22 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
             {playlist.scenes.map((item, index) => {
               const scene = item.scene;
               const isCurrent = index === currentIndex;
+              // No longer visible to the user: dimmed and not clickable
+              const isUnavailable = unavailable.includes(index);
 
               return (
                 <div
                   key={item.sceneId}
                   ref={isCurrent ? setCurrentItemRef : null}
-                  onClick={() => navigateToScene(index)}
-                  className="group cursor-pointer p-3 border-b transition-colors hover:bg-opacity-80"
+                  onClick={
+                    isUnavailable ? undefined : () => navigateToScene(index)
+                  }
+                  aria-disabled={isUnavailable || undefined}
+                  className={`group p-3 border-b transition-colors ${
+                    isUnavailable
+                      ? "cursor-default opacity-50"
+                      : "cursor-pointer hover:bg-opacity-80"
+                  }`}
                   style={{
                     backgroundColor: isCurrent
                       ? "var(--bg-secondary)"
@@ -366,7 +377,9 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                     <div className="flex-1 min-w-0">
                       <h4
                         className={`text-sm font-medium line-clamp-2 ${
-                          !isCurrent && "group-hover:underline"
+                          !isCurrent &&
+                          !isUnavailable &&
+                          "group-hover:underline"
                         }`}
                         style={{
                           color: isCurrent
@@ -378,6 +391,14 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                           scene?.files?.[0]?.basename ||
                           "Untitled"}
                       </h4>
+                      {isUnavailable && (
+                        <p
+                          className="text-xs mt-0.5"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Unavailable
+                        </p>
+                      )}
                       {scene?.studio && (
                         <p
                           className="text-xs mt-0.5 line-clamp-1"

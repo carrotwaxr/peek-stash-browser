@@ -19,18 +19,23 @@ import {
   useLibraryReady,
 } from "../api/hooks/useLibraryReady";
 import { useAuth } from "../hooks/useAuth";
+import { describeLookupFailure } from "../hooks/useEntityLookup";
 import { getEntityPath } from "../utils/entityLinks";
 import { clearInternalPop, takeInternalPop } from "../utils/historyGuard";
 import {
   type PlaybackQueue,
   readSceneLocationState,
 } from "../utils/playbackQueue";
+import { showWarning } from "../utils/toast";
 import { useConfig } from "./ConfigContext";
 import {
   type ScenePlayerReducerState,
+  type SceneRequest,
   controlsOf,
   initialState,
+  markUnavailable,
   scenePlayerReducer,
+  stepPastUnavailable,
 } from "./scenePlayerReducer";
 
 // Use the reducer's state type directly
@@ -39,7 +44,11 @@ type ScenePlayerState = ScenePlayerReducerState;
 interface ScenePlayerContextValue extends ScenePlayerState {
   shouldResume: boolean;
   dispatch: Dispatch<{ type: string; payload?: unknown }>;
-  loadScene: (sceneId: string, instanceId?: string | null) => Promise<void>;
+  loadScene: (
+    sceneId: string,
+    instanceId?: string | null,
+    signal?: AbortSignal
+  ) => Promise<void>;
   /** Loads the current scene again (after a failed load) */
   retryScene: () => void;
   nextScene: () => void;
@@ -75,6 +84,28 @@ function isUrlEntry(
   if (entry.sceneId !== sceneId) return false;
   const entryServer = entryInstanceId(entry);
   return !instanceId || entryServer === null || entryServer === instanceId;
+}
+
+/** Is this queue entry the scene a load asked for? */
+function isRequestedEntry(
+  entry: Record<string, unknown>,
+  request: SceneRequest
+): boolean {
+  return (
+    entry.sceneId === request.sceneId &&
+    entryInstanceId(entry) === request.instanceId
+  );
+}
+
+/** A queue entry's title, as the queue's own lists show it */
+function entryTitle(entry: Record<string, unknown>): string {
+  const scene = entry.scene as
+    | { title?: unknown; files?: Array<{ basename?: unknown }> }
+    | null
+    | undefined;
+  if (typeof scene?.title === "string" && scene.title) return scene.title;
+  const basename = scene?.files?.[0]?.basename;
+  return typeof basename === "string" && basename ? basename : "Untitled";
 }
 
 /** Has the loaded scene the id and server this queue entry names? */
@@ -166,13 +197,32 @@ export function ScenePlayerProvider({
   const location = useLocation();
   const navigate = useNavigate();
 
+  // The latest render's state, for callbacks and effects that must read it
+  // as it is now
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   // ============================================================================
   // ACTION CREATORS (with side effects)
   // ============================================================================
 
+  /**
+   * Loads a scene. An answer counts only for the latest load (the reducer
+   * drops any other), and an aborted load dispatches nothing. In a queue, a
+   * scene not found (deleted, hidden, restricted, or on a server turned off)
+   * is skipped with a notice; any other failure shows with Retry.
+   */
   const loadScene = useCallback(
-    async (sceneIdToLoad: string, sceneInstanceId?: string | null) => {
-      dispatch({ type: "LOAD_SCENE_START" });
+    async (
+      sceneIdToLoad: string,
+      sceneInstanceId?: string | null,
+      signal?: AbortSignal
+    ) => {
+      const request: SceneRequest = {
+        sceneId: sceneIdToLoad,
+        instanceId: sceneInstanceId ?? null,
+      };
+      dispatch({ type: "LOAD_SCENE_START", payload: request });
       try {
         const requestBody: Record<string, unknown> = {
           ids: [sceneIdToLoad],
@@ -183,7 +233,8 @@ export function ScenePlayerProvider({
         }
         const data = await apiPost<{
           findScenes: { scenes: NormalizedScene[] };
-        }>("/library/scenes", requestBody);
+        }>("/library/scenes", requestBody, signal);
+        if (signal?.aborted) return;
         const scene = data?.findScenes?.scenes?.[0];
 
         // None the user can see: missing, hidden or restricted alike
@@ -194,21 +245,49 @@ export function ScenePlayerProvider({
         dispatch({
           type: "LOAD_SCENE_SUCCESS",
           payload: {
+            request,
             scene: scene,
             oCounter: scene.o_counter || 0,
           },
         });
       } catch (error) {
+        // A later load, or leaving the page, replaced this one
+        if (signal?.aborted) return;
         // The library's first sync is running: stay loading; the re-check
         // runs the load again once it is ready
         if (isLibraryInitializing(error)) {
           markLibraryNotReady(queryClient);
           return;
         }
+        const current = stateRef.current;
+        const index = current.currentIndex;
+        const entry = current.playlist?.scenes?.[index];
+        if (
+          entry &&
+          isRequestedEntry(entry, request) &&
+          describeLookupFailure(error).status === "notFound"
+        ) {
+          // Only a skip gets the notice; with nothing left to play, the
+          // page's not-found view says it
+          const marked = {
+            ...current,
+            unavailable: markUnavailable(current, index),
+          };
+          if (stepPastUnavailable(marked, () => 0)) {
+            showWarning(
+              `Skipped "${entryTitle(entry)}": it is no longer available`
+            );
+          }
+          dispatch({
+            type: "ENTRY_UNAVAILABLE",
+            payload: { index, request, error },
+          });
+          return;
+        }
         console.error("Error loading scene:", error);
         dispatch({
           type: "LOAD_SCENE_ERROR",
-          payload: error,
+          payload: { request, error },
         });
       }
     },
@@ -271,10 +350,12 @@ export function ScenePlayerProvider({
   // Load the scene when the entry's (id, instance) changes, or on retry.
   // Keyed on those strings, not the queue, so a control toggle never loads
   // the scene again.
+  // The next load (or leaving the page) aborts the last one.
   useEffect(() => {
-    if (effectiveSceneId && ready) {
-      void loadScene(effectiveSceneId, effectiveInstanceId);
-    }
+    if (!effectiveSceneId || !ready) return;
+    const controller = new AbortController();
+    void loadScene(effectiveSceneId, effectiveInstanceId, controller.signal);
+    return () => controller.abort();
   }, [effectiveSceneId, effectiveInstanceId, loadScene, loadAttempt, ready]);
 
   // ============================================================================
@@ -282,9 +363,7 @@ export function ScenePlayerProvider({
   // ============================================================================
 
   // The latest render's values, for the effects below that run on one
-  // dependency only and must read the rest as they are now
-  const stateRef = useRef(state);
-  stateRef.current = state;
+  // dependency only and must read the rest as they are now (and stateRef)
   const locationRef = useRef(location);
   locationRef.current = location;
   // The signed-in user: the queue in an entry is theirs, or none

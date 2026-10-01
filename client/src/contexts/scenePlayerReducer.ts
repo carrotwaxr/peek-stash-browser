@@ -39,6 +39,15 @@ interface PlaylistData {
   [key: string]: unknown;
 }
 
+/** The scene a load asks for: its id, and its server when known */
+export interface SceneRequest {
+  sceneId: string;
+  instanceId: string | null;
+}
+
+/** Which way the last queue step went: an unavailable entry is skipped that way */
+export type StepDirection = "next" | "prev";
+
 export interface ScenePlayerReducerState {
   /** The scene as the scenes list answers it, with its View in Stash link */
   scene: WithStashUrl<NormalizedScene> | null;
@@ -61,6 +70,15 @@ export interface ScenePlayerReducerState {
    * player restarts that scene from the start when it changes
    */
   restartCount: number;
+  /**
+   * The scene the latest load asked for: an answer (or failure) for any
+   * other is stale and changes nothing
+   */
+  requested: SceneRequest | null;
+  /** Queue indexes whose scene the user can no longer see; steps skip them */
+  unavailable: number[];
+  /** The way the last step went (GOTO and a new queue count as next) */
+  direction: StepDirection;
   oCounter: number;
 }
 
@@ -73,7 +91,7 @@ interface ScenePlayerAction {
 type StepState = Pick<
   ScenePlayerReducerState,
   "playlist" | "currentIndex" | "shuffle" | "repeat" | "shuffleHistory"
->;
+> & { unavailable?: number[] };
 
 /** Where a step lands, and the shuffle history after it */
 export interface QueueStep {
@@ -86,10 +104,28 @@ function pick(items: number[], random: () => number): number | undefined {
   return items[Math.floor(random() * items.length)];
 }
 
-/** Every index of the queue but the current one */
+/** Every index of the queue but the current one and the unavailable ones */
 function otherIndexes(s: StepState, total: number): number[] {
   return Array.from({ length: total }, (_, i) => i).filter(
-    (i) => i !== s.currentIndex
+    (i) => i !== s.currentIndex && !isUnavailable(s, i)
+  );
+}
+
+function isUnavailable(s: StepState, index: number): boolean {
+  return s.unavailable?.includes(index) ?? false;
+}
+
+/** The first available index in `indexes`, in their order */
+function firstAvailable(s: StepState, indexes: number[]): number | undefined {
+  return indexes.find((i) => !isUnavailable(s, i));
+}
+
+/** The indexes from `from` to `to`, both included, counting up or down */
+function range(from: number, to: number): number[] {
+  const step = from <= to ? 1 : -1;
+  return Array.from(
+    { length: Math.abs(to - from) + 1 },
+    (_, i) => from + i * step
   );
 }
 
@@ -98,7 +134,9 @@ function otherIndexes(s: StepState, total: number): number[] {
  * index not yet played and adds the current one to the history; once every
  * index is played, repeat all restarts the history with the current index.
  * Sequential steps on, and repeat all wraps to the first. Repeat one only
- * replays at the end of a video; a step moves as with repeat off.
+ * replays at the end of a video; a step moves as with repeat off. Unavailable
+ * entries are passed over; with none available, there is no step (so a queue
+ * of unavailable entries never loops on repeat all).
  */
 export function nextIndex(
   s: StepState,
@@ -123,16 +161,24 @@ export function nextIndex(
       : { index: restart, history: [s.currentIndex] };
   }
 
-  if (s.currentIndex < total - 1) {
-    return { index: s.currentIndex + 1, history: s.shuffleHistory };
-  }
-  return s.repeat === "all" ? { index: 0, history: s.shuffleHistory } : null;
+  const ahead =
+    s.currentIndex < total - 1
+      ? firstAvailable(s, range(s.currentIndex + 1, total - 1))
+      : undefined;
+  // Repeat all wraps to the first, up to the current one again
+  const index =
+    ahead ??
+    (s.repeat === "all"
+      ? firstAvailable(s, range(0, s.currentIndex))
+      : undefined);
+  return index === undefined ? null : { index, history: s.shuffleHistory };
 }
 
 /**
  * The index before the current one, or null at the start. Shuffle goes back
  * through the history, and with none picks another index at random.
- * Sequential steps back, and repeat all wraps to the last.
+ * Sequential steps back, and repeat all wraps to the last. Unavailable
+ * entries are passed over, as in `nextIndex`.
  */
 export function prevIndex(
   s: StepState,
@@ -142,20 +188,29 @@ export function prevIndex(
   if (total === 0) return null;
 
   if (s.shuffle) {
-    const last = s.shuffleHistory[s.shuffleHistory.length - 1];
-    if (last !== undefined) {
-      return { index: last, history: s.shuffleHistory.slice(0, -1) };
+    // Back through the history, past entries found unavailable since
+    const history = [...s.shuffleHistory];
+    while (history.length > 0) {
+      const last = history.pop();
+      if (last !== undefined && !isUnavailable(s, last)) {
+        return { index: last, history };
+      }
     }
     const index = pick(otherIndexes(s, total), random);
     return index === undefined ? null : { index, history: s.shuffleHistory };
   }
 
-  if (s.currentIndex > 0) {
-    return { index: s.currentIndex - 1, history: s.shuffleHistory };
-  }
-  return s.repeat === "all"
-    ? { index: total - 1, history: s.shuffleHistory }
-    : null;
+  const behind =
+    s.currentIndex > 0
+      ? firstAvailable(s, range(s.currentIndex - 1, 0))
+      : undefined;
+  // Repeat all wraps to the last, down to the current one again
+  const index =
+    behind ??
+    (s.repeat === "all"
+      ? firstAvailable(s, range(total - 1, s.currentIndex))
+      : undefined);
+  return index === undefined ? null : { index, history: s.shuffleHistory };
 }
 
 /** The (scene, server) a queue entry names, or null when it names no scene */
@@ -183,7 +238,8 @@ function entryScene(
 function stepTo(
   state: ScenePlayerReducerState,
   step: QueueStep,
-  autoplay: boolean | undefined
+  autoplay: boolean | undefined,
+  direction: StepDirection
 ): ScenePlayerReducerState {
   const target = entryScene(state.playlist, step.index);
   if (
@@ -196,6 +252,7 @@ function stepTo(
       shuffleHistory: step.history,
       restartCount: state.restartCount + 1,
       shouldAutoplay: autoplay ?? state.shouldAutoplay,
+      direction,
     };
   }
   return {
@@ -206,7 +263,70 @@ function stepTo(
     quality: "direct",
     oCounter: 0,
     shouldAutoplay: autoplay ?? state.shouldAutoplay,
+    direction,
   };
+}
+
+/** Do two loads ask for the same scene? (A missing one is no request.) */
+function sameRequest(
+  a: SceneRequest | null | undefined,
+  b: SceneRequest | null
+): boolean {
+  if (!a || !b) return (a ?? null) === b;
+  return a.sceneId === b.sceneId && a.instanceId === b.instanceId;
+}
+
+/** Is the scene shown the one this load asked for? */
+function isShown(
+  scene: ScenePlayerReducerState["scene"],
+  request: SceneRequest | null
+): boolean {
+  if (!scene || !request || scene.id !== request.sceneId) return false;
+  return request.instanceId === null || scene.instanceId === request.instanceId;
+}
+
+/**
+ * A failed load: the error shows, and the scene shown goes unless it is the
+ * one that failed (a retry), so the page never shows the previous scene
+ * under another scene's URL
+ */
+function loadFailed(
+  state: ScenePlayerReducerState,
+  error: unknown
+): ScenePlayerReducerState {
+  return {
+    ...state,
+    scene: isShown(state.scene, state.requested) ? state.scene : null,
+    sceneLoading: false,
+    sceneError: error,
+  };
+}
+
+/**
+ * The queue's unavailable indexes after `index` is found unavailable: it, and
+ * every other entry of the same scene
+ */
+export function markUnavailable(
+  state: Pick<ScenePlayerReducerState, "playlist" | "unavailable">,
+  index: number
+): number[] {
+  const scene = entryScene(state.playlist, index);
+  const total = state.playlist?.scenes?.length ?? 0;
+  const same = Array.from({ length: total }, (_, i) => i).filter(
+    (i) =>
+      i === index || (scene !== null && entryScene(state.playlist, i) === scene)
+  );
+  return [...new Set([...state.unavailable, ...same])].sort((a, b) => a - b);
+}
+
+/** Where a queue goes on from an unavailable entry: the last step's way */
+export function stepPastUnavailable(
+  state: StepState & { direction: StepDirection },
+  random: () => number = Math.random
+): QueueStep | null {
+  return state.direction === "prev"
+    ? prevIndex(state, random)
+    : nextIndex(state, random);
 }
 
 /** NEXT_SCENE's and PREV_SCENE's optional payload */
@@ -277,6 +397,11 @@ export const initialState: ScenePlayerReducerState = {
   shuffleHistory: [], // Track played scenes to avoid immediate repeats
   restartCount: 0,
 
+  // Scene loads and unavailable queue entries
+  requested: null,
+  unavailable: [],
+  direction: "next",
+
   // O Counter
   oCounter: 0,
 };
@@ -296,13 +421,17 @@ export function scenePlayerReducer(
         ...state,
         sceneLoading: true,
         sceneError: null,
+        requested: (action.payload as SceneRequest | undefined) ?? null,
       };
 
     case "LOAD_SCENE_SUCCESS": {
       const payload = action.payload as {
+        request?: SceneRequest;
         scene: WithStashUrl<NormalizedScene>;
         oCounter?: number;
       };
+      // An answer for a scene asked for before the latest: stale
+      if (!sameRequest(payload.request, state.requested)) return state;
       const scene = payload.scene;
 
       // Smart default quality selection based on codec detection (Phase 3)
@@ -331,12 +460,36 @@ export function scenePlayerReducer(
       };
     }
 
-    case "LOAD_SCENE_ERROR":
-      return {
-        ...state,
-        sceneLoading: false,
-        sceneError: action.payload,
+    case "LOAD_SCENE_ERROR": {
+      const payload = action.payload as {
+        request?: SceneRequest;
+        error: unknown;
       };
+      if (!sameRequest(payload.request, state.requested)) return state;
+      return loadFailed(state, payload.error);
+    }
+
+    // The current queue entry's scene is not found (deleted, hidden,
+    // restricted, or on a server the user turned off): mark it and step on
+    // the way the last step went. With nothing left, the error shows.
+    case "ENTRY_UNAVAILABLE": {
+      const payload = action.payload as {
+        index: number;
+        request?: SceneRequest;
+        error: unknown;
+      };
+      if (!sameRequest(payload.request, state.requested)) return state;
+      const marked = {
+        ...state,
+        unavailable: markUnavailable(state, payload.index),
+      };
+      const step = stepPastUnavailable(marked);
+      if (!step) return loadFailed(marked, payload.error);
+      return {
+        ...stepTo(marked, step, undefined, state.direction),
+        sceneError: null,
+      };
+    }
 
     // Quality management
     case "SET_QUALITY":
@@ -349,12 +502,16 @@ export function scenePlayerReducer(
     // video and the media keys all step through here)
     case "NEXT_SCENE": {
       const step = nextIndex(state);
-      return step ? stepTo(state, step, stepAutoplay(action.payload)) : state;
+      return step
+        ? stepTo(state, step, stepAutoplay(action.payload), "next")
+        : state;
     }
 
     case "PREV_SCENE": {
       const step = prevIndex(state);
-      return step ? stepTo(state, step, stepAutoplay(action.payload)) : state;
+      return step
+        ? stepTo(state, step, stepAutoplay(action.payload), "prev")
+        : state;
     }
 
     case "GOTO_SCENE_INDEX": {
@@ -382,7 +539,8 @@ export function scenePlayerReducer(
       return stepTo(
         state,
         { index, history: state.shuffleHistory },
-        shouldAutoplay
+        shouldAutoplay,
+        "next"
       );
     }
 
@@ -450,6 +608,8 @@ export function scenePlayerReducer(
         shuffle: false,
         repeat: "none",
         shuffleHistory: [],
+        unavailable: [],
+        direction: "next",
         shouldAutoplay: leavePayload?.shouldAutoplay ?? false,
       };
     }
@@ -490,6 +650,8 @@ export function scenePlayerReducer(
           (playlist?.repeat as string | undefined) ??
           "none",
         shuffleHistory: controls?.shuffleHistory ?? [],
+        unavailable: [],
+        direction: "next",
         // Use the determined shouldAutoplay value
         shouldAutoplay: shouldAutoplay,
       };
