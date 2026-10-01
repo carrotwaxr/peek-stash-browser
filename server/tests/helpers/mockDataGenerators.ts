@@ -182,7 +182,6 @@ export function createMockGallery(
     studio: null,
     tags: [],
     performers: [],
-    scenes: [],
     folder: null,
     files: [],
     created_at: new Date().toISOString(),

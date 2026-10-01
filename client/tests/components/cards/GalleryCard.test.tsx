@@ -145,7 +145,7 @@ describe("GalleryCard indicator links", () => {
             image_count: 25,
             performers: [{ id: "1", name: "P" }],
             tags: [{ id: "1", name: "T" }],
-            scenes: [{ id: "4", title: "S", paths: { screenshot: null } }],
+            relation_totals: { scenes: 1 },
           } as NormalizedGallery
         }
       />
