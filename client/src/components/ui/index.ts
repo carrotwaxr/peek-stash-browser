@@ -52,7 +52,6 @@ export { default as PageHeader } from "./PageHeader";
 export { default as PageLayout } from "./PageLayout";
 export { default as PageLoader } from "./PageLoader";
 export { default as Pagination } from "./Pagination";
-export { default as PaginatedImageGrid } from "./PaginatedImageGrid";
 export { default as Paper } from "./Paper";
 export { PerformerCard } from "../cards/index";
 export { default as PlayCountIndicator } from "./PlayCountIndicator";
