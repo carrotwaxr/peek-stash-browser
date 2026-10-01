@@ -3,9 +3,10 @@
  * images search with an instance-aware galleries filter (item 11); and
  * getRelationCounts, a detail page's tab counts (B19).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { NormalizedPerformer, WithStashUrl } from "@peek/shared-types";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { apiGet, apiPost } from "@/api/client";
-import { libraryApi } from "@/api/library";
+import { findEntityById, libraryApi } from "@/api/library";
 
 vi.mock("@/api/client", () => ({
   apiFetch: vi.fn(),
@@ -70,6 +71,40 @@ describe("libraryApi", () => {
         "/library/studios/7/counts?instanceId=inst-a&includeSubStudios=true",
         "/library/galleries/9/counts?instanceId=inst-a",
       ]);
+    });
+  });
+
+  describe("findEntityById", () => {
+    it("sends ids and the instance filter, and answers the typed row or null", async () => {
+      const row = { id: "9", instanceId: "inst-a", stashUrl: null };
+      mockApiPost.mockResolvedValueOnce({
+        findPerformers: { performers: [row], count: 1 },
+      });
+
+      const found = await findEntityById("performer", "9", "inst-a");
+      expectTypeOf(
+        found
+      ).toEqualTypeOf<WithStashUrl<NormalizedPerformer> | null>();
+      expect(found).toEqual(row);
+      expect(mockApiPost).toHaveBeenLastCalledWith(
+        "/library/performers",
+        { ids: ["9"], performer_filter: { instance_id: "inst-a" } },
+        undefined
+      );
+
+      // A bare link sends no instance; no match answers null
+      const controller = new AbortController();
+      mockApiPost.mockResolvedValueOnce({
+        findTags: { tags: [], count: 0 },
+      });
+      await expect(
+        findEntityById("tag", "5", null, controller.signal)
+      ).resolves.toBeNull();
+      expect(mockApiPost).toHaveBeenLastCalledWith(
+        "/library/tags",
+        { ids: ["5"] },
+        controller.signal
+      );
     });
   });
 });

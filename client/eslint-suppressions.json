@@ -150,9 +150,6 @@
     }
   },
   "src/components/pages/Scene.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }

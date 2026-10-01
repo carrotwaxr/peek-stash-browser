@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { NormalizedScene } from "@peek/shared-types";
+import type { FindScenesResponse } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../api";
 import { ApiError } from "../api/client";
@@ -234,9 +234,11 @@ export function ScenePlayerProvider({
         if (sceneInstanceId) {
           requestBody.scene_filter = { instance_id: sceneInstanceId };
         }
-        const data = await apiPost<{
-          findScenes: { scenes: NormalizedScene[] };
-        }>("/library/scenes", requestBody, signal);
+        const data = await apiPost<FindScenesResponse>(
+          "/library/scenes",
+          requestBody,
+          signal
+        );
         if (signal?.aborted) return;
         const scene = data?.findScenes?.scenes?.[0];
 
