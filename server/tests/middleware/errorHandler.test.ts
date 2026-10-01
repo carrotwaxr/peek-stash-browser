@@ -284,6 +284,19 @@ describe("errorHandler", () => {
     });
   });
 
+  it("a 503 SERVICE_UNAVAILABLE is logged at warn, not error", () => {
+    const res = handle(
+      new ServiceUnavailableError("Media is busy, try again", {
+        retryAfterSeconds: 1,
+      })
+    );
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "1");
+    // A deliberate refusal (a full queue, a sync running), not a server fault
+    expect(onlyLine()).toContain("[WARN] Request refused");
+  });
+
   it("BadGatewayError answers 502 with its message and errorType BAD_GATEWAY", () => {
     const res = handle(new BadGatewayError("Stash could not serve this media"));
 

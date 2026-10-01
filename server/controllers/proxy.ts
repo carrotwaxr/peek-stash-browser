@@ -25,6 +25,7 @@ import {
   canUserLoadMedia,
   isValidInstanceId,
 } from "../utils/mediaAccess.js";
+import { type Acquired, mediaProxyLimiter } from "../utils/proxyLimiter.js";
 import {
   SCENE_ID_PATTERN,
   parseStashMediaPath,
@@ -49,38 +50,6 @@ const httpsAgent = new https.Agent({
   maxSockets: 6,
   keepAliveMsecs: 30000,
 });
-
-// =============================================================================
-// Concurrency Limiting
-// =============================================================================
-// Limits concurrent outbound requests to Stash to prevent overwhelming it.
-// Requests beyond the limit are queued and processed in order.
-
-const MAX_CONCURRENT_REQUESTS = 6;
-let activeRequests = 0;
-const requestQueue: Array<() => void> = [];
-
-function acquireConcurrencySlot(): Promise<void> {
-  return new Promise((resolve) => {
-    if (activeRequests < MAX_CONCURRENT_REQUESTS) {
-      activeRequests++;
-      resolve();
-    } else {
-      requestQueue.push(() => {
-        activeRequests++;
-        resolve();
-      });
-    }
-  });
-}
-
-function releaseConcurrencySlot(): void {
-  activeRequests--;
-  const next = requestQueue.shift();
-  if (next) {
-    next();
-  }
-}
 
 // =============================================================================
 // Helper to get the appropriate agent for a URL
@@ -176,7 +145,7 @@ function instanceIdOrRespond(
  * - Range: the browser's `Range` and `If-Range` go to Stash, and Stash's
  *   206, `Content-Range`, `Accept-Ranges`, `ETag` and `Last-Modified` come back
  * - Client disconnect cleanup (destroys upstream request)
- * - Double-release guard for concurrency slots
+ * - The queue slot (`mediaProxyLimiter`) freed once, whichever end comes first
  * - Timeout handling
  * - Stash failing mid-transfer: once the status and Content-Length are out
  *   the response can only be cut short, so it is destroyed and the browser
@@ -184,24 +153,23 @@ function instanceIdOrRespond(
  * - Private Cache-Control: media belongs to a signed-in user, so a shared
  *   cache must never store it (privateCacheControl keeps Stash's freshness)
  */
-function proxyHttpRequest({
-  fullUrl,
-  res,
-  label,
-  defaultCacheControl,
-  timeoutMs,
-  requestHeaders,
-}: ProxyOptions): void {
-  let slotReleased = false;
-  const releaseOnce = () => {
-    if (!slotReleased) {
-      slotReleased = true;
-      releaseConcurrencySlot();
-    }
-  };
+function proxyHttpRequest(
+  {
+    fullUrl,
+    res,
+    label,
+    defaultCacheControl,
+    timeoutMs,
+    requestHeaders,
+  }: ProxyOptions,
+  slot: Acquired
+): void {
+  // Idempotent: the transfer's end, the client's close, an error and the
+  // timeout may each release it
+  const releaseOnce = slot.release;
 
-  // The client left while this request waited for its slot: free the slot
-  // at once rather than fetching a response nobody will read
+  // The client left just as the slot came (the queue drops one that leaves
+  // while waiting): free the slot rather than fetch what nobody will read
   if (isClientGone(res)) {
     releaseOnce();
     return;
@@ -342,6 +310,31 @@ function proxyHttpRequest({
   });
 }
 
+/**
+ * Forwards the request once the media queue gives it a slot. A browser that
+ * has moved on skips the queue, and one that leaves while queued is dropped
+ * there; a full queue or a wait past its limit throws
+ * ServiceUnavailableError, which the central handler answers with 503.
+ */
+async function proxyWhenSlotFree(
+  userId: number,
+  options: ProxyOptions
+): Promise<void> {
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(options.res)) return;
+
+  const slot = await mediaProxyLimiter.acquire(userId, options.res);
+  if (!slot) return;
+
+  try {
+    proxyHttpRequest(options, slot);
+  } catch (error) {
+    // The central error handler answers; the slot is not left held
+    slot.release();
+    throw error;
+  }
+}
+
 // =============================================================================
 // Proxy endpoints
 // =============================================================================
@@ -382,29 +375,16 @@ export const proxyScenePreview = async (
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
-  // Nothing to send to a browser that has moved on; skip the queue entirely
-  if (isClientGone(res)) return;
+  logger.debug("Proxying scene preview", { sceneId: id });
 
-  await acquireConcurrencySlot();
-
-  try {
-    const fullUrl = `${stashUrl}/scene/${id}/preview?apikey=${apiKey}`;
-
-    logger.debug("Proxying scene preview", { sceneId: id });
-
-    proxyHttpRequest({
-      fullUrl,
-      res,
-      label: "[PROXY scene preview]",
-      defaultCacheControl: "private, max-age=86400",
-      timeoutMs: 60000,
-      requestHeaders: rangeHeaders(req),
-    });
-  } catch (error) {
-    // The central error handler answers; the slot is not left held
-    releaseConcurrencySlot();
-    throw error;
-  }
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl: `${stashUrl}/scene/${id}/preview?apikey=${apiKey}`,
+    res,
+    label: "[PROXY scene preview]",
+    defaultCacheControl: "private, max-age=86400",
+    timeoutMs: 60000,
+    requestHeaders: rangeHeaders(req),
+  });
 };
 
 /**
@@ -443,29 +423,16 @@ export const proxySceneWebp = async (
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
-  // Nothing to send to a browser that has moved on; skip the queue entirely
-  if (isClientGone(res)) return;
+  logger.debug("Proxying scene webp", { sceneId: id });
 
-  await acquireConcurrencySlot();
-
-  try {
-    const fullUrl = `${stashUrl}/scene/${id}/webp?apikey=${apiKey}`;
-
-    logger.debug("Proxying scene webp", { sceneId: id });
-
-    proxyHttpRequest({
-      fullUrl,
-      res,
-      label: "[PROXY scene webp]",
-      defaultCacheControl: "private, max-age=86400",
-      timeoutMs: 60000,
-      requestHeaders: rangeHeaders(req),
-    });
-  } catch (error) {
-    // The central error handler answers; the slot is not left held
-    releaseConcurrencySlot();
-    throw error;
-  }
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl: `${stashUrl}/scene/${id}/webp?apikey=${apiKey}`,
+    res,
+    label: "[PROXY scene webp]",
+    defaultCacheControl: "private, max-age=86400",
+    timeoutMs: 60000,
+    requestHeaders: rangeHeaders(req),
+  });
 };
 
 /**
@@ -521,33 +488,22 @@ export const proxyStashMedia = async (
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
-  // Nothing to send to a browser that has moved on; skip the queue entirely
-  if (isClientGone(res)) return;
+  const url = new URL(`${stashUrl}${target.pathname}`);
+  target.search.forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+  url.searchParams.set("apikey", apiKey);
 
-  await acquireConcurrencySlot();
+  logger.debug("Proxying Stash media request", { path: target.pathname });
 
-  try {
-    const url = new URL(`${stashUrl}${target.pathname}`);
-    target.search.forEach((value, key) => {
-      url.searchParams.set(key, value);
-    });
-    url.searchParams.set("apikey", apiKey);
-
-    logger.debug("Proxying Stash media request", { path: target.pathname });
-
-    proxyHttpRequest({
-      fullUrl: url.toString(),
-      res,
-      label: "[PROXY stash media]",
-      defaultCacheControl: "private, max-age=31536000, immutable",
-      timeoutMs: 30000,
-      requestHeaders: rangeHeaders(req),
-    });
-  } catch (error) {
-    // The central error handler answers; the slot is not left held
-    releaseConcurrencySlot();
-    throw error;
-  }
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl: url.toString(),
+    res,
+    label: "[PROXY stash media]",
+    defaultCacheControl: "private, max-age=31536000, immutable",
+    timeoutMs: 30000,
+    requestHeaders: rangeHeaders(req),
+  });
 };
 
 /**
@@ -613,27 +569,16 @@ export const proxyClipPreview = async (
     return;
   }
 
-  // Nothing to send to a browser that has moved on; skip the queue entirely
-  if (isClientGone(res)) return;
+  logger.debug("Proxying clip preview", { clipId: id });
 
-  await acquireConcurrencySlot();
-
-  try {
-    logger.debug("Proxying clip preview", { clipId: id });
-
-    proxyHttpRequest({
-      fullUrl,
-      res,
-      label: "[PROXY clip preview]",
-      defaultCacheControl: "private, max-age=86400",
-      timeoutMs: 30000,
-      requestHeaders: rangeHeaders(req),
-    });
-  } catch (error) {
-    // The central error handler answers; the slot is not left held
-    releaseConcurrencySlot();
-    throw error;
-  }
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl,
+    res,
+    label: "[PROXY clip preview]",
+    defaultCacheControl: "private, max-age=86400",
+    timeoutMs: 30000,
+    requestHeaders: rangeHeaders(req),
+  });
 };
 
 /**
@@ -723,25 +668,14 @@ export const proxyImage = async (
     return;
   }
 
-  // Nothing to send to a browser that has moved on; skip the queue entirely
-  if (isClientGone(res)) return;
+  logger.debug("Proxying image request", { imageId, type });
 
-  await acquireConcurrencySlot();
-
-  try {
-    logger.debug("Proxying image request", { imageId, type });
-
-    proxyHttpRequest({
-      fullUrl,
-      res,
-      label: "[PROXY image]",
-      defaultCacheControl: "private, max-age=86400",
-      timeoutMs: 30000,
-      requestHeaders: rangeHeaders(req),
-    });
-  } catch (error) {
-    // The central error handler answers; the slot is not left held
-    releaseConcurrencySlot();
-    throw error;
-  }
+  await proxyWhenSlotFree(req.user.id, {
+    fullUrl,
+    res,
+    label: "[PROXY image]",
+    defaultCacheControl: "private, max-age=86400",
+    timeoutMs: 30000,
+    requestHeaders: rangeHeaders(req),
+  });
 };

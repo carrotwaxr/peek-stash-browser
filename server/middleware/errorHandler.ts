@@ -268,7 +268,8 @@ function logContext(req: ErrorRequest, err: unknown): LogContext {
  * Must be registered AFTER all routes in the Express app. Express 5 hands it
  * whatever a handler throws or rejects with.
  *
- * Answers `toHttpAnswer(err)`, logging 5xx at ERROR and refusals at WARN.
+ * Answers `toHttpAnswer(err)`, logging 5xx at ERROR and refusals (4xx and a
+ * ServiceUnavailableError's 503) at WARN.
  * Once headers are out it can no longer answer, so it ends the connection,
  * which tells the client the response is incomplete.
  */
@@ -285,7 +286,9 @@ export function errorHandler(
   }
 
   const answer = toHttpAnswer(err);
-  if (answer.status >= 500) {
+  // A ServiceUnavailableError is a deliberate refusal (a full media queue, a
+  // sync running), not a fault; a busy database stays an error
+  if (answer.status >= 500 && !(err instanceof ServiceUnavailableError)) {
     logger.error("Request failed", logContext(req, err));
   } else {
     logger.warn("Request refused", logContext(req, err));
