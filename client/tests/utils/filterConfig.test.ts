@@ -703,6 +703,27 @@ describe("buildImageFilter", () => {
         modifier: "INCLUDES",
       });
     });
+
+    it("a detail page's fixed performers, studios and galleries criteria reach the filter", () => {
+      const result = buildImageFilter({
+        performers: { value: ["1:a"], modifier: "INCLUDES" },
+        studios: { value: ["2:a"], modifier: "INCLUDES", depth: -1 },
+        galleries: { value: ["3:a"], modifier: "INCLUDES" },
+      });
+      expect(result.performers).toEqual({
+        value: ["1:a"],
+        modifier: "INCLUDES",
+      });
+      expect(result.studios).toEqual({
+        value: ["2:a"],
+        modifier: "INCLUDES",
+        depth: -1,
+      });
+      expect(result.galleries).toEqual({
+        value: ["3:a"],
+        modifier: "INCLUDES",
+      });
+    });
   });
 
   describe("Combined Filters with Date", () => {

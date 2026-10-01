@@ -2,7 +2,7 @@
  * One config per list page on `EntityListPage`: what it lists, how its cards
  * and loading placeholders look, and the views beyond grid and table.
  */
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -60,6 +60,12 @@ export interface CardContext extends CardHandlers {
   fromPageTitle?: string;
 }
 
+/** A host's handle on a list's viewer (`ListEmbed.lightboxRef`) */
+export interface ListLightbox {
+  /** Opens the viewer at the page's `index`th image, playing the slideshow if `autoPlay` */
+  open: (index: number, autoPlay?: boolean) => void;
+}
+
 /** The list a page's own hook reads */
 export interface ListPageData {
   listState: ListUrlState;
@@ -80,6 +86,8 @@ export interface ListPageData {
   title: string;
   /** Where a card's page says the user came from */
   fromPageTitle?: string;
+  /** The host's handle on the page's viewer, for a page with one */
+  lightboxRef?: Ref<ListLightbox>;
 }
 
 /** What a page's own hook adds to the list page */
