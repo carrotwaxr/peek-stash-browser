@@ -5,6 +5,10 @@ import { rankingComputeService } from "../services/RankingComputeService.js";
 import { recommendationService } from "../services/RecommendationService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
+import {
+  findWatchedScenes,
+  parseWatchedScenesQuery,
+} from "../services/WatchHistoryQueryService.js";
 import type {
   ApiErrorResponse,
   ClearAllWatchHistoryResponse,
@@ -12,6 +16,8 @@ import type {
   GetAllWatchHistoryResponse,
   GetWatchHistoryParams,
   GetWatchHistoryResponse,
+  GetWatchedScenesQuery,
+  GetWatchedScenesResponse,
   IncrementOCounterRequest,
   IncrementOCounterResponse,
   IncrementPlayCountRequest,
@@ -21,6 +27,7 @@ import type {
   SaveActivityRequest,
   SaveActivityResponse,
   TypedAuthRequest,
+  TypedLibraryRequest,
   TypedResponse,
 } from "../types/api/index.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
@@ -564,6 +571,31 @@ export async function getAllWatchHistory(
   }));
 
   res.json({ watchHistory: parsed });
+}
+
+/**
+ * The viewer's watched scenes they can see, one page: `view` all,
+ * in_progress or completed, `sort` recent, most_watched or
+ * longest_duration, with the view's totals unless `count=false`. Unknown
+ * parameters or values are a ValidationError (400) through the central
+ * handler.
+ */
+export async function getWatchedScenes(
+  req: TypedLibraryRequest<
+    unknown,
+    Record<string, string>,
+    GetWatchedScenesQuery
+  >,
+  res: TypedResponse<GetWatchedScenesResponse | ApiErrorResponse>
+) {
+  const request = parseWatchedScenesQuery(req.query);
+  res.json(
+    await findWatchedScenes({
+      userId: req.user.id,
+      allowedInstanceIds: req.allowedInstanceIds,
+      request,
+    })
+  );
 }
 
 /**

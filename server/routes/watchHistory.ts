@@ -3,13 +3,14 @@ import {
   clearAllWatchHistory,
   getAllWatchHistory,
   getWatchHistory,
+  getWatchedScenes,
   incrementOCounter,
   incrementPlayCount,
   pingWatchHistory,
   saveActivity,
 } from "../controllers/watchHistory.js";
-import { authenticate } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
+import { authenticate, requireCacheReady } from "../middleware/auth.js";
+import { authenticated, libraryHandler } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -33,6 +34,10 @@ router.get("/", authenticated(getAllWatchHistory));
 
 // Clear all watch history for current user
 router.delete("/", authenticated(clearAllWatchHistory));
+
+// The viewer's watched scenes, paged, sorted and filtered in SQL (before
+// /:sceneId, which would take "scenes" as an id)
+router.get("/scenes", requireCacheReady, libraryHandler(getWatchedScenes));
 
 // Get watch history for specific scene
 router.get("/:sceneId", authenticated(getWatchHistory));

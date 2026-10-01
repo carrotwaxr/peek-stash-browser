@@ -4,6 +4,7 @@
  *
  * Request and response types for /api/watch-history/* endpoints.
  */
+import type { NormalizedScene } from "../entities.js";
 
 // =============================================================================
 // COMMON TYPES
@@ -136,6 +137,66 @@ export interface GetAllWatchHistoryQuery extends Record<
 
 export interface GetAllWatchHistoryResponse {
   watchHistory: FullWatchHistoryRecord[];
+}
+
+// =============================================================================
+// GET WATCHED SCENES
+// =============================================================================
+
+/**
+ * The views of `GET /api/watch-history/scenes`:
+ * - `all`: played, watched for any time, or left with a resume point (a
+ *   scene with only an O is not watched)
+ * - `in_progress`: a resume point before the final 10% of the scene, with at
+ *   least 2% of it watched (any resume point when the length is unknown)
+ * - `completed`: played at least once, and the last session finished
+ *   (resume point 0) or stopped within the final 10% of the scene
+ */
+export const WATCHED_SCENES_VIEWS = [
+  "all",
+  "in_progress",
+  "completed",
+] as const;
+export type WatchedScenesView = (typeof WATCHED_SCENES_VIEWS)[number];
+
+/**
+ * The orders: `recent` by last played (never-dated rows last),
+ * `most_watched` by play count, `longest_duration` by time watched
+ */
+export const WATCHED_SCENES_SORTS = [
+  "recent",
+  "most_watched",
+  "longest_duration",
+] as const;
+export type WatchedScenesSort = (typeof WATCHED_SCENES_SORTS)[number];
+
+/**
+ * GET /api/watch-history/scenes
+ * The viewer's watched scenes they can see, one page, in the view and order
+ * asked for. Unknown parameters or values are a 400.
+ */
+export interface GetWatchedScenesQuery extends Record<
+  string,
+  string | undefined
+> {
+  /** A `WatchedScenesView`; default `all` */
+  view?: string;
+  /** A `WatchedScenesSort`; default `recent` */
+  sort?: string;
+  /** Default 1 */
+  page?: string;
+  /** 1 to 250; default 24 */
+  per_page?: string;
+  /** `false` skips the totals (both answer null); default `true` */
+  count?: string;
+}
+
+export interface GetWatchedScenesResponse {
+  scenes: NormalizedScene[];
+  /** Every scene in the view; null when the request sent `count=false` */
+  total: number | null;
+  /** Seconds watched over every scene in the view; null with `count=false` */
+  totalPlayDuration: number | null;
 }
 
 // =============================================================================
