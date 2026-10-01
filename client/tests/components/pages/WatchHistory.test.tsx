@@ -354,7 +354,7 @@ describe("WatchHistory", () => {
 
     expect(
       screen.getByText(
-        "This clears your scene watch history: plays, watch time, resume points and O counts. Image views and image O counts are kept."
+        "This clears your scene watch history: plays, watch time, resume points and O counts, and the performer, studio and tag totals built from them. Image views and image O counts are kept. This cannot be undone."
       )
     ).toBeTruthy();
   });
