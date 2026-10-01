@@ -38,29 +38,6 @@ export interface FullWatchHistoryRecord {
 }
 
 // =============================================================================
-// PING WATCH HISTORY
-// =============================================================================
-
-/**
- * POST /api/watch-history/ping
- * Periodic ping from video player to track playback progress
- */
-export interface PingWatchHistoryRequest {
-  /** The scene's instance: required, the server never guesses one */
-  instanceId: string;
-  sceneId: string;
-  currentTime: number;
-  quality?: string;
-  sessionStart?: string;
-  seekEvents?: Array<{ from: number; to: number }>;
-}
-
-export interface PingWatchHistoryResponse {
-  success: true;
-  watchHistory: WatchHistoryData;
-}
-
-// =============================================================================
 // SAVE ACTIVITY
 // =============================================================================
 
@@ -117,26 +94,6 @@ export interface IncrementOCounterResponse {
   success: true;
   oCount: number;
   timestamp: string;
-}
-
-// =============================================================================
-// GET ALL WATCH HISTORY
-// =============================================================================
-
-/**
- * GET /api/watch-history
- * Get all watch history for current user (Continue Watching carousel)
- */
-export interface GetAllWatchHistoryQuery extends Record<
-  string,
-  string | undefined
-> {
-  limit?: string;
-  inProgress?: string;
-}
-
-export interface GetAllWatchHistoryResponse {
-  watchHistory: FullWatchHistoryRecord[];
 }
 
 // =============================================================================

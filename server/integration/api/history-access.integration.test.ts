@@ -21,9 +21,8 @@ import {
 import type { TestClient } from "../helpers/testClient.js";
 import { adminClient } from "../helpers/testClient.js";
 
-/** The four watch-history writes, with the extra fields each one needs. */
+/** The three watch-history writes, with the extra fields each one needs. */
 const WATCH_WRITES: [string, Record<string, unknown>][] = [
-  ["ping", { currentTime: 1 }],
   ["save-activity", { resumeTime: 5, playDuration: 5 }],
   ["increment-play-count", {}],
   ["increment-o", {}],
@@ -314,10 +313,6 @@ describe("History access (integration)", () => {
       for (let round = 0; round < ROUNDS; round++) {
         await clearSceneRow();
         const responses = await Promise.all([
-          viewer.client.post("/api/watch-history/ping", {
-            ...scene,
-            currentTime: 1,
-          }),
           viewer.client.post("/api/watch-history/increment-o", scene),
           viewer.client.post("/api/watch-history/increment-play-count", scene),
           viewer.client.post("/api/watch-history/save-activity", {
@@ -340,11 +335,10 @@ describe("History access (integration)", () => {
         });
       }
 
-      // The fixture scene has no duration, so ping never adds a play itself.
       expect(outcomes).toEqual(
         Array.from({ length: ROUNDS }, (_, round) => ({
           round,
-          status: [200, 200, 200, 200],
+          status: [200, 200, 200],
           oCount: 1,
           playCount: 1,
           playDuration: 5,
@@ -429,7 +423,7 @@ describe("History access (integration)", () => {
     }, 60000);
 
     it.each(WATCH_WRITES.filter(([route]) => route !== "increment-o"))(
-      "a ping, activity save or play count without an instance answers 400 and writes nothing (%s)",
+      "an activity save or play count without an instance answers 400 and writes nothing (%s)",
       async (route, extra) => {
         // SAME is visible to the writer on both instances, so a guess would
         // find one and store the write there.
@@ -464,29 +458,20 @@ describe("History access (integration)", () => {
       ]);
     });
 
-    it("one session counts one play on each of two instances' same scene id", async () => {
+    it("a play on each of two instances' same scene id counts on its own instance", async () => {
       await prisma.watchHistory.deleteMany({ where: { userId: writer.id } });
-      // The fixture scene has no duration, so a ping counts its session's
-      // play only when the threshold is 0.
-      await prisma.user.update({
-        where: { id: writer.id },
-        data: { minimumPlayPercent: 0 },
-      });
-      const sessionStart = new Date().toISOString();
-      const ping = (instanceId: string) =>
-        writer.client.post("/api/watch-history/ping", {
+      const play = (instanceId: string) =>
+        writer.client.post("/api/watch-history/increment-play-count", {
           sceneId: FX_ID.SAME,
           instanceId,
-          currentTime: 1,
-          sessionStart,
         });
 
       const statuses = [];
-      for (const instanceId of [FX.A, FX.B, FX.A, FX.B]) {
-        statuses.push((await ping(instanceId)).status);
+      for (const instanceId of [FX.A, FX.B]) {
+        statuses.push((await play(instanceId)).status);
       }
 
-      expect(statuses).toEqual([200, 200, 200, 200]);
+      expect(statuses).toEqual([200, 200]);
       expect(await rowsOf(writer.id)).toEqual([
         { instanceId: FX.A, sceneId: FX_ID.SAME, playCount: 1 },
         { instanceId: FX.B, sceneId: FX_ID.SAME, playCount: 1 },
@@ -521,12 +506,11 @@ describe("History access (integration)", () => {
         [FX.A, 10],
         [FX.B, 20],
       ] as const) {
-        const pinged = await reader.client.post("/api/watch-history/ping", {
-          sceneId: FX_ID.SAME,
-          instanceId,
-          currentTime,
-        });
-        expect(pinged.status).toBe(200);
+        const saved = await reader.client.post(
+          "/api/watch-history/save-activity",
+          { sceneId: FX_ID.SAME, instanceId, resumeTime: currentTime }
+        );
+        expect(saved.status).toBe(200);
       }
 
       const read = async (instanceId: string) =>

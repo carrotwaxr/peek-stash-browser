@@ -11,7 +11,7 @@
   },
   "controllers/watchHistory.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 3
     }
   },
   "utils/codecDetection.ts": {
