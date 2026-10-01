@@ -299,24 +299,20 @@ const GalleryDetail = () => {
         <div className="mb-6">
           <PageHeader
             title={
-              (
-                <div className="flex flex-wrap gap-3 items-center">
-                  <span>{galleryTitle(gallery) as React.ReactNode}</span>
-                  {!!settings.showFavorite && (
-                    <FavoriteButton
-                      isFavorite={isFavorite}
-                      onChange={(newValue) =>
-                        void handleFavoriteChange(newValue)
-                      }
-                      size="large"
-                    />
-                  )}
-                  <ViewInStashButton
-                    stashUrl={gallery?.stashUrl as string}
-                    size={24}
+              <div className="flex flex-wrap gap-3 items-center">
+                <span>{galleryTitle(gallery) as React.ReactNode}</span>
+                {!!settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={(newValue) => void handleFavoriteChange(newValue)}
+                    size="large"
                   />
-                </div>
-              ) as unknown as string
+                )}
+                <ViewInStashButton
+                  stashUrl={gallery?.stashUrl as string}
+                  size={24}
+                />
+              </div>
             }
             subtitle={
               (

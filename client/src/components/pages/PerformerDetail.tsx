@@ -197,27 +197,23 @@ const PerformerDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              (
-                <div className="flex flex-wrap items-center gap-4 min-w-0">
-                  <span className="min-w-0 break-words">
-                    {performer?.name as React.ReactNode}
-                  </span>
-                  <GenderIcon gender={performer?.gender as string} size={32} />
-                  {(settings.showFavorite as boolean) && (
-                    <FavoriteButton
-                      isFavorite={isFavorite}
-                      onChange={(newValue) =>
-                        void handleFavoriteChange(newValue)
-                      }
-                      size="large"
-                    />
-                  )}
-                  <ViewInStashButton
-                    stashUrl={(performer?.stashUrl as string) || ""}
-                    size={24}
+              <div className="flex flex-wrap items-center gap-4 min-w-0">
+                <span className="min-w-0 break-words">
+                  {performer?.name as React.ReactNode}
+                </span>
+                <GenderIcon gender={performer?.gender as string} size={32} />
+                {(settings.showFavorite as boolean) && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={(newValue) => void handleFavoriteChange(newValue)}
+                    size="large"
                   />
-                </div>
-              ) as unknown as string
+                )}
+                <ViewInStashButton
+                  stashUrl={(performer?.stashUrl as string) || ""}
+                  size={24}
+                />
+              </div>
             }
             subtitle={
               (performer?.alias_list as string[] | undefined)?.length
