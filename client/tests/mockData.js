@@ -224,7 +224,6 @@ export const createTag = (overrides = {}) => {
     parents: [],
     children: [],
     scene_count: 25,
-    scene_marker_count: 0,
     image_count: 50,
     gallery_count: 5,
     performer_count: 10,

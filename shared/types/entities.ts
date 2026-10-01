@@ -275,7 +275,6 @@ export interface NormalizedTag {
   performer_count: number;
   studio_count: number;
   group_count: number;
-  scene_marker_count: number;
   scene_count_via_performers: number;
   description: string | null;
   aliases: string[];

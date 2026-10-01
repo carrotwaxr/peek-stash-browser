@@ -525,16 +525,17 @@ describe("statistics", () => {
     });
   });
 
-  // B3 changes this to the clips the viewer can see
-  it("a tag's Markers statistic is the row's synced count", async () => {
+  it("a tag's Markers statistic is the clips the viewer can see", async () => {
     renderDetailPage("tag", "/tag/5", {
-      entity: { ...base, scene_marker_count: 7 },
-      counts: { scenes: 3 },
+      entity: base,
+      counts: { scenes: 3, clips: 7 },
     });
 
     const statistics = await card("Statistics");
-    expect(statistics.getByText("Markers:").nextSibling).toHaveTextContent(
-      /^7$/
+    await waitFor(() =>
+      expect(statistics.getByText("Markers:").nextSibling).toHaveTextContent(
+        /^7$/
+      )
     );
   });
 

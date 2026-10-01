@@ -395,6 +395,8 @@ export interface RelationCountsByType {
     performers: number;
     studios: number;
     groups: number;
+    /** The clips of the Clips page's default list (generated), with this tag */
+    clips: number;
   };
   group: { scenes: number; performers: number };
   gallery: { images: number; scenes: number };

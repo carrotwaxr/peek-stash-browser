@@ -117,7 +117,6 @@ function tagRow(overrides: Partial<TagQueryRow> = {}): TagQueryRow {
     performerCount: 2,
     studioCount: 1,
     groupCount: null,
-    sceneMarkerCount: 0,
     sceneCountViaPerformers: 7,
     // Direct or inherited, each scene once: more than either part
     sceneCountAll: 9,

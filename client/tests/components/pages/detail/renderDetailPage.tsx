@@ -255,7 +255,12 @@ export function renderDetailPage(
   // The URL's query, for `currentSearch()`, and the router's `navigate`
   const CurrentSearch = () => {
     navigateRef = useNavigate();
-    return <output data-testid="search">{useLocation().search}</output>;
+    const location = useLocation();
+    return (
+      <output data-testid="search" data-pathname={location.pathname}>
+        {location.search}
+      </output>
+    );
   };
   const result = render(
     <QueryClientProvider client={queryClient}>
@@ -275,6 +280,11 @@ export function currentSearch(): Record<string, string> {
   return Object.fromEntries(
     new URLSearchParams(screen.getByTestId("search").textContent ?? "")
   );
+}
+
+/** The current URL's path */
+export function currentPath(): string | undefined {
+  return screen.getByTestId("search").dataset.pathname;
 }
 
 function asRecord(value: unknown, what: string): Record<string, unknown> {
