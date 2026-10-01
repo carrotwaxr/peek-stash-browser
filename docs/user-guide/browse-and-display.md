@@ -53,7 +53,7 @@ A high-density tabular layout for scanning metadata across many items.
 3. Use arrows to reorder columns
 4. Or right-click any column header → **Hide column**
 
-A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A preset saved in table view shows its own columns while it is loaded; your next column change saves the columns then shown as yours.
+A table remembers your columns for each type: a change on the Scenes table is saved as your scene columns and is there the next time you open it, on any device. **Settings > Customization > Table Columns** shows and edits the same setting. A preset saved in table view shows its own columns when you load it from **Load Preset**; a default preset applied when you open a page leaves your saved columns alone; your next column change saves the columns then shown as yours.
 
 ### Timeline View
 

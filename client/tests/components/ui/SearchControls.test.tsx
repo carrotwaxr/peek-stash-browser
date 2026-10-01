@@ -572,6 +572,45 @@ describe("SearchControls", () => {
     });
   });
 
+  describe("Preset table columns", () => {
+    const COLUMNS = {
+      visible: ["title", "rating"],
+      order: ["rating", "title"],
+    };
+    const withColumns = {
+      presets: { scene: [preset({ tableColumns: COLUMNS })] },
+      defaults: { scene: "p1" },
+    };
+
+    it("a default preset with columns does not change the table's columns on a visit", async () => {
+      const onPresetColumns = vi.fn();
+      const list = renderSearchControls(
+        { onPresetColumns },
+        { presets: withColumns }
+      );
+      await firstQuery(list.onQueryChange);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(onPresetColumns).not.toHaveBeenCalled();
+    });
+
+    it("loading that preset from the menu shows its columns", async () => {
+      const user = userEvent.setup();
+      const onPresetColumns = vi.fn();
+      const list = renderSearchControls(
+        { onPresetColumns },
+        { presets: withColumns }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await user.click(screen.getByTitle("Load Preset"));
+      await user.click(await screen.findByText("Default"));
+
+      expect(onPresetColumns).toHaveBeenCalledTimes(1);
+      expect(onPresetColumns).toHaveBeenCalledWith(COLUMNS);
+    });
+  });
+
   describe("Sort Controls", () => {
     it("changes sort field when dropdown selection changes", async () => {
       const user = userEvent.setup();
