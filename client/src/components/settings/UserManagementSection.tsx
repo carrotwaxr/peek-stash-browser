@@ -606,8 +606,12 @@ const UserManagementSection = ({
             setShowSyncModal(false);
             setSyncTargetUser(null);
           }}
-          onSyncComplete={(username) => {
-            onMessage(`Successfully synced data from Stash for ${username}!`);
+          onSyncComplete={(username, { partial, failedInstances }) => {
+            onMessage(
+              partial
+                ? `Synced from Stash for ${username}, except: ${failedInstances.join(", ")}`
+                : `Synced from Stash for ${username}`
+            );
           }}
         />
       )}

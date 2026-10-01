@@ -1282,6 +1282,12 @@ export const syncFromStash = async (
     );
   }
 
+  // Admins see the servers by name; an id stays when the name is gone
+  const failed = failedInstances.map((id) => ({
+    id,
+    name: stashInstanceManager.getConfig(id)?.name ?? id,
+  }));
+
   logger.info("syncFromStash completed", {
     totalTime: `${Date.now() - startTime}ms`,
     targetUserId,
@@ -1294,9 +1300,9 @@ export const syncFromStash = async (
     message:
       failedInstances.length === 0
         ? "Successfully synced ratings and favorites from Stash"
-        : `Synced from Stash, except for ${failedInstances.join(", ")}, which failed`,
+        : `Synced from Stash, except for ${failed.map((f) => f.name).join(", ")}, which failed`,
     stats,
-    failedInstances,
+    failedInstances: failed,
   });
 };
 
