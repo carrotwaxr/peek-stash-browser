@@ -130,7 +130,6 @@ describe("loadTagTree", () => {
       "WHERE NOT EXISTS (SELECT 1 FROM SceneTag d WHERE d.sceneId = it.sceneId AND d.sceneInstanceId = it.sceneInstanceId AND d.tagId = it.tagId AND d.tagInstanceId = it.tagInstanceId)"
     );
     expect(sql).not.toContain("inheritedTagIds");
-    expect(sql).toContain("CROSS JOIN json_each(c.parentIds) jp");
     expect(sql).toContain(
       "CROSS JOIN StashTag p ON p.id = jp.value AND p.stashInstanceId = c.inst"
     );

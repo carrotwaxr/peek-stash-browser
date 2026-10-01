@@ -14,6 +14,7 @@ import {
 } from "../../../services/query/nestedRefs.js";
 import { entityKey, pairsJson } from "../../../utils/entityRef.js";
 import { toProxyUrl } from "../../../utils/proxyUrl.js";
+import { jsonListOrEmpty } from "../../../utils/sqlJson.js";
 import { must } from "../../helpers/must.js";
 import { prismaImpl } from "../../helpers/prismaMock.js";
 
@@ -220,7 +221,9 @@ describe("nested refs", () => {
       const [sql, ...params] = statement();
       expect(sql).toContain("FROM json_each(?)");
       expect(sql).toContain(
-        "SELECT je.value AS pid, x.stashInstanceId AS pinst, x.id, x.stashInstanceId, x.name, x.imagePath\nFROM StashTag x\nCROSS JOIN json_each(x.parentIds) je"
+        "SELECT je.value AS pid, x.stashInstanceId AS pinst, x.id, x.stashInstanceId, x.name, x.imagePath\nFROM StashTag x\nCROSS JOIN json_each(" +
+          jsonListOrEmpty("x.parentIds") +
+          ") je"
       );
       expect(sql).toContain(
         "LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'tag' AND e.entityId = x.id AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)"

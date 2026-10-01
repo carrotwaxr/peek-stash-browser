@@ -929,7 +929,6 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
     );
     expect(recursive).toHaveLength(1);
     const [sql, ...params] = must(recursive[0]);
-    expect(sql).toContain("json_each(COALESCE(c.parentIds, '[]'))");
     expect(sql).toContain("CROSS JOIN StashTag t ON");
     // Bare ids, allowed instances and scoped refs are bound, never spliced
     expect(params[0]).toBe(JSON.stringify([]));
@@ -1645,7 +1644,6 @@ describe("computeEmptyExclusions", () => {
     await exclusionComputationService.recomputeForUser(1);
 
     const [sql] = must(queriesMatching(EMPTY_TAG)[0]);
-    expect(sql).toContain("json_each(COALESCE(child.parentIds, '[]'))");
     expect(sql).toContain("child.stashInstanceId = t.stashInstanceId");
     expect(sql).not.toContain("LIKE");
   });

@@ -33,6 +33,7 @@ import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import { sceneUntaggedSql } from "../utils/sqlClauses.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import {
   excludedCountsJoinSql,
   visibleCountSql,
@@ -237,7 +238,7 @@ tree(id, inst, parentIds) AS (
   UNION
   SELECT p.id, p.stashInstanceId, p.parentIds
   FROM tree c
-  CROSS JOIN json_each(c.parentIds) jp
+  CROSS JOIN json_each(${jsonListOrEmpty("c.parentIds")}) jp
   CROSS JOIN StashTag p ON p.id = jp.value AND p.stashInstanceId = c.inst
   ${parent.join.sql}
   WHERE ${parent.where.sql}
