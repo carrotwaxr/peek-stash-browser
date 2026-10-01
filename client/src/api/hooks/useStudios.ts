@@ -27,12 +27,3 @@ export function useStudioList(
     placeholderData: keepPreviousData,
   });
 }
-
-export function useStudioDetail(id: string | undefined, instanceId?: string) {
-  return useQuery({
-    queryKey: queryKeys.studios.detail(instanceId, id),
-    queryFn: id
-      ? () => libraryApi.findStudioById(id, instanceId ?? null)
-      : skipToken,
-  });
-}

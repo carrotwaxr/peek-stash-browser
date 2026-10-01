@@ -1,13 +1,9 @@
-export {
-  useSceneList,
-  useSceneDetail,
-  useExternalPlayerLink,
-} from "./useScenes";
-export { usePerformerList, usePerformerDetail } from "./usePerformers";
-export { useStudioList, useStudioDetail } from "./useStudios";
-export { useTagList, useTagDetail, useTagTree } from "./useTags";
-export { useGalleryList, useGalleryDetail } from "./useGalleries";
-export { useGroupList, useGroupDetail } from "./useGroups";
+export { useSceneList, useExternalPlayerLink } from "./useScenes";
+export { usePerformerList } from "./usePerformers";
+export { useStudioList } from "./useStudios";
+export { useTagList, useTagTree } from "./useTags";
+export { useGalleryList } from "./useGalleries";
+export { useGroupList } from "./useGroups";
 export { useImageList } from "./useImages";
 export { useClipList } from "./useClips";
 export { useRelationCounts } from "./useRelationCounts";

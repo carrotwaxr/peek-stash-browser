@@ -3,16 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  usePerformerDetail,
-  usePerformerList,
-} from "../../../src/api/hooks/usePerformers";
+import { usePerformerList } from "../../../src/api/hooks/usePerformers";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
     findPerformers: vi.fn(),
-    findPerformerById: vi.fn(),
   },
 }));
 
@@ -129,67 +125,5 @@ describe("usePerformerList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
-  });
-});
-
-describe("usePerformerDetail", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("does not fire query when id is undefined", () => {
-    const { result } = renderHook(() => usePerformerDetail(undefined), {
-      wrapper: createWrapper(),
-    });
-    expect(result.current.isFetching).toBe(false);
-    expect(libraryApi.findPerformerById).not.toHaveBeenCalled();
-  });
-
-  it("fires query and returns data on success", async () => {
-    const mockPerformer = { id: "perf-1", name: "Test Performer" };
-    (
-      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(mockPerformer);
-
-    const { result } = renderHook(() => usePerformerDetail("perf-1"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockPerformer);
-    expect(libraryApi.findPerformerById).toHaveBeenCalledWith("perf-1", null);
-  });
-
-  it("passes instanceId to findPerformerById", async () => {
-    const mockPerformer = { id: "perf-1", name: "Test Performer" };
-    (
-      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(mockPerformer);
-
-    const { result } = renderHook(
-      () => usePerformerDetail("perf-1", "instance-2"),
-      {
-        wrapper: createWrapper(),
-      }
-    );
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findPerformerById).toHaveBeenCalledWith(
-      "perf-1",
-      "instance-2"
-    );
-  });
-
-  it("returns error state on failure", async () => {
-    (
-      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
-    ).mockRejectedValue(new Error("Not found"));
-
-    const { result } = renderHook(() => usePerformerDetail("bad-id"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

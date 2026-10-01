@@ -3,13 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useGroupDetail, useGroupList } from "../../../src/api/hooks/useGroups";
+import { useGroupList } from "../../../src/api/hooks/useGroups";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
     findGroups: vi.fn(),
-    findGroupById: vi.fn(),
   },
 }));
 
@@ -106,54 +105,5 @@ describe("useGroupList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
-  });
-});
-
-describe("useGroupDetail", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("does not fire query when id is undefined", () => {
-    const { result } = renderHook(() => useGroupDetail(undefined), {
-      wrapper: createWrapper(),
-    });
-    expect(result.current.isFetching).toBe(false);
-    expect(libraryApi.findGroupById).not.toHaveBeenCalled();
-  });
-
-  it("fires query and returns data on success", async () => {
-    const mockGroup = { id: "group-1", name: "Test Group" };
-    (libraryApi.findGroupById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockGroup
-    );
-
-    const { result } = renderHook(() => useGroupDetail("group-1"), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockGroup);
-    expect(libraryApi.findGroupById).toHaveBeenCalledWith("group-1", null);
-  });
-
-  it("passes instanceId to findGroupById", async () => {
-    const mockGroup = { id: "group-1", name: "Test Group" };
-    (libraryApi.findGroupById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockGroup
-    );
-
-    const { result } = renderHook(
-      () => useGroupDetail("group-1", "instance-6"),
-      {
-        wrapper: createWrapper(),
-      }
-    );
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findGroupById).toHaveBeenCalledWith(
-      "group-1",
-      "instance-6"
-    );
   });
 });

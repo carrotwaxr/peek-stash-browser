@@ -124,7 +124,6 @@ export const queryKeys = {
   carousels: {
     all: () => ["carousels"] as const,
     list: () => ["carousels", "list"] as const,
-    detail: (id: string) => ["carousels", "detail", id] as const,
     execute: (id: string) => ["carousels", "execute", id] as const,
   },
 
@@ -136,7 +135,6 @@ export const queryKeys = {
     permissions: () => ["user", "permissions"] as const,
     filterPresets: () => ["user", "filterPresets"] as const,
     defaultPresets: () => ["user", "defaultPresets"] as const,
-    watchHistory: (page?: number) => ["user", "watchHistory", page] as const,
     hiddenEntities: () => ["user", "hiddenEntities"] as const,
     /** One page of the Hidden Items list; `hiddenEntities()` is its prefix */
     hiddenItems: (type: string, page: number) =>
@@ -157,36 +155,18 @@ export const queryKeys = {
     /** One playlist's play queue in one order */
     queue: (playlistId: number, sort?: string, direction?: string) =>
       ["playlists", "queue", playlistId, sort, direction] as const,
-    shares: (playlistId: number) =>
-      ["playlists", "shares", playlistId] as const,
   },
 
   // ── Clips ────────────────────────────────────────────────────────────
   clips: {
-    all: () => ["clips"] as const,
     list: (params: Record<string, unknown>) =>
       ["clips", "list", params] as const,
     forScene: (sceneId: string, instanceId?: string) =>
       ["clips", "forScene", sceneId, instanceId] as const,
   },
 
-  // ── Admin ────────────────────────────────────────────────────────────
-  admin: {
-    groups: () => ["admin", "groups"] as const,
-    group: (id: string) => ["admin", "groups", id] as const,
-    userPermissions: (userId: number) =>
-      ["admin", "userPermissions", userId] as const,
-    userGroups: (userId: number) => ["admin", "userGroups", userId] as const,
-  },
-
   // ── Setup ────────────────────────────────────────────────────────────
   setup: {
     status: () => ["setup", "status"] as const,
-  },
-
-  // ── Config / Server ──────────────────────────────────────────────────
-  config: {
-    all: () => ["config"] as const,
-    syncStatus: () => ["config", "syncStatus"] as const,
   },
 } as const;
