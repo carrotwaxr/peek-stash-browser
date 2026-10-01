@@ -10,21 +10,17 @@
  *
  * Rows are seeded under two made-up instances, cl-a and cl-b, with the same
  * ids. Both are real `StashInstance` rows with their own API keys, loaded
- * into the instance manager, at an unreachable address; the preview probe is
- * stubbed with a fake Stash that answers only its own instance's key.
+ * into the instance manager. The preview probe is sent to the instance's
+ * configured address, never to the host a stored preview URL names (it
+ * names `<id>.stash.invalid` here), so each instance's URL points at one
+ * local fake Stash under its own path prefix (`/cl-a`, `/cl-b`). The fake
+ * serves a generated preview only to a request on its prefix carrying that
+ * instance's own key, and records every request it gets.
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { type IncomingMessage, type Server, createServer } from "http";
+import { type AddressInfo } from "net";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   ENTITY_SYNC,
@@ -37,7 +33,6 @@ import {
 } from "../../services/SyncChangeSet.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
-import { UNREACHABLE_STASH_URL } from "../helpers/stashTarget.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -47,12 +42,55 @@ const CL_A = "cl-a";
 const CL_B = "cl-b";
 const INSTANCES = [CL_A, CL_B];
 
-/** Each instance's API key, and the host its previews are served from */
+/** Each instance's API key, and the host its stored previews name */
 const API_KEYS: Record<string, string> = {
   [CL_A]: "cl-a-api-key",
   [CL_B]: "cl-b-api-key",
 };
 const previewHost = (instanceId: string) => `${instanceId}.stash.invalid`;
+
+/** A request the fake Stash got */
+interface Probe {
+  /** The instance whose prefix the path is under, if any */
+  instanceId: string | undefined;
+  /** The path after the instance's prefix */
+  path: string;
+  apiKey: string | null;
+  host: string | undefined;
+}
+
+/** A preview of this size counts as generated (the probe wants 5 KB or more) */
+const PREVIEW_BYTES = 10_000;
+
+/**
+ * One local fake Stash for both instances: each is configured at its own
+ * path prefix, which is how the fake tells whose address a probe went to.
+ */
+function fakeStash(probes: Probe[]): Server {
+  return createServer((req: IncomingMessage, res) => {
+    const url = new URL(req.url ?? "/", "http://fake");
+    const instanceId = INSTANCES.find((id) =>
+      url.pathname.startsWith(`/${id}/`)
+    );
+    const apiKey = url.searchParams.get("apikey");
+    probes.push({
+      instanceId,
+      path:
+        instanceId === undefined
+          ? url.pathname
+          : url.pathname.slice(`/${instanceId}`.length),
+      apiKey,
+      host: req.headers.host,
+    });
+    if (instanceId === undefined || apiKey !== API_KEYS[instanceId]) {
+      res.writeHead(404).end();
+      return;
+    }
+    res
+      .writeHead(206, { "Content-Range": `bytes 0-0/${PREVIEW_BYTES}` })
+      .end("x");
+  });
+}
 
 /** The scene and tags every seeded marker points at, on both instances */
 const SCENE_ID = "1";
@@ -160,10 +198,15 @@ async function clearSeed(): Promise<void> {
 }
 
 describeWithDb("StashSyncService clip pages (integration)", () => {
-  /** Every preview URL the probe was asked about */
-  let probed: string[];
+  /** Every request the fake Stash got */
+  const probes: Probe[] = [];
+  let stash: Server;
 
   beforeAll(async () => {
+    stash = fakeStash(probes);
+    await new Promise<void>((resolve) => stash.listen(0, "127.0.0.1", resolve));
+    const { port } = stash.address() as AddressInfo;
+
     await clearSeed();
     await prisma.stashInstance.deleteMany({ where: { id: { in: INSTANCES } } });
     for (const [i, id] of INSTANCES.entries()) {
@@ -171,7 +214,7 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
         data: {
           id,
           name: id,
-          url: UNREACHABLE_STASH_URL,
+          url: `http://127.0.0.1:${port}/${id}/graphql`,
           apiKey: must(API_KEYS[id]),
           enabled: true,
           // After the test Stash, which stays the highest-priority instance
@@ -198,35 +241,16 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
       });
     }
 
-    // A fake Stash per instance: a preview is generated, and served only to
-    // a request carrying that instance's own key
-    probed = [];
-    vi.spyOn(clipPreviewProber, "probeBatch").mockImplementation((urls) => {
-      probed.push(...urls);
-      return Promise.resolve(
-        new Map(
-          urls.map((url) => {
-            const { hostname, searchParams } = new URL(url);
-            const owner = INSTANCES.find((id) => previewHost(id) === hostname);
-            return [
-              url,
-              owner !== undefined &&
-                searchParams.get("apikey") === API_KEYS[owner],
-            ];
-          })
-        )
-      );
-    });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    probes.length = 0;
   });
 
   afterAll(async () => {
     await clearSeed();
     await prisma.stashInstance.deleteMany({ where: { id: { in: INSTANCES } } });
     await stashInstanceManager.reload();
+    await new Promise<void>((resolve, reject) =>
+      stash.close((err) => (err ? reject(err) : resolve()))
+    );
   });
 
   it("a page of markers is written with its tags and its primary tag", async () => {
@@ -454,12 +478,25 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
     await writePage(CL_A, [marker(CL_A, "50"), marker(CL_A, "51")]);
     await writePage(CL_B, [marker(CL_B, "50"), marker(CL_B, "51")]);
 
-    const keysBy = (instanceId: string) =>
-      probed
-        .filter((url) => new URL(url).hostname === previewHost(instanceId))
-        .map((url) => new URL(url).searchParams.get("apikey"));
-    expect(keysBy(CL_A)).toEqual([API_KEYS[CL_A], API_KEYS[CL_A]]);
-    expect(keysBy(CL_B)).toEqual([API_KEYS[CL_B], API_KEYS[CL_B]]);
+    // Every probe reached the fake, on its own instance's prefix and with
+    // its own key
+    const probesOf = (instanceId: string) =>
+      probes
+        .filter((p) => p.instanceId === instanceId)
+        .map((p) => [p.path, p.apiKey]);
+    expect(probes).toHaveLength(4);
+    expect(probesOf(CL_A)).toEqual(
+      ["50", "51"].map((id) => [
+        `/scene/${SCENE_ID}/scene_marker/${id}/preview`,
+        API_KEYS[CL_A],
+      ])
+    );
+    expect(probesOf(CL_B)).toEqual(
+      ["50", "51"].map((id) => [
+        `/scene/${SCENE_ID}/scene_marker/${id}/preview`,
+        API_KEYS[CL_B],
+      ])
+    );
 
     // So the second instance's generated previews show as generated
     expect((await clipsOf(CL_B)).map((c) => c.isGenerated)).toEqual([
@@ -470,5 +507,25 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
       true,
       true,
     ]);
+  });
+
+  it("a marker is probed on the instance's address, not the host its stored preview names", async () => {
+    await writePage(CL_A, [marker(CL_A, "60")]);
+
+    // The stored preview still names another host, which nothing listens on
+    const [stored] = await clipsOf(CL_A);
+    expect(new URL(must(stored).previewPath ?? "").hostname).toBe(
+      previewHost(CL_A)
+    );
+    // The probe went to the configured address, on the instance's prefix
+    expect(probes).toEqual([
+      {
+        instanceId: CL_A,
+        path: `/scene/${SCENE_ID}/scene_marker/60/preview`,
+        apiKey: API_KEYS[CL_A],
+        host: `127.0.0.1:${(stash.address() as AddressInfo).port}`,
+      },
+    ]);
+    expect(must(stored).isGenerated).toBe(true);
   });
 });
