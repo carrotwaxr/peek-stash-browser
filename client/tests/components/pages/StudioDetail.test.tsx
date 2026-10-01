@@ -4,36 +4,50 @@
  * collection's studio) sends depth -1 while it is on; the Performers tab's
  * field takes none, so the toggle is hidden there.
  */
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as hooksModule from "@/api/hooks";
-import StudioDetail from "@/components/pages/StudioDetail";
-import type * as uiModule from "@/components/ui/index";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  grids,
+  resetDetailPageMocks,
+  sceneSearch,
+} from "./detail/detailPageMocks";
+import {
+  type DetailPageOptions,
+  bodiesTo,
+  currentSearch,
+  lastBody,
+  renderDetailPage,
+  requestsTo,
+} from "./detail/renderDetailPage";
 
-interface GridProps {
-  lockedFilters?: Record<string, Record<string, unknown>>;
-}
-interface SceneSearchProps {
-  permanentFilters?: Record<string, unknown>;
-}
-
-const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
-  findImages: vi.fn<(params: Record<string, unknown>) => Promise<unknown>>(),
-  relationCounts: vi.fn<
-    (...args: unknown[]) => {
-      data: { counts: Record<string, number> } | undefined;
-    }
-  >(),
-  grids: {
-    GalleryGrid: vi.fn<(props: GridProps) => null>(() => null),
-    GroupGrid: vi.fn<(props: GridProps) => null>(() => null),
-    PerformerGrid: vi.fn<(props: GridProps) => null>(() => null),
-    StudioGrid: vi.fn<(props: GridProps) => null>(() => null),
-  },
-  sceneSearch: vi.fn<(props: SceneSearchProps) => null>(() => null),
-}));
+vi.mock("@/components/grids/index", () =>
+  import("./detail/detailPageMocks").then((m) => m.gridsModule)
+);
+vi.mock("@/components/scene-search/SceneSearch", () =>
+  import("./detail/detailPageMocks").then((m) => m.sceneSearchModule)
+);
+vi.mock("@/contexts/CardDisplaySettingsContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.cardDisplaySettingsModule)
+);
+vi.mock("@/contexts/ConfigContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.configModule)
+);
+vi.mock("@/contexts/UnitPreferenceContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.unitPreferenceModule)
+);
+vi.mock("@/hooks/useNavigationState", () =>
+  import("./detail/detailPageMocks").then((m) => m.navigationStateModule)
+);
+vi.mock("@/hooks/useAuth", () =>
+  import("./detail/detailPageMocks").then((m) => m.authModule)
+);
+vi.mock("@/hooks/usePageTitle", () =>
+  import("./detail/detailPageMocks").then((m) => m.pageTitleModule)
+);
+vi.mock("@/themes/useTheme", () =>
+  import("./detail/detailPageMocks").then((m) => m.themeModule)
+);
 
 const studio = {
   id: "5",
@@ -47,80 +61,46 @@ const studio = {
   child_studios: [{ id: "6", name: "Sub Studio", instanceId: "inst-a" }],
 };
 
-vi.mock("@/api", () => ({
-  libraryApi: {
-    findImages,
-    findStudioById: vi.fn(),
-    updateRating: vi.fn(),
-    updateFavorite: vi.fn(),
-  },
-}));
-vi.mock("@/api/hooks", async (importOriginal) => ({
-  ...(await importOriginal<typeof hooksModule>()),
-  useRelationCounts: relationCounts,
-}));
-vi.mock("@/hooks/useEntityLookup", () => ({
-  useEntityLookup: () => ({ status: "found", entity: studio, retry: vi.fn() }),
-}));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
-vi.mock("@/hooks/useNavigationState", () => ({
-  useNavigationState: () => ({ goBack: vi.fn(), backButtonText: "Back" }),
-}));
-vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/contexts/ConfigContext", () => ({
-  useConfig: () => ({ hasMultipleInstances: true }),
-}));
-vi.mock("@/contexts/CardDisplaySettingsContext", () => ({
-  useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
-}));
-vi.mock("@/themes/useTheme", () => ({
-  useTheme: () => ({ theme: undefined }),
-}));
-vi.mock("@/components/grids/index", () => grids);
-vi.mock("@/components/scene-search/SceneSearch", () => ({
-  default: sceneSearch,
-}));
-vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof uiModule>()),
-  PaginatedImageGrid: () => null,
-}));
+const ALL_COUNTS = {
+  scenes: 3,
+  galleries: 2,
+  images: 4,
+  performers: 2,
+  groups: 1,
+};
 
-const CurrentSearch = () => (
-  <output data-testid="search">{useLocation().search}</output>
-);
+let counts: DetailPageOptions["counts"];
 
 function renderPage(search: string) {
-  return render(
-    <MemoryRouter initialEntries={[`/studio/5?instance=inst-a&${search}`]}>
-      <Routes>
-        <Route path="/studio/:studioId" element={<StudioDetail />} />
-      </Routes>
-      <CurrentSearch />
-    </MemoryRouter>
-  );
+  return renderDetailPage("studio", `/studio/5?instance=inst-a&${search}`, {
+    entity: studio,
+    counts,
+  });
 }
 
 /** The studio criterion a tab sends: its grid's lock, the scene search's, or the image request's */
 async function sentCriterion(tab: string): Promise<unknown> {
+  const lock = async (grid: keyof typeof grids, filterKey: string) => {
+    await waitFor(() => expect(grids[grid]).toHaveBeenCalled());
+    return must(grids[grid].mock.lastCall, `${grid}'s props`)[0]
+      .lockedFilters?.[filterKey]?.studios;
+  };
   switch (tab) {
     case "scenes":
+      await waitFor(() => expect(sceneSearch).toHaveBeenCalled());
       return must(sceneSearch.mock.lastCall, "SceneSearch's props")[0]
         .permanentFilters?.studios;
     case "images":
-      await waitFor(() => expect(findImages).toHaveBeenCalled());
+      await waitFor(() => expect(bodiesTo("/library/images")).not.toEqual([]));
       return (
-        must(findImages.mock.lastCall, "the image request")[0]
-          .image_filter as Record<string, unknown>
+        lastBody("/library/images").image_filter as Record<string, unknown>
       ).studios;
     case "galleries":
-      return must(grids.GalleryGrid.mock.lastCall, "GalleryGrid's props")[0]
-        .lockedFilters?.gallery_filter?.studios;
+      return lock("GalleryGrid", "gallery_filter");
     case "groups":
-      return must(grids.GroupGrid.mock.lastCall, "GroupGrid's props")[0]
-        .lockedFilters?.group_filter?.studios;
+      return lock("GroupGrid", "group_filter");
     case "performers":
-      return must(grids.PerformerGrid.mock.lastCall, "PerformerGrid's props")[0]
-        .lockedFilters?.performer_filter?.studios;
+      return lock("PerformerGrid", "performer_filter");
     default:
       throw new Error(`No tab ${tab}`);
   }
@@ -128,47 +108,41 @@ async function sentCriterion(tab: string): Promise<unknown> {
 
 const toggle = () =>
   screen.queryByRole("checkbox", { name: /Include sub-studios/ });
+const findToggle = () =>
+  screen.findByRole("checkbox", { name: /Include sub-studios/ });
+
+beforeEach(() => {
+  resetDetailPageMocks();
+  counts = ALL_COUNTS;
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("StudioDetail: Include sub-studios", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-    relationCounts.mockReturnValue({
-      data: {
-        counts: {
-          scenes: 3,
-          galleries: 2,
-          images: 4,
-          performers: 2,
-          groups: 1,
-        },
-      },
-    });
-  });
+  it("the counts follow the toggle, and open the first tab with content", async () => {
+    counts = {
+      scenes: 0,
+      galleries: 0,
+      images: 5,
+      performers: 1,
+      groups: 0,
+    };
+    const { api } = renderPage("includeSubStudios=true");
 
-  it("the counts follow the toggle, and open the first tab with content", () => {
-    relationCounts.mockReturnValue({
-      data: {
-        counts: {
-          scenes: 0,
-          galleries: 0,
-          images: 5,
-          performers: 1,
-          groups: 0,
-        },
-      },
-    });
-    renderPage("includeSubStudios=true");
-
-    expect(relationCounts).toHaveBeenLastCalledWith("studio", "5", "inst-a", {
-      includeSubStudios: true,
-    });
-    expect(screen.getByRole("button", { name: /^Images\b/ })).toHaveAttribute(
-      "aria-current",
-      "page"
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^Images\b/ })).toHaveAttribute(
+        "aria-current",
+        "page"
+      )
     );
+    expect(requestsTo(api, "/library/studios/5/counts")).toEqual([
+      "/api/library/studios/5/counts?instanceId=inst-a&includeSubStudios=true",
+    ]);
     expect(screen.queryByRole("button", { name: /^Scenes\b/ })).toBeNull();
     expect(sceneSearch).not.toHaveBeenCalled();
+    // The Images tab asks for its first page
+    await screen.findByText(/No images found/);
   });
 
   it.each(["scenes", "galleries", "images", "groups"])(
@@ -176,7 +150,7 @@ describe("StudioDetail: Include sub-studios", () => {
     async (tab) => {
       renderPage(`tab=${tab}&includeSubStudios=true`);
 
-      expect(toggle()).toBeChecked();
+      expect(await findToggle()).toBeChecked();
       expect(await sentCriterion(tab)).toEqual({
         value: ["5:inst-a"],
         modifier: "INCLUDES",
@@ -190,7 +164,7 @@ describe("StudioDetail: Include sub-studios", () => {
     async (tab) => {
       renderPage(`tab=${tab}`);
 
-      expect(toggle()).not.toBeChecked();
+      expect(await findToggle()).not.toBeChecked();
       expect(await sentCriterion(tab)).toEqual({
         value: ["5:inst-a"],
         modifier: "INCLUDES",
@@ -200,8 +174,9 @@ describe("StudioDetail: Include sub-studios", () => {
 
   it("ticking the toggle on the Collections tab sends depth -1", async () => {
     renderPage("tab=groups");
+    await sentCriterion("groups");
 
-    fireEvent.click(must(toggle(), "the Include sub-studios toggle"));
+    fireEvent.click(await findToggle());
 
     expect(await sentCriterion("groups")).toEqual({
       value: ["5:inst-a"],
@@ -213,58 +188,41 @@ describe("StudioDetail: Include sub-studios", () => {
   it("the Performers tab hides the toggle and sends no depth: a performer's studios take none", async () => {
     renderPage("tab=performers&includeSubStudios=true");
 
-    expect(toggle()).not.toBeInTheDocument();
     expect(await sentCriterion("performers")).toEqual({
       value: ["5:inst-a"],
       modifier: "INCLUDES",
     });
+    expect(toggle()).not.toBeInTheDocument();
   });
 });
 
 describe("StudioDetail: a tab and its toggle start clean", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-    relationCounts.mockReturnValue({
-      data: {
-        counts: {
-          scenes: 3,
-          galleries: 2,
-          images: 4,
-          performers: 2,
-          groups: 1,
-        },
-      },
-    });
-  });
-
-  const search = () =>
-    Object.fromEntries(
-      new URLSearchParams(screen.getByTestId("search").textContent ?? "")
-    );
-
-  it("ticking Include sub-studios on page 5 shows page 1", () => {
+  it("ticking Include sub-studios on page 5 shows page 1", async () => {
     renderPage("tab=groups&page=5");
 
-    fireEvent.click(must(toggle(), "the Include sub-studios toggle"));
+    fireEvent.click(await findToggle());
 
-    expect(search()).toEqual({
+    expect(currentSearch()).toEqual({
       instance: "inst-a",
       tab: "groups",
       includeSubStudios: "true",
     });
   });
 
-  it("the Images statistic opens the Images tab clean", () => {
+  it("the Images statistic opens the Images tab clean", async () => {
     renderPage("page=7&sort=title&includeSubStudios=true");
 
     const images = must(
-      screen.getByText("Images:").parentElement?.querySelector("button"),
+      (await screen.findByText("Images:")).parentElement?.querySelector(
+        "button"
+      ),
       "the Images statistic"
     );
     fireEvent.click(images);
+    // The Images tab asks for its first page
+    await screen.findByText(/No images found/);
 
-    expect(search()).toEqual({
+    expect(currentSearch()).toEqual({
       instance: "inst-a",
       includeSubStudios: "true",
       tab: "images",

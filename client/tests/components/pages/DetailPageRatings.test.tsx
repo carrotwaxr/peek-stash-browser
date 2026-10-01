@@ -3,19 +3,17 @@
  * images on the loaded entity's own instance, not on the URL's `instance`
  * parameter: a bare-id link carries none.
  */
-import type { ComponentType } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as hooksModule from "@/api/hooks";
-import GalleryDetail from "@/components/pages/GalleryDetail";
-import GroupDetail from "@/components/pages/GroupDetail";
-import PerformerDetail from "@/components/pages/PerformerDetail";
-import StudioDetail from "@/components/pages/StudioDetail";
-import TagDetail from "@/components/pages/TagDetail";
-import type * as uiModule from "@/components/ui/index";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetDetailPageMocks } from "./detail/detailPageMocks";
+import {
+  type DetailType,
+  bodiesTo,
+  lastBody,
+  renderDetailPage,
+  requestsTo,
+} from "./detail/renderDetailPage";
 
 interface HotkeyOptions {
   enabled?: boolean;
@@ -23,124 +21,76 @@ interface HotkeyOptions {
   toggleFavorite: () => void;
 }
 
-const {
-  entity,
-  findGalleryImages,
-  hotkeys,
-  relationCounts,
-  updateRating,
-  updateFavorite,
-} = vi.hoisted(() => ({
-  entity: { current: {} as Record<string, unknown> },
-  findGalleryImages: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+const { hotkeys } = vi.hoisted(() => ({
   hotkeys: vi.fn<(options: HotkeyOptions) => void>(),
-  relationCounts: vi.fn<(...args: unknown[]) => { data: undefined }>(() => ({
-    data: undefined,
-  })),
-  updateRating: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
-  updateFavorite: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
-vi.mock("@/api", () => ({
-  libraryApi: {
-    findImages: vi.fn(() => Promise.resolve({ images: [], count: 0 })),
-    findGalleryImages,
-    updateRating,
-    updateFavorite,
-  },
-}));
-vi.mock("@/api/hooks", async (importOriginal) => ({
-  ...(await importOriginal<typeof hooksModule>()),
-  useRelationCounts: relationCounts,
-}));
-vi.mock("@/hooks/useEntityLookup", () => ({
-  useEntityLookup: () => ({
-    status: "found",
-    entity: entity.current,
-    retry: vi.fn(),
-  }),
-}));
 vi.mock("@/hooks/useRatingHotkeys", () => ({ useRatingHotkeys: hotkeys }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
-vi.mock("@/hooks/useNavigationState", () => ({
-  useNavigationState: () => ({ goBack: vi.fn(), backButtonText: "Back" }),
-}));
-vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/hooks/useImagesPagination", () => ({
-  useImagesPagination: () => ({}),
-}));
-vi.mock("@/hooks/usePaginatedLightbox", () => ({
-  usePaginatedLightbox: () => ({
-    currentPage: 1,
-    images: [],
-    totalCount: 0,
-    isOpen: false,
-    setImages: vi.fn(),
-    openLightbox: vi.fn(),
-    closeLightbox: vi.fn(),
-    consumePendingLightboxIndex: vi.fn(),
-  }),
-}));
-vi.mock("@/contexts/ConfigContext", () => ({
-  useConfig: () => ({ hasMultipleInstances: true }),
-}));
-vi.mock("@/contexts/UnitPreferenceContext", () => ({
-  useUnitPreference: () => ({ unitPreference: "metric" }),
-}));
-vi.mock("@/contexts/CardDisplaySettingsContext", () => ({
-  useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
-}));
-vi.mock("@/themes/useTheme", () => ({
-  useTheme: () => ({ theme: undefined }),
-}));
-vi.mock("@/components/grids/index", () => ({
-  GalleryGrid: () => null,
-  GroupGrid: () => null,
-  PerformerGrid: () => null,
-  StudioGrid: () => null,
-}));
-vi.mock("@/components/scene-search/SceneSearch", () => ({
-  default: () => null,
-}));
-vi.mock("@/components/wall/WallView", () => ({ default: () => null }));
-vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof uiModule>()),
-  PaginatedImageGrid: () => null,
-}));
+vi.mock("@/components/grids/index", () =>
+  import("./detail/detailPageMocks").then((m) => m.gridsModule)
+);
+vi.mock("@/components/scene-search/SceneSearch", () =>
+  import("./detail/detailPageMocks").then((m) => m.sceneSearchModule)
+);
+vi.mock("@/contexts/CardDisplaySettingsContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.cardDisplaySettingsModule)
+);
+vi.mock("@/contexts/ConfigContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.configModule)
+);
+vi.mock("@/contexts/UnitPreferenceContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.unitPreferenceModule)
+);
+vi.mock("@/hooks/useNavigationState", () =>
+  import("./detail/detailPageMocks").then((m) => m.navigationStateModule)
+);
+vi.mock("@/hooks/useAuth", () =>
+  import("./detail/detailPageMocks").then((m) => m.authModule)
+);
+vi.mock("@/hooks/usePageTitle", () =>
+  import("./detail/detailPageMocks").then((m) => m.pageTitleModule)
+);
+vi.mock("@/themes/useTheme", () =>
+  import("./detail/detailPageMocks").then((m) => m.themeModule)
+);
 
-const PAGES: [string, string, string, ComponentType][] = [
-  ["performer", "performers", "performerId", PerformerDetail],
-  ["studio", "studios", "studioId", StudioDetail],
-  ["tag", "tags", "tagId", TagDetail],
-  ["group", "groups", "groupId", GroupDetail],
-  ["gallery", "galleries", "galleryId", GalleryDetail],
+const PAGES: [DetailType, string][] = [
+  ["performer", "performers"],
+  ["studio", "studios"],
+  ["tag", "tags"],
+  ["group", "groups"],
+  ["gallery", "galleries"],
 ];
 
-describe.each(PAGES)("%s page rating", (type, _plural, param, Page) => {
+/** The galleries criterion's values of an images request */
+const galleriesOf = (body: Record<string, unknown>) =>
+  (
+    (body.image_filter as Record<string, unknown>).galleries as {
+      value: string[];
+    }
+  ).value;
+
+describe.each(PAGES)("%s page rating", (type, plural) => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    updateRating.mockResolvedValue({});
-    updateFavorite.mockResolvedValue({});
-    findGalleryImages.mockResolvedValue({ images: [], count: 0 });
-    entity.current = {
-      id: "5",
-      instanceId: "inst-b",
-      name: "Thing",
-      title: "Thing",
-      images: [],
-    };
+    resetDetailPageMocks();
+    hotkeys.mockClear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function renderPage(search: string) {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={[`/${type}/5${search}`]}>
-          <Routes>
-            <Route path={`/${type}/:${param}`} element={<Page />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
+    return renderDetailPage(type, `/${type}/5${search}`, {
+      entity: {
+        id: "5",
+        instanceId: "inst-b",
+        name: "Thing",
+        title: "Thing",
+        images: [],
+      },
+      // No tab opens, as before the counts answer
+      counts: "loading",
+    });
   }
 
   // The page's own hotkeys are the enabled ones (a gallery's closed lightbox registers a disabled set)
@@ -150,42 +100,60 @@ describe.each(PAGES)("%s page rating", (type, _plural, param, Page) => {
       "the page's rating hotkeys"
     )[0];
 
-  it.each([
-    ["a bare-id link", ""],
-    ["a link naming another server", "?instance=inst-a"],
-  ])("rates and favorites on the entity's own server from %s", (_n, s) => {
-    renderPage(s);
-
-    act(() => {
-      latestHotkeys().setRating(80);
-    });
-    expect(updateRating).toHaveBeenCalledWith(type, "5", 80, "inst-b");
-
-    act(() => {
-      latestHotkeys().toggleFavorite();
-    });
-    expect(updateFavorite).toHaveBeenCalledWith(type, "5", true, "inst-b");
-  });
+  const ratingPath = `/ratings/${type}/5`;
 
   it.each([
     ["a bare-id link", ""],
     ["a link naming another server", "?instance=inst-a"],
-  ])("counts its tabs on the entity's own server from %s", (_n, s) => {
-    renderPage(s);
+  ])(
+    "rates and favorites on the entity's own server from %s",
+    async (_n, s) => {
+      const { api } = renderPage(s);
 
-    expect(relationCounts).toHaveBeenLastCalledWith(
-      type,
-      "5",
-      "inst-b",
-      ...(type === "tag"
-        ? [{ includeSubTags: false }]
-        : type === "studio"
-          ? [{ includeSubStudios: false }]
-          : [])
+      const keys = await waitFor(() => latestHotkeys());
+      act(() => {
+        keys.setRating(80);
+      });
+      await waitFor(() =>
+        expect(requestsTo(api, ratingPath)).toEqual([`/api${ratingPath}`])
+      );
+      expect(lastBody(ratingPath)).toEqual({
+        rating: 80,
+        instanceId: "inst-b",
+      });
+      const rated = must(
+        api.mock.calls.find(([url]) => url === `/api${ratingPath}`),
+        "the rating request"
+      );
+      expect(rated[1]?.method).toBe("PUT");
+
+      act(() => {
+        latestHotkeys().toggleFavorite();
+      });
+      await waitFor(() => expect(requestsTo(api, ratingPath)).toHaveLength(2));
+      expect(lastBody(ratingPath)).toEqual({
+        favorite: true,
+        instanceId: "inst-b",
+      });
+    }
+  );
+
+  it.each([
+    ["a bare-id link", ""],
+    ["a link naming another server", "?instance=inst-a"],
+  ])("counts its tabs on the entity's own server from %s", async (_n, s) => {
+    const { api } = renderPage(s);
+
+    await waitFor(() =>
+      expect(requestsTo(api, `/library/${plural}/5/counts`)).toEqual([
+        `/api/library/${plural}/5/counts?instanceId=inst-b`,
+      ])
     );
     // A gallery's images come from its own server too
-    expect(
-      findGalleryImages.mock.calls.map(([, instanceId]) => instanceId)
-    ).toEqual(type === "gallery" ? ["inst-b"] : []);
+    await waitFor(() =>
+      expect(bodiesTo("/library/images").map(galleriesOf)).toEqual(
+        type === "gallery" ? [["5:inst-b"]] : []
+      )
+    );
   });
 });

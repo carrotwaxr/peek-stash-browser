@@ -3,46 +3,51 @@
  * of a scene, gallery, image, performer, studio and collection) takes a
  * depth in the shared contract, so each tab sends depth -1 while it is on.
  */
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { jsonResponse } from "@tests/helpers/stubApi";
 import { must } from "@tests/testUtils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as hooksModule from "@/api/hooks";
-import TagDetail from "@/components/pages/TagDetail";
-import type * as uiModule from "@/components/ui/index";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  grids,
+  resetDetailPageMocks,
+  sceneSearch,
+} from "./detail/detailPageMocks";
+import {
+  type DetailPageOptions,
+  bodiesTo,
+  currentSearch,
+  lastBody,
+  renderDetailPage,
+  requestsTo,
+} from "./detail/renderDetailPage";
 
-interface GridProps {
-  lockedFilters?: Record<string, Record<string, unknown>>;
-}
-interface SceneSearchProps {
-  permanentFilters?: Record<string, unknown>;
-}
-
-interface CountsQuery {
-  data: { counts: Record<string, number> } | undefined;
-  error?: Error | null;
-  refetch?: () => void;
-}
-
-const { findImages, grids, relationCounts, sceneSearch } = vi.hoisted(() => ({
-  findImages: vi.fn<(params: Record<string, unknown>) => Promise<unknown>>(),
-  relationCounts:
-    vi.fn<
-      (
-        type: string,
-        id: string | undefined,
-        instanceId: string | undefined,
-        options?: Record<string, boolean>
-      ) => CountsQuery
-    >(),
-  grids: {
-    GalleryGrid: vi.fn<(props: GridProps) => null>(() => null),
-    GroupGrid: vi.fn<(props: GridProps) => null>(() => null),
-    PerformerGrid: vi.fn<(props: GridProps) => null>(() => null),
-    StudioGrid: vi.fn<(props: GridProps) => null>(() => null),
-  },
-  sceneSearch: vi.fn<(props: SceneSearchProps) => null>(() => null),
-}));
+vi.mock("@/components/grids/index", () =>
+  import("./detail/detailPageMocks").then((m) => m.gridsModule)
+);
+vi.mock("@/components/scene-search/SceneSearch", () =>
+  import("./detail/detailPageMocks").then((m) => m.sceneSearchModule)
+);
+vi.mock("@/contexts/CardDisplaySettingsContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.cardDisplaySettingsModule)
+);
+vi.mock("@/contexts/ConfigContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.configModule)
+);
+vi.mock("@/contexts/UnitPreferenceContext", () =>
+  import("./detail/detailPageMocks").then((m) => m.unitPreferenceModule)
+);
+vi.mock("@/hooks/useNavigationState", () =>
+  import("./detail/detailPageMocks").then((m) => m.navigationStateModule)
+);
+vi.mock("@/hooks/useAuth", () =>
+  import("./detail/detailPageMocks").then((m) => m.authModule)
+);
+vi.mock("@/hooks/usePageTitle", () =>
+  import("./detail/detailPageMocks").then((m) => m.pageTitleModule)
+);
+vi.mock("@/themes/useTheme", () =>
+  import("./detail/detailPageMocks").then((m) => m.themeModule)
+);
 
 const tag = {
   id: "5",
@@ -57,44 +62,6 @@ const tag = {
   children: [{ id: "6", name: "Sub Tag", instanceId: "inst-a" }],
 };
 
-vi.mock("@/api", () => ({
-  libraryApi: {
-    findImages,
-    findTagById: vi.fn(),
-    updateRating: vi.fn(),
-    updateFavorite: vi.fn(),
-  },
-}));
-vi.mock("@/api/hooks", async (importOriginal) => ({
-  ...(await importOriginal<typeof hooksModule>()),
-  useRelationCounts: relationCounts,
-}));
-vi.mock("@/hooks/useEntityLookup", () => ({
-  useEntityLookup: () => ({ status: "found", entity: tag, retry: vi.fn() }),
-}));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
-vi.mock("@/hooks/useNavigationState", () => ({
-  useNavigationState: () => ({ goBack: vi.fn(), backButtonText: "Back" }),
-}));
-vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
-vi.mock("@/contexts/ConfigContext", () => ({
-  useConfig: () => ({ hasMultipleInstances: true }),
-}));
-vi.mock("@/contexts/CardDisplaySettingsContext", () => ({
-  useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
-}));
-vi.mock("@/themes/useTheme", () => ({
-  useTheme: () => ({ theme: undefined }),
-}));
-vi.mock("@/components/grids/index", () => grids);
-vi.mock("@/components/scene-search/SceneSearch", () => ({
-  default: sceneSearch,
-}));
-vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof uiModule>()),
-  PaginatedImageGrid: () => null,
-}));
-
 const ALL_COUNTS = {
   scenes: 3,
   galleries: 2,
@@ -104,40 +71,34 @@ const ALL_COUNTS = {
   groups: 1,
 };
 
+const COUNTS_PATH = "/library/tags/5/counts";
+
+let counts: DetailPageOptions["counts"];
+
 function renderPage(search: string) {
   return renderAt(`/tag/5?instance=inst-a&${search}`);
 }
 
-const CurrentSearch = () => (
-  <output data-testid="search">{useLocation().search}</output>
-);
-
 function renderAt(url: string) {
-  return render(
-    <MemoryRouter initialEntries={[url]}>
-      <Routes>
-        <Route path="/tag/:tagId" element={<TagDetail />} />
-      </Routes>
-      <CurrentSearch />
-    </MemoryRouter>
-  );
+  return renderDetailPage("tag", url, { entity: tag, counts });
 }
 
 /** The tag criterion a tab sends: its grid's lock, the scene search's, or the image request's */
 async function sentCriterion(tab: string): Promise<unknown> {
-  const lock = (grid: keyof typeof grids, filterKey: string) =>
-    must(grids[grid].mock.lastCall, `${grid}'s props`)[0].lockedFilters?.[
-      filterKey
-    ]?.tags;
+  const lock = async (grid: keyof typeof grids, filterKey: string) => {
+    await waitFor(() => expect(grids[grid]).toHaveBeenCalled());
+    return must(grids[grid].mock.lastCall, `${grid}'s props`)[0]
+      .lockedFilters?.[filterKey]?.tags;
+  };
   switch (tab) {
     case "scenes":
+      await waitFor(() => expect(sceneSearch).toHaveBeenCalled());
       return must(sceneSearch.mock.lastCall, "SceneSearch's props")[0]
         .permanentFilters?.tags;
     case "images":
-      await waitFor(() => expect(findImages).toHaveBeenCalled());
+      await waitFor(() => expect(bodiesTo("/library/images")).not.toEqual([]));
       return (
-        must(findImages.mock.lastCall, "the image request")[0]
-          .image_filter as Record<string, unknown>
+        lastBody("/library/images").image_filter as Record<string, unknown>
       ).tags;
     case "galleries":
       return lock("GalleryGrid", "gallery_filter");
@@ -152,8 +113,12 @@ async function sentCriterion(tab: string): Promise<unknown> {
   }
 }
 
-const toggle = () =>
-  screen.queryByRole("checkbox", { name: /Include sub-tags/ });
+const findToggle = () =>
+  screen.findByRole("checkbox", { name: /Include sub-tags/ });
+
+/** Waits for the counts to have answered and the tabs to show them */
+const countsShown = () =>
+  waitFor(() => expect(screen.getByText("Statistics")).toBeInTheDocument());
 
 const TABS = [
   "scenes",
@@ -164,19 +129,21 @@ const TABS = [
   "groups",
 ];
 
-describe("TagDetail: Include sub-tags", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
-  });
+beforeEach(() => {
+  resetDetailPageMocks();
+  counts = ALL_COUNTS;
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
+describe("TagDetail: Include sub-tags", () => {
   it.each(TABS)(
     "the %s tab shows the toggle and sends depth -1 when it is on",
     async (tab) => {
       renderPage(`tab=${tab}&includeSubTags=true`);
 
-      expect(toggle()).toBeChecked();
+      expect(await findToggle()).toBeChecked();
       expect(await sentCriterion(tab)).toEqual({
         value: ["5:inst-a"],
         modifier: "INCLUDES",
@@ -190,7 +157,7 @@ describe("TagDetail: Include sub-tags", () => {
     async (tab) => {
       renderPage(`tab=${tab}`);
 
-      expect(toggle()).not.toBeChecked();
+      expect(await findToggle()).not.toBeChecked();
       expect(await sentCriterion(tab)).toEqual({
         value: ["5:inst-a"],
         modifier: "INCLUDES",
@@ -200,8 +167,9 @@ describe("TagDetail: Include sub-tags", () => {
 
   it("ticking the toggle on the Performers tab sends depth -1", async () => {
     renderPage("tab=performers");
+    await sentCriterion("performers");
 
-    fireEvent.click(must(toggle(), "the Include sub-tags toggle"));
+    fireEvent.click(await findToggle());
 
     expect(await sentCriterion("performers")).toEqual({
       value: ["5:inst-a"],
@@ -212,35 +180,28 @@ describe("TagDetail: Include sub-tags", () => {
 });
 
 describe("TagDetail: counts", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-  });
-
   const tabButton = (label: string) =>
     screen.queryByRole("button", { name: new RegExp(`^${label}\\b`) });
 
-  it("tab badges and the default tab follow the counts", () => {
-    relationCounts.mockReturnValue({
-      data: {
-        counts: {
-          scenes: 0,
-          galleries: 3,
-          images: 0,
-          performers: 2,
-          studios: 0,
-          groups: 1,
-        },
-      },
-    });
-    renderPage("");
+  it("tab badges and the default tab follow the counts", async () => {
+    counts = {
+      scenes: 0,
+      galleries: 3,
+      images: 0,
+      performers: 2,
+      studios: 0,
+      groups: 1,
+    };
+    const { api } = renderPage("");
 
-    expect(relationCounts).toHaveBeenLastCalledWith("tag", "5", "inst-a", {
-      includeSubTags: false,
-    });
+    await waitFor(() =>
+      expect(tabButton("Galleries")).toHaveAttribute("aria-current", "page")
+    );
+    expect(requestsTo(api, COUNTS_PATH)).toEqual([
+      "/api/library/tags/5/counts?instanceId=inst-a",
+    ]);
     // The first tab with content opens; empty tabs are hidden
     expect(tabButton("Galleries")).toHaveTextContent("Galleries3");
-    expect(tabButton("Galleries")).toHaveAttribute("aria-current", "page");
     expect(tabButton("Performers")).toHaveTextContent("Performers2");
     expect(tabButton("Collections")).toHaveTextContent("Collections1");
     expect(tabButton("Scenes")).toBeNull();
@@ -256,143 +217,129 @@ describe("TagDetail: counts", () => {
     expect(stats).toHaveTextContent("Performers:2");
   });
 
-  it("while the counts load, every tab shows without a badge and none opens", () => {
-    relationCounts.mockReturnValue({ data: undefined });
-    renderPage("");
+  it("while the counts load, every tab shows without a badge and none opens", async () => {
+    counts = "loading";
+    const { api } = renderPage("");
 
-    expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/);
+    await waitFor(() =>
+      expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/)
+    );
+    expect(requestsTo(api, COUNTS_PATH)).toHaveLength(1);
     expect(tabButton("Galleries")).toHaveTextContent(/^Galleries$/);
     expect(sceneSearch).not.toHaveBeenCalled();
     expect(grids.GalleryGrid).not.toHaveBeenCalled();
     expect(screen.queryByText("This tag has no content in Peek")).toBeNull();
   });
 
-  it("when the counts fail, the tabs stay with the error and a Retry that asks again", () => {
-    const refetch = vi.fn();
-    relationCounts.mockReturnValue({
-      data: undefined,
-      error: new Error("Counts are down"),
-      refetch,
-    });
-    renderPage("");
+  it("when the counts fail, the tabs stay with the error and a Retry that asks again", async () => {
+    counts = "error";
+    const { api } = renderPage("");
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Counts are down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Counts are down"
+    );
     expect(tabButton("Scenes")).toHaveTextContent(/^Scenes$/);
     expect(sceneSearch).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(refetch).toHaveBeenCalledOnce();
+    await waitFor(() => expect(requestsTo(api, COUNTS_PATH)).toHaveLength(2));
   });
 
-  it("a counts failure after the counts were shown leaves the page as it is", () => {
-    relationCounts.mockReturnValue({
-      data: { counts: ALL_COUNTS },
-      error: new Error("Refresh failed"),
-    });
-    renderPage("");
+  it("a counts failure after the counts were shown leaves the page as it is", async () => {
+    let calls = 0;
+    counts = () =>
+      calls++ === 0
+        ? jsonResponse(200, { counts: ALL_COUNTS })
+        : jsonResponse(500, { error: "Refresh failed" });
+    const { api, queryClient } = renderPage("");
+    await countsShown();
 
+    await act(() => queryClient.refetchQueries({ type: "active" }));
+
+    expect(requestsTo(api, COUNTS_PATH)).toHaveLength(2);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("a tag with nothing to show says so once the counts answer", () => {
-    relationCounts.mockReturnValue({
-      data: {
-        counts: {
-          scenes: 0,
-          galleries: 0,
-          images: 0,
-          performers: 0,
-          studios: 0,
-          groups: 0,
-        },
-      },
-    });
+  it("a tag with nothing to show says so once the counts answer", async () => {
+    counts = {
+      scenes: 0,
+      galleries: 0,
+      images: 0,
+      performers: 0,
+      studios: 0,
+      groups: 0,
+    };
     renderPage("");
 
-    expect(screen.getByText("This tag has no content in Peek")).toBeVisible();
+    expect(
+      await screen.findByText("This tag has no content in Peek")
+    ).toBeVisible();
   });
 
-  it("a bare-id link counts and filters on the tag's own server", () => {
-    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
-    renderAt("/tag/5?includeSubTags=true");
+  it("a bare-id link counts and filters on the tag's own server", async () => {
+    const { api } = renderAt("/tag/5?includeSubTags=true");
 
-    expect(relationCounts).toHaveBeenLastCalledWith("tag", "5", "inst-a", {
-      includeSubTags: true,
+    expect(await sentCriterion("scenes")).toEqual({
+      value: ["5:inst-a"],
+      modifier: "INCLUDES",
+      depth: -1,
     });
-    expect(
-      must(sceneSearch.mock.lastCall, "SceneSearch's props")[0].permanentFilters
-        ?.tags
-    ).toEqual({ value: ["5:inst-a"], modifier: "INCLUDES", depth: -1 });
+    expect(requestsTo(api, COUNTS_PATH)).toEqual([
+      "/api/library/tags/5/counts?instanceId=inst-a&includeSubTags=true",
+    ]);
   });
 });
 
 describe("TagDetail: a statistic starts its tab clean", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
-  });
-
-  const search = () =>
-    Object.fromEntries(
-      new URLSearchParams(screen.getByTestId("search").textContent ?? "")
-    );
-
   /** The button of a statistic in the Statistics card */
-  const stat = (label: string) =>
+  const stat = async (label: string) =>
     must(
-      screen.getByText(label).parentElement?.querySelector("button"),
+      (await screen.findByText(label)).parentElement?.querySelector("button"),
       `the ${label} statistic`
     );
 
-  it("the Images statistic opens the Images tab at page 1 when the scenes list was on page 7", () => {
+  it("the Images statistic opens the Images tab at page 1 when the scenes list was on page 7", async () => {
     renderPage("page=7&sort=title&favorite=true&includeSubTags=true");
 
-    fireEvent.click(stat("Images:"));
+    fireEvent.click(await stat("Images:"));
+    // The Images tab asks for its first page
+    await screen.findByText(/No images found/);
 
-    expect(search()).toEqual({
+    expect(currentSearch()).toEqual({
       instance: "inst-a",
       includeSubTags: "true",
       tab: "images",
     });
   });
 
-  it("ticking Include sub-tags on page 5 shows page 1", () => {
+  it("ticking Include sub-tags on page 5 shows page 1", async () => {
     renderPage("tab=performers&page=5");
 
-    fireEvent.click(must(toggle(), "the Include sub-tags toggle"));
+    fireEvent.click(await findToggle());
 
-    expect(search()).toEqual({
+    expect(currentSearch()).toEqual({
       instance: "inst-a",
       tab: "performers",
       includeSubTags: "true",
     });
   });
 
-  it("with no scenes, the Scenes statistic's default tab is the first tab with content", () => {
-    relationCounts.mockReturnValue({
-      data: { counts: { ...ALL_COUNTS, scenes: 0 } },
-    });
+  it("with no scenes, the Scenes statistic's default tab is the first tab with content", async () => {
+    counts = { ...ALL_COUNTS, scenes: 0 };
     renderPage("tab=images&page=2");
 
     // Galleries is the first tab with content: switching to it drops `tab`
-    fireEvent.click(stat("Galleries:"));
+    fireEvent.click(await stat("Galleries:"));
 
-    expect(search().tab).toBeUndefined();
+    expect(currentSearch().tab).toBeUndefined();
   });
 });
 
 describe("TagDetail: title row", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
-    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
-  });
-
-  it("a tag page's title row wraps (has flex-wrap and min-w-0) and the name breaks words", () => {
+  it("a tag page's title row wraps (has flex-wrap and min-w-0) and the name breaks words", async () => {
     renderPage("tab=scenes");
 
-    const name = screen.getByText("Parent Tag", { selector: "h1 span" });
+    const name = await screen.findByText("Parent Tag", { selector: "h1 span" });
     expect(name).toHaveClass("min-w-0", "break-words");
     const row = must(name.parentElement, "the title row");
     expect(row).toHaveClass("flex", "flex-wrap", "items-center", "min-w-0");
