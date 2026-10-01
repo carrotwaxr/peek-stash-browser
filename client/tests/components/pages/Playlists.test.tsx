@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as clientModule from "@/api/client";
 import Playlists from "@/components/pages/Playlists";
 import AddToPlaylistButton from "@/components/ui/AddToPlaylistButton";
+import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 import { showError, showSuccess } from "@/utils/toast";
 
 const { mockApiGet, mockApiPost, mockApiDelete } = vi.hoisted(() => ({
@@ -213,5 +214,27 @@ describe("Playlists page", () => {
       description: undefined,
     });
     expect(showSuccess).toHaveBeenCalledWith("Playlist created successfully!");
+  });
+  it("the create dialog has role dialog and closes on Escape", async () => {
+    render(
+      <ShortcutScopeProvider>
+        <MemoryRouterWithQuery>
+          <Playlists />
+        </MemoryRouterWithQuery>
+      </ShortcutScopeProvider>
+    );
+
+    fireEvent.click(await screen.findByText("+ New Playlist"));
+
+    expect(
+      screen.getByRole("dialog", { name: "Create New Playlist" })
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Playlist Name *")).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

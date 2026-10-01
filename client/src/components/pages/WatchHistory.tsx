@@ -18,6 +18,7 @@ import { makeCompositeKey } from "../../utils/compositeKey";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import {
   Button,
+  ConfirmDialog,
   LoadingSpinner,
   PageHeader,
   PageLayout,
@@ -347,51 +348,18 @@ const WatchHistory = () => {
       )}
 
       {/* Confirmation Dialog */}
-      {showConfirmDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowConfirmDialog(false)}
-        >
-          <div
-            className="p-6 rounded-lg max-w-md mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="text-xl font-bold mb-4"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Clear Watch History?
-            </h3>
-            <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
-              This clears your scene watch history: plays, watch time, resume
-              points and O counts, and the performer, studio and tag totals
-              built from them. Image views and image O counts are kept. This
-              cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button
-                onClick={() => setShowConfirmDialog(false)}
-                disabled={isClearing}
-                variant="secondary"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void handleClearHistory()}
-                disabled={isClearing}
-                variant="destructive"
-                loading={isClearing}
-              >
-                Clear History
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        onClose={() => {
+          if (!isClearing) setShowConfirmDialog(false);
+        }}
+        onConfirm={() => {
+          if (!isClearing) void handleClearHistory();
+        }}
+        title="Clear Watch History?"
+        message="This clears your scene watch history: plays, watch time, resume points and O counts, and the performer, studio and tag totals built from them. Image views and image O counts are kept. This cannot be undone."
+        confirmText="Clear History"
+      />
     </PageLayout>
   );
 };

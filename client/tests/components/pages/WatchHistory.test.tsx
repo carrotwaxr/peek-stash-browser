@@ -20,6 +20,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { SignedIn } from "@tests/helpers/SignedIn";
 import { must } from "@tests/testUtils";
@@ -27,6 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/api/queryClient";
 import { queryKeys } from "@/api/queryKeys";
 import WatchHistory from "@/components/pages/WatchHistory";
+import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 import { jsonResponse, requestsTo, stubApi } from "../../helpers/stubApi";
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
@@ -51,7 +53,9 @@ const rowStates = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("@/components/ui/index", () => ({
+vi.mock("@/components/ui/index", async () => ({
+  // The real dialog: the page's clear confirmation is under test
+  ConfirmDialog: (await import("@/components/ui/ConfirmDialog")).default,
   Button: ({
     children,
     onClick,
@@ -158,7 +162,9 @@ describe("WatchHistory", () => {
     render(
       <QueryClientProvider client={client}>
         <SignedIn>
-          <RouterProvider router={router} />
+          <ShortcutScopeProvider>
+            <RouterProvider router={router} />
+          </ShortcutScopeProvider>
         </SignedIn>
       </QueryClientProvider>
     );
@@ -365,5 +371,35 @@ describe("WatchHistory", () => {
         "This clears your scene watch history: plays, watch time, resume points and O counts, and the performer, studio and tag totals built from them. Image views and image O counts are kept. This cannot be undone."
       )
     ).toBeTruthy();
+  });
+  it("Clear History asks in a ConfirmDialog, closes on Escape without clearing, and clears on confirm", async () => {
+    const fetchMock = stubApi({
+      [WATCHED]: answer([scene("1")], 1),
+      "/watch-history": () => jsonResponse(200, { success: true }),
+    });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("row")).toHaveLength(1);
+    });
+    const deletes = () =>
+      fetchMock.mock.calls.filter(([, init]) => init?.method === "DELETE");
+
+    fireEvent.click(screen.getByText("Clear History"));
+    expect(
+      screen.getByRole("dialog", { name: "Clear Watch History?" })
+    ).toBeTruthy();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(deletes()).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("Clear History"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(must(within(dialog).getByText("Clear History")));
+
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });

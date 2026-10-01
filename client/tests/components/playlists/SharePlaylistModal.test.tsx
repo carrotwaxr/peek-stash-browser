@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { jsonResponse, stubApi } from "@tests/helpers/stubApi";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SharePlaylistModal from "@/components/playlists/SharePlaylistModal";
+import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 
 vi.mock("@/utils/toast", () => ({
   showError: vi.fn(),
@@ -60,5 +61,35 @@ describe("SharePlaylistModal", () => {
     expect(puts.map(([, init]) => init?.body)).toEqual([
       JSON.stringify({ groupIds: [1, 3] }),
     ]);
+  });
+  it("the share dialog has role dialog and closes on Escape", async () => {
+    stubApi({
+      "/groups/user/mine": () => jsonResponse(200, { groups: [] }),
+      "/playlists/5/shares": () => jsonResponse(200, { shares: [] }),
+    });
+    const onClose = vi.fn();
+    render(
+      <ShortcutScopeProvider>
+        <SharePlaylistModal
+          playlistId={5}
+          playlistName="Mine"
+          isOpen
+          onClose={onClose}
+        />
+      </ShortcutScopeProvider>
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Share Playlist" })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("You are not a member of any groups.")
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+
+    expect(onClose).toHaveBeenCalled();
   });
 });
