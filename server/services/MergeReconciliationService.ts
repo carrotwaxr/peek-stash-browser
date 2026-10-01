@@ -13,9 +13,9 @@ import type {
   OrphanedScene,
 } from "@peek/shared-types/api/mergeRecovery.js";
 import type { Prisma } from "@prisma/client";
-import { ValidationError } from "../middleware/errorHandler.js";
+import { ConflictError, ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
-import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import { bumpLibrary } from "./LibraryStamp.js";
@@ -62,6 +62,31 @@ function instanceName(instanceId: string): string {
 /** "5:default", for log lines */
 function refLabel(scene: SceneRef): string {
   return `${scene.id}:${scene.instanceId}`;
+}
+
+/**
+ * Throws ConflictError (409) unless the scene is still soft-deleted on its
+ * instance. Merge Recovery lists a scene that a later sync can restore (it
+ * came back to Stash); its users' data then belongs to a live scene again,
+ * so neither a discard nor a merge may touch it. Run inside the write unit
+ * that changes the data, so no sync's restore lands between check and
+ * write.
+ */
+async function assertStillDeleted(
+  db: Pick<Prisma.TransactionClient, "stashScene">,
+  scene: SceneRef
+): Promise<void> {
+  const row = await db.stashScene.findUnique({
+    where: {
+      id_stashInstanceId: { id: scene.id, stashInstanceId: scene.instanceId },
+    },
+    select: { deletedAt: true },
+  });
+  if (!row || row.deletedAt === null) {
+    throw new ConflictError(
+      `Scene ${scene.id} is not a deleted scene on ${instanceName(scene.instanceId)}: a sync restored it, so its data stays`
+    );
+  }
 }
 
 export interface PhashMatch {
@@ -254,6 +279,8 @@ class MergeReconciliationService {
         | { success: false }
         | { success: true; mergeRecordId: string; playlistItems: number }
       > => {
+        // A sync may have restored the source since it was listed
+        await assertStillDeleted(tx, source);
         const sourceHistory = await tx.watchHistory.findUnique({
           where: sourceKey,
         });
@@ -428,7 +455,9 @@ class MergeReconciliationService {
    * Reconcile all user data for a source scene to a target scene on the
    * same instance: every user with a play history, a rating or a playlist
    * entry on the source. Throws MergeTargetError unless the target is a
-   * live scene of the source's instance other than the source.
+   * live scene of the source's instance other than the source, and
+   * ConflictError (409) when the source is no longer deleted (each user's
+   * transfer checks again inside its own write unit).
    */
   async reconcileScene(
     source: SceneRef,
@@ -458,6 +487,7 @@ class MergeReconciliationService {
         `Scene ${target.id} is not a live scene on ${instanceName(target.instanceId)}`
       );
     }
+    await assertStillDeleted(prisma, source);
 
     const onSource = { sceneId: source.id, instanceId: source.instanceId };
     const [histories, ratings, playlistItems] = await Promise.all([
@@ -620,18 +650,23 @@ class MergeReconciliationService {
    * Discard what users' data still holds on a scene of one instance: its
    * WatchHistory and SceneRating rows and its PlaylistItem rows, in one
    * write unit. A playlist keeps a gap where an entry was, which is
-   * harmless (`removeUnavailableItems` leaves the same).
+   * harmless (`removeUnavailableItems` leaves the same). Throws
+   * ConflictError (409), deleting nothing, when the scene is no longer
+   * deleted (a sync restored it), checked in the same unit.
    */
   async discardOrphanedData(
     scene: SceneRef
   ): Promise<Omit<DiscardOrphanResponse, "ok">> {
     const where = { sceneId: scene.id, instanceId: scene.instanceId };
     const [watchHistoryResult, ratingsResult, playlistResult] =
-      await dbWriteBatch("history.discard", [
-        prisma.watchHistory.deleteMany({ where }),
-        prisma.sceneRating.deleteMany({ where }),
-        prisma.playlistItem.deleteMany({ where }),
-      ]);
+      await dbWriteTransaction("history.discard", async (tx) => {
+        await assertStillDeleted(tx, scene);
+        return [
+          await tx.watchHistory.deleteMany({ where }),
+          await tx.sceneRating.deleteMany({ where }),
+          await tx.playlistItem.deleteMany({ where }),
+        ] as const;
+      });
     // Playlists changed for every user holding the scene
     bumpLibrary();
 

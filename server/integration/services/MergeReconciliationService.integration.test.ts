@@ -474,6 +474,60 @@ describeWithDb("MergeReconciliationService (integration)", () => {
     expect(await orphansNamed5()).toEqual([]);
   });
 
+  it("discard refuses a scene a sync restored and deletes nothing", async () => {
+    const playlistId = must((await seedPlaylistEntries("5", A, 1))[0]);
+    // A:5 left Stash and came back: a sync cleared its soft-delete while
+    // Merge Recovery still listed it
+
+    await expect(
+      mergeReconciliationService.discardOrphanedData({ id: "5", instanceId: A })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(await history(u, A, "5")).toMatchObject({ playCount: 3 });
+    expect(await rating(u, A, "5")).toMatchObject({ rating: 60 });
+    expect(await prisma.playlistItem.count({ where: { playlistId } })).toBe(1);
+  });
+
+  it("reconcile refuses a source a sync restored and moves nothing", async () => {
+    await seedScene(A, "7", PHASH);
+    const playlistId = must((await seedPlaylistEntries("5", A, 1))[0]);
+
+    await expect(
+      mergeReconciliationService.reconcileScene(
+        { id: "5", instanceId: A },
+        { id: "7", instanceId: A },
+        PHASH,
+        null
+      )
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(await mergeRecords()).toEqual([]);
+    expect(await history(u, A, "5")).toMatchObject({ playCount: 3 });
+    expect(await history(u, A, "7")).toBeNull();
+    const items = await prisma.playlistItem.findMany({
+      where: { playlistId },
+      select: { sceneId: true },
+    });
+    expect(items).toEqual([{ sceneId: "5" }]);
+  });
+
+  it("a user's transfer refuses a source a sync restored", async () => {
+    await seedScene(A, "7", PHASH);
+
+    await expect(
+      mergeReconciliationService.transferUserData(
+        { id: "5", instanceId: A },
+        { id: "7", instanceId: A },
+        u,
+        PHASH,
+        null
+      )
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(await history(u, A, "5")).toMatchObject({ playCount: 3 });
+    expect(await mergeRecords()).toEqual([]);
+  });
+
   it("a scene soft-deleted by an interrupted cleanup is reconciled by the next one", async () => {
     await seedScene(A, "7", PHASH);
     // A:5 left Stash in a cleanup that stopped before reconciling it

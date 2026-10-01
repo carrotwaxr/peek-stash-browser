@@ -6,6 +6,7 @@ import type {
 } from "@peek/shared-types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { apiGet, apiPost } from "../../../api";
+import { ApiError } from "../../../api/client";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { makeCompositeKey } from "../../../utils/compositeKey";
 import { formatDate } from "../../../utils/date";
@@ -28,6 +29,9 @@ const orphanKey = (orphan: OrphanedScene) =>
 
 const orphanPath = (orphan: OrphanedScene) =>
   `/admin/orphaned-scenes/${encodeURIComponent(orphanKey(orphan))}`;
+
+/** What a refused discard or transfer of a restored scene says */
+const RESTORED_MESSAGE = "This scene is back in Stash, so its data was kept";
 
 const MergeRecoveryTab = () => {
   const [orphans, setOrphans] = useState<OrphanedScene[]>([]);
@@ -83,6 +87,18 @@ const MergeRecoveryTab = () => {
     }
   };
 
+  /**
+   * The server refuses (409) a scene a sync restored since the list was
+   * read: say its data stays and read the list again, which no longer
+   * holds it. True when the error was that refusal.
+   */
+  const keptBecauseRestored = (error: unknown): boolean => {
+    if (!(error instanceof ApiError) || error.status !== 409) return false;
+    showError(RESTORED_MESSAGE);
+    void fetchOrphans();
+    return true;
+  };
+
   /** Transfer to `targetId`, a scene id on the orphan's instance */
   const handleReconcile = async (orphan: OrphanedScene, targetId: string) => {
     try {
@@ -92,8 +108,8 @@ const MergeRecoveryTab = () => {
       });
       showSuccess("Activity transferred successfully");
       void fetchOrphans();
-    } catch {
-      showError("Failed to reconcile scene");
+    } catch (error) {
+      if (!keptBecauseRestored(error)) showError("Failed to reconcile scene");
     } finally {
       setProcessing(null);
     }
@@ -115,8 +131,8 @@ const MergeRecoveryTab = () => {
       await apiPost<DiscardOrphanResponse>(`${orphanPath(orphan)}/discard`);
       showSuccess("Orphaned data discarded");
       void fetchOrphans();
-    } catch {
-      showError("Failed to discard data");
+    } catch (error) {
+      if (!keptBecauseRestored(error)) showError("Failed to discard data");
     } finally {
       setProcessing(null);
     }
