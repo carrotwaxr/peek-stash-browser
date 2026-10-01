@@ -4,6 +4,11 @@ import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
 import {
+  getPreviewProbe,
+  setPreviewProbe,
+} from "../../utils/previewProbeCache";
+import { releaseVideoOnUnmount } from "../../utils/releaseVideo";
+import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
 } from "../../utils/spriteSheet";
@@ -154,10 +159,24 @@ const SceneCardPreview = ({
           scene.instanceId
         );
 
-        // Test if high quality preview exists by doing a HEAD request
-        const response = await fetch(previewUrl, { method: "HEAD" });
+        // Test if high quality preview exists by doing a HEAD request, once
+        // per scene: a card that remounts reads the earlier answer
+        const probedType =
+          preferredPreviewType === "mp4" || preferredPreviewType === "webp"
+            ? preferredPreviewType
+            : null;
+        let probe = probedType
+          ? getPreviewProbe(probedType, scene.id, scene.instanceId)
+          : undefined;
+        if (probe === undefined) {
+          const response = await fetch(previewUrl, { method: "HEAD" });
+          probe = response.ok ? "ok" : "missing";
+          if (probedType) {
+            setPreviewProbe(probedType, scene.id, scene.instanceId, probe);
+          }
+        }
 
-        if (response.ok) {
+        if (probe === "ok") {
           // High quality preview available, use it
           setActivePreviewType(preferredPreviewType);
           setIsLoading(false);
@@ -316,6 +335,7 @@ const SceneCardPreview = ({
         shouldShowAnimation &&
         previewDataLoaded && (
           <video
+            ref={releaseVideoOnUnmount}
             src={getPreviewUrl() ?? undefined}
             className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}

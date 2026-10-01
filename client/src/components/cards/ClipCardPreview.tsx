@@ -2,14 +2,24 @@ import { useRef, useState } from "react";
 import { getClipPreviewUrl } from "../../api";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
+import { releaseVideoOnUnmount } from "../../utils/releaseVideo";
 import type { Clip } from "./ClipCard";
 
 interface Props {
   clip: Clip;
   objectFit?: "contain" | "cover";
+  /**
+   * Preview while the card is in view (a single-column touch layout, where
+   * nothing hovers) instead of while the pointer is over it
+   */
+  autoplayOnScroll?: boolean;
 }
 
-const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
+const ClipCardPreview = ({
+  clip,
+  objectFit = "cover",
+  autoplayOnScroll = false,
+}: Props) => {
   const [isHovering, setIsHovering] = useState(false);
   const hasHoverCapability = useHoverCapable();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +27,14 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const shouldLoadScreenshot = useInView(containerRef, {
     rootMargin: "200px",
     once: true,
+  });
+  // Scroll autoplay, as on the scene cards: the thumbnail is 90% visible,
+  // clear of the viewport's top and bottom 5%
+  const isInView = useInView(containerRef, {
+    rootMargin: "-5% 0px",
+    threshold: [0, 0.5, 0.9, 1.0],
+    minRatio: 0.9,
+    skip: !autoplayOnScroll,
   });
 
   // Get preview URLs (every clip from the API carries its instance)
@@ -27,7 +45,9 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const screenshotUrl =
     clip.screenshotUrl || clip.scene?.pathScreenshot || null;
 
-  const shouldShowVideo = isHovering && hasHoverCapability && previewUrl;
+  const shouldShowVideo =
+    (autoplayOnScroll ? isInView : isHovering && hasHoverCapability) &&
+    previewUrl;
   const objectFitClass =
     objectFit === "cover" ? "object-cover" : "object-contain";
 
@@ -58,6 +78,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
       {/* Video preview overlay - only render when hovering to trigger load */}
       {shouldShowVideo && (
         <video
+          ref={releaseVideoOnUnmount}
           src={previewUrl}
           className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
           style={{ backgroundColor: "var(--bg-secondary)" }}

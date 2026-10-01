@@ -1,6 +1,6 @@
 import { act } from "react";
 import { render } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Clip } from "../../../src/components/cards/ClipCard";
 import ClipCardPreview from "../../../src/components/cards/ClipCardPreview";
 
@@ -19,7 +19,13 @@ beforeEach(() => {
           // Trigger intersection asynchronously after observer is assigned
           queueMicrotask(() => {
             intersectionCallback(
-              [{ isIntersecting: true, target } as IntersectionObserverEntry],
+              [
+                {
+                  isIntersecting: true,
+                  intersectionRatio: 1,
+                  target,
+                } as IntersectionObserverEntry,
+              ],
               {} as IntersectionObserver
             );
           });
@@ -30,6 +36,14 @@ beforeEach(() => {
     }
   );
   vi.stubGlobal("IntersectionObserver", mockIntersectionObserver);
+});
+
+/** Spies on the media element, restored after each test */
+const mediaSpies: { mockRestore: () => void }[] = [];
+
+afterEach(() => {
+  mediaSpies.forEach((spy) => spy.mockRestore());
+  mediaSpies.length = 0;
 });
 
 const baseClip: Clip = {
@@ -88,5 +102,48 @@ describe("ClipCardPreview", () => {
     const img = container.querySelector("img");
     expect(img).toBeNull();
     expect(container.textContent).toContain("No preview");
+  });
+
+  it("leaving the card clears the video's src before unmount", async () => {
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    mediaSpies.push(pause, load);
+    const { container, rerender } = render(
+      <ClipCardPreview clip={baseClip} autoplayOnScroll />
+    );
+    await act(() => Promise.resolve());
+    const video = container.querySelector("video");
+    expect(video).not.toBeNull();
+
+    // Out of view: the preview unmounts
+    rerender(<ClipCardPreview clip={baseClip} />);
+
+    expect(container.querySelector("video")).toBeNull();
+    expect(video?.hasAttribute("src")).toBe(false);
+    expect(pause).toHaveBeenCalled();
+    expect(load).toHaveBeenCalled();
+  });
+
+  it("with autoplayOnScroll, a clip card in view plays its preview without hover", async () => {
+    const { container } = render(
+      <ClipCardPreview clip={baseClip} autoplayOnScroll />
+    );
+    await act(() => Promise.resolve());
+
+    expect(container.querySelector("video")).toHaveAttribute(
+      "src",
+      "/api/proxy/clip/1/preview"
+    );
+  });
+
+  it("without autoplayOnScroll, a clip card in view stays a still on a device that cannot hover", async () => {
+    const { container } = render(<ClipCardPreview clip={baseClip} />);
+    await act(() => Promise.resolve());
+
+    expect(container.querySelector("video")).toBeNull();
   });
 });

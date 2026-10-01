@@ -34,6 +34,8 @@ interface Props {
   className?: string;
   fromPageTitle?: string;
   onHideSuccess?: (entityId: string, entityType: string) => void;
+  /** Preview as the card scrolls into view (a single-column touch layout) */
+  autoplayOnScroll?: boolean;
 }
 
 // Memoised: a grid that renders again with the same row skips this card
@@ -48,6 +50,7 @@ const ClipCard = memo(
         className = "",
         fromPageTitle,
         onHideSuccess,
+        autoplayOnScroll = false,
       },
       ref
     ) => {
@@ -100,7 +103,7 @@ const ClipCard = memo(
       const renderImageContent = () => (
         <>
           {/* Animated clip preview (handles its own image/video) */}
-          <ClipCardPreview clip={clip} />
+          <ClipCardPreview clip={clip} autoplayOnScroll={autoplayOnScroll} />
 
           {/* Duration badge */}
           {formattedDuration && (
