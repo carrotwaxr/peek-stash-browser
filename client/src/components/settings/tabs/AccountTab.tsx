@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES_TEXT,
+  validatePassword,
+} from "@peek/shared-types/password.js";
 import { Copy, RefreshCw } from "lucide-react";
 import {
   apiPost,
@@ -94,16 +99,9 @@ const AccountTab = () => {
       return;
     }
 
-    if (newPassword.length < 8) {
-      showError("Password must be at least 8 characters");
-      return;
-    }
-    if (!/[a-zA-Z]/.test(newPassword)) {
-      showError("Password must contain at least one letter");
-      return;
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      showError("Password must contain at least one number");
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.valid) {
+      showError(passwordCheck.errors.join(". "));
       return;
     }
 
@@ -180,7 +178,7 @@ const AccountTab = () => {
                 className="text-xs mb-1"
                 style={{ color: "var(--text-muted)" }}
               >
-                8+ characters with at least one letter and one number
+                {PASSWORD_RULES_TEXT}
               </p>
               <input
                 type="password"
@@ -194,7 +192,7 @@ const AccountTab = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
               />
             </div>
 
@@ -218,7 +216,7 @@ const AccountTab = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
               />
             </div>
 

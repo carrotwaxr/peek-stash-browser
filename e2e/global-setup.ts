@@ -17,7 +17,6 @@
  * there. The run admin has Sync to Stash off, as every new user does.
  */
 import { type APIRequestContext, request } from "@playwright/test";
-import { randomBytes } from "node:crypto";
 import { mustOk } from "./support/api";
 import { deleteGroups, deleteUsers } from "./support/cleanup";
 import {
@@ -29,6 +28,7 @@ import {
   replayStatsUrl,
   replayUrl,
 } from "./support/env";
+import { randomPassword } from "./support/users";
 
 interface SetupStatus {
   setupComplete: boolean;
@@ -237,7 +237,7 @@ async function setUpDevStack(
 
   const runAdmin = {
     username: `e2e-${runId}-admin`,
-    password: randomBytes(18).toString("base64url"),
+    password: randomPassword(),
   };
   await mustOk(
     await api.post("/api/user/create", {

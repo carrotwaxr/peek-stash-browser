@@ -1,4 +1,9 @@
 import { useRef, useState } from "react";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES_TEXT,
+  validatePassword,
+} from "@peek/shared-types/password.js";
 import { apiPost } from "../../api";
 import { Button, Modal } from "../ui/index";
 
@@ -23,8 +28,9 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.errors.join(". "));
       return;
     }
 
@@ -114,10 +120,10 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
                 color: "var(--text-primary)",
               }}
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
             />
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              Must be at least 6 characters
+              {PASSWORD_RULES_TEXT}
             </p>
           </div>
 

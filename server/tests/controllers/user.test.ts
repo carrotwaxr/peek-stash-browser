@@ -1138,9 +1138,17 @@ describe("User Controller", () => {
   // ─── createUser ───
 
   describe("createUser", () => {
+    // The file mocks validatePassword as always valid; these cases run the rule
+    beforeEach(async () => {
+      const actual = await vi.importActual<{
+        validatePassword: typeof validatePassword;
+      }>("../../utils/passwordValidation.js");
+      mockValidatePassword.mockImplementation(actual.validatePassword);
+    });
+
     it("returns 403 when non-admin", async () => {
       const req = reqFor(createUser, {
-        body: { username: "new", password: "Pass123" },
+        body: { username: "new", password: "Pass1234" },
         user: USER,
       });
       const res = resFor(createUser);
@@ -1160,7 +1168,7 @@ describe("User Controller", () => {
 
     it("creating a user with a 256-character name answers 400", async () => {
       const req = reqFor(createUser, {
-        body: { username: "a".repeat(256), password: "Pass123" },
+        body: { username: "a".repeat(256), password: "Pass1234" },
         user: ADMIN,
       });
       const res = resFor(createUser);
@@ -1177,12 +1185,54 @@ describe("User Controller", () => {
       const res = resFor(createUser);
       await createUser(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getErrorBody().error).toMatch(/6 characters/);
+      expect(res._getErrorBody().error).toMatch(/at least 8 characters/);
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it("createUser refuses abcdef", async () => {
+      const req = reqFor(createUser, {
+        body: { username: "new", password: "abcdef" },
+        user: ADMIN,
+      });
+      const res = resFor(createUser);
+      await createUser(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it("createUser refuses a password without a number", async () => {
+      const req = reqFor(createUser, {
+        body: { username: "new", password: "abcdefgh" },
+        user: ADMIN,
+      });
+      const res = resFor(createUser);
+      await createUser(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toMatch(/at least one number/);
+    });
+
+    it("createUser accepts Pass1234", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 5,
+          username: "new",
+          role: "USER",
+          createdAt: new Date(),
+        })
+      );
+      const req = reqFor(createUser, {
+        body: { username: "new", password: "Pass1234" },
+        user: ADMIN,
+      });
+      const res = resFor(createUser);
+      await createUser(req, res);
+      expect(res._getStatus()).toBe(201);
     });
 
     it("returns 400 for invalid role", async () => {
       const req = reqFor(createUser, {
-        body: { username: "new", password: "Pass123", role: "SUPERADMIN" },
+        body: { username: "new", password: "Pass1234", role: "SUPERADMIN" },
         user: ADMIN,
       });
       const res = resFor(createUser);
@@ -1194,7 +1244,7 @@ describe("User Controller", () => {
     it("returns 409 when username already exists", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 5 }));
       const req = reqFor(createUser, {
-        body: { username: "existing", password: "Pass123" },
+        body: { username: "existing", password: "Pass1234" },
         user: ADMIN,
       });
       const res = resFor(createUser);
@@ -1215,7 +1265,7 @@ describe("User Controller", () => {
       const res = resFor(createUser);
       await createUser(
         reqFor(createUser, {
-          body: { username: "new", password: "Pass123" },
+          body: { username: "new", password: "Pass1234" },
           user: ADMIN,
         }),
         res
@@ -1234,7 +1284,7 @@ describe("User Controller", () => {
         })
       );
       const req = reqFor(createUser, {
-        body: { username: "new", password: "Pass123" },
+        body: { username: "new", password: "Pass1234" },
         user: ADMIN,
       });
       const res = resFor(createUser);
@@ -1260,7 +1310,7 @@ describe("User Controller", () => {
         })
       );
       const req = reqFor(createUser, {
-        body: { username: "new", password: "Pass123", role: "" },
+        body: { username: "new", password: "Pass1234", role: "" },
         user: ADMIN,
       });
       const res = resFor(createUser);
@@ -1284,7 +1334,7 @@ describe("User Controller", () => {
         })
       );
       const req = reqFor(createUser, {
-        body: { username: "admin2", password: "Pass123", role: "ADMIN" },
+        body: { username: "admin2", password: "Pass1234", role: "ADMIN" },
         user: ADMIN,
       });
       const res = resFor(createUser);

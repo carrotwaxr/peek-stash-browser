@@ -404,6 +404,22 @@ describe("Setup Controller", () => {
       );
     });
 
+    it("create-admin refuses a password without a digit", async () => {
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      const res = resFor(createFirstAdmin);
+      await createFirstAdmin(
+        reqFor(createFirstAdmin, {
+          body: { username: "admin", password: "abcdefgh" },
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getErrorBody().error).toMatch(/at least one number/);
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("returns 403 when users already exist", async () => {
       mockPrisma.user.count.mockResolvedValue(1);
 
@@ -463,7 +479,7 @@ describe("Setup Controller", () => {
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getErrorBody().error).toContain("at least 6 characters");
+      expect(res._getErrorBody().error).toContain("at least 8 characters");
     });
   });
 
