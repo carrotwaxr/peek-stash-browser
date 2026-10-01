@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { actAsync, createAuthValue } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/api/queryKeys";
 import {
   AuthContext,
   type AuthContextValue,
@@ -92,6 +93,7 @@ function renderTheme(initialAuth: AuthContextValue) {
   const view = renderHook(() => useTheme(), { wrapper });
   return {
     ...view,
+    queryClient,
     setAuth: (next: AuthContextValue) => {
       auth = next;
       view.rerender();
@@ -286,17 +288,21 @@ describe("ThemeProvider", () => {
 
   it("changeTheme applies at once, writes localStorage and the cache, and PUTs { theme } through useUpdateUserSettings", async () => {
     settingsAnswer = () => userSettingsResponse({ theme: "peek" });
-    const { result } = renderTheme(signedIn());
+    const { result, queryClient } = renderTheme(signedIn());
+    // The stored settings are in (a save before they load reads them again)
     await waitFor(() => {
-      expect(calls("/user/settings")).toBe(1);
+      expect(queryClient.getQueryData(queryKeys.user.settings())).toBeDefined();
     });
+    expect(calls("/user/settings")).toBe(1);
 
-    await act(async () => {
+    act(() => {
       result.current.changeTheme("light");
-      await Promise.resolve();
     });
 
-    expect(result.current.currentTheme).toBe("light");
+    // The settings cache takes the key as the save starts
+    await waitFor(() => {
+      expect(result.current.currentTheme).toBe("light");
+    });
     expect(rootBackground()).toBe(
       builtInThemes.light.properties["--bg-primary"]
     );
