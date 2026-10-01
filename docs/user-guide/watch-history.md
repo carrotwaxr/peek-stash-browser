@@ -27,15 +27,13 @@ For each scene you watch, Peek remembers:
 
 ### Automatic Resume
 
-When you click Play on a scene you've partially watched:
+A scene resumes where you left off when you open it from **Continue Watching** (Home) or from the **Watch History** page:
 
-1. Video player opens
-2. You see a **"Resume from [timestamp]"** notification
-3. Player automatically jumps to where you left off
-4. Click **"Start from beginning"** if you prefer to restart
+1. Click Play on the scene
+2. The player opens and jumps to your last position
+3. The scenes after it in that queue resume the same way, each from its own last position (a scene you have not started plays from the beginning)
 
-!!! tip "Quick Resume"
-    The resume prompt appears for 5 seconds. If you do nothing, playback continues from your last position automatically!
+A scene opened from anywhere else (a scene card, a search or a playlist) starts from the beginning, even if you have watched part of it. Your saved position is replaced as you watch it again.
 
 ### From Scene Cards
 
@@ -45,10 +43,7 @@ Scene cards show your progress visually:
 - **Percentage indicator** (e.g., "65% watched")
 - **Blue progress bar** fills from left to right as you watch
 
-**To resume from a scene card:**
-1. Find the scene (look for the progress bar)
-2. Click Play
-3. Playback resumes automatically
+A card's progress bar shows where you stopped, but playing from the card starts at the beginning. To pick up where you left off, use Continue Watching or Watch History.
 
 ## Continue Watching
 
@@ -168,14 +163,14 @@ Combine watch history with playlists:
 2. Add scenes you plan to watch later
 3. Watch them at your own pace
 4. Progress tracked automatically
-5. Resume from **Continue Watching** or the playlist
+5. Resume from **Continue Watching**; a playlist plays each scene from the beginning
 
 ### Track Rewatches
 
 Want to rewatch a favorite scene?
 
-1. Click Play on an already-watched scene
-2. Choose **"Start from beginning"** when prompted
+1. Open an already-watched scene from its card or the scene page (these start from the beginning)
+2. Watch it again
 3. Watch count increments
 4. New progress tracked
 
@@ -184,6 +179,7 @@ Want to rewatch a favorite scene?
 ### Resume not working
 
 **Solution:**
+- Open the scene from **Continue Watching** or **Watch History**: a scene opened from a card, a search or a playlist starts from the beginning
 - Make sure you're logged in (watch history is per-user)
 - Check that you watched for at least 10 seconds (minimum tracking threshold)
 - Verify you're using the same user account
