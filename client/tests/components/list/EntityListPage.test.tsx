@@ -355,6 +355,22 @@ describe("EntityListPage", () => {
     expect(handlers.size).toBe(1);
   });
 
+  it("table view renders one column picker (the toolbar's)", async () => {
+    api.findPerformers.mockResolvedValue(
+      response("findPerformers", "performers", rowsOf("perf", 2), 2)
+    );
+
+    renderListPage(<Performers />, {
+      initialEntries: ["/performers?view=table"],
+    });
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Columns" })).toHaveLength(1);
+    // No spare header cell is left where the second picker was
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.every((th) => (th.textContent ?? "") !== "")).toBe(true);
+  });
+
   it("the Tags hierarchy view opens from a view=hierarchy URL and from a default preset with viewMode hierarchy", async () => {
     api.findTagTree.mockResolvedValue({
       tags: [

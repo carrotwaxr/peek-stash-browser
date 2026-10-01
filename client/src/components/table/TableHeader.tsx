@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { getColumnSortField } from "../../config/tableColumns";
 
@@ -21,7 +20,6 @@ interface Props {
   onSort?: (field: string, direction: "ASC" | "DESC") => void;
   onColumnContextMenu?: (columnId: string, event: React.MouseEvent) => void;
   entityType: string;
-  columnsPopover?: ReactNode;
 }
 
 /**
@@ -33,7 +31,6 @@ const TableHeader = ({
   onSort,
   onColumnContextMenu,
   entityType,
-  columnsPopover,
 }: Props) => {
   /**
    * Handle click on a sortable column header
@@ -88,22 +85,18 @@ const TableHeader = ({
   };
 
   return (
-    <thead>
+    // Sticky on tablets and desktops, where the table scrolls in its own box;
+    // a phone scrolls the page. The opaque background hides rows passing under.
+    <thead
+      className="md:sticky md:top-0 md:z-10"
+      style={{ backgroundColor: "var(--bg-secondary)" }}
+    >
       <tr
         style={{
           backgroundColor: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border-color)",
         }}
       >
-        {/* Columns config button - always first cell */}
-        {columnsPopover && (
-          <th
-            className="w-10 px-2 py-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {columnsPopover}
-          </th>
-        )}
         {columns.map((column) => {
           const isSortable = column.sortable;
           const isSorted = isCurrentSortColumn(column);

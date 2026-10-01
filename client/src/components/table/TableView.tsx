@@ -1,11 +1,6 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useElementScrollRestoration } from "../../hooks/useScrollRestoration";
 import TableHeader from "./TableHeader";
 import { getCellRenderer } from "./cellRenderers";
 
@@ -30,7 +25,6 @@ interface Props {
   onHideColumn?: (columnId: string) => void;
   entityType: string;
   isLoading?: boolean;
-  columnsPopover?: ReactNode;
 }
 
 /**
@@ -44,7 +38,6 @@ const TableView = ({
   onHideColumn,
   entityType,
   isLoading = false,
-  columnsPopover,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
@@ -57,6 +50,8 @@ const TableView = ({
 
   // Scroll state for showing/hiding the scroll hint
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Back restores the box's own scroll, which the window's restore never saw
+  useElementScrollRestoration(scrollContainerRef);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const checkScrollState = useCallback(() => {
@@ -131,7 +126,6 @@ const TableView = ({
             borderBottom: "1px solid var(--border-color)",
           }}
         >
-          {columnsPopover && <td className="w-10 px-2 py-3" />}
           {columns.map((column) => (
             <td key={column.id} className={`${column.width} px-4 py-3`}>
               <div
@@ -154,7 +148,7 @@ const TableView = ({
       return (
         <tr>
           <td
-            colSpan={columns.length + (columnsPopover ? 1 : 0)}
+            colSpan={columns.length}
             className="px-3 py-8 text-center"
             style={{ color: "var(--text-muted)" }}
           >
@@ -174,7 +168,6 @@ const TableView = ({
           borderBottom: "1px solid var(--border-color)",
         }}
       >
-        {columnsPopover && <td className="w-10 px-2 py-2" />}
         {columns.map((column) => {
           const renderer = getCellRenderer(column.id, entityType, {
             hasMultipleInstances,
@@ -212,7 +205,10 @@ const TableView = ({
       )}
       <div
         ref={scrollContainerRef}
-        className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
+        // Phones scroll the page and the box only sideways; from md up the box
+        // is no taller than the screen and scrolls both ways, so the sticky
+        // header (TableHeader) stays in view
+        className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch] md:overflow-auto md:max-h-[calc(100dvh-8rem)]"
       >
         <table className="table-fixed min-w-full">
           <TableHeader
@@ -221,7 +217,6 @@ const TableView = ({
             onSort={onSort}
             onColumnContextMenu={handleColumnContextMenu}
             entityType={entityType}
-            columnsPopover={columnsPopover}
           />
           <tbody>{isLoading ? renderSkeletonRows() : renderRows()}</tbody>
         </table>
