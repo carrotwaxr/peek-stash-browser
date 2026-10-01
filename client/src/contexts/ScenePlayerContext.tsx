@@ -18,8 +18,8 @@ import {
   markLibraryNotReady,
   useLibraryReady,
 } from "../api/hooks/useLibraryReady";
+import { describeLookupFailure } from "../api/lookupFailure";
 import { useAuth } from "../hooks/useAuth";
-import { describeLookupFailure } from "../hooks/useEntityLookup";
 import { getEntityPath } from "../utils/entityLinks";
 import { clearInternalPop, takeInternalPop } from "../utils/historyGuard";
 import {

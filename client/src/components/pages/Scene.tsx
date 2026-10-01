@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router-dom";
+import { describeLookupFailure } from "../../api/lookupFailure";
 import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext";
 import { useAuth } from "../../hooks/useAuth";
-import { describeLookupFailure } from "../../hooks/useEntityLookup";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useNavigationState } from "../../hooks/useNavigationState";

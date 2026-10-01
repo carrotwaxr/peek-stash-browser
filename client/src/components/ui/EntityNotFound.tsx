@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { apiGet, getErrorMessage } from "../../api";
-import type { EntityMatch } from "../../hooks/useEntityLookup";
+import type { EntityMatch } from "../../api/lookupFailure";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { getEntityPath } from "../../utils/entityLinks";
 import Button from "./Button";
