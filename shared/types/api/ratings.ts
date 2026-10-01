@@ -9,6 +9,16 @@
 // COMMON RATING TYPES
 // =============================================================================
 
+/** The entity types a user can rate, favorite or (scenes, images) press O on */
+export type RatableEntityType =
+  | "scene"
+  | "performer"
+  | "studio"
+  | "tag"
+  | "gallery"
+  | "group"
+  | "image";
+
 /**
  * Common request body for all rating updates
  */

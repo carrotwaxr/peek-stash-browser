@@ -76,6 +76,28 @@ export function invalidateLibraryQueries(client: QueryClient): Promise<void> {
 }
 
 /**
+ * After a write to the viewer's own values (a rating, favorite or O), once
+ * `patchEntityInCache` has put the new value in every cached row: marks
+ * the library queries (lists, details, pickers, clips, carousels, watched
+ * scenes) and the user's stats stale and fetches nothing. A row that no
+ * longer fits its list's filter or order stays until the list is next
+ * shown, which fetches the truth. Call it after the patch: `setQueryData`
+ * resets `dataUpdatedAt`, so the stale mark must come second.
+ */
+export function markLibraryStale(client: QueryClient): Promise<void> {
+  return Promise.all([
+    client.invalidateQueries({
+      predicate: (query) => isLibraryQuery(query.queryKey),
+      refetchType: "none",
+    }),
+    client.invalidateQueries({
+      queryKey: queryKeys.user.stats(),
+      refetchType: "none",
+    }),
+  ]).then(() => undefined);
+}
+
+/**
  * After a Stash instance is added, edited, enabled, disabled or deleted, or
  * a user's Content Sources change: the setup status (its instance count
  * decides whether cards name their server) and everything the user's
