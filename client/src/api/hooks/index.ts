@@ -7,6 +7,7 @@ export { useGroupList } from "./useGroups";
 export { useImageList } from "./useImages";
 export { useClipList } from "./useClips";
 export { useRelationCounts } from "./useRelationCounts";
+export { useEntityDetail, type EntityDetail } from "./useEntityDetail";
 export { useUpdateRating } from "./useRatingMutation";
 export { useUpdateFavorite } from "./useFavoriteMutation";
 export {
