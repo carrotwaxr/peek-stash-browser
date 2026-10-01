@@ -109,6 +109,37 @@ export class RouteErrorBoundary extends Component<RouteProps, State> {
   }
 }
 
+interface PieceProps {
+  children: ReactNode;
+  /** The piece failed: the host closes it and says so */
+  onError: (error: unknown) => void;
+}
+
+/**
+ * Catches an optional piece loaded on demand (the help dialog) that fails
+ * to load or render: it shows nothing and tells its host, so the bar it
+ * opened from and the page around it (a playing video included) stay.
+ */
+export class PieceErrorBoundary extends Component<
+  PieceProps,
+  { failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.error("[piece]", error, info.componentStack);
+    this.props.onError(error);
+  }
+
+  override render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /** The plain panel for the app's outermost boundary: no router, no theme */
 export class AppErrorBoundary extends Component<
   { children: ReactNode },

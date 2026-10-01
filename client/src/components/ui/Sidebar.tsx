@@ -7,9 +7,11 @@ import {
 import { useAuth } from "../../hooks/useAuth";
 import { useSharedMediaQuery } from "../../hooks/useHoverCapable";
 import { useTVMode } from "../../hooks/useTVMode";
+import { showError } from "../../utils/toast";
 import { PeekLogo } from "../branding/PeekLogo";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
+import { PieceErrorBoundary } from "./ErrorBoundary";
 import Tooltip from "./Tooltip";
 import UserMenu from "./UserMenu";
 
@@ -289,9 +291,17 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
       {/* Help Modal */}
       {isHelpModalOpen && (
-        <Suspense fallback={null}>
-          <HelpModal onClose={() => setIsHelpModalOpen(false)} />
-        </Suspense>
+        // Its own chunk: one that fails to load closes and says so
+        <PieceErrorBoundary
+          onError={() => {
+            setIsHelpModalOpen(false);
+            showError("Couldn't open help");
+          }}
+        >
+          <Suspense fallback={null}>
+            <HelpModal onClose={() => setIsHelpModalOpen(false)} />
+          </Suspense>
+        </PieceErrorBoundary>
       )}
     </>
   );

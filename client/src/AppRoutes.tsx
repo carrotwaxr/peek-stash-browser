@@ -7,6 +7,7 @@ import {
   SetupGuard,
 } from "./components/guards/RouteGuards";
 import Login from "./components/pages/Login";
+import { RouteErrorBoundary } from "./components/ui/ErrorBoundary";
 import GlobalLayout from "./components/ui/GlobalLayout";
 import { PUBLIC_ROUTES } from "./constants/navigation";
 
@@ -62,10 +63,13 @@ const AppRoutes = ({
         path={PUBLIC_ROUTES.setup}
         element={
           <SetupGuard setupStatus={setupStatus}>
-            <SetupWizard
-              setupStatus={setupStatus}
-              onSetupComplete={onSetupComplete}
-            />
+            {/* Its own chunk, outside the layout's boundary */}
+            <RouteErrorBoundary resetKey={PUBLIC_ROUTES.setup}>
+              <SetupWizard
+                setupStatus={setupStatus}
+                onSetupComplete={onSetupComplete}
+              />
+            </RouteErrorBoundary>
           </SetupGuard>
         }
       />
@@ -83,7 +87,11 @@ const AppRoutes = ({
       {/* Forgot password route */}
       <Route
         path={PUBLIC_ROUTES.forgotPassword}
-        element={<ForgotPasswordPage />}
+        element={
+          <RouteErrorBoundary resetKey={PUBLIC_ROUTES.forgotPassword}>
+            <ForgotPasswordPage />
+          </RouteErrorBoundary>
+        }
       />
 
       {/* Redirects from legacy routes */}
