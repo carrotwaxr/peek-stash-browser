@@ -19,6 +19,7 @@ import type {
   GetDownloadStatusParams,
   GetDownloadStatusResponse,
   GetUserDownloadsResponse,
+  PlaylistTooLargeResponse,
   RetryDownloadParams,
   RetryDownloadResponse,
   StartEntityDownloadRequest,
@@ -206,7 +207,9 @@ export async function startImageDownload(
  */
 export async function startPlaylistDownload(
   req: TypedAuthRequest<never, StartPlaylistDownloadParams>,
-  res: TypedResponse<StartPlaylistDownloadResponse | ApiErrorResponse>
+  res: TypedResponse<
+    StartPlaylistDownloadResponse | PlaylistTooLargeResponse | ApiErrorResponse
+  >
 ) {
   const userId = req.user.id;
   const playlistId = parseInt(req.params.playlistId, 10);
@@ -258,9 +261,13 @@ export async function startPlaylistDownload(
   const totalSize = plannedZipBytes(scenes);
   const maxBytes = maxPlaylistBytes();
   if (totalSize > maxBytes) {
+    const totalSizeMB = Number(toMiB(totalSize));
+    const maxSizeMB = Number(toMiB(maxBytes));
     return res.status(400).json({
       error: "Playlist exceeds maximum download size",
-      details: `Total: ${toMiB(totalSize)}MB, max: ${toMiB(maxBytes)}MB`,
+      details: `Total: ${totalSizeMB}MB, max: ${maxSizeMB}MB`,
+      totalSizeMB,
+      maxSizeMB,
     });
   }
 

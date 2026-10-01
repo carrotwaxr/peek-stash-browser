@@ -35,7 +35,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { apiPost, getMyPermissions } from "../../api";
+import {
+  ApiError,
+  apiPost,
+  getErrorMessage,
+  getMyPermissions,
+} from "../../api";
 import {
   useDuplicatePlaylist,
   useMovePlaylistItem,
@@ -156,11 +161,6 @@ const itemKey = (item: { sceneId: string; instanceId: string }) =>
 
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
-
-interface ApiError {
-  data?: { error?: string; totalSizeMB?: number; maxSizeMB?: number };
-  message?: string;
-}
 
 /**
  * A playlist's page: the route's id and the view the URL names. A random
@@ -573,15 +573,16 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
       await apiPost(`/downloads/playlist/${playlistId}`);
       showSuccess("Download started - check Downloads page for progress");
     } catch (err) {
-      const error = err as ApiError;
-      const message = error.data?.error || error.message || "Download failed";
-      if (error.data?.totalSizeMB) {
-        showError(
-          `${message} (${error.data.totalSizeMB}MB exceeds ${error.data.maxSizeMB}MB limit)`
-        );
-      } else {
-        showError(message);
-      }
+      const message = getErrorMessage(err, "Download failed");
+      // A playlist past the size cap names the zip's size and the cap, in MiB
+      // (`PlaylistTooLargeResponse`)
+      const { totalSizeMB, maxSizeMB } =
+        err instanceof ApiError ? err.data : {};
+      showError(
+        typeof totalSizeMB === "number" && typeof maxSizeMB === "number"
+          ? `${message} (${totalSizeMB}MB exceeds ${maxSizeMB}MB limit)`
+          : message
+      );
     } finally {
       setDownloading(false);
     }

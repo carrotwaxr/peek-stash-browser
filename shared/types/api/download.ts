@@ -80,6 +80,17 @@ export interface StartPlaylistDownloadResponse {
   download: SerializedDownload;
 }
 
+/**
+ * The 400 for a playlist whose zip would pass the size cap: the zip's planned
+ * size and the cap, each in MiB rounded up
+ */
+export interface PlaylistTooLargeResponse {
+  error: string;
+  details: string;
+  totalSizeMB: number;
+  maxSizeMB: number;
+}
+
 // =============================================================================
 // GET USER DOWNLOADS
 // =============================================================================
