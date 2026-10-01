@@ -319,7 +319,6 @@ describe("ScenePlayerContext", () => {
       expect(result.current).toHaveProperty("scene");
       expect(result.current).toHaveProperty("sceneLoading");
       expect(result.current).toHaveProperty("sceneError");
-      expect(result.current).toHaveProperty("quality");
       expect(result.current).toHaveProperty("playlist");
       expect(result.current).toHaveProperty("currentIndex");
       expect(result.current).toHaveProperty("autoplayNext");
@@ -354,7 +353,7 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(result.current.quality).toBe("direct");
+      expect(result.current).not.toHaveProperty("quality");
       expect(result.current.currentIndex).toBe(0);
       expect(result.current).not.toHaveProperty("compatibility");
       expect(result.current.playlist).toBeNull();
@@ -381,18 +380,6 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.playlist).not.toBeNull();
       expect(result.current.currentIndex).toBe(1);
-    });
-
-    it("initializes with the quality prop", async () => {
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ initialQuality: "720p" }),
-      });
-
-      await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
-      });
-
-      expect(result.current.quality).toBe("720p");
     });
 
     it("passes shouldResume prop through to context value", async () => {

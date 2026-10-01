@@ -13,10 +13,12 @@ import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, apiGet, apiPost } from "@/api";
+import { apiFetch, apiGet, apiPost, redirectToLogin } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
+import { isSessionExpired } from "@/components/video-player/sessionCheck";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
+import { canDecode } from "@/utils/browserPlayback";
 import { type PlaybackQueue, buildPlaybackQueue } from "@/utils/playbackQueue";
 
 vi.mock("@/api", () => ({
@@ -105,6 +107,7 @@ function fakePlayer() {
     src: vi.fn(),
     play: vi.fn(() => Promise.resolve()),
     paused: vi.fn(() => true),
+    muted: vi.fn((_muted?: boolean) => false),
   };
   return player;
 }
@@ -128,6 +131,8 @@ interface Controls {
   playlist?: PlaybackQueue | null;
   autoplayNext?: boolean;
   repeat?: "none" | "all" | "one";
+  /** The player is ready and the scene should start by itself */
+  autoplay?: boolean;
 }
 
 function renderPlayer(
@@ -153,9 +158,8 @@ function renderPlayer(
         videoRef,
         playerRef,
         scene: current,
-        quality: "direct",
-        ready: false,
-        shouldAutoplay: false,
+        ready: controls.autoplay ?? false,
+        shouldAutoplay: controls.autoplay ?? false,
         playlist: controls.playlist ?? null,
         currentIndex: 0,
         autoplayNext: controls.autoplayNext ?? true,
@@ -165,7 +169,6 @@ function renderPlayer(
         nextScene: noop,
         prevScene: noop,
         registerPlayer: noop,
-        updateQuality: noop,
         location,
         hasResumedRef,
         initialResumeTimeRef,
@@ -386,7 +389,10 @@ describe("useVideoPlayer", () => {
     const { rerender } = renderPlayer(player, onA);
     rerender({ current: onB });
 
-    expect(vi.mocked(buildPlayerSources).mock.calls).toEqual([[onA], [onB]]);
+    expect(vi.mocked(buildPlayerSources).mock.calls).toEqual([
+      [onA, canDecode],
+      [onB, canDecode],
+    ]);
     expect(player.load).toHaveBeenCalledTimes(2);
   });
 
@@ -401,19 +407,80 @@ describe("useVideoPlayer", () => {
     expect(player.load).toHaveBeenCalledTimes(1);
   });
 
-  it("the stream URL always names the scene's instance", async () => {
+  it("no handler other than the source selector calls player.src on an error", async () => {
     const player = fakePlayer();
     const { rerender } = renderPlayer(player, onA);
     rerender({ current: onB });
+    player.src.mockClear();
 
-    await must(player.handlers.get("error"), "error handler")();
+    const onError = player.on.mock.calls
+      .filter(([event]) => event === "error")
+      .map(([, handler]) => handler);
+    for (const handler of onError) await handler();
+
+    expect(player.src).not.toHaveBeenCalled();
+    expect(player.load).toHaveBeenCalledTimes(2);
+  });
+
+  it("the source selector checks the session before a fallback and sends a lost one to login", async () => {
+    const player = { ...fakePlayer(), dispose: vi.fn() };
+    vi.mocked(videojs).mockReturnValueOnce(player as never);
+    const { unmount } = renderPlayer(
+      player,
+      onA,
+      document.createElement("div")
+    );
+    const options = must(
+      vi.mocked(videojs).mock.calls[0]?.[1],
+      "videojs options"
+    ) as {
+      plugins: { sourceSelector: { beforeFallback: () => Promise<boolean> } };
+    };
+    const { beforeFallback } = options.plugins.sourceSelector;
+
+    vi.mocked(isSessionExpired).mockResolvedValueOnce(false);
+    await expect(beforeFallback()).resolves.toBe(false);
+    expect(redirectToLogin).not.toHaveBeenCalled();
+
+    vi.mocked(isSessionExpired).mockResolvedValueOnce(true);
+    await expect(beforeFallback()).resolves.toBe(true);
+    expect(redirectToLogin).toHaveBeenCalledWith("expired");
+    unmount();
+  });
+
+  it("a blocked autoplay retries muted", async () => {
+    const player = fakePlayer();
+    player.play.mockRejectedValueOnce(
+      new DOMException("play() needs a user gesture", "NotAllowedError")
+    );
+
+    renderPlayer(player, onA, null, { autoplay: true });
 
     await waitFor(() => {
-      expect(player.src).toHaveBeenCalledWith({
-        src: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=inst-b&resolution=FULL_HD",
-        type: "application/x-mpegURL",
-      });
+      expect(player.play).toHaveBeenCalledTimes(2);
     });
+    expect(player.muted).toHaveBeenCalledWith(true);
+    const muted = must(player.muted.mock.invocationCallOrder[0]);
+    const retried = must(player.play.mock.invocationCallOrder[1]);
+    expect(muted).toBeLessThan(retried);
+  });
+
+  it("an autoplay that fails for another reason is not retried", async () => {
+    const player = fakePlayer();
+    player.play.mockRejectedValueOnce(
+      new DOMException("the load was aborted", "AbortError")
+    );
+
+    renderPlayer(player, onA, null, { autoplay: true });
+
+    await waitFor(() => {
+      expect(player.play).toHaveBeenCalledTimes(1);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(player.play).toHaveBeenCalledTimes(1);
+    expect(player.muted).not.toHaveBeenCalled();
   });
 
   it("the player is created with the html5 tech only and no cast plugin", () => {
@@ -548,7 +615,6 @@ describe("useVideoPlayer", () => {
             videoRef,
             playerRef,
             scene: current,
-            quality: "direct",
             ready: true,
             shouldAutoplay,
             playlist: null,
@@ -565,7 +631,6 @@ describe("useVideoPlayer", () => {
             nextScene: noop,
             prevScene: noop,
             registerPlayer: noop,
-            updateQuality: noop,
             location,
             hasResumedRef,
             initialResumeTimeRef,

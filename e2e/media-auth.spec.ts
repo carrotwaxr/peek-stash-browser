@@ -68,7 +68,8 @@ test("grid thumbnails load with the session", async ({ page }) => {
 test("the scene page's first stream request succeeds", async ({ page }) => {
   const scene = await firstScene(page);
 
-  // Direct play, or for a scene without a Direct entry its first transcode
+  // Direct play, or the first transcode when this browser cannot decode the
+  // file or Stash offers no Direct
   const streamResponse = page.waitForResponse(
     (r) =>
       /\/proxy-stream\/stream(\?|\.)/.test(r.url()) &&
@@ -151,8 +152,8 @@ test("a paused video whose session expired sends the user to login with a messag
   await expect(playerEl).toBeAttached({ timeout: 15_000 });
 
   // Start the way a user does. Headless Chromium lacks the file's codec, so
-  // the player may already be on its HLS fallback, which starts by itself;
-  // either way, end up paused with a source loaded.
+  // the player may already have fallen back to another source, which starts
+  // by itself; either way, end up paused with a source loaded.
   const play = page.locator(".vjs-big-play-button");
   if (await play.isVisible()) {
     await play.click();

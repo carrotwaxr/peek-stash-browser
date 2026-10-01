@@ -330,7 +330,6 @@ const Scene = () => {
       instanceId={instanceId}
       playlist={playlist ?? null}
       shouldResume={shouldResume ?? false}
-      initialQuality="direct"
       initialShouldAutoplay={shouldAutoplay ?? false}
     >
       <SceneContent />

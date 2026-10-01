@@ -51,8 +51,9 @@ test("a scene below 720p gets proxied stream paths without HD tiers and its firs
     const body = r.request().postDataJSON() as { ids?: unknown[] } | null;
     return body?.ids?.length === 1;
   });
-  // Direct play, or for a scene without a Direct entry its first transcode or
-  // the HLS fallback; a preload request counts as well as one after the click.
+  // The first source this browser can play: Direct, or the first transcode
+  // when it cannot decode the file (headless Chromium has no H.264) or Stash
+  // offers no Direct; a preload request counts as well as one after the click.
   const streamResponse = page.waitForResponse(
     (r) =>
       /\/proxy-stream\/stream(\?|\.)/.test(r.url()) &&

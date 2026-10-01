@@ -2,35 +2,6 @@ import type { NormalizedScene, WithStashUrl } from "@peek/shared-types";
 import type { PlaybackQueueControls } from "../utils/playbackQueue";
 
 // ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Quality presets in descending order of resolution
- * Must match the presets defined in TranscodingManager.ts and useVideoPlayer.js
- */
-const QUALITY_PRESETS = [
-  { height: 2160, quality: "2160p" },
-  { height: 1080, quality: "1080p" },
-  { height: 720, quality: "720p" },
-  { height: 480, quality: "480p" },
-  { height: 360, quality: "360p" },
-];
-
-/**
- * Get the best transcode quality for a given source resolution
- * Returns the highest quality preset that is <= source height
- */
-function getBestTranscodeQuality(sourceHeight: number) {
-  for (const preset of QUALITY_PRESETS) {
-    if (preset.height <= sourceHeight) {
-      return preset.quality;
-    }
-  }
-  return "360p";
-}
-
-// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -53,7 +24,6 @@ export interface ScenePlayerReducerState {
   scene: WithStashUrl<NormalizedScene> | null;
   sceneLoading: boolean;
   sceneError: unknown;
-  quality: string;
   ready: boolean;
   shouldAutoplay: boolean;
   /** The queue as it started; never rewritten after INITIALIZE */
@@ -230,8 +200,7 @@ function entryScene(
 
 /**
  * The state after a step to another queue entry: the player waits for the
- * new scene, quality starts at direct again, and the O count waits for the
- * scene's own. `autoplay` sets whether the new scene starts playing; left
+ * new scene, and the O count waits for the scene's own. `autoplay` sets whether the new scene starts playing; left
  * out, the current choice stays. An entry of the scene already loaded loads
  * nothing: the player restarts it (`restartCount`) and keeps the rest.
  */
@@ -260,7 +229,6 @@ function stepTo(
     currentIndex: step.index,
     shuffleHistory: step.history,
     ready: false,
-    quality: "direct",
     oCounter: 0,
     shouldAutoplay: autoplay ?? state.shouldAutoplay,
     direction,
@@ -380,7 +348,6 @@ export const initialState: ScenePlayerReducerState = {
   scene: null,
   sceneLoading: false,
   sceneError: null,
-  quality: "direct",
 
   // Player internal state
   ready: false, // Player ready to play (metadata loaded)
@@ -432,29 +399,10 @@ export function scenePlayerReducer(
       };
       // An answer for a scene asked for before the latest: stale
       if (!sameRequest(payload.request, state.requested)) return state;
-      const scene = payload.scene;
-
-      // Smart default quality selection based on codec detection (Phase 3)
-      // If scene has streamability info and quality is still at default "direct",
-      // automatically choose the best quality
-      let autoSelectedQuality = state.quality;
-
-      if (state.quality === "direct" && scene.isStreamable !== undefined) {
-        if (scene.isStreamable) {
-          // Scene is browser-compatible - keep direct play
-          autoSelectedQuality = "direct";
-        } else {
-          // Scene needs transcoding - choose highest quality <= source resolution
-          const sourceHeight = scene.files?.[0]?.height || 1080;
-          autoSelectedQuality = getBestTranscodeQuality(sourceHeight);
-        }
-      }
-
       return {
         ...state,
-        scene: scene,
+        scene: payload.scene,
         oCounter: payload.oCounter || 0,
-        quality: autoSelectedQuality,
         sceneLoading: false,
         sceneError: null,
       };
@@ -490,13 +438,6 @@ export function scenePlayerReducer(
         sceneError: null,
       };
     }
-
-    // Quality management
-    case "SET_QUALITY":
-      return {
-        ...state,
-        quality: action.payload as string,
-      };
 
     // Queue navigation: the one advance path (the controls, the end of a
     // video and the media keys all step through here)
@@ -620,7 +561,6 @@ export function scenePlayerReducer(
       const initPayload = action.payload as {
         playlist?: PlaylistData | null;
         currentIndex?: number;
-        initialQuality?: string;
         initialShouldAutoplay?: boolean;
       };
       const playlist = initPayload.playlist;
@@ -637,7 +577,6 @@ export function scenePlayerReducer(
         ...state,
         playlist: playlist ?? null,
         currentIndex: initPayload.currentIndex || 0,
-        quality: initPayload.initialQuality || "direct",
         // A queue carries shuffle and repeat as starting values only;
         // autoplay starts on wherever a queue starts
         autoplayNext: controls?.autoplayNext ?? true,

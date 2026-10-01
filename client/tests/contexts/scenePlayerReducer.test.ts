@@ -142,8 +142,6 @@ describe("scenePlayerReducer", () => {
         sceneLoading: false,
         sceneError: null,
 
-        quality: "direct",
-
         ready: false,
         shouldAutoplay: false,
 
@@ -163,6 +161,7 @@ describe("scenePlayerReducer", () => {
         oCounter: 0,
       });
       expect(initialState).not.toHaveProperty("compatibility");
+      expect(initialState).not.toHaveProperty("quality");
     });
 
     it("deleted actions are gone", () => {
@@ -179,6 +178,7 @@ describe("scenePlayerReducer", () => {
         "SET_SWITCHING_MODE",
         "SET_INITIALIZING",
         "SET_SHUFFLE_HISTORY",
+        "SET_QUALITY",
       ]) {
         const state = { ...initialState, playlist: makePlaylist(3) };
         expect(scenePlayerReducer(state, { type, payload: 1 })).toBe(state);
@@ -256,7 +256,7 @@ describe("scenePlayerReducer", () => {
       expect(prevIndex(state, () => 0.99)).toEqual({ index: 1, history: [4] });
     });
 
-    it("repeat-all shuffle after every scene played restarts the history with the current index and resets quality and oCounter like every other branch", () => {
+    it("repeat-all shuffle after every scene played restarts the history with the current index and resets oCounter like every other branch", () => {
       const state = {
         ...initialState,
         playlist: makePlaylist(3),
@@ -264,7 +264,6 @@ describe("scenePlayerReducer", () => {
         shuffle: true,
         repeat: "all",
         shuffleHistory: [1, 2],
-        quality: "720p",
         oCounter: 4,
         ready: true,
       };
@@ -273,7 +272,6 @@ describe("scenePlayerReducer", () => {
 
       expect(result.currentIndex).toBe(1);
       expect(result.shuffleHistory).toEqual([0]);
-      expect(result.quality).toBe("direct");
       expect(result.oCounter).toBe(0);
       expect(result.ready).toBe(false);
       expect(result.playlist).toBe(state.playlist);
@@ -406,7 +404,7 @@ describe("scenePlayerReducer", () => {
     });
 
     it("LOAD_SCENE_SUCCESS sets scene, oCounter, clears loading", () => {
-      const scene = { id: "1", isStreamable: true, files: [] };
+      const scene = { id: "1", files: [] };
       const state = { ...initialState, sceneLoading: true };
       const result = scenePlayerReducer(state, {
         type: "LOAD_SCENE_SUCCESS",
@@ -420,7 +418,7 @@ describe("scenePlayerReducer", () => {
     });
 
     it("LOAD_SCENE_SUCCESS defaults oCounter to 0 if not provided", () => {
-      const scene = { id: "1", isStreamable: true, files: [] };
+      const scene = { id: "1", files: [] };
       const result = scenePlayerReducer(initialState, {
         type: "LOAD_SCENE_SUCCESS",
         payload: { scene },
@@ -617,178 +615,9 @@ describe("scenePlayerReducer", () => {
   });
 
   // -------------------------------------------------------------------------
-  // LOAD_SCENE_SUCCESS quality auto-selection
-  // -------------------------------------------------------------------------
-  describe("LOAD_SCENE_SUCCESS quality auto-selection", () => {
-    it("keeps 'direct' when scene.isStreamable is true", () => {
-      const scene = { id: "1", isStreamable: true, files: [{ height: 1080 }] };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("direct");
-    });
-
-    it("selects '1080p' when isStreamable=false and height=1080", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 1080 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("1080p");
-    });
-
-    it("selects '2160p' when isStreamable=false and height=2160", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 2160 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("2160p");
-    });
-
-    it("selects '720p' when isStreamable=false and height=720", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 720 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("720p");
-    });
-
-    it("selects '360p' when isStreamable=false and height=400 (between 480 and 360)", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 400 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("360p");
-    });
-
-    it("selects '480p' when isStreamable=false and height=480", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 480 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("480p");
-    });
-
-    it("selects '360p' as fallback when height is very small", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 240 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("360p");
-    });
-
-    it("defaults to 1080p source height when files array is missing", () => {
-      const scene = { id: "1", isStreamable: false };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("1080p");
-    });
-
-    it("defaults to 1080p source height when files array is empty", () => {
-      const scene = { id: "1", isStreamable: false, files: [] };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      expect(result.quality).toBe("1080p");
-    });
-
-    it("does NOT auto-select when isStreamable is undefined", () => {
-      const scene = { id: "1", files: [{ height: 720 }] };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      // isStreamable is undefined so the condition `scene.isStreamable !== undefined`
-      // is false, quality stays at the current state value
-      expect(result.quality).toBe("direct");
-    });
-
-    it("does NOT auto-select when quality has already been changed from 'direct'", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 1080 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "720p" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      // Quality is already "720p" (not "direct"), so no auto-selection
-      expect(result.quality).toBe("720p");
-    });
-
-    it("selects best quality for heights between presets (1440p -> 1080p)", () => {
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 1440 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-
-      // 1440 is less than 2160 but >= 1080, so 1080p is the best <= sourceHeight
-      expect(result.quality).toBe("1080p");
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Simple setters
   // -------------------------------------------------------------------------
   describe("Simple setters", () => {
-    it("SET_QUALITY updates quality", () => {
-      const result = scenePlayerReducer(initialState, {
-        type: "SET_QUALITY",
-        payload: "720p",
-      });
-      expect(result.quality).toBe("720p");
-    });
-
     it("SET_READY updates ready", () => {
       const result = scenePlayerReducer(initialState, {
         type: "SET_READY",
@@ -979,14 +808,12 @@ describe("scenePlayerReducer", () => {
           ...initialState,
           playlist: makePlaylist(5),
           currentIndex: 1,
-          quality: "720p",
           oCounter: 5,
           ready: true,
         };
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
         expect(result.currentIndex).toBe(2);
-        expect(result.quality).toBe("direct");
         expect(result.oCounter).toBe(0);
         expect(result.ready).toBe(false);
       });
@@ -1012,7 +839,6 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
         expect(result.currentIndex).toBe(0);
-        expect(result.quality).toBe("direct");
         expect(result.oCounter).toBe(0);
       });
 
@@ -1164,14 +990,12 @@ describe("scenePlayerReducer", () => {
           ...initialState,
           playlist: makePlaylist(5),
           currentIndex: 3,
-          quality: "720p",
           oCounter: 5,
           ready: true,
         };
         const result = scenePlayerReducer(state, { type: "PREV_SCENE" });
 
         expect(result.currentIndex).toBe(2);
-        expect(result.quality).toBe("direct");
         expect(result.oCounter).toBe(0);
         expect(result.ready).toBe(false);
       });
@@ -1197,7 +1021,6 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "PREV_SCENE" });
 
         expect(result.currentIndex).toBe(4);
-        expect(result.quality).toBe("direct");
         expect(result.oCounter).toBe(0);
       });
     });
@@ -1219,7 +1042,6 @@ describe("scenePlayerReducer", () => {
         expect(result.shuffleHistory).toEqual([0, 2]);
         expect(result.playlist).toBe(state.playlist);
         // State resets
-        expect(result.quality).toBe("direct");
         expect(result.oCounter).toBe(0);
         expect(result.ready).toBe(false);
       });
@@ -1293,7 +1115,6 @@ describe("scenePlayerReducer", () => {
         ...initialState,
         playlist: makePlaylist(5),
         currentIndex: 0,
-        quality: "720p",
         oCounter: 3,
         ready: true,
       };
@@ -1303,7 +1124,6 @@ describe("scenePlayerReducer", () => {
       });
 
       expect(result.currentIndex).toBe(3);
-      expect(result.quality).toBe("direct");
       expect(result.oCounter).toBe(0);
       expect(result.ready).toBe(false);
       expect(result.shouldAutoplay).toBe(false);
@@ -1417,7 +1237,7 @@ describe("scenePlayerReducer", () => {
   // INITIALIZE
   // -------------------------------------------------------------------------
   describe("INITIALIZE", () => {
-    it("sets playlist, currentIndex, quality, shouldAutoplay", () => {
+    it("sets playlist, currentIndex, shouldAutoplay", () => {
       const playlist = makePlaylist(3, { shuffle: true, repeat: "one" });
 
       const result = scenePlayerReducer(initialState, {
@@ -1425,14 +1245,12 @@ describe("scenePlayerReducer", () => {
         payload: {
           playlist,
           currentIndex: 1,
-          initialQuality: "720p",
           initialShouldAutoplay: true,
         },
       });
 
       expect(result.playlist).toBe(playlist);
       expect(result.currentIndex).toBe(1);
-      expect(result.quality).toBe("720p");
       expect(result.shouldAutoplay).toBe(true);
     });
 
@@ -1488,7 +1306,6 @@ describe("scenePlayerReducer", () => {
 
       expect(result.playlist).toBeNull();
       expect(result.currentIndex).toBe(0);
-      expect(result.quality).toBe("direct");
       expect(result.autoplayNext).toBe(true);
       expect(result.shuffle).toBe(false);
       expect(result.repeat).toBe("none");
@@ -1515,15 +1332,6 @@ describe("scenePlayerReducer", () => {
       });
 
       expect(result.currentIndex).toBe(0);
-    });
-
-    it("defaults quality to 'direct' when initialQuality is not provided", () => {
-      const result = scenePlayerReducer(initialState, {
-        type: "INITIALIZE",
-        payload: { playlist: makePlaylist(3) },
-      });
-
-      expect(result.quality).toBe("direct");
     });
 
     it("preserves existing shouldAutoplay if already set and no initialShouldAutoplay", () => {
@@ -1571,7 +1379,7 @@ describe("scenePlayerReducer", () => {
   // -------------------------------------------------------------------------
   describe("Default case", () => {
     it("returns state unchanged for an unknown action type", () => {
-      const state = { ...initialState, quality: "720p" };
+      const state = { ...initialState, oCounter: 7 };
       const result = scenePlayerReducer(state, { type: "UNKNOWN_ACTION" });
       expect(result).toBe(state);
     });
@@ -1595,12 +1403,12 @@ describe("scenePlayerReducer", () => {
     });
 
     it("does not mutate state on LOAD_SCENE_SUCCESS", () => {
-      const state = { ...initialState, quality: "direct" };
+      const state = { ...initialState };
       const frozen = snapshot(state);
       scenePlayerReducer(state, {
         type: "LOAD_SCENE_SUCCESS",
         payload: {
-          scene: { id: "1", isStreamable: false, files: [{ height: 720 }] },
+          scene: { id: "1", files: [{ height: 720 }] },
           oCounter: 3,
         },
       });
@@ -1701,7 +1509,6 @@ describe("scenePlayerReducer", () => {
           playlist: makePlaylist(3),
           currentIndex: 1,
           compatibility: { hevc: false },
-          initialQuality: "1080p",
         },
       });
       expect(snapshot(state)).toEqual(frozen);
@@ -1789,30 +1596,6 @@ describe("scenePlayerReducer", () => {
       expect(result.shuffleHistory).toEqual([0]);
     });
 
-    it("LOAD_SCENE_SUCCESS with isStreamable=false and height exactly at preset boundary", () => {
-      // Height exactly at 2160 should match 2160p
-      const scene = {
-        id: "1",
-        isStreamable: false,
-        files: [{ height: 2160 }],
-      };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-      expect(result.quality).toBe("2160p");
-    });
-
-    it("LOAD_SCENE_SUCCESS with isStreamable=false and height 0 falls back to default 1080", () => {
-      const scene = { id: "1", isStreamable: false, files: [{ height: 0 }] };
-      const result = scenePlayerReducer(
-        { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
-      );
-      // height 0 is falsy, so `|| 1080` kicks in -> sourceHeight=1080 -> "1080p"
-      expect(result.quality).toBe("1080p");
-    });
-
     it("multiple rapid scene loads maintain correct state", () => {
       let state: ScenePlayerReducerState = { ...initialState };
 
@@ -1824,7 +1607,7 @@ describe("scenePlayerReducer", () => {
       state = scenePlayerReducer(state, {
         type: "LOAD_SCENE_SUCCESS",
         payload: {
-          scene: { id: "1", isStreamable: true },
+          scene: { id: "1" },
           oCounter: 2,
         },
       });
@@ -1842,14 +1625,12 @@ describe("scenePlayerReducer", () => {
       state = scenePlayerReducer(state, {
         type: "LOAD_SCENE_SUCCESS",
         payload: {
-          scene: { id: "2", isStreamable: false, files: [{ height: 480 }] },
+          scene: { id: "2", files: [{ height: 480 }] },
           oCounter: 0,
         },
       });
       expect(must(state.scene).id).toBe("2");
       expect(state.oCounter).toBe(0);
-      // Quality was reset to "direct" by default, so auto-selection kicks in
-      expect(state.quality).toBe("480p");
     });
 
     it("GOTO_SCENE_INDEX with payload.index of 0 when currentIndex is also 0", () => {
@@ -1915,7 +1696,6 @@ describe("scenePlayerReducer", () => {
         ...initialState,
         playlist: sameScene,
         ready: true,
-        quality: "720p",
         oCounter: 3,
       };
 
@@ -1926,7 +1706,6 @@ describe("scenePlayerReducer", () => {
 
       expect(result.currentIndex).toBe(1);
       expect(result.ready).toBe(true);
-      expect(result.quality).toBe("720p");
       expect(result.oCounter).toBe(3);
       expect(result.shouldAutoplay).toBe(true);
       expect(result.restartCount).toBe(1);
