@@ -11,6 +11,8 @@ import { createQueryWrapper } from "../../testUtils";
 
 vi.mock("../../../src/api/client", () => ({
   apiPost: vi.fn(),
+  // The query client registers its library-stamp listener here
+  setLibraryStampListener: vi.fn(),
 }));
 
 describe("OCounterButton", () => {

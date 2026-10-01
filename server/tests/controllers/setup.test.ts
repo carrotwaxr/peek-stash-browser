@@ -21,6 +21,7 @@ import {
 } from "../../controllers/setup.js";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { libraryStampFor } from "../../services/LibraryStamp.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { syncScheduler } from "../../services/SyncScheduler.js";
@@ -873,6 +874,18 @@ describe("Setup Controller", () => {
       expect(res._getOkBody().sync).toBe("started");
     });
 
+    it("a new instance moves every user's library stamp", async () => {
+      mockSync.queueFullSync.mockReturnValue("started");
+      const before = libraryStampFor(1);
+
+      await createStashInstance(
+        reqFor(createStashInstance, { body }),
+        resFor(createStashInstance)
+      );
+
+      expect(libraryStampFor(1)).not.toBe(before);
+    });
+
     it("a disabled instance syncs nothing: sync: none", async () => {
       const res = resFor(createStashInstance);
       await createStashInstance(
@@ -933,6 +946,21 @@ describe("Setup Controller", () => {
           'Stash instance "Secondary" deleted; its cached library is being removed.',
       });
       expect(mockSync.deleteInstance).toHaveBeenCalledWith("inst-b");
+    });
+
+    it("a deleted instance moves every user's library stamp", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({ id: "inst-b", name: "Secondary" })
+      );
+      mockSync.deleteInstance.mockResolvedValue({ purged: Promise.resolve() });
+      const before = libraryStampFor(1);
+
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+        resFor(deleteStashInstance)
+      );
+
+      expect(libraryStampFor(1)).not.toBe(before);
     });
 
     it("deleteStashInstance answers 409 and deletes nothing while a sync runs", async () => {
@@ -1118,6 +1146,36 @@ describe("Setup Controller", () => {
       expect(res._getOkBody()).toMatchObject({ success: true, sync: "queued" });
       expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith("inst-a");
       expect(mockSync.fullSync).not.toHaveBeenCalled();
+    });
+
+    it("an update moves every user's library stamp", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          ...instanceDates,
+          id: "inst-a",
+          name: "Renamed",
+          enabled: true,
+        })
+      );
+      const before = libraryStampFor(1);
+
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { name: "Renamed" },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+
+      expect(libraryStampFor(1)).not.toBe(before);
     });
 
     it("a rename syncs nothing: sync: none", async () => {

@@ -32,6 +32,7 @@ import {
   withAllowedInstances,
 } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { libraryStampFor } from "../../services/LibraryStamp.js";
 import {
   getEnabledSyncedInstanceIds,
   getUserAllowedInstanceIds,
@@ -757,6 +758,42 @@ describe("Auth Middleware", () => {
 
       expect(nextFn).toHaveBeenCalled();
       expect(must(req.user).id).toBe(MOCK_USER.id);
+    });
+
+    it("an authenticated answer carries X-Peek-Library; a 401 does not", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
+      const stamp = libraryStampFor(MOCK_USER.id);
+
+      // The session token
+      const token = generateToken({
+        id: MOCK_USER.id,
+        username: MOCK_USER.username,
+        role: MOCK_USER.role,
+      });
+      const cookieReq = createMockReq({ cookies: { token } });
+      const { res: cookieRes } = createMockRes();
+      await authenticate(cookieReq, cookieRes, nextFn);
+      expect(cookieRes.setHeader).toHaveBeenCalledWith("X-Peek-Library", stamp);
+
+      // The trusted-header sign-in
+      process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
+      const proxyReq = createMockReq({
+        headers: { "X-Forwarded-User": "testuser" },
+      });
+      const { res: proxyRes } = createMockRes();
+      await authenticate(proxyReq, proxyRes, nextFn);
+      expect(proxyRes.setHeader).toHaveBeenCalledWith("X-Peek-Library", stamp);
+      expect(nextFn).toHaveBeenCalledTimes(2);
+
+      // No session
+      delete process.env.PROXY_AUTH_HEADER;
+      const anonReq = createMockReq();
+      const { res: anonRes, statusFn } = createMockRes();
+      await authenticate(anonReq, anonRes, nextFn);
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(anonRes.setHeader.mock.calls.map(([name]) => name)).not.toContain(
+        "X-Peek-Library"
+      );
     });
   });
 

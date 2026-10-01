@@ -147,6 +147,34 @@ function errorMessage(data: Record<string, unknown>, status: number): string {
 }
 
 /**
+ * The library stamp: every authenticated answer names one in
+ * `X-Peek-Library`, and the server moves it when a sync ends or an admin
+ * changes the user's restrictions, role or the Stash servers. The first
+ * stamp a page sees is only recorded; a different one calls the listener
+ * (`createQueryClient` registers one that refetches what the page shows).
+ */
+const LIBRARY_STAMP_HEADER = "X-Peek-Library";
+let lastLibraryStamp: string | undefined;
+let libraryStampListener: (() => void) | undefined;
+
+/** Registers what a changed stamp does; a later call replaces it. */
+export function setLibraryStampListener(listener: () => void): void {
+  libraryStampListener = listener;
+}
+
+/** Forgets the stamp seen (on logout, and between tests). */
+export function resetLibraryStamp(): void {
+  lastLibraryStamp = undefined;
+}
+
+function noteLibraryStamp(stamp: string | null): void {
+  if (stamp === null || stamp === lastLibraryStamp) return;
+  const first = lastLibraryStamp === undefined;
+  lastLibraryStamp = stamp;
+  if (!first) libraryStampListener?.();
+}
+
+/**
  * Base fetch wrapper with auth redirect and error handling.
  *
  * Only a 401 means the session is gone: it sends the browser to the login
@@ -163,6 +191,8 @@ export async function apiFetch<T = unknown>(
     ...options,
     headers: requestHeaders(options.headers),
   });
+  // Any answer, an error included, can carry a newer stamp
+  noteLibraryStamp(response.headers.get(LIBRARY_STAMP_HEADER));
 
   if (response.ok) {
     // No Content has no body to parse

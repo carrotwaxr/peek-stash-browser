@@ -5,7 +5,10 @@
  * full navigation), so every test resets the module registry and imports
  * the client afresh.
  */
+import type { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ApiClient from "@/api/client";
+import type { queryKeys as QueryKeys } from "@/api/queryKeys";
 import { must } from "../testUtils";
 
 type FakeLocation = {
@@ -493,5 +496,116 @@ describe("getErrorMessage", () => {
     expect(getErrorMessage(undefined)).toBe(
       "Something went wrong. Please try again."
     );
+  });
+});
+
+describe("the library stamp (X-Peek-Library)", () => {
+  type Modules = {
+    client: typeof ApiClient;
+    queryClient: QueryClient;
+    queryKeys: typeof QueryKeys;
+  };
+
+  /** Fresh modules and a query client holding one entry per kind. */
+  async function setup(): Promise<Modules> {
+    const client = await import("@/api/client");
+    const { createQueryClient } = await import("@/api/queryClient");
+    const { queryKeys } = await import("@/api/queryKeys");
+    const queryClient = createQueryClient();
+    return { client, queryClient, queryKeys };
+  }
+
+  /** Keys the stamp reaches, and one it does not (the user's settings). */
+  function seed({ queryClient, queryKeys }: Modules) {
+    const keys = {
+      list: queryKeys.scenes.list(undefined, { page: 1 }),
+      stats: queryKeys.user.stats(),
+      playlists: queryKeys.playlists.all(),
+      hidden: queryKeys.user.hiddenEntities(),
+      settings: queryKeys.user.settings(),
+    };
+    for (const key of Object.values(keys)) queryClient.setQueryData(key, {});
+    return keys;
+  }
+
+  function invalidated(
+    queryClient: Modules["queryClient"],
+    key: readonly unknown[]
+  ): boolean {
+    return must(queryClient.getQueryState(key), "the query").isInvalidated;
+  }
+
+  /** Each GET answers with `stamp` on the header, if given. */
+  function answerWith(stamp: string | undefined, status = 200) {
+    stubFetch(
+      status,
+      status === 200 ? {} : { error: "nope" },
+      stamp === undefined ? {} : { "X-Peek-Library": stamp }
+    );
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    sessionStorage.clear();
+    stubLocation("/scenes");
+  });
+
+  afterEach(async () => {
+    const { resetLibraryStamp } = await import("@/api/client");
+    resetLibraryStamp();
+    vi.unstubAllGlobals();
+  });
+
+  it("the first stamp seen invalidates nothing", async () => {
+    const modules = await setup();
+    const keys = seed(modules);
+    const spy = vi.spyOn(modules.queryClient, "invalidateQueries");
+
+    answerWith("boot.0.0");
+    await modules.client.apiGet("/library/scenes");
+
+    expect(spy).not.toHaveBeenCalled();
+    for (const key of Object.values(keys)) {
+      expect(invalidated(modules.queryClient, key)).toBe(false);
+    }
+  });
+
+  it("a changed stamp on any answer invalidates the library, stats, playlists and Hidden Items once", async () => {
+    const modules = await setup();
+    const keys = seed(modules);
+    answerWith("boot.0.0");
+    await modules.client.apiGet("/library/scenes");
+    const spy = vi.spyOn(modules.queryClient, "invalidateQueries");
+
+    // An error answer carries the stamp too
+    answerWith("boot.1.0", 404);
+    await expect(modules.client.apiGet("/library/scenes/9")).rejects.toThrow(
+      "nope"
+    );
+
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(invalidated(modules.queryClient, keys.list)).toBe(true);
+    expect(invalidated(modules.queryClient, keys.stats)).toBe(true);
+    expect(invalidated(modules.queryClient, keys.playlists)).toBe(true);
+    expect(invalidated(modules.queryClient, keys.hidden)).toBe(true);
+    expect(invalidated(modules.queryClient, keys.settings)).toBe(false);
+  });
+
+  it("the same stamp again invalidates nothing", async () => {
+    const modules = await setup();
+    seed(modules);
+    answerWith("boot.0.0");
+    await modules.client.apiGet("/library/scenes");
+    answerWith("boot.1.0");
+    await modules.client.apiGet("/library/scenes");
+    const spy = vi.spyOn(modules.queryClient, "invalidateQueries");
+
+    answerWith("boot.1.0");
+    await modules.client.apiGet("/library/scenes");
+    // An answer without the header (a public endpoint) changes nothing
+    answerWith(undefined);
+    await modules.client.apiGet("/setup/status");
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
