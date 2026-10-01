@@ -177,6 +177,8 @@ describe("TimelineService", () => {
       ],
       ["image", "tagId", "it.tagId = ? AND it.tagInstanceId = ?"],
       ["image", "studioId", "i.studioId = ? AND i.stashInstanceId = ?"],
+      ["scene", "galleryId", "sga.galleryId = ? AND sga.galleryInstanceId = ?"],
+      ["image", "galleryId", "ig.galleryId = ? AND ig.galleryInstanceId = ?"],
     ] as const)(
       "a composite %s %s binds the pair",
       (entityType, filter, condition) => {
@@ -221,6 +223,33 @@ describe("TimelineService", () => {
         "a",
       ]);
       expect(placeholders(sql)).toBe(params.length);
+    });
+
+    it("a gallery's images join ImageGallery on the image's own pair", () => {
+      const { sql } = service.buildDistributionQuery(
+        "image",
+        1,
+        ["inst-a"],
+        "months",
+        { galleryId: ref("9", "inst-a") }
+      );
+
+      expect(sql).toContain(
+        "INNER JOIN ImageGallery ig ON ig.imageId = i.id AND ig.imageInstanceId = i.stashInstanceId"
+      );
+    });
+
+    it("a gallery has no gallery filter of its own", () => {
+      const { sql, params } = service.buildDistributionQuery(
+        "gallery",
+        1,
+        ["inst-a", "inst-b"],
+        "months",
+        { galleryId: ref("9", "inst-a") }
+      );
+
+      expect(sql).not.toContain("galleryId");
+      expect(params).toEqual([1, "inst-a", "inst-b"]);
     });
 
     it("ignores a filter the entity type does not have", () => {

@@ -144,6 +144,7 @@ const tagTreeRequest = z.strictObject({
       tag: scopeRef.optional(),
       studio: scopeRef.optional(),
       group: scopeRef.optional(),
+      gallery: scopeRef.optional(),
     })
     .optional(),
   untagged: z.enum(["scene", "gallery", "image"]).optional(),

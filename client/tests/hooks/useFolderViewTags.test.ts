@@ -65,6 +65,12 @@ describe("useFolderViewTags", () => {
     );
   });
 
+  it("scopes the tree to a gallery page", () => {
+    renderHook(() => useFolderViewTags(true, { galleryId: "9:a" }));
+
+    expect(mockUseTagTree).toHaveBeenLastCalledWith({ gallery: "9:a" }, true);
+  });
+
   it("asks for the page type's untagged count and returns it, 0 until the tree answers", () => {
     const { result, rerender } = renderHook(() =>
       useFolderViewTags(true, null, "image")

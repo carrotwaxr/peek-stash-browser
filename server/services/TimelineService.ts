@@ -25,6 +25,8 @@ export interface TimelineFilters {
   tagId?: FilterRef;
   studioId?: FilterRef;
   groupId?: FilterRef;
+  /** A gallery's scenes or images (a gallery page's tabs) */
+  galleryId?: FilterRef;
 }
 
 type TimelineFilter = keyof TimelineFilters;
@@ -39,7 +41,7 @@ type FilterPath =
       kind: "junction";
       table: string;
       alias: string;
-      ref: "performer" | "tag" | "group";
+      ref: "performer" | "tag" | "group" | "gallery";
     }
   | { kind: "studio" };
 
@@ -72,6 +74,12 @@ const ENTITY_CONFIG: Record<TimelineEntityType, EntityConfig> = {
         alias: "sg",
         ref: "group",
       },
+      galleryId: {
+        kind: "junction",
+        table: "SceneGallery",
+        alias: "sga",
+        ref: "gallery",
+      },
     },
   },
   gallery: {
@@ -102,6 +110,12 @@ const ENTITY_CONFIG: Record<TimelineEntityType, EntityConfig> = {
       },
       tagId: { kind: "junction", table: "ImageTag", alias: "it", ref: "tag" },
       studioId: { kind: "studio" },
+      galleryId: {
+        kind: "junction",
+        table: "ImageGallery",
+        alias: "ig",
+        ref: "gallery",
+      },
     },
   },
 };
@@ -112,6 +126,7 @@ const FILTER_ORDER: readonly TimelineFilter[] = [
   "tagId",
   "studioId",
   "groupId",
+  "galleryId",
 ];
 
 export class TimelineService {

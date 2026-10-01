@@ -317,22 +317,30 @@ export function usePaginatedLightbox<TImage = unknown>({
   // URL. While a crossing's page loads (or before its image is named) the
   // index is the old page's, so it names nothing; nor while an address's
   // image waits for its page (a Back to another page and image), whose
-  // param the old index would overwrite.
+  // param the old index would overwrite. That includes a navigation not
+  // followed yet: the lightbox reports before the observer runs (a child's
+  // effects run first), and a Back to a cached page brings that page's
+  // images with it.
   const handleLightboxIndexChange = useCallback(
     (index: number) => {
       setTrackedIndex(index);
+      const unfollowed =
+        location !== seenLocationRef.current &&
+        imageParam !== latestRef.current &&
+        !ownWritesRef.current.includes(imageParam);
       if (
         !lightboxOpen ||
         pendingLightboxNav.current !== null ||
         landingIndex !== null ||
-        resolveRef.current !== null
+        resolveRef.current !== null ||
+        unfollowed
       ) {
         return;
       }
       const image = images[index];
       if (image) writeImage(imageKey(image), "replace");
     },
-    [lightboxOpen, landingIndex, images, writeImage]
+    [lightboxOpen, landingIndex, images, writeImage, location, imageParam]
   );
 
   // Handle lightbox close. The list then shows the page of the last image

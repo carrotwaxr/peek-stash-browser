@@ -38,7 +38,7 @@ Sort by Created At, Date, Image Count, Path, Random, Rating, Title, or Updated A
 
 Click a gallery to open its detail page showing:
 
-- **Header** — Gallery title, favorite toggle, and "View in Stash" link
+- **Header** — Gallery title, favorite toggle, "View in Stash" link, the studio, how many images you can see, the date, the photographer, and **Play Slideshow**
 - **Rating** — 0-100 slider (keyboard shortcut: ++r++ then ++1++ through ++5++)
 - **Description** — If available from Stash
 - **Performers** — Scrollable grid with clickable performer links
@@ -50,7 +50,9 @@ The detail page has two tabs:
 
 **Images**
 
-Displays gallery images in a wall layout with pagination (100 images per page). Click any image to open the lightbox viewer.
+The Images page's list, kept to this gallery: the same sort, filters, search, Grid, Wall, Table and Timeline views and page size (see [Images Tabs](browse-and-display.md#images-tabs)). It opens in the gallery's file order (sorted by path), on the wall. The timeline counts this gallery's images only. The tab has its own filter presets and default, shared by every gallery's Images tab. Click any image to open the lightbox viewer.
+
+**Play Slideshow** opens the viewer on the first image of the list's page and starts the slideshow; from the Scenes tab it opens the Images tab first.
 
 The lightbox supports:
 
@@ -64,7 +66,7 @@ The lightbox supports:
 
 **Scenes**
 
-Shows scenes associated with this gallery, with full search and filtering.
+Shows scenes associated with this gallery, with full search and filtering. Its timeline counts this gallery's scenes only, and its folder view lists the tags on this gallery's scenes.
 
 ## Rating and Favorites
 

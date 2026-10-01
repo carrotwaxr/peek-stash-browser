@@ -101,10 +101,26 @@ export function useImageListPage({
   });
   const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
     lightbox;
-  // A host's Play Slideshow (a gallery's) opens the viewer from outside
-  useImperativeHandle(lightboxRef, () => ({ open: openLightbox }), [
-    openLightbox,
-  ]);
+  // A host's Play Slideshow (a gallery's) opens the viewer from outside. It
+  // may ask before the page's rows are in (it opened the tab), and it opens
+  // after the lightbox has followed the URL, which on mount closes it.
+  const [hostOpen, setHostOpen] = useState<{
+    index: number;
+    autoPlay: boolean;
+  } | null>(null);
+  const rowsReady = !loading && !error && items.length > 0;
+  useImperativeHandle(
+    lightboxRef,
+    () => ({
+      open: (index, autoPlay = false) => setHostOpen({ index, autoPlay }),
+    }),
+    []
+  );
+  useEffect(() => {
+    if (hostOpen === null || !rowsReady) return;
+    setHostOpen(null);
+    openLightbox(hostOpen.index, hostOpen.autoPlay);
+  }, [hostOpen, rowsReady, openLightbox]);
 
   // A crossing's page that fails leaves the list with no rows until the
   // lightbox returns to its page: the open lightbox keeps the last rows

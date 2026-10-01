@@ -115,6 +115,11 @@ export interface DetailPageOptions {
   settings?: Partial<GetUserSettingsResponse["settings"]>;
   /** The status `PUT /ratings/<type>/<id>` answers, after 20 ms (default 200) */
   ratingAnswer?: number;
+  /**
+   * Further routes, by path after `/api`, over the ones above (a paged
+   * images list, an image's rating, the timeline)
+   */
+  routes?: Record<string, Answer>;
 }
 
 export const DEFAULT_ENTITY: Record<string, unknown> = {
@@ -152,6 +157,16 @@ const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
     front_image_path: null,
     back_image_path: null,
   },
+  gallery: {
+    tags: [],
+    performers: [],
+    studio: null,
+    details: null,
+    date: null,
+    photographer: null,
+    files: [],
+    folder: null,
+  },
 };
 
 let latestApi: ApiStub | undefined;
@@ -187,6 +202,16 @@ export function navigateTo(url: string): void {
   const navigate = navigateRef;
   act(() => {
     void navigate(url);
+  });
+}
+
+/** Goes back one history entry inside the router, as the browser's Back does */
+export function goBack(): void {
+  if (!navigateRef)
+    throw new Error("No page rendered: call renderDetailPage first");
+  const navigate = navigateRef;
+  act(() => {
+    void navigate(-1);
   });
 }
 
@@ -307,6 +332,7 @@ export function renderDetailPage(
     "/user/default-presets": () => jsonResponse(200, { defaults: {} }),
     "/user/settings": () =>
       jsonResponse(200, userSettingsResponse(options.settings)),
+    ...options.routes,
   });
   latestApi = api;
 

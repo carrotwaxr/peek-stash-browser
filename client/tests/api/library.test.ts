@@ -1,7 +1,6 @@
 /**
- * Unit tests for libraryApi.findGalleryImages: gallery images come from the
- * images search with an instance-aware galleries filter (item 11); and
- * getRelationCounts, a detail page's tab counts (B19).
+ * Unit tests for libraryApi.getRelationCounts, a detail page's tab counts
+ * (B19), and findEntityById, a detail page's lookup.
  */
 import type { NormalizedPerformer, WithStashUrl } from "@peek/shared-types";
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -23,33 +22,6 @@ describe("libraryApi", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApiPost.mockResolvedValue({});
-  });
-
-  describe("findGalleryImages", () => {
-    it("posts the gallery as an instance-aware images filter", async () => {
-      await libraryApi.findGalleryImages("44", "inst-b", {
-        page: 2,
-        perPage: 100,
-      });
-
-      expect(mockApiPost).toHaveBeenCalledWith("/library/images", {
-        filter: { page: 2, per_page: 100, sort: "path", direction: "ASC" },
-        image_filter: {
-          galleries: { value: ["44:inst-b"], modifier: "INCLUDES" },
-        },
-      });
-    });
-
-    it("returns images and count from findImages", async () => {
-      const image = { id: "1", instanceId: "inst-b" };
-      mockApiPost.mockResolvedValueOnce({
-        findImages: { images: [image], count: 7 },
-      });
-
-      await expect(
-        libraryApi.findGalleryImages("44", "inst-b")
-      ).resolves.toEqual({ images: [image], count: 7 });
-    });
   });
 
   describe("getRelationCounts", () => {

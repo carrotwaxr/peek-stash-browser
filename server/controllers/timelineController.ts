@@ -26,6 +26,7 @@ const FILTER_PARAMS = [
   "tagId",
   "studioId",
   "groupId",
+  "galleryId",
 ] as const satisfies ReadonlyArray<keyof TimelineFilters>;
 
 /** Each filter parameter as a ref; a value that is not one id (or id:instanceId), or a repeated parameter, is a 400 */

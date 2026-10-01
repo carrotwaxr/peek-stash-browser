@@ -230,15 +230,16 @@ export interface FindTagsMinimalResponse {
 }
 
 /**
- * What a scoped tag tree covers: the scenes of a performer, tag, studio and
- * collection (all that are given). Each is `"id:instanceId"`, or a bare id
- * for that id on every instance the user sees.
+ * What a scoped tag tree covers: the scenes of a performer, tag, studio,
+ * collection and gallery (all that are given). Each is `"id:instanceId"`, or
+ * a bare id for that id on every instance the user sees.
  */
 export interface TagTreeScope {
   performer?: string;
   tag?: string;
   studio?: string;
   group?: string;
+  gallery?: string;
 }
 
 /**

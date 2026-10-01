@@ -8,8 +8,9 @@
  * `deletedAt IS NULL` and the user's allowed instances. A parent the user
  * cannot see is left out of a tag's parents, so the tag becomes a root.
  *
- * With a scope (a performer, tag, studio and collection, all that are given),
- * a recursive CTE starts from the tags on the scope's visible scenes (their
+ * With a scope (a performer, tag, studio, collection and gallery, all that
+ * are given), a recursive CTE starts from the tags on the scope's visible
+ * scenes (their
  * own and their inherited ones, from `SceneTag` and `SceneInheritedTag`, as
  * the scene list's tag filter matches them; a tag scope's scenes too), each
  * counted once per scene, so a folder's badge on a detail page is its list's
@@ -45,6 +46,7 @@ export interface TagTreeScopeRefs {
   readonly tag?: FilterRef | undefined;
   readonly studio?: FilterRef | undefined;
   readonly group?: FilterRef | undefined;
+  readonly gallery?: FilterRef | undefined;
 }
 
 export interface LoadTagTreeOptions {
@@ -162,6 +164,7 @@ SELECT j.sceneId, j.sceneInstanceId FROM SceneInheritedTag j WHERE ${direct.sql}
     });
   }
   junction(scope.group, "SceneGroup", "groupId", "groupInstanceId");
+  junction(scope.gallery, "SceneGallery", "galleryId", "galleryInstanceId");
   if (scope.studio) {
     // A scene's studio is on the scene's own instance
     const match = refMatch(scope.studio, "s.studioId", "s.stashInstanceId");

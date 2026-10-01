@@ -1,9 +1,4 @@
 {
-  "src/api/library.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
   "src/api/setup.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -72,17 +67,6 @@
   },
   "src/components/pages/Downloads.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
-    }
-  },
-  "src/components/pages/GalleryDetail.tsx": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }
   },

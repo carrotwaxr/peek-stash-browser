@@ -183,6 +183,25 @@ describe("Timeline API", () => {
       }
     );
 
+    // A gallery page's Images and Scenes tabs: the fixture's galleries hold
+    // only undated images and scenes, so their bars are empty where the
+    // library's are not (an ignored filter would answer the library's)
+    it.each([
+      ["image", TEST_ENTITIES.galleryWithImages],
+      ["scene", TEST_ENTITIES.galleryWithScenes],
+    ] as const)(
+      "%s bars by galleryId count the gallery's own, not the library's",
+      async (entityType, id) => {
+        const library = await distribution(entityType, "");
+        const gallery = await distribution(
+          entityType,
+          `galleryId=${pair(id, instanceId)}`
+        );
+        expect(library.length).toBeGreaterThan(0);
+        expect(gallery).toEqual([]);
+      }
+    );
+
     it.each(CASES)(
       "%s bars by %s on another instance are empty",
       async (entityType, filter, id) => {

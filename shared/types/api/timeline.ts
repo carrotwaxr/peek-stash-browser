@@ -23,6 +23,7 @@ export interface GetDateDistributionQuery extends Record<
   tagId?: string;
   studioId?: string;
   groupId?: string;
+  galleryId?: string;
 }
 
 export interface DateDistributionEntry {
