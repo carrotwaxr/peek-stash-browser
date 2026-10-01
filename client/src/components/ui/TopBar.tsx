@@ -6,9 +6,11 @@ import {
 } from "../../constants/navigation";
 import { useScrollDirection } from "../../hooks/useScrollDirection";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
+import { showError } from "../../utils/toast";
 import { PeekLogo } from "../branding/PeekLogo";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
+import { PieceErrorBoundary } from "./ErrorBoundary";
 import UserMenu from "./UserMenu";
 
 // Loaded on first open: the shortcut list is not part of the first load
@@ -202,9 +204,17 @@ const TopBar = ({ navPreferences = [] }: Props) => {
 
       {/* Help Modal */}
       {isHelpModalOpen && (
-        <Suspense fallback={null}>
-          <HelpModal onClose={() => setIsHelpModalOpen(false)} />
-        </Suspense>
+        // Its own chunk: one that fails to load closes and says so
+        <PieceErrorBoundary
+          onError={() => {
+            setIsHelpModalOpen(false);
+            showError("Couldn't open help");
+          }}
+        >
+          <Suspense fallback={null}>
+            <HelpModal onClose={() => setIsHelpModalOpen(false)} />
+          </Suspense>
+        </PieceErrorBoundary>
       )}
     </>
   );
