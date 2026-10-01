@@ -119,8 +119,6 @@ export type CardDisplaySettings = Record<string, unknown> | null;
 /** GET /api/user/settings */
 export interface GetUserSettingsResponse {
   settings: {
-    preferredQuality: string;
-    preferredPlaybackMode: string;
     preferredPreviewQuality: string | null;
     theme: string;
     carouselPreferences: CarouselPreference[];
@@ -147,8 +145,6 @@ export interface UpdateUserSettingsParams extends Record<string, string> {
 }
 
 export interface UpdateUserSettingsBody {
-  preferredQuality?: string;
-  preferredPlaybackMode?: string;
   preferredPreviewQuality?: string;
   theme?: string;
   carouselPreferences?: CarouselPreference[];
@@ -166,8 +162,6 @@ export interface UpdateUserSettingsBody {
 export interface UpdateUserSettingsResponse {
   success: true;
   settings: {
-    preferredQuality: string;
-    preferredPlaybackMode: string;
     theme: string;
     carouselPreferences: CarouselPreference[];
     navPreferences: NavPreference[] | null;

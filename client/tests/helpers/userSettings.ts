@@ -7,8 +7,6 @@ export const userSettingsResponse = (
   overrides: Partial<UserSettings> = {}
 ): GetUserSettingsResponse => ({
   settings: {
-    preferredQuality: "auto",
-    preferredPlaybackMode: "auto",
     preferredPreviewQuality: null,
     theme: "dark",
     carouselPreferences: [],
