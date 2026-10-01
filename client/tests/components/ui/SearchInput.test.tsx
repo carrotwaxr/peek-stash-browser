@@ -58,4 +58,66 @@ describe("SearchInput", () => {
     expect(screen.getByPlaceholderText("Search...")).toHaveValue("");
     expect(onSearch).not.toHaveBeenCalled();
   });
+  it("typing 'ab', waiting for the debounce, then 'c' before the parent echoes value='ab' keeps 'abc' in the field and later sends 'abc'", async () => {
+    const onSearch = vi.fn<(query: string) => void>();
+    const { rerender } = render(<SearchInput onSearch={onSearch} value="" />);
+    const input = screen.getByPlaceholderText("Search...");
+
+    fireEvent.change(input, { target: { value: "ab" } });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(onSearch).toHaveBeenLastCalledWith("ab");
+
+    fireEvent.change(input, { target: { value: "abc" } });
+    rerender(<SearchInput onSearch={onSearch} value="ab" />);
+    expect(input).toHaveValue("abc");
+
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(onSearch).toHaveBeenCalledTimes(2);
+    expect(onSearch).toHaveBeenLastCalledWith("abc");
+    rerender(<SearchInput onSearch={onSearch} value="abc" />);
+    expect(input).toHaveValue("abc");
+  });
+
+  it("a value from outside that differs from the last search (Back, a cleared chip) replaces the field", async () => {
+    const onSearch = vi.fn<(query: string) => void>();
+    const { rerender } = render(<SearchInput onSearch={onSearch} value="" />);
+    const input = screen.getByPlaceholderText("Search...");
+
+    fireEvent.change(input, { target: { value: "ab" } });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    rerender(<SearchInput onSearch={onSearch} value="ab" />);
+
+    rerender(<SearchInput onSearch={onSearch} value="" />);
+    expect(input).toHaveValue("");
+
+    fireEvent.change(input, { target: { value: "xy" } });
+    rerender(<SearchInput onSearch={onSearch} value="beach" />);
+    expect(input).toHaveValue("beach");
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(onSearch).toHaveBeenCalledWith("ab");
+  });
+
+  it("Clear sends '' once and a late echo of the old text does not refill the field", async () => {
+    const onSearch = vi.fn<(query: string) => void>();
+    const { rerender } = render(<SearchInput onSearch={onSearch} value="" />);
+    const input = screen.getByPlaceholderText("Search...");
+
+    fireEvent.change(input, { target: { value: "abc" } });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(onSearch).toHaveBeenLastCalledWith("abc");
+    onSearch.mockClear();
+
+    fireEvent.click(screen.getByRole("button"));
+    expect(input).toHaveValue("");
+
+    rerender(<SearchInput onSearch={onSearch} value="abc" />);
+    expect(input).toHaveValue("");
+    rerender(<SearchInput onSearch={onSearch} value="" />);
+    expect(input).toHaveValue("");
+
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(onSearch).toHaveBeenCalledWith("");
+  });
 });
