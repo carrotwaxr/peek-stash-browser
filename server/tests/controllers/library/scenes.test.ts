@@ -629,6 +629,7 @@ describe("getRecommendedScenes", () => {
     ratedTags: 0,
     favoritedScenes: 0,
     ratedScenes: 0,
+    rankedEntities: 0,
   };
   const someCriteria = { ...noCriteria, favoritedPerformers: 1 };
   const ref = (id: string, instanceId = "default") => ({ id, instanceId });

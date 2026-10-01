@@ -3,10 +3,13 @@
  * ratings, plays, hidden items and rankings and the scene sync are as they
  * were (a stamp, one query), keyed by user, day and allowed instances.
  */
-import type { PerformerRating } from "@prisma/client";
+import type { PerformerRating, UserEntityRanking } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import type { ScoringScene } from "../../services/RecommendationScoringService.js";
+import {
+  type ScoringScene,
+  hasAnyCriteria,
+} from "../../services/RecommendationScoringService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { must } from "../helpers/must.js";
@@ -268,6 +271,64 @@ describe("RecommendationService", () => {
 
     expect(ranked.refs).toEqual([]);
     expect(ranked.criteria.favoritedPerformers).toBe(0);
+    expect(mockScoring).not.toHaveBeenCalled();
+  });
+
+  it("a user with no ratings but rankings at or above the 50th percentile has criteria and a scored list", async () => {
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.userEntityRanking.findMany.mockResolvedValue([
+      partialRow<UserEntityRanking>({
+        entityId: "p1",
+        instanceId: A,
+        entityType: "performer",
+        engagementRate: 1,
+        percentileRank: 100,
+      }),
+      partialRow<UserEntityRanking>({
+        entityId: "p2",
+        instanceId: A,
+        entityType: "performer",
+        engagementRate: 0.2,
+        percentileRank: 50,
+      }),
+      partialRow<UserEntityRanking>({
+        entityId: "p3",
+        instanceId: A,
+        entityType: "performer",
+        engagementRate: 0.1,
+        percentileRank: 49,
+      }),
+    ]);
+    mockScoring.mockResolvedValue([
+      scene("s1", A, ["p1"]),
+      scene("s2", A, ["p3"]),
+    ]);
+
+    const ranked = await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(ranked.criteria.rankedEntities).toBe(2);
+    expect(hasAnyCriteria(ranked.criteria)).toBe(true);
+    expect(keys(ranked.refs)).toEqual([`s1:${A}`]);
+    // The rankings are read once, for the criteria and the weights
+    expect(mockPrisma.userEntityRanking.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("rankings all below the 50th percentile still mean no criteria", async () => {
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.userEntityRanking.findMany.mockResolvedValue([
+      partialRow<UserEntityRanking>({
+        entityId: "p1",
+        instanceId: A,
+        entityType: "performer",
+        engagementRate: 0.1,
+        percentileRank: 49,
+      }),
+    ]);
+
+    const ranked = await recommendationService.getRankedRefs(USER, [A]);
+
+    expect(ranked.criteria.rankedEntities).toBe(0);
+    expect(ranked.refs).toEqual([]);
     expect(mockScoring).not.toHaveBeenCalled();
   });
 

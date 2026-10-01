@@ -33,6 +33,7 @@ import { logger } from "../utils/logger.js";
 import { SeededRandom, generateDailySeed } from "../utils/seededRandom.js";
 import {
   type EntityRankingData,
+  IMPLICIT_MIN_PERCENTILE,
   type LightweightEntityPreferences,
   type SceneRatingInput,
   type ScoringScene,
@@ -50,8 +51,6 @@ import { stashEntityService } from "./StashEntityService.js";
 export const RANKED_LIMIT = 500;
 /** How many users' lists are kept */
 const CACHED_USERS = 100;
-/** Rankings below this percentile carry no implicit weight */
-const IMPLICIT_MIN_PERCENTILE = 50;
 
 export interface RankedRecommendations {
   /** The ranked, diversified top scenes, best first */
@@ -192,25 +191,17 @@ export class RecommendationService {
   ): Promise<RankedRecommendations> {
     const startTime = Date.now();
 
-    const [performerRatings, studioRatings, tagRatings, sceneRatings] =
-      await Promise.all([
-        prisma.performerRating.findMany({ where: { userId } }),
-        prisma.studioRating.findMany({ where: { userId } }),
-        prisma.tagRating.findMany({ where: { userId } }),
-        prisma.sceneRating.findMany({ where: { userId } }),
-      ]);
-
-    const criteria = countUserCriteria(
+    const [
       performerRatings,
       studioRatings,
       tagRatings,
-      sceneRatings
-    );
-    if (!hasAnyCriteria(criteria)) {
-      return { refs: [], criteria };
-    }
-
-    const [engagementRankings, scenes] = await Promise.all([
+      sceneRatings,
+      engagementRankings,
+    ] = await Promise.all([
+      prisma.performerRating.findMany({ where: { userId } }),
+      prisma.studioRating.findMany({ where: { userId } }),
+      prisma.tagRating.findMany({ where: { userId } }),
+      prisma.sceneRating.findMany({ where: { userId } }),
       prisma.userEntityRanking.findMany({
         where: { userId, entityType: { in: ["performer", "studio", "tag"] } },
         select: {
@@ -221,7 +212,25 @@ export class RecommendationService {
           percentileRank: true,
         },
       }),
-      stashEntityService.getScenesForScoring(userId, [...allowedInstanceIds]),
+    ]);
+
+    // A user who only watches has no ratings or favorites, but their most
+    // engaged performers, studios and tags are criteria all the same
+    const criteria = countUserCriteria(
+      performerRatings,
+      studioRatings,
+      tagRatings,
+      sceneRatings,
+      engagementRankings.filter(
+        (r) => r.percentileRank >= IMPLICIT_MIN_PERCENTILE
+      ).length
+    );
+    if (!hasAnyCriteria(criteria)) {
+      return { refs: [], criteria };
+    }
+
+    const scenes = await stashEntityService.getScenesForScoring(userId, [
+      ...allowedInstanceIds,
     ]);
 
     const sets = <T extends RatingRow>(rows: T[], id: (row: T) => string) => ({

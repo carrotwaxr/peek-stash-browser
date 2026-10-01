@@ -310,9 +310,11 @@ describe("RecommendationScoringService", () => {
         performerRatings,
         studioRatings,
         tagRatings,
-        sceneRatings
+        sceneRatings,
+        4
       );
 
+      expect(counts.rankedEntities).toBe(4);
       expect(counts.favoritedPerformers).toBe(1);
       expect(counts.ratedPerformers).toBe(1);
       expect(counts.favoritedStudios).toBe(1);
@@ -335,6 +337,7 @@ describe("RecommendationScoringService", () => {
         ratedTags: 0,
         favoritedScenes: 0,
         ratedScenes: 0,
+        rankedEntities: 0,
       };
 
       expect(hasAnyCriteria(counts)).toBe(false);
@@ -350,6 +353,7 @@ describe("RecommendationScoringService", () => {
         ratedTags: 0,
         favoritedScenes: 1,
         ratedScenes: 0,
+        rankedEntities: 0,
       };
 
       expect(hasAnyCriteria(counts)).toBe(true);
@@ -365,6 +369,23 @@ describe("RecommendationScoringService", () => {
         ratedTags: 0,
         favoritedScenes: 0,
         ratedScenes: 3,
+        rankedEntities: 0,
+      };
+
+      expect(hasAnyCriteria(counts)).toBe(true);
+    });
+
+    it("returns true when only ranked entities exist (watching, no ratings)", () => {
+      const counts = {
+        favoritedPerformers: 0,
+        ratedPerformers: 0,
+        favoritedStudios: 0,
+        ratedStudios: 0,
+        favoritedTags: 0,
+        ratedTags: 0,
+        favoritedScenes: 0,
+        ratedScenes: 0,
+        rankedEntities: 2,
       };
 
       expect(hasAnyCriteria(counts)).toBe(true);

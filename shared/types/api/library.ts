@@ -149,6 +149,8 @@ export interface GetRecommendedScenesResponse {
     ratedTags: number;
     favoritedScenes: number;
     ratedScenes: number;
+    /** Performers, studios and tags the user's viewing ranks in its top half */
+    rankedEntities: number;
   };
 }
 

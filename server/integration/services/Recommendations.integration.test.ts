@@ -19,6 +19,7 @@ import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import {
   reqFor,
   resFor,
@@ -371,5 +372,39 @@ describe("Recommended scenes (integration)", () => {
 
     const after = await recommendationService.getRankedRefs(viewer.id, [A, B]);
     expect(after).not.toBe(before);
+  });
+
+  it("a viewer who only saved activity on three scenes gets a non-empty Recommended page after the stats recompute", async () => {
+    const viewer = await createViewer("access_it_rec_watch_only");
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // No ratings or favorites: three plays of scenes with performers SAME and
+    // VISIBLE_A on A (SAME is on SAME and GLOBAL, VISIBLE_A on SAME and EXTRA)
+    await prisma.watchHistory.createMany({
+      data: [SAME, GLOBAL, EXTRA].map((sceneId) => ({
+        userId: viewer.id,
+        instanceId: A,
+        sceneId,
+        playCount: 1,
+        playDuration: 600,
+        lastPlayedAt: monthAgo,
+      })),
+    });
+    expect((await recommended(viewer, 1, 24)).scenes).toEqual([]);
+
+    // What the stats page does: the stats from the history, then the rankings
+    await userStatsService.rebuildAllStatsForUser(viewer.id);
+    await rankingComputeService.recomputeAllRankings(viewer.id);
+    recommendationService.forget(viewer.id);
+
+    const body = await recommended(viewer, 1, 24);
+    expect(body.scenes.length).toBeGreaterThan(0);
+    expect(body.count).toBe(body.scenes.length);
+    // VISIBLE_A ranks in the top half (its two plays over two library scenes
+    // beat SAME's over four), so its two scenes are listed; SAME ranks below
+    // the 50th percentile, so GLOBAL, which only it is on, is not
+    expect(body.scenes.map(key).sort()).toEqual([
+      `${SAME}:${A}`,
+      `${EXTRA}:${A}`,
+    ]);
   });
 });

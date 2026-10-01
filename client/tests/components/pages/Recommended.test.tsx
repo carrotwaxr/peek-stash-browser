@@ -32,6 +32,8 @@ interface MockGridProps {
   error?: string;
   currentPage: number;
   onPageChange: (page: number) => void;
+  emptyMessage?: string;
+  emptyDescription?: ReactNode;
 }
 
 vi.mock("@/components/scene-search/SceneGrid", () => ({
@@ -41,9 +43,17 @@ vi.mock("@/components/scene-search/SceneGrid", () => ({
     error,
     currentPage,
     onPageChange,
+    emptyMessage,
+    emptyDescription,
   }: MockGridProps) => (
     <div data-testid="scene-grid" data-loading={String(loading)}>
       {error && <p>{error}</p>}
+      {!loading && scenes.length === 0 && (
+        <div data-testid="empty-state">
+          <p>{emptyMessage}</p>
+          {emptyDescription}
+        </div>
+      )}
       {scenes.map((scene) => (
         <p key={scene.id}>{scene.title}</p>
       ))}
@@ -224,5 +234,57 @@ describe("Recommended", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("(Error type: INTERNAL)")).toBeInTheDocument();
     expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
+
+  describe("the empty state", () => {
+    const noActivity = {
+      favoritedPerformers: 0,
+      ratedPerformers: 0,
+      favoritedStudios: 0,
+      ratedStudios: 0,
+      favoritedTags: 0,
+      ratedTags: 0,
+      favoritedScenes: 0,
+      ratedScenes: 0,
+      rankedEntities: 0,
+    };
+
+    it("the empty state mentions watching as a source", async () => {
+      stubApi({
+        [RECOMMENDED]: () =>
+          jsonResponse(200, {
+            scenes: [],
+            count: 0,
+            message: "No recommendations yet",
+            criteria: noActivity,
+          }),
+      });
+
+      renderAt("/recommended");
+      await settle();
+
+      expect(screen.getByTestId("empty-state")).toHaveTextContent(
+        /keep watching/i
+      );
+    });
+
+    it("the activity list shows N performers, studios and tags from your viewing", async () => {
+      stubApi({
+        [RECOMMENDED]: () =>
+          jsonResponse(200, {
+            scenes: [],
+            count: 0,
+            message: "No matching recommendations found",
+            criteria: { ...noActivity, rankedEntities: 5 },
+          }),
+      });
+
+      renderAt("/recommended");
+      await settle();
+
+      expect(screen.getByTestId("empty-state")).toHaveTextContent(
+        "5 performers, studios and tags from your viewing"
+      );
+    });
   });
 });
