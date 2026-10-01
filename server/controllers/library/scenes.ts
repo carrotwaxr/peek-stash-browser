@@ -20,7 +20,6 @@ import type {
   WithStashUrl,
 } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
-import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { type EntityRef, entityKey } from "../../utils/entityRef.js";
 import {
   parseListRequest,
@@ -32,31 +31,16 @@ import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
- * Add streamability information to scenes
- * This adds codec detection metadata to determine if scenes can be directly played
- * in browsers without transcoding, and the View in Stash link, which only an
- * admin viewer gets
+ * Add the View in Stash link to scenes; only an admin viewer gets it
  */
-export function addStreamabilityInfo(
+export function addStashUrl(
   scenes: NormalizedScene[],
   viewer: { role: string } | undefined
 ): WithStashUrl<NormalizedScene>[] {
-  return scenes.map((scene) => {
-    const streamabilityInfo = isSceneStreamable(scene);
-    const stashUrl = buildStashEntityUrl(
-      "scene",
-      scene.id,
-      scene.instanceId,
-      viewer
-    );
-
-    return {
-      ...scene,
-      isStreamable: streamabilityInfo.isStreamable,
-      streamabilityReasons: streamabilityInfo.reasons,
-      stashUrl,
-    };
-  });
+  return scenes.map((scene) => ({
+    ...scene,
+    stashUrl: buildStashEntityUrl("scene", scene.id, scene.instanceId, viewer),
+  }));
 }
 
 /**
@@ -107,7 +91,7 @@ export const findScenes = async (
   }
 
   // Add streamability info
-  let scenes = addStreamabilityInfo(result.items, req.user);
+  let scenes = addStashUrl(result.items, req.user);
 
   // The Scene page loads one scene by id: only then build its stream
   // list. Lists keep sceneStreams empty.

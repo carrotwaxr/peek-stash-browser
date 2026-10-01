@@ -118,8 +118,7 @@ const VideoPlayer = () => {
   // ============================================================================
   const { watchHistory, loading: loadingWatchHistory } = useWatchHistory(
     scene?.id ?? "",
-    scene?.instanceId ?? "",
-    playerRef
+    scene?.instanceId ?? ""
   );
 
   // ============================================================================

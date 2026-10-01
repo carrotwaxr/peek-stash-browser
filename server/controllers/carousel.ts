@@ -36,7 +36,7 @@ import {
 } from "../utils/listRequest.js";
 import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
-import { addStreamabilityInfo } from "./library/scenes.js";
+import { addStashUrl } from "./library/scenes.js";
 
 // Maximum number of custom carousels per user
 const MAX_CAROUSELS_PER_USER = 15;
@@ -325,7 +325,7 @@ export async function executeCarouselQuery(
     request: query,
   });
 
-  const scenes = addStreamabilityInfo(result.items, viewer);
+  const scenes = addStashUrl(result.items, viewer);
 
   logger.debug("executeCarouselQuery complete (SQL path)", {
     totalTimeMs: Date.now() - startTime,

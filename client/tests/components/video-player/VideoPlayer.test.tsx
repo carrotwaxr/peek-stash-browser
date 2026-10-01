@@ -40,7 +40,6 @@ vi.mock("@/hooks/useWatchHistory", () => ({
   useWatchHistory: () => ({
     watchHistory: null,
     loading: false,
-    updateQuality: vi.fn(),
   }),
 }));
 vi.mock("@/components/video-player/useOrientationFullscreen", () => ({
