@@ -294,8 +294,16 @@ function proxyHttpRequest(
   });
 
   // Stash sent nothing for `timeoutMs`: before its response, answer 504;
-  // after, the response can only be cut short
-  proxyReq.setTimeout(timeoutMs, () => {
+  // after, the response can only be cut short. The timer is the socket's idle
+  // timer, which also runs out when the browser stops reading (a paused
+  // preview, a background tab): the pipeline then holds Stash back, so that
+  // is not a silent Stash, and the timer is armed again while the browser's
+  // side waits to drain (as `pipeResponseToClient` does)
+  const onIdle = (): void => {
+    if (upstreamRes !== undefined && res.writableNeedDrain) {
+      proxyReq.setTimeout(timeoutMs, onIdle);
+      return;
+    }
     endedBy ??= "timeout";
     logger.warn(`${label} Stash sent nothing for ${timeoutMs} ms`, {
       responseStarted: upstreamRes !== undefined,
@@ -307,7 +315,8 @@ function proxyHttpRequest(
       return;
     }
     sendAppError(res, new GatewayTimeoutError("Stash did not answer"));
-  });
+  };
+  proxyReq.setTimeout(timeoutMs, onIdle);
 }
 
 /**

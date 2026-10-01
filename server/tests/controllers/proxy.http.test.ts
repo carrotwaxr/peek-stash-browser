@@ -394,3 +394,136 @@ describe("the media proxy and byte ranges", () => {
     }
   );
 });
+
+/** Bytes Stash sends for a large preview: far more than the sockets buffer. */
+const LARGE_BYTES = 32 * 1024 * 1024;
+
+describe("the media proxy and a browser that reads slowly", () => {
+  let stashServer: http.Server;
+  /** Bytes Stash has handed to its socket in the latest transfer. */
+  let stashSent = 0;
+  let peekUrl: string;
+  let closePeek: () => Promise<void>;
+  let setTimeoutSpy: { mockRestore: () => void } | undefined;
+
+  beforeAll(async () => {
+    // A large preview, written as fast as Peek reads it
+    stashServer = http.createServer((_req, res) => {
+      stashSent = 0;
+      res.writeHead(200, {
+        "content-type": "video/mp4",
+        "content-length": String(LARGE_BYTES),
+      });
+      const chunk = Buffer.alloc(64 * 1024, 1);
+      const writeMore = (): void => {
+        while (stashSent < LARGE_BYTES) {
+          stashSent += chunk.length;
+          if (!res.write(chunk)) {
+            res.once("drain", writeMore);
+            return;
+          }
+        }
+        res.end();
+      };
+      writeMore();
+    });
+    await new Promise<void>((resolve) =>
+      stashServer.listen(0, "127.0.0.1", resolve)
+    );
+    state.stashUrl = `http://127.0.0.1:${(stashServer.address() as AddressInfo).port}`;
+
+    const peek = await startTestApp((app) => {
+      app.use((req, _res, next) => {
+        (req as AuthenticatedRequest).user = {
+          id: 1,
+          username: "u",
+          role: "USER",
+        };
+        next();
+      });
+      app.get("/api/proxy/scene/:id/preview", authenticated(proxyScenePreview));
+    });
+    peekUrl = peek.baseUrl;
+    closePeek = peek.close;
+  });
+
+  afterAll(async () => {
+    await closePeek();
+    await closeServer(stashServer);
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stashSent = 0;
+  });
+
+  afterEach(() => {
+    setTimeoutSpy?.mockRestore();
+    setTimeoutSpy = undefined;
+  });
+
+  /** The browser's request, its body left unread once the headers came. */
+  function requestPaused(): Promise<http.IncomingMessage> {
+    return new Promise((resolve, reject) => {
+      http
+        .get(`${peekUrl}/api/proxy/scene/1/preview?instanceId=inst-a`, (res) => {
+          res.pause();
+          resolve(res);
+        })
+        .on("error", reject);
+    });
+  }
+
+  /** Reads the rest of the body; rejects when the response is cut short. */
+  function readAll(res: http.IncomingMessage): Promise<number> {
+    return new Promise((resolve, reject) => {
+      let bytes = 0;
+      res.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+      });
+      res.on("end", () => resolve(bytes));
+      res.on("error", reject);
+      res.on("close", () => {
+        if (!res.complete) reject(new Error("the response was cut short"));
+      });
+      res.resume();
+    });
+  }
+
+  it("a browser that stops reading is not taken for a silent Stash", async () => {
+    // The proxy's idle timeout on its request to Stash, fired by the test
+    const timeouts: { ms: number; fire: () => void }[] = [];
+    setTimeoutSpy = vi
+      .spyOn(http.ClientRequest.prototype, "setTimeout")
+      .mockImplementation(function (
+        this: http.ClientRequest,
+        ms: number,
+        callback?: () => void
+      ) {
+        timeouts.push({ ms, fire: callback ?? (() => undefined) });
+        return this;
+      });
+
+    const res = await requestPaused();
+    expect(res.statusCode).toBe(200);
+    // Every buffer between the browser and Stash fills: Peek stops reading
+    // from Stash because the browser stopped reading from Peek, and Stash
+    // sends nothing more
+    let lastSent = -1;
+    await vi.waitFor(
+      () => {
+        const moved = stashSent !== lastSent;
+        lastSent = stashSent;
+        expect(moved).toBe(false);
+      },
+      { timeout: 10000, interval: 200 }
+    );
+    expect(stashSent).toBeLessThan(LARGE_BYTES);
+
+    // The idle limit passes while the browser holds the transfer back
+    must(timeouts[0], "the proxy's upstream timeout").fire();
+
+    expect(await readAll(res)).toBe(LARGE_BYTES);
+    expect(logger.warn).not.toHaveBeenCalled();
+  }, 15000);
+});
