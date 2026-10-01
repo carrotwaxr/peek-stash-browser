@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -6,6 +6,7 @@ import {
   type ToggleSelectOptions,
   useCardSelection,
 } from "../../hooks/useCardSelection";
+import { useSharedMediaQuery } from "../../hooks/useHoverCapable";
 import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
 import { getSceneDescription } from "../../utils/format";
@@ -73,17 +74,7 @@ const SceneListItem = ({
 
   // Track if viewport is mobile-width for scroll-based preview autoplay
   // Uses md breakpoint (768px) since list items stack vertically below this
-  const [isMobileWidth, setIsMobileWidth] = useState(false);
-
-  useEffect(() => {
-    const checkWidth = () => {
-      setIsMobileWidth(window.innerWidth < 768);
-    };
-
-    checkWidth();
-    window.addEventListener("resize", checkWidth);
-    return () => window.removeEventListener("resize", checkWidth);
-  }, []);
+  const isMobileWidth = useSharedMediaQuery("(max-width: 767px)");
 
   // Check if an O was clicked during the last viewing session
   const hadOInLastSession = () => {
@@ -414,4 +405,4 @@ const SceneListItem = ({
   );
 };
 
-export default SceneListItem;
+export default memo(SceneListItem);
