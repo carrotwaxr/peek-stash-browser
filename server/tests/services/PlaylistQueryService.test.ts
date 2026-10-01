@@ -366,7 +366,7 @@ describe("loadPlaylistItems with paging", () => {
         "pi.playlistId = ? AND s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?)"
       );
     }
-    expect(page.sql).toContain("ORDER BY pi.position, pi.id");
+    expect(page.sql).toContain("ORDER BY pi.position ASC, pi.id ASC");
     expect(page.sql).toContain("LIMIT ? OFFSET ?");
     expect(page.params).toEqual([USER_ID, 9, "a", "b", 2, 2]);
     expect(placeholders(page.sql)).toBe(page.params.length);

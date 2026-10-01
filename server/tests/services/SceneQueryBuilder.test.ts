@@ -917,3 +917,71 @@ describe("getByRefs", () => {
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 });
+
+describe("sortTerms", () => {
+  /** The two user joins, as the list statement writes them */
+  const USER_JOINS = [
+    {
+      sql: "LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?",
+      params: [5],
+    },
+    {
+      sql: "LEFT JOIN WatchHistory w ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND w.userId = ?",
+      params: [5],
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("joins the viewer's rating and history and orders by the list's expression", () => {
+    expect(
+      sceneQueryBuilder.sortTerms(5, {
+        field: "title",
+        direction: "ASC",
+        seed: undefined,
+      })
+    ).toEqual({
+      joins: USER_JOINS,
+      order: { sql: "s.titleSort ASC", params: [] },
+    });
+    expect(
+      sceneQueryBuilder.sortTerms(5, {
+        field: "rating",
+        direction: "DESC",
+        seed: undefined,
+      }).order
+    ).toEqual({ sql: "COALESCE(r.rating, 0) DESC", params: [] });
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("orders the list's way: the same expression a Scenes page sorts by", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    await sceneQueryBuilder.execute({
+      userId: 5,
+      allowedInstanceIds: ALLOWED,
+      request: request({
+        sort: { field: "last_o_at", direction: "ASC", seed: undefined },
+      }),
+    });
+    const { order } = sceneQueryBuilder.sortTerms(5, {
+      field: "last_o_at",
+      direction: "ASC",
+      seed: undefined,
+    });
+    expect(pageStatement().sql).toContain(`ORDER BY ${order.sql}, s.id ASC`);
+  });
+
+  it("binds a random sort's seed through the list's random order", () => {
+    const { joins, order } = sceneQueryBuilder.sortTerms(5, {
+      field: "random",
+      direction: "ASC",
+      seed: 7,
+    });
+    expect(joins).toEqual(USER_JOINS);
+    expect(order.sql).toMatch(/^\(\(\(\(\(s\.id \+ \?\).* ASC$/);
+    expect(order.sql).not.toMatch(/\b7\b/);
+    expect(order.params).toEqual([7, 7, 7]);
+  });
+});

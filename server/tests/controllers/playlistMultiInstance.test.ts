@@ -211,6 +211,7 @@ describe("Playlist reads through PlaylistQueryService", () => {
       allowedInstanceIds: ALLOWED,
       playlistId: 3,
       paging: undefined,
+      sort: { field: "position", direction: "ASC", seed: undefined },
     });
     const body = res._getOkBody();
     expect(body.playlist.items).toEqual(items);
@@ -218,6 +219,8 @@ describe("Playlist reads through PlaylistQueryService", () => {
     expect(body.totalItems).toBe(2);
     expect(body.page).toBeUndefined();
     expect(body.perPage).toBeUndefined();
+    expect(body.sort).toBe("position");
+    expect(body.direction).toBe("ASC");
     expect(body.isOwner).toBe(true);
   });
 
@@ -242,6 +245,7 @@ describe("Playlist reads through PlaylistQueryService", () => {
       allowedInstanceIds: ALLOWED,
       playlistId: 3,
       paging: { page: 2, perPage: 100 },
+      sort: { field: "position", direction: "ASC", seed: undefined },
     });
     const body = res._getOkBody();
     expect(body.totalItems).toBe(6);

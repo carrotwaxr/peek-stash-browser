@@ -11,10 +11,10 @@
  *
  * Every playlist's previews come from one statement driven by the playlist
  * ids (`json_each` with `CROSS JOIN`s, so SQLite looks each item and scene up
- * by key). A playlist's items go through `loadPlaylistItems`, the one read
- * a sort can join later: a page of the visible items in SQL, or every item
- * without paging, and their scenes from the scene builder, whose joins carry
- * the viewer's own rating, favorite, O and play fields.
+ * by key). A playlist's items go through `loadPlaylistItems`: a page of the
+ * visible items in SQL in the view's sort (`orderTerms`), or every item in
+ * position order without paging, and their scenes from the scene builder,
+ * whose joins carry the viewer's own rating, favorite, O and play fields.
  *
  * Adds go through `appendItems`: the scenes the adder can see, numbered
  * after the playlist's last item inside the insert itself.
@@ -30,6 +30,7 @@ import type {
   PlaylistItemQueryRow,
   PlaylistPreviewQueryRow,
 } from "../types/internal/queryRows.js";
+import type { ParsedPlaylistItemSort } from "../types/parsedFilters.js";
 import { dbWrite } from "../utils/dbWrite.js";
 import {
   type EntityRef,
@@ -38,7 +39,11 @@ import {
   pairsJson,
 } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
-import { instanceColumnClause } from "../utils/sqlClauses.js";
+import {
+  type SqlFragment,
+  type SqlParam,
+  instanceColumnClause,
+} from "../utils/sqlClauses.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { getVisibleEntityKeys } from "./EntityAccessService.js";
@@ -53,13 +58,6 @@ const PREVIEW_COUNT = 4;
  * faster (2,000 refs in one read took 1.8 s on the prod snapshot)
  */
 const REFS_PER_READ = PER_PAGE_MAX;
-
-type SqlParam = string | number;
-
-interface Fragment {
-  readonly sql: string;
-  readonly params: SqlParam[];
-}
 
 export interface PlaylistPreviews {
   /** The first four items the viewer can see, in position order */
@@ -88,6 +86,11 @@ export interface LoadPlaylistItemsOptions {
   readonly playlistId: number;
   /** A page of the items the viewer can see; every item when absent */
   readonly paging?: PlaylistItemsPaging | undefined;
+  /**
+   * The page's order; position ASC when absent. Every item without paging
+   * comes in position order whatever this says.
+   */
+  readonly sort?: ParsedPlaylistItemSort | undefined;
 }
 
 export interface PlaylistItems {
@@ -103,6 +106,13 @@ export interface PlaylistItems {
 
 const NO_PREVIEWS: PlaylistPreviews = { items: [], visibleCount: 0 };
 
+/** A playlist's own order, the sort a request without one reads */
+const POSITION_ASC: ParsedPlaylistItemSort = {
+  field: "position",
+  direction: "ASC",
+  seed: undefined,
+};
+
 /**
  * What makes item `pi` visible: its scene `s` on the item's instance (`join`,
  * after `pi`), and that scene live, allowed and not excluded (`where`)
@@ -110,7 +120,7 @@ const NO_PREVIEWS: PlaylistPreviews = { items: [], visibleCount: 0 };
 function visibleItem(
   userId: number,
   allowedInstanceIds: readonly string[]
-): { join: Fragment; where: Fragment } {
+): { join: SqlFragment; where: SqlFragment } {
   const instances = instanceColumnClause("s.stashInstanceId", [
     ...allowedInstanceIds,
   ]);
@@ -123,6 +133,43 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.
     where: {
       sql: `s.deletedAt IS NULL AND e.id IS NULL AND ${instances.sql}`,
       params: instances.params,
+    },
+  };
+}
+
+/**
+ * The order of a playlist's visible items (`pi`, with its scene `s`) under a
+ * view sort, and the joins it reads, which follow `visibleItem`'s join:
+ * `position` is the playlist's order, `added_at` when each item was added
+ * (ties by position), and any scene sort the Scenes page's expression
+ * (`SceneQueryBuilder.sortTerms`: the viewer's own rating and history, a
+ * seeded random) with ties by position. The item id ends every order, so
+ * a page never repeats or skips an item. The item page, the play queue and
+ * "Save as playlist order" all order through this, so the three agree.
+ */
+export function orderTerms(
+  userId: number,
+  sort: ParsedPlaylistItemSort
+): { joins: SqlFragment[]; order: SqlFragment } {
+  const dir = sort.direction;
+  if (sort.field === "position") {
+    return {
+      joins: [],
+      order: { sql: `pi.position ${dir}, pi.id ${dir}`, params: [] },
+    };
+  }
+  if (sort.field === "added_at") {
+    return {
+      joins: [],
+      order: { sql: `pi.addedAt ${dir}, pi.position, pi.id`, params: [] },
+    };
+  }
+  const terms = sceneQueryBuilder.sortTerms(userId, sort);
+  return {
+    joins: terms.joins,
+    order: {
+      sql: `${terms.order.sql}, pi.position, pi.id`,
+      params: terms.order.params,
     },
   };
 }
@@ -347,12 +394,15 @@ async function loadItemScenes(
 
 /**
  * A playlist's items with their scenes, as the viewer sees them. The one
- * read of a playlist's items: a view sort joins its page statement.
+ * read of a playlist's items: a page comes in the view's sort
+ * (`orderTerms`), whose joins only the page statement takes; the count
+ * reads the visible items alone.
  */
 export async function loadPlaylistItems(
   options: LoadPlaylistItemsOptions
 ): Promise<PlaylistItems> {
   const { userId, allowedInstanceIds, playlistId, paging } = options;
+  const sort = options.sort ?? POSITION_ASC;
 
   if (paging === undefined) {
     // Every item, as the playlist page has always read them
@@ -374,23 +424,34 @@ export async function loadPlaylistItems(
   if (allowedInstanceIds.length === 0) return { items: [], totalItems: 0 };
 
   const { join, where } = visibleItem(userId, allowedInstanceIds);
-  const from = `FROM PlaylistItem pi
-${join.sql}
-WHERE pi.playlistId = ? AND ${where.sql}`;
-  const fromParams = [...join.params, playlistId, ...where.params];
+  const { joins: sortJoins, order } = orderTerms(userId, sort);
+  const fromWith = (joins: readonly SqlFragment[]) => ({
+    sql: `FROM PlaylistItem pi
+${[join, ...joins].map((j) => j.sql).join("\n")}
+WHERE pi.playlistId = ? AND ${where.sql}`,
+    params: [
+      ...join.params,
+      ...joins.flatMap((j) => j.params),
+      playlistId,
+      ...where.params,
+    ],
+  });
 
+  const counted = fromWith([]);
   const countRows = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
-    `SELECT COUNT(*) AS total ${from}`,
-    ...fromParams
+    `SELECT COUNT(*) AS total ${counted.sql}`,
+    ...counted.params
   );
   const totalItems = Number(countRows[0]?.total ?? 0n);
 
+  const paged = fromWith(sortJoins);
   const rows = await prisma.$queryRawUnsafe<PlaylistItemQueryRow[]>(
     `SELECT pi.id, pi.playlistId, pi.sceneId, pi.instanceId, pi.position, pi.addedAt
-${from}
-ORDER BY pi.position, pi.id
+${paged.sql}
+ORDER BY ${order.sql}
 LIMIT ? OFFSET ?`,
-    ...fromParams,
+    ...paged.params,
+    ...order.params,
     paging.perPage,
     (paging.page - 1) * paging.perPage
   );

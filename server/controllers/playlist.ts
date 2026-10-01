@@ -233,8 +233,10 @@ export const getSharedPlaylists = async (
 
 /**
  * Get single playlist with its items and their scenes as this user sees
- * them: every item without `page` and `per_page`, else one page of the
- * items the user can see (PlaylistQueryService.loadPlaylistItems)
+ * them: every item in position order without `page`, `per_page`, `sort` and
+ * `direction`, else one page of the items the user can see in the
+ * request's sort (PlaylistQueryService.loadPlaylistItems). The answer names
+ * the sort it read, a random one as `random_<seed>`.
  */
 export const getPlaylist = async (
   req: TypedLibraryRequest<unknown, GetPlaylistParams, GetPlaylistQuery>,
@@ -267,18 +269,22 @@ export const getPlaylist = async (
     return;
   }
 
-  const { paging } = request;
+  const { paging, sort } = request;
   const { items, totalItems } = await loadPlaylistItems({
     userId,
     allowedInstanceIds: req.allowedInstanceIds,
     playlistId,
     paging,
+    sort,
   });
 
   res.json({
     playlist: { ...playlist, items },
     totalItems,
     ...(paging && { page: paging.page, perPage: paging.perPage }),
+    // The parser always seeds a random sort
+    sort: sort.field === "random" ? `random_${sort.seed ?? 0}` : sort.field,
+    direction: sort.direction,
     isOwner: access.level === "owner",
     accessLevel: access.level,
     ...(access.level === "shared" ? { sharedViaGroups: access.groups } : {}),

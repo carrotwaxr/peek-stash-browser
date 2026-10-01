@@ -451,11 +451,25 @@ interface GetPlaylistParams {
 }
 ```
 
+**Query:** `page` (from 1), `per_page` (1 to 100, default 50), `sort` and `direction`. Anything else answers 400.
+
+- `sort`: `position` (the playlist's own order, the default), `added_at` (when each item was added, ties in playlist order), or any scene sort except `scene_index` (`title`, `rating`, `last_played_at`, ...), which orders the items as the Scenes page orders scenes, with the viewer's own rating and history, ties in playlist order. A random order is `random_<seed>`: the same seed gives the same order on every page. A bare `random` uses the user's daily seed. An unknown sort answers 400 "Unknown sort".
+- `direction`: `ASC` or `DESC`. When absent, `ASC` for `position` and `added_at`, `DESC` for a scene sort.
+- With none of the four, the response holds every item in playlist order, with `scene: null` for the items the viewer cannot see. With any of them, one page of the items the viewer can see.
+
 **Response:**
 
 ```typescript
 interface GetPlaylistResponse {
-  playlist: PlaylistData;
+  playlist: PlaylistData & { items: PlaylistItemWithScene[] };
+  totalItems: number; // the items the viewer can see
+  page?: number; // when a page was read
+  perPage?: number;
+  sort: string; // the sort read: a random one as random_<seed>
+  direction: "ASC" | "DESC";
+  isOwner: boolean;
+  accessLevel: "owner" | "shared";
+  sharedViaGroups?: string[];
 }
 ```
 
