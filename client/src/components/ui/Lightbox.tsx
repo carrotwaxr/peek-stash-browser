@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import {
   ChevronLeft,
   ChevronRight,
@@ -28,8 +28,8 @@ import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useImageDownload } from "../../hooks/useImageDownload";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
-import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import { isVideoImage } from "../../utils/imageMedia";
+import { getImageTitle } from "../../utils/imageTitle";
 import { ratingSequence } from "../../utils/ratingSequence";
 import MetadataDrawer from "./MetadataDrawer";
 
@@ -37,19 +37,19 @@ import MetadataDrawer from "./MetadataDrawer";
 const EDGE_ZONE_PERCENT = 0.15;
 
 interface Props {
-  images: NormalizedImage[];
+  images: ImageListItem[];
   initialIndex?: number;
   isOpen: boolean;
   onClose: () => void;
   autoPlay?: boolean;
-  onImagesUpdate?: (images: NormalizedImage[]) => void;
+  onImagesUpdate?: (images: ImageListItem[]) => void;
   onPageBoundary?: (direction: "next" | "prev") => boolean;
   totalCount?: number;
   pageOffset?: number;
   onIndexChange?: (index: number) => void;
   isPageTransitioning?: boolean;
   transitionKey?: number;
-  prefetchImages?: NormalizedImage[];
+  prefetchImages?: ImageListItem[];
 }
 
 const Lightbox = ({
@@ -223,7 +223,7 @@ const Lightbox = ({
 
     prefetchImages.forEach((img) => {
       if (isVideoImage(img)) return;
-      const url = img?.paths?.image || img?.paths?.preview;
+      const url = img.paths.image ?? img.paths.preview;
       if (url) {
         const el = new Image();
         el.decoding = "async";
@@ -658,11 +658,9 @@ const Lightbox = ({
   if (!isOpen || !images || images.length === 0) return null;
 
   const currentImage = images[currentIndex];
-  const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
+  const imageSrc = currentImage?.paths.image ?? currentImage?.paths.preview;
   const isVideoEntry = isVideoImage(currentImage);
-  const imageTitle = getImageTitle(
-    currentImage as Parameters<typeof getImageTitle>[0]
-  );
+  const imageTitle = getImageTitle(currentImage);
 
   // Handle backdrop click - edge zones navigate, center does nothing
   // Left 15% = previous, right 15% = next, center = no action

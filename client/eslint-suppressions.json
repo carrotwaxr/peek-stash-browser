@@ -19,14 +19,6 @@
       "count": 1
     }
   },
-  "src/components/cards/ImageCard.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "src/components/cards/TagCard.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 1
@@ -429,9 +421,6 @@
   },
   "src/components/ui/Lightbox.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 7
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },
@@ -1003,14 +992,6 @@
   "src/utils/format.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
-    }
-  },
-  "src/utils/imageGalleryInheritance.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 10
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
     }
   },
   "src/utils/spriteSheet.ts": {

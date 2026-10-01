@@ -16,7 +16,6 @@ export type {
   NormalizedTag,
   NormalizedGroup,
   NormalizedGallery,
-  NormalizedImage,
   ImageListItem,
   WithInstanceId,
   SceneScoringData,

@@ -140,8 +140,20 @@ vi.mock("@/components/table/index", () => ({
 
 type Image = Record<string, unknown> & { id: string };
 
+// The fields every list row carries; a case names the ones it cares about
+const listRow = (row: Image): Image => ({
+  paths: { thumbnail: null, preview: null, image: null },
+  performers: [],
+  tags: [],
+  galleries: [],
+  rating100: null,
+  favorite: false,
+  oCounter: 0,
+  ...row,
+});
+
 const images = (rows: Image[], count = rows.length) => ({
-  findImages: { count, images: rows },
+  findImages: { count, images: rows.map(listRow) },
 });
 
 const pageOf = (params: Record<string, unknown>) =>
@@ -334,13 +346,13 @@ describe("Images", () => {
       ) as { paths: Record<string, string | undefined>; oCounter: number }[];
       expect(sources[0]?.paths).toEqual({
         image: "/api/proxy/image/7/image?instanceId=inst%20a",
+        preview: null,
         thumbnail: "/api/proxy/image/7/thumbnail?instanceId=inst%20a",
       });
       expect(sources[0]?.oCounter).toBe(3);
       // No instance known: the path carries none, never an empty one
       expect(sources[1]?.paths.image).toBe("/api/proxy/image/8/image");
       expect(sources[1]?.paths.thumbnail).toBe("/api/proxy/image/8/thumbnail");
-      expect(sources[1]?.oCounter).toBe(0);
       // Paths the server sent are kept as they are
       expect(sources[2]?.paths).toEqual({
         image: "/full",

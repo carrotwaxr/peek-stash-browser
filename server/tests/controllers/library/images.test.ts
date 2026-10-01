@@ -64,7 +64,6 @@ function createQueryBuilderImage(
   };
   return {
     id: "img1",
-    stashInstanceId: "default",
     instanceId: "default",
     title: "Test Image",
     code: null,
@@ -79,9 +78,6 @@ function createQueryBuilderImage(
     height: null,
     fileSize: null,
     paths,
-    pathThumbnail: paths.thumbnail,
-    pathPreview: paths.preview,
-    pathImage: paths.image,
     stashCreatedAt: null,
     stashUpdatedAt: null,
     rating100: null,

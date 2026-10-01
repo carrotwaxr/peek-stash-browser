@@ -153,6 +153,22 @@ describe("ImageQueryBuilder", () => {
       }
     });
 
+    it("an image row carries its instance and paths once", async () => {
+      const { items } = await run();
+      const row = must(items[0], "an image row");
+
+      expect(row.instanceId).toBe(A);
+      expect(row.paths).toBeDefined();
+      for (const key of [
+        "stashInstanceId",
+        "pathThumbnail",
+        "pathPreview",
+        "pathImage",
+      ]) {
+        expect(row).not.toHaveProperty(key);
+      }
+    });
+
     it("each row carries the viewer's rating, favorite, O count and views, never Stash's", async () => {
       await prisma.stashImage.update({
         where: {

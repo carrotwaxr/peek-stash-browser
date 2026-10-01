@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -32,7 +32,7 @@ vi.mock("../../../src/components/ui/RatingSliderDialog", () => ({
   default: () => null,
 }));
 
-function makeImage(overrides: Partial<NormalizedImage> = {}): NormalizedImage {
+function makeImage(overrides: Partial<ImageListItem> = {}): ImageListItem {
   return {
     id: "1",
     instanceId: "inst-a",
@@ -45,23 +45,27 @@ function makeImage(overrides: Partial<NormalizedImage> = {}): NormalizedImage {
     studio: null,
     studioId: null,
     rating100: null,
-    o_counter: 0,
+    favorite: false,
+    oCounter: 0,
+    viewCount: 0,
+    lastViewedAt: null,
     organized: false,
     filePath: null,
     width: null,
     height: null,
     fileSize: null,
-    files: [],
-    paths: { thumbnail: "", preview: "", image: "" },
+    paths: { thumbnail: null, preview: null, image: null },
     performers: [],
     tags: [],
     galleries: [],
+    stashCreatedAt: null,
+    stashUpdatedAt: null,
     ...overrides,
-  } as NormalizedImage;
+  };
 }
 
 function renderDrawer(
-  image: NormalizedImage,
+  image: ImageListItem,
   oCounter = 0,
   onOCounterChange: (count: number) => void = vi.fn()
 ) {
@@ -92,7 +96,13 @@ describe("MetadataDrawer subtitle", () => {
     const date = "2024-03-05";
     const { container } = renderDrawer(
       makeImage({
-        studio: { id: "9", name: "Acme" },
+        studio: {
+          id: "9",
+          instanceId: "inst-a",
+          name: "Acme",
+          image_path: null,
+          parent_studio: null,
+        },
         date,
         photographer: "Ansel",
         width: 1920,

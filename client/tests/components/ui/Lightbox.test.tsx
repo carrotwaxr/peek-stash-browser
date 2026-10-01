@@ -1,6 +1,6 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
 import type { ReactElement, ReactNode } from "react";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -610,7 +610,7 @@ describe("Lightbox", () => {
   });
 
   describe("keyboard", () => {
-    const image: NormalizedImage = {
+    const image: ImageListItem = {
       id: "img-1",
       instanceId: "inst-1",
       title: "Image one",
@@ -622,19 +622,21 @@ describe("Lightbox", () => {
       studio: null,
       studioId: null,
       rating100: null,
-      o_counter: 0,
+      favorite: false,
+      oCounter: 0,
+      viewCount: 0,
+      lastViewedAt: null,
       organized: false,
       filePath: null,
       width: null,
       height: null,
       fileSize: null,
-      files: [],
       paths: { thumbnail: "/t.jpg", preview: "/p.jpg", image: "/i.jpg" },
       performers: [],
       tags: [],
       galleries: [],
-      created_at: null,
-      updated_at: null,
+      stashCreatedAt: null,
+      stashUpdatedAt: null,
     };
 
     /** A performer page: its own r-then-number rating hotkeys. */
@@ -742,7 +744,7 @@ describe("Lightbox", () => {
 
     it("Escape closes it and the arrows page through its images", () => {
       const onClose = vi.fn();
-      const second: NormalizedImage = {
+      const second: ImageListItem = {
         ...image,
         id: "img-2",
         paths: { thumbnail: "/t2.jpg", preview: "/p2.jpg", image: "/i2.jpg" },
@@ -817,11 +819,11 @@ describe("Lightbox", () => {
 
   describe("media element", () => {
     it("an mp4 image entry renders a video, not an img", () => {
-      const images = createMockImages(1, 1) as NormalizedImage[];
+      const images = createMockImages(1, 1) as ImageListItem[];
       images[0] = {
         ...images[0],
         filePath: "/data/clip.mp4",
-      } as NormalizedImage;
+      } as ImageListItem;
       const { container } = render(
         <Lightbox
           images={images}
@@ -840,7 +842,7 @@ describe("Lightbox", () => {
     });
 
     it("an img fills the frame with object-contain", () => {
-      const images = createMockImages(1, 1) as NormalizedImage[];
+      const images = createMockImages(1, 1) as ImageListItem[];
       const { container } = render(
         <Lightbox
           images={images}
@@ -857,11 +859,11 @@ describe("Lightbox", () => {
     });
 
     it("a video entry becomes visible on loadeddata", () => {
-      const images = createMockImages(1, 1) as NormalizedImage[];
+      const images = createMockImages(1, 1) as ImageListItem[];
       images[0] = {
         ...images[0],
         filePath: "/data/clip.webm",
-      } as NormalizedImage;
+      } as ImageListItem;
       const { container } = render(
         <Lightbox
           images={images}
@@ -879,11 +881,11 @@ describe("Lightbox", () => {
     });
 
     it("a video entry becomes visible on error", () => {
-      const images = createMockImages(1, 1) as NormalizedImage[];
+      const images = createMockImages(1, 1) as ImageListItem[];
       images[0] = {
         ...images[0],
         filePath: "/data/clip.webm",
-      } as NormalizedImage;
+      } as ImageListItem;
       const { container } = render(
         <Lightbox
           images={images}
@@ -929,8 +931,8 @@ describe("Lightbox", () => {
     it("prefetch creates Image objects for the neighbours' URLs and calls no fetch", () => {
       const fetchSpy = vi.fn().mockResolvedValue({});
       vi.stubGlobal("fetch", fetchSpy);
-      const current = createMockImages(1, 1) as NormalizedImage[];
-      const next = createMockImages(2, 2) as NormalizedImage[];
+      const current = createMockImages(1, 1) as ImageListItem[];
+      const next = createMockImages(2, 2) as ImageListItem[];
       render(
         <Lightbox
           images={current}
@@ -951,13 +953,13 @@ describe("Lightbox", () => {
     });
 
     it("prefetch skips video entries, whose file is the whole mp4", () => {
-      const current = createMockImages(1, 1) as NormalizedImage[];
-      const next = createMockImages(2, 2) as NormalizedImage[];
+      const current = createMockImages(1, 1) as ImageListItem[];
+      const next = createMockImages(2, 2) as ImageListItem[];
       const photo = must(next[0], "the photo");
       const video = {
         ...must(next[1], "the video"),
         filePath: "/data/clip.mp4",
-      } as NormalizedImage;
+      } as ImageListItem;
       render(
         <Lightbox
           images={current}
@@ -972,8 +974,8 @@ describe("Lightbox", () => {
     });
 
     it("closing clears the prefetch images' src", () => {
-      const current = createMockImages(1, 1) as NormalizedImage[];
-      const next = createMockImages(2, 2) as NormalizedImage[];
+      const current = createMockImages(1, 1) as ImageListItem[];
+      const next = createMockImages(2, 2) as ImageListItem[];
       const { rerender } = render(
         <Lightbox
           images={current}
@@ -1019,7 +1021,7 @@ describe("Lightbox", () => {
     });
 
     const renderOpen = () => {
-      const base = createMockImages(1, 2) as NormalizedImage[];
+      const base = createMockImages(1, 2) as ImageListItem[];
       const images = base.map((image, i) => ({
         ...image,
         id: `img-${i}`,

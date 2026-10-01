@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import type { NormalizedImage } from "@peek/shared-types";
+import type { ImageListItem } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -57,8 +57,8 @@ const sameImage = (
 ) => imageKey(a) === imageKey(b);
 
 /** A path the server sent, or undefined for none or an empty one */
-const sentPath = (path: string | undefined): string | undefined =>
-  path === undefined || path === "" ? undefined : path;
+const sentPath = (path: string | null | undefined): string | undefined =>
+  path == null || path === "" ? undefined : path;
 
 type ImagesResponse = {
   findImages?: { images?: ListRow[] } & Record<string, unknown>;
@@ -189,33 +189,35 @@ export function useImageListPage({
     [onItemClick, onOCounterChange]
   );
 
+  // The viewer's source and preview, each falling back to the image's proxy
+  // route when the server sent none
   const lightboxImages = useMemo(
     () =>
-      lightboxRows.map((img) => {
-        const paths = img.paths as Record<string, string> | undefined;
+      (lightboxRows as unknown as ImageListItem[]).map((img) => {
         // The server serves an image only from the instance it names
-        const instanceQuery =
-          typeof img.instanceId === "string" && img.instanceId !== ""
-            ? `?instanceId=${encodeURIComponent(img.instanceId)}`
-            : "";
+        const instanceQuery = img.instanceId
+          ? `?instanceId=${encodeURIComponent(img.instanceId)}`
+          : "";
         const proxied = (kind: string) =>
-          `/api/proxy/image/${img.id as string}/${kind}${instanceQuery}`;
+          `/api/proxy/image/${img.id}/${kind}${instanceQuery}`;
         return {
           ...img,
           paths: {
-            image: sentPath(paths?.image) ?? proxied("image"),
-            preview: sentPath(paths?.preview) ?? sentPath(paths?.thumbnail),
-            thumbnail: sentPath(paths?.thumbnail) ?? proxied("thumbnail"),
+            image: sentPath(img.paths.image) ?? proxied("image"),
+            preview:
+              sentPath(img.paths.preview) ??
+              sentPath(img.paths.thumbnail) ??
+              null,
+            thumbnail: sentPath(img.paths.thumbnail) ?? proxied("thumbnail"),
           },
-          oCounter: (img.oCounter as number | undefined) ?? 0,
         };
-      }) as unknown as NormalizedImage[],
+      }),
     [lightboxRows]
   );
 
   // The lightbox's own changes, back into the cached page
   const onImagesUpdate = useCallback(
-    (updated: NormalizedImage[]) =>
+    (updated: ImageListItem[]) =>
       updateCachedPage((rows) =>
         rows.map((row) => {
           const match = updated.find((u) => imageKey(u) === imageKey(row));
