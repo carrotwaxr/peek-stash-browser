@@ -99,6 +99,8 @@ const LIBRARY_ROUTES = [
   "GET /api/playlists/:id",
   "POST /api/playlists/:id/duplicate",
   "PUT /api/playlists/:id",
+  "POST /api/playlists/:id/items",
+  "POST /api/playlists/:id/items/bulk",
   "GET /api/user-stats",
   "GET /api/timeline/:entityType/distribution",
 ];

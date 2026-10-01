@@ -297,7 +297,10 @@ export interface RemoveSceneFromPlaylistResponse {
 // =============================================================================
 
 /**
- * Add several scenes at once, in the order given
+ * POST /api/playlists/:id/items/bulk
+ * Add several scenes at once (1 to PER_PAGE_MAX), in the order given, after
+ * the last item; scenes already there or not visible to the adder are
+ * skipped and counted
  */
 export interface AddScenesToPlaylistRequest {
   scenes: { sceneId: string; instanceId: string }[];
@@ -363,9 +366,12 @@ export interface RemoveUnavailableItemsResponse {
 
 /**
  * GET /api/playlists/shared
- * Get playlists shared with current user
+ * Get playlists shared with current user; takes `containsScene` as
+ * `GET /api/playlists` does (`GetUserPlaylistsQuery`)
  */
 export interface SharedPlaylistData {
+  /** With `containsScene`: whether the playlist has that scene (B3) */
+  containsScene?: boolean;
   id: number;
   name: string;
   description: string | null;

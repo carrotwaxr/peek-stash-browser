@@ -15,6 +15,9 @@
  * a sort can join later: a page of the visible items in SQL, or every item
  * without paging, and their scenes from the scene builder, whose joins carry
  * the viewer's own rating, favorite, O and play fields.
+ *
+ * Adds go through `appendItems`: the scenes the adder can see, numbered
+ * after the playlist's last item inside the insert itself.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
@@ -27,11 +30,18 @@ import type {
   PlaylistItemQueryRow,
   PlaylistPreviewQueryRow,
 } from "../types/internal/queryRows.js";
-import { type EntityRef, distinctRefs, entityKey } from "../utils/entityRef.js";
+import { dbWrite } from "../utils/dbWrite.js";
+import {
+  type EntityRef,
+  distinctRefs,
+  entityKey,
+  pairsJson,
+} from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { getVisibleEntityKeys } from "./EntityAccessService.js";
 import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
 
 /** The preview thumbnails a playlist shows */
@@ -219,6 +229,86 @@ WHERE pi.playlistId = ? AND ${where.sql}`;
       ...where.params,
     ],
   };
+}
+
+/** What an add did with the scenes it was asked to add */
+export interface AppendItemsResult {
+  readonly added: number;
+  /** Visible scenes the playlist already held, a racing add's included */
+  readonly alreadyInPlaylist: number;
+  /** Scenes the adder cannot see: missing, deleted, hidden, restricted or on an instance they do not use */
+  readonly unavailable: number;
+}
+
+/**
+ * The append statement: the requested refs (`[id, instance]` pairs in
+ * request order) that the playlist does not hold yet, numbered from
+ * `MAX(position) + 1` in that order. It runs alone in its write unit, so the
+ * `MAX` and the insert see one state; `INSERT OR IGNORE` leaves the unique
+ * key the last word.
+ */
+const APPEND_ITEMS_SQL = `WITH req(ord, sid, inst) AS (
+  SELECT CAST(j.key AS INTEGER), json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]') FROM json_each(?) j
+), fresh AS (
+  SELECT r.ord, r.sid, r.inst FROM req r
+  WHERE NOT EXISTS (SELECT 1 FROM PlaylistItem p WHERE p.playlistId = ? AND p.instanceId = r.inst AND p.sceneId = r.sid)
+), base AS (SELECT COALESCE(MAX(position), -1) AS m FROM PlaylistItem WHERE playlistId = ?)
+INSERT OR IGNORE INTO PlaylistItem (playlistId, instanceId, sceneId, position, addedAt)
+SELECT ?, f.inst, f.sid, base.m + ROW_NUMBER() OVER (ORDER BY f.ord), ? FROM fresh f CROSS JOIN base`;
+
+/**
+ * Adds scenes to the end of a playlist, in the order given, skipping the
+ * ones it holds and the ones the adder cannot see (the adder's own access
+ * rules, invariants 3 and 10). One statement in one write unit; the caller
+ * has checked the adder may add to the playlist.
+ */
+export async function appendItems(
+  playlistId: number,
+  userId: number,
+  refs: readonly EntityRef[]
+): Promise<AppendItemsResult> {
+  const requested = distinctRefs(refs);
+  const visibleKeys = await getVisibleEntityKeys(userId, "scene", requested);
+  const visible = requested.filter((ref) =>
+    visibleKeys.has(entityKey(ref.id, ref.instanceId))
+  );
+  const unavailable = requested.length - visible.length;
+  if (visible.length === 0) {
+    return { added: 0, alreadyInPlaylist: 0, unavailable };
+  }
+
+  const params = [
+    pairsJson(visible),
+    playlistId,
+    playlistId,
+    playlistId,
+    // epoch milliseconds, as Prisma stores a DateTime
+    Date.now(),
+  ];
+  const added = await dbWrite("playlist.addItems", () =>
+    prisma.$executeRawUnsafe(APPEND_ITEMS_SQL, ...params)
+  );
+  return { added, alreadyInPlaylist: visible.length - added, unavailable };
+}
+
+/**
+ * Which of these playlists hold the scene, by its id on its instance: one
+ * statement on the item key `(playlistId, instanceId, sceneId)`. Membership
+ * is the rows', whatever the viewer can see of the scene.
+ */
+export async function playlistsHoldingScene(
+  playlistIds: readonly number[],
+  scene: EntityRef
+): Promise<Set<number>> {
+  if (playlistIds.length === 0) return new Set();
+  const rows = await prisma.$queryRawUnsafe<{ playlistId: number }[]>(
+    `SELECT pi.playlistId FROM json_each(?) j
+CROSS JOIN PlaylistItem pi ON pi.playlistId = j.value AND pi.instanceId = ? AND pi.sceneId = ?`,
+    JSON.stringify(playlistIds),
+    scene.instanceId,
+    scene.id
+  );
+  return new Set(rows.map((row) => row.playlistId));
 }
 
 /**

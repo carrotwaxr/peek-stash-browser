@@ -211,6 +211,17 @@ export interface ParsedPlaylistItemsQuery {
     | undefined;
 }
 
+/** `GET /api/playlists` and `GET /api/playlists/shared` */
+export interface ParsedPlaylistsQuery {
+  /**
+   * `containsScene`: the scene each playlist says it holds or not, with its
+   * instance (a bare id is refused); undefined when not asked
+   */
+  readonly containsScene:
+    | { readonly id: string; readonly instanceId: string }
+    | undefined;
+}
+
 /** The lists with a `/minimal` endpoint (the entity pickers) */
 export type MinimalKind = "performer" | "studio" | "tag" | "group" | "gallery";
 

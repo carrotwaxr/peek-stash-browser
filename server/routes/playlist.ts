@@ -1,6 +1,7 @@
 import express from "express";
 import {
   addSceneToPlaylist,
+  addScenesToPlaylist,
   createPlaylist,
   deletePlaylist,
   duplicatePlaylist,
@@ -40,7 +41,18 @@ router.put("/:id", withAllowedInstances, libraryHandler(updatePlaylist));
 router.delete("/:id", authenticated(deletePlaylist));
 
 // Add scene to playlist
-router.post("/:id/items", authenticated(addSceneToPlaylist));
+router.post(
+  "/:id/items",
+  withAllowedInstances,
+  libraryHandler(addSceneToPlaylist)
+);
+
+// Add several scenes to playlist
+router.post(
+  "/:id/items/bulk",
+  withAllowedInstances,
+  libraryHandler(addScenesToPlaylist)
+);
 
 // Remove scene from playlist
 router.delete("/:id/items/:sceneId", authenticated(removeSceneFromPlaylist));
