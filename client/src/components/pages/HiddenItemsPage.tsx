@@ -10,17 +10,14 @@ import {
   useHiddenItems,
 } from "../../hooks/useHiddenEntities";
 import { useNavigationState } from "../../hooks/useNavigationState";
-import {
-  Button,
-  EmptyState,
-  LazyImage,
-  LoadingSpinner,
-  PageHeader,
-  PageLayout,
-  Pagination,
-  TAB_COUNT_LOADING,
-  TabNavigation,
-} from "../ui/index";
+import Button from "../ui/Button";
+import { LazyImage } from "../ui/CardComponents";
+import EmptyState from "../ui/EmptyState";
+import LoadingSpinner from "../ui/LoadingSpinner";
+import PageHeader from "../ui/PageHeader";
+import PageLayout from "../ui/PageLayout";
+import Pagination from "../ui/Pagination";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 
 type TabId = HiddenEntityType | "all";
 

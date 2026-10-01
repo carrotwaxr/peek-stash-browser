@@ -60,10 +60,10 @@ const rowStates = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("@/components/ui/index", async () => ({
-  // The real dialog: the page's clear confirmation is under test
-  ConfirmDialog: (await import("@/components/ui/ConfirmDialog")).default,
-  Button: ({
+// The page imports each piece directly; ConfirmDialog stays real, since the
+// page's clear confirmation is under test
+vi.mock("@/components/ui/Button", () => ({
+  default: ({
     children,
     onClick,
     disabled,
@@ -76,10 +76,18 @@ vi.mock("@/components/ui/index", async () => ({
       {children}
     </button>
   ),
-  LoadingSpinner: () => <div data-testid="spinner" />,
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-  PageLayout: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  Pagination: ({
+}));
+vi.mock("@/components/ui/LoadingSpinner", () => ({
+  default: () => <div data-testid="spinner" />,
+}));
+vi.mock("@/components/ui/PageHeader", () => ({
+  default: ({ title }: { title: string }) => <h1>{title}</h1>,
+}));
+vi.mock("@/components/ui/PageLayout", () => ({
+  default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("@/components/ui/Pagination", () => ({
+  default: ({
     currentPage,
     totalPages,
     perPage,
@@ -101,7 +109,9 @@ vi.mock("@/components/ui/index", async () => ({
       <button onClick={() => onPageChange(currentPage + 1)}>Next page</button>
     </nav>
   ),
-  SceneListItem: ({ scene, watchHistory, linkState }: RowProps) => {
+}));
+vi.mock("@/components/ui/SceneListItem", () => ({
+  default: ({ scene, watchHistory, linkState }: RowProps) => {
     if (linkState) rowStates.queues.push(linkState.playlist);
     return (
       <div data-testid="row">

@@ -14,7 +14,8 @@ import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { makeCompositeKey } from "../../utils/compositeKey";
-import { Button, useLazyLoad } from "../ui/index";
+import Button from "../ui/Button";
+import { useLazyLoad } from "../ui/CardComponents";
 
 interface PlaylistScene {
   sceneId: string;

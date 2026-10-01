@@ -17,15 +17,13 @@ import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import { showError } from "../../utils/toast";
-import {
-  Button,
-  ConfirmDialog,
-  LoadingSpinner,
-  PageHeader,
-  PageLayout,
-  Pagination,
-  SceneListItem,
-} from "../ui/index";
+import Button from "../ui/Button";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import LoadingSpinner from "../ui/LoadingSpinner";
+import PageHeader from "../ui/PageHeader";
+import PageLayout from "../ui/PageLayout";
+import Pagination from "../ui/Pagination";
+import SceneListItem from "../ui/SceneListItem";
 
 /** Scenes per page; the page has no per-page selector. */
 const PER_PAGE = 24;

@@ -42,10 +42,22 @@ export default defineConfig(({ mode }) => ({
     },
     // Chunk splitting configuration
     rollupOptions: {
+      // A barrel (src/**/index.ts) only re-exports (tests/scripts/barrels.test.ts
+      // holds it to that), so it has no side effects of its own: importing one
+      // name from it no longer pulls every module it re-exports into the chunk
+      treeshake: {
+        moduleSideEffects: (id, external) =>
+          external || !/\/client\/src\/.*\/index\.ts$/.test(id),
+      },
       output: {
         manualChunks: {
           // Separate vendor chunks for better caching
-          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "react-vendor": [
+            "react",
+            "react-dom",
+            "react-dom/client",
+            "react-router-dom",
+          ],
           "query-vendor": ["@tanstack/react-query"],
           "video-vendor": ["video.js"],
           // lucide-react stays out: each chunk that imports an icon carries it,
@@ -54,8 +66,10 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    // Increase chunk size warning limit (we'll fix with code splitting)
-    chunkSizeWarningLimit: 1000,
+    // video-vendor is video.js with VHS (about 620 kB, no smaller build plays
+    // HLS and DASH); any other chunk this large still warns. The gate is
+    // scripts/bundleBudget.mjs (npm run check:bundle), which fails the build.
+    chunkSizeWarningLimit: 650,
   },
   server: {
     port: 5173,

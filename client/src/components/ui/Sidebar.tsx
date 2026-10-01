@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   getNavKeyForPath,
@@ -10,9 +10,11 @@ import { useTVMode } from "../../hooks/useTVMode";
 import { PeekLogo } from "../branding/PeekLogo";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
-import HelpModal from "./HelpModal";
 import Tooltip from "./Tooltip";
 import UserMenu from "./UserMenu";
+
+// Loaded on first open: the shortcut list is not part of the first load
+const HelpModal = lazy(() => import("./HelpModal"));
 
 /**
  * Sidebar Navigation Component
@@ -287,7 +289,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
       {/* Help Modal */}
       {isHelpModalOpen && (
-        <HelpModal onClose={() => setIsHelpModalOpen(false)} />
+        <Suspense fallback={null}>
+          <HelpModal onClose={() => setIsHelpModalOpen(false)} />
+        </Suspense>
       )}
     </>
   );

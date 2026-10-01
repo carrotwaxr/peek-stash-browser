@@ -3,7 +3,8 @@ import { Check, Copy, Server } from "lucide-react";
 import { userSetupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { showError } from "../../utils/toast";
-import { Button, Modal } from "../ui/index";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
 
 const COPY_FAILED = "Copy failed: the key is selected, press Ctrl+C";
 
