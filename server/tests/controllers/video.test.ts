@@ -18,6 +18,7 @@ import {
   deriveStreamLinkKey,
   isStreamLinkSignatureValid,
 } from "../../utils/streamLink.js";
+import type * as streamProxyModule from "../../utils/streamProxy.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
 import {
   type MockRes,
@@ -27,6 +28,7 @@ import {
   resFor,
 } from "../helpers/controllerTestUtils.js";
 import { stashInstanceRow } from "../helpers/fixtures.js";
+import { anyOf } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -56,7 +58,8 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-vi.mock("../../utils/streamProxy.js", () => ({
+vi.mock("../../utils/streamProxy.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof streamProxyModule>()),
   pipeResponseToClient: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -685,7 +688,8 @@ describe("Video Controller", () => {
             "content-range",
             "last-modified",
             "etag",
-          ]
+          ],
+          { idleTimeoutMs: 60_000, abort: anyOf(AbortController) }
         );
       });
 
@@ -1242,6 +1246,70 @@ describe("Video Controller", () => {
       expect(fetchUrl).toBe(
         "http://stash:9999/scene/456/caption?lang=en&type=srt"
       );
+    });
+
+    it("the caption fetch aborts when the client closes", async () => {
+      const req = reqFor(getCaption, {
+        params: { sceneId: "456" },
+        query: { lang: "en", type: "srt", instanceId: "inst-a" },
+        user: USER,
+      });
+      const res = resFor(getCaption);
+      let signal: AbortSignal | undefined;
+      vi.mocked(global.fetch).mockImplementation((_url, init) => {
+        signal = init?.signal ?? undefined;
+        return new Promise(() => {
+          // Stash never answers
+        });
+      });
+
+      void getCaption(req, res);
+      await vi.waitFor(() => expect(signal).toBeDefined());
+      expect(signal?.aborted).toBe(false);
+
+      const closeHandler = must(
+        res.on.mock.calls.find(([event]) => event === "close"),
+        "a close handler"
+      )[1] as () => void;
+      closeHandler();
+
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it("a caption Stash never answers fails after 15 s", async () => {
+      vi.useFakeTimers();
+      try {
+        const req = reqFor(getCaption, {
+          params: { sceneId: "456" },
+          query: { lang: "en", type: "srt", instanceId: "inst-a" },
+          user: USER,
+        });
+        const res = resFor(getCaption);
+        let signal: AbortSignal | undefined;
+        vi.mocked(global.fetch).mockImplementation((_url, init) => {
+          const s = init?.signal as AbortSignal;
+          signal = s;
+          return new Promise((_resolve, reject) =>
+            s.addEventListener("abort", () =>
+              reject(
+                s.reason instanceof Error ? s.reason : new Error("aborted")
+              )
+            )
+          );
+        });
+
+        const done = getCaption(req, res);
+        await vi.advanceTimersByTimeAsync(14_999);
+        expect(signal?.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await done;
+
+        expect(signal?.aborted).toBe(true);
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.send).not.toHaveBeenCalledWith("WEBVTT\n\n");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("caption requests log at debug, not info", async () => {
