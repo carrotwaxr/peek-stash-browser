@@ -1,6 +1,7 @@
 import type { Server } from "http";
 import { disconnectComputeClient } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
+import { downloadJobQueue } from "../services/DownloadJobQueue.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { syncScheduler } from "../services/SyncScheduler.js";
 import {
@@ -17,7 +18,7 @@ import { whenMigrationsSettled } from "./database.js";
  *
  * `docker stop` sends SIGTERM and kills the container 10 s later. The
  * server is PID 1 in the image, and nginx goes with it when it exits.
- * The shutdown stops the syncs, closes the HTTP server, waits for the
+ * The shutdown stops the syncs and the zip queue, closes the HTTP server, waits for the
  * migrations and the sync, refreshes the planner statistics, checkpoints the
  * WAL into the database file and disconnects, so the next start (or a copy
  * of the data volume) finds everything in `peek-stash-browser.db`.
@@ -116,9 +117,11 @@ export async function gracefulShutdown(
   deadline.unref();
 
   // 1. Nothing starts a new sync; the running job stops at its next check
-  // (a Stash request in flight ends at once)
+  // (a Stash request in flight ends at once). The zip being built stops and
+  // removes its partial file; its row stays for the next start to resume
   syncScheduler.stop();
   stashSyncService.abort();
+  await downloadJobQueue.stop();
 
   // 2. No new requests; the ones in flight get the grace period
   if (httpServer) await closeHttpServer(httpServer);

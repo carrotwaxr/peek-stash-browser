@@ -1,5 +1,6 @@
 import { DownloadStatus, DownloadType } from "@prisma/client";
 import { BadGatewayError, NotFoundError } from "../middleware/errorHandler.js";
+import { downloadJobQueue } from "../services/DownloadJobQueue.js";
 import { downloadService } from "../services/DownloadService.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -30,6 +31,12 @@ import type {
 } from "../types/api/download.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { attachmentContentDisposition } from "../utils/contentDisposition.js";
+import {
+  MAX_ACTIVE_ZIPS_PER_USER,
+  maxPlaylistBytes,
+  plannedZipBytes,
+  toMiB,
+} from "../utils/downloadLimits.js";
 import { userFacingReason } from "../utils/downloadReasons.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -63,15 +70,8 @@ const FORWARDED_FILE_HEADERS = [
   "etag",
 ];
 
-/**
- * Maximum playlist download size in MB (default: 10GB)
- */
-const MAX_PLAYLIST_SIZE_MB = parseInt(
-  process.env.MAX_PLAYLIST_DOWNLOAD_SIZE_MB || "10240",
-  10
-);
-const MAX_PLAYLIST_SIZE_BYTES =
-  BigInt(MAX_PLAYLIST_SIZE_MB) * BigInt(1024 * 1024);
+/** The 429 a user gets with MAX_ACTIVE_ZIPS_PER_USER zips waiting or building */
+const TOO_MANY_ZIPS = `You have ${MAX_ACTIVE_ZIPS_PER_USER} playlist downloads in progress; wait for one to finish`;
 
 /**
  * Serialize a download record for JSON response.
@@ -228,24 +228,39 @@ export async function startPlaylistDownload(
     return res.status(404).json({ error: "Playlist not found" });
   }
 
-  // Only the scenes this user may see, each on its own instance
-  const items = await downloadService.getDownloadablePlaylistItems(
+  // A second click while the zip waits or builds gets that zip
+  const active = await downloadService.findActivePlaylistDownload(
     userId,
     playlistId
   );
-  if (items.length === 0) {
+  if (active) {
+    return res.json({ download: serializeDownload(active) });
+  }
+  if (
+    (await downloadService.countActivePlaylistDownloads(userId)) >=
+    MAX_ACTIVE_ZIPS_PER_USER
+  ) {
+    return res.status(429).json({ error: TOO_MANY_ZIPS });
+  }
+
+  // Only the scenes this user may see, each on its own instance
+  const scenes = await playlistZipService.readDownloadableScenes(
+    userId,
+    playlistId
+  );
+  if (scenes.length === 0) {
     return res
       .status(400)
       .json({ error: "This playlist has no scenes you can download" });
   }
 
   // Check size limit
-  const totalSize = await downloadService.calculatePlaylistSize(items);
-  if (totalSize > MAX_PLAYLIST_SIZE_BYTES) {
-    const totalSizeMB = Math.ceil(Number(totalSize) / (1024 * 1024));
+  const totalSize = plannedZipBytes(scenes);
+  const maxBytes = maxPlaylistBytes();
+  if (totalSize > maxBytes) {
     return res.status(400).json({
       error: "Playlist exceeds maximum download size",
-      details: `Total: ${totalSizeMB}MB, max: ${MAX_PLAYLIST_SIZE_MB}MB`,
+      details: `Total: ${toMiB(totalSize)}MB, max: ${toMiB(maxBytes)}MB`,
     });
   }
 
@@ -261,15 +276,8 @@ export async function startPlaylistDownload(
     playlistId,
   });
 
-  // Start zip creation in background (don't await)
-  playlistZipService
-    .createZip(download.id, { maxBytes: MAX_PLAYLIST_SIZE_BYTES })
-    .catch((error: unknown) => {
-      logger.error("Background zip creation failed", {
-        downloadId: download.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
+  // Built when its turn comes in the zip queue, which checks access again
+  downloadJobQueue.enqueue(download.id, userId);
 
   return res.json({ download: serializeDownload(download) });
 }
@@ -536,9 +544,9 @@ export async function retryDownload(
     });
   }
 
-  // The zip is rebuilt from the scenes the user may see now
-  // (PlaylistZipService reads them as this user), so only the playlist
-  // needs checking here
+  // The zip is rebuilt from the scenes the user may see when its turn
+  // comes (PlaylistZipService reads them as this user and checks again),
+  // so only the playlist needs checking here
   if (!(await resolveUserPermissions(userId))?.canDownloadPlaylists) {
     return res
       .status(403)
@@ -551,20 +559,23 @@ export async function retryDownload(
     return res.status(404).json({ error: "Playlist not found" });
   }
 
-  // Reset progress and restart zip creation
-  await downloadService.updateProgress(downloadId, 0);
+  if (
+    (await downloadService.countActivePlaylistDownloads(userId)) >=
+    MAX_ACTIVE_ZIPS_PER_USER
+  ) {
+    return res.status(429).json({ error: TOO_MANY_ZIPS });
+  }
+
+  // Back to PENDING only if still FAILED: of two quick retries, one wins
+  if (!(await downloadService.requeueFailedDownload(downloadId))) {
+    return res
+      .status(409)
+      .json({ error: "This download is already being retried" });
+  }
 
   logger.info("Retrying playlist download", { downloadId, userId });
 
-  // Start zip creation in background (don't await)
-  playlistZipService
-    .createZip(downloadId, { maxBytes: MAX_PLAYLIST_SIZE_BYTES })
-    .catch((error: unknown) => {
-      logger.error("Background zip retry failed", {
-        downloadId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
+  downloadJobQueue.enqueue(downloadId, userId);
 
   // Fetch updated download record
   const updatedDownload = await downloadService.getDownload(downloadId);

@@ -27,6 +27,12 @@ vi.mock("../../services/StashSyncService.js", () => ({
   },
 }));
 
+vi.mock("../../services/DownloadJobQueue.js", () => ({
+  downloadJobQueue: {
+    stop: vi.fn(),
+  },
+}));
+
 vi.mock("../../services/SyncScheduler.js", () => ({
   syncScheduler: {
     stop: vi.fn(),
@@ -70,6 +76,10 @@ async function load() {
     await import("../../services/SyncScheduler.js"),
     true
   );
+  const { downloadJobQueue: downloads } = vi.mocked(
+    await import("../../services/DownloadJobQueue.js"),
+    true
+  );
   const { whenMigrationsSettled } = vi.mocked(
     await import("../../initializers/database.js"),
     true
@@ -81,6 +91,7 @@ async function load() {
   prisma.$queryRaw.mockResolvedValue([{ busy: 0, log: 0, checkpointed: 0 }]);
   disconnectComputeClient.mockResolvedValue(undefined);
   sync.whenIdle.mockResolvedValue(undefined);
+  downloads.stop.mockResolvedValue(undefined);
   whenMigrationsSettled.mockResolvedValue(undefined);
 
   return {
@@ -89,6 +100,7 @@ async function load() {
     disconnectComputeClient,
     sync,
     scheduler,
+    downloads,
     whenMigrationsSettled,
     logger,
   };
@@ -247,6 +259,22 @@ describe("processHandlers", () => {
       expect(m.logger.info).toHaveBeenCalledWith(
         stringContaining("Shutdown complete (")
       );
+    });
+
+    it("shutdown stops the download queue before closing the HTTP server", async () => {
+      const m = await load();
+      const server = await listening();
+      const close = vi.spyOn(server, "close");
+      m.registerHttpServer(server);
+      const exit = vi.fn();
+
+      await m.gracefulShutdown("SIGTERM", exit);
+
+      expect(m.downloads.stop).toHaveBeenCalledOnce();
+      expect(callOrder(m.downloads.stop.mock)).toBeLessThan(
+        callOrder(close.mock)
+      );
+      expect(exit).toHaveBeenCalledExactlyOnceWith(0);
     });
 
     it("closes connections still open after the grace period (a video stream)", async () => {

@@ -6,6 +6,8 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { downloadService } from "../../services/DownloadService.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
+import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { loadPlaylistItems } from "../../services/PlaylistQueryService.js";
 import {
   PlaylistZipService,
@@ -18,7 +20,7 @@ import {
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { PlaylistItemWithScene } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
-import { downloadRow } from "../helpers/fixtures.js";
+import { downloadRow, userPermissions } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 import { malformedRow } from "../helpers/untrusted.js";
@@ -47,8 +49,18 @@ vi.mock("../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn(),
 }));
 
+vi.mock("../../services/PermissionService.js", () => ({
+  resolveUserPermissions: vi.fn(),
+}));
+
+vi.mock("../../services/PlaylistAccessService.js", () => ({
+  getPlaylistAccess: vi.fn(),
+}));
+
 const mockLoadPlaylistItems = vi.mocked(loadPlaylistItems);
 const mockAllowedInstanceIds = vi.mocked(getUserAllowedInstanceIds);
+const mockPermissions = vi.mocked(resolveUserPermissions);
+const mockPlaylistAccess = vi.mocked(getPlaylistAccess);
 
 // The real archiver writes the zip. Each entry's name and text are recorded
 // as the service passes them: archiver rewrites the name in place (it strips
@@ -250,11 +262,13 @@ describe("PlaylistZipService.createZip", () => {
       "fetch",
       vi.fn(() => Promise.resolve(new Response("bytes")))
     );
-    vi.spyOn(downloadService, "updateProgress").mockResolvedValue(
-      downloadRow()
+    vi.spyOn(downloadService, "updateProgress").mockResolvedValue(true);
+    vi.spyOn(downloadService, "markCompleted").mockResolvedValue(true);
+    vi.spyOn(downloadService, "markFailed").mockResolvedValue(true);
+    mockPermissions.mockResolvedValue(
+      userPermissions({ canDownloadPlaylists: true })
     );
-    vi.spyOn(downloadService, "markCompleted").mockResolvedValue(downloadRow());
-    vi.spyOn(downloadService, "markFailed").mockResolvedValue(downloadRow());
+    mockPlaylistAccess.mockResolvedValue({ level: "owner" });
   });
 
   afterEach(() => {
@@ -591,7 +605,8 @@ describe("PlaylistZipService.createZip", () => {
     });
 
     it("a zip that grows past the size cap fails", async () => {
-      arrangeTwo([100, 100]);
+      // Planned under the cap; Stash sends more than the cache says
+      arrangeTwo([50, 50]);
       vi.mocked(fetch)
         .mockResolvedValueOnce(new Response(new Uint8Array(100)))
         .mockResolvedValueOnce(new Response(new Uint8Array(100)));
@@ -755,6 +770,142 @@ describe("PlaylistZipService.createZip", () => {
       expect(appended).toEqual([]);
       expect(fs.existsSync(zipPath())).toBe(false);
       expect(downloadService.markCompleted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a build rechecks access when its turn comes", () => {
+    const NO_PERMISSION = "You no longer have permission to download playlists";
+    const NO_DISK_SPACE =
+      "Not enough space on the server for this zip; try again later";
+
+    /** Download 7's zip file */
+    function zipPath(): string {
+      return path.join(configDir, "downloads", "user-5", "download-7.zip");
+    }
+
+    it("a build rechecks the playlist permission", async () => {
+      arrangeTwo();
+      mockPermissions.mockResolvedValue(userPermissions());
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(mockPermissions).toHaveBeenCalledWith(5);
+      expect(downloadService.markFailed).toHaveBeenCalledWith(7, NO_PERMISSION);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(downloadService.markCompleted).not.toHaveBeenCalled();
+    });
+
+    it("a build rechecks playlist access", async () => {
+      arrangeTwo();
+      mockPlaylistAccess.mockResolvedValue({ level: "none" });
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(mockPlaylistAccess).toHaveBeenCalledWith(3, 5);
+      expect(downloadService.markFailed).toHaveBeenCalledWith(
+        7,
+        "Playlist not found"
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("a build over the size cap fails before any fetch", async () => {
+      arrangeTwo([100, 100]);
+
+      await playlistZipService.createZip(7, { maxBytes: 150n });
+
+      expect(downloadService.markFailed).toHaveBeenCalledWith(
+        7,
+        "The zip grew past the size limit"
+      );
+      expect(fetch).not.toHaveBeenCalled();
+      expect(fs.existsSync(zipPath())).toBe(false);
+    });
+
+    it("a build with too little free disk fails before any fetch", async () => {
+      arrangeTwo([100, 100]);
+      // 10 blocks of 4 KiB free: under 200 planned bytes plus 1 GiB
+      const statfs = vi.spyOn(fs.promises, "statfs").mockResolvedValue({
+        type: 0,
+        bsize: 4096,
+        blocks: 1000,
+        bfree: 10,
+        bavail: 10,
+        files: 0,
+        ffree: 0,
+      });
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(statfs).toHaveBeenCalledWith(path.join(configDir, "downloads"));
+      expect(downloadService.markFailed).toHaveBeenCalledWith(7, NO_DISK_SPACE);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(fs.existsSync(zipPath())).toBe(false);
+    });
+
+    it("a first build with no downloads folder yet creates it and passes the space check", async () => {
+      arrangeTwo();
+      const statfs = vi.spyOn(fs.promises, "statfs");
+      expect(fs.existsSync(path.join(configDir, "downloads"))).toBe(false);
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(statfs).toHaveBeenCalledWith(path.join(configDir, "downloads"));
+      expect(downloadService.markFailed).not.toHaveBeenCalled();
+      expect(downloadService.markCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["shutdown", "cancelled"])(
+      "an abort for %s leaves the row as it is and removes the file",
+      async (reason) => {
+        const first = new StashBody();
+        serveBodies(first);
+        arrangeTwo();
+        const job = new AbortController();
+
+        const done = playlistZipService.createZip(7, {
+          ...NO_CAP,
+          signal: job.signal,
+        });
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        first.send(10);
+        await settle();
+        job.abort(reason);
+        await done;
+
+        expect(first.cancelled).toBe(true);
+        expect(downloadService.markFailed).not.toHaveBeenCalled();
+        expect(downloadService.markCompleted).not.toHaveBeenCalled();
+        expect(fs.existsSync(zipPath())).toBe(false);
+      }
+    );
+
+    it("a deleted row stops the build", async () => {
+      arrangeTwo();
+      // The row is there when the build starts, gone after the first file
+      vi.mocked(downloadService.updateProgress)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValue(false);
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+        "http://stash-a.test/scene/s1/stream",
+      ]);
+      expect(downloadService.markFailed).not.toHaveBeenCalled();
+      expect(downloadService.markCompleted).not.toHaveBeenCalled();
+      expect(fs.existsSync(zipPath())).toBe(false);
+    });
+
+    it("a row deleted before the build writes nothing", async () => {
+      arrangeTwo();
+      vi.mocked(downloadService.getDownload).mockResolvedValue(null);
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(downloadService.markFailed).not.toHaveBeenCalled();
+      expect(downloadService.updateProgress).not.toHaveBeenCalled();
     });
   });
 });
