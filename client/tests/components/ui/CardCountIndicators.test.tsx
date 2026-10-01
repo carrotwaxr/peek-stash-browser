@@ -1,3 +1,4 @@
+import { render } from "@testing-library/react";
 import { readFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -24,5 +25,23 @@ describe("CardCountIndicator hoverDisabled", () => {
     // The component should pass hoverDisabled={true} when tooltipContent is rich (not string)
     expect(sourceCode).toContain("hoverDisabled");
     expect(sourceCode).toContain("isRichTooltip");
+  });
+});
+
+describe("CardCountIndicators counts", () => {
+  const shownCounts = (count: number) => {
+    const { container, unmount } = render(
+      <CardCountIndicators indicators={[{ type: "SCENES", count }]} />
+    );
+    const shown = container.querySelectorAll(".card-indicator-text").length;
+    unmount();
+    return shown;
+  };
+
+  it("a zero count is hidden; NaN is hidden", () => {
+    expect(shownCounts(0)).toBe(0);
+    expect(shownCounts(Number.NaN)).toBe(0);
+    expect(shownCounts(-1)).toBe(0);
+    expect(shownCounts(3)).toBe(1);
   });
 });

@@ -555,6 +555,7 @@ export const CardDescription = ({
 /**
  * Card indicators section - renders indicators with optional menu on the right
  * @param {Array} indicators - Array of indicator objects
+ * @param {Object} badge - Optional text label (a resolution) shown before the counts
  * @param {React.ReactNode} menuComponent - Optional menu component to render on the right
  */
 interface IndicatorItem {
@@ -565,25 +566,47 @@ interface IndicatorItem {
   onClick?: (e: React.MouseEvent) => void;
 }
 
+/** A text label beside the counts, such as an image's resolution */
+export interface CardBadge {
+  label: string;
+  /** Hover text, such as the exact size */
+  title?: string;
+}
+
 interface CardIndicatorsProps {
   indicators?: IndicatorItem[];
+  badge?: CardBadge;
   menuComponent?: ReactNode;
 }
 
 export const CardIndicators = ({
   indicators,
+  badge,
   menuComponent,
 }: CardIndicatorsProps) => {
   const hasIndicators = indicators && indicators.length > 0;
 
-  // Don't render anything if no indicators and no menu
-  if (!hasIndicators && !menuComponent) {
+  // Don't render anything if no indicators, no badge and no menu
+  if (!hasIndicators && !badge && !menuComponent) {
     return null;
   }
 
   return (
     <div className="my-2 w-full flex items-center">
-      <div className="flex-1">
+      <div className="flex-1 flex flex-wrap items-center justify-center gap-4">
+        {badge && (
+          <span
+            title={badge.title}
+            className="px-2 py-1 text-xs font-medium rounded"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            {badge.label}
+          </span>
+        )}
         {hasIndicators && (
           <CardCountIndicators
             indicators={

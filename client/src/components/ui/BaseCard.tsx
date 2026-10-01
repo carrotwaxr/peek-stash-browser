@@ -13,6 +13,7 @@ import {
 } from "../../hooks/useCardSelection";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import {
+  type CardBadge,
   CardContainer,
   CardDescription,
   CardHideMenu,
@@ -70,6 +71,8 @@ export interface BaseCardProps {
     options?: ToggleSelectOptions
   ) => void;
   indicators?: CardIndicator[];
+  /** A text label shown before the count indicators, such as a resolution */
+  indicatorBadge?: CardBadge;
   ratingControlsProps?: RatingControlsProps;
   displayPreferences?: { showDescription?: boolean };
   hideDescription?: boolean;
@@ -115,6 +118,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
 
       // Indicators & Rating
       indicators = [],
+      indicatorBadge,
       ratingControlsProps,
 
       // Display preferences
@@ -271,7 +275,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
               ratingControlsProps.showFavorite ||
               ratingControlsProps.showOCounter);
           const showMenu = ratingControlsProps?.showMenu ?? true;
-          const hasIndicators = indicators.length > 0;
+          const hasIndicators = indicators.length > 0 || !!indicatorBadge;
           // What the hide dialog and toast call the entity
           const entityTitle =
             ratingControlsProps?.entityTitle ??
@@ -295,6 +299,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
               {(hasIndicators || menuForIndicators) && (
                 <CardIndicators
                   indicators={indicators}
+                  badge={indicatorBadge}
                   menuComponent={menuForIndicators}
                 />
               )}

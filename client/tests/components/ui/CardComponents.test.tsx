@@ -7,6 +7,7 @@ import type * as api from "../../../src/api";
 import {
   CardDescription,
   CardImage,
+  CardIndicators,
   CardMenuRow,
   CardOverlay,
   CardRatingRow,
@@ -179,6 +180,29 @@ describe("CardDescription", () => {
     // CardDescription should delegate to ExpandableDescription
     const funcString = CardDescription.toString();
     expect(funcString).toContain("ExpandableDescription");
+  });
+});
+
+describe("CardIndicators badge", () => {
+  it("shows the badge beside the count indicators", () => {
+    render(
+      <CardIndicators
+        badge={{ label: "1080p", title: "1920x1080" }}
+        indicators={[{ type: "TAGS", count: 2 }]}
+      />
+    );
+
+    const badge = screen.getByText("1080p");
+    expect(badge).toHaveAttribute("title", "1920x1080");
+    const row = badge.closest(".flex-1");
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(screen.getByText("2"));
+  });
+
+  it("shows the badge alone when no count applies", () => {
+    render(<CardIndicators badge={{ label: "4K" }} indicators={[]} />);
+
+    expect(screen.getByText("4K")).toBeInTheDocument();
   });
 });
 

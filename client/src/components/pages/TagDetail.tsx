@@ -243,8 +243,10 @@ const TagDetail = () => {
           <PageHeader
             title={
               (
-                <div className="flex gap-4 items-center">
-                  <span>{(tag?.name as string) || `Tag ${tagId}`}</span>
+                <div className="flex flex-wrap items-center gap-4 min-w-0">
+                  <span className="min-w-0 break-words">
+                    {(tag?.name as string) || `Tag ${tagId}`}
+                  </span>
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}

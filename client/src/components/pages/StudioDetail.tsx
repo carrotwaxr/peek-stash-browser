@@ -252,8 +252,8 @@ const StudioDetail = () => {
           <PageHeader
             title={
               (
-                <div className="flex gap-4 items-center">
-                  <span>
+                <div className="flex flex-wrap items-center gap-4 min-w-0">
+                  <span className="min-w-0 break-words">
                     {(studio?.name as string) || `Studio ${studioId}`}
                   </span>
                   {!!settings.showFavorite && (

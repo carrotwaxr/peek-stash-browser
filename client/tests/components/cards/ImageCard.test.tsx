@@ -14,7 +14,9 @@ vi.mock("../../../src/contexts/ConfigContext", () => ({
   useConfig: () => ({ hasMultipleInstances: false }),
 }));
 vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
-  useCardDisplaySettings: () => ({ getSettings: () => ({}) }),
+  useCardDisplaySettings: () => ({
+    getSettings: () => ({ showRelationshipIndicators: true }),
+  }),
 }));
 // Captures the rating controls the card hands to BaseCard
 vi.mock("../../../src/components/ui/BaseCard", () => ({
@@ -145,5 +147,44 @@ describe("ImageCard", () => {
     expect(onOCounterChange).toHaveBeenCalledWith("1", 3, "inst-b");
     expect(onRatingChange).toHaveBeenCalledWith("1", 80, "inst-b");
     expect(onFavoriteChange).toHaveBeenCalledWith("1", true, "inst-b");
+  });
+
+  it("an image card with a resolution shows a resolution badge", () => {
+    render(
+      <MemoryRouter>
+        <ImageCard
+          image={
+            {
+              ...mockImage,
+              instanceId: "inst-a",
+              width: 1920,
+              height: 1080,
+            } as never
+          }
+        />
+      </MemoryRouter>
+    );
+
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    expect(props.indicatorBadge).toEqual({
+      label: "1080p",
+      title: "1920x1080",
+    });
+    // A badge, not a count type
+    expect(props.indicators?.map((i) => i.type) ?? []).not.toContain(
+      "RESOLUTION"
+    );
+  });
+
+  it("an image without a size shows no resolution badge", () => {
+    render(
+      <MemoryRouter>
+        <ImageCard image={{ ...mockImage, instanceId: "inst-a" } as never} />
+      </MemoryRouter>
+    );
+
+    expect(
+      must(baseCardProps.mock.lastCall, "BaseCard's props")[0].indicatorBadge
+    ).toBeUndefined();
   });
 });

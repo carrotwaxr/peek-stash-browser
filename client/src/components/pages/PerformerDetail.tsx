@@ -198,8 +198,10 @@ const PerformerDetail = () => {
           <PageHeader
             title={
               (
-                <div className="flex gap-4 items-center">
-                  <span>{performer?.name as React.ReactNode}</span>
+                <div className="flex flex-wrap items-center gap-4 min-w-0">
+                  <span className="min-w-0 break-words">
+                    {performer?.name as React.ReactNode}
+                  </span>
                   <GenderIcon gender={performer?.gender as string} size={32} />
                   {(settings.showFavorite as boolean) && (
                     <FavoriteButton

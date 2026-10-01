@@ -14,7 +14,6 @@ interface IndicatorItem {
 
 interface CardCountIndicatorsProps {
   indicators: IndicatorItem[];
-  showZeroCounts?: boolean;
   size?: number;
 }
 
@@ -97,7 +96,6 @@ const CARD_COUNT_INDICATOR_TYPES = {
 
 export const CardCountIndicators = ({
   indicators,
-  showZeroCounts = false,
   size = 20,
 }: CardCountIndicatorsProps) => {
   return (
@@ -108,8 +106,7 @@ export const CardCountIndicators = ({
             indicator.type as keyof typeof CARD_COUNT_INDICATOR_TYPES
           ];
         if (!knownIndicatorProps) return null;
-        if ((!showZeroCounts && isNaN(indicator.count)) || indicator.count <= 0)
-          return null;
+        if (isNaN(indicator.count) || indicator.count <= 0) return null;
         return (
           <CardCountIndicator
             key={index}
