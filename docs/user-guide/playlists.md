@@ -14,14 +14,15 @@ Your new playlist is now ready to use!
 
 ## Adding Scenes to Playlists
 
-There are two ways to add scenes to your playlists:
+There are three ways to add scenes to your playlists:
 
-### From Scene Cards
+### From the Bulk Action Bar
 
-1. Find a scene you want to add (on any page with scene cards)
-2. Click the **+ (plus)** icon on the scene card
-3. Select the playlist you want to add it to
-4. The scene is added instantly!
+1. Select one or more scenes on any page with scene cards
+2. Click **Add to Playlist** on the bar that appears
+3. Select the playlist you want to add them to
+
+All the selected scenes are added in one step. Peek tells you how many were added, how many the playlist already held and how many were unavailable (hidden, restricted or removed from Stash).
 
 ### From Scene Detail Page
 
@@ -29,6 +30,12 @@ There are two ways to add scenes to your playlists:
 2. Click the **Add to Playlist** button
 3. Select the playlist you want to add it to
 4. Done!
+
+The menu marks the playlists that already hold the scene with "already added", and its video counts stay current as you add.
+
+### While Watching
+
+The **Add to Playlist** button on the player's controls works the same way.
 
 !!! tip "Multiple Playlists"
     You can add the same scene to multiple playlists. Great for organizing scenes by different themes or moods!

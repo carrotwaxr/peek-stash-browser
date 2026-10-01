@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
-import { MemoryRouter } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouterWithQuery } from "@tests/helpers/MemoryRouterWithQuery";
 import { must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SceneGrid from "../../../src/components/scene-search/SceneGrid";
@@ -75,9 +75,9 @@ describe("SceneGrid autoplay on scroll", () => {
       () => ({ gridTemplateColumns: tracks }) as CSSStyleDeclaration
     );
     render(
-      <MemoryRouter>
+      <MemoryRouterWithQuery>
         <SceneGrid scenes={[scene]} />
-      </MemoryRouter>
+      </MemoryRouterWithQuery>
     );
     return must(cardSpy.mock.lastCall, "a card render")[0];
   };
@@ -94,13 +94,13 @@ describe("SceneGrid autoplay on scroll", () => {
 describe("SceneGrid empty list", () => {
   it("an empty list shows EmptyState with the page's message", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouterWithQuery>
         <SceneGrid
           scenes={[]}
           emptyMessage="No scenes found"
           emptyDescription="Try adjusting your search filters"
         />
-      </MemoryRouter>
+      </MemoryRouterWithQuery>
     );
 
     expect(screen.getByTestId("empty-state")).toHaveTextContent(
@@ -121,9 +121,9 @@ describe("SceneGrid selection", () => {
 
   const renderGrid = (props: Partial<ComponentProps<typeof SceneGrid>>) => {
     const tree = (p: Partial<ComponentProps<typeof SceneGrid>>) => (
-      <MemoryRouter>
+      <MemoryRouterWithQuery>
         <SceneGrid scenes={sceneList(["1", "2", "3", "4", "5", "6"])} {...p} />
-      </MemoryRouter>
+      </MemoryRouterWithQuery>
     );
     const view = render(tree(props));
     return {

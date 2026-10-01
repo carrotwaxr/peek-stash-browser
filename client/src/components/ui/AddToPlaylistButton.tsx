@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type ReactNode } from "react";
-import { apiGet, apiPost } from "../../api";
-import { ApiError } from "../../api/client";
+import {
+  useAddScenesToPlaylist,
+  useCreatePlaylist,
+  usePlaylists,
+  useSharedPlaylists,
+} from "../../api/hooks";
+import { makeCompositeKey } from "../../utils/compositeKey";
 import { showError, showSuccess, showWarning } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
@@ -15,9 +20,48 @@ interface Props {
   icon?: ReactNode;
   dropdownPosition?: "below" | "above";
   onSuccess?: () => void;
-  excludePlaylistIds?: string[];
+  /** Playlists left out of the menu; a playlist's id is a number, compared as text */
+  excludePlaylistIds?: ReadonlyArray<number | string>;
   variant?: "primary" | "secondary" | "tertiary" | "destructive";
   disabled?: boolean;
+}
+
+/** One row of the menu: the playlist's own fields, from either list */
+interface MenuEntry {
+  id: number;
+  name: string;
+  isShared: boolean;
+  videoCount: number;
+  /** One scene and the playlist already holds it */
+  holdsScene: boolean;
+}
+
+/** What an add did, in words: a success only when nothing was left out */
+function reportAdd(
+  result: { added: number; alreadyInPlaylist: number; unavailable: number },
+  isMultiple: boolean
+) {
+  const { added, alreadyInPlaylist, unavailable } = result;
+  const skipped: string[] = [];
+  if (alreadyInPlaylist > 0)
+    skipped.push(`${alreadyInPlaylist} already in playlist`);
+  if (unavailable > 0) skipped.push(`${unavailable} unavailable`);
+
+  if (skipped.length === 0) {
+    showSuccess(
+      isMultiple ? `Added ${added} scenes to playlist!` : "Added to playlist!"
+    );
+  } else if (added > 0) {
+    showWarning(`Added ${added} scenes, ${skipped.join(", ")}`);
+  } else if (unavailable === 0) {
+    showWarning(
+      isMultiple
+        ? "All scenes already in playlist"
+        : "Scene already in playlist"
+    );
+  } else {
+    showWarning(`No scenes added: ${skipped.join(", ")}`);
+  }
 }
 
 const AddToPlaylistButton = ({
@@ -29,27 +73,51 @@ const AddToPlaylistButton = ({
   onSuccess,
   excludePlaylistIds = [],
   variant = "primary",
+  disabled = false,
 }: Props) => {
   const [showMenu, setShowMenu] = useState(false);
-  interface PlaylistItem {
-    id: string;
-    name: string;
-    isShared: boolean;
-    _count?: { items?: number };
-    sceneCount?: number;
-    [key: string]: unknown;
-  }
-
-  const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
-  const [creating, setCreating] = useState(false);
   const [computedPosition, setComputedPosition] = useState("below");
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isMultiple = scenes.length > 1;
+  const onlyScene = scenes.length === 1 ? scenes[0] : undefined;
+
+  // The lists are read only while the menu is open; one scene also asks each
+  // playlist whether it holds that scene
+  const ownQuery = usePlaylists(
+    {
+      containsScene: onlyScene
+        ? makeCompositeKey(onlyScene.id, onlyScene.instanceId)
+        : undefined,
+    },
+    { enabled: showMenu }
+  );
+  const sharedQuery = useSharedPlaylists({ enabled: showMenu });
+  const addScenes = useAddScenesToPlaylist();
+  const createPlaylist = useCreatePlaylist();
+  const creating = createPlaylist.isPending;
+  const loading = ownQuery.isLoading || sharedQuery.isLoading;
+
+  const excluded = new Set(excludePlaylistIds.map(String));
+  const entries: MenuEntry[] = [
+    ...(ownQuery.data?.playlists ?? []).map((playlist) => ({
+      id: playlist.id,
+      name: playlist.name,
+      isShared: false,
+      videoCount: playlist._count.items,
+      holdsScene: playlist.containsScene === true,
+    })),
+    ...(sharedQuery.data?.playlists ?? []).map((playlist) => ({
+      id: playlist.id,
+      name: playlist.name,
+      isShared: true,
+      videoCount: playlist.sceneCount,
+      holdsScene: false,
+    })),
+  ].filter((entry) => !excluded.has(String(entry.id)));
 
   // Auto-detect menu position when opening
   const dropdownPosition = dropdownPositionProp || computedPosition;
@@ -65,13 +133,6 @@ const AddToPlaylistButton = ({
       );
     }
   }, [showMenu, dropdownPositionProp]);
-
-  useEffect(() => {
-    if (showMenu && playlists.length === 0) {
-      void loadPlaylists();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMenu]); // Only load when menu opens, not when playlists.length changes
 
   // Click outside to close
   useEffect(() => {
@@ -89,126 +150,65 @@ const AddToPlaylistButton = ({
     return undefined;
   }, [showMenu]);
 
-  const loadPlaylists = async () => {
+  /** One request for every scene; the server counts what it left out */
+  const sendScenes = (playlistId: number) =>
+    addScenes.mutateAsync({
+      playlistId,
+      scenes: scenes.map((scene) => ({
+        sceneId: scene.id,
+        instanceId: scene.instanceId,
+      })),
+    });
+
+  const addToPlaylist = async (playlistId: number) => {
     try {
-      setLoading(true);
-      const [ownResult, sharedResult] = await Promise.allSettled([
-        apiGet("/playlists"),
-        apiGet("/playlists/shared"),
-      ]);
-      const ownData =
-        ownResult.status === "fulfilled"
-          ? ((ownResult.value as { playlists?: Record<string, unknown>[] })
-              .playlists ?? [])
-          : [];
-      const own = ownData.map((p: Record<string, unknown>) => ({
-        ...p,
-        isShared: false,
-      })) as PlaylistItem[];
-      const sharedData =
-        sharedResult.status === "fulfilled"
-          ? ((sharedResult.value as { playlists?: Record<string, unknown>[] })
-              .playlists ?? [])
-          : [];
-      const shared = sharedData.map((p: Record<string, unknown>) => ({
-        ...p,
-        isShared: true,
-      })) as PlaylistItem[];
-      setPlaylists([...own, ...shared]);
+      const result = await sendScenes(playlistId);
+      reportAdd(result, isMultiple);
+      setShowMenu(false);
+      if (onSuccess && result.added > 0) onSuccess();
     } catch {
-      // Error loading playlists - will show in UI
-    } finally {
-      setLoading(false);
+      showError("Failed to add to playlist");
     }
   };
 
-  const addToPlaylist = async (playlistId: string, skipToast = false) => {
-    try {
-      // Add scenes one by one (could be optimized with a batch endpoint later)
-      let addedCount = 0;
-      let skippedCount = 0;
-
-      for (const scene of scenes) {
-        try {
-          await apiPost(`/playlists/${playlistId}/items`, {
-            sceneId: scene.id,
-            instanceId: scene.instanceId,
-          });
-          addedCount++;
-        } catch (err) {
-          if (err instanceof ApiError && err.status === 409) {
-            skippedCount++; // Already in playlist
-          } else {
-            throw err; // Re-throw for outer catch
-          }
-        }
-      }
-
-      // Show appropriate message (unless skipToast is true)
-      if (!skipToast) {
-        if (addedCount > 0 && skippedCount === 0) {
-          showSuccess(
-            isMultiple
-              ? `Added ${addedCount} scenes to playlist!`
-              : "Added to playlist!"
-          );
-        } else if (addedCount > 0 && skippedCount > 0) {
-          showWarning(
-            `Added ${addedCount} scenes, ${skippedCount} already in playlist`
-          );
-        } else if (skippedCount > 0) {
-          showWarning(
-            isMultiple
-              ? "All scenes already in playlist"
-              : "Scene already in playlist"
-          );
-        }
-      }
-
+  const chooseEntry = (entry: MenuEntry) => {
+    if (entry.holdsScene) {
+      showWarning("Scene already in playlist");
       setShowMenu(false);
-
-      // Call onSuccess callback if provided
-      if (onSuccess && addedCount > 0) {
-        onSuccess();
-      }
-
-      return { addedCount, skippedCount };
-    } catch (err) {
-      showError("Failed to add to playlist");
-      throw err;
+      return;
     }
+    void addToPlaylist(entry.id);
   };
 
   const createPlaylistAndAdd = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
+    let playlistId: number;
     try {
-      setCreating(true);
-      const data = await apiPost("/playlists", {
+      const data = await createPlaylist.mutateAsync({
         name: newPlaylistName.trim(),
         description: newPlaylistDescription.trim() || undefined,
       });
-
-      const newPlaylistId = (data as { playlist: { id: string } }).playlist.id;
-
-      // Add scenes to the newly created playlist (skip the toast, we'll show our own)
-      const { addedCount } = await addToPlaylist(newPlaylistId, true);
-
-      showSuccess(
-        `Playlist created and ${addedCount} ${addedCount === 1 ? "scene" : "scenes"} added!`
-      );
-      setNewPlaylistName("");
-      setNewPlaylistDescription("");
-      setShowCreateModal(false);
-      setShowMenu(false);
-
-      // Reload playlists for next time
-      void loadPlaylists();
+      playlistId = data.playlist.id;
     } catch {
       showError("Failed to create playlist");
-    } finally {
-      setCreating(false);
+      return;
+    }
+
+    setNewPlaylistName("");
+    setNewPlaylistDescription("");
+    setShowCreateModal(false);
+    setShowMenu(false);
+
+    try {
+      const { added } = await sendScenes(playlistId);
+      showSuccess(
+        `Playlist created and ${added} ${added === 1 ? "scene" : "scenes"} added!`
+      );
+      if (onSuccess && added > 0) onSuccess();
+    } catch {
+      showError("Playlist created, but adding to it failed");
     }
   };
 
@@ -222,6 +222,7 @@ const AddToPlaylistButton = ({
         variant={compact ? "secondary" : variant}
         icon={icon || null}
         title="Add to playlist"
+        disabled={disabled}
       >
         {compact ? (
           <ThemedIcon name="list-plus" size={16} />
@@ -288,7 +289,16 @@ const AddToPlaylistButton = ({
                 </Button>
 
                 {/* Existing Playlists */}
-                {playlists.length === 0 ? (
+                {ownQuery.isError ? (
+                  <div className="p-4 text-center">
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Could not load playlists
+                    </p>
+                  </div>
+                ) : entries.length === 0 ? (
                   <div className="p-4 text-center">
                     <p
                       className="text-sm"
@@ -298,58 +308,62 @@ const AddToPlaylistButton = ({
                     </p>
                   </div>
                 ) : (
-                  playlists
-                    .filter(
-                      (playlist) => !excludePlaylistIds.includes(playlist.id)
-                    )
-                    .map((playlist) => (
-                      <Button
-                        key={`${playlist.id}-${playlist.isShared ? "shared" : "own"}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToPlaylist(playlist.id).catch(() => {
-                            // addToPlaylist has shown the error toast
-                          });
-                        }}
-                        variant="tertiary"
-                        fullWidth
-                        className="text-left px-4 py-2 text-sm"
-                        style={{
-                          color: "var(--text-primary)",
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor =
-                            "var(--bg-secondary)";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor =
-                            "transparent";
-                        }}
+                  entries.map((entry) => (
+                    <Button
+                      key={`${entry.id}-${entry.isShared ? "shared" : "own"}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        chooseEntry(entry);
+                      }}
+                      variant="tertiary"
+                      fullWidth
+                      className="text-left px-4 py-2 text-sm"
+                      style={{
+                        color: "var(--text-primary)",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.target as HTMLElement).style.backgroundColor =
+                          "var(--bg-secondary)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.target as HTMLElement).style.backgroundColor =
+                          "transparent";
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {entry.name}
+                        {entry.isShared && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: "var(--accent-color)",
+                              color: "var(--bg-primary)",
+                              opacity: 0.8,
+                            }}
+                          >
+                            shared
+                          </span>
+                        )}
+                        {entry.holdsScene && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: "var(--bg-tertiary)",
+                              color: "var(--text-secondary)",
+                            }}
+                          >
+                            already added
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="text-xs"
+                        style={{ color: "var(--text-muted)" }}
                       >
-                        <div className="flex items-center gap-1.5">
-                          {playlist.name}
-                          {playlist.isShared && (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: "var(--accent-color)",
-                                color: "var(--bg-primary)",
-                                opacity: 0.8,
-                              }}
-                            >
-                              shared
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          className="text-xs"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          {playlist._count?.items ?? playlist.sceneCount ?? 0}{" "}
-                          videos
-                        </div>
-                      </Button>
-                    ))
+                        {entry.videoCount} videos
+                      </div>
+                    </Button>
+                  ))
                 )}
               </div>
             )}
