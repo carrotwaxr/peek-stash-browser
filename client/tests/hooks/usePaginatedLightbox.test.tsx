@@ -16,9 +16,12 @@ import {
   type PageChangeOptions,
   usePaginatedLightbox,
 } from "../../src/hooks/usePaginatedLightbox";
-import { showError } from "../../src/utils/toast";
+import { showError, showInfo } from "../../src/utils/toast";
 
-vi.mock("../../src/utils/toast", () => ({ showError: vi.fn() }));
+vi.mock("../../src/utils/toast", () => ({
+  showError: vi.fn(),
+  showInfo: vi.fn(),
+}));
 
 type Options = Parameters<typeof usePaginatedLightbox>[0];
 
@@ -425,6 +428,55 @@ describe("usePaginatedLightbox", () => {
       expect(result.current.lightbox.lightboxOpen).toBe(true);
       expect(result.current.lightbox.lightboxIndex).toBe(5);
       expect(imageParam(result)).toBe("13:inst-b");
+    });
+
+    it("an image param not among the loaded page's images, once ready, is removed with a replace and an info toast says the image is not on this page", () => {
+      vi.mocked(showInfo).mockClear();
+      const { result } = renderLightbox(
+        { perPage: 10, totalCount: 20, images: pageOf(1), ready: true },
+        "/images?sort=title&image=99%3Ainst-a"
+      );
+
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(imageParam(result)).toBeNull();
+      expect(result.current.location.search).toBe("?sort=title");
+      expect(result.current.navigationType).toBe("REPLACE");
+      expect(vi.mocked(showInfo)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(showInfo)).toHaveBeenCalledWith(
+        "That image isn't on this page of the list."
+      );
+    });
+
+    it("while not ready it waits: an image param not among the images is kept", () => {
+      vi.mocked(showInfo).mockClear();
+      const props = { perPage: 10, totalCount: 20, externalPage: 2 };
+      const { result, rerender } = renderLightbox(
+        { ...props, images: [], ready: false },
+        "/images?page=2&image=13%3Ainst-a"
+      );
+      rerender({ ...props, images: pageOf(1), ready: false });
+
+      expect(imageParam(result)).toBe("13:inst-a");
+      expect(result.current.lightbox.lightboxOpen).toBe(false);
+      expect(vi.mocked(showInfo)).not.toHaveBeenCalled();
+    });
+
+    it("with the page loading (placeholder rows of the last page) it does not drop the param", () => {
+      vi.mocked(showInfo).mockClear();
+      const props = { perPage: 10, totalCount: 20, externalPage: 2 };
+      // The list shows the last page's rows while page 2 loads: not ready
+      const { result, rerender } = renderLightbox(
+        { ...props, images: pageOf(1), ready: false },
+        "/images?page=2&image=13%3Ainst-a"
+      );
+      expect(imageParam(result)).toBe("13:inst-a");
+      expect(vi.mocked(showInfo)).not.toHaveBeenCalled();
+
+      rerender({ ...props, images: pageOf(2), ready: true });
+      expect(result.current.lightbox.lightboxOpen).toBe(true);
+      expect(result.current.lightbox.lightboxIndex).toBe(2);
+      expect(imageParam(result)).toBe("13:inst-a");
+      expect(vi.mocked(showInfo)).not.toHaveBeenCalled();
     });
 
     it("holding Right across a boundary lands on the new page's first image", () => {

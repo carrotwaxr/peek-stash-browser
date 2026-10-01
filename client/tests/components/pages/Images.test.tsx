@@ -16,6 +16,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import Images from "@/components/pages/Images";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import type * as toastModule from "@/utils/toast";
+import { showError } from "@/utils/toast";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
 
@@ -75,31 +77,50 @@ vi.mock("@/components/cards/index", () => ({
     );
   },
 }));
-/** A lightbox stub: its images, and a Next that at the last image asks for the next page */
-vi.mock("@/components/ui/Lightbox", () => ({
-  default: (props: {
+/**
+ * A lightbox stub: its images, a Next that at the last image asks for the
+ * next page, and a zoom of its own state (lost if the lightbox remounts)
+ */
+vi.mock("@/components/ui/Lightbox", async () => {
+  const { useState } = await import("react");
+  const LightboxStub = (props: {
     isOpen: boolean;
     images: unknown[];
     initialIndex: number;
     onPageBoundary?: (direction: "next" | "prev") => boolean;
-  }) => (
-    <div
-      data-testid="lightbox"
-      data-is-open={String(props.isOpen)}
-      data-index={props.initialIndex}
-      data-images={JSON.stringify(props.images)}
-    >
-      <button
-        onClick={() => {
-          if (props.initialIndex === props.images.length - 1) {
-            props.onPageBoundary?.("next");
-          }
-        }}
+  }) => {
+    const [zoom, setZoom] = useState(1);
+    return (
+      <div
+        data-testid="lightbox"
+        data-is-open={String(props.isOpen)}
+        data-index={props.initialIndex}
+        data-images={JSON.stringify(props.images)}
       >
-        Lightbox next
-      </button>
-    </div>
-  ),
+        <div
+          data-testid="lightbox-zoom"
+          style={{ transform: `scale(${zoom})` }}
+        />
+        <button onClick={() => setZoom((z) => z * 2)}>Lightbox zoom in</button>
+        <button
+          onClick={() => {
+            if (props.initialIndex === props.images.length - 1) {
+              props.onPageBoundary?.("next");
+            }
+          }}
+        >
+          Lightbox next
+        </button>
+      </div>
+    );
+  };
+  return { default: LightboxStub };
+});
+// The lightbox's failure toast and the dropped-image note
+vi.mock("@/utils/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof toastModule>()),
+  showError: vi.fn(),
+  showInfo: vi.fn(),
 }));
 vi.mock("@/components/wall/WallView", () => ({
   default: (props: { items: unknown[]; playbackMode: string }) => (
@@ -462,6 +483,89 @@ describe("Images", () => {
       expect(lightbox).toHaveAttribute("data-is-open", "true");
       expect(lightbox).toHaveAttribute("data-index", "23");
       expect(imageParam(router)).toBe("24:a");
+    });
+
+    it("a lightbox crossing to a page that fails never renders the error page, keeps the same Lightbox element (zoom kept), returns to the image it left and toasts", async () => {
+      const first = Array.from({ length: 24 }, (_, i) => ({
+        id: String(i + 1),
+        instanceId: "a",
+        title: `Image ${i + 1}`,
+      }));
+      let failPage2: (error: Error) => void = () => {};
+      api.findImages.mockImplementation((params) =>
+        pageOf(params) === 1
+          ? Promise.resolve(images(first, 48))
+          : new Promise((_, reject) => {
+              failPage2 = reject;
+            })
+      );
+      const { router } = renderPage();
+      await waitFor(() => expect(cards()).toHaveLength(24));
+
+      fireEvent.click(screen.getByRole("button", { name: "Open Image 24" }));
+      const lightbox = screen.getByTestId("lightbox");
+      fireEvent.click(
+        within(lightbox).getByRole("button", { name: "Lightbox zoom in" })
+      );
+      expect(screen.getByTestId("lightbox-zoom").style.transform).toBe(
+        "scale(2)"
+      );
+      fireEvent.click(
+        within(lightbox).getByRole("button", { name: "Lightbox next" })
+      );
+      await waitFor(() =>
+        expect(
+          api.findImages.mock.calls.map((call) => pageOf(call[0]))
+        ).toContain(2)
+      );
+
+      // Record any error page shown while the failure settles
+      let errorPageShown = false;
+      const observer = new MutationObserver(() => {
+        if (screen.queryByRole("alert")) errorPageShown = true;
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      await act(async () => {
+        failPage2(new Error("The server is down"));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      await waitFor(() =>
+        expect(
+          new URLSearchParams(router.state.location.search).get("page")
+        ).toBeNull()
+      );
+      await waitFor(() => expect(cards()).toHaveLength(24));
+      observer.disconnect();
+
+      expect(errorPageShown).toBe(false);
+      expect(screen.getByTestId("lightbox")).toBe(lightbox);
+      expect(screen.getByTestId("lightbox-zoom").style.transform).toBe(
+        "scale(2)"
+      );
+      expect(lightbox).toHaveAttribute("data-is-open", "true");
+      expect(lightbox).toHaveAttribute("data-index", "23");
+      expect(imageParam(router)).toBe("24:a");
+      expect(vi.mocked(showError)).toHaveBeenCalledWith(
+        expect.stringContaining("The server is down")
+      );
+    });
+
+    it("with the lightbox closed, a failed page still shows the error page", async () => {
+      api.findImages.mockImplementation((params) =>
+        pageOf(params) === 1
+          ? Promise.resolve(images([{ id: "1", instanceId: "a" }], 48))
+          : Promise.reject(new ApiError("Page two is down", 500))
+      );
+      const { router } = renderPage();
+      await waitFor(() => expect(cards()).toHaveLength(1));
+
+      await act(async () => {
+        await router.navigate("/images?page=2");
+      });
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Page two is down"
+      );
     });
 
     it("opening an image names it in the URL and Back closes the lightbox", async () => {

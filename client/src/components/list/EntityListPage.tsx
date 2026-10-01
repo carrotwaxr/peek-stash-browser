@@ -267,12 +267,14 @@ const EntityListPage = ({
 
   // The page's own handlers and parts (the Images lightbox, a scene's queue)
   const usePage = config.usePage ?? useNoExtras;
-  const { cardHandlers, after } = usePage({
+  const { cardHandlers, after, holdsPage } = usePage({
     listState,
     items,
     count,
     request,
     error,
+    // Placeholder rows are the previous request's, not this one's answer
+    loading: isLoading || isPlaceholderData,
     title,
     fromPageTitle,
   });
@@ -304,16 +306,6 @@ const EntityListPage = ({
   } = useTableColumns(config.tableEntity ?? entityType);
 
   const documentTitle = embed ? null : <DocumentTitle title={title} />;
-
-  if (error && !initializing && paged) {
-    return (
-      <PageLayout>
-        {documentTitle}
-        <PageHeader title={title} subtitle={subtitle} />
-        <ErrorMessage error={error} />
-      </PageLayout>
-    );
-  }
 
   const columnsPopover = (
     <ColumnConfigPopover
@@ -438,7 +430,16 @@ const EntityListPage = ({
     );
   };
 
-  return (
+  // The error page, unless the page's own part covers the list (the open
+  // lightbox, which reports a failed page itself and must not remount)
+  const failed = !!error && !initializing && paged && !holdsPage;
+  const body = failed ? (
+    <PageLayout>
+      {documentTitle}
+      <PageHeader title={title} subtitle={subtitle} />
+      <ErrorMessage error={error} />
+    </PageLayout>
+  ) : (
     <PageLayout>
       {documentTitle}
       <div>
@@ -467,10 +468,16 @@ const EntityListPage = ({
         >
           {renderResults()}
         </SearchControls>
-
-        {after}
       </div>
     </PageLayout>
+  );
+
+  // `after` keeps its tree position whichever body shows
+  return (
+    <>
+      {body}
+      {after}
+    </>
   );
 };
 

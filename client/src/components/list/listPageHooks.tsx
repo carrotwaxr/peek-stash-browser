@@ -2,7 +2,7 @@
  * The list pages' own hooks (`ListPageConfig.usePage`): what a page adds to
  * the shared list page, its wall's click and the Images lightbox.
  */
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -71,6 +71,7 @@ export function useImageListPage({
   count,
   request,
   error,
+  loading,
 }: ListPageData): ListPageExtras {
   const queryClient = useQueryClient();
   const { page, perPage, setPage } = listState;
@@ -87,9 +88,19 @@ export function useImageListPage({
     externalPage: page,
     onExternalPageChange: turnPage,
     images: items,
+    // An `image` param waits for this request's own rows (not a
+    // placeholder's), and a failed page drops nothing
+    ready: !loading && !error,
   });
   const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
     lightbox;
+
+  // A crossing's page that fails leaves the list with no rows until the
+  // lightbox returns to its page: the open lightbox keeps the last rows
+  const [lastRows, setLastRows] = useState(items);
+  if (items.length > 0 && items !== lastRows) setLastRows(items);
+  const lightboxRows =
+    lightbox.lightboxOpen && !!error && items.length === 0 ? lastRows : items;
 
   // A page turned from the lightbox opens at its first or last image once
   // the page's images arrive; if the page fails, the lightbox goes back to
@@ -153,7 +164,7 @@ export function useImageListPage({
 
   const lightboxImages = useMemo(
     () =>
-      items.map((img) => {
+      lightboxRows.map((img) => {
         const paths = img.paths as Record<string, string> | undefined;
         // The server serves an image only from the instance it names
         const instanceQuery =
@@ -172,7 +183,7 @@ export function useImageListPage({
           oCounter: (img.oCounter as number | undefined) ?? 0,
         };
       }) as unknown as NormalizedImage[],
-    [items]
+    [lightboxRows]
   );
 
   // The lightbox's own changes, back into the cached page
@@ -188,7 +199,7 @@ export function useImageListPage({
   );
 
   const after =
-    items.length > 0 ? (
+    lightboxRows.length > 0 ? (
       <Lightbox
         isOpen={lightbox.lightboxOpen}
         images={lightboxImages}
@@ -205,5 +216,7 @@ export function useImageListPage({
       />
     ) : null;
 
-  return { cardHandlers, after };
+  // The open lightbox covers the list: a failed page is its toast, not the
+  // error page (which would unmount it)
+  return { cardHandlers, after, holdsPage: lightbox.lightboxOpen };
 }
