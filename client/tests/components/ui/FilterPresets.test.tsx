@@ -675,6 +675,19 @@ describe("FilterPresets", () => {
     });
   });
 
+  describe("Context labels", () => {
+    it("the default-preset label for scene_gallery reads Gallery pages", async () => {
+      const user = userEvent.setup();
+      render(<FilterPresets {...defaultProps} context="scene_gallery" />);
+
+      await user.click(must(screen.getByText("Save Preset").closest("button")));
+
+      expect(
+        await screen.findByText("Set as default for Gallery pages")
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("Context-specific behavior", () => {
     it("uses scene presets for scene_performer context", async () => {
       mockApiGet.mockImplementation((url) => {

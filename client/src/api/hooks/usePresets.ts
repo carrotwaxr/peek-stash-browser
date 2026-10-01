@@ -2,6 +2,7 @@ import type {
   GetDefaultFilterPresetsResponse,
   GetFilterPresetsResponse,
 } from "@peek/shared-types";
+import { presetArtifactType } from "@peek/shared-types/presetContexts.js";
 import {
   type QueryClient,
   queryOptions,
@@ -47,7 +48,7 @@ export function presetsForContext(
   response: GetFilterPresetsResponse | undefined,
   context: string
 ): SavedPreset[] {
-  const artifactType = context.startsWith("scene_") ? "scene" : context;
+  const artifactType = presetArtifactType(context);
   return (response?.presets[artifactType] ?? []) as unknown as SavedPreset[];
 }
 

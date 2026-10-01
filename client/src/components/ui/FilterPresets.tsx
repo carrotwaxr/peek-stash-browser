@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import {
+  PRESET_CONTEXT_LABELS,
+  isPresetContext,
+} from "@peek/shared-types/presetContexts.js";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LucideBookmark,
@@ -20,21 +24,8 @@ import Modal from "./Modal";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 
 // Helper to get context label for UI
-const contextLabels: Record<string, string> = {
-  scene: "All Scenes page",
-  scene_performer: "Performer pages",
-  scene_tag: "Tag pages",
-  scene_studio: "Studio pages",
-  scene_group: "Group pages",
-  performer: "Performers page",
-  studio: "Studios page",
-  tag: "Tags page",
-  group: "Groups page",
-  gallery: "Galleries page",
-};
-
 const getContextLabel = (ctx: string): string => {
-  return contextLabels[ctx] || ctx;
+  return isPresetContext(ctx) ? PRESET_CONTEXT_LABELS[ctx] : ctx;
 };
 
 /**

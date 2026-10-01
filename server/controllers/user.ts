@@ -4,6 +4,10 @@ import {
 } from "@peek/shared-types/api/user.js";
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import {
+  isPresetContext,
+  presetArtifactType,
+} from "@peek/shared-types/presetContexts.js";
+import {
   isBuiltInThemeKey,
   parseCustomThemeKey,
 } from "@peek/shared-types/themes.js";
@@ -1031,21 +1035,7 @@ export const saveFilterPreset = async (
 
   // Validate context if provided (used for setAsDefault)
   if (context) {
-    const validContexts = [
-      "scene",
-      "scene_performer",
-      "scene_tag",
-      "scene_studio",
-      "scene_group",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-      "clip",
-    ];
-    if (!validContexts.includes(context)) {
+    if (!isPresetContext(context)) {
       res.status(400).json({ error: "Invalid context" });
       return;
     }
@@ -1212,20 +1202,8 @@ export const setDefaultFilterPreset = async (
     return;
   }
 
-  // Validate context - includes base types and scene grid contexts
-  const validContexts = [
-    "scene",
-    "scene_performer",
-    "scene_tag",
-    "scene_studio",
-    "scene_group",
-    "performer",
-    "studio",
-    "tag",
-    "group",
-    "gallery",
-  ];
-  if (!validContexts.includes(context)) {
+  // Validate context against the shared list
+  if (!isPresetContext(context)) {
     res.status(400).json({ error: "Invalid context" });
     return;
   }
@@ -1245,10 +1223,13 @@ export const setDefaultFilterPreset = async (
     (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
   const currentPresets = (user.filterPresets as FilterPresets | null) ?? {};
 
+  // The defaults map is keyed by any string, not only the declared entity keys
+  const contextKey: string = context;
+
   // If presetId is provided, validate it exists
-  // For scene grid contexts (scene_performer, etc.), validate against "scene" presets
+  // For scene and image tab contexts (scene_performer, image_tag, ...), validate against the "scene" or "image" presets
   if (presetId) {
-    const artifactType = context.startsWith("scene_") ? "scene" : context;
+    const artifactType = presetArtifactType(context);
     const presetExists = (currentPresets[artifactType] ?? []).some(
       (preset: FilterPreset) => preset.id === presetId
     );
@@ -1258,10 +1239,10 @@ export const setDefaultFilterPreset = async (
       return;
     }
 
-    currentDefaults[context] = presetId;
+    currentDefaults[contextKey] = presetId;
   } else {
     // If presetId is null/undefined, clear the default
-    currentDefaults[context] = undefined;
+    currentDefaults[contextKey] = undefined;
   }
 
   // Update user

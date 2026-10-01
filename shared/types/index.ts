@@ -39,6 +39,15 @@ export {
 } from "./themes.js";
 export type { BuiltInThemeKey } from "./themes.js";
 
+// Filter preset contexts
+export {
+  PRESET_CONTEXTS,
+  PRESET_CONTEXT_LABELS,
+  isPresetContext,
+  presetArtifactType,
+} from "./presetContexts.js";
+export type { PresetContext } from "./presetContexts.js";
+
 // API contract types
 export * from "./api/index.js";
 

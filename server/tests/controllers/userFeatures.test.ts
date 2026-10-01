@@ -290,6 +290,34 @@ describe("User Controller — Features", () => {
       expect(res._getErrorBody().error).toMatch(/Invalid context/);
     });
 
+    it("a preset saved as default on a gallery's Scenes tab (scene_gallery) is stored", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ filterPresets: {}, defaultFilterPresets: {} })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
+      const req = reqFor(saveFilterPreset, {
+        body: {
+          artifactType: "scene",
+          context: "scene_gallery",
+          name: "Gallery default",
+          filters: {},
+          sort: "title",
+          direction: "ASC",
+          setAsDefault: true,
+        },
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
+      await saveFilterPreset(req, res);
+      expect(res._getStatus()).toBe(200);
+      const data = mockPrisma.user.update.mock.calls[0]?.[0]?.data as
+        | { defaultFilterPresets: Record<string, string> }
+        | undefined;
+      expect(Object.keys(data?.defaultFilterPresets ?? {})).toEqual([
+        "scene_gallery",
+      ]);
+    });
+
     it("saves preset with defaults for optional fields", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({
@@ -506,6 +534,45 @@ describe("User Controller — Features", () => {
       const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
+    });
+
+    it("set-default accepts the image and clip contexts", async () => {
+      for (const [context, artifactType] of [
+        ["image", "image"],
+        ["clip", "clip"],
+        ["image_performer", "image"],
+        ["image_studio", "image"],
+        ["image_tag", "image"],
+        ["image_gallery", "image"],
+        ["scene_gallery", "scene"],
+      ] as const) {
+        const presetId = `preset-${context}`;
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({
+            defaultFilterPresets: {},
+            filterPresets: { [artifactType]: [{ id: presetId, name: "P" }] },
+          })
+        );
+        mockPrisma.user.update.mockResolvedValue(userRow());
+        const req = reqFor(setDefaultFilterPreset, {
+          body: { context, presetId },
+          user: USER,
+        });
+        const res = resFor(setDefaultFilterPreset);
+        await setDefaultFilterPreset(req, res);
+        expect(res._getStatus(), context).toBe(200);
+      }
+    });
+
+    it("an unknown context still answers 400", async () => {
+      const req = reqFor(setDefaultFilterPreset, {
+        body: { context: "gallery_scenes", presetId: "x" },
+        user: USER,
+      });
+      const res = resFor(setDefaultFilterPreset);
+      await setDefaultFilterPreset(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getErrorBody().error).toMatch(/Invalid context/);
     });
 
     it("returns 400 when preset not found", async () => {

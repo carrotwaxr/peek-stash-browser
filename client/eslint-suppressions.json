@@ -469,7 +469,7 @@
       "count": 1
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
+      "count": 5
     }
   },
   "src/components/ui/HelpModal.tsx": {
