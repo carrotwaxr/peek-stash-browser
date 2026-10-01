@@ -192,26 +192,22 @@ const GroupDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              (
-                <div className="flex flex-wrap items-center gap-4 min-w-0">
-                  <span className="min-w-0 break-words">
-                    {(group?.name as string) || `Collection ${groupId}`}
-                  </span>
-                  {!!settings.showFavorite && (
-                    <FavoriteButton
-                      isFavorite={isFavorite}
-                      onChange={(newValue) =>
-                        void handleFavoriteChange(newValue)
-                      }
-                      size="large"
-                    />
-                  )}
-                  <ViewInStashButton
-                    stashUrl={group?.stashUrl as string}
-                    size={24}
+              <div className="flex flex-wrap items-center gap-4 min-w-0">
+                <span className="min-w-0 break-words">
+                  {(group?.name as string) || `Collection ${groupId}`}
+                </span>
+                {!!settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={(newValue) => void handleFavoriteChange(newValue)}
+                    size="large"
                   />
-                </div>
-              ) as unknown as string
+                )}
+                <ViewInStashButton
+                  stashUrl={group?.stashUrl as string}
+                  size={24}
+                />
+              </div>
             }
             subtitle={
               (group?.aliases as string[] | undefined)?.length

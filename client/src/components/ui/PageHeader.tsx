@@ -1,7 +1,8 @@
 import { type ReactNode } from "react";
 
 interface Props {
-  title: string;
+  /** The h1: a string, or a node holding the name and its controls */
+  title: ReactNode;
   subtitle?: ReactNode;
   className?: string;
 }

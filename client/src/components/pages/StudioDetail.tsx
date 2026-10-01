@@ -251,26 +251,22 @@ const StudioDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              (
-                <div className="flex flex-wrap items-center gap-4 min-w-0">
-                  <span className="min-w-0 break-words">
-                    {(studio?.name as string) || `Studio ${studioId}`}
-                  </span>
-                  {!!settings.showFavorite && (
-                    <FavoriteButton
-                      isFavorite={isFavorite}
-                      onChange={(newValue) =>
-                        void handleFavoriteChange(newValue)
-                      }
-                      size="large"
-                    />
-                  )}
-                  <ViewInStashButton
-                    stashUrl={studio?.stashUrl as string}
-                    size={24}
+              <div className="flex flex-wrap items-center gap-4 min-w-0">
+                <span className="min-w-0 break-words">
+                  {(studio?.name as string) || `Studio ${studioId}`}
+                </span>
+                {!!settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={(newValue) => void handleFavoriteChange(newValue)}
+                    size="large"
                   />
-                </div>
-              ) as unknown as string
+                )}
+                <ViewInStashButton
+                  stashUrl={studio?.stashUrl as string}
+                  size={24}
+                />
+              </div>
             }
             subtitle={
               (studio?.aliases as string[] | undefined)?.length
