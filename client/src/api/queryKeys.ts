@@ -165,6 +165,12 @@ export const queryKeys = {
       ["clips", "forScene", sceneId, instanceId] as const,
   },
 
+  // ── Downloads ────────────────────────────────────────────────────────
+  // The user's download jobs (useDownloads)
+  downloads: {
+    all: () => ["downloads"] as const,
+  },
+
   // ── Setup ────────────────────────────────────────────────────────────
   setup: {
     status: () => ["setup", "status"] as const,

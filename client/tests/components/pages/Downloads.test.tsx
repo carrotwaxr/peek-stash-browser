@@ -1,10 +1,18 @@
+import type { ReactElement } from "react";
 import type {
   GetUserDownloadsResponse,
   SerializedDownload,
 } from "@peek/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { actAsync } from "@tests/testUtils";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  fireEvent,
+  render as renderPlain,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { actAsync, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/api/queryKeys";
 import Downloads from "@/components/pages/Downloads";
 import { showError, showSuccess } from "@/utils/toast";
 
@@ -24,6 +32,16 @@ vi.mock("@/utils/toast", () => ({
   showError: vi.fn(),
   showSuccess: vi.fn(),
 }));
+
+/** The cache the page's downloads query lives in; a visit reuses it */
+let queryClient: QueryClient;
+
+/** Renders inside the test's QueryClientProvider */
+function render(ui: ReactElement) {
+  return renderPlain(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 function download(overrides: Partial<SerializedDownload>): SerializedDownload {
   return {
@@ -60,6 +78,9 @@ function mockDownloads(downloads: SerializedDownload[]) {
 describe("Downloads page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
   });
 
   it("scene and image thumbnails ask for the download's instance", async () => {
@@ -442,7 +463,7 @@ describe("Downloads page", () => {
       vi.useRealTimers();
     });
 
-    it("polls every 3 seconds while a download is active and stops once none is", async () => {
+    it("asks again every 3 s while a job is pending and stops once none is", async () => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
       let calls = 0;
       mockApiGet.mockImplementation(() => {
@@ -450,27 +471,76 @@ describe("Downloads page", () => {
         return Promise.resolve({
           downloads: [
             download({
-              status: calls < 2 ? "PROCESSING" : "COMPLETED",
-              progress: 50,
+              status: calls < 3 ? "PENDING" : "COMPLETED",
+              progress: 0,
             }),
           ],
         });
       });
 
       render(<Downloads />);
-      expect(await screen.findByText("Processing")).toBeInTheDocument();
+      expect(await screen.findByText("Queued")).toBeInTheDocument();
       expect(mockApiGet).toHaveBeenCalledTimes(1);
 
       await actAsync(() => {
         vi.advanceTimersByTime(3000);
       });
-      expect(await screen.findByText("Completed")).toBeInTheDocument();
       expect(mockApiGet).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Queued")).toBeInTheDocument();
+
+      await actAsync(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(await screen.findByText("Completed")).toBeInTheDocument();
+      expect(mockApiGet).toHaveBeenCalledTimes(3);
 
       await actAsync(() => {
         vi.advanceTimersByTime(9000);
       });
-      expect(mockApiGet).toHaveBeenCalledTimes(2);
+      expect(mockApiGet).toHaveBeenCalledTimes(3);
     });
+  });
+
+  it("removing a download drops its row without a reload", async () => {
+    let rows = [
+      download({ id: 4, fileName: "gone.mp4" }),
+      download({ id: 5, fileName: "kept.mp4" }),
+    ];
+    mockApiGet.mockImplementation(() => Promise.resolve({ downloads: rows }));
+    mockApiDelete.mockImplementation(() => {
+      rows = rows.filter((d) => d.id !== 4);
+      return Promise.resolve({});
+    });
+
+    render(<Downloads />);
+    await screen.findByText("gone");
+    fireEvent.click(must(screen.getAllByRole("button", { name: "Delete" })[0]));
+
+    await waitFor(() =>
+      expect(screen.queryByText("gone")).not.toBeInTheDocument()
+    );
+    expect(screen.getByText("kept")).toBeInTheDocument();
+  });
+
+  it("a download started from the player is listed on the next visit without waiting", async () => {
+    let rows: SerializedDownload[] = [];
+    mockApiGet.mockImplementation(() => Promise.resolve({ downloads: rows }));
+
+    const first = render(<Downloads />);
+    expect(await screen.findByText("No downloads yet")).toBeInTheDocument();
+    first.unmount();
+
+    // The start site marks the query stale; the page was not mounted
+    rows = [download({ id: 8, status: "PENDING", fileName: "new.mp4" })];
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.downloads.all(),
+    });
+    expect(
+      queryClient.getQueryState(queryKeys.downloads.all())?.isInvalidated
+    ).toBe(true);
+
+    render(<Downloads />);
+    expect(await screen.findByText("new")).toBeInTheDocument();
+    expect(mockApiGet).toHaveBeenCalledTimes(2);
   });
 });

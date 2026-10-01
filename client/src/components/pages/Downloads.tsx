@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  GetUserDownloadsResponse,
-  SerializedDownload,
-} from "@peek/shared-types";
-import { apiDelete, apiGet, apiPost } from "../../api";
+import { useEffect } from "react";
+import type { SerializedDownload } from "@peek/shared-types";
+import {
+  useDeleteDownload,
+  useDownloads,
+  useRetryDownload,
+} from "../../api/hooks/useDownloads";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, PageHeader, PageLayout } from "../ui/index";
@@ -214,51 +215,20 @@ const getDownloadThumbnail = (download: SerializedDownload) => {
 
 const Downloads = () => {
   usePageTitle("Downloads");
-  const [downloads, setDownloads] = useState<SerializedDownload[]>([]);
-  const [loading, setLoading] = useState(true);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { data, isPending, isError } = useDownloads();
+  const deleteDownload = useDeleteDownload();
+  const retryDownload = useRetryDownload();
+  const downloads = data?.downloads ?? [];
 
-  const loadDownloads = useCallback(async () => {
-    try {
-      const response = await apiGet<GetUserDownloadsResponse>("/downloads");
-      setDownloads(response.downloads);
-    } catch {
-      showError("Failed to load downloads");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Check if there are active downloads
-  const hasActiveDownloads = downloads.some(
-    (d) => d.status === "PENDING" || d.status === "PROCESSING"
-  );
-
-  // Set up polling when there are active downloads
+  // A failed read shows the empty state and says why
   useEffect(() => {
-    void loadDownloads();
-  }, [loadDownloads]);
-
-  useEffect(() => {
-    if (hasActiveDownloads) {
-      pollIntervalRef.current = setInterval(() => void loadDownloads(), 3000);
-    } else if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, [hasActiveDownloads, loadDownloads]);
+    if (isError) showError("Failed to load downloads");
+  }, [isError]);
 
   const handleDelete = async (id: number) => {
     try {
-      await apiDelete(`/downloads/${id}`);
+      await deleteDownload.mutateAsync(id);
       showSuccess("Download removed");
-      void loadDownloads();
     } catch {
       showError("Failed to delete download");
     }
@@ -266,15 +236,14 @@ const Downloads = () => {
 
   const handleRetry = async (id: number) => {
     try {
-      await apiPost(`/downloads/${id}/retry`);
+      await retryDownload.mutateAsync(id);
       showSuccess("Download queued for retry");
-      void loadDownloads();
     } catch {
       showError("Failed to retry download");
     }
   };
 
-  if (loading) {
+  if (isPending) {
     return (
       <PageLayout>
         <div className="flex items-center justify-center">

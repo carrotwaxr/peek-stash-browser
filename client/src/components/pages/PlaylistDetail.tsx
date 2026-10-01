@@ -571,6 +571,9 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
     try {
       setDownloading(true);
       await apiPost(`/downloads/playlist/${playlistId}`);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.downloads.all(),
+      });
       showSuccess("Download started - check Downloads page for progress");
     } catch (err) {
       const message = getErrorMessage(err, "Download failed");

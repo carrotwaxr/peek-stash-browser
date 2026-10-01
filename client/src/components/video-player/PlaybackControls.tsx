@@ -5,6 +5,7 @@ import {
   useUpdateFavorite,
   useUpdateRating,
 } from "../../api/hooks";
+import { useInvalidateDownloads } from "../../api/hooks/useDownloads";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
@@ -80,6 +81,7 @@ const PlaybackControls = () => {
 
   // Download state
   const [downloading, setDownloading] = useState(false);
+  const invalidateDownloads = useInvalidateDownloads();
   const [permissions, setPermissions] = useState<Record<
     string,
     unknown
@@ -166,6 +168,7 @@ const PlaybackControls = () => {
         download: { id: string; status: string };
       }>(`/downloads/scene/${scene.id}`, { instanceId: scene.instanceId });
       const download = response.download;
+      void invalidateDownloads();
 
       // For scenes, download is immediate - redirect to file endpoint
       // Server sets Content-Disposition: attachment to force download
