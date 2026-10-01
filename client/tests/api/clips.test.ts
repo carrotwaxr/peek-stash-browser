@@ -98,7 +98,19 @@ describe("getClipsForScene", () => {
     await getClipsForScene("42", "inst a");
 
     expect(mockApiGet).toHaveBeenCalledWith(
-      "/scenes/42/clips?instanceId=inst+a"
+      "/scenes/42/clips?instanceId=inst+a",
+      undefined
+    );
+  });
+
+  it("passes the caller's abort signal through", async () => {
+    const controller = new AbortController();
+
+    await getClipsForScene("42", "server-a", false, controller.signal);
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/scenes/42/clips?instanceId=server-a",
+      controller.signal
     );
   });
 
