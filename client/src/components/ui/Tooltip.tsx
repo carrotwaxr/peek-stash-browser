@@ -172,7 +172,8 @@ const Tooltip = ({
     };
   }, [isVisible, calculatePosition]);
 
-  // Handle click outside to close when in clickable mode
+  // Handle click outside to close when in clickable mode,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     if (!clickable || !isVisible) return;
 
@@ -187,12 +188,12 @@ const Tooltip = ({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside, true);
+    document.addEventListener("touchstart", handleClickOutside, true);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
+      document.removeEventListener("touchstart", handleClickOutside, true);
     };
   }, [clickable, isVisible]);
 

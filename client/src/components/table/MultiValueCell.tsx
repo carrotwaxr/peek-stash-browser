@@ -67,7 +67,8 @@ const MultiValueCell = ({
     setPopoverPosition({ top, left });
   }, []);
 
-  // Handle click outside to close popover
+  // Handle click outside to close popover,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     if (!isPopoverOpen) return;
 
@@ -82,12 +83,12 @@ const MultiValueCell = ({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside, true);
+    document.addEventListener("touchstart", handleClickOutside, true);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
+      document.removeEventListener("touchstart", handleClickOutside, true);
     };
   }, [isPopoverOpen]);
 

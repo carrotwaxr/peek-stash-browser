@@ -150,7 +150,8 @@ export default function ExternalPlayerButton({
     }
   }, [isDropdownOpen]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
@@ -164,13 +165,13 @@ export default function ExternalPlayerButton({
     };
 
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside, true);
+      document.addEventListener("touchstart", handleClickOutside, true);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
+      document.removeEventListener("touchstart", handleClickOutside, true);
     };
   }, [isDropdownOpen]);
 

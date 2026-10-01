@@ -98,7 +98,8 @@ const RatingSliderDialog = ({
     onSave(ratingValue === 0 ? null : ratingValue);
   }, 300);
 
-  // Click outside or scroll to close
+  // Click outside or scroll to close,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     if (!isOpen) return;
 
@@ -118,14 +119,14 @@ const RatingSliderDialog = ({
 
     // Slight delay to avoid immediate close from the opening click
     setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside, true);
     }, 10);
 
     // Close on any scroll event (capture phase to catch all scroll events)
     window.addEventListener("scroll", handleScroll, true);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
       window.removeEventListener("scroll", handleScroll, true);
     };
   }, [isOpen, onClose, anchorEl]);

@@ -63,7 +63,8 @@ const ViewModeToggle = ({
     setLocalValue(value);
   }, [value]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -75,9 +76,9 @@ const ViewModeToggle = ({
     };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside, true);
       return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("mousedown", handleClickOutside, true);
     }
     return undefined;
   }, [isOpen]);
