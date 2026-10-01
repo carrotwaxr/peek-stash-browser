@@ -29,7 +29,7 @@ import { useVideoPlayer } from "./useVideoPlayer";
  * - Render video element and loading overlay
  *
  * DATA FLOW:
- * - ScenePlayerContext provides scene, video, quality, playlist state
+ * - ScenePlayerContext provides scene, quality, playlist and control state
  * - Hooks manage side effects and player lifecycle
  * - Watch history tracks playback progress
  */
@@ -51,19 +51,13 @@ const VideoPlayer = () => {
   // ============================================================================
   const {
     scene: rawScene,
-    video: _video,
-    videoLoading,
-    sessionId: _sessionId,
     quality,
-    isInitializing,
-    isAutoFallback,
     ready,
     shouldAutoplay,
     playlist,
     currentIndex,
-    shuffle: _shuffle,
-    repeat: _repeat,
-    shuffleHistory: _shuffleHistory,
+    autoplayNext,
+    repeat,
     dispatch,
     nextScene,
     prevScene,
@@ -137,11 +131,12 @@ const VideoPlayer = () => {
     playerRef,
     scene,
     quality,
-    isAutoFallback,
     ready,
     shouldAutoplay,
     playlist,
     currentIndex,
+    autoplayNext,
+    repeat,
     dispatch,
     nextScene,
     prevScene,
@@ -215,8 +210,8 @@ const VideoPlayer = () => {
           }}
         />
 
-        {/* Loading overlay for scene or video data */}
-        {(!scene || videoLoading || isInitializing || isAutoFallback) && (
+        {/* Loading overlay until the scene's data arrives */}
+        {!scene && (
           <div
             style={{
               position: "absolute",
@@ -234,11 +229,7 @@ const VideoPlayer = () => {
             <div className="flex flex-col items-center gap-2">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
               <span style={{ color: "white", fontSize: "14px" }}>
-                {!scene
-                  ? "Loading scene..."
-                  : isAutoFallback
-                    ? "Switching to transcoded playback..."
-                    : "Loading video..."}
+                Loading scene...
               </span>
             </div>
           </div>

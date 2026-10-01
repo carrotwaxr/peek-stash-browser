@@ -108,6 +108,8 @@ Each move is saved as soon as you make it, so there is nothing to save or cancel
 
 If nothing in the playlist is available to you, Play says so and stays on the page.
 
+Autoplay is on by default wherever a queue starts: the Play button, a playlist row, a scene grid, a carousel or Watch History. The player's **Autoplay** button shows whether it is on; one click turns it off, and the scene then stops at its end. The player's Autoplay, Shuffle and Repeat buttons apply to that viewing session: changing them never reloads the scene you are watching.
+
 ### Shuffle Mode
 
 Randomize the playback order:

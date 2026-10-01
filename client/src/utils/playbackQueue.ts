@@ -18,7 +18,11 @@ export interface PlaybackEntry {
   };
 }
 
-/** The queue `Scene` hands the player and keeps in sessionStorage */
+/**
+ * The queue `Scene` hands the player and keeps in sessionStorage. `shuffle`
+ * and `repeat` are starting values only: the player owns its controls
+ * (autoplay, shuffle, repeat and the shuffle history) from then on.
+ */
 export interface PlaybackQueue {
   id: string;
   name: string;
@@ -26,8 +30,6 @@ export interface PlaybackQueue {
   repeat: "none" | "one" | "all";
   scenes: PlaybackEntry[];
   currentIndex: number;
-  autoplayNext?: boolean;
-  shuffleHistory?: number[];
 }
 
 /** A scene file as a list row carries it; `basename` is added by the server */
@@ -60,8 +62,8 @@ export const toPlaybackEntry = (
 };
 
 /**
- * The queue for a list of scenes, starting at `currentIndex`. Options a caller
- * does not set stay out of the queue, so the player's own defaults apply.
+ * The queue for a list of scenes, starting at `currentIndex`, with shuffle
+ * and repeat off unless the caller sets them.
  */
 export const buildPlaybackQueue = (options: {
   id: string;
@@ -70,19 +72,11 @@ export const buildPlaybackQueue = (options: {
   currentIndex: number;
   shuffle?: boolean;
   repeat?: "none" | "one" | "all";
-  autoplayNext?: boolean;
-  shuffleHistory?: number[];
 }): PlaybackQueue => ({
   id: options.id,
   name: options.name,
   shuffle: options.shuffle ?? false,
   repeat: options.repeat ?? "none",
-  ...(options.autoplayNext !== undefined && {
-    autoplayNext: options.autoplayNext,
-  }),
-  ...(options.shuffleHistory !== undefined && {
-    shuffleHistory: options.shuffleHistory,
-  }),
   scenes: options.scenes.map(toPlaybackEntry),
   currentIndex: options.currentIndex,
 });

@@ -28,9 +28,6 @@ interface Playlist {
   id?: string;
   name?: string;
   scenes?: PlaylistScene[];
-  autoplayNext?: boolean;
-  shuffle?: boolean;
-  repeat?: string;
 }
 
 interface Props {
@@ -46,6 +43,9 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
     playlist: rawPlaylist,
     currentIndex,
     gotoSceneIndex,
+    autoplayNext,
+    shuffle,
+    repeat,
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
@@ -189,15 +189,13 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
               onClick={toggleAutoplayNext}
               className="p-1.5 rounded transition-colors focus:outline-none"
               style={{
-                backgroundColor: playlist.autoplayNext
+                backgroundColor: autoplayNext
                   ? "var(--accent-primary)"
                   : "transparent",
-                color: playlist.autoplayNext
-                  ? "white"
-                  : "var(--text-secondary)",
+                color: autoplayNext ? "white" : "var(--text-secondary)",
                 border: "1px solid var(--border-color)",
               }}
-              title={playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
+              title={autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
             >
               <PlayCircle size={14} />
             </button>
@@ -207,13 +205,13 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
               onClick={toggleShuffle}
               className="p-1.5 rounded transition-colors focus:outline-none"
               style={{
-                backgroundColor: playlist.shuffle
+                backgroundColor: shuffle
                   ? "var(--accent-primary)"
                   : "transparent",
-                color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                color: shuffle ? "white" : "var(--text-secondary)",
                 border: "1px solid var(--border-color)",
               }}
-              title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
+              title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
             >
               <Shuffle size={14} />
             </button>
@@ -224,28 +222,19 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
               className="p-1.5 rounded transition-colors focus:outline-none"
               style={{
                 backgroundColor:
-                  playlist.repeat !== "none"
-                    ? "var(--accent-primary)"
-                    : "transparent",
-                color:
-                  playlist.repeat !== "none"
-                    ? "white"
-                    : "var(--text-secondary)",
+                  repeat !== "none" ? "var(--accent-primary)" : "transparent",
+                color: repeat !== "none" ? "white" : "var(--text-secondary)",
                 border: "1px solid var(--border-color)",
               }}
               title={
-                playlist.repeat === "one"
+                repeat === "one"
                   ? "Repeat: One"
-                  : playlist.repeat === "all"
+                  : repeat === "all"
                     ? "Repeat: All"
                     : "Repeat: Off"
               }
             >
-              {playlist.repeat === "one" ? (
-                <Repeat1 size={14} />
-              ) : (
-                <Repeat size={14} />
-              )}
+              {repeat === "one" ? <Repeat1 size={14} /> : <Repeat size={14} />}
             </button>
           </div>
 

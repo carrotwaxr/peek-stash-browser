@@ -549,8 +549,6 @@ const PlaylistDetailView = ({ playlistId, view, changeView }: ViewProps) => {
             repeat,
             scenes,
             currentIndex: startIndex,
-            autoplayNext: true,
-            shuffleHistory: [],
           },
         },
       }

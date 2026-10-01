@@ -17,7 +17,6 @@ vi.mock("@/contexts/ScenePlayerContext", () => ({
   useScenePlayer: () => ({
     scene: { id: "7", instanceId: "inst-b", title: "x" },
     sceneLoading: false,
-    videoLoading: false,
     oCounter: 0,
     dispatch: vi.fn(),
   }),

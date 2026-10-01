@@ -128,7 +128,7 @@ describe("buildPlaybackQueue", () => {
     expect(JSON.stringify(queue).length).toBeLessThan(600 * 1024);
   });
 
-  it("passes currentIndex, shuffle, repeat, autoplayNext and shuffleHistory through unchanged", () => {
+  it("passes currentIndex, shuffle and repeat through unchanged", () => {
     const queue = buildPlaybackQueue({
       id: "5",
       name: "Mine",
@@ -136,8 +136,6 @@ describe("buildPlaybackQueue", () => {
       currentIndex: 1,
       shuffle: true,
       repeat: "all",
-      autoplayNext: true,
-      shuffleHistory: [0],
     });
 
     expect(queue).toMatchObject({
@@ -146,8 +144,6 @@ describe("buildPlaybackQueue", () => {
       currentIndex: 1,
       shuffle: true,
       repeat: "all",
-      autoplayNext: true,
-      shuffleHistory: [0],
     });
     expect(queue.scenes.map((e) => [e.sceneId, e.position])).toEqual([
       ["1", 0],

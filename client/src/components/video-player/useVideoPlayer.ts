@@ -135,11 +135,12 @@ export function useVideoPlayer({
   playerRef,
   scene,
   quality,
-  isAutoFallback, // eslint-disable-line @typescript-eslint/no-unused-vars
   ready,
   shouldAutoplay,
   playlist,
   currentIndex,
+  autoplayNext,
+  repeat,
   dispatch,
   nextScene,
   prevScene,
@@ -155,11 +156,13 @@ export function useVideoPlayer({
   playerRef: React.RefObject<any>;
   scene: any;
   quality: string;
-  isAutoFallback: boolean;
   ready: boolean;
   shouldAutoplay: boolean;
   playlist: any;
   currentIndex: number;
+  /** The player's controls (the context's), never the queue's */
+  autoplayNext: boolean;
+  repeat: string;
   dispatch: (action: any) => void;
   nextScene: () => void;
   prevScene: () => void;
@@ -615,8 +618,6 @@ export function useVideoPlayer({
       dispatch({ type: "SET_READY", payload: true });
     });
 
-    dispatch({ type: "SET_INITIALIZING", payload: false });
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneKey, quality]); // Stateless: only scene and quality matter
 
@@ -683,92 +684,40 @@ export function useVideoPlayer({
     nextScene();
   }, [playerRef, nextScene, dispatch]);
 
-  // Auto-play next video when current video ends (respects shuffle/repeat/autoplayNext)
+  // At the end of a video: repeat one replays it; otherwise, with autoplay
+  // on, the queue steps on through the reducer's one advance path (which
+  // owns shuffle, its history and repeat all)
   useEffect(() => {
     const player = playerRef.current;
 
-    if (!player || player.isDisposed?.() || !playlist || !playlist.scenes) {
+    if (!player || player.isDisposed?.()) {
       return;
     }
 
     const handleEnded = () => {
-      // Repeat One: replay current scene
-      if (playlist.repeat === "one") {
+      if (repeat === "one") {
         player.currentTime(0);
         player
           .play()
-          .catch((err: any) => console.error("Repeat play failed:", err));
+          .catch((err: unknown) => console.error("Repeat play failed:", err));
         return;
       }
 
-      // Autoplay Next is OFF: stop playback
-      if (!playlist.autoplayNext) {
+      if (!autoplayNext) {
         return;
       }
 
-      // Determine next scene index
-      let nextIndex = null;
-
-      if (playlist.shuffle) {
-        // Shuffle mode: pick random unplayed scene
-        const totalScenes = playlist.scenes.length;
-        const unplayedScenes = [];
-
-        for (let i = 0; i < totalScenes; i++) {
-          if (i !== currentIndex && !playlist.shuffleHistory.includes(i)) {
-            unplayedScenes.push(i);
-          }
-        }
-
-        if (unplayedScenes.length > 0) {
-          // Pick random from unplayed
-          nextIndex =
-            unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)];
-        } else if (playlist.repeat === "all") {
-          // All scenes played, reset shuffle history and start over
-          dispatch({ type: "SET_SHUFFLE_HISTORY", payload: [] });
-          // Pick random scene (excluding current)
-          const candidates = Array.from(
-            { length: totalScenes },
-            (_, i) => i
-          ).filter((i) => i !== currentIndex);
-          nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
-        }
-        // else: no more scenes and repeat is not "all", stop playback
-      } else {
-        // Sequential mode
-        if (currentIndex < playlist.scenes.length - 1) {
-          nextIndex = currentIndex + 1;
-        } else if (playlist.repeat === "all") {
-          nextIndex = 0; // Loop back to start
-        }
-        // else: last scene and repeat is not "all", stop playback
-      }
-
-      // Navigate to next scene if determined
-      if (nextIndex !== null) {
-        // Add current index to shuffle history
-        if (playlist.shuffle) {
-          const newHistory = [...playlist.shuffleHistory, currentIndex];
-          dispatch({ type: "SET_SHUFFLE_HISTORY", payload: newHistory });
-        }
-
-        // Navigate to next scene with autoplay enabled
-        dispatch({
-          type: "GOTO_SCENE_INDEX",
-          payload: { index: nextIndex, shouldAutoplay: true },
-        });
-      }
+      dispatch({ type: "NEXT_SCENE", payload: { autoplay: true } });
     };
 
     player.on("ended", handleEnded);
 
     return () => {
-      if (player && !player.isDisposed()) {
+      if (!player.isDisposed()) {
         player.off("ended", handleEnded);
       }
     };
-  }, [playerRef, playlist, currentIndex, dispatch]);
+  }, [playerRef, autoplayNext, repeat, dispatch]);
 
   // Configure skipButtons plugin for playlist navigation (Stash pattern)
   useEffect(() => {

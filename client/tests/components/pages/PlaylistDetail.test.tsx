@@ -304,8 +304,6 @@ const lastSceneState = () =>
     playlist: {
       scenes: PlaylistQueueEntry[];
       currentIndex: number;
-      autoplayNext?: boolean;
-      shuffleHistory?: unknown[];
     };
   };
 
@@ -685,8 +683,9 @@ describe("PlaylistDetail Play", () => {
     expect(state.scene).toBeUndefined();
     expect(state.playlist.scenes).toEqual(queueOf(items).entries);
     expect(state.playlist.currentIndex).toBe(0);
-    expect(state.playlist.autoplayNext).toBe(true);
-    expect(state.playlist.shuffleHistory).toEqual([]);
+    // The player owns autoplay and the shuffle history; the queue names neither
+    expect(state.playlist).not.toHaveProperty("autoplayNext");
+    expect(state.playlist).not.toHaveProperty("shuffleHistory");
     unmount();
 
     // With shuffle on, the start is a random entry
