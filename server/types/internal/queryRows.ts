@@ -128,6 +128,7 @@ export interface PerformerQueryRow {
   groupCount: number | bigint | null;
   details: string | null;
   aliasList: string | null; // JSON-encoded string[]
+  stashIds: string | null; // JSON-encoded { endpoint, stash_id }[]
   country: string | null;
   ethnicity: string | null;
   hairColor: string | null;
@@ -174,6 +175,7 @@ export interface StudioQueryRow {
   stashInstanceId: string;
   name: string;
   parentId: string | null;
+  stashIds: string | null; // JSON-encoded { endpoint, stash_id }[]
   stashFavorite: boolean;
   stashRating100: number | null;
   sceneCount: number | bigint | null;

@@ -12,6 +12,7 @@ export type {
   NormalizedScene,
   NormalizedPerformer,
   NormalizedStudio,
+  StashId,
   NormalizedTag,
   NormalizedGroup,
   NormalizedGallery,

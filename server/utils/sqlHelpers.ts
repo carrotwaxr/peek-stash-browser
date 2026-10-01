@@ -6,6 +6,7 @@
  * absent text). Prisma's raw queries already return BOOLEAN columns as
  * booleans (see types/internal/queryRows.ts).
  */
+import type { StashId } from "@peek/shared-types";
 
 /**
  * Parse a JSON-encoded array column from SQLite.
@@ -21,6 +22,21 @@ export function parseJsonArray<T = string>(
   } catch {
     return [];
   }
+}
+
+/**
+ * A stored `stashIds` column (JSON `[{ endpoint, stash_id }]`) as the list
+ * the API sends: text that is not a JSON list reads as none, and an entry
+ * without both strings is left out.
+ */
+export function parseStashIds(json: string | null | undefined): StashId[] {
+  return parseJsonArray<unknown>(json).flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const { endpoint, stash_id } = entry as Record<string, unknown>;
+    return typeof endpoint === "string" && typeof stash_id === "string"
+      ? [{ endpoint, stash_id }]
+      : [];
+  });
 }
 
 /** Stash and user text where "" means absent: "" and null read as null. */

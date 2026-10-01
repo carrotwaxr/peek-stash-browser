@@ -19,6 +19,7 @@ import EntityDetailPage, {
   type FoundEntityDetail,
 } from "../detail/EntityDetailPage";
 import EntityHeroImage from "../detail/EntityHeroImage";
+import StashIdLinks from "../detail/StashIdLinks";
 import type { DetailTabSpec } from "../detail/detailTabState";
 import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
@@ -61,12 +62,6 @@ type GridProps = {
   hideLockedFilters: boolean;
   emptyMessage: string;
 };
-
-/** A studio's StashDB entry, once its row carries `stash_ids` (B12) */
-interface StashId {
-  endpoint: string;
-  stash_id: string;
-}
 
 const StudioPage = ({ detail }: { detail: FoundEntityDetail<"studio"> }) => {
   const { entity: studio, instanceId, ref } = detail;
@@ -157,7 +152,6 @@ const StudioPage = ({ detail }: { detail: FoundEntityDetail<"studio"> }) => {
   // parent is on the studio's own
   const parent = studio.parent_studio;
   const children = studio.child_studios ?? [];
-  const stashIds = (studio as { stash_ids?: StashId[] }).stash_ids ?? [];
 
   return (
     <EntityDetailLayout
@@ -215,27 +209,7 @@ const StudioPage = ({ detail }: { detail: FoundEntityDetail<"studio"> }) => {
               <TagChips tags={studio.tags} />
             </DetailCard>
           )}
-          {stashIds.length > 0 && (
-            <DetailCard title="StashDB Links">
-              <div className="space-y-2">
-                {stashIds.map((stashId) => (
-                  <a
-                    key={`${stashId.endpoint}:${stashId.stash_id}`}
-                    href={`${stashId.endpoint.replace("/graphql", "")}/studios/${stashId.stash_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-sm hover:underline transition-colors"
-                    style={{ color: "var(--accent-primary)" }}
-                  >
-                    {stashId.endpoint.includes("stashdb.org")
-                      ? "StashDB"
-                      : "External"}
-                    : {stashId.stash_id.substring(0, 8)}...
-                  </a>
-                ))}
-              </div>
-            </DetailCard>
-          )}
+          <StashIdLinks boxPath="studios" stashIds={studio.stash_ids} />
         </>
       }
       {...(children.length > 0 && {

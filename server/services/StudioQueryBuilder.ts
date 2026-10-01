@@ -22,7 +22,11 @@ import {
   buildNumericFilter,
   buildTextFilter,
 } from "../utils/sqlClauses.js";
-import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
+import {
+  emptyToNull,
+  likeContains,
+  parseStashIds,
+} from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -50,7 +54,7 @@ const selectColumns = (ctx: QueryContext) =>
     ${visibleCount(ctx, "s.galleryCount", "galleries")} AS galleryCount,
     ${visibleCount(ctx, "s.performerCount", "performers")} AS performerCount,
     ${visibleCount(ctx, "s.groupCount", "groups")} AS groupCount,
-    s.details, s.url, s.imagePath,
+    s.details, s.url, s.stashIds, s.imagePath,
     s.stashCreatedAt, s.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
     us.oCounter AS userOCounter, us.playCount AS userPlayCount
@@ -227,6 +231,7 @@ class StudioQueryBuilder extends EntityQueryBuilder<
       parent_studio: row.parentId ? { id: row.parentId } : null,
       details: emptyToNull(row.details),
       url: emptyToNull(row.url),
+      stash_ids: parseStashIds(row.stashIds),
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: toProxyUrl(row.imagePath, row.stashInstanceId),

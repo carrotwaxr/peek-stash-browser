@@ -173,6 +173,13 @@ export interface NormalizedScene {
 
 // ─── NormalizedPerformer ─────────────────────────────────────────────────────
 
+/** An entity's entry on a stash-box (StashDB and the like) */
+export interface StashId {
+  /** The box's GraphQL endpoint */
+  endpoint: string;
+  stash_id: string;
+}
+
 export interface NormalizedPerformer {
   id: string;
   instanceId: string;
@@ -203,6 +210,8 @@ export interface NormalizedPerformer {
   career_length: string | null;
   death_date: string | null;
   url: string | null;
+  /** Its stash-box entries, as stored at the last sync */
+  stash_ids: StashId[];
   tags: Array<{ id: string; name: string; image_path: string | null }>;
   image_path: string | null;
   created_at: string | null;
@@ -241,6 +250,8 @@ export interface NormalizedStudio {
   group_count: number;
   details: string | null;
   url: string | null;
+  /** Its stash-box entries, as stored at the last sync */
+  stash_ids: StashId[];
   tags: Array<{ id: string; name: string; image_path: string | null }>;
   image_path: string | null;
   created_at: string | null;
