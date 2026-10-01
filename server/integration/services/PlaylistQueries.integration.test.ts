@@ -31,6 +31,7 @@ import {
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import {
+  appendItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
 } from "../../services/PlaylistQueryService.js";
@@ -572,5 +573,101 @@ describe("Playlist queries (integration)", () => {
 
     const copy = await duplicateAs(recipient, pq);
     expect(copy._count?.items).toBe(RECIPIENT_SEES.length);
+  });
+
+  /** The playlist's items as [scene id, instance, position], by position */
+  const positioned = async (playlistId: number) =>
+    (
+      await prisma.playlistItem.findMany({
+        where: { playlistId },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+      })
+    ).map((i) => [i.sceneId, i.instanceId, i.position]);
+
+  it("two adds at once get positions n and n+1", async () => {
+    const playlistId = await createPlaylist(owner.id, "append race", [
+      [P1, A],
+      [P2, A],
+      [P3, A],
+    ]);
+
+    const [first, second] = await Promise.all([
+      appendItems(playlistId, owner.id, [{ id: P4, instanceId: A }]),
+      appendItems(playlistId, owner.id, [{ id: P5, instanceId: A }]),
+    ]);
+
+    expect(first.added + second.added).toBe(2);
+    const rows = await positioned(playlistId);
+    expect(rows.slice(0, 3)).toEqual([
+      [P1, A, 0],
+      [P2, A, 1],
+      [P3, A, 2],
+    ]);
+    // Two new rows, no position shared, in whichever order the queue ran them
+    expect(rows.slice(3).map(([, , position]) => position)).toEqual([3, 4]);
+    expect(
+      rows
+        .slice(3)
+        .map(([id]) => id)
+        .sort()
+    ).toEqual([P4, P5]);
+  });
+
+  it("a bulk add of 5 where 1 is already in, 1 is hidden and 1 is named twice adds 3 in request order after the last item", async () => {
+    // A gap from an earlier remove: the next position is MAX + 1
+    const playlist = await prisma.playlist.create({
+      data: {
+        userId: owner.id,
+        name: "append bulk",
+        items: {
+          create: [
+            { sceneId: P1, instanceId: A, position: 0 },
+            { sceneId: P2, instanceId: A, position: 4 },
+          ],
+        },
+      },
+    });
+
+    const result = await appendItems(playlist.id, owner.id, [
+      { id: P5, instanceId: A },
+      { id: X1, instanceId: A }, // hidden by the owner
+      { id: P1, instanceId: A }, // already in
+      { id: P3, instanceId: A },
+      { id: P5, instanceId: A }, // named twice
+      { id: SAME, instanceId: B },
+    ]);
+
+    expect(result).toEqual({ added: 3, alreadyInPlaylist: 1, unavailable: 1 });
+    expect(await positioned(playlist.id)).toEqual([
+      [P1, A, 0],
+      [P2, A, 4],
+      [P5, A, 5],
+      [P3, A, 6],
+      [SAME, B, 7],
+    ]);
+    // addedAt holds epoch milliseconds, as Prisma writes it
+    const stored = await prisma.$queryRawUnsafe<{ kind: string }[]>(
+      "SELECT DISTINCT typeof(addedAt) AS kind FROM PlaylistItem WHERE playlistId = ? AND position >= 5",
+      playlist.id
+    );
+    expect(stored).toEqual([{ kind: "integer" }]);
+  });
+
+  it("a shared playlist's recipient asking containsScene learns whether it holds that scene", async () => {
+    const sharedAs = async (containsScene: string) => {
+      const req = reqFor(getSharedPlaylists, {
+        query: { containsScene },
+        user: testUser({ id: recipient.id, username: recipient.username }),
+        allowedInstanceIds: await getUserAllowedInstanceIds(recipient.id),
+      });
+      const res = resFor(getSharedPlaylists);
+      await getSharedPlaylists(req, res);
+      return must(res._getOkBody().playlists.find((p) => p.id === pq))
+        .containsScene;
+    };
+
+    expect(await sharedAs(`${SAME}:${B}`)).toBe(true);
+    // PQ holds SAME on B, not on A
+    expect(await sharedAs(`${SAME}:${A}`)).toBe(false);
   });
 });

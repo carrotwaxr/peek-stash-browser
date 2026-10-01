@@ -6,7 +6,7 @@
  * access-control-based duplicate flow; and that the item writes (add,
  * remove, reorder) take each scene's instance from the request.
  */
-import type { Prisma } from "@prisma/client";
+import type { PlaylistItem, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addSceneToPlaylist,
@@ -20,13 +20,13 @@ import {
   updatePlaylistShares,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
-import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import {
   getPlaylistAccess,
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
 import {
+  appendItems,
   duplicateVisibleItems,
   loadPlaylistPreviews,
 } from "../../services/PlaylistQueryService.js";
@@ -35,7 +35,6 @@ import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import {
   type PlaylistShareWithGroup,
-  type PlaylistWithItems,
   userPermissions,
 } from "../helpers/fixtures.js";
 import { objectContaining } from "../helpers/matchers.js";
@@ -57,15 +56,12 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
   getUserGroups: vi.fn(),
 }));
 
-vi.mock("../../services/EntityAccessService.js", () => ({
-  canUserAccessEntity: vi.fn(),
-}));
-
 // Mock PlaylistQueryService (the playlist reads, not under test here)
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
   duplicateVisibleItems: vi.fn(),
+  appendItems: vi.fn(),
 }));
 
 // The writer queue runs for real; each unit's label is on `openUnits` while
@@ -110,7 +106,7 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 const mockGetUserGroups = vi.mocked(getUserGroups);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
-const mockCanAccess = vi.mocked(canUserAccessEntity);
+const mockAppendItems = vi.mocked(appendItems);
 const mockPreviews = vi.mocked(loadPlaylistPreviews);
 const mockDuplicateItems = vi.mocked(duplicateVisibleItems);
 
@@ -858,10 +854,11 @@ describe("Playlist Controller Operations", () => {
 
     it("add of a scene the user cannot see answers 404", async () => {
       mockGetAccess.mockResolvedValue({ level: "owner" });
-      mockPrisma.playlist.findUnique.mockResolvedValue(
-        partialRow<PlaylistWithItems>({ id: 1, userId: USER.id, items: [] })
-      );
-      mockCanAccess.mockResolvedValue(false);
+      mockAppendItems.mockResolvedValue({
+        added: 0,
+        alreadyInPlaylist: 0,
+        unavailable: 1,
+      });
 
       const req = reqFor(addSceneToPlaylist, {
         params: { id: "1" },
@@ -872,30 +869,53 @@ describe("Playlist Controller Operations", () => {
 
       await addSceneToPlaylist(req, res);
 
-      expect(mockCanAccess).toHaveBeenCalledWith(
-        USER.id,
-        "scene",
-        "42",
-        "inst-b"
-      );
+      expect(mockAppendItems).toHaveBeenCalledWith(1, USER.id, [
+        { id: "42", instanceId: "inst-b" },
+      ]);
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+      expect(res._getErrorBody().error).toBe("Scene not found");
+      expect(mockPrisma.playlistItem.findUnique).not.toHaveBeenCalled();
     });
 
     it("add of a scene already there answers 409", async () => {
       mockGetAccess.mockResolvedValue({ level: "owner" });
-      mockPrisma.playlist.findUnique.mockResolvedValue(
-        partialRow<PlaylistWithItems>({ id: 1, userId: USER.id, items: [] })
-      );
-      mockCanAccess.mockResolvedValue(true);
-      mockPrisma.playlistItem.findUnique.mockResolvedValue(
-        partialRow({
-          id: 9,
-          playlistId: 1,
-          sceneId: "42",
-          instanceId: "inst-b",
-        })
-      );
+      mockAppendItems.mockResolvedValue({
+        added: 0,
+        alreadyInPlaylist: 1,
+        unavailable: 0,
+      });
+
+      const req = reqFor(addSceneToPlaylist, {
+        params: { id: "1" },
+        body: { sceneId: "42", instanceId: "inst-b" },
+        user: USER,
+      });
+      const res = resFor(addSceneToPlaylist);
+
+      await addSceneToPlaylist(req, res);
+
+      expect(mockAppendItems).toHaveBeenCalledWith(1, USER.id, [
+        { id: "42", instanceId: "inst-b" },
+      ]);
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(mockPrisma.playlistItem.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("add answers 201 with the stored item, read after the write", async () => {
+      mockGetAccess.mockResolvedValue({ level: "shared", groups: ["g"] });
+      mockAppendItems.mockResolvedValue({
+        added: 1,
+        alreadyInPlaylist: 0,
+        unavailable: 0,
+      });
+      const stored = partialRow<PlaylistItem>({
+        id: 9,
+        playlistId: 1,
+        sceneId: "42",
+        instanceId: "inst-b",
+        position: 3,
+      });
+      mockPrisma.playlistItem.findUnique.mockResolvedValue(stored);
 
       const req = reqFor(addSceneToPlaylist, {
         params: { id: "1" },
@@ -915,8 +935,10 @@ describe("Playlist Controller Operations", () => {
           },
         },
       });
-      expect(res.status).toHaveBeenCalledWith(409);
-      expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res._getOkBody()).toEqual({ item: stored });
+      // The position is numbered inside the insert, never read before it
+      expect(mockPrisma.playlist.findUnique).not.toHaveBeenCalled();
     });
 
     it("remove with a repeated instance answers 400", async () => {

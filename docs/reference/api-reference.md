@@ -398,15 +398,44 @@ Playlist management endpoints for creating and organizing scene collections.
 
 **Authentication:** Required
 
+The user's own playlists, each with its first four items and the item count this user can see. With `containsScene`, each playlist also says whether it holds that scene on that instance (`containsScene: boolean`; left out when not asked). A bare id, an empty value or a malformed instance answers 400 naming `containsScene`.
+
+**Query Parameters:**
+
+```typescript
+interface GetUserPlaylistsQuery {
+  /** A scene as "id:instanceId" */
+  containsScene?: string;
+}
+```
+
 **Response:**
 
 ```typescript
 interface GetUserPlaylistsResponse {
-  playlists: PlaylistData[];
+  playlists: PlaylistSummary[];
 }
 ```
 
 **Controller:** `getUserPlaylists` in `../controllers/playlist.ts`
+
+---
+
+### GET /api/playlists/shared
+
+**Authentication:** Required
+
+Playlists other users shared with a group this user belongs to, with the previews and count this user can see. Takes `containsScene` as `GET /api/playlists/` does.
+
+**Response:**
+
+```typescript
+interface GetSharedPlaylistsResponse {
+  playlists: SharedPlaylistData[];
+}
+```
+
+**Controller:** `getSharedPlaylists` in `../controllers/playlist.ts`
 
 ---
 
@@ -586,6 +615,35 @@ interface AddSceneToPlaylistResponse {
 ```
 
 **Controller:** `addSceneToPlaylist` in `../controllers/playlist.ts`
+
+---
+
+### POST /api/playlists/:id/items/bulk
+
+**Authentication:** Required
+
+Adds up to 250 scenes (a page) in one request, in the order given, after the playlist's last item. A scene named twice is added once; scenes already in the playlist and scenes this user cannot see (missing, hidden, restricted or on an instance they do not use) are skipped and counted. Owners and users the playlist is shared with can add. Answers 400 when `scenes` is not an array of 1 to 250 entries or an entry lacks its `sceneId` or `instanceId` (the error names the entry, as `scenes[1].instanceId is required`), with nothing added, and 404 when the playlist is not theirs.
+
+**Request Body:**
+
+```typescript
+interface AddScenesToPlaylistRequest {
+  scenes: { sceneId: string; instanceId: string }[];
+}
+```
+
+**Response:**
+
+```typescript
+interface AddScenesToPlaylistResponse {
+  added: number;
+  alreadyInPlaylist: number;
+  /** Scenes the requester cannot see or that no longer exist */
+  unavailable: number;
+}
+```
+
+**Controller:** `addScenesToPlaylist` in `../controllers/playlist.ts`
 
 ---
 

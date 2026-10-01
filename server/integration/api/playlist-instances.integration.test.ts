@@ -2,12 +2,19 @@
  * Playlist item writes name each scene's instance (item 33).
  *
  * Scene SAME exists on instance A and on instance B (see
- * helpers/accessFixture.ts), so a bare id names two scenes. Add, remove and
- * reorder take the instance from the request and never guess one; an add
- * also checks the viewer can see the scene. The viewer hid GLOBAL on B.
+ * helpers/accessFixture.ts), so a bare id names two scenes. Add, bulk add,
+ * remove and reorder take the instance from the request and never guess
+ * one; an add also checks the viewer can see the scene, and the playlist
+ * list's `containsScene` names one. The viewer hid GLOBAL on B.
  */
+import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import type {
+  AddSceneToPlaylistResponse,
+  AddScenesToPlaylistResponse,
+  GetUserPlaylistsResponse,
+} from "../../types/api/index.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import {
   FX,
@@ -17,6 +24,7 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
+import { expectRefused } from "../helpers/refused.js";
 import type { TestClient } from "../helpers/testClient.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -71,15 +79,26 @@ describe("Playlist items keep each scene's instance (integration)", () => {
   }, 60000);
 
   it("adding B's SAME stores B:SAME when A has the same id", async () => {
-    const playlistId = await playlistWith();
+    const playlistId = await playlistWith([[FX_ID.SAME, FX.A]]);
 
-    const res = await viewer.client.post(`/api/playlists/${playlistId}/items`, {
+    const res = await viewer.client.post<AddSceneToPlaylistResponse>(
+      `/api/playlists/${playlistId}/items`,
+      { sceneId: FX_ID.SAME, instanceId: FX.B }
+    );
+
+    // The single add keeps its answer: 201 with the stored item, after the
+    // last one
+    expect(res.status).toBe(201);
+    expect(res.data.item).toMatchObject({
+      playlistId,
       sceneId: FX_ID.SAME,
       instanceId: FX.B,
+      position: 1,
     });
-
-    expect(res.status).toBe(201);
-    expect(await itemsOf(playlistId)).toEqual([`${FX_ID.SAME}@${FX.B}`]);
+    expect(await itemsOf(playlistId)).toEqual([
+      `${FX_ID.SAME}@${FX.A}`,
+      `${FX_ID.SAME}@${FX.B}`,
+    ]);
   });
 
   it("adding a scene already in the playlist answers 409", async () => {
@@ -122,6 +141,129 @@ describe("Playlist items keep each scene's instance (integration)", () => {
 
       expect(res.status).toBe(404);
       expect(await itemsOf(playlistId)).toEqual([]);
+    }
+  );
+
+  it("bulk add of A:SAME and B:SAME adds both", async () => {
+    const playlistId = await playlistWith();
+
+    const res = await viewer.client.post<AddScenesToPlaylistResponse>(
+      `/api/playlists/${playlistId}/items/bulk`,
+      {
+        scenes: [
+          { sceneId: FX_ID.SAME, instanceId: FX.A },
+          { sceneId: FX_ID.SAME, instanceId: FX.B },
+        ],
+      }
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.data).toEqual({
+      added: 2,
+      alreadyInPlaylist: 0,
+      unavailable: 0,
+    });
+    expect(await itemsOf(playlistId)).toEqual([
+      `${FX_ID.SAME}@${FX.A}`,
+      `${FX_ID.SAME}@${FX.B}`,
+    ]);
+  });
+
+  it("bulk add without an instance on one entry answers 400 naming the index and adds nothing", async () => {
+    const playlistId = await playlistWith();
+
+    const res = await viewer.client.post<{ error?: string }>(
+      `/api/playlists/${playlistId}/items/bulk`,
+      {
+        scenes: [
+          { sceneId: FX_ID.SAME, instanceId: FX.A },
+          { sceneId: FX_ID.SAME },
+        ],
+      }
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.data.error).toContain("scenes[1]");
+    expect(await itemsOf(playlistId)).toEqual([]);
+  });
+
+  it("bulk add of 251 scenes answers 400", async () => {
+    const playlistId = await playlistWith();
+    const scenes = Array.from({ length: PER_PAGE_MAX + 1 }, (_, i) => ({
+      sceneId: String(i + 1),
+      instanceId: FX.A,
+    }));
+
+    const res = await viewer.client.post(
+      `/api/playlists/${playlistId}/items/bulk`,
+      { scenes }
+    );
+
+    expect(res.status).toBe(400);
+    expect(await itemsOf(playlistId)).toEqual([]);
+  });
+
+  it("bulk add to a playlist the viewer cannot reach answers 404", async () => {
+    const other = await prisma.playlist.create({
+      data: {
+        userId: (
+          await prisma.user.findFirstOrThrow({
+            where: { username: TEST_ADMIN.username },
+          })
+        ).id,
+        name: "access-it-pl-instances-admin",
+      },
+    });
+    try {
+      const res = await viewer.client.post(
+        `/api/playlists/${other.id}/items/bulk`,
+        { scenes: [{ sceneId: FX_ID.SAME, instanceId: FX.A }] }
+      );
+
+      expect(res.status).toBe(404);
+      expect(await itemsOf(other.id)).toEqual([]);
+    } finally {
+      await prisma.playlist.delete({ where: { id: other.id } });
+    }
+  });
+
+  it("GET /api/playlists?containsScene=<id:instance> marks the playlists holding that scene", async () => {
+    const holdsB = await playlistWith([[FX_ID.SAME, FX.B]]);
+    const holdsA = await playlistWith([[FX_ID.SAME, FX.A]]);
+
+    const res = await viewer.client.get<GetUserPlaylistsResponse>(
+      `/api/playlists?containsScene=${encodeURIComponent(`${FX_ID.SAME}:${FX.B}`)}`
+    );
+
+    expect(res.status).toBe(200);
+    const marks = new Map(
+      res.data.playlists.map((p) => [p.id, p.containsScene])
+    );
+    expect(marks.get(holdsB)).toBe(true);
+    // The same id on the other instance is another scene
+    expect(marks.get(holdsA)).toBe(false);
+
+    // Not asked, not answered
+    const plain =
+      await viewer.client.get<GetUserPlaylistsResponse>("/api/playlists");
+    expect(plain.status).toBe(200);
+    expect(plain.data.playlists.every((p) => !("containsScene" in p))).toBe(
+      true
+    );
+  });
+
+  it.each([
+    ["a bare id", FX_ID.SAME],
+    ["an empty value", ""],
+    ["a bad instance", `${FX_ID.SAME}:not an instance`],
+  ])(
+    "GET /api/playlists?containsScene with %s answers 400",
+    async (_why, value) => {
+      const res = await viewer.client.get(
+        `/api/playlists?containsScene=${encodeURIComponent(value)}`
+      );
+
+      expectRefused(res, ["containsScene"]);
     }
   );
 

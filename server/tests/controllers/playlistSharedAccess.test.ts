@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addSceneToPlaylist } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
+import { appendItems } from "../../services/PlaylistQueryService.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
-import { type PlaylistWithItems } from "../helpers/fixtures.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -24,15 +24,12 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
   getUserGroups: vi.fn(),
 }));
 
-// The scene is visible to the user
-vi.mock("../../services/EntityAccessService.js", () => ({
-  canUserAccessEntity: vi.fn(() => Promise.resolve(true)),
-}));
-
-// Mock PlaylistQueryService (the playlist reads, not under test here)
+// Mock PlaylistQueryService (the playlist reads and the add's statement,
+// not under test here)
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
+  appendItems: vi.fn(),
 }));
 
 // Mock PermissionService
@@ -47,6 +44,7 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
+const mockAppendItems = vi.mocked(appendItems);
 
 describe("addSceneToPlaylist - shared access", () => {
   beforeEach(() => {
@@ -61,22 +59,13 @@ describe("addSceneToPlaylist - shared access", () => {
     // User 2 has shared access (not owner)
     mockGetAccess.mockResolvedValue({ level: "shared", groups: ["Family"] });
 
-    // Playlist exists (owned by user 1)
-    mockPrisma.playlist.findFirst.mockResolvedValue(null); // NOT owner
-    mockPrisma.playlist.findUnique.mockResolvedValue(
-      partialRow<PlaylistWithItems>({
-        id: 1,
-        userId: 1, // Different user
-        name: "Shared Playlist",
-        items: [],
-      })
-    );
-
-    // Scene not already in playlist
-    mockPrisma.playlistItem.findUnique.mockResolvedValue(null);
-
-    // Create succeeds
-    mockPrisma.playlistItem.create.mockResolvedValue(
+    // The scene is visible to user 2 and not in the playlist yet
+    mockAppendItems.mockResolvedValue({
+      added: 1,
+      alreadyInPlaylist: 0,
+      unavailable: 0,
+    });
+    mockPrisma.playlistItem.findUnique.mockResolvedValue(
       partialRow({
         id: 1,
         playlistId: 1,
@@ -96,8 +85,10 @@ describe("addSceneToPlaylist - shared access", () => {
     await addSceneToPlaylist(req, res);
 
     // Should succeed with 201, NOT 404
-    expect(res.status).not.toHaveBeenCalledWith(404);
-    expect(mockPrisma.playlistItem.create).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(mockAppendItems).toHaveBeenCalledWith(1, 2, [
+      { id: "scene-123", instanceId: "instance-1" },
+    ]);
   });
 
   it("rejects user with no access from adding scenes", async () => {
@@ -114,6 +105,6 @@ describe("addSceneToPlaylist - shared access", () => {
 
     // Should be rejected
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
+    expect(mockAppendItems).not.toHaveBeenCalled();
   });
 });

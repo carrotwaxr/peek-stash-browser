@@ -59,6 +59,7 @@ import type {
   ParsedListRequest,
   ParsedMinimalRequest,
   ParsedPlaylistItemsQuery,
+  ParsedPlaylistsQuery,
   ParsedRecommendedQuery,
   ParsedSceneClipsQuery,
   ParsedSimilarScenesQuery,
@@ -1265,6 +1266,38 @@ export function parsePlaylistItemsRequest(
             ),
           },
   };
+}
+
+/**
+ * `GET /api/playlists` and `GET /api/playlists/shared`: `containsScene` is
+ * a scene as `"id:instanceId"`; a bare id is refused, since the answer is
+ * about one scene on one server
+ */
+export function parsePlaylistsQuery(
+  query: unknown,
+  _options: ParseOptions
+): ParsedPlaylistsQuery {
+  const input = requireObject(query, "query");
+  const problems = new Problems();
+  let containsScene: ParsedPlaylistsQuery["containsScene"];
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    [
+      "containsScene",
+      (raw, path) => {
+        const ref = typeof raw === "string" ? parseFilterRef(raw) : undefined;
+        if (ref?.instanceId === undefined) {
+          problems.add(path, "Expected id:instanceId");
+          return;
+        }
+        containsScene = { id: ref.id, instanceId: ref.instanceId };
+      },
+    ],
+  ]);
+  walk(input, "", handlers, problems, "Unknown query parameter");
+  problems.finish();
+
+  return { containsScene };
 }
 
 // =============================================================================
