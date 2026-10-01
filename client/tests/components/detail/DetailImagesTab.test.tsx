@@ -63,6 +63,8 @@ vi.mock("@/utils/toast", async (importOriginal) => ({
 vi.mock("react-swipeable", () => ({ useSwipeable: () => ({}) }));
 
 const TOTAL = 30;
+/** The library's images: those after the tab's 30 are not in the tab */
+const LIBRARY = 40;
 const PER_PAGE = 24;
 const INSTANCE = "inst-a";
 
@@ -120,16 +122,21 @@ interface Setup {
 function stubServer({ presets = {}, defaults = {} }: Setup = {}): ApiStub {
   return stubApi({
     "/library/images": (_url, init) => {
-      // A read by id: the images that exist among them
+      // A read by id: the images that exist among them, within the tab's
+      // tag when the read names it
       const ids = jsonBody(init).ids as string[] | undefined;
       if (ids) {
+        const imageFilter = jsonBody(init).image_filter as
+          | { tags?: unknown }
+          | undefined;
+        const last = imageFilter?.tags === undefined ? LIBRARY : TOTAL;
         // An id that is not one is refused, as the server's parser does
         if (ids.some((id) => !/^img-\d+$/.test(id))) {
           return jsonResponse(400, { error: "Invalid request" });
         }
         const found = ids
           .map((id) => Number(id.replace(/^img-/, "")))
-          .filter((n) => n >= 1 && n <= TOTAL)
+          .filter((n) => n >= 1 && n <= last)
           .map(imageRow);
         return jsonResponse(200, {
           findImages: { images: found, count: found.length },
@@ -291,13 +298,42 @@ describe("DetailImagesTab", () => {
     expect(within(viewer).getByText("1 / 1")).toBeInTheDocument();
     const byId = bodiesTo(api, "/library/images").filter((body) => body.ids);
     expect(byId).toEqual([
-      { ids: ["img-27"], image_filter: { instance_id: INSTANCE } },
+      {
+        ids: ["img-27"],
+        image_filter: {
+          tags: { value: [`5:${INSTANCE}`], modifier: "INCLUDES", depth: -1 },
+          instance_id: INSTANCE,
+        },
+      },
     ]);
     expect(search(router)).toMatchObject({
       tab: "images",
       image: `img-27:${INSTANCE}`,
     });
     expect(showInfo).not.toHaveBeenCalled();
+  });
+
+  it("an `image` param for an image outside the tab's entity is dropped and says it is no longer available", async () => {
+    const { api, router } = tagTab([
+      `/tag/5?tab=images&image=img-35:${INSTANCE}`,
+    ]);
+
+    await waitFor(() => expect(search(router).image).toBeUndefined());
+    expect(search(router)).toMatchObject({ tab: "images" });
+    expect(showError).toHaveBeenCalledWith("That image is no longer available");
+    expect(
+      screen.queryByRole("dialog", { name: "Image viewer" })
+    ).not.toBeInTheDocument();
+    const byId = bodiesTo(api, "/library/images").filter((body) => body.ids);
+    expect(byId).toEqual([
+      {
+        ids: ["img-35"],
+        image_filter: {
+          tags: { value: [`5:${INSTANCE}`], modifier: "INCLUDES", depth: -1 },
+          instance_id: INSTANCE,
+        },
+      },
+    ]);
   });
 
   it.each([

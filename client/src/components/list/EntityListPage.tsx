@@ -307,6 +307,7 @@ const EntityListPage = ({
     title,
     fromPageTitle,
     ...(embed?.lightboxRef ? { lightboxRef: embed.lightboxRef } : {}),
+    ...(embed?.permanentFilters ? { lockedFilters: pagePermanentFilters } : {}),
   });
 
   // One hide handler and one context for every card, so memoised cards keep

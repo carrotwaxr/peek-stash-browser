@@ -31,7 +31,7 @@ const ENTITY_PATHS: Record<string, string> = {
 /**
  * Generate a path for an entity detail page.
  *
- * @param {string} entityType - Type of entity (performer, scene, studio, tag, group, gallery); an image has no page, see getImagePath
+ * @param {string} entityType - Type of entity (performer, scene, studio, tag, group, gallery, image); an image has no page, so its link is getImagePath's
  * @param {Object|string} entity - Entity object with id and instanceId, or just the id string
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} The path to the entity detail page
@@ -46,6 +46,11 @@ export function getEntityPath(
   entity: EntityLike | string,
   hasMultipleInstances: boolean
 ) {
+  // Every caller that links an entity by type (the wall, stats, tooltips)
+  // reaches an image this way, so it gets the image's own link
+  if (entityType === "image") {
+    return getImagePath(typeof entity === "string" ? { id: entity } : entity);
+  }
   const basePath = ENTITY_PATHS[entityType];
   if (!basePath) {
     console.warn(`Unknown entity type: ${entityType}`);

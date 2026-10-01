@@ -19,6 +19,16 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  * cannot see drops the name and says so.
  */
 
+/**
+ * The image id a wall tile links to: its href opens the Images page's
+ * viewer on the image, `/images?image=<id:instance>`
+ */
+const linkedImageId = (href: string | null): string | undefined => {
+  const url = new URL(href ?? "", "http://peek.invalid");
+  if (url.pathname !== "/images") return undefined;
+  return url.searchParams.get("image")?.split(":")[0];
+};
+
 test.describe("Gallery lightbox", () => {
   let userId: number | undefined;
 
@@ -90,15 +100,14 @@ test.describe("Gallery lightbox", () => {
       expect(oCount).toBeGreaterThanOrEqual(1);
 
       // 6. Reload the gallery and reopen the same image, wherever the
-      //    reloaded list puts it (each wall item links to /image/<id>)
+      //    reloaded list puts it (each wall item links to its image)
       await userPage.goto(galleryUrl);
       const wallItems = userPage.locator(".wall-item");
       await expect(wallItems.first()).toBeVisible({ timeout: 15_000 });
-      const ids = await wallItems.evaluateAll((items) =>
-        items.map(
-          (a) => /^\/image\/([^/?]+)/.exec(a.getAttribute("href") ?? "")?.[1]
-        )
+      const hrefs = await wallItems.evaluateAll((items) =>
+        items.map((a) => a.getAttribute("href"))
       );
+      const ids = hrefs.map(linkedImageId);
       const index = ids.indexOf(currentImageId);
       expect(
         index,
@@ -142,9 +151,7 @@ test.describe("Gallery lightbox", () => {
       const firstImage = userPage.locator(".wall-item").first();
       await expect(firstImage).toBeVisible({ timeout: 15_000 });
       const galleryUrl = userPage.url();
-      const imageId = /^\/image\/([^/?]+)/.exec(
-        (await firstImage.getAttribute("href")) ?? ""
-      )?.[1];
+      const imageId = linkedImageId(await firstImage.getAttribute("href"));
       expect(imageId, "the first image's id").toBeTruthy();
 
       // 2. Opening the image puts it in the address as "id:instance"

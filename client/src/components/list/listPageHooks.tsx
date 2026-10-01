@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import type { ImageListItem } from "@peek/shared-types";
+import type { ImageFilterInput, ImageListItem } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
@@ -22,6 +22,7 @@ import {
 } from "../../hooks/usePaginatedLightbox";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
+import { buildImageFilter } from "../../utils/filterConfig";
 import Lightbox from "../ui/Lightbox";
 import type {
   CardHandlers,
@@ -83,30 +84,37 @@ const viewerImage = (img: ImageListItem): ImageListItem => {
 };
 
 /**
- * One image by its "id:instanceId", read through the Images list on its own
- * instance, so the viewer's exclusions apply and the rating, favorite and O
- * count are the viewer's; null for an image they cannot see
+ * A reader of one image by its "id:instanceId", through the Images list on
+ * its own instance and within the list's locked filter (a detail tab's
+ * entity), so the viewer's exclusions apply, an image outside the tab is
+ * none, and the rating, favorite and O count are the viewer's; null for an
+ * image they cannot see there
  */
-const readImage = async (
-  key: string,
-  signal: AbortSignal
-): Promise<ImageListItem | null> => {
-  const { id, instanceId } = parseCompositeKey(key);
-  try {
-    const { findImages } = await libraryApi.findImages(
-      {
-        ids: [String(id)],
-        ...(instanceId ? { image_filter: { instance_id: instanceId } } : {}),
-      },
-      signal
-    );
-    return findImages.images.find((image) => imageKey(image) === key) ?? null;
-  } catch (error) {
-    // The server refuses an id that is not one (a mangled link): no image
-    if (error instanceof ApiError && error.status === 400) return null;
-    throw error;
-  }
-};
+const imageReader =
+  (lockedFilter: ImageFilterInput) =>
+  async (key: string, signal: AbortSignal): Promise<ImageListItem | null> => {
+    const { id, instanceId } = parseCompositeKey(key);
+    const imageFilter: ImageFilterInput = {
+      ...lockedFilter,
+      ...(instanceId ? { instance_id: instanceId } : {}),
+    };
+    try {
+      const { findImages } = await libraryApi.findImages(
+        {
+          ids: [String(id)],
+          ...(Object.keys(imageFilter).length > 0
+            ? { image_filter: imageFilter }
+            : {}),
+        },
+        signal
+      );
+      return findImages.images.find((image) => imageKey(image) === key) ?? null;
+    } catch (error) {
+      // The server refuses an id that is not one (a mangled link): no image
+      if (error instanceof ApiError && error.status === 400) return null;
+      throw error;
+    }
+  };
 
 type ImagesResponse = {
   findImages?: { images?: ListRow[] } & Record<string, unknown>;
@@ -119,7 +127,8 @@ type ImagesResponse = {
  * entry); a card's O, rating and favorite change the image on its instance
  * in the cached page. An `image` param naming an image not on the loaded
  * page (a link to it) reads that image by id and shows it alone; a detail
- * page's tab reads it the same way, by id and instance only.
+ * page's tab reads it within its locked entity, so an image outside the tab
+ * is dropped as no longer available.
  */
 export function useImageListPage({
   listState,
@@ -129,9 +138,16 @@ export function useImageListPage({
   error,
   loading,
   lightboxRef,
+  lockedFilters,
 }: ListPageData): ListPageExtras {
   const queryClient = useQueryClient();
   const { page, perPage, setPage } = listState;
+  // An address's image beyond the page is read within the page's locked
+  // filter (a detail tab's entity; none on the Images page)
+  const fetchImage = useMemo(
+    () => imageReader(lockedFilters ? buildImageFilter(lockedFilters) : {}),
+    [lockedFilters]
+  );
 
   const turnPage = useCallback(
     (next: number, options?: PageChangeOptions) =>
@@ -148,7 +164,7 @@ export function useImageListPage({
     // An `image` param waits for this request's own rows (not a
     // placeholder's), and a failed page drops nothing
     ready: !loading && !error,
-    fetchImage: readImage,
+    fetchImage,
   });
   const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
     lightbox;

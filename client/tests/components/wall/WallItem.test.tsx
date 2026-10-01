@@ -53,6 +53,27 @@ describe("WallItem", () => {
   });
 });
 
+describe("WallItem link", () => {
+  it("an image tile opens the image in the Images page's viewer", () => {
+    render(
+      <MemoryRouter>
+        <WallItem
+          item={{ id: "7", instanceId: "i1" }}
+          config={config}
+          entityType="image"
+          width={200}
+          height={120}
+          playbackMode="static"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      "/images?image=7%3Ai1"
+    );
+  });
+});
+
 describe("WallItem preview slots", () => {
   const previewConfig = {
     ...config,
