@@ -1,3 +1,4 @@
+import { PLAYLIST_REPEAT_MODES } from "@peek/shared-types/api/playlist.js";
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -412,9 +413,29 @@ export const updatePlaylist = async (
     return;
   }
 
-  const { name, description, repeat } = req.body;
-  // The body is not validated: only a literal true turns this on
-  const { shuffle }: { shuffle?: unknown } = req.body;
+  const { description } = req.body;
+  // Read as unknown: the body is the client's, whatever its type says.
+  // Only a literal true turns shuffle on
+  const {
+    name,
+    repeat,
+    shuffle,
+  }: { name?: unknown; repeat?: unknown; shuffle?: unknown } = req.body;
+
+  // A name, when sent, follows the rule of create: a string, not blank
+  if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
+    res.status(400).json({ error: "Playlist name is required" });
+    return;
+  }
+  if (
+    repeat !== undefined &&
+    !(PLAYLIST_REPEAT_MODES as readonly unknown[]).includes(repeat)
+  ) {
+    res.status(400).json({
+      error: `repeat must be one of ${PLAYLIST_REPEAT_MODES.join(", ")}`,
+    });
+    return;
+  }
 
   // Check ownership
   const existing = await prisma.playlist.findFirst({
@@ -433,12 +454,12 @@ export const updatePlaylist = async (
     prisma.playlist.update({
       where: { id: playlistId },
       data: {
-        ...(name !== undefined && { name: name.trim() }),
+        ...(typeof name === "string" && { name: name.trim() }),
         ...(description !== undefined && {
           description: emptyToNull(description?.trim()),
         }),
         ...(shuffle !== undefined && { shuffle: shuffle === true }),
-        ...(repeat !== undefined && { repeat }),
+        ...(typeof repeat === "string" && { repeat }),
       },
     })
   );

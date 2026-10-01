@@ -217,12 +217,17 @@ export interface UpdatePlaylistParams extends Record<string, string> {
   id: string;
 }
 
+/** A playlist's repeat: off, the whole queue, or the current scene */
+export const PLAYLIST_REPEAT_MODES = ["none", "all", "one"] as const;
+export type PlaylistRepeatMode = (typeof PLAYLIST_REPEAT_MODES)[number];
+
 export interface UpdatePlaylistRequest {
+  /** Not empty once trimmed */
   name?: string;
   /** A client may send null to clear the description. */
   description?: string | null;
   shuffle?: boolean;
-  repeat?: string;
+  repeat?: PlaylistRepeatMode;
 }
 
 export interface UpdatePlaylistResponse {
