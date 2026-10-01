@@ -3,6 +3,7 @@ import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import {
   useFilterOptions,
+  useFiltersByContent,
   useListDefaults,
   useLockedFields,
 } from "../../hooks/useListOptions";
@@ -76,7 +77,7 @@ function withLockedFilters(
  */
 export const SearchableGrid = ({
   entityType,
-  lockedFilters = NO_LOCKS,
+  lockedFilters: pageLockedFilters,
   hideLockedFilters = false,
   renderItem,
   defaultSort = "name",
@@ -86,6 +87,9 @@ export const SearchableGrid = ({
   density = "medium",
 }: SearchableGridProps) => {
   const list = LIST_SOURCES[entityType];
+  // A detail page passes its lock inline: an equal lock on a re-render is
+  // the same object, so the list state and the request keep theirs
+  const lockedFilters = useFiltersByContent(pageLockedFilters);
   const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
   const lockedFields = useLockedFields(entityType, lockedFilters);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   act,
   fireEvent,
@@ -6,9 +7,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { MemoryRouterWithQuery as MemoryRouter } from "@tests/helpers/MemoryRouterWithQuery";
-import { must } from "@tests/testUtils";
+import { flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type SearchControlsType from "../../../src/components/ui/SearchControls";
 import SearchableGrid from "../../../src/components/ui/SearchableGrid";
+import type { ListUrlState } from "../../../src/hooks/useListUrlState";
 
 type Find = (params: Record<string, unknown>) => Promise<unknown>;
 
@@ -20,6 +23,24 @@ const { api } = vi.hoisted(() => ({
     findGroups: vi.fn<Find>(),
   },
 }));
+
+/** The list state each render handed the grid's controls */
+const { shownStates } = vi.hoisted(() => ({
+  shownStates: [] as ListUrlState[],
+}));
+
+// The real controls, recording the list state they are given
+vi.mock("@/components/ui/SearchControls", async (importOriginal) => {
+  const { default: Controls } = await importOriginal<{
+    default: typeof SearchControlsType;
+  }>();
+  return {
+    default: (props: Parameters<typeof SearchControlsType>[0]) => {
+      shownStates.push(props.listState);
+      return <Controls {...props} />;
+    },
+  };
+});
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: true, isLoading: false }),
@@ -150,6 +171,43 @@ describe("SearchableGrid lockedFilters", () => {
       });
     }
   );
+
+  it("a parent re-render with an equal new lock keeps the filters and sends nothing", async () => {
+    const Tab = () => {
+      const [, setRenders] = useState(0);
+      return (
+        <>
+          <button type="button" onClick={() => setRenders((n) => n + 1)}>
+            Re-render the page
+          </button>
+          <SearchableGrid
+            entityType="performer"
+            lockedFilters={{ performer_filter: { tags: LOCK } }}
+            hideLockedFilters
+            renderItem={() => null}
+          />
+        </>
+      );
+    };
+    render(
+      <MemoryRouter initialEntries={["/tab?gender=FEMALE&tagIds=9:inst-b"]}>
+        <Tab />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(api.findPerformers).toHaveBeenCalledTimes(1));
+    const before = must(shownStates.at(-1), "the list state");
+    shownStates.length = 0;
+
+    fireEvent.click(screen.getByRole("button", { name: "Re-render the page" }));
+    await flushPromises();
+
+    expect(shownStates.length).toBeGreaterThan(0);
+    for (const state of shownStates) {
+      expect(state.filters).toBe(before.filters);
+      expect(state.sort).toBe(before.sort);
+    }
+    expect(api.findPerformers).toHaveBeenCalledTimes(1);
+  });
 
   it("the lock wins over the panel's criterion of the same field", async () => {
     render(
