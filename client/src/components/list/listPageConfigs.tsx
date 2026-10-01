@@ -88,6 +88,11 @@ export interface ListPageData {
   fromPageTitle?: string;
   /** The host's handle on the page's viewer, for a page with one */
   lightboxRef?: Ref<ListLightbox>;
+  /**
+   * The page's locked filters (a detail tab's entity), not its view's; none
+   * on a list page of its own
+   */
+  lockedFilters?: Record<string, unknown>;
 }
 
 /** What a page's own hook adds to the list page */

@@ -612,6 +612,46 @@ describe("Images", () => {
       );
       expect(screen.getByTestId("lightbox")).toHaveAttribute("data-index", "1");
     });
+
+    it("an address naming an image beyond the page reads it by id and instance only, no entity's filter", async () => {
+      api.findImages.mockImplementation((params) =>
+        Promise.resolve(
+          params.ids
+            ? images([
+                {
+                  id: "9",
+                  instanceId: "a",
+                  title: "Ninth",
+                  paths: {},
+                  tags: [],
+                },
+              ])
+            : images([
+                {
+                  id: "1",
+                  instanceId: "a",
+                  title: "First",
+                  paths: {},
+                  tags: [],
+                },
+              ])
+        )
+      );
+      renderPage("/images?image=9%3Aa");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("lightbox")).toHaveAttribute(
+          "data-is-open",
+          "true"
+        )
+      );
+      const byId = api.findImages.mock.calls
+        .map(([params]) => params)
+        .filter((params) => params.ids);
+      expect(byId).toEqual([
+        { ids: ["9"], image_filter: { instance_id: "a" } },
+      ]);
+    });
   });
 
   describe("Changes from a card", () => {

@@ -45,6 +45,14 @@ describe("image links", () => {
     );
   });
 
+  it("an entity link for an image opens it in the Images page's viewer, like getImagePath", () => {
+    const image = { id: "12", instanceId: "inst-a" };
+    expect(getEntityPath("image", image, false)).toBe(getImagePath(image));
+    expect(getEntityPath("image", image, true)).toBe(
+      "/images?image=12%3Ainst-a"
+    );
+  });
+
   it("an image without an id links nowhere", () => {
     expect(getImagePath({ instanceId: "inst-a" })).toBe("#");
   });
