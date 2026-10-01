@@ -5,19 +5,23 @@
  * scenes: moving from one to the other is a scene change, and every write
  * and stream URL carries the instance of the scene playing.
  */
+import { useState } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { SignedIn } from "@tests/helpers/SignedIn";
 import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, apiPost } from "@/api";
+import { apiFetch, apiGet, apiPost } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
+import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { type PlaybackQueue, buildPlaybackQueue } from "@/utils/playbackQueue";
 
 vi.mock("@/api", () => ({
   apiFetch: vi.fn(() => Promise.resolve({ success: true })),
+  apiGet: vi.fn(() => Promise.resolve(null)),
   apiPost: vi.fn(() => Promise.resolve({ success: true })),
   redirectToLogin: vi.fn(),
 }));
@@ -97,7 +101,7 @@ function fakePlayer() {
     isDisposed: () => false,
     error: vi.fn(() => ({ code: 4 })),
     currentSrc: vi.fn(() => "/api/scene/123/stream"),
-    currentTime: vi.fn(() => 0),
+    currentTime: vi.fn((_seekTo?: number) => 0),
     src: vi.fn(),
     play: vi.fn(() => Promise.resolve()),
     paused: vi.fn(() => true),
@@ -487,5 +491,187 @@ describe("useVideoPlayer", () => {
 
     expect(player.play).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  describe("resume", () => {
+    // Only Continue Watching and Watch History open a scene with
+    // `shouldResume` in the link state; the queue they start keeps it in the
+    // router state, so every later entry sees it too.
+    type History = { resumeTime: number };
+
+    /** The watch-history requests the player has made, answered by the test */
+    function pendingHistory() {
+      const answers = new Map<string, (history: History) => void>();
+      vi.mocked(apiGet<History>).mockImplementation(
+        (endpoint) =>
+          new Promise<History>((resolve) => {
+            const sceneId = must(endpoint.split("/").pop()).split("?")[0];
+            answers.set(sceneId ?? "", resolve);
+          })
+      );
+      return {
+        answer: (sceneId: string, resumeTime: number) =>
+          act(async () => {
+            must(
+              answers.get(sceneId),
+              `a request for scene ${sceneId}`
+            )({
+              resumeTime,
+            });
+            await Promise.resolve();
+          }),
+      };
+    }
+
+    /**
+     * The player with the real watch-history hook, on a link state: the
+     * autoplay flag follows the dispatch the way the reducer's does
+     */
+    function renderResuming(
+      first: Scene,
+      state: { shouldResume: true } | null
+    ) {
+      const player = fakePlayer();
+      const dispatch =
+        vi.fn<(action: { type: string; payload?: boolean }) => void>();
+      const noop = () => {};
+      const playerRef = { current: player };
+      const videoRef = { current: null };
+      const hasResumedRef = { current: false };
+      const initialResumeTimeRef = { current: null as number | null };
+      const location = { state };
+      const rendered = renderHook(
+        ({ current }: { current: Scene }) => {
+          const [shouldAutoplay, setShouldAutoplay] = useState(false);
+          const history = useWatchHistory(current.id, current.instanceId);
+          useVideoPlayer({
+            videoRef,
+            playerRef,
+            scene: current,
+            quality: "direct",
+            ready: true,
+            shouldAutoplay,
+            playlist: null,
+            currentIndex: 0,
+            autoplayNext: true,
+            repeat: "none",
+            restartCount: 0,
+            dispatch: (action: { type: string; payload?: boolean }) => {
+              dispatch(action);
+              if (action.type === "SET_SHOULD_AUTOPLAY") {
+                setShouldAutoplay(action.payload === true);
+              }
+            },
+            nextScene: noop,
+            prevScene: noop,
+            registerPlayer: noop,
+            updateQuality: noop,
+            location,
+            hasResumedRef,
+            initialResumeTimeRef,
+            watchHistory: history.watchHistory,
+            loadingWatchHistory: history.loading,
+          });
+        },
+        { initialProps: { current: first }, wrapper: SignedIn }
+      );
+      return { player, initialResumeTimeRef, ...rendered };
+    }
+
+    const sceneA = { id: "1", instanceId: "inst-a" };
+    const sceneB = { id: "2", instanceId: "inst-a" };
+    const sceneC = { id: "3", instanceId: "inst-a" };
+
+    it("a scene opened with shouldResume and resumeTime 300 seeks to 300 once", async () => {
+      const history = pendingHistory();
+      const { player } = renderResuming(sceneA, { shouldResume: true });
+
+      await history.answer("1", 300);
+
+      await waitFor(() => {
+        expect(player.play).toHaveBeenCalledTimes(1);
+      });
+      expect(player.currentTime.mock.calls.filter(([t]) => t === 300)).toEqual([
+        [300],
+      ]);
+    });
+
+    it("a scene opened without shouldResume starts at 0 whatever its resumeTime", async () => {
+      const history = pendingHistory();
+      const { player, initialResumeTimeRef } = renderResuming(sceneA, null);
+
+      await history.answer("1", 300);
+
+      expect(initialResumeTimeRef.current).toBeNull();
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+      expect(player.play).not.toHaveBeenCalled();
+    });
+
+    it("after a queue step from a resumed entry, the next scene resumes from its own resumeTime", async () => {
+      const history = pendingHistory();
+      const { player, rerender } = renderResuming(sceneA, {
+        shouldResume: true,
+      });
+      await history.answer("1", 300);
+      await waitFor(() => {
+        expect(player.currentTime).toHaveBeenCalledWith(300);
+      });
+
+      // The step keeps shouldResume in the router state
+      rerender({ current: sceneB });
+      await history.answer("2", 45);
+
+      await waitFor(() => {
+        expect(player.currentTime).toHaveBeenCalledWith(45);
+      });
+      expect(player.currentTime.mock.calls.filter(([t]) => t === 300)).toEqual([
+        [300],
+      ]);
+    });
+
+    it("after a queue step to a scene with no progress, it starts at 0", async () => {
+      const history = pendingHistory();
+      const { player, rerender } = renderResuming(sceneA, {
+        shouldResume: true,
+      });
+      await history.answer("1", 300);
+      await waitFor(() => {
+        expect(player.currentTime).toHaveBeenCalledWith(300);
+      });
+      player.currentTime.mockClear();
+      player.play.mockClear();
+
+      rerender({ current: sceneB });
+      await history.answer("2", 0);
+
+      // A bare currentTime() is a read; a seek names the time
+      expect(
+        player.currentTime.mock.calls.filter((args) => args.length > 0)
+      ).toEqual([]);
+      expect(player.play).not.toHaveBeenCalled();
+    });
+
+    it("the resume of the previous scene never applies to the next", async () => {
+      const history = pendingHistory();
+      const { player, initialResumeTimeRef, rerender } = renderResuming(
+        sceneB,
+        { shouldResume: true }
+      );
+      // B is slow: the step to C is made before B's answer arrives
+      rerender({ current: sceneC });
+
+      // B's late answer belongs to a scene that is gone, and C has no
+      // answer yet
+      await history.answer("2", 300);
+      expect(initialResumeTimeRef.current).toBeNull();
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+
+      await history.answer("3", 120);
+      await waitFor(() => {
+        expect(player.currentTime).toHaveBeenCalledWith(120);
+      });
+      expect(initialResumeTimeRef.current).toBe(120);
+      expect(player.currentTime).not.toHaveBeenCalledWith(300);
+    });
   });
 });
