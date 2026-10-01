@@ -63,7 +63,7 @@ const SESSION_ROUTES: readonly string[] = [
   "GET /api/user-stats",
   "GET /api/user/settings",
   "GET /api/user/permissions",
-  "GET /api/watch-history",
+  "GET /api/watch-history/scenes",
   "GET /api/library/ready",
   "GET /api/auth/me",
   "GET /api/proxy/stash?path=/scene/1/screenshot",

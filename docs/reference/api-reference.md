@@ -1037,16 +1037,6 @@ interface DeleteCarouselResponse {
 
 Watch history tracking endpoints.
 
-### POST /api/watch-history/ping
-
-**Authentication:** Required
-
-**Controller:** `pingWatchHistory` in `../controllers/watchHistory.ts`
-
-**Body:** `sceneId`, `instanceId` (required) and `currentTime`; optional `quality`, `sessionStart` and `seekEvents`. Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404. A viewing session counts one play per scene on its own instance.
-
----
-
 ### POST /api/watch-history/save-activity
 
 **Authentication:** Required
@@ -1074,14 +1064,6 @@ Watch history tracking endpoints.
 **Controller:** `incrementOCounter` in `../controllers/watchHistory.ts`
 
 **Body:** `sceneId`, `instanceId` (required). Scene ids repeat across Stash servers, so the write names the scene's instance; a missing or empty `instanceId` answers 400, and a scene the user cannot see on that instance answers 404.
-
----
-
-### GET /api/watch-history/
-
-**Authentication:** Required
-
-**Controller:** `getAllWatchHistory` in `../controllers/watchHistory.ts`
 
 ---
 

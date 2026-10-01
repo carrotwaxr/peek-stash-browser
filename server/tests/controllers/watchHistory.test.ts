@@ -6,22 +6,18 @@
  * - incrementPlayCount (play count increment with threshold)
  * - incrementOCounter (O counter management)
  * - getWatchHistory (single scene retrieval)
- * - getAllWatchHistory (list retrieval)
  * - clearAllWatchHistory (bulk deletion)
- * - pingWatchHistory (player progress pings)
  * - the entity access check on every write
  */
-import { Prisma, type WatchHistory } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import {
   clearAllWatchHistory,
-  getAllWatchHistory,
   getWatchHistory,
   incrementOCounter,
   incrementPlayCount,
-  pingWatchHistory,
   saveActivity,
 } from "../../controllers/watchHistory.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
@@ -32,19 +28,15 @@ import { recommendationService } from "../../services/RecommendationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { DB_WRITE_TX } from "../../utils/dbWrite.js";
-import { logger } from "../../utils/logger.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import {
+  findHandler,
   malformed,
   reqFor,
   resFor,
   testUser,
 } from "../helpers/controllerTestUtils.js";
-import {
-  anyOf,
-  arrayContaining,
-  objectContaining,
-} from "../helpers/matchers.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -114,7 +106,6 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
-const mockLogger = vi.mocked(logger, true);
 const mockStats = vi.mocked(userStatsService, true);
 
 describe("Watch History Controller", () => {
@@ -1016,148 +1007,6 @@ describe("Watch History Controller", () => {
   });
 
   // ============================================================================
-  // getAllWatchHistory Tests
-  // ============================================================================
-
-  describe("getAllWatchHistory", () => {
-    it("should return 401 if user is not authenticated", async () => {
-      const res = resFor(getAllWatchHistory);
-      await authenticated(getAllWatchHistory)(
-        reqFor(getAllWatchHistory, {
-          query: {},
-          user: undefined,
-        }),
-        res,
-        vi.fn()
-      );
-
-      expect(res.status).toHaveBeenCalledWith(401);
-    });
-
-    it("should return all watch history for user", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          sceneId: "123",
-          resumeTime: 60,
-          playCount: 1,
-          oHistory: [],
-          playHistory: [],
-        }),
-        partialRow({
-          id: 2,
-          sceneId: "456",
-          resumeTime: 120,
-          playCount: 2,
-          oHistory: [],
-          playHistory: [],
-        }),
-      ]);
-
-      const res = resFor(getAllWatchHistory);
-      await getAllWatchHistory(
-        reqFor(getAllWatchHistory, {
-          query: { limit: "20" },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userId: 1 },
-          orderBy: { lastPlayedAt: "desc" },
-          take: 20,
-        })
-      );
-
-      expect(res.json).toHaveBeenCalledWith({
-        watchHistory: arrayContaining([
-          expect.objectContaining({ sceneId: "123" }),
-          expect.objectContaining({ sceneId: "456" }),
-        ]),
-      });
-    });
-
-    it("reads histories stored as JSON-encoded strings", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          sceneId: "123",
-          oHistory: JSON.stringify(["2024-01-01T01:00:00.000Z"]),
-          playHistory: JSON.stringify([
-            "2024-01-01T00:00:00.000Z",
-            "2024-01-02T00:00:00.000Z",
-          ]),
-        }),
-      ]);
-
-      const res = resFor(getAllWatchHistory);
-      await getAllWatchHistory(
-        reqFor(getAllWatchHistory, {
-          query: {},
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      const record = must(res._getOkBody().watchHistory[0]);
-      expect(record.oHistory).toEqual(["2024-01-01T01:00:00.000Z"]);
-      expect(record.playHistory).toEqual([
-        "2024-01-01T00:00:00.000Z",
-        "2024-01-02T00:00:00.000Z",
-      ]);
-    });
-
-    it("reads a malformed history as an empty list", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([
-        partialRow({
-          id: 1,
-          sceneId: "123",
-          oHistory: "not json",
-          playHistory: "not json",
-        }),
-      ]);
-
-      const res = resFor(getAllWatchHistory);
-      await getAllWatchHistory(
-        reqFor(getAllWatchHistory, {
-          query: {},
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(res.status).not.toHaveBeenCalled();
-      const record = must(res._getOkBody().watchHistory[0]);
-      expect(record.oHistory).toEqual([]);
-      expect(record.playHistory).toEqual([]);
-    });
-
-    it("should filter by inProgress when requested", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-
-      const res = resFor(getAllWatchHistory);
-      await getAllWatchHistory(
-        reqFor(getAllWatchHistory, {
-          query: { limit: "20", inProgress: "true" },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId: 1,
-            resumeTime: { not: null },
-          },
-        })
-      );
-    });
-  });
-
-  // ============================================================================
   // clearAllWatchHistory Tests
   // ============================================================================
 
@@ -1302,7 +1151,6 @@ describe("Watch History Controller", () => {
       ],
       ["incrementPlayCount", incrementPlayCount as never, {}],
       ["incrementOCounter", incrementOCounter as never, {}],
-      ["pingWatchHistory", pingWatchHistory as never, { currentTime: 1 }],
     ];
 
     it.each(writes)(
@@ -1425,366 +1273,6 @@ describe("Watch History Controller", () => {
         expect(mockResolve).not.toHaveBeenCalled();
       }
     );
-
-    it("ping reads the duration from the requested instance", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          minimumPlayPercent: 50,
-          syncToStash: false,
-        })
-      );
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({
-          duration: 600,
-        })
-      );
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 0,
-        resumeTime: 1,
-        lastPlayedAt: new Date(),
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.create.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      const res = resFor(pingWatchHistory);
-      await pingWatchHistory(
-        reqFor(pingWatchHistory, {
-          body: { sceneId: "scene-1", instanceId: "inst-b", currentTime: 1 },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(mockResolve).toHaveBeenCalledWith(1, "scene", "scene-1", "inst-b");
-      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "scene-1", stashInstanceId: "inst-b" },
-        select: { duration: true },
-      });
-      expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: objectContaining({ instanceId: "inst-b" }),
-        })
-      );
-    });
-  });
-
-  // ============================================================================
-  // pingWatchHistory Tests
-  // ============================================================================
-
-  describe("pingWatchHistory", () => {
-    it("one session counts one play on each of two instances' same scene id", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          minimumPlayPercent: 50,
-          syncToStash: false,
-        })
-      );
-      // 400 of 600 seconds played: past the 50% threshold
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 400,
-        resumeTime: 390,
-        lastPlayedAt: new Date(),
-        oHistory: [],
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      // A scene id no other test pings, so the sessions start clean
-      const res = resFor(pingWatchHistory);
-      const ping = (instanceId: string) =>
-        pingWatchHistory(
-          reqFor(pingWatchHistory, {
-            body: { sceneId: "session-two", instanceId, currentTime: 400 },
-            user: testUser({ id: 1 }),
-          }),
-          res
-        );
-      for (const instanceId of ["inst-a", "inst-b", "inst-a", "inst-b"]) {
-        await ping(instanceId);
-      }
-
-      expect(res.status).not.toHaveBeenCalled();
-      // Each instance's session reads its scene once, until it counts
-      expect(
-        mockStats.statsWritesForScene.mock.calls.map((call) => [
-          call[1],
-          call[2],
-        ])
-      ).toEqual([
-        ["session-two", "inst-a"],
-        ["session-two", "inst-b"],
-      ]);
-      expect(mockStatsWrites).toHaveBeenCalledTimes(2);
-      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(2);
-    });
-
-    it("a ping under the threshold counts no play: no stats written, nothing bumped", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ id: 1, minimumPlayPercent: 50, syncToStash: false })
-      );
-      // 100 of 600 seconds played
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 100,
-        resumeTime: 90,
-        lastPlayedAt: new Date(),
-        oHistory: [],
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      const res = resFor(pingWatchHistory);
-      await pingWatchHistory(
-        reqFor(pingWatchHistory, {
-          body: {
-            sceneId: "session-under",
-            instanceId: "test-instance",
-            currentTime: 100,
-          },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(res.status).not.toHaveBeenCalled();
-      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
-        objectContaining({
-          data: objectContaining({ playCount: { increment: 0 } }),
-        })
-      );
-      expect(mockStatsWrites).not.toHaveBeenCalled();
-      expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
-    });
-
-    it("two pings of one session past the threshold count one play", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          minimumPlayPercent: 50,
-          syncToStash: false,
-        })
-      );
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({
-          duration: 600,
-        })
-      );
-      // 400 of 600 seconds played: past the 50% threshold
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 400,
-        resumeTime: 390,
-        lastPlayedAt: new Date(),
-        oHistory: [],
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      // A scene id no other test pings, so the session starts clean
-      const res = resFor(pingWatchHistory);
-      const ping = () =>
-        pingWatchHistory(
-          {
-            body: {
-              sceneId: "session-guard",
-              instanceId: "test-instance",
-              currentTime: 400,
-            },
-            user: { id: 1 },
-          } as never,
-          res
-        );
-      await Promise.all([ping(), ping()]);
-
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalledTimes(2);
-      expect(mockStats.statsWritesForScene).toHaveBeenCalledWith(
-        1,
-        "session-guard",
-        "test-instance",
-        { oCount: 0, playCount: 1, lastPlayedAt: anyOf(Date) }
-      );
-      // One play, so its stats are written once, inside its transaction
-      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
-      expect(mockStatsWrites).toHaveBeenCalledWith(mockPrisma);
-      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(1);
-    });
-
-    it("a ping whose first attempt found the database busy counts the play when tried again", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          minimumPlayPercent: 50,
-          syncToStash: false,
-        })
-      );
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({
-          duration: 600,
-        })
-      );
-      // 400 of 600 seconds played: past the 50% threshold
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 400,
-        resumeTime: 390,
-        lastPlayedAt: new Date(),
-        oHistory: [],
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      // The first attempt's write finds another writer holding the database
-      mockPrisma.watchHistory.update
-        .mockRejectedValueOnce(
-          new Prisma.PrismaClientKnownRequestError(
-            "Operations timed out after 5s",
-            { code: "P1008", clientVersion: "test" }
-          )
-        )
-        .mockResolvedValue(record);
-
-      // A scene id no other test pings, so the session starts clean
-      const res = resFor(pingWatchHistory);
-      await pingWatchHistory(
-        {
-          body: {
-            sceneId: "session-busy-retry",
-            instanceId: "test-instance",
-            currentTime: 400,
-          },
-          user: { id: 1 },
-        } as never,
-        res
-      );
-
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalledTimes(1);
-      // Both attempts counted the play: the flag the failed one set did not
-      // stop the second
-      expect(mockPrisma.watchHistory.update).toHaveBeenCalledTimes(2);
-      for (const call of mockPrisma.watchHistory.update.mock.calls) {
-        expect(must(call)[0].data).toMatchObject({
-          playCount: { increment: 1 },
-        });
-      }
-      // The failed attempt wrote nothing: its stats never ran
-      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
-      expect(mockStats.bumpWriteGeneration).toHaveBeenCalledTimes(1);
-    });
-
-    it("a ping keeps the play sessions Peek 1.0 stored, as their start times", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({
-          id: 1,
-          minimumPlayPercent: 50,
-          syncToStash: false,
-        })
-      );
-      mockPrisma.stashScene.findFirst.mockResolvedValue(
-        partialRow({
-          duration: 600,
-        })
-      );
-      const first = "2025-10-22T10:00:00.000Z";
-      const second = "2025-10-22T11:00:00.000Z";
-      const later = "2025-11-01T09:00:00.000Z";
-      const session = (startTime: string) => ({
-        startTime,
-        endTime: startTime,
-        quality: "1080p",
-        duration: 10,
-        totalSessionDuration: 10,
-        seekEvents: [],
-      });
-      // 100 of 600 seconds played: below the threshold, so no play is added
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 1,
-        playDuration: 100,
-        resumeTime: 90,
-        lastPlayedAt: new Date(),
-        oHistory: [],
-        playHistory: JSON.stringify([session(first), session(second), later]),
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      const res = resFor(pingWatchHistory);
-      await pingWatchHistory(
-        reqFor(pingWatchHistory, {
-          body: {
-            sceneId: "session-v1-history",
-            instanceId: "test-instance",
-            currentTime: 100,
-          },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(res.status).not.toHaveBeenCalled();
-      const update = must(mockPrisma.watchHistory.update.mock.calls[0]);
-      expect(update[0].data.playHistory).toEqual([first, second, later]);
-    });
-
-    it("a watch-history ping logs nothing at INFO", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(
-        partialRow({ id: 1, minimumPlayPercent: 50, syncToStash: false })
-      );
-      // Last played an hour before this session: a new viewing session
-      const record: WatchHistory = partialRow({
-        id: 1,
-        playCount: 0,
-        playDuration: 400,
-        resumeTime: 390,
-        lastPlayedAt: new Date(Date.now() - 60 * 60 * 1000),
-        oHistory: [],
-        playHistory: [],
-      });
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
-      mockPrisma.watchHistory.update.mockResolvedValue(record);
-
-      // A session start, a seek and a play past the threshold: every branch
-      // of the ping that logs
-      const res = resFor(pingWatchHistory);
-      await pingWatchHistory(
-        reqFor(pingWatchHistory, {
-          body: {
-            instanceId: "test-instance",
-            sceneId: "session-log-level",
-            currentTime: 400,
-            quality: "1080p",
-            sessionStart: new Date(Date.now() - 20 * 1000).toISOString(),
-            seekEvents: [{ from: 100, to: 110 }],
-          },
-          user: testUser({ id: 1 }),
-        }),
-        res
-      );
-
-      expect(res.status).not.toHaveBeenCalled();
-      expect(mockStatsWrites).toHaveBeenCalledTimes(1);
-      expect(mockLogger.info).not.toHaveBeenCalled();
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "Watch history ping",
-        objectContaining({ userId: 1, sceneId: "session-log-level" })
-      );
-    });
   });
 
   // ============================================================================
@@ -1872,5 +1360,19 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.watchHistory.create).toHaveBeenCalled();
       expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("legacy watch-history routes", () => {
+  it("POST /api/watch-history/ping and GET /api/watch-history answer 404", async () => {
+    const { default: router } = await import("../../routes/watchHistory.js");
+
+    expect(() => findHandler(router, "post", "/ping")).toThrow(
+      "No POST /ping route"
+    );
+    expect(() => findHandler(router, "get", "/")).toThrow("No GET / route");
+    // The routes that replace them stay
+    expect(() => findHandler(router, "post", "/save-activity")).not.toThrow();
+    expect(() => findHandler(router, "get", "/scenes")).not.toThrow();
   });
 });
