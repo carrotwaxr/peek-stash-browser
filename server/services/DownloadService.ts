@@ -1,7 +1,10 @@
 import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
+import * as fs from "fs";
 import { ForbiddenError, NotFoundError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { fileExtension, safeFileName } from "../utils/contentDisposition.js";
+import { zipPath } from "../utils/downloadPaths.js";
+import { logger } from "../utils/logger.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 
@@ -268,12 +271,15 @@ export class DownloadService {
   }
 
   /**
-   * Delete a download record. Only the owner can delete.
+   * A download its owner may act on. 404 when there is none, 403 for
+   * another user's.
    */
-  async deleteDownload(downloadId: number, userId: number): Promise<void> {
+  async getOwnedDownload(
+    downloadId: number,
+    userId: number
+  ): Promise<Download> {
     const download = await prisma.download.findUnique({
       where: { id: downloadId },
-      select: { id: true, userId: true },
     });
 
     if (!download) {
@@ -284,8 +290,30 @@ export class DownloadService {
       throw new ForbiddenError("Access denied");
     }
 
+    return download;
+  }
+
+  /**
+   * Delete a download record and, for a playlist zip, its file (the
+   * finished one, or the partial one of a build in progress). Only the owner
+   * can delete. The caller stops a build first (`downloadJobQueue.cancel`).
+   */
+  async deleteDownload(downloadId: number, userId: number): Promise<void> {
+    const download = await this.getOwnedDownload(downloadId, userId);
+
     await prisma.download.delete({
       where: { id: downloadId },
+    });
+
+    if (download.type !== "PLAYLIST") return;
+    const file = download.filePath ?? zipPath(userId, downloadId);
+    await fs.promises.unlink(file).catch((error: unknown) => {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT")
+        return;
+      logger.warn("Could not remove a deleted download's file", {
+        downloadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 }

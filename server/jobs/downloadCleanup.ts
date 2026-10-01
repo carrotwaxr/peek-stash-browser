@@ -1,5 +1,8 @@
 import fs from "fs/promises";
+import path from "path";
 import prisma from "../prisma/singleton.js";
+import { downloadJobQueue } from "../services/DownloadJobQueue.js";
+import { downloadsDir, zipPath } from "../utils/downloadPaths.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -96,6 +99,126 @@ export async function cleanupExpiredDownloads(): Promise<void> {
   }
 }
 
+const USER_DIR_PATTERN = /^user-(\d+)$/;
+const ZIP_FILE_PATTERN = /^download-(\d+)\.zip$/;
+
+function isMissing(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Removes the zip files nothing owns: the folder of a user that no longer
+ * exists, and a `download-<id>.zip` that is neither being built (the queue
+ * holds it) nor the file of a COMPLETED row. Builds interrupted by a crash,
+ * and deletes that failed, leave such files. Never throws: one file that
+ * cannot be removed is logged and the sweep goes on.
+ */
+export async function sweepOrphanedDownloadFiles(): Promise<void> {
+  const root = downloadsDir();
+  let removedFiles = 0;
+  let removedFolders = 0;
+  let failures = 0;
+
+  try {
+    const entries = await fs
+      .readdir(root, { withFileTypes: true })
+      .catch((error: unknown) => {
+        if (isMissing(error)) return [];
+        throw error;
+      });
+    const userFolders = entries.flatMap((entry) => {
+      const match = entry.isDirectory()
+        ? USER_DIR_PATTERN.exec(entry.name)
+        : null;
+      return match ? [{ name: entry.name, userId: Number(match[1]) }] : [];
+    });
+    if (userFolders.length === 0) return;
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: userFolders.map((folder) => folder.userId) } },
+      select: { id: true },
+    });
+    const existing = new Set(users.map((user) => user.id));
+
+    for (const folder of userFolders) {
+      const dir = path.join(root, folder.name);
+      try {
+        if (!existing.has(folder.userId)) {
+          await fs.rm(dir, { recursive: true, force: true });
+          removedFolders++;
+          continue;
+        }
+
+        const files = (await fs.readdir(dir))
+          .map((name) => ({ name, match: ZIP_FILE_PATTERN.exec(name) }))
+          .flatMap(({ match }) => (match ? [Number(match[1])] : []));
+        if (files.length === 0) continue;
+
+        const completed = await prisma.download.findMany({
+          where: {
+            id: { in: files },
+            userId: folder.userId,
+            status: "COMPLETED",
+          },
+          select: { id: true, filePath: true },
+        });
+        const kept = new Set(
+          completed.flatMap((row) =>
+            row.filePath === zipPath(folder.userId, row.id) ? [row.id] : []
+          )
+        );
+
+        for (const id of files) {
+          if (kept.has(id)) continue;
+          try {
+            // Checked as late as possible: a build may have started since
+            // the rows were read
+            if (downloadJobQueue.isActive(id)) continue;
+            await fs.unlink(zipPath(folder.userId, id));
+            removedFiles++;
+          } catch (error) {
+            if (isMissing(error)) continue;
+            failures++;
+            logger.warn("Could not remove a stray download file", {
+              downloadId: id,
+              error: describeError(error),
+            });
+          }
+        }
+      } catch (error) {
+        failures++;
+        logger.warn("Could not sweep a download folder", {
+          folder: folder.name,
+          error: describeError(error),
+        });
+      }
+    }
+  } catch (error) {
+    logger.error("Download file sweep failed", {
+      error: describeError(error),
+    });
+    return;
+  }
+
+  if (removedFiles > 0 || removedFolders > 0 || failures > 0) {
+    logger.info("Download file sweep completed", {
+      removedFiles,
+      removedFolders,
+      failures,
+    });
+  }
+}
+
+/** One hourly pass: expire finished zips, then remove stray files */
+async function runDownloadCleanup(): Promise<void> {
+  await cleanupExpiredDownloads();
+  await sweepOrphanedDownloadFiles();
+}
+
 /**
  * Schedule the download cleanup job to run periodically
  *
@@ -105,10 +228,10 @@ export function scheduleDownloadCleanup(): void {
   logger.info("Scheduling download cleanup job (runs every hour)");
 
   // Run immediately on startup
-  void cleanupExpiredDownloads();
+  void runDownloadCleanup();
 
   // Schedule to run every hour
   setInterval(() => {
-    void cleanupExpiredDownloads();
+    void runDownloadCleanup();
   }, CLEANUP_INTERVAL_MS);
 }

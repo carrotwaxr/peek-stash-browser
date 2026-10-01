@@ -5,6 +5,7 @@ import {
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
 import { z } from "zod";
 import {
   USERNAME_MAX_LENGTH,
@@ -17,6 +18,7 @@ import {
   ValidationError,
 } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
+import { downloadJobQueue } from "../services/DownloadJobQueue.js";
 import { getVisibleEntityKeys } from "../services/EntityAccessService.js";
 import {
   type RestrictionRowInput,
@@ -114,6 +116,7 @@ import type {
   UpdateUserStashInstancesBody,
 } from "../types/api/user.js";
 import { dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
+import { userDownloadsDir } from "../utils/downloadPaths.js";
 import { type EntityRef, compositeKey, entityKey } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
@@ -872,6 +875,18 @@ export const deleteUser = async (
   ]);
   rankingComputeService.forget(userIdInt);
   recommendationService.forget(userIdInt);
+
+  // Their zips: stop the builds, then remove the folder (the sweep in
+  // jobs/downloadCleanup.ts takes whatever this leaves)
+  await downloadJobQueue.cancelUser(userIdInt);
+  await fs.promises
+    .rm(userDownloadsDir(userIdInt), { recursive: true, force: true })
+    .catch((error: unknown) => {
+      logger.warn("Could not remove a deleted user's downloads folder", {
+        userId: userIdInt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 
   res.json({ success: true, message: "User deleted successfully" });
 };

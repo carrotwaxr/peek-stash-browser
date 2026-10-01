@@ -136,11 +136,11 @@ From the Downloads page, you can:
 |--------|-------------|
 | **Download** | Download a completed file |
 | **Retry** | Retry a failed playlist download |
-| **Delete** | Remove a download from your history |
+| **Delete** | Remove a download from your history. Delete also removes the file from the server (and stops a zip that is still being built) |
 
 ### Download Expiration
 
-Completed playlist downloads are available for **24 hours**, then automatically cleaned up to save server space. Scene and image downloads don't expire, but their links from before this release are marked expired: start those again from the scene or image.
+Completed playlist downloads are available for **24 hours**, then automatically cleaned up to save server space. An hourly sweep also removes zip files left over from builds that were interrupted. Scene and image downloads don't expire, but their links from before this release are marked expired: start those again from the scene or image.
 
 ---
 
