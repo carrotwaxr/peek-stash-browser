@@ -34,7 +34,7 @@ router.get("/:id", withAllowedInstances, libraryHandler(getPlaylist));
 router.post("/", authenticated(createPlaylist));
 
 // Update playlist
-router.put("/:id", authenticated(updatePlaylist));
+router.put("/:id", withAllowedInstances, libraryHandler(updatePlaylist));
 
 // Delete playlist
 router.delete("/:id", authenticated(deletePlaylist));
@@ -55,6 +55,10 @@ router.get("/:id/shares", authenticated(getPlaylistShares));
 router.put("/:id/shares", authenticated(updatePlaylistShares));
 
 // Duplicate a playlist
-router.post("/:id/duplicate", authenticated(duplicatePlaylist));
+router.post(
+  "/:id/duplicate",
+  withAllowedInstances,
+  libraryHandler(duplicatePlaylist)
+);
 
 export default router;

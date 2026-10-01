@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import {
+  FX,
+  FX_ID,
+  clearAccessFixture,
+  createApiUser,
+  hideFor,
+  seedAccessFixture,
+} from "../helpers/accessFixture.js";
 import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
 
 /**
@@ -787,5 +796,76 @@ describe("Playlist Sharing API", () => {
       );
       expect(foundDuplicate).toBeDefined();
     });
+  });
+});
+
+describe("Playlist duplicate visibility", () => {
+  const GROUP_NAME = "access-it-playlist-duplicate";
+  const PASSWORD = "access_it_pass_1";
+  let ownerPlaylistId: number;
+  let recipient: Awaited<ReturnType<typeof createApiUser>>;
+
+  beforeAll(async () => {
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    await seedAccessFixture();
+    const owner = await createApiUser("access_it_dup_owner", PASSWORD);
+    recipient = await createApiUser("access_it_dup_recipient", PASSWORD);
+
+    // GLOBAL@A is hidden by the recipient; DELETED is soft-deleted and
+    // ON_OFF sits on a disabled instance
+    await hideFor(recipient.id, "scene", FX_ID.GLOBAL, FX.A);
+    const items = [
+      [FX_ID.SAME, FX.A],
+      [FX_ID.GLOBAL, FX.A],
+      [FX_ID.DELETED, FX.A],
+      [FX_ID.ON_OFF, FX.OFF],
+      [FX_ID.SAME, FX.B],
+    ] as const;
+    const playlist = await prisma.playlist.create({
+      data: {
+        userId: owner.id,
+        name: "access-it duplicate",
+        items: {
+          create: items.map(([sceneId, instanceId], position) => ({
+            sceneId,
+            instanceId,
+            position,
+          })),
+        },
+      },
+    });
+    ownerPlaylistId = playlist.id;
+    const group = await prisma.userGroup.create({
+      data: {
+        name: GROUP_NAME,
+        members: { create: [{ userId: owner.id }, { userId: recipient.id }] },
+      },
+    });
+    await prisma.playlistShare.create({
+      data: { playlistId: ownerPlaylistId, groupId: group.id },
+    });
+  }, 60000);
+
+  afterAll(async () => {
+    await prisma.userGroup.deleteMany({ where: { name: GROUP_NAME } });
+    await clearAccessFixture();
+  }, 60000);
+
+  it("a recipient's duplicate leaves out what they cannot see", async () => {
+    const response = await recipient.client.post<PlaylistResponse>(
+      `/api/playlists/${ownerPlaylistId}/duplicate`
+    );
+    expect(response.status).toBe(201);
+    const copy = response.data.playlist;
+    expect(copy._count?.items).toBe(2);
+
+    const stored = await prisma.playlistItem.findMany({
+      where: { playlistId: copy.id },
+      orderBy: { position: "asc" },
+    });
+    expect(stored.map((i) => [i.sceneId, i.instanceId, i.position])).toEqual([
+      [FX_ID.SAME, FX.A, 0],
+      [FX_ID.SAME, FX.B, 1],
+    ]);
   });
 });

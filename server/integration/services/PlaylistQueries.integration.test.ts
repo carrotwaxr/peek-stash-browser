@@ -23,9 +23,11 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  duplicatePlaylist,
   getPlaylist,
   getSharedPlaylists,
   getUserPlaylists,
+  updatePlaylist,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import {
@@ -237,7 +239,13 @@ describe("Playlist queries (integration)", () => {
     const group = await prisma.userGroup.create({
       data: {
         name: GROUP_NAME,
-        members: { create: [{ userId: owner.id }, { userId: recipient.id }] },
+        members: {
+          create: [
+            { userId: owner.id },
+            { userId: recipient.id },
+            { userId: onlyA.id },
+          ],
+        },
       },
     });
     await prisma.playlistShare.create({
@@ -497,5 +505,72 @@ describe("Playlist queries (integration)", () => {
       instanceId: B,
       title: titleOf(SAME, B),
     });
+  });
+
+  /** The copy's items as [scene id, instance, position], by position */
+  const copiedItems = async (playlistId: number) =>
+    (
+      await prisma.playlistItem.findMany({
+        where: { playlistId },
+        orderBy: { position: "asc" },
+      })
+    ).map((i) => [i.sceneId, i.instanceId, i.position]);
+
+  const duplicateAs = async (user: User, playlistId: number) => {
+    const req = reqFor(duplicatePlaylist, {
+      params: { id: String(playlistId) },
+      user: testUser({ id: user.id, username: user.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
+    });
+    const res = resFor(duplicatePlaylist);
+    await duplicatePlaylist(req, res);
+    return res._getOkBody().playlist;
+  };
+
+  it("a duplicate copies only the items the requester can see, numbered 0..n-1 in the original's order", async () => {
+    // The recipient hid P2; DELETED is soft-deleted; ON_OFF is on a disabled
+    // instance
+    const copy = await duplicateAs(recipient, pq);
+    expect(copy.userId).toBe(recipient.id);
+    expect(await copiedItems(copy.id)).toEqual(
+      RECIPIENT_SEES.map(([id, inst], n) => [id, inst, n])
+    );
+    expect(copy._count?.items).toBe(RECIPIENT_SEES.length);
+
+    // A user who selected only A: SAME@B is on an instance they deselected
+    const onlyACopy = await duplicateAs(onlyA, pq);
+    const seesA: Ref[] = [X1, P1, P2, X2, P3, P4, P5].map((id) => [id, A]);
+    expect(await copiedItems(onlyACopy.id)).toEqual(
+      seesA.map(([id, inst], n) => [id, inst, n])
+    );
+    expect(onlyACopy._count?.items).toBe(seesA.length);
+
+    // The owner's own copy leaves out what the owner hid
+    const ownerCopy = await duplicateAs(owner, pq);
+    expect(await copiedItems(ownerCopy.id)).toEqual(
+      OWNER_SEES.map(([id, inst], n) => [id, inst, n])
+    );
+  });
+
+  it("a duplicate of a playlist with nothing visible is an empty copy", async () => {
+    const copy = await duplicateAs(owner, allHidden);
+    expect(await copiedItems(copy.id)).toEqual([]);
+    expect(copy._count?.items).toBe(0);
+  });
+
+  it("update and duplicate answer the visible count", async () => {
+    const req = reqFor(updatePlaylist, {
+      params: { id: String(pq) },
+      body: { name: "PQ" },
+      user: testUser({ id: owner.id, username: owner.username }),
+      allowedInstanceIds: await getUserAllowedInstanceIds(owner.id),
+    });
+    const res = resFor(updatePlaylist);
+    await updatePlaylist(req, res);
+    // Ten rows, six the owner can see
+    expect(res._getOkBody().playlist._count?.items).toBe(OWNER_SEES.length);
+
+    const copy = await duplicateAs(recipient, pq);
+    expect(copy._count?.items).toBe(RECIPIENT_SEES.length);
   });
 });
