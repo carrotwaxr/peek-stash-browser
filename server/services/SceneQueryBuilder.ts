@@ -31,7 +31,6 @@ import type {
   RefCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
-import { readHistory } from "../utils/historyJson.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
@@ -90,8 +89,8 @@ const SELECT_COLUMNS = `
     r.rating AS userRating, r.favorite AS userFavorite,
     w.playCount AS userPlayCount, w.playDuration AS userPlayDuration,
     w.lastPlayedAt AS userLastPlayedAt, w.oCount AS userOCount,
-    w.resumeTime AS userResumeTime, w.oHistory AS userOHistory,
-    w.playHistory AS userPlayHistory
+    w.resumeTime AS userResumeTime,
+    (SELECT MAX(j.value) FROM json_each(w.oHistory) j) AS userLastOAt
   `.trim();
 
 /**
@@ -625,13 +624,6 @@ class SceneQueryBuilder extends EntityQueryBuilder<
    * Transform a raw database row into a NormalizedScene
    */
   protected transformRow(row: SceneQueryRow): NormalizedScene {
-    // Parse JSON fields
-    const oHistory = readHistory(row.userOHistory);
-    const playHistory = readHistory(row.userPlayHistory);
-
-    // Determine last_o_at from o_history
-    const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
-
     // Create scene object with studioId preserved for population
     const scene = {
       id: row.id,
@@ -661,11 +653,8 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       play_count: row.userPlayCount ?? 0,
       play_duration: row.userPlayDuration ?? 0,
       resume_time: row.userResumeTime ?? 0,
-      play_history: playHistory,
-      // The stored ISO strings, as the JSON carries them
-      o_history: oHistory,
       last_played_at: row.userLastPlayedAt?.toISOString() ?? null,
-      last_o_at: lastOAt,
+      last_o_at: row.userLastOAt,
 
       // File data - build from individual columns
       files: row.filePath

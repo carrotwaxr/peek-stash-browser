@@ -2,8 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { createApiUser } from "../helpers/accessFixture.js";
 import { expectRefused } from "../helpers/refused.js";
 import {
+  type TestClient,
   adminClient,
   guestClient,
   restoreInstanceSelection,
@@ -23,6 +25,7 @@ interface FindScenesResponse {
       tags?: Array<{ id: string; name?: string }>;
       inheritedTagIds?: string[];
       studio?: { id: string; name?: string } | null;
+      last_o_at?: string | null;
     }>;
     count: number;
   };
@@ -368,6 +371,54 @@ describe("Scene API", () => {
           created_at: s.created_at,
         }))
       ).toEqual(scenes.map((s) => ({ id: s.id, ...expected.get(s.id) })));
+    });
+  });
+
+  describe("a scene's O history in a list", () => {
+    const USERNAME = "scenes_it_o_history";
+    let viewer: { id: number; client: TestClient } | undefined;
+
+    beforeAll(async () => {
+      viewer = await createApiUser(USERNAME, "scenes_it_o_history_pass_1");
+    });
+
+    afterAll(async () => {
+      if (viewer) await adminClient.delete(`/api/user/${viewer.id}`);
+    });
+
+    it("the list item has last_o_at equal to the second O and no history arrays", async () => {
+      const { client, id: userId } = must(viewer, USERNAME);
+      const sceneId = TEST_ENTITIES.sceneWithRelations;
+      const body = { sceneId, instanceId: testInstanceId };
+
+      expect(
+        (await client.post("/api/watch-history/increment-o", body)).status
+      ).toBe(200);
+      // The two Os must differ in their ISO timestamps
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(
+        (await client.post("/api/watch-history/increment-o", body)).status
+      ).toBe(200);
+
+      const row = must(
+        await prisma.watchHistory.findFirst({
+          where: { userId, sceneId, instanceId: testInstanceId },
+          select: { oHistory: true },
+        }),
+        "the O history row"
+      );
+      const stored = row.oHistory as string[];
+      expect(stored).toHaveLength(2);
+
+      const response = await client.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { ids: [`${sceneId}:${testInstanceId}`] }
+      );
+      expect(response.ok).toBe(true);
+      const item = must(response.data.findScenes.scenes[0], "the scene");
+      expect(item.last_o_at).toBe(stored[1]);
+      expect(item).not.toHaveProperty("o_history");
+      expect(item).not.toHaveProperty("play_history");
     });
   });
 
