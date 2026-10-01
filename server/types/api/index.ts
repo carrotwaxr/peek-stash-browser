@@ -386,6 +386,7 @@ export type {
   GetPlaylistQueueResponse,
   AddScenesToPlaylistRequest,
   AddScenesToPlaylistResponse,
+  MovePlaylistItemParams,
   MovePlaylistItemRequest,
   MovePlaylistItemResponse,
   RemovePlaylistItemsRequest,

@@ -331,8 +331,17 @@ export interface AddScenesToPlaylistResponse {
 // =============================================================================
 
 /**
- * Move one item to an index among the items the owner sees
+ * PUT /api/playlists/:id/items/:itemId/position
+ * Move one item (by item id) to an index among the items the owner sees, in
+ * playlist order; an index past the end puts it after the last one. Every
+ * item is renumbered 0..n-1; the items the owner cannot see keep their
+ * place between their neighbours. Owner only.
  */
+export interface MovePlaylistItemParams extends Record<string, string> {
+  id: string;
+  itemId: string;
+}
+
 export interface MovePlaylistItemRequest {
   index: number;
 }
@@ -342,7 +351,9 @@ export interface MovePlaylistItemResponse {
 }
 
 /**
- * Remove several items by item id
+ * POST /api/playlists/:id/items/remove
+ * Remove several items by item id (1 to PER_PAGE_MAX); ids of another
+ * playlist's items are ignored and not counted. Owner only.
  */
 export interface RemovePlaylistItemsRequest {
   itemIds: number[];

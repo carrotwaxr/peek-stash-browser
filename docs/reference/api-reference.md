@@ -747,6 +747,67 @@ interface RemoveSceneFromPlaylistResponse {
 
 ---
 
+### POST /api/playlists/:id/items/remove
+
+**Authentication:** Required
+
+Removes several items by item id (owner only), in one statement. Ids of another playlist's items, or of no item, are ignored and not counted. The other items keep their positions. Answers 400 unless `itemIds` is an array of 1 to 250 positive integers, and 404 when the playlist is not the user's (a recipient's request is refused this way), with nothing removed.
+
+**Request Body:**
+
+```typescript
+interface RemovePlaylistItemsRequest {
+  itemIds: number[]; // PlaylistItemWithScene.id
+}
+```
+
+**Response:**
+
+```typescript
+interface RemovePlaylistItemsResponse {
+  removed: number;
+}
+```
+
+**Controller:** `removePlaylistItems` in `../controllers/playlist.ts`
+
+---
+
+### PUT /api/playlists/:id/items/:itemId/position
+
+**Authentication:** Required
+
+Moves one item, named by its item id, to `index` among the items the owner can see, in playlist order (the order the page shows when sorted by playlist order); an `index` past the end puts it after the last one. Every item of the playlist is then numbered 0 to n-1, and the items the owner cannot see (hidden, restricted, deleted from Stash or on an instance they do not use) keep their places between their neighbours. The read and the renumbering are one transaction, so two moves at once both land. Answers 400 when `index` is not a non-negative integer or `itemId` is not a positive integer, and 404 when the playlist is not the user's (a recipient's move is refused this way), or the item is not in it or not visible to the owner, with nothing moved.
+
+**URL Parameters:**
+
+```typescript
+interface MovePlaylistItemParams {
+  id: string;
+  itemId: string;
+}
+```
+
+**Request Body:**
+
+```typescript
+interface MovePlaylistItemRequest {
+  index: number;
+}
+```
+
+**Response:**
+
+```typescript
+interface MovePlaylistItemResponse {
+  success: true;
+}
+```
+
+**Controller:** `movePlaylistItem` in `../controllers/playlist.ts`
+
+---
+
 ### PUT /api/playlists/:id/reorder
 
 **Authentication:** Required

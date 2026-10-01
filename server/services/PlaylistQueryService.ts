@@ -23,7 +23,9 @@
  *
  * Adds go through `appendItems`: the scenes the adder can see, numbered
  * after the playlist's last item inside the insert itself. "Save as
- * playlist order" goes through `sortPlaylistItems`, in the same order.
+ * playlist order" goes through `sortPlaylistItems`, in the same order. A
+ * reorder moves one item at a time (`moveItem`), renumbering the playlist
+ * 0..n-1.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
@@ -35,11 +37,12 @@ import type {
 import type { NormalizedScene } from "../types/index.js";
 import type {
   PlaylistItemQueryRow,
+  PlaylistMoveQueryRow,
   PlaylistPreviewQueryRow,
   PlaylistQueueQueryRow,
 } from "../types/internal/queryRows.js";
 import type { ParsedPlaylistItemSort } from "../types/parsedFilters.js";
-import { dbWrite } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteTransaction } from "../utils/dbWrite.js";
 import {
   type EntityRef,
   distinctRefs,
@@ -420,6 +423,86 @@ WHERE PlaylistItem.id = n.itemId`;
   return dbWrite("playlist.sort", () =>
     prisma.$executeRawUnsafe(sql, ...params)
   );
+}
+
+/**
+ * Writes the positions 0..n-1 in the order of the item ids in the JSON
+ * array parameter, one statement; rows already in place are not written
+ */
+const RENUMBER_SQL = `WITH o(id, pos) AS (
+  SELECT CAST(j.value AS INTEGER), CAST(j.key AS INTEGER) FROM json_each(?) j
+)
+UPDATE PlaylistItem SET position = o.pos
+FROM o
+WHERE PlaylistItem.id = o.id AND PlaylistItem.position <> o.pos`;
+
+/**
+ * Where item `itemId` lands when moved to `index` among the visible items:
+ * the playlist's item ids in their new order, or null when the item is not
+ * among the visible ones. It goes before the visible item now at `index`
+ * (counted without it), or right after the last visible one when `index`
+ * is past the end; the items the owner cannot see keep their places
+ * between their neighbours.
+ */
+function movedOrder(
+  rows: ReadonlyArray<{ readonly id: number; readonly visible: boolean }>,
+  itemId: number,
+  index: number
+): number[] | null {
+  const from = rows.findIndex((row) => row.id === itemId && row.visible);
+  if (from === -1) return null;
+  const rest = rows.filter((_, i) => i !== from);
+  const visibleAt = rest.flatMap((row, i) => (row.visible ? [i] : []));
+  const last = visibleAt[visibleAt.length - 1];
+  // Alone among the visible items, it stays where it is
+  const at = visibleAt[index] ?? (last === undefined ? from : last + 1);
+  const ids = rest.map((row) => row.id);
+  ids.splice(at, 0, itemId);
+  return ids;
+}
+
+/**
+ * Moves one item of a playlist to `index` among the items the owner sees in
+ * playlist order (what the page shows in reorder mode), and renumbers every
+ * item 0..n-1 (`movedOrder`). One transaction in one write unit: the read
+ * of the playlist's order and the write see one state, so a racing add or
+ * move lands before or after this one, never inside it. The caller has
+ * checked `ownerId` owns the playlist. Answers false, writing nothing, when
+ * the item is not in the playlist or the owner cannot see it.
+ */
+export async function moveItem(
+  playlistId: number,
+  ownerId: number,
+  allowedInstanceIds: readonly string[],
+  itemId: number,
+  index: number
+): Promise<boolean> {
+  const { join, where } = visibleItem(ownerId, allowedInstanceIds, "LEFT JOIN");
+  const readSql = `SELECT pi.id AS id,
+  CASE WHEN s.id IS NOT NULL AND ${where.sql} THEN 1 ELSE 0 END AS visible
+FROM PlaylistItem pi
+${join.sql}
+WHERE pi.playlistId = ?
+ORDER BY pi.position, pi.id`;
+  const readParams = [...where.params, ...join.params, playlistId];
+
+  return dbWriteTransaction("playlist.move", async (tx) => {
+    const rows = await tx.$queryRawUnsafe<PlaylistMoveQueryRow[]>(
+      readSql,
+      ...readParams
+    );
+    const order = movedOrder(
+      rows.map((row) => ({
+        id: row.id,
+        visible: Number(row.visible) === 1,
+      })),
+      itemId,
+      index
+    );
+    if (order === null) return false;
+    await tx.$executeRawUnsafe(RENUMBER_SQL, JSON.stringify(order));
+    return true;
+  });
 }
 
 /**

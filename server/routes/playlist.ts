@@ -10,6 +10,8 @@ import {
   getPlaylistShares,
   getSharedPlaylists,
   getUserPlaylists,
+  movePlaylistItem,
+  removePlaylistItems,
   removeSceneFromPlaylist,
   removeUnavailablePlaylistItems,
   reorderPlaylist,
@@ -69,6 +71,16 @@ router.post(
   "/:id/items/remove-unavailable",
   withAllowedInstances,
   libraryHandler(removeUnavailablePlaylistItems)
+);
+
+// Remove several items by item id (owner only)
+router.post("/:id/items/remove", authenticated(removePlaylistItems));
+
+// Move one item to an index among the items the owner sees (owner only)
+router.put(
+  "/:id/items/:itemId/position",
+  withAllowedInstances,
+  libraryHandler(movePlaylistItem)
 );
 
 // Remove scene from playlist
