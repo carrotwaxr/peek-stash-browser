@@ -6,7 +6,11 @@ import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { generateToken, setTokenCookie } from "../middleware/auth.js";
+import {
+  USERNAME_MAX_LENGTH,
+  generateToken,
+  setTokenCookie,
+} from "../middleware/auth.js";
 import {
   AppError,
   NotFoundError,
@@ -774,7 +778,13 @@ export const createUser = async (
   // Check if user is admin
   const { username, password, role } = req.body;
 
-  if (!username || !password) {
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    !username ||
+    !password ||
+    username.length > USERNAME_MAX_LENGTH
+  ) {
     res.status(400).json({ error: "Username and password are required" });
     return;
   }

@@ -301,6 +301,22 @@ describe("Setup Controller", () => {
       expect(res._getErrorBody().error).toContain("required");
     });
 
+    it("returns 400 when the username is not text or over 255 characters", async () => {
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      for (const username of ["a".repeat(256), 12345]) {
+        const res = resFor(createFirstAdmin);
+        await createFirstAdmin(
+          reqFor(createFirstAdmin, {
+            body: malformed({ username, password: "securepass1" }),
+          }),
+          res
+        );
+        expect(res.status).toHaveBeenCalledWith(400);
+      }
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("returns 400 when password is too short", async () => {
       mockPrisma.user.count.mockResolvedValue(0);
 

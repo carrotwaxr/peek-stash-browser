@@ -20,6 +20,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { _trackedCountForTesting } from "../../middleware/accountLockout.js";
 import { errorHandler } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import authRoutes from "../../routes/auth.js";
@@ -184,6 +185,32 @@ describe("auth routes", () => {
           setupCompleted: true,
         })
       );
+    });
+
+    it("login with a numeric username answers 400 and records no failed attempt", async () => {
+      const before = _trackedCountForTesting();
+
+      const res = await post("/login", { username: 12345, password: PASSWORD });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Username and password are required",
+      });
+      expect(_trackedCountForTesting()).toBe(before);
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("login with a 256-character username answers 400 and the lockout map does not grow", async () => {
+      const before = _trackedCountForTesting();
+
+      const res = await post("/login", {
+        username: "a".repeat(256),
+        password: PASSWORD,
+      });
+
+      expect(res.status).toBe(400);
+      expect(_trackedCountForTesting()).toBe(before);
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
     });
 
     it("login no longer writes a recovery key", async () => {

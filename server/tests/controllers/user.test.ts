@@ -941,6 +941,17 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(400);
     });
 
+    it("creating a user with a 256-character name answers 400", async () => {
+      const req = reqFor(createUser, {
+        body: { username: "a".repeat(256), password: "Pass123" },
+        user: ADMIN,
+      });
+      const res = resFor(createUser);
+      await createUser(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("returns 400 when password too short", async () => {
       const req = reqFor(createUser, {
         body: { username: "new", password: "12345" },
