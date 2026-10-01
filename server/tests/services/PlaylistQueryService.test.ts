@@ -6,18 +6,28 @@
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { getVisibleEntityKeys } from "../../services/EntityAccessService.js";
 import {
+  appendItems,
+  countUnavailableItems,
   duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
+  loadPlaylistQueue,
   moveItem,
+  playlistsHoldingScene,
+  removeUnavailableItems,
+  sortPlaylistItems,
 } from "../../services/PlaylistQueryService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { NormalizedScene } from "../../types/index.js";
 import type {
   PlaylistItemQueryRow,
   PlaylistPreviewQueryRow,
+  PlaylistQueueQueryRow,
 } from "../../types/internal/queryRows.js";
+import type { ParsedPlaylistItemSort } from "../../types/parsedFilters.js";
+import { entityKey } from "../../utils/entityRef.js";
 import { toProxyUrl } from "../../utils/proxyUrl.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
@@ -31,8 +41,19 @@ vi.mock("../../services/SceneQueryBuilder.js", () => ({
   sceneQueryBuilder: { getByRefs: vi.fn() },
 }));
 
+vi.mock("../../services/EntityAccessService.js", () => ({
+  getVisibleEntityKeys: vi.fn(),
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
 const mockGetByRefs = vi.mocked(sceneQueryBuilder.getByRefs);
+const mockVisibleKeys = vi.mocked(getVisibleEntityKeys);
+
+const POSITION_ASC: ParsedPlaylistItemSort = {
+  field: "position",
+  direction: "ASC",
+  seed: undefined,
+};
 
 const USER_ID = 7;
 const ALLOWED = ["a", "b"];
@@ -563,5 +584,315 @@ describe("duplicateVisibleItems", () => {
     const { sql } = duplicateVisibleItems(USER_ID, [], 12);
 
     expect(sql).toContain("AND 1 = 0");
+  });
+});
+
+describe("appendItems", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const ref = (id: string, instanceId: string) => ({ id, instanceId });
+
+  it("inserts the scenes the adder can see, once each, in request order, and counts the rest", async () => {
+    mockVisibleKeys.mockResolvedValue(
+      new Set([entityKey("1", "a"), entityKey("3", "b")])
+    );
+    // One of the two visible scenes was already in the playlist
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+
+    const result = await appendItems(9, USER_ID, [
+      ref("3", "b"),
+      ref("2", "a"),
+      ref("1", "a"),
+      ref("3", "b"),
+    ]);
+
+    expect(result).toEqual({ added: 1, alreadyInPlaylist: 1, unavailable: 1 });
+    expect(mockVisibleKeys).toHaveBeenCalledWith(USER_ID, "scene", [
+      ref("3", "b"),
+      ref("2", "a"),
+      ref("1", "a"),
+    ]);
+    const [sql, ...params] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("INSERT OR IGNORE INTO PlaylistItem");
+    expect(placeholders(sql)).toBe(params.length);
+    expect(params.slice(0, 4)).toEqual([
+      JSON.stringify([
+        ["3", "b"],
+        ["1", "a"],
+      ]),
+      9,
+      9,
+      9,
+    ]);
+    expect(typeof params[4]).toBe("number");
+  });
+
+  it("writes nothing when the adder can see none of the scenes", async () => {
+    mockVisibleKeys.mockResolvedValue(new Set());
+
+    const result = await appendItems(9, USER_ID, [ref("1", "a")]);
+
+    expect(result).toEqual({ added: 0, alreadyInPlaylist: 0, unavailable: 1 });
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+  });
+});
+
+describe("sortPlaylistItems", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renumbers every item in one statement, visible ones in the sort and the rest after them by position, and answers the count", async () => {
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(5);
+
+    const count = await sortPlaylistItems({
+      userId: USER_ID,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 9,
+      sort: { field: "added_at", direction: "DESC", seed: undefined },
+    });
+
+    expect(count).toBe(5);
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+    const [sql, ...params] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("UPDATE PlaylistItem");
+    expect(sql).toContain(
+      "PARTITION BY vis.v ORDER BY pi.addedAt DESC, pi.position, pi.id"
+    );
+    expect(sql).toContain(
+      "CASE WHEN n.v = 1 THEN n.rsort - 1 ELSE n.nvis + n.rpos - 1 END"
+    );
+    // vis's select list (the allowed instances), its join (the viewer's
+    // exclusions), then its WHERE (the playlist)
+    expect(params).toEqual(["a", "b", USER_ID, 9]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+});
+
+describe("playlistsHoldingScene", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("asks nothing for no playlists", async () => {
+    const holding = await playlistsHoldingScene([], {
+      id: "1",
+      instanceId: "a",
+    });
+
+    expect(holding.size).toBe(0);
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("answers the playlists whose items hold the scene on its own instance, in one statement", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      { playlistId: 3 },
+      { playlistId: 5 },
+    ]);
+
+    const holding = await playlistsHoldingScene([3, 4, 5], {
+      id: "42",
+      instanceId: "b",
+    });
+
+    expect([...holding]).toEqual([3, 5]);
+    const [only, ...rest] = statements();
+    expect(rest).toEqual([]);
+    const { sql, params } = must(only);
+    expect(sql).toContain("pi.instanceId = ? AND pi.sceneId = ?");
+    expect(params).toEqual(["[3,4,5]", "b", "42"]);
+  });
+});
+
+describe("loadPlaylistQueue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function queueRow(
+    fields: Partial<PlaylistQueueQueryRow>
+  ): PlaylistQueueQueryRow {
+    return {
+      sceneId: "42",
+      instanceId: "a",
+      title: "Title",
+      filePath: "/videos/clip.mp4",
+      pathScreenshot: "/scene/42/screenshot",
+      duration: 61.5,
+      studioName: "Studio",
+      ...fields,
+    };
+  }
+
+  it("without an allowed instance, an empty queue and no statement", async () => {
+    const queue = await loadPlaylistQueue({
+      userId: USER_ID,
+      allowedInstanceIds: [],
+      playlistId: 9,
+      sort: POSITION_ASC,
+    });
+
+    expect(queue).toEqual([]);
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("reads every visible item in the view's order in one statement, with the studio only when the viewer may see it", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    await loadPlaylistQueue({
+      userId: USER_ID,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 9,
+      sort: POSITION_ASC,
+    });
+
+    const [only, ...rest] = statements();
+    expect(rest).toEqual([]);
+    const { sql, params } = must(only);
+    expect(sql).toContain("LEFT JOIN StashStudio qst");
+    expect(sql).toContain(
+      "NOT EXISTS (SELECT 1 FROM UserExcludedEntity qse WHERE qse.userId = ? AND qse.entityType = 'studio'"
+    );
+    expect(sql).toContain("ORDER BY pi.position ASC, pi.id ASC");
+    // The scene exclusion join, the studio join, the playlist, the instances
+    expect(params).toEqual([USER_ID, USER_ID, 9, "a", "b"]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+
+  it("numbers the entries in the order read, with a title from the file name when the scene has none, a proxied screenshot and no studio when hidden", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      queueRow({}),
+      queueRow({
+        sceneId: "7",
+        instanceId: "b",
+        title: "",
+        filePath: "C:\\media\\holiday.mkv",
+        pathScreenshot: null,
+        duration: null,
+        studioName: null,
+      }),
+      queueRow({ sceneId: "8", title: null, filePath: null }),
+    ]);
+
+    const queue = await loadPlaylistQueue({
+      userId: USER_ID,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 9,
+      sort: POSITION_ASC,
+    });
+
+    expect(queue).toEqual([
+      {
+        sceneId: "42",
+        instanceId: "a",
+        position: 0,
+        scene: {
+          title: "Title",
+          paths: { screenshot: toProxyUrl("/scene/42/screenshot", "a") },
+          files: [{ duration: 61.5, basename: "clip.mp4" }],
+          studio: { name: "Studio" },
+        },
+      },
+      {
+        sceneId: "7",
+        instanceId: "b",
+        position: 1,
+        scene: {
+          title: "holiday",
+          paths: { screenshot: toProxyUrl(null, "b") },
+          files: [{ duration: null, basename: "holiday.mkv" }],
+          studio: null,
+        },
+      },
+      {
+        sceneId: "8",
+        instanceId: "a",
+        position: 2,
+        scene: {
+          title: null,
+          paths: { screenshot: toProxyUrl("/scene/42/screenshot", "a") },
+          files: [],
+          studio: { name: "Studio" },
+        },
+      },
+    ]);
+  });
+});
+
+describe("countUnavailableItems", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("answers the playlist's rows minus the ones the viewer can see, in one statement", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ total: 5n, visible: 3n }]);
+
+    const count = await countUnavailableItems({
+      userId: USER_ID,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 9,
+    });
+
+    expect(count).toBe(2);
+    const [only, ...rest] = statements();
+    expect(rest).toEqual([]);
+    const { sql, params } = must(only);
+    expect(sql).toContain(
+      "(SELECT COUNT(*) FROM PlaylistItem WHERE playlistId = ?) AS total"
+    );
+    expect(sql).toContain("e.id IS NULL");
+    expect(params).toEqual([9, USER_ID, 9, "a", "b"]);
+    expect(placeholders(sql)).toBe(params.length);
+  });
+
+  it("without an allowed instance every item is unavailable", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ total: 4n, visible: 0n }]);
+
+    const count = await countUnavailableItems({
+      userId: USER_ID,
+      allowedInstanceIds: [],
+      playlistId: 9,
+    });
+
+    expect(count).toBe(4);
+    const { sql, params } = must(statements()[0]);
+    expect(sql).toContain("0 AS visible");
+    expect(params).toEqual([9]);
+  });
+
+  it("never answers less than none, and none when no row comes back", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      { total: 2n, visible: 3n },
+    ]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+    const options = {
+      userId: USER_ID,
+      allowedInstanceIds: ALLOWED,
+      playlistId: 9,
+    };
+
+    expect(await countUnavailableItems(options)).toBe(0);
+    expect(await countUnavailableItems(options)).toBe(0);
+  });
+});
+
+describe("removeUnavailableItems", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("deletes the playlist's items whose scene Stash deleted, in one statement, and answers how many went", async () => {
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(2);
+
+    expect(await removeUnavailableItems(9)).toBe(2);
+
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+    const [sql, ...params] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("DELETE FROM PlaylistItem");
+    expect(sql).toContain("s.deletedAt IS NOT NULL");
+    expect(sql).toContain("i.enabled = 1 AND i.firstSyncedAt IS NOT NULL");
+    expect(params).toEqual([9]);
   });
 });
