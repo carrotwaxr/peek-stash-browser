@@ -23,6 +23,7 @@ import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
+import { isVideoImage } from "../../utils/imageMedia";
 import { ratingSequence } from "../../utils/ratingSequence";
 import MetadataDrawer from "./MetadataDrawer";
 
@@ -184,10 +185,9 @@ const Lightbox = ({
 
   // Reset zoom when image changes
   useEffect(() => {
-    if (transformRef.current) {
-      transformRef.current.resetTransform(0); // instant reset (0ms)
-      setZoomScale(1);
-    }
+    // The wrapper is absent while a video entry shows, but the scale resets anyway
+    transformRef.current?.resetTransform(0); // instant reset (0ms)
+    setZoomScale(1);
   }, [currentIndex]);
 
   // Notify parent of index changes (for syncing page on close)
@@ -712,6 +712,7 @@ const Lightbox = ({
 
   const currentImage = images[currentIndex];
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
+  const isVideoEntry = isVideoImage(currentImage);
   const imageTitle = getImageTitle(
     currentImage as Parameters<typeof getImageTitle>[0]
   );
@@ -985,40 +986,59 @@ const Lightbox = ({
               : "visible",
         }}
       >
-        {/* Image with pinch-to-zoom and pan support */}
-        <TransformWrapper
-          ref={transformRef}
-          initialScale={1}
-          minScale={1}
-          maxScale={5}
-          doubleClick={{ disabled: true }}
-          onTransformed={(_ref, state) => setZoomScale(state.scale)}
-          panning={{ disabled: zoomScale <= 1 }}
-          wheel={{ step: 0.2 }}
-        >
-          <TransformComponent
-            wrapperStyle={{ width: "100%", height: "100%" }}
-            contentStyle={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+        {/* Video entries play in a plain <video>; the zoom wrapper is for images only */}
+        {isVideoEntry ? (
+          <video
+            key={currentImageId}
+            src={imageSrc ?? undefined}
+            className="w-full h-full object-contain"
+            style={{
+              opacity: imageLoaded ? 1 : 0,
+              transition: "opacity 0.2s ease-in-out",
             }}
+            controls
+            loop
+            playsInline
+            muted
+            tabIndex={-1}
+            onLoadedData={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(true)}
+          />
+        ) : (
+          <TransformWrapper
+            ref={transformRef}
+            initialScale={1}
+            minScale={1}
+            maxScale={5}
+            doubleClick={{ disabled: true }}
+            onTransformed={(_ref, state) => setZoomScale(state.scale)}
+            panning={{ disabled: zoomScale <= 1 }}
+            wheel={{ step: 0.2 }}
           >
-            <img
-              src={imageSrc ?? undefined}
-              alt={imageTitle ?? undefined}
-              className="max-w-full max-h-full object-contain"
-              style={{
-                opacity: imageLoaded ? 1 : 0,
-                transition: "opacity 0.2s ease-in-out",
+            <TransformComponent
+              wrapperStyle={{ width: "100%", height: "100%" }}
+              contentStyle={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageLoaded(true)}
-            />
-          </TransformComponent>
-        </TransformWrapper>
+            >
+              <img
+                src={imageSrc ?? undefined}
+                alt={imageTitle ?? undefined}
+                className="w-full h-full object-contain"
+                style={{
+                  opacity: imageLoaded ? 1 : 0,
+                  transition: "opacity 0.2s ease-in-out",
+                }}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoaded(true)}
+              />
+            </TransformComponent>
+          </TransformWrapper>
+        )}
 
         {/* Double-tap/double-click visual feedback */}
         {doubleTapFeedback && (

@@ -648,6 +648,91 @@ describe("Lightbox", () => {
     });
   });
 
+  describe("media element", () => {
+    it("an mp4 image entry renders a video, not an img", () => {
+      const images = createMockImages(1, 1) as NormalizedImage[];
+      images[0] = {
+        ...images[0],
+        filePath: "/data/clip.mp4",
+      } as NormalizedImage;
+      const { container } = render(
+        <Lightbox
+          images={images}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      const video = container.querySelector("video");
+      expect(video).not.toBeNull();
+      expect(video?.getAttribute("src")).toBe(images[0].paths.image);
+      expect(video?.hasAttribute("controls")).toBe(true);
+      expect(video?.getAttribute("tabindex")).toBe("-1");
+      expect(container.querySelector("img")).toBeNull();
+    });
+
+    it("an img fills the frame with object-contain", () => {
+      const images = createMockImages(1, 1) as NormalizedImage[];
+      const { container } = render(
+        <Lightbox
+          images={images}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      const img = container.querySelector("img");
+      expect(img?.className).toContain("w-full");
+      expect(img?.className).toContain("h-full");
+      expect(img?.className).toContain("object-contain");
+    });
+
+    it("a video entry becomes visible on loadeddata", () => {
+      const images = createMockImages(1, 1) as NormalizedImage[];
+      images[0] = {
+        ...images[0],
+        filePath: "/data/clip.webm",
+      } as NormalizedImage;
+      const { container } = render(
+        <Lightbox
+          images={images}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      const video = container.querySelector("video");
+      if (!video) throw new Error("no video element");
+      expect(video.style.opacity).toBe("0");
+      fireEvent.loadedData(video);
+      expect(video.style.opacity).toBe("1");
+    });
+
+    it("a video entry becomes visible on error", () => {
+      const images = createMockImages(1, 1) as NormalizedImage[];
+      images[0] = {
+        ...images[0],
+        filePath: "/data/clip.webm",
+      } as NormalizedImage;
+      const { container } = render(
+        <Lightbox
+          images={images}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      const video = container.querySelector("video");
+      if (!video) throw new Error("no video element");
+      fireEvent.error(video);
+      expect(video.style.opacity).toBe("1");
+    });
+  });
+
   describe("prefetch", () => {
     const created: Array<{
       src: string;
