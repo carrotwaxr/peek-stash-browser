@@ -1,6 +1,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
 import { requireData } from "./support/data";
+import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
  * E2E tests for entity detail pages.
@@ -51,7 +52,28 @@ interface HierarchyRef {
 }
 
 interface FindTagsBody {
-  findTags: { tags: Array<HierarchyRef & { parents: HierarchyRef[] }> };
+  findTags: {
+    tags: Array<
+      HierarchyRef & { parents: HierarchyRef[]; image_count: number }
+    >;
+  };
+}
+
+/** What a list's images request asked for */
+interface ImagesRequest {
+  filter?: { sort?: string; direction?: string };
+  image_filter?: { tags?: { value?: string[] } };
+}
+
+/** The body of the next images request the page sends */
+async function nextImagesRequest(page: Page): Promise<ImagesRequest> {
+  const response = await page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/library/images") &&
+      r.request().method() === "POST" &&
+      r.ok()
+  );
+  return response.request().postDataJSON() as ImagesRequest;
 }
 
 interface FindStudiosBody {
@@ -217,6 +239,83 @@ test.describe("Detail Pages", () => {
         exact: true,
       })
     ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("a tag's Images tab lists the tag's images, opens the viewer, and keeps a default preset saved there to itself", async ({
+    browser,
+    baseURL,
+    request,
+  }) => {
+    // The preset is per-user state: a throwaway user of its own
+    const user = await createUser(request, "tag-images");
+    const context = await signIn(browser, baseURL, user);
+    try {
+      await completeSetup(context);
+      const listed = await context.request.post("/api/library/tags", {
+        data: { filter: { per_page: 250 } },
+      });
+      expect(listed.ok(), await listed.text()).toBeTruthy();
+      const tag = requireData(
+        ((await listed.json()) as FindTagsBody).findTags.tags.find(
+          (row) => row.image_count > 0
+        ),
+        "a tag with images"
+      );
+      const tabPath = `${detailPath("tag", tag)}&tab=images`;
+      const page = await context.newPage();
+      const list = new ListPage(page);
+
+      // 1. The tab asks for this tag's images and lists them
+      const firstRequest = nextImagesRequest(page);
+      await page.goto(tabPath);
+      expect((await firstRequest).image_filter?.tags?.value).toEqual([
+        `${tag.id}:${tag.instanceId}`,
+      ]);
+      requireData((await list.waitForResults("Image")) > 0, "tag images");
+
+      // 2. A card opens the viewer on the tab
+      // The card's thumbnail loads once it is in view
+      const card = list.cards("Image").first();
+      await card.scrollIntoViewIfNeeded();
+      await card.locator("img").first().click();
+      const viewer = page.getByRole("dialog", { name: "Image viewer" });
+      await expect(viewer).toBeVisible();
+      await expect(page).toHaveURL(/[?&]image=/);
+      await page.keyboard.press("Escape");
+      await expect(viewer).toBeHidden();
+
+      // 3. A sort by file size saved there as the default
+      await page.goto(`${tabPath}&sort=filesize&dir=DESC`);
+      await list.waitForResults("Image");
+      await page.getByRole("button", { name: "Save Preset" }).click();
+      const dialog = page.getByRole("dialog", { name: "Save Filter Preset" });
+      await dialog.getByPlaceholder("Enter preset name...").fill("By size");
+      await dialog
+        .getByRole("checkbox", { name: /Set as default for Tag pages/ })
+        .check();
+      const saved = page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/user/filter-presets") &&
+          r.request().method() === "POST" &&
+          r.ok()
+      );
+      await dialog.getByRole("button", { name: "Save" }).click();
+      await saved;
+
+      // 4. The tab opens with it; the Images page does not
+      const tabRequest = nextImagesRequest(page);
+      await page.goto(tabPath);
+      expect((await tabRequest).filter).toMatchObject({
+        sort: "filesize",
+        direction: "DESC",
+      });
+      const imagesRequest = nextImagesRequest(page);
+      await page.goto("/images");
+      expect((await imagesRequest).filter?.sort).not.toBe("filesize");
+    } finally {
+      await context.close();
+      await deleteUser(request, user.id);
+    }
   });
 
   test("a child studio's page names its parent; the parent's page lists it and offers its sub-studios", async ({

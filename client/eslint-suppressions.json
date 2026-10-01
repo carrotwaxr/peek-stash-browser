@@ -186,17 +186,6 @@
       "count": 5
     }
   },
-  "src/components/pages/TagDetail.tsx": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 10
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 3
-    }
-  },
   "src/components/pages/UserStats/components/HighlightCard.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
