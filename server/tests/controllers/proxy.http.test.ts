@@ -17,8 +17,15 @@ import {
   it,
   vi,
 } from "vitest";
-import { proxyStashMedia } from "../../controllers/proxy.js";
+import {
+  proxyClipPreview,
+  proxyImage,
+  proxyScenePreview,
+  proxySceneWebp,
+  proxyStashMedia,
+} from "../../controllers/proxy.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
 import type * as mediaAccessModule from "../../utils/mediaAccess.js";
@@ -37,6 +44,10 @@ vi.mock(
 vi.mock("../../utils/mediaAccess.js", async (importOriginal) => ({
   ...(await importOriginal<typeof mediaAccessModule>()),
   canUserLoadMedia: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("../../services/StashInstanceManager.js", async (importOriginal) => {
@@ -246,4 +257,140 @@ describe("the media proxy when Stash fails mid-transfer", () => {
     expect(logger.warn).not.toHaveBeenCalled();
     expect(logger.error).not.toHaveBeenCalled();
   });
+});
+
+/** What Stash received for one request, in lower-case header names. */
+interface StashRequest {
+  url: string;
+  headers: http.IncomingHttpHeaders;
+}
+
+const FILE_BYTES = 1000;
+
+describe("the media proxy and byte ranges", () => {
+  let stashServer: http.Server;
+  const stashRequests: StashRequest[] = [];
+  let peekUrl: string;
+  let closePeek: () => Promise<void>;
+  const mockPrisma = vi.mocked(prisma, true);
+
+  beforeAll(async () => {
+    // A Stash that serves byte ranges: "bytes=0-9" gets 206 with 10 bytes,
+    // anything else the whole file with its validators
+    stashServer = http.createServer((req, res) => {
+      stashRequests.push({ url: req.url ?? "", headers: req.headers });
+      res.setHeader("content-type", "video/mp4");
+      res.setHeader("accept-ranges", "bytes");
+      res.setHeader("etag", '"abc123"');
+      res.setHeader("last-modified", "Wed, 01 Jan 2025 00:00:00 GMT");
+      if (req.headers.range === "bytes=0-9") {
+        res.writeHead(206, {
+          "content-range": `bytes 0-9/${FILE_BYTES}`,
+          "content-length": "10",
+        });
+        res.end(Buffer.alloc(10, 1));
+        return;
+      }
+      res.writeHead(200, { "content-length": String(FILE_BYTES) });
+      res.end(Buffer.alloc(FILE_BYTES, 1));
+    });
+    await new Promise<void>((resolve) =>
+      stashServer.listen(0, "127.0.0.1", resolve)
+    );
+    state.stashUrl = `http://127.0.0.1:${(stashServer.address() as AddressInfo).port}`;
+
+    const peek = await startTestApp((app) => {
+      app.use((req, _res, next) => {
+        (req as AuthenticatedRequest).user = {
+          id: 1,
+          username: "u",
+          role: "USER",
+        };
+        next();
+      });
+      app.get("/api/proxy/scene/:id/preview", authenticated(proxyScenePreview));
+      app.get("/api/proxy/scene/:id/webp", authenticated(proxySceneWebp));
+      app.get("/api/proxy/stash", authenticated(proxyStashMedia));
+      app.get("/api/proxy/clip/:id/preview", authenticated(proxyClipPreview));
+      app.get("/api/proxy/image/:imageId/:type", authenticated(proxyImage));
+    });
+    peekUrl = peek.baseUrl;
+    closePeek = peek.close;
+  });
+
+  afterAll(async () => {
+    await closePeek();
+    await closeServer(stashServer);
+  });
+
+  beforeEach(() => {
+    stashRequests.length = 0;
+    mockPrisma.stashClip.findUnique.mockResolvedValue({
+      streamPath: `${state.stashUrl}/clip/9/stream.mp4`,
+      screenshotPath: null,
+      deletedAt: null,
+    } as never);
+    mockPrisma.stashImage.findUnique.mockResolvedValue({
+      pathThumbnail: null,
+      pathPreview: null,
+      pathImage: "/image/5/image",
+      deletedAt: null,
+    } as never);
+  });
+
+  /** Every handler's route, with a path that reaches Stash. */
+  const ROUTES: Record<string, string> = {
+    "scene preview": "/api/proxy/scene/1/preview?instanceId=inst-a",
+    "scene webp": "/api/proxy/scene/1/webp?instanceId=inst-a",
+    "stash media":
+      "/api/proxy/stash?path=/scene/1/screenshot&instanceId=inst-a",
+    "clip preview": "/api/proxy/clip/9/preview?instanceId=inst-a",
+    image: "/api/proxy/image/5/image?instanceId=inst-a",
+  };
+
+  it("a Range request for a scene preview reaches Stash and answers 206 with Stash's Content-Range and 10 bytes", async () => {
+    const res = await fetch(`${peekUrl}${ROUTES["scene preview"]}`, {
+      headers: { Range: "bytes=0-9" },
+    });
+
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe(`bytes 0-9/${FILE_BYTES}`);
+    expect((await res.arrayBuffer()).byteLength).toBe(10);
+    expect(stashRequests[0]?.headers.range).toBe("bytes=0-9");
+  });
+
+  it("Accept-Ranges, ETag and Last-Modified pass through on a full response", async () => {
+    const res = await fetch(`${peekUrl}${ROUTES["scene preview"]}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("accept-ranges")).toBe("bytes");
+    expect(res.headers.get("etag")).toBe('"abc123"');
+    expect(res.headers.get("last-modified")).toBe(
+      "Wed, 01 Jan 2025 00:00:00 GMT"
+    );
+    expect((await res.arrayBuffer()).byteLength).toBe(FILE_BYTES);
+  });
+
+  it("no Range header from the browser sends none to Stash", async () => {
+    const res = await fetch(`${peekUrl}${ROUTES["scene preview"]}`);
+    await res.arrayBuffer();
+
+    expect(stashRequests).toHaveLength(1);
+    expect(stashRequests[0]?.headers.range).toBeUndefined();
+    expect(stashRequests[0]?.headers["if-range"]).toBeUndefined();
+  });
+
+  it.each(Object.entries(ROUTES))(
+    "the %s handler passes Range and If-Range to Stash and answers 206",
+    async (_name, route) => {
+      const res = await fetch(`${peekUrl}${route}`, {
+        headers: { Range: "bytes=0-9", "If-Range": '"abc123"' },
+      });
+
+      expect(res.status).toBe(206);
+      expect((await res.arrayBuffer()).byteLength).toBe(10);
+      expect(stashRequests[0]?.headers.range).toBe("bytes=0-9");
+      expect(stashRequests[0]?.headers["if-range"]).toBe('"abc123"');
+    }
+  );
 });
