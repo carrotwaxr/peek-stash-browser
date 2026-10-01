@@ -45,6 +45,7 @@ vi.mock("../../services/DownloadService.js", () => ({
     requeueFailedDownload: vi.fn(),
     getUserDownloads: vi.fn(),
     getDownload: vi.fn(),
+    getOwnedDownload: vi.fn(),
     deleteDownload: vi.fn(),
     updateProgress: vi.fn(),
   },
@@ -60,6 +61,7 @@ vi.mock("../../services/PlaylistZipService.js", () => ({
 vi.mock("../../services/DownloadJobQueue.js", () => ({
   downloadJobQueue: {
     enqueue: vi.fn(),
+    cancel: vi.fn(),
   },
 }));
 
@@ -1293,18 +1295,21 @@ describe("Download Controller", () => {
   });
 
   describe("deleteDownload", () => {
+    const ownerReq = (id: string) =>
+      reqFor(deleteDownload, {
+        user: { id: 1, username: "testuser", role: "USER" },
+        params: { id },
+      });
+
     it("should delete download successfully", async () => {
       const res = resFor(deleteDownload);
 
+      mockDownloadService.getOwnedDownload.mockResolvedValue(
+        downloadRow({ id: 1, userId: 1 })
+      );
       mockDownloadService.deleteDownload.mockResolvedValue(undefined);
 
-      await deleteDownload(
-        reqFor(deleteDownload, {
-          user: { id: 1, username: "testuser", role: "USER" },
-          params: { id: "1" },
-        }),
-        res
-      );
+      await deleteDownload(ownerReq("1"), res);
 
       expect(mockDownloadService.deleteDownload).toHaveBeenCalledWith(1, 1);
       expect(res.json).toHaveBeenCalledWith({
@@ -1313,45 +1318,53 @@ describe("Download Controller", () => {
       });
     });
 
+    it("delete cancels the download's build before removing it", async () => {
+      const res = resFor(deleteDownload);
+      mockDownloadService.getOwnedDownload.mockResolvedValue(
+        downloadRow({ id: 5, userId: 1 })
+      );
+      mockDownloadService.deleteDownload.mockResolvedValue(undefined);
+      mockDownloadJobQueue.cancel.mockResolvedValue(undefined);
+
+      await deleteDownload(ownerReq("5"), res);
+
+      expect(mockDownloadJobQueue.cancel).toHaveBeenCalledExactlyOnceWith(5);
+      expect(
+        must(mockDownloadJobQueue.cancel.mock.invocationCallOrder[0])
+      ).toBeLessThan(
+        must(mockDownloadService.deleteDownload.mock.invocationCallOrder[0])
+      );
+    });
+
     it("a download that is not found reaches the error handler as a 404", async () => {
       const res = resFor(deleteDownload);
 
-      mockDownloadService.deleteDownload.mockRejectedValue(
+      mockDownloadService.getOwnedDownload.mockRejectedValue(
         new NotFoundError("Download not found")
       );
 
-      await expect(
-        deleteDownload(
-          reqFor(deleteDownload, {
-            user: { id: 1, username: "testuser", role: "USER" },
-            params: { id: "999" },
-          }),
-          res
-        )
-      ).rejects.toMatchObject({
+      await expect(deleteDownload(ownerReq("999"), res)).rejects.toMatchObject({
         statusCode: 404,
         message: "Download not found",
       });
       expect(res.json).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.cancel).not.toHaveBeenCalled();
     });
 
-    it("another user's download reaches the error handler as a 403", async () => {
+    it("another user's download is refused with a 403 and its build is not cancelled", async () => {
       const res = resFor(deleteDownload);
 
-      mockDownloadService.deleteDownload.mockRejectedValue(
+      mockDownloadService.getOwnedDownload.mockRejectedValue(
         new ForbiddenError("Access denied")
       );
 
-      await expect(
-        deleteDownload(
-          reqFor(deleteDownload, {
-            user: { id: 1, username: "testuser", role: "USER" },
-            params: { id: "1" },
-          }),
-          res
-        )
-      ).rejects.toMatchObject({ statusCode: 403, message: "Access denied" });
+      await expect(deleteDownload(ownerReq("1"), res)).rejects.toMatchObject({
+        statusCode: 403,
+        message: "Access denied",
+      });
       expect(res.json).not.toHaveBeenCalled();
+      expect(mockDownloadJobQueue.cancel).not.toHaveBeenCalled();
+      expect(mockDownloadService.deleteDownload).not.toHaveBeenCalled();
     });
   });
 

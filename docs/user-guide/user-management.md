@@ -54,7 +54,7 @@ From the user table, you can also:
 | Action | Description |
 |--------|-------------|
 | **Sync from Stash** | Import ratings, favorites, O counts, plays, watch time and resume points from Stash for this user |
-| **Delete** | Remove the user account |
+| **Delete** | Remove the user account, all their data and their download files |
 
 !!! warning "Cannot Delete Self"
     Admins cannot delete their own account. Another admin must perform this action.

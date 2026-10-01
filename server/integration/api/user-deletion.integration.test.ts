@@ -12,11 +12,13 @@
  * The users here never log in, so the server starts no ranking recompute
  * for them (routes/auth.ts) that could land between the steps.
  */
+import * as fs from "fs";
 import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { deleteOrphanedUserRows } from "../../services/DataMigrationService.js";
 import { must } from "../../tests/helpers/must.js";
+import { userDownloadsDir, zipPath } from "../../utils/downloadPaths.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TEST_CONFIG } from "../helpers/config.js";
 import { adminClient } from "../helpers/testClient.js";
@@ -269,6 +271,33 @@ describe("Deleting a user (integration)", () => {
     expect(
       await prisma.playlistShare.count({ where: { playlistId: playlist.id } })
     ).toBe(0);
+  });
+
+  it("deleting a user removes their zip files", async () => {
+    const userId = await createUser("user_delete_it_zips");
+    createdUserIds.push(userId);
+    const row = await prisma.download.create({
+      data: {
+        userId,
+        instanceId,
+        type: "PLAYLIST",
+        status: "COMPLETED",
+        fileName: "user-delete-it.zip",
+      },
+    });
+    const file = zipPath(userId, row.id);
+    await prisma.download.update({
+      where: { id: row.id },
+      data: { filePath: file },
+    });
+    fs.mkdirSync(userDownloadsDir(userId), { recursive: true });
+    fs.writeFileSync(file, "zip bytes");
+
+    const deleted = await adminClient.delete(`/api/user/${userId}`);
+    expect(deleted.status, JSON.stringify(deleted.data)).toBe(200);
+
+    expect(fs.existsSync(userDownloadsDir(userId))).toBe(false);
+    expect(await prisma.download.count({ where: { userId } })).toBe(0);
   });
 
   it("the data migration deletes only rows whose user no longer exists", async () => {

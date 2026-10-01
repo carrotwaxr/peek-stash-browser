@@ -13,7 +13,10 @@ import {
 import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
-import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
+import {
+  scheduleDownloadCleanup,
+  sweepOrphanedDownloadFiles,
+} from "./jobs/downloadCleanup.js";
 import { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { recoverPendingDownloads } from "./services/DownloadJobQueue.js";
@@ -92,6 +95,8 @@ const main = async () => {
     // instances' scenes are loaded (with none configured they wait for the
     // next start that has one)
     await recoverPendingDownloads();
+    // Then the zip files no row and no build owns (a crash left them)
+    await sweepOrphanedDownloadFiles();
 
     // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
     await dataMigrationService.runPendingMigrations();

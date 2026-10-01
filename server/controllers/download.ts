@@ -499,6 +499,9 @@ export async function deleteDownload(
     return res.status(400).json({ error: "Invalid download ID" });
   }
 
+  // Ownership first: another user's id must not cancel someone's build
+  await downloadService.getOwnedDownload(downloadId, userId);
+  await downloadJobQueue.cancel(downloadId);
   await downloadService.deleteDownload(downloadId, userId);
 
   logger.info("Download deleted", { downloadId, userId });

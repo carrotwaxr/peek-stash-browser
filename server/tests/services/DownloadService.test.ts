@@ -1,6 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
+import { userDownloadsDir, zipPath } from "../../utils/downloadPaths.js";
 import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -487,6 +491,93 @@ describe("DownloadService", () => {
       });
     });
 
+    describe("the zip file", () => {
+      const previousConfigDir = process.env.CONFIG_DIR;
+      let configDir: string;
+
+      beforeEach(() => {
+        configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-dl-del-"));
+        process.env.CONFIG_DIR = configDir;
+      });
+
+      afterEach(() => {
+        if (previousConfigDir === undefined) delete process.env.CONFIG_DIR;
+        else process.env.CONFIG_DIR = previousConfigDir;
+        fs.rmSync(configDir, { recursive: true, force: true });
+      });
+
+      function writeZip(userId: number, downloadId: number): string {
+        const file = zipPath(userId, downloadId);
+        fs.mkdirSync(userDownloadsDir(userId), { recursive: true });
+        fs.writeFileSync(file, "zip bytes");
+        return file;
+      }
+
+      it("deleting a completed zip removes its file", async () => {
+        const file = writeZip(1, 7);
+        const row = downloadRow({
+          id: 7,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: file,
+        });
+        vi.mocked(prisma.download.findUnique).mockResolvedValue(row);
+        vi.mocked(prisma.download.delete).mockResolvedValue(row);
+
+        await service.deleteDownload(7, 1);
+
+        expect(fs.existsSync(file)).toBe(false);
+      });
+
+      it("deleting a zip still being built removes its partial file", async () => {
+        const file = writeZip(1, 8);
+        const row = downloadRow({
+          id: 8,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "PROCESSING",
+          filePath: null,
+        });
+        vi.mocked(prisma.download.findUnique).mockResolvedValue(row);
+        vi.mocked(prisma.download.delete).mockResolvedValue(row);
+
+        await service.deleteDownload(8, 1);
+
+        expect(fs.existsSync(file)).toBe(false);
+      });
+
+      it("a missing file is not an error", async () => {
+        const row = downloadRow({
+          id: 9,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: zipPath(1, 9),
+        });
+        vi.mocked(prisma.download.findUnique).mockResolvedValue(row);
+        vi.mocked(prisma.download.delete).mockResolvedValue(row);
+
+        await expect(service.deleteDownload(9, 1)).resolves.toBeUndefined();
+      });
+
+      it("a scene download has no file to remove", async () => {
+        const other = writeZip(1, 10);
+        const row = downloadRow({
+          id: 11,
+          userId: 1,
+          type: "SCENE",
+          status: "COMPLETED",
+        });
+        vi.mocked(prisma.download.findUnique).mockResolvedValue(row);
+        vi.mocked(prisma.download.delete).mockResolvedValue(row);
+
+        await service.deleteDownload(11, 1);
+
+        expect(fs.existsSync(other)).toBe(true);
+      });
+    });
+
     it("should throw if download not found", async () => {
       vi.mocked(prisma.download.findUnique).mockResolvedValue(null);
 
@@ -507,6 +598,29 @@ describe("DownloadService", () => {
       await expect(service.deleteDownload(1, 1)).rejects.toMatchObject({
         statusCode: 403,
         message: "Access denied",
+      });
+    });
+  });
+
+  describe("getOwnedDownload", () => {
+    it("returns the row of its owner", async () => {
+      const row = downloadRow({ id: 1, userId: 1 });
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(row);
+
+      expect(await service.getOwnedDownload(1, 1)).toEqual(row);
+    });
+
+    it("throws 404 for a missing row and 403 for another user's", async () => {
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(null);
+      await expect(service.getOwnedDownload(9, 1)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(
+        downloadRow({ id: 1, userId: 2 })
+      );
+      await expect(service.getOwnedDownload(1, 1)).rejects.toMatchObject({
+        statusCode: 403,
       });
     });
   });

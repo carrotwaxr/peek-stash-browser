@@ -7,8 +7,17 @@
  */
 import type { User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import * as fs from "fs";
 import jwt from "jsonwebtoken";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type MockInstance,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   adminRegenerateRecoveryKey,
   adminResetPassword,
@@ -28,10 +37,13 @@ import {
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import userRoutes from "../../routes/user.js";
+import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { recommendationService } from "../../services/RecommendationService.js";
 import type { UserRestriction } from "../../types/api/index.js";
+import { userDownloadsDir } from "../../utils/downloadPaths.js";
+import { logger } from "../../utils/logger.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import {
@@ -103,7 +115,13 @@ vi.mock("../../services/RecommendationService.js", () => ({
   recommendationService: { forget: vi.fn() },
 }));
 
+// The zips of the deleted user's downloads: stopped, then their folder removed
+vi.mock("../../services/DownloadJobQueue.js", () => ({
+  downloadJobQueue: { cancelUser: vi.fn() },
+}));
+
 const mockPrisma = vi.mocked(prisma, true);
+const mockDownloadQueue = vi.mocked(downloadJobQueue, true);
 const mockExclusions = vi.mocked(exclusionComputationService);
 const mockRankings = vi.mocked(rankingComputeService, true);
 const mockRecommendations = vi.mocked(recommendationService, true);
@@ -1058,6 +1076,16 @@ describe("User Controller", () => {
   // ─── deleteUser ───
 
   describe("deleteUser", () => {
+    // No test here touches the real downloads folder
+    let rm: MockInstance<typeof fs.promises.rm>;
+    beforeEach(() => {
+      mockDownloadQueue.cancelUser.mockResolvedValue(undefined);
+      rm = vi.spyOn(fs.promises, "rm").mockResolvedValue(undefined);
+    });
+    afterEach(() => {
+      rm.mockRestore();
+    });
+
     it("returns 403 when non-admin", async () => {
       const req = reqFor(deleteUser, { params: { userId: "3" }, user: USER });
       const res = resFor(deleteUser);
@@ -1136,6 +1164,41 @@ describe("User Controller", () => {
       expect(
         must(mockRecommendations.forget.mock.invocationCallOrder[0])
       ).toBeGreaterThan(deletedAt);
+    });
+
+    it("deleting a user cancels their zips and removes their downloads folder", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      expect(mockDownloadQueue.cancelUser).toHaveBeenCalledExactlyOnceWith(3);
+      expect(rm).toHaveBeenCalledExactlyOnceWith(userDownloadsDir(3), {
+        recursive: true,
+        force: true,
+      });
+      const deletedAt = must(
+        mockPrisma.$transaction.mock.invocationCallOrder[0]
+      );
+      expect(
+        must(mockDownloadQueue.cancelUser.mock.invocationCallOrder[0])
+      ).toBeGreaterThan(deletedAt);
+      expect(must(rm.mock.invocationCallOrder[0])).toBeGreaterThan(
+        must(mockDownloadQueue.cancelUser.mock.invocationCallOrder[0])
+      );
+    });
+
+    it("a failure removing the folder is logged, the delete still answers 200", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
+      rm.mockRejectedValue(new Error("EACCES"));
+      const req = reqFor(deleteUser, { params: { userId: "3" }, user: ADMIN });
+      const res = resFor(deleteUser);
+      await deleteUser(req, res);
+
+      expect(res._getOkBody().success).toBe(true);
+      expect(logger.warn).toHaveBeenCalled();
     });
 
     it("a failed delete answers 500 and forgets nothing", async () => {
