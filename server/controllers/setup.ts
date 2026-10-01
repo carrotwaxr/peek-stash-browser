@@ -1,7 +1,11 @@
 import bcrypt from "bcryptjs";
 import type { Request } from "express";
 import { StashClient, describeStashError } from "../graphql/StashClient.js";
-import { generateToken, setTokenCookie } from "../middleware/auth.js";
+import {
+  USERNAME_MAX_LENGTH,
+  generateToken,
+  setTokenCookie,
+} from "../middleware/auth.js";
 import { ConflictError, ValidationError } from "../middleware/errorHandler.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
@@ -106,7 +110,13 @@ export const createFirstAdmin = async (
 
   const { username, password } = req.body;
 
-  if (!username || !password) {
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    !username ||
+    !password ||
+    username.length > USERNAME_MAX_LENGTH
+  ) {
     res.status(400).json({
       error: "Username and password are required",
     });

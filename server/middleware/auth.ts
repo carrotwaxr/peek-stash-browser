@@ -23,6 +23,9 @@ import {
 const TOKEN_EXPIRY_HOURS = 2;
 const TOKEN_REFRESH_THRESHOLD_HOURS = 1;
 
+/** The longest username a login, a new user or the setup wizard accepts. */
+export const USERNAME_MAX_LENGTH = 255;
+
 /** A session ends this long after its password sign-in (`authTime`), even while in use. */
 export const MAX_SESSION_AGE_SECONDS = 30 * 24 * 60 * 60;
 

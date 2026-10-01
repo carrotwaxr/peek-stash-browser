@@ -8,6 +8,7 @@ import {
 } from "../middleware/accountLockout.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import {
+  USERNAME_MAX_LENGTH,
   authenticate,
   generateToken,
   setTokenCookie,
@@ -25,11 +26,17 @@ const router = express.Router();
 // Login endpoint
 router.post("/login", authRateLimiter, async (req, res) => {
   const { username, password } = req.body as {
-    username: string;
-    password: string;
+    username: unknown;
+    password: unknown;
   };
 
-  if (!username || !password) {
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    !username ||
+    !password ||
+    username.length > USERNAME_MAX_LENGTH
+  ) {
     res.status(400).json({ error: "Username and password are required" });
     return;
   }
@@ -135,9 +142,13 @@ router.get(
 
 // Forgot password - check username and get recovery method
 router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
-  const { username } = req.body as { username: string };
+  const { username } = req.body as { username: unknown };
 
-  if (!username) {
+  if (
+    typeof username !== "string" ||
+    !username ||
+    username.length > USERNAME_MAX_LENGTH
+  ) {
     res.status(400).json({ error: "Username is required" });
     return;
   }
@@ -159,12 +170,20 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 // Forgot password - verify recovery key and set new password
 router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
   const { username, recoveryKey, newPassword } = req.body as {
-    username: string;
-    recoveryKey: string;
-    newPassword: string;
+    username: unknown;
+    recoveryKey: unknown;
+    newPassword: unknown;
   };
 
-  if (!username || !recoveryKey || !newPassword) {
+  if (
+    typeof username !== "string" ||
+    typeof recoveryKey !== "string" ||
+    typeof newPassword !== "string" ||
+    !username ||
+    !recoveryKey ||
+    !newPassword ||
+    username.length > USERNAME_MAX_LENGTH
+  ) {
     res.status(400).json({ error: "All fields are required" });
     return;
   }
