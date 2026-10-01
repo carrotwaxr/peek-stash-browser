@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useRef } from "react";
+import { mayTakeFocus } from "../utils/pageFocus";
 import { useShortcutScope } from "./useShortcutScope";
 
 /**
@@ -99,7 +100,8 @@ export const useFocusTrap = (
 
 /**
  * Hook for managing initial focus on page load
- * Focuses the first meaningful interactive element
+ * Focuses the first meaningful interactive element, unless the user has
+ * already put focus on another element by then (see `mayTakeFocus`)
  *
  * @param {Object} containerRef Ref to the container element
  * @param {string} selector Optional CSS selector for the element to focus
@@ -134,7 +136,11 @@ export const useInitialFocus = (
         elementToFocus = container.querySelector(focusableSelectors);
       }
 
-      if (elementToFocus && (elementToFocus as HTMLElement).focus) {
+      if (
+        elementToFocus &&
+        (elementToFocus as HTMLElement).focus &&
+        mayTakeFocus(elementToFocus)
+      ) {
         (elementToFocus as HTMLElement).focus();
       }
     }, 100);

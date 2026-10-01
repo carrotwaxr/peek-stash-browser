@@ -80,8 +80,10 @@ function fakePlayer() {
     minimumPlayPercent: 0,
   };
   const setSources = vi.fn();
+  const el = document.createElement("div");
   const player = {
     handlers,
+    el: () => el,
     trackActivity: () => trackActivity,
     sourceSelector: () => ({ setSources }),
     setSources,
@@ -394,6 +396,35 @@ describe("useVideoPlayer", () => {
       [onB, canDecode],
     ]);
     expect(player.load).toHaveBeenCalledTimes(2);
+  });
+
+  describe("focus on a new scene", () => {
+    it("the player takes focus while focus is on nothing", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+
+      renderPlayer(player, onA);
+
+      expect(player.focus).toHaveBeenCalledTimes(1);
+      player.el().remove();
+    });
+
+    it("a scene that loads after the user focused a control outside the player leaves focus there", () => {
+      const player = fakePlayer();
+      document.body.appendChild(player.el());
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+
+      renderPlayer(player, onA);
+
+      expect(player.focus).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
+      player.el().remove();
+    });
   });
 
   it("a queue step to an entry of the same scene seeks it to the start without loading it again", () => {
