@@ -8,7 +8,7 @@ import {
 } from "../../api/hooks/useDownloads";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
-import { Button, PageHeader, PageLayout } from "../ui/index";
+import { Button, PageHeader, PageLayout, StatusMessage } from "../ui/index";
 
 /**
  * Format bytes to human readable string
@@ -55,23 +55,27 @@ const getDisplayName = (fileName: string): string => {
 const getStatusBadge = (status: string) => {
   const statusStyles = {
     PENDING: {
-      backgroundColor: "rgba(59, 130, 246, 0.2)",
-      color: "rgb(59, 130, 246)",
+      backgroundColor:
+        "color-mix(in srgb, var(--status-info) 20%, transparent)",
+      color: "var(--status-info)",
       text: "Queued",
     },
     PROCESSING: {
-      backgroundColor: "rgba(234, 179, 8, 0.2)",
-      color: "rgb(234, 179, 8)",
+      backgroundColor:
+        "color-mix(in srgb, var(--status-warning) 20%, transparent)",
+      color: "var(--status-warning)",
       text: "Processing",
     },
     COMPLETED: {
-      backgroundColor: "rgba(34, 197, 94, 0.2)",
-      color: "rgb(34, 197, 94)",
+      backgroundColor:
+        "color-mix(in srgb, var(--status-success) 20%, transparent)",
+      color: "var(--status-success)",
       text: "Completed",
     },
     FAILED: {
-      backgroundColor: "rgba(239, 68, 68, 0.2)",
-      color: "rgb(239, 68, 68)",
+      backgroundColor:
+        "color-mix(in srgb, var(--status-error) 20%, transparent)",
+      color: "var(--status-error)",
       text: "Failed",
     },
     EXPIRED: {
@@ -380,15 +384,12 @@ const Downloads = () => {
 
                     {/* Error message for failed downloads */}
                     {hasFailed ? (
-                      <div
-                        className="mt-2 text-sm p-2 rounded"
-                        style={{
-                          backgroundColor: "rgba(239, 68, 68, 0.1)",
-                          color: "rgb(239, 68, 68)",
-                        }}
-                      >
-                        {download.error}
-                      </div>
+                      <StatusMessage
+                        variant="error"
+                        title={null}
+                        className="mt-2 text-sm"
+                        message={download.error}
+                      />
                     ) : null}
 
                     {/* Hint for expired downloads */}

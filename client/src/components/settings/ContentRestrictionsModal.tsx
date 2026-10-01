@@ -7,9 +7,9 @@ import { apiDelete, apiGet, apiPut, getErrorMessage } from "../../api";
 import {
   Button,
   ConfirmDialog,
-  ErrorMessage,
   Modal,
   SearchableSelect,
+  StatusMessage,
 } from "../ui/index";
 
 interface UserData {
@@ -493,9 +493,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
 
           {loadError && (
             <div className="space-y-2">
-              <ErrorMessage
+              <StatusMessage
+                variant="error"
                 title="Failed to load restrictions"
-                error={loadError}
+                message={loadError}
                 onRetry={() => setLoadAttempt((n) => n + 1)}
               />
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>

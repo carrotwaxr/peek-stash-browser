@@ -373,11 +373,11 @@ const HelpModal = ({ onClose }: Props) => {
                 style={{
                   backgroundColor:
                     activeTab === "hotkeys"
-                      ? "rgba(59, 130, 246, 0.1)"
+                      ? "var(--status-info-bg)"
                       : "transparent",
                   color:
                     activeTab === "hotkeys"
-                      ? "rgb(59, 130, 246)"
+                      ? "var(--status-info)"
                       : "var(--text-secondary)",
                 }}
               >
@@ -454,11 +454,11 @@ const HelpModal = ({ onClose }: Props) => {
                   style={{
                     backgroundColor:
                       activeTab === "hotkeys"
-                        ? "rgba(59, 130, 246, 0.1)"
+                        ? "var(--status-info-bg)"
                         : "transparent",
                     color:
                       activeTab === "hotkeys"
-                        ? "rgb(59, 130, 246)"
+                        ? "var(--status-info)"
                         : "var(--text-secondary)",
                   }}
                 >
@@ -523,8 +523,8 @@ const HelpModal = ({ onClose }: Props) => {
                   <div
                     className="mt-6 p-4 rounded-lg text-sm"
                     style={{
-                      backgroundColor: "rgba(59, 130, 246, 0.1)",
-                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      backgroundColor: "var(--status-info-bg)",
+                      border: "1px solid var(--status-info-border)",
                       color: "var(--text-secondary)",
                     }}
                   >

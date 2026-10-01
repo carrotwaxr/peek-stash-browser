@@ -1,6 +1,6 @@
 import { getErrorMessage } from "../../api/client";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
-import ErrorMessage from "./ErrorMessage";
+import StatusMessage from "./StatusMessage";
 
 interface Props {
   /** The counts request's error while no counts have loaded, else nothing */
@@ -16,10 +16,11 @@ interface Props {
 const RelationCountsError = ({ error, onRetry }: Props) => {
   if (!error || isLibraryInitializing(error)) return null;
   return (
-    <ErrorMessage
+    <StatusMessage
+      variant="error"
       className="mt-6"
       title="Could not load the counts"
-      error={getErrorMessage(error)}
+      message={getErrorMessage(error)}
       onRetry={onRetry}
     />
   );

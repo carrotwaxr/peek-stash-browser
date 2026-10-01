@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "../../../api";
 import { useAuth } from "../../../hooks/useAuth";
+import { StatusMessage } from "../../ui/index";
 import UserManagementSection from "../UserManagementSection";
 
 interface UserItem {
@@ -63,29 +64,21 @@ const UserManagementTab = () => {
     <div>
       {/* Messages */}
       {message && (
-        <div
-          className="mb-6 p-4 rounded-lg"
-          style={{
-            backgroundColor: "rgba(34, 197, 94, 0.1)",
-            border: "1px solid rgba(34, 197, 94, 0.3)",
-            color: "rgb(34, 197, 94)",
-          }}
-        >
-          {message}
-        </div>
+        <StatusMessage
+          variant="success"
+          title={null}
+          className="mb-6"
+          message={message}
+        />
       )}
 
       {error && (
-        <div
-          className="mb-6 p-4 rounded-lg"
-          style={{
-            backgroundColor: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "rgb(239, 68, 68)",
-          }}
-        >
-          {error}
-        </div>
+        <StatusMessage
+          variant="error"
+          title={null}
+          className="mb-6"
+          message={error}
+        />
       )}
 
       {/* User Management Section */}

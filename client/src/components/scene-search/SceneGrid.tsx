@@ -15,12 +15,12 @@ import {
   BulkActionBar,
   Button,
   EmptyState,
-  ErrorMessage,
   HideConfirmationDialog,
   LoadingSpinner,
   Pagination,
   SceneCard,
   SkeletonSceneCard,
+  StatusMessage,
 } from "../ui/index";
 
 interface Props {
@@ -181,7 +181,7 @@ const SceneGrid = ({
   }
 
   if (error) {
-    return <ErrorMessage error={error} />;
+    return <StatusMessage variant="error" message={error} />;
   }
 
   if (!scenes || scenes.length === 0) {

@@ -24,11 +24,11 @@ import TimelineView from "../timeline/TimelineView";
 import { periodDateRange } from "../timeline/useTimelineState";
 import {
   EmptyState,
-  ErrorMessage,
   LibraryInitializingBanner,
   PageHeader,
   PageLayout,
   SearchControls,
+  StatusMessage,
 } from "../ui/index";
 import WallView from "../wall/WallView";
 import ListSkeleton from "./ListSkeleton";
@@ -398,8 +398,9 @@ const EntityListPage = ({
     if (viewMode === "folder") {
       if (folderTagsFailed) {
         return (
-          <ErrorMessage
-            error={folderTagsError}
+          <StatusMessage
+            variant="error"
+            message={folderTagsError}
             onRetry={() => void refetchFolderTags()}
           />
         );
@@ -468,7 +469,7 @@ const EntityListPage = ({
     <PageLayout>
       {documentTitle}
       <PageHeader title={title} subtitle={subtitle} />
-      <ErrorMessage error={error} />
+      <StatusMessage variant="error" message={error} />
     </PageLayout>
   ) : (
     <PageLayout>

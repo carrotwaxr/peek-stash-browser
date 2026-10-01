@@ -17,7 +17,7 @@ import {
   updateUserPermissionOverrides,
 } from "../../api";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
-import { Button, ConfirmDialog, Modal } from "../ui/index";
+import { Button, ConfirmDialog, Modal, StatusMessage } from "../ui/index";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 interface UserData {
@@ -339,7 +339,7 @@ const UserEditModalContent = ({
       );
     }
     return (
-      <span className="text-xs" style={{ color: "rgb(59, 130, 246)" }}>
+      <span className="text-xs" style={{ color: "var(--status-info)" }}>
         Inherited from: {source}
       </span>
     );
@@ -375,15 +375,12 @@ const UserEditModalContent = ({
         <div className="space-y-6">
           {/* Error display */}
           {error && (
-            <div
-              className="p-3 rounded-lg text-sm"
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                color: "rgb(239, 68, 68)",
-              }}
-            >
-              {error}
-            </div>
+            <StatusMessage
+              variant="error"
+              title={null}
+              className="text-sm"
+              message={error}
+            />
           )}
 
           {/* Section 1: Basic Info */}
@@ -495,7 +492,7 @@ const UserEditModalContent = ({
                         className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-opacity-50"
                         style={{
                           backgroundColor: isMember
-                            ? "rgba(59, 130, 246, 0.05)"
+                            ? "color-mix(in srgb, var(--status-info) 5%, transparent)"
                             : "transparent",
                         }}
                       >

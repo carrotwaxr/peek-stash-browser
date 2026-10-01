@@ -12,7 +12,7 @@ import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
-import { Button, Paper } from "../ui/index";
+import { Button, Paper, StatusMessage } from "../ui/index";
 
 interface StashInstance {
   id: string;
@@ -402,15 +402,12 @@ const StashInstanceSection = () => {
             <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
           </div>
         ) : error ? (
-          <div
-            className="p-3 rounded-lg text-sm"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
-            {error}
-          </div>
+          <StatusMessage
+            variant="error"
+            title={null}
+            className="text-sm"
+            message={error}
+          />
         ) : showAddForm ? (
           // Add/Edit Form
           <div className="space-y-4">
@@ -606,16 +603,10 @@ const StashInstanceSection = () => {
 
             {/* Test Result */}
             {testResult && (
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: testResult.success
-                    ? "rgba(34, 197, 94, 0.1)"
-                    : "rgba(239, 68, 68, 0.1)",
-                  color: testResult.success
-                    ? "rgb(34, 197, 94)"
-                    : "rgb(239, 68, 68)",
-                }}
+              <StatusMessage
+                variant={testResult.success ? "success" : "error"}
+                title={null}
+                className="text-sm"
               >
                 <div>{testResult.message}</div>
                 {testResult.details && (
@@ -623,25 +614,19 @@ const StashInstanceSection = () => {
                     {testResult.details}
                   </div>
                 )}
-              </div>
+              </StatusMessage>
             )}
 
             {/* Form Error */}
             {formError && (
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: "rgba(239, 68, 68, 0.1)",
-                  color: "rgb(239, 68, 68)",
-                }}
-              >
+              <StatusMessage variant="error" title={null} className="text-sm">
                 <div>{formError.message}</div>
                 {formError.details && (
                   <div className="mt-1 text-xs opacity-80">
                     {formError.details}
                   </div>
                 )}
-              </div>
+              </StatusMessage>
             )}
 
             {/* Form Actions */}
@@ -770,32 +755,20 @@ const StashInstanceSection = () => {
             ))}
 
             {instances.length > 1 && (
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: "rgba(59, 130, 246, 0.1)",
-                  color: "var(--text-secondary)",
-                }}
-              >
+              <StatusMessage variant="info" title={null} className="text-sm">
                 Content from all enabled instances is combined in your library.
                 When duplicates are found (via StashDB IDs), the instance with
                 the lowest priority number is used as the primary source.
-              </div>
+              </StatusMessage>
             )}
           </div>
         ) : (
-          <div
-            className="p-4 rounded-lg text-center"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
+          <StatusMessage variant="error" title={null}>
             <p className="font-medium">No Stash Instance Configured</p>
             <p className="text-sm mt-1 opacity-80">
               Please complete the setup wizard to connect to a Stash server.
             </p>
-          </div>
+          </StatusMessage>
         )}
       </Paper.Body>
       {confirmDialog}

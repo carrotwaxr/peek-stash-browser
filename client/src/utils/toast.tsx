@@ -1,10 +1,5 @@
 import toast from "react-hot-toast";
-import {
-  ErrorMessage,
-  InfoMessage,
-  SuccessMessage,
-  WarningMessage,
-} from "../components/ui/index";
+import StatusMessage from "../components/ui/StatusMessage";
 
 /**
  * Toast utility functions for showing notifications
@@ -24,7 +19,6 @@ interface ToastOptions {
   /** Calls with one id show one toast: a repeating failure does not stack */
   id?: string;
   position?: ToastPosition;
-  onRetry?: () => void;
   [key: string]: unknown;
 }
 
@@ -37,7 +31,8 @@ interface PromiseMessages {
 export const showSuccess = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
-      <SuccessMessage
+      <StatusMessage
+        variant="success"
         message={message}
         mode="toast"
         onClose={() => toast.dismiss(t.id)}
@@ -57,11 +52,10 @@ export const showError = (
 ) => {
   return toast.custom(
     (t) => (
-      <ErrorMessage
-        error={error}
+      <StatusMessage
+        variant="error"
+        message={error}
         mode="toast"
-        showRetry={false}
-        onRetry={options.onRetry}
         onClose={() => toast.dismiss(t.id)}
       />
     ),
@@ -76,7 +70,8 @@ export const showError = (
 export const showWarning = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
-      <WarningMessage
+      <StatusMessage
+        variant="warning"
         message={message}
         mode="toast"
         onClose={() => toast.dismiss(t.id)}
@@ -93,7 +88,8 @@ export const showWarning = (message: string, options: ToastOptions = {}) => {
 export const showInfo = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
-      <InfoMessage
+      <StatusMessage
+        variant="info"
         message={message}
         mode="toast"
         onClose={() => toast.dismiss(t.id)}

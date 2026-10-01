@@ -5,7 +5,7 @@ import {
   validatePassword,
 } from "@peek/shared-types/password.js";
 import { apiPost } from "../../api";
-import { Button, Modal } from "../ui/index";
+import { Button, Modal, StatusMessage } from "../ui/index";
 
 interface Props {
   onClose: () => void;
@@ -65,15 +65,12 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
       <form onSubmit={(e) => void handleSubmit(e)}>
         <div className="space-y-4">
           {error && (
-            <div
-              className="p-3 rounded-lg text-sm"
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                color: "rgb(239, 68, 68)",
-              }}
-            >
-              {error}
-            </div>
+            <StatusMessage
+              variant="error"
+              title={null}
+              className="text-sm"
+              message={error}
+            />
           )}
 
           <div>

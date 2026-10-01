@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import EmptyState from "./EmptyState";
-import ErrorMessage from "./ErrorMessage";
 import { LayoutRenderer } from "./LayoutRenderer";
+import StatusMessage from "./StatusMessage";
 
 interface Props {
   entityType: string;
@@ -60,9 +60,10 @@ export const SearchResults = ({
   // Error state
   if (error) {
     return (
-      <ErrorMessage
+      <StatusMessage
+        variant="error"
         title="Error loading items"
-        error={error}
+        message={error}
         {...(onRetry ? { onRetry } : {})}
       />
     );

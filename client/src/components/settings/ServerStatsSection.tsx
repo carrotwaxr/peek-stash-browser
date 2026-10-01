@@ -5,7 +5,7 @@ import { ApiError } from "../../api/client";
 import { useAuth } from "../../hooks/useAuth";
 import { useVisibleInterval } from "../../hooks/useVisibleInterval";
 import { showError, showSuccess } from "../../utils/toast";
-import { Button, ConfirmDialog, Paper } from "../ui/index";
+import { Button, ConfirmDialog, Paper, StatusMessage } from "../ui/index";
 
 interface CacheCounts {
   scenes: number;
@@ -341,35 +341,22 @@ const ServerStatsSection = ({ onSyncStarted }: Props) => {
                   {reprobingClips ? "Re-probing..." : "Re-probe Clips"}
                 </Button>
               </div>
-              <div
-                className="p-3 rounded-lg text-sm"
-                style={{
-                  backgroundColor: "rgba(59, 130, 246, 0.1)",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                <p>
-                  Some clips were synced before their previews were generated in
-                  Stash. Click &quot;Re-probe Clips&quot; to check if previews
-                  are now available.
-                </p>
-              </div>
+              <StatusMessage variant="info" title={null} className="text-sm">
+                Some clips were synced before their previews were generated in
+                Stash. Click &quot;Re-probe Clips&quot; to check if previews are
+                now available.
+              </StatusMessage>
               {reprobeResult && (
-                <div
-                  className="mt-3 p-3 rounded-lg text-sm"
-                  style={{
-                    backgroundColor: reprobeResult.success
-                      ? "rgba(34, 197, 94, 0.1)"
-                      : "rgba(239, 68, 68, 0.1)",
-                    color: reprobeResult.success
-                      ? "rgb(34, 197, 94)"
-                      : "rgb(239, 68, 68)",
-                  }}
-                >
-                  {reprobeResult.success
-                    ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
-                    : reprobeResult.message}
-                </div>
+                <StatusMessage
+                  variant={reprobeResult.success ? "success" : "error"}
+                  title={null}
+                  className="mt-3 text-sm"
+                  message={
+                    reprobeResult.success
+                      ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
+                      : reprobeResult.message
+                  }
+                />
               )}
             </div>
           </>

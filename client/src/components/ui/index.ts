@@ -31,7 +31,6 @@ export {
   ErrorPanel,
   RouteErrorBoundary,
 } from "./ErrorBoundary";
-export { default as ErrorMessage } from "./ErrorMessage";
 export { default as ExternalPlayerButton } from "./ExternalPlayerButton";
 export { default as FavoriteButton } from "./FavoriteButton";
 export { default as HideConfirmationDialog } from "./HideConfirmationDialog";
@@ -40,7 +39,6 @@ export { default as FilterPresets } from "./FilterPresets";
 export { default as GenderIcon } from "./GenderIcon";
 export { default as GlobalLayout } from "./GlobalLayout";
 export { default as HelpModal } from "./HelpModal";
-export { default as InfoMessage } from "./InfoMessage";
 export { default as LazyThumbnail } from "./LazyThumbnail";
 export { default as LibraryInitializingBanner } from "./LibraryInitializingBanner";
 export { default as Lightbox } from "./Lightbox";
@@ -71,7 +69,7 @@ export { default as SearchInput } from "./SearchInput";
 export { default as SectionLink } from "./SectionLink";
 export { default as Sidebar } from "./Sidebar";
 export { default as SkeletonSceneCard } from "./SkeletonSceneCard";
-export { default as SuccessMessage } from "./SuccessMessage";
+export { default as StatusMessage } from "./StatusMessage";
 export { default as Switch } from "./Switch";
 export { default as TabNavigation, TAB_COUNT_LOADING } from "./TabNavigation";
 export { default as TagChips } from "./TagChips";
@@ -80,5 +78,4 @@ export { TooltipEntityGrid } from "./TooltipEntityGrid";
 export { default as TopBar } from "./TopBar";
 export { default as UserMenu } from "./UserMenu";
 export { default as ViewModeToggle } from "./ViewModeToggle";
-export { default as WarningMessage } from "./WarningMessage";
 export { default as ZoomSlider } from "./ZoomSlider";

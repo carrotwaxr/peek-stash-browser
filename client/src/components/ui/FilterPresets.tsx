@@ -22,7 +22,7 @@ import {
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import Button from "./Button";
 import Modal from "./Modal";
-import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
+import StatusMessage from "./StatusMessage";
 
 // Helper to get context label for UI
 const getContextLabel = (ctx: string): string => {
@@ -251,12 +251,12 @@ const FilterPresets = ({
       {/* Success/Error Messages */}
       {success && (
         <div className="fixed top-4 right-4 z-50">
-          <SuccessMessage message={success} />
+          <StatusMessage variant="success" message={success} />
         </div>
       )}
       {error && (
         <div className="fixed top-4 right-4 z-50">
-          <ErrorMessage error={error} />
+          <StatusMessage variant="error" message={error} />
         </div>
       )}
 

@@ -96,7 +96,7 @@ const TabNavigation = ({
                   ? "3px solid var(--accent-primary)"
                   : "3px solid transparent",
                 backgroundColor: isActive
-                  ? "rgba(59, 130, 246, 0.05)"
+                  ? "color-mix(in srgb, var(--status-info) 5%, transparent)"
                   : "transparent",
                 cursor: isActive ? "default" : "pointer",
               }}

@@ -141,10 +141,10 @@ const SharePlaylistModal = ({
                 className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
                 style={{
                   backgroundColor: selectedGroupIds.has(group.id)
-                    ? "rgba(59, 130, 246, 0.1)"
+                    ? "var(--status-info-bg)"
                     : "var(--bg-secondary)",
                   border: selectedGroupIds.has(group.id)
-                    ? "1px solid rgba(59, 130, 246, 0.3)"
+                    ? "1px solid var(--status-info-border)"
                     : "1px solid var(--border-color)",
                 }}
               >
