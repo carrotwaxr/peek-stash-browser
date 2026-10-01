@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createAuthValue } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,19 +31,32 @@ vi.mock("../../src/api", () => ({
 // The provider loads settings only for a signed-in user (useAuth).
 const signedIn = createAuthValue({ isAuthenticated: true });
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <AuthContext.Provider value={signedIn}>
-    <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-  </AuthContext.Provider>
-);
+/** A fresh query client per render, as the app has one per session */
+const newQueryClient = () =>
+  new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function Wrapper({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(newQueryClient);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={signedIn}>
+        <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+const wrapper = Wrapper;
 
 /** Renders the hook under a provider whose auth state can change. */
 function renderWithAuth(initialAuth: AuthContextValue) {
   let auth = initialAuth;
+  const queryClient = newQueryClient();
   const authWrapper = ({ children }: { children: ReactNode }) => (
-    <AuthContext.Provider value={auth}>
-      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-    </AuthContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={auth}>
+        <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
   );
   const view = renderHook(() => useCardDisplaySettings(), {
     wrapper: authWrapper,
@@ -154,7 +168,7 @@ describe("useCardDisplaySettings", () => {
       });
       expect(result.current.isLoading).toBe(false);
       expect(mockGet).toHaveBeenCalledTimes(1);
-      expect(mockGet).toHaveBeenCalledWith("/user/settings");
+      expect(mockGet).toHaveBeenCalledWith("/user/settings", expect.anything());
     });
 
     it("stays loading without a request while auth is loading", async () => {
@@ -273,8 +287,11 @@ describe("useCardDisplaySettings", () => {
         await result.current.updateSettings("scene", "showRating", false);
       });
 
-      // Should immediately reflect change (optimistic)
-      expect(result.current.getSettings("scene").showRating).toBe(false);
+      // Should reflect the change in the one settings cache, with no refetch
+      await waitFor(() =>
+        expect(result.current.getSettings("scene").showRating).toBe(false)
+      );
+      expect(mockGet).toHaveBeenCalledTimes(1);
     });
 
     it("calls API with merged settings", async () => {
@@ -333,8 +350,10 @@ describe("useCardDisplaySettings", () => {
         }
       });
 
-      // Should revert to original state
-      expect(result.current.getSettings("scene").showRating).toBe(true);
+      // Should revert to original state: the refused save refetches
+      await waitFor(() =>
+        expect(result.current.getSettings("scene").showRating).toBe(true)
+      );
 
       consoleSpy.mockRestore();
     });

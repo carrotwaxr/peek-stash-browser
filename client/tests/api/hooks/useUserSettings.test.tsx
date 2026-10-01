@@ -3,6 +3,7 @@
  * one request, and a save updates every reader from the cache, without a
  * refetch or a page reload.
  */
+import { MemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { userSettingsResponse } from "@tests/helpers/userSettings";
@@ -13,6 +14,9 @@ import {
   useUpdateUserSettings,
   useUserSettings,
 } from "@/api/hooks/useUserSettings";
+import GlobalLayout from "@/components/ui/GlobalLayout";
+import { CardDisplaySettingsProvider } from "@/contexts/CardDisplaySettingsContext";
+import { UnitPreferenceProvider } from "@/contexts/UnitPreferenceProvider";
 
 const { mockApiGet, mockApiPut } = vi.hoisted(() => ({
   mockApiGet: vi.fn(),
@@ -24,6 +28,17 @@ vi.mock("@/api", async (importOriginal) => ({
   apiGet: mockApiGet,
   apiPut: mockApiPut,
 }));
+
+vi.mock("@/hooks/useTVMode", () => ({
+  useTVMode: () => ({ isTVMode: false }),
+}));
+vi.mock("@/hooks/useGlobalNavigation", () => ({
+  useGlobalNavigation: vi.fn(),
+}));
+vi.mock("@/hooks/useScrollRestoration", () => ({ default: vi.fn() }));
+vi.mock("@/components/ui/TVNavigator", () => ({ default: () => null }));
+vi.mock("@/components/ui/TopBar", () => ({ default: () => null }));
+vi.mock("@/components/ui/Sidebar", () => ({ default: () => null }));
 
 const settingsRequests = () =>
   mockApiGet.mock.calls.filter(([path]) => path === "/user/settings").length;
@@ -39,7 +54,7 @@ function SaveHover() {
   return (
     <button
       type="button"
-      onClick={() => void save.mutateAsync({ wallPlayback: "hover" })}
+      onClick={() => save.mutate({ wallPlayback: "hover" })}
     >
       Save hover
     </button>
@@ -116,5 +131,64 @@ describe("useUserSettings", () => {
 
     expect(screen.getByTestId("a")).toHaveTextContent("loading");
     expect(settingsRequests()).toBe(0);
+  });
+
+  it("a save shows in every reader before the server answers, and a refused save shows the server's value again", async () => {
+    let refuse: (error: Error) => void = () => {};
+    mockApiPut.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        refuse = reject;
+      })
+    );
+    render(
+      <SignedInWithQuery>
+        <Reader name="a" />
+        <Reader name="b" />
+        <SaveHover />
+      </SignedInWithQuery>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("a")).toHaveTextContent("static")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save hover" }));
+
+    // The server has not answered: both readers already show the save
+    await waitFor(() =>
+      expect(screen.getByTestId("a")).toHaveTextContent("hover")
+    );
+    expect(screen.getByTestId("b")).toHaveTextContent("hover");
+    expect(settingsRequests()).toBe(1);
+
+    refuse(new Error("Database busy"));
+
+    // The server still holds the old value: the readers show it again
+    await waitFor(() =>
+      expect(screen.getByTestId("a")).toHaveTextContent("static")
+    );
+    expect(screen.getByTestId("b")).toHaveTextContent("static");
+    expect(settingsRequests()).toBe(2);
+  });
+
+  it("a signed-in app with every provider and the layout mounted sends one GET /user/settings", async () => {
+    render(
+      <MemoryRouter>
+        <SignedInWithQuery>
+          <UnitPreferenceProvider>
+            <CardDisplaySettingsProvider>
+              <GlobalLayout>
+                <Reader name="page" />
+              </GlobalLayout>
+            </CardDisplaySettingsProvider>
+          </UnitPreferenceProvider>
+        </SignedInWithQuery>
+      </MemoryRouter>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("page")).toHaveTextContent("static")
+    );
+    await flushPromises();
+    expect(settingsRequests()).toBe(1);
   });
 });

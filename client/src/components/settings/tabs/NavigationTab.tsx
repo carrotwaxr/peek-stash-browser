@@ -70,10 +70,8 @@ const NavigationTab = () => {
   const saveNavPreferences = async (newPreferences: NavPreference[]) => {
     try {
       await save.mutateAsync({ navPreferences: newPreferences });
+      // The sidebar reads the settings query: it already shows the new order
       showSuccess("Navigation preferences saved successfully!");
-
-      // The sidebar reads its own copy (PR 8): reload to apply nav changes
-      window.location.reload();
     } catch (err) {
       showError(getErrorMessage(err, "Failed to save navigation preferences"));
       throw err;

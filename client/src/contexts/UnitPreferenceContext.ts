@@ -3,7 +3,7 @@ import { UNITS } from "../utils/unitConversions";
 
 export const UnitPreferenceContext = createContext({
   unitPreference: UNITS.METRIC,
-  setUnitPreference: () => {},
+  setUnitPreference: (_unit: string): Promise<void> => Promise.resolve(),
   isLoading: true,
 });
 

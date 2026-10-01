@@ -1,76 +1,28 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPut, getErrorMessage } from "../../../api";
+import { useState } from "react";
+import { getErrorMessage } from "../../../api";
+import {
+  useUpdateUserSettings,
+  useUserSettings,
+} from "../../../api/hooks/useUserSettings";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button, ErrorMessage } from "../../ui/index";
 
-const PlaybackTab = () => {
-  const [loading, setLoading] = useState(true);
-  // After a failed load the form would show defaults, and Save would write
-  // them over the stored settings: show Retry instead
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
-
-  // Load settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const data = await apiGet<{ settings: Record<string, unknown> }>(
-          "/user/settings"
-        );
-        const { settings } = data;
-
-        setMinimumPlayPercent((settings.minimumPlayPercent as number) ?? 20);
-      } catch (err) {
-        setLoadError(getErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSettings();
-  }, [loadAttempt]);
+/** The form, mounted once the stored value is known */
+const PlaybackForm = ({ storedPercent }: { storedPercent: number }) => {
+  const save = useUpdateUserSettings();
+  const [minimumPlayPercent, setMinimumPlayPercent] = useState(storedPercent);
+  const saving = save.isPending;
 
   const saveSettings = async (e: React.SubmitEvent) => {
     e.preventDefault();
     try {
-      setSaving(true);
-
-      await apiPut("/user/settings", {
-        minimumPlayPercent,
-      });
-
+      // The player reads the settings query, so the next play uses it
+      await save.mutateAsync({ minimumPlayPercent });
       showSuccess("Playback settings saved successfully!");
     } catch (err) {
       showError(getErrorMessage(err, "Failed to save settings"));
-    } finally {
-      setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div
-        className="flex items-center justify-center p-12"
-        style={{ backgroundColor: "var(--bg-card)" }}
-      >
-        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <ErrorMessage
-        title="Failed to load playback settings"
-        error={loadError}
-        onRetry={() => setLoadAttempt((n) => n + 1)}
-      />
-    );
-  }
 
   return (
     <form onSubmit={(e) => void saveSettings(e)}>
@@ -127,6 +79,39 @@ const PlaybackTab = () => {
         </div>
       </div>
     </form>
+  );
+};
+
+/**
+ * The playback settings. After a failed load the form would show defaults,
+ * and Save would write them over the stored settings: show Retry instead.
+ */
+const PlaybackTab = () => {
+  const { data, isPending, error, refetch } = useUserSettings();
+
+  if (isPending) {
+    return (
+      <div
+        className="flex items-center justify-center p-12"
+        style={{ backgroundColor: "var(--bg-card)" }}
+      >
+        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorMessage
+        title="Failed to load playback settings"
+        error={getErrorMessage(error)}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+
+  return (
+    <PlaybackForm storedPercent={data.settings.minimumPlayPercent ?? 20} />
   );
 };
 

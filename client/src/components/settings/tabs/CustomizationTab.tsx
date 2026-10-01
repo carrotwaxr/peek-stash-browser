@@ -172,9 +172,7 @@ const CustomizationTab = () => {
             <select
               id="unitPreference"
               value={unitPreference}
-              onChange={(e) =>
-                (setUnitPreference as (v: string) => void)(e.target.value)
-              }
+              onChange={(e) => void setUnitPreference(e.target.value)}
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",

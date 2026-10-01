@@ -9,11 +9,12 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { must } from "@tests/testUtils";
+import { createAuthValue, must } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost, getMyPermissions, libraryApi } from "@/api";
 import { queryKeys } from "@/api/queryKeys";
 import Lightbox from "../../../src/components/ui/Lightbox";
+import { AuthContext } from "../../../src/contexts/AuthContextProvider";
 import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
 
 // Mock the API (the rating hooks reach `libraryApi` through its own module)
@@ -38,7 +39,16 @@ vi.mock("@/api", () => ({
 /** The cache the lightbox's rating and favorite saves write into */
 let queryClient: QueryClient;
 const withClient = (ui: ReactElement) => (
-  <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  <QueryClientProvider client={queryClient}>
+    <AuthContext.Provider
+      value={createAuthValue({
+        isAuthenticated: true,
+        user: { id: 1, username: "viewer", role: "USER" },
+      })}
+    >
+      {ui}
+    </AuthContext.Provider>
+  </QueryClientProvider>
 );
 /** Renders inside the test's QueryClientProvider; rerender keeps it */
 function render(ui: ReactElement) {

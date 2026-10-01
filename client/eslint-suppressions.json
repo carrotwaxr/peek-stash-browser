@@ -99,7 +99,7 @@
   },
   "src/components/pages/Home.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     },
     "@typescript-eslint/no-non-null-assertion": {
       "count": 2
@@ -108,13 +108,10 @@
       "count": 3
     },
     "@typescript-eslint/no-unsafe-argument": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 9
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 6
@@ -501,7 +498,7 @@
   },
   "src/components/ui/Lightbox.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 8
+      "count": 7
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1

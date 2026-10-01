@@ -152,10 +152,9 @@ class ColumnSaves {
         const dropped = [...carried, ...this.waiting];
         this.waiting = [];
         showError(getErrorMessage(err, "Failed to save the table columns"));
+        // The failed save already refetched the settings
+        // (`useUpdateUserSettings`), so the stored columns show again
         for (const waiter of dropped) waiter.reject(err);
-        void this.queryClient.invalidateQueries({
-          queryKey: queryKeys.user.settings(),
-        });
       }
     );
   }

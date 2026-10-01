@@ -1,12 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { apiGet, apiPut } from "../api";
+import React, { createContext, useCallback, useContext } from "react";
+import type { GetUserSettingsResponse } from "@peek/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useUpdateUserSettings,
+  useUserSettings,
+} from "../api/hooks/useUserSettings";
+import { queryKeys } from "../api/queryKeys";
 import { getDefaultSettings } from "../config/entityDisplayConfig";
 import { useAuth } from "../hooks/useAuth";
 
@@ -24,53 +24,34 @@ export interface CardDisplaySettingsContextValue {
 export const CardDisplaySettingsContext =
   createContext<CardDisplaySettingsContextValue | null>(null);
 
+type CardDisplaySettingsMap = Record<string, Record<string, unknown>>;
+
+const NO_SETTINGS: CardDisplaySettingsMap = {};
+
+/** The stored options by entity type (the wire type is a loose record) */
+const optionsOf = (
+  stored: GetUserSettingsResponse | undefined
+): CardDisplaySettingsMap =>
+  (stored?.settings.cardDisplaySettings as CardDisplaySettingsMap | null) ??
+  NO_SETTINGS;
+
+/**
+ * The card display options, read from the one settings query: a change
+ * shows in every card at once, and a refused save puts the server's options
+ * back (`useUpdateUserSettings`).
+ */
 export const CardDisplaySettingsProvider = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [settings, setSettings] = useState<
-    Record<string, Record<string, unknown>>
-  >({});
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data, isPending } = useUserSettings();
+  const { mutateAsync } = useUpdateUserSettings();
 
-  // Load once auth has resolved, and only for a signed-in user: a signed-out
-  // request answers 401, and apiFetch then reloads the page at /login while
-  // the router is already redirecting there. Until auth resolves, isLoading
-  // stays true.
-  useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated) {
-      setSettings({});
-      setIsLoading(false);
-      return;
-    }
-
-    // A response that lands after sign-out (or a later load) is dropped.
-    let cancelled = false;
-    setIsLoading(true);
-    const loadSettings = async () => {
-      try {
-        const data = await apiGet<{
-          settings: {
-            cardDisplaySettings?: Record<string, Record<string, unknown>>;
-          };
-        }>("/user/settings");
-        if (!cancelled) setSettings(data.settings.cardDisplaySettings ?? {});
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to load card display settings:", error);
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    void loadSettings();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, authLoading]);
+  const settings = isAuthenticated ? optionsOf(data) : NO_SETTINGS;
+  const isLoading = authLoading || (isAuthenticated && isPending);
 
   // Get settings for a specific entity type (with defaults from shared config)
   const getSettings = useCallback(
@@ -82,33 +63,29 @@ export const CardDisplaySettingsProvider = ({
     [settings]
   );
 
-  // Update a specific setting
+  // Update a specific setting. The merged map is built from the cache at
+  // call time, so two quick changes to different cards both stay.
   const updateSettings = useCallback(
     async (entityType: string, key: string, value: unknown) => {
-      const newEntitySettings = {
-        ...(settings[entityType] ?? {}),
-        [key]: value,
-      };
-      const newSettings = {
-        ...settings,
-        [entityType]: newEntitySettings,
-      };
-
-      // Optimistic update
-      setSettings(newSettings);
-
+      const stored = queryClient.getQueryData<GetUserSettingsResponse>(
+        queryKeys.user.settings()
+      );
+      // Saving over settings that never loaded would replace the stored ones
+      if (!stored) throw new Error("Your settings have not loaded yet");
+      const current = optionsOf(stored);
       try {
-        await apiPut("/user/settings", {
-          cardDisplaySettings: newSettings,
+        await mutateAsync({
+          cardDisplaySettings: {
+            ...current,
+            [entityType]: { ...(current[entityType] ?? {}), [key]: value },
+          },
         });
       } catch (error) {
         console.error("Failed to save card display settings:", error);
-        // Revert on error
-        setSettings(settings);
         throw error;
       }
     },
-    [settings]
+    [queryClient, mutateAsync]
   );
 
   return (
