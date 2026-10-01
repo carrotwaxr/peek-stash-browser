@@ -957,6 +957,25 @@ describe("User Controller", () => {
   // ─── getAllUsers ───
 
   describe("getAllUsers", () => {
+    it("answers createdAt and updatedAt as ISO strings", async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        partialRow<UserWithGroups>({
+          id: 1,
+          username: "admin",
+          role: "ADMIN",
+          createdAt: new Date("2026-01-02T03:04:05.000Z"),
+          updatedAt: new Date("2026-02-03T04:05:06.000Z"),
+          syncToStash: false,
+          groupMemberships: [],
+        }),
+      ]);
+      const res = resFor(getAllUsers);
+      await getAllUsers(reqFor(getAllUsers, { user: ADMIN }), res);
+      const user = must(res._getOkBody().users[0]);
+      expect(user.createdAt).toBe("2026-01-02T03:04:05.000Z");
+      expect(user.updatedAt).toBe("2026-02-03T04:05:06.000Z");
+    });
+
     it("returns 403 when non-admin", async () => {
       const req = reqFor(getAllUsers, { user: USER });
       const res = resFor(getAllUsers);
@@ -1056,6 +1075,27 @@ describe("User Controller", () => {
       const res = resFor(createUser);
       await createUser(req, res);
       expect(res._getStatus()).toBe(409);
+    });
+
+    it("answers createdAt as an ISO string", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 5,
+          username: "new",
+          role: "USER",
+          createdAt: new Date("2026-01-02T03:04:05.000Z"),
+        })
+      );
+      const res = resFor(createUser);
+      await createUser(
+        reqFor(createUser, {
+          body: { username: "new", password: "Pass123" },
+          user: ADMIN,
+        }),
+        res
+      );
+      expect(res._getOkBody().user.createdAt).toBe("2026-01-02T03:04:05.000Z");
     });
 
     it("creates user with default USER role", async () => {
@@ -1315,6 +1355,27 @@ describe("User Controller", () => {
       await updateUserRole(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getErrorBody().error).toMatch(/own role/);
+    });
+
+    it("answers updatedAt as an ISO string", async () => {
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "ADMIN",
+          updatedAt: new Date("2026-02-03T04:05:06.000Z"),
+        })
+      );
+      const res = resFor(updateUserRole);
+      await updateUserRole(
+        reqFor(updateUserRole, {
+          body: { role: "ADMIN" },
+          params: { userId: "3" },
+          user: ADMIN,
+        }),
+        res
+      );
+      expect(res._getOkBody().user.updatedAt).toBe("2026-02-03T04:05:06.000Z");
     });
 
     it("updates role successfully", async () => {

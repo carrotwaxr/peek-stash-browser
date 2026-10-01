@@ -6,6 +6,8 @@
  * These are public endpoints for initial setup wizard.
  */
 
+// Dates are ISO 8601 strings: that is what JSON carries.
+
 // =============================================================================
 // GET SETUP STATUS
 // =============================================================================
@@ -40,7 +42,7 @@ export interface CreateFirstAdminResponse {
     id: number;
     username: string;
     role: string;
-    createdAt: Date;
+    createdAt: string;
   };
 }
 
@@ -88,7 +90,7 @@ export interface CreateFirstStashInstanceResponse {
     url: string;
     uiUrl: string | null;
     enabled: boolean;
-    createdAt: Date;
+    createdAt: string;
   };
 }
 
@@ -108,8 +110,8 @@ export interface GetStashInstanceResponse {
     uiUrl: string | null;
     enabled: boolean;
     priority: number;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
   } | null;
   instanceCount: number;
 }
@@ -129,14 +131,14 @@ export interface StashInstanceData {
   uiUrl: string | null;
   enabled: boolean;
   priority: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   /**
    * When its first sync finished with its users' exclusions computed; null
    * while it runs (the instance is hidden from every user until then) or
    * after its URL changed
    */
-  firstSyncedAt: Date | null;
+  firstSyncedAt: string | null;
 }
 
 /**

@@ -164,7 +164,7 @@ export const createFirstAdmin = async (
 
   res.status(201).json({
     success: true,
-    user: newUser,
+    user: { ...newUser, createdAt: newUser.createdAt.toISOString() },
   });
 };
 
@@ -420,9 +420,21 @@ export const createFirstStashInstance = async (
 
   res.status(201).json({
     success: true,
-    instance,
+    instance: { ...instance, createdAt: instance.createdAt.toISOString() },
   });
 };
+
+/** A Stash instance row as the responses send it: dates as ISO strings */
+function toStashInstanceData<
+  T extends { createdAt: Date; updatedAt: Date; firstSyncedAt: Date | null },
+>(instance: T) {
+  return {
+    ...instance,
+    createdAt: instance.createdAt.toISOString(),
+    updatedAt: instance.updatedAt.toISOString(),
+    firstSyncedAt: instance.firstSyncedAt?.toISOString() ?? null,
+  };
+}
 
 /**
  * Get current Stash instance info (for Server Settings display)
@@ -451,7 +463,11 @@ export const getStashInstance = async (
   const instance = instances[0] ?? null;
 
   res.json({
-    instance,
+    instance: instance && {
+      ...instance,
+      createdAt: instance.createdAt.toISOString(),
+      updatedAt: instance.updatedAt.toISOString(),
+    },
     instanceCount: instances.length,
   });
 };
@@ -485,7 +501,7 @@ export const getAllStashInstances = async (
     orderBy: { priority: "asc" },
   });
 
-  res.json({ instances });
+  res.json({ instances: instances.map(toStashInstanceData) });
 };
 
 /**
@@ -594,7 +610,7 @@ export const createStashInstance = async (
 
   res.status(201).json({
     success: true,
-    instance,
+    instance: toStashInstanceData(instance),
     sync,
   });
 };
@@ -734,7 +750,7 @@ export const updateStashInstance = async (
 
   res.json({
     success: true,
-    instance,
+    instance: toStashInstanceData(instance),
     sync,
   });
 };

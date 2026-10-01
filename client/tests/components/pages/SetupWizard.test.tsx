@@ -46,7 +46,12 @@ const mockCreateFirstStashInstance = vi.mocked(
 
 const ADMIN_CREATED = {
   success: true as const,
-  user: { id: 1, username: "admin", role: "ADMIN", createdAt: new Date() },
+  user: {
+    id: 1,
+    username: "admin",
+    role: "ADMIN",
+    createdAt: new Date().toISOString(),
+  },
 };
 
 const STASH_CREATED = {
@@ -57,7 +62,7 @@ const STASH_CREATED = {
     url: "http://stash:9999/graphql",
     uiUrl: null,
     enabled: true,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
 };
 
@@ -169,7 +174,12 @@ describe("SetupWizard", () => {
   it("creating the admin moves to the Stash step signed in", async () => {
     mockCreateFirstAdmin.mockResolvedValue({
       success: true,
-      user: { id: 1, username: "admin", role: "ADMIN", createdAt: new Date() },
+      user: {
+        id: 1,
+        username: "admin",
+        role: "ADMIN",
+        createdAt: new Date().toISOString(),
+      },
     });
     mockLogin.mockImplementation(() => {
       authState.isAuthenticated = true;
