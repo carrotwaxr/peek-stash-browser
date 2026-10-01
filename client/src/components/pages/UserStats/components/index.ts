@@ -5,3 +5,4 @@ export { default as LibraryOverview } from "./LibraryOverview";
 export { default as EngagementTotals } from "./EngagementTotals";
 export { default as TopList } from "./TopList";
 export { default as HighlightCard } from "./HighlightCard";
+export { default as MostViewedImageCard } from "./MostViewedImageCard";

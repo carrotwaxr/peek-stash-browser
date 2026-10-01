@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getEntityPath,
   getFilteredListPath,
+  getImagePath,
   getScenePathWithTime,
 } from "@/utils/entityLinks";
 
@@ -18,6 +19,34 @@ describe("getEntityPath", () => {
 
   it("links nowhere for an entity without an id", () => {
     expect(getEntityPath("studio", { instanceId: "inst-1" }, true)).toBe("#");
+  });
+});
+
+describe("image links", () => {
+  it("no entity link goes to /image/<id>, a page the app does not have", () => {
+    for (const type of [
+      "performer",
+      "scene",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+      "image",
+    ]) {
+      expect(
+        getEntityPath(type, { id: "12", instanceId: "a" }, true)
+      ).not.toMatch(/^\/image\//);
+    }
+  });
+
+  it("an image's link opens it in the Images page's viewer, with its instance", () => {
+    expect(getImagePath({ id: "12", instanceId: "inst-a" })).toBe(
+      "/images?image=12%3Ainst-a"
+    );
+  });
+
+  it("an image without an id links nowhere", () => {
+    expect(getImagePath({ instanceId: "inst-a" })).toBe("#");
   });
 });
 

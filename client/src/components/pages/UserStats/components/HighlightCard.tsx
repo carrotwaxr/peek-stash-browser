@@ -20,6 +20,10 @@ interface Props {
   statLabel: string;
   statValue: number;
   entityType?: EntityType;
+  /** Opens the item right here (a button) instead of linking to its page */
+  onOpen?: () => void;
+  /** The opener is working: the button waits */
+  opening?: boolean;
 }
 
 /**
@@ -62,6 +66,8 @@ const HighlightCard = ({
   statLabel,
   statValue,
   entityType = "scene",
+  onOpen,
+  opening = false,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
@@ -71,6 +77,45 @@ const HighlightCard = ({
 
   const displayName = getDisplayName(item);
   const fallbackIcon = getFallbackIcon(entityType);
+
+  const content = (
+    <>
+      {/* Consistent 16/9 container for all cards - portrait images pillarboxed */}
+      <div
+        className="relative overflow-hidden flex items-center justify-center"
+        style={{
+          aspectRatio: "16/9",
+          backgroundColor: "var(--bg-secondary)",
+        }}
+      >
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={displayName}
+            className="max-w-full max-h-full object-contain"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span className="text-3xl">{fallbackIcon}</span>
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <div
+          className="font-medium truncate"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {displayName}
+        </div>
+        <div className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {statValue.toLocaleString()} {statLabel}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <Paper padding="none" className="overflow-hidden">
@@ -85,45 +130,24 @@ const HighlightCard = ({
           {title}
         </h3>
       </div>
-      <Link
-        to={getEntityPath(entityType, item, hasMultipleInstances)}
-        className="block transition-colors hover:bg-[var(--bg-secondary)]"
-      >
-        {/* Consistent 16/9 container for all cards - portrait images pillarboxed */}
-        <div
-          className="relative overflow-hidden flex items-center justify-center"
-          style={{
-            aspectRatio: "16/9",
-            backgroundColor: "var(--bg-secondary)",
-          }}
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={opening}
+          aria-busy={opening}
+          className="block w-full text-left transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-wait disabled:opacity-70"
         >
-          {item.imageUrl ? (
-            <img
-              src={item.imageUrl}
-              alt={displayName}
-              className="max-w-full max-h-full object-contain"
-            />
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <span className="text-3xl">{fallbackIcon}</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <div
-            className="font-medium truncate"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {displayName}
-          </div>
-          <div className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {statValue.toLocaleString()} {statLabel}
-          </div>
-        </div>
-      </Link>
+          {content}
+        </button>
+      ) : (
+        <Link
+          to={getEntityPath(entityType, item, hasMultipleInstances)}
+          className="block transition-colors hover:bg-[var(--bg-secondary)]"
+        >
+          {content}
+        </Link>
+      )}
     </Paper>
   );
 };

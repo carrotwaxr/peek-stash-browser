@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HighlightCard from "@/components/pages/UserStats/components/HighlightCard";
@@ -56,5 +56,34 @@ describe("HighlightCard", () => {
     );
 
     expect(screen.getByRole("link").getAttribute("href")).toBe("/scene/5");
+  });
+
+  it("with an opener, the card is a button that opens the item, not the home page", () => {
+    const onOpen = vi.fn();
+
+    renderWithProviders(
+      <HighlightCard
+        title="Most Viewed Image"
+        entityType="image"
+        item={{
+          id: "12",
+          instanceId: "inst-b",
+          title: "Twelve",
+          filePath: null,
+          imageUrl: null,
+          viewCount: 4,
+        }}
+        statLabel="views"
+        statValue={4}
+        onOpen={onOpen}
+      />
+    );
+
+    expect(screen.queryByRole("link")).toBeNull();
+    const button = screen.getByRole("button");
+    expect(button.textContent).toContain("Twelve");
+    expect(button.textContent).toContain("4 views");
+    fireEvent.click(button);
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });

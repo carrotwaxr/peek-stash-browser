@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import {
   getEntityPath as _getEntityPath,
   getScenePathWithTime as _getScenePathWithTime,
+  getImagePath,
 } from "../../utils/entityLinks";
 import RatingBadge from "../ui/RatingBadge";
 import MultiValueCell from "./MultiValueCell";
@@ -531,19 +532,19 @@ const galleryRenderers: RendererMap = {
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const imageRenderers: RendererMap = {
-  title: (image, options = {}) => (
+  title: (image) => (
     <LinkCell
       text={
         image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`
       }
-      linkTo={getEntityPath("image", image, options.hasMultipleInstances)}
+      linkTo={getImagePath(image)}
     />
   ),
-  image: (image, options = {}) => (
+  image: (image) => (
     <ThumbnailCell
       src={image.paths?.thumbnail || image.image_path}
       alt={image.title}
-      linkTo={getEntityPath("image", image, options.hasMultipleInstances)}
+      linkTo={getImagePath(image)}
       entityType="image"
     />
   ),

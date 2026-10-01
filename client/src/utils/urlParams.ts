@@ -120,6 +120,9 @@ const filtersToUrlParams = (
   return params;
 };
 
+/** The URL param that names the open image on a list, as "id:instanceId" */
+export const IMAGE_PARAM = "image";
+
 /**
  * The URL param that sets an entity filter to one entity: the option's key in
  * the singular (`tagIds` reads `tagId`; `studioId` and `sceneId` read
@@ -389,7 +392,7 @@ export const switchTabParams = (
 ): URLSearchParams => {
   const next = new URLSearchParams(params);
   for (const key of LIST_OWNED_KEYS) next.delete(key);
-  next.delete("image");
+  next.delete(IMAGE_PARAM);
   if (tabId === defaultTab) {
     next.delete("tab");
   } else {

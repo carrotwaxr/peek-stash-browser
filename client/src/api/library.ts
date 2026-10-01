@@ -16,6 +16,7 @@ import type {
   FindGroupsRequest,
   FindGroupsResponse,
   FindImagesRequest,
+  FindImagesResponse,
   FindPerformersMinimalRequest,
   FindPerformersMinimalResponse,
   FindPerformersRequest,
@@ -223,7 +224,7 @@ export const libraryApi = {
     }),
 
   findImages: (params: FindImagesRequest = {}, signal?: AbortSignal) =>
-    apiFetch("/library/images", {
+    apiFetch<FindImagesResponse>("/library/images", {
       method: "POST",
       body: JSON.stringify(params),
       signal,

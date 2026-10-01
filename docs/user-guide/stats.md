@@ -69,7 +69,7 @@ Percentile ranks show where each entity falls relative to all others — "Top 92
 Four highlight cards showcase your single best-of entries:
 
 - **Most Watched Scene** — Highest play count
-- **Most Viewed Image** — Highest view count
+- **Most Viewed Image** — Highest view count. Click the card to open the image in the viewer right on the Stats page (only an image you can still see opens).
 - **Most O'd Scene** — Highest O count
 - **Most O'd Performer** — Highest O count across all their scenes
 
