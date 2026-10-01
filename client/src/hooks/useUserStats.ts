@@ -19,30 +19,54 @@ export function useUserStats({
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
+  const queryKey = [...queryKeys.user.stats(), sortBy];
+
+  const fetchStats = (signal: AbortSignal, forceRefresh = false) => {
+    const params = new URLSearchParams();
+    if (sortBy && sortBy !== "engagement") {
+      params.set("sortBy", sortBy);
+    }
+    if (forceRefresh) {
+      params.set("refresh", "1");
+    }
+    const queryString = params.toString();
+    return apiGet<UserStatsResponse>(
+      queryString ? `/user-stats?${queryString}` : "/user-stats",
+      signal
+    );
+  };
+
   const { data, isLoading, error } = useQuery<UserStatsResponse>({
-    queryKey: [...queryKeys.user.stats(), sortBy],
-    queryFn: ({ signal }) => {
-      const params = new URLSearchParams();
-      if (sortBy && sortBy !== "engagement") {
-        params.set("sortBy", sortBy);
-      }
-      const queryString = params.toString();
-      const endpoint = queryString
-        ? `/user-stats?${queryString}`
-        : "/user-stats";
-      return apiGet<UserStatsResponse>(endpoint, signal);
-    },
+    queryKey,
+    queryFn: ({ signal }) => fetchStats(signal),
     enabled: isAuthenticated,
   });
 
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.user.stats() });
+  /**
+   * Asks the server to recompute the rankings, and resolves once the
+   * refreshed answer is in the query (it rejects when the request fails).
+   * The other sorts' cached answers come from the old rankings: they are
+   * marked stale, not fetched, and refetch when next shown.
+   */
+  const refresh = async (): Promise<void> => {
+    await queryClient.fetchQuery({
+      queryKey,
+      queryFn: ({ signal }) => fetchStats(signal, true),
+      staleTime: 0,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.user.stats(),
+      predicate: (query) => query.queryKey.at(-1) !== sortBy,
+      refetchType: "none",
+    });
   };
 
   return {
     data: data ?? null,
     loading: isLoading,
-    error: error ? getErrorMessage(error, "Failed to fetch stats") : null,
+    // A failed refresh leaves the page's last answer showing
+    error:
+      error && !data ? getErrorMessage(error, "Failed to fetch stats") : null,
     refresh,
   };
 }
