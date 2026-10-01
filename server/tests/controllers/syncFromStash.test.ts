@@ -83,6 +83,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getAll: vi.fn().mockReturnValue([["instance-1", mockStashClient]]),
+    getConfig: vi.fn(),
   },
 }));
 
@@ -1458,6 +1459,10 @@ describe("syncFromStash", () => {
       const workingStash = stashStub();
       workingStash.findScenes.mockResolvedValue(page(SCENE, [rated("1", 80)]));
 
+      mockInstanceManager.getConfig.mockImplementation(((id: string) =>
+        id === "failing-instance"
+          ? { id, name: "Archive" }
+          : undefined) as typeof mockInstanceManager.getConfig);
       mockInstanceManager.getAll.mockReturnValue([
         ["failing-instance", partialRow(failingStash)],
         ["working-instance", partialRow(workingStash)],
@@ -1468,8 +1473,10 @@ describe("syncFromStash", () => {
       // The failing instance is skipped, the others run, and the answer
       // names the failure instead of reporting success
       expect(res._getOkBody().success).toBe(false);
-      expect(res._getOkBody().failedInstances).toEqual(["failing-instance"]);
-      expect(res._getOkBody().message).toContain("failing-instance");
+      expect(res._getOkBody().failedInstances).toEqual([
+        { id: "failing-instance", name: "Archive" },
+      ]);
+      expect(res._getOkBody().message).toContain("Archive");
       expect(workingStash.findScenes).toHaveBeenCalled();
       expect(res._getOkBody().stats.scenes.created).toBe(1);
     });

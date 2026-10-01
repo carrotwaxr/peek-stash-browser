@@ -1,5 +1,14 @@
 import { useState } from "react";
+import type {
+  SyncFromStashBody,
+  SyncFromStashOptions,
+  SyncFromStashResponse,
+  SyncTypeStats,
+} from "@peek/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../../api";
+import { invalidateLibraryQueries } from "../../api/hooks/useLibraryReady";
+import { useAuth } from "../../hooks/useAuth";
 import { Button, Modal } from "../ui/index";
 
 interface UserData {
@@ -7,48 +16,25 @@ interface UserData {
   username: string;
 }
 
-interface SyncEntityStats {
-  checked?: number;
-  created?: number;
-  updated?: number;
-}
-
-interface SyncStats {
-  scenes: SyncEntityStats | null;
-  performers: SyncEntityStats | null;
-  studios: SyncEntityStats | null;
-  tags: SyncEntityStats | null;
-  galleries: SyncEntityStats | null;
-  groups: SyncEntityStats | null;
-  images: SyncEntityStats | null;
-}
-
-interface SyncOptions {
-  scenes: {
-    rating: boolean;
-    favorite?: boolean;
-    oCounter: boolean;
-    playCount: boolean;
-  };
-  performers: { rating: boolean; favorite: boolean };
-  studios: { rating: boolean; favorite: boolean };
-  tags: { rating: boolean; favorite: boolean };
-  galleries: { rating: boolean };
-  groups: { rating: boolean };
-  images: { rating: boolean };
-}
-
 interface Props {
   user: UserData;
   onClose: () => void;
-  onSyncComplete: (username: string) => void;
+  /** `partial`: some Stash servers failed while the others imported */
+  onSyncComplete: (
+    username: string,
+    outcome: { partial: boolean; failedInstances: string[] }
+  ) => void;
 }
 
 const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
+  const { user: signedIn } = useAuth();
+  const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<SyncStats | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncFromStashResponse | null>(
+    null
+  );
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncOptions, setSyncOptions] = useState<SyncOptions>({
+  const [syncOptions, setSyncOptions] = useState<SyncFromStashOptions>({
     scenes: {
       rating: true,
       favorite: false,
@@ -63,12 +49,15 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
     images: { rating: true },
   });
 
-  const toggleSyncOption = (entityType: keyof SyncOptions, field: string) => {
+  const toggleSyncOption = <K extends keyof SyncFromStashOptions>(
+    entityType: K,
+    field: keyof SyncFromStashOptions[K]
+  ) => {
     setSyncOptions((prev) => ({
       ...prev,
       [entityType]: {
         ...prev[entityType],
-        [field]: !(prev[entityType] as Record<string, boolean>)[field],
+        [field]: !prev[entityType][field],
       },
     }));
   };
@@ -79,14 +68,19 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
     setSyncResult(null);
 
     try {
-      const data = await apiPost<{ stats: SyncStats }>(
+      const body: SyncFromStashBody = { options: syncOptions };
+      const data = await apiPost<SyncFromStashResponse>(
         `/user/${user.id}/sync-from-stash`,
-        {
-          options: syncOptions,
-        }
+        body
       );
-      setSyncResult(data.stats);
-      onSyncComplete(user.username);
+      setSyncResult(data);
+      // An admin who imports into their own account changed the ratings and
+      // favorites every open list and detail shows
+      if (signedIn?.id === user.id) void invalidateLibraryQueries(queryClient);
+      onSyncComplete(user.username, {
+        partial: !data.success,
+        failedInstances: data.failedInstances.map((f) => f.name || f.id),
+      });
     } catch (err) {
       setSyncError((err as Error).message || "Failed to sync from Stash");
     } finally {
@@ -303,32 +297,50 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
           </div>
         )}
 
-        {/* Success Result */}
+        {/* Result: the counts of what imported, with a warning when a server failed */}
         {syncResult && !syncing && (
           <div
             className="p-4 rounded-lg"
             style={{
-              backgroundColor: "rgba(34, 197, 94, 0.1)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
+              backgroundColor: syncResult.success
+                ? "rgba(34, 197, 94, 0.1)"
+                : "rgba(234, 179, 8, 0.1)",
+              border: `1px solid ${
+                syncResult.success
+                  ? "rgba(34, 197, 94, 0.3)"
+                  : "rgba(234, 179, 8, 0.4)"
+              }`,
             }}
           >
             <p
               className="font-medium mb-3"
-              style={{ color: "rgb(34, 197, 94)" }}
+              style={{
+                color: syncResult.success
+                  ? "rgb(34, 197, 94)"
+                  : "rgb(202, 138, 4)",
+              }}
             >
-              Sync Completed Successfully
+              {syncResult.success
+                ? "Sync Completed Successfully"
+                : `Partly imported: ${syncResult.failedInstances.map((f) => f.name || f.id).join(", ")} failed, so only the other servers' data came in. Run the sync again once it is back.`}
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-              <SyncResultItem label="Scenes" stats={syncResult.scenes} />
+              <SyncResultItem label="Scenes" stats={syncResult.stats.scenes} />
               <SyncResultItem
                 label="Performers"
-                stats={syncResult.performers}
+                stats={syncResult.stats.performers}
               />
-              <SyncResultItem label="Studios" stats={syncResult.studios} />
-              <SyncResultItem label="Tags" stats={syncResult.tags} />
-              <SyncResultItem label="Galleries" stats={syncResult.galleries} />
-              <SyncResultItem label="Groups" stats={syncResult.groups} />
-              <SyncResultItem label="Images" stats={syncResult.images} />
+              <SyncResultItem
+                label="Studios"
+                stats={syncResult.stats.studios}
+              />
+              <SyncResultItem label="Tags" stats={syncResult.stats.tags} />
+              <SyncResultItem
+                label="Galleries"
+                stats={syncResult.stats.galleries}
+              />
+              <SyncResultItem label="Groups" stats={syncResult.stats.groups} />
+              <SyncResultItem label="Images" stats={syncResult.stats.images} />
             </div>
           </div>
         )}
@@ -415,7 +427,7 @@ const SyncCheckbox = ({ label, checked, onChange }: SyncCheckboxProps) => (
 
 interface SyncResultItemProps {
   label: string;
-  stats: { checked?: number; created?: number; updated?: number } | null;
+  stats: SyncTypeStats | null;
 }
 
 const SyncResultItem = ({ label, stats }: SyncResultItemProps) => {
@@ -426,11 +438,11 @@ const SyncResultItem = ({ label, stats }: SyncResultItemProps) => {
         {label}
       </p>
       <p style={{ color: "var(--text-secondary)" }}>
-        {stats.checked?.toLocaleString() || 0} checked
+        {stats.checked.toLocaleString()} checked
         <br />
-        {stats.created || 0} new
+        {stats.created} new
         <br />
-        {stats.updated || 0} updated
+        {stats.updated} updated
       </p>
     </div>
   );

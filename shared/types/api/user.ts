@@ -380,8 +380,8 @@ export interface SyncFromStashResponse {
   success: boolean;
   message: string;
   stats: SyncStats;
-  /** The ids of the instances whose import failed */
-  failedInstances: string[];
+  /** The instances whose import failed (the name falls back to the id) */
+  failedInstances: Array<{ id: string; name: string }>;
 }
 
 // =============================================================================
