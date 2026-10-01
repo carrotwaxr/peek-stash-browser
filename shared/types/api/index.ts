@@ -22,3 +22,4 @@ export * from "./video.js";
 export * from "./databaseBackup.js";
 export * from "./sync.js";
 export * from "./library.js";
+export * from "./playlist.js";

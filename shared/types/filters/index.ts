@@ -48,6 +48,7 @@ export type {
 
 export {
   CLIP_PARAMS,
+  DEFAULT_PLAYLIST_ITEM_SORT,
   DEFAULT_SORT,
   FIELDS,
   FILTER_BODY_KEYS,
@@ -60,6 +61,7 @@ export {
   MINIMAL_PER_PAGE_MAX,
   PERFORMER_FIELDS,
   PER_PAGE_MAX,
+  PLAYLIST_ITEM_SORTS,
   Q_MAX_LENGTH,
   SCENE_FIELDS,
   SORTS,
@@ -71,6 +73,7 @@ export type {
   FieldSpecOf,
   FilterBodyKey,
   ListKind,
+  PlaylistItemSort,
   RandomSortKey,
   SortDirection,
   SortOf,
