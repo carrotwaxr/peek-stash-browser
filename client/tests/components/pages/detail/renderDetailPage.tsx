@@ -130,6 +130,7 @@ export const DEFAULT_ENTITY: Record<string, unknown> = {
  */
 const ROW_DEFAULTS: Partial<Record<DetailType, Record<string, unknown>>> = {
   tag: { aliases: [], parents: [], description: null, image_path: null },
+  studio: { tags: [], details: null, url: null, image_path: null },
 };
 
 let latestApi: ApiStub | undefined;
