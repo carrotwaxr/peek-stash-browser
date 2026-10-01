@@ -26,6 +26,8 @@ export interface SerializedDownload {
   fileSize: string | null;
   progress: number;
   error: string | null;
+  /** Playlist zips: scenes left out because they could not be fetched when it was built; 0 otherwise. */
+  skippedItems: number;
   createdAt: Date;
   completedAt: Date | null;
   expiresAt: Date | null;

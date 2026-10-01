@@ -24,6 +24,8 @@ export interface DownloadRecord {
   filePath: string | null;
   progress: number;
   error: string | null;
+  /** Playlist zips: scenes left out because they could not be fetched */
+  skippedItems: number;
   createdAt: Date;
   completedAt: Date | null;
   expiresAt: Date | null;
@@ -238,12 +240,14 @@ WHERE s.deletedAt IS NULL`,
   }
 
   /**
-   * Mark a download as completed with file path and 24h expiry.
+   * Mark a download as completed with file path and 24h expiry, and how
+   * many of a zip's scenes were left out because they could not be fetched.
    */
   async markCompleted(
     downloadId: number,
     filePath: string,
-    fileSize: bigint
+    fileSize: bigint,
+    skippedItems: number
   ): Promise<Download> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + DOWNLOAD_EXPIRY_MS);
@@ -255,6 +259,7 @@ WHERE s.deletedAt IS NULL`,
         progress: 100,
         filePath,
         fileSize,
+        skippedItems,
         completedAt: now,
         expiresAt,
       },

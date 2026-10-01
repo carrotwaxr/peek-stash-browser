@@ -478,12 +478,27 @@ describe("DownloadService", () => {
       const result = await service.markCompleted(
         1,
         "/tmp/download.zip",
-        BigInt(5000000)
+        BigInt(5000000),
+        2
       );
 
       expect(result.status).toBe("COMPLETED");
       expect(result.progress).toBe(100);
       expect(result.filePath).toBe("/tmp/download.zip");
+      const update = must(
+        vi.mocked(prisma, true).download.update.mock.calls[0],
+        "the download update"
+      )[0];
+      expect(update.where).toEqual({ id: 1 });
+      expect(update.data).toEqual({
+        status: "COMPLETED",
+        progress: 100,
+        filePath: "/tmp/download.zip",
+        fileSize: BigInt(5000000),
+        skippedItems: 2,
+        completedAt: now,
+        expiresAt: expectedExpiry,
+      });
 
       vi.useRealTimers();
     });

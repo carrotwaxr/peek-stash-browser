@@ -11,7 +11,10 @@ import {
   PlaylistZipService,
   playlistZipService,
 } from "../../services/PlaylistZipService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import {
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../../services/StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { PlaylistItemWithScene } from "../../types/api/index.js";
 import type { NormalizedScene } from "../../types/index.js";
@@ -617,6 +620,141 @@ describe("PlaylistZipService.createZip", () => {
       expect(downloadService.markFailed).toHaveBeenCalledWith(7, ZIP_FAILED);
       expect(first.cancelled).toBe(true);
       expect(zipLeft()).toBe(false);
+    });
+  });
+
+  describe("a scene that cannot be fetched is left out and counted", () => {
+    const ZIP_FAILED = "The zip could not be created";
+    const NOTHING_FETCHED =
+      "None of the playlist's scenes could be fetched from Stash";
+
+    /** Download 7's zip file */
+    function zipPath(): string {
+      return path.join(configDir, "downloads", "user-5", "download-7.zip");
+    }
+
+    /** Three scenes, s1 to s3, in playlist "Mix"; s2 on `secondInstance` */
+    function arrangeThree(secondInstance = "inst-a") {
+      arrange("Mix", [
+        item(0, scene("s1", "First")),
+        item(1, scene("s2", "Second", { instanceId: secondInstance })),
+        item(2, scene("s3", "Third")),
+      ]);
+    }
+
+    it.each([404, 410])(
+      "a scene Stash answers %i for is left out and counted",
+      async (status) => {
+        arrangeThree();
+        const refused = new StashBody();
+        vi.mocked(fetch)
+          .mockResolvedValueOnce(new Response("bytes"))
+          .mockResolvedValueOnce(new Response(refused.stream, { status }))
+          .mockResolvedValueOnce(new Response("bytes"));
+
+        await playlistZipService.createZip(7, NO_CAP);
+
+        expect(appended.map((e) => e.name)).toEqual([
+          "Mix/First.nfo",
+          "Mix/First.mp4",
+          "Mix/Third.nfo",
+          "Mix/Third.mp4",
+          "Mix/playlist.m3u",
+        ]);
+        expect(entryText("/playlist.m3u")).toBe(
+          "#EXTM3U\n#EXTINF:60,First\nFirst.mp4\n#EXTINF:60,Third\nThird.mp4\n"
+        );
+        expect(refused.cancelled).toBe(true);
+        const size = BigInt(fs.statSync(zipPath()).size);
+        expect(downloadService.markCompleted).toHaveBeenCalledWith(
+          7,
+          zipPath(),
+          size,
+          1
+        );
+        expect(downloadService.markFailed).not.toHaveBeenCalled();
+      }
+    );
+
+    it("a scene whose instance is no longer loaded is left out and counted", async () => {
+      arrangeThree("inst-b");
+      vi.mocked(stashInstanceManager.getCredentials).mockImplementation(
+        (instanceId) => {
+          if (instanceId === "inst-b") {
+            throw new UnknownInstanceError("inst-b");
+          }
+          return { baseUrl: "http://stash-a.test", apiKey: "key-a" };
+        }
+      );
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(appended.map((e) => e.name)).toEqual([
+        "Mix/First.nfo",
+        "Mix/First.mp4",
+        "Mix/Third.nfo",
+        "Mix/Third.mp4",
+        "Mix/playlist.m3u",
+      ]);
+      expect(entryText("/playlist.m3u")).toBe(
+        "#EXTM3U\n#EXTINF:60,First\nFirst.mp4\n#EXTINF:60,Third\nThird.mp4\n"
+      );
+      expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+        "http://stash-a.test/scene/s1/stream",
+        "http://stash-a.test/scene/s3/stream",
+      ]);
+      const size = BigInt(fs.statSync(zipPath()).size);
+      expect(downloadService.markCompleted).toHaveBeenCalledWith(
+        7,
+        zipPath(),
+        size,
+        1
+      );
+    });
+
+    it("a zip that skips nothing completes with 0 skipped", async () => {
+      arrangeThree();
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(downloadService.markCompleted).toHaveBeenCalledWith(
+        7,
+        zipPath(),
+        BigInt(fs.statSync(zipPath()).size),
+        0
+      );
+    });
+
+    it("a 5xx or a network error still fails the zip", async () => {
+      arrangeThree();
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response("bytes"))
+        .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }));
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(downloadService.markFailed).toHaveBeenCalledWith(7, ZIP_FAILED);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fs.existsSync(zipPath())).toBe(false);
+      expect(downloadService.markCompleted).not.toHaveBeenCalled();
+    });
+
+    it("nothing fetchable fails with its own reason", async () => {
+      arrangeThree();
+      vi.mocked(fetch).mockImplementation(() =>
+        Promise.resolve(new Response(null, { status: 404 }))
+      );
+
+      await playlistZipService.createZip(7, NO_CAP);
+
+      expect(downloadService.markFailed).toHaveBeenCalledWith(
+        7,
+        NOTHING_FETCHED
+      );
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(appended).toEqual([]);
+      expect(fs.existsSync(zipPath())).toBe(false);
+      expect(downloadService.markCompleted).not.toHaveBeenCalled();
     });
   });
 });
