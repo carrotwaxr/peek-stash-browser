@@ -7,7 +7,8 @@ import {
   getEffectiveImageMetadata,
   getImageTitle,
 } from "../../utils/imageGalleryInheritance";
-import { BaseCard, type CardIndicator } from "../ui/BaseCard";
+import { BaseCard } from "../ui/BaseCard";
+import type { CardBadge } from "../ui/CardComponents";
 import { useCardIndicators } from "./cardIndicators";
 
 interface Props {
@@ -95,7 +96,7 @@ const ImageCard = memo(
         return parts.length > 0 ? parts.join(" • ") : null;
       })();
 
-      // Resolution badge
+      // Resolution label
       const resolution = formatResolution(image.width, image.height);
 
       // The counts, from the image card's table, on the effective relations
@@ -109,26 +110,22 @@ const ImageCard = memo(
         [image.instanceId, image.galleries, effective]
       );
       const relationIndicators = useCardIndicators("image", indicatorRow);
-      const indicators = useMemo<CardIndicator[]>(
-        () => [
-          ...(resolution
-            ? [
-                {
-                  type: "RESOLUTION",
-                  label: resolution,
-                  tooltipContent: `${image.width}x${image.height}`,
-                },
-              ]
-            : []),
-          ...relationIndicators,
-        ],
-        [resolution, image.width, image.height, relationIndicators]
+      // The resolution is a label beside the counts, not a count
+      const resolutionBadge = useMemo<CardBadge | undefined>(
+        () =>
+          resolution
+            ? { label: resolution, title: `${image.width}x${image.height}` }
+            : undefined,
+        [resolution, image.width, image.height]
       );
 
       // Only show indicators if setting is enabled
       const indicatorsToShow = imageSettings.showRelationshipIndicators
-        ? indicators
+        ? relationIndicators
         : [];
+      const badgeToShow = imageSettings.showRelationshipIndicators
+        ? resolutionBadge
+        : undefined;
 
       // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
       const handleClick = onClick
@@ -175,6 +172,7 @@ const ImageCard = memo(
           fromPageTitle={fromPageTitle}
           tabIndex={tabIndex}
           indicators={indicatorsToShow}
+          indicatorBadge={badgeToShow}
           displayPreferences={{
             showDescription: imageSettings.showDescriptionOnCard as
               | boolean

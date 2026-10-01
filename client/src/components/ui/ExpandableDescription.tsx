@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * Description text with inline "...more" link when truncated
- * Clicking "more" opens a popover with full description
+ * A card's description, clamped to `maxLines`.
  *
- * Uses a float-based technique to position "more" inline with the last line of text:
- * - A floated spacer element reserves space in the bottom-right corner
- * - The "more" button is positioned absolutely over that reserved space
- * - This ensures "more" appears at the end of the text regardless of line count
+ * Only a description the clamp actually cut off is interactive: a tap on it
+ * opens a popover with the whole text. A description that fits takes no
+ * click and shows no pointer, so a tap on it reaches the card's own link.
+ * Truncation is measured on the rendered text (its scroll height against its
+ * box) when the text mounts or changes, and again when a pointer reaches it,
+ * since a card's width, and so its line count, changes with the grid. There is
+ * no observer per card: a grid holds hundreds of these.
  */
 interface Props {
   description: string | null | undefined;
@@ -17,11 +19,20 @@ interface Props {
 
 export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
+  const textRef = useRef<HTMLParagraphElement>(null);
 
   const descriptionHeight = useMemo(() => {
     return `${maxLines * 1.5}rem`;
   }, [maxLines]);
+
+  const measure = useCallback(() => {
+    const text = textRef.current;
+    setIsTruncated(!!text && text.scrollHeight > text.clientHeight);
+  }, []);
+
+  useLayoutEffect(measure, [measure, description, maxLines]);
 
   if (!description) {
     return (
@@ -32,7 +43,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
     );
   }
 
-  const handleMoreClick = (e: React.MouseEvent<HTMLParagraphElement>) => {
+  const handleOpen = (e: React.MouseEvent<HTMLParagraphElement>) => {
     e.stopPropagation();
     e.preventDefault();
 
@@ -61,17 +72,15 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
         className="relative w-full my-1 overflow-hidden"
         style={{ height: descriptionHeight }}
       >
-        {/*
-          Float-based inline "more" technique:
-          1. Floated spacer creates empty space at bottom-right
-          2. Text flows around it naturally
-          3. "more" button positioned over the spacer
-        */}
         <p
+          ref={textRef}
           className="card-description leading-relaxed m-0"
-          onClick={handleMoreClick}
+          onClick={isTruncated ? handleOpen : undefined}
+          onPointerEnter={measure}
+          onPointerDown={measure}
           style={{
             color: "var(--text-muted)",
+            cursor: isTruncated ? "pointer" : undefined,
             display: "-webkit-box",
             WebkitLineClamp: maxLines,
             WebkitBoxOrient: "vertical",

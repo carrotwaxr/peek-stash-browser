@@ -193,8 +193,8 @@ const GroupDetail = () => {
           <PageHeader
             title={
               (
-                <div className="flex gap-4 items-center">
-                  <span>
+                <div className="flex flex-wrap items-center gap-4 min-w-0">
+                  <span className="min-w-0 break-words">
                     {(group?.name as string) || `Collection ${groupId}`}
                   </span>
                   {!!settings.showFavorite && (

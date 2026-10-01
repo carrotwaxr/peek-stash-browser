@@ -381,3 +381,20 @@ describe("TagDetail: a statistic starts its tab clean", () => {
     expect(search().tab).toBeUndefined();
   });
 });
+
+describe("TagDetail: title row", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findImages.mockResolvedValue({ findImages: { images: [], count: 0 } });
+    relationCounts.mockReturnValue({ data: { counts: ALL_COUNTS } });
+  });
+
+  it("a tag page's title row wraps (has flex-wrap and min-w-0) and the name breaks words", () => {
+    renderPage("tab=scenes");
+
+    const name = screen.getByText("Parent Tag", { selector: "h1 span" });
+    expect(name).toHaveClass("min-w-0", "break-words");
+    const row = must(name.parentElement, "the title row");
+    expect(row).toHaveClass("flex", "flex-wrap", "items-center", "min-w-0");
+  });
+});
