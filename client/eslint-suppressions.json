@@ -72,7 +72,7 @@
   },
   "src/components/pages/Downloads.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/pages/GalleryDetail.tsx": {
@@ -1292,11 +1292,6 @@
     },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 9
-    }
-  },
-  "tests/components/pages/Downloads.test.tsx": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 3
     }
   },
   "tests/components/pages/HiddenItemsPage.test.tsx": {

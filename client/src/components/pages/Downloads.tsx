@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  GetUserDownloadsResponse,
+  SerializedDownload,
+} from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost } from "../../api";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
@@ -23,13 +27,11 @@ const formatSize = (bytes: number | null | undefined): string => {
 
 /**
  * Format ISO date string to locale string
- * @param {string} dateStr - ISO date string
+ * @param {Date | string} value - Date, or the ISO string it arrives as
  * @returns {string} Formatted date string
  */
-const formatDate = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  return date.toLocaleString();
+const formatDate = (value: Date | string): string => {
+  return new Date(value).toLocaleString();
 };
 
 /**
@@ -37,7 +39,7 @@ const formatDate = (dateStr: string | null | undefined): string => {
  * @param {string} fileName - File name with extension
  * @returns {string} Display name without extension
  */
-const getDisplayName = (fileName: string | null | undefined): string => {
+const getDisplayName = (fileName: string): string => {
   if (!fileName) return "Untitled";
   // Remove extension for display
   return fileName.replace(/\.[^/.]+$/, "") || "Untitled";
@@ -53,7 +55,7 @@ const getStatusBadge = (status: string) => {
     PENDING: {
       backgroundColor: "rgba(59, 130, 246, 0.2)",
       color: "rgb(59, 130, 246)",
-      text: "Pending",
+      text: "Queued",
     },
     PROCESSING: {
       backgroundColor: "rgba(234, 179, 8, 0.2)",
@@ -107,18 +109,14 @@ const EXPIRED_HINTS: Record<string, string> = {
  * @param {Object} download - Download object
  * @returns {JSX.Element} Thumbnail or type icon
  */
-const getDownloadThumbnail = (download: Record<string, unknown>) => {
+const getDownloadThumbnail = (download: SerializedDownload) => {
   // The thumbnail comes from the instance the download's entity lives on.
   // A download stored without one (it answers 410) gets its type's icon: the
   // media routes serve only the instance a request names
-  const instanceId =
-    typeof download.instanceId === "string" ? download.instanceId : "";
+  const instanceId = download.instanceId;
   const instanceParam = `instanceId=${encodeURIComponent(instanceId)}`;
   // A playlist download has no entity (entityId is null)
-  const entityId =
-    typeof download.entityId === "string" && instanceId
-      ? download.entityId
-      : "";
+  const entityId = instanceId ? (download.entityId ?? "") : "";
 
   // For scenes and images, show actual thumbnail
   if (download.type === "SCENE" && entityId) {
@@ -216,16 +214,14 @@ const getDownloadThumbnail = (download: Record<string, unknown>) => {
 
 const Downloads = () => {
   usePageTitle("Downloads");
-  const [downloads, setDownloads] = useState<Record<string, unknown>[]>([]);
+  const [downloads, setDownloads] = useState<SerializedDownload[]>([]);
   const [loading, setLoading] = useState(true);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadDownloads = useCallback(async () => {
     try {
-      const response = await apiGet<{ downloads: Record<string, unknown>[] }>(
-        "/downloads"
-      );
-      setDownloads(response.downloads || []);
+      const response = await apiGet<GetUserDownloadsResponse>("/downloads");
+      setDownloads(response.downloads);
     } catch {
       showError("Failed to load downloads");
     } finally {
@@ -258,7 +254,7 @@ const Downloads = () => {
     };
   }, [hasActiveDownloads, loadDownloads]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
       await apiDelete(`/downloads/${id}`);
       showSuccess("Download removed");
@@ -268,7 +264,7 @@ const Downloads = () => {
     }
   };
 
-  const handleRetry = async (id: string) => {
+  const handleRetry = async (id: number) => {
     try {
       await apiPost(`/downloads/${id}/retry`);
       showSuccess("Download queued for retry");
@@ -334,17 +330,16 @@ const Downloads = () => {
         <div className="space-y-3">
           {downloads.map((download) => {
             const isActive =
-              (download.status === "PENDING" ||
-                download.status === "PROCESSING") &&
-              download.progress !== undefined;
+              download.status === "PENDING" || download.status === "PROCESSING";
             const hasFailed = download.status === "FAILED" && download.error;
             const expiredHint =
               download.status === "EXPIRED"
-                ? EXPIRED_HINTS[download.type as string]
+                ? EXPIRED_HINTS[download.type]
                 : undefined;
+            const fileSize = Number(download.fileSize);
             return (
               <div
-                key={download.id as string}
+                key={download.id}
                 className="p-4 rounded-lg"
                 style={{
                   backgroundColor: "var(--bg-secondary)",
@@ -362,25 +357,19 @@ const Downloads = () => {
                         className="font-medium truncate"
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {getDisplayName(
-                          download.fileName as string | null | undefined
-                        )}
+                        {getDisplayName(download.fileName)}
                       </span>
-                      {getStatusBadge(download.status as string)}
+                      {getStatusBadge(download.status)}
                     </div>
 
                     <div
                       className="text-sm flex items-center gap-3 flex-wrap"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      {download.fileSize ? (
-                        <span>{formatSize(download.fileSize as number)}</span>
+                      {fileSize > 0 ? (
+                        <span>{formatSize(fileSize)}</span>
                       ) : null}
-                      <span>
-                        {formatDate(
-                          download.createdAt as string | null | undefined
-                        )}
-                      </span>
+                      <span>{formatDate(download.createdAt)}</span>
                     </div>
 
                     {/* Progress bar for active downloads */}
@@ -393,7 +382,7 @@ const Downloads = () => {
                           <div
                             className="h-full rounded-full transition-all duration-300"
                             style={{
-                              width: `${(download.progress as number) || 0}%`,
+                              width: `${download.progress}%`,
                               backgroundColor: "var(--accent-primary)",
                             }}
                           />
@@ -402,7 +391,7 @@ const Downloads = () => {
                           className="text-xs mt-1"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          {(download.progress as number) || 0}%
+                          {download.progress}%
                         </div>
                       </div>
                     ) : null}
@@ -416,7 +405,7 @@ const Downloads = () => {
                           color: "rgb(239, 68, 68)",
                         }}
                       >
-                        {download.error as string}
+                        {download.error}
                       </div>
                     ) : null}
 
@@ -429,6 +418,20 @@ const Downloads = () => {
                         {expiredHint}
                       </div>
                     ) : null}
+
+                    {/* Scenes a finished zip had to leave out */}
+                    {download.type === "PLAYLIST" &&
+                    download.status === "COMPLETED" &&
+                    download.skippedItems > 0 ? (
+                      <div
+                        className="mt-2 text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {download.skippedItems === 1
+                          ? "1 scene could not be included"
+                          : `${download.skippedItems} scenes could not be included`}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Actions */}
@@ -436,8 +439,8 @@ const Downloads = () => {
                     {/* Download button for completed */}
                     {download.status === "COMPLETED" && (
                       <a
-                        href={`/api/downloads/${download.id as string}/file`}
-                        download={download.fileName as string}
+                        href={`/api/downloads/${download.id}/file`}
+                        download={download.fileName}
                         className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg font-medium transition-all"
                         style={{
                           backgroundColor: "var(--accent-primary)",
@@ -451,7 +454,7 @@ const Downloads = () => {
                     {/* Retry button for failed */}
                     {download.status === "FAILED" && (
                       <Button
-                        onClick={() => void handleRetry(download.id as string)}
+                        onClick={() => void handleRetry(download.id)}
                         variant="secondary"
                         size="sm"
                       >
@@ -461,7 +464,7 @@ const Downloads = () => {
 
                     {/* Delete button for all */}
                     <Button
-                      onClick={() => void handleDelete(download.id as string)}
+                      onClick={() => void handleDelete(download.id)}
                       variant="destructive"
                       size="sm"
                     >

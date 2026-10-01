@@ -1,17 +1,21 @@
+import type {
+  GetUserDownloadsResponse,
+  SerializedDownload,
+} from "@peek/shared-types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Downloads from "@/components/pages/Downloads";
 import { showError, showSuccess } from "@/utils/toast";
 
-const mockApiGet = vi.fn();
-const mockApiPost = vi.fn();
-const mockApiDelete = vi.fn();
+const mockApiGet = vi.fn<(endpoint: string) => Promise<unknown>>();
+const mockApiPost = vi.fn<(endpoint: string) => Promise<unknown>>();
+const mockApiDelete = vi.fn<(endpoint: string) => Promise<unknown>>();
 
 vi.mock("@/api", () => ({
-  apiGet: (...args: unknown[]) => mockApiGet(...args),
-  apiPost: (...args: unknown[]) => mockApiPost(...args),
-  apiDelete: (...args: unknown[]) => mockApiDelete(...args),
+  apiGet: (endpoint: string) => mockApiGet(endpoint),
+  apiPost: (endpoint: string) => mockApiPost(endpoint),
+  apiDelete: (endpoint: string) => mockApiDelete(endpoint),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
@@ -21,7 +25,7 @@ vi.mock("@/utils/toast", () => ({
   showSuccess: vi.fn(),
 }));
 
-function download(overrides: Record<string, unknown>) {
+function download(overrides: Partial<SerializedDownload>): SerializedDownload {
   return {
     id: 1,
     userId: 1,
@@ -33,19 +37,22 @@ function download(overrides: Record<string, unknown>) {
     instanceId: "inst-a",
     fileName: "file.mp4",
     fileSize: "1000",
-    filePath: null,
     progress: 100,
     error: null,
-    createdAt: "2026-09-23T00:00:00.000Z",
-    completedAt: "2026-09-23T00:00:00.000Z",
+    skippedItems: 0,
+    createdAt: new Date("2026-09-23T00:00:00.000Z"),
+    completedAt: new Date("2026-09-23T00:00:00.000Z"),
     expiresAt: null,
     ...overrides,
   };
 }
 
-function mockDownloads(downloads: Record<string, unknown>[]) {
+function mockDownloads(downloads: SerializedDownload[]) {
   mockApiGet.mockImplementation((endpoint: string) => {
-    if (endpoint === "/downloads") return Promise.resolve({ downloads });
+    if (endpoint === "/downloads") {
+      const response: GetUserDownloadsResponse = { downloads };
+      return Promise.resolve(response);
+    }
     return Promise.reject(new Error(`unexpected GET ${endpoint}`));
   });
 }
@@ -153,7 +160,7 @@ describe("Downloads page", () => {
 
   it("an image download with no instance shows no thumbnail request", async () => {
     mockDownloads([
-      download({ id: 1, instanceId: null, fileName: "scene.mp4" }),
+      download({ id: 1, instanceId: "", fileName: "scene.mp4" }),
       download({
         id: 2,
         type: "IMAGE",
@@ -241,7 +248,7 @@ describe("Downloads page", () => {
   });
 
   it("a completed download links to its file", async () => {
-    mockDownloads([download({ id: 7, fileSize: 1536 })]);
+    mockDownloads([download({ id: 7, fileSize: "1536" })]);
 
     render(<Downloads />);
 
@@ -268,7 +275,7 @@ describe("Downloads page", () => {
 
     render(<Downloads />);
 
-    expect(await screen.findByText("Pending")).toBeInTheDocument();
+    expect(await screen.findByText("Queued")).toBeInTheDocument();
     expect(screen.getByText("Processing")).toBeInTheDocument();
     expect(screen.getByText("0%")).toBeInTheDocument();
     expect(screen.getByText("42%")).toBeInTheDocument();
@@ -277,21 +284,70 @@ describe("Downloads page", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("an active download without progress shows no progress bar", async () => {
-    mockDownloads([download({ status: "PENDING", progress: undefined })]);
+  it("a pending zip reads Queued", async () => {
+    mockDownloads([
+      download({ status: "PENDING", progress: 0, type: "PLAYLIST" }),
+    ]);
 
     render(<Downloads />);
 
-    expect(await screen.findByText("Pending")).toBeInTheDocument();
-    expect(screen.queryByText(/%$/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Queued")).toBeInTheDocument();
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
   });
 
-  it("an unknown status shows as Pending", async () => {
-    mockDownloads([download({ status: "QUEUED" })]);
+  it("an unknown status shows as Queued", async () => {
+    mockDownloads([download({ status: "WAITING" })]);
 
     render(<Downloads />);
 
-    expect(await screen.findByText("Pending")).toBeInTheDocument();
+    expect(await screen.findByText("Queued")).toBeInTheDocument();
+  });
+
+  it("a completed zip with skipped scenes says how many", async () => {
+    mockDownloads([
+      download({
+        id: 1,
+        type: "PLAYLIST",
+        entityType: null,
+        entityId: null,
+        fileName: "two.zip",
+        skippedItems: 2,
+      }),
+      download({
+        id: 2,
+        type: "PLAYLIST",
+        entityType: null,
+        entityId: null,
+        fileName: "one.zip",
+        skippedItems: 1,
+      }),
+    ]);
+
+    render(<Downloads />);
+
+    expect(
+      await screen.findByText("2 scenes could not be included")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("1 scene could not be included")
+    ).toBeInTheDocument();
+  });
+
+  it("a completed zip with none skipped shows no note", async () => {
+    mockDownloads([
+      download({
+        type: "PLAYLIST",
+        entityType: null,
+        entityId: null,
+        fileName: "all.zip",
+        skippedItems: 0,
+      }),
+    ]);
+
+    render(<Downloads />);
+
+    expect(await screen.findByText("Completed")).toBeInTheDocument();
+    expect(screen.queryByText(/could not be included/)).not.toBeInTheDocument();
   });
 
   it("a failed download shows its error and retries on request", async () => {
@@ -360,14 +416,6 @@ describe("Downloads page", () => {
     expect(await screen.findByText("No downloads yet")).toBeInTheDocument();
   });
 
-  it("treats a response without a list as empty", async () => {
-    mockApiGet.mockResolvedValue({});
-
-    render(<Downloads />);
-
-    expect(await screen.findByText("No downloads yet")).toBeInTheDocument();
-  });
-
   it("reports a failed load and shows the empty state", async () => {
     mockApiGet.mockRejectedValue(new Error("offline"));
 
@@ -377,16 +425,15 @@ describe("Downloads page", () => {
     expect(showError).toHaveBeenCalledWith("Failed to load downloads");
   });
 
-  it("shows placeholders for a missing name, size and date", async () => {
+  it("shows placeholders for a missing name and size", async () => {
     mockDownloads([
-      download({ fileName: null, fileSize: null, createdAt: null }),
-      download({ id: 2, fileName: ".mp4", fileSize: 0 }),
+      download({ fileName: "", fileSize: null }),
+      download({ id: 2, fileName: ".mp4", fileSize: "0" }),
     ]);
 
     render(<Downloads />);
 
     expect(await screen.findAllByText("Untitled")).toHaveLength(2);
-    expect(screen.getByText("-")).toBeInTheDocument();
     expect(screen.queryByText("0 B")).not.toBeInTheDocument();
   });
 
