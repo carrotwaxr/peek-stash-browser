@@ -7,6 +7,7 @@
  * remove) take each scene's instance from the request; a move and a bulk
  * remove name items by item id.
  */
+import { PLAYLIST_REPEAT_MODES } from "@peek/shared-types/api/playlist.js";
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import type { Playlist, PlaylistItem, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -329,7 +330,7 @@ describe("Playlist Controller Operations", () => {
       expect(mockPrisma.playlist.update).not.toHaveBeenCalled();
     });
 
-    it.each(["none", "all", "one"])(
+    it.each(PLAYLIST_REPEAT_MODES)(
       "stores repeat %s and a trimmed name",
       async (repeat) => {
         mockPrisma.playlist.findFirst.mockResolvedValue(
