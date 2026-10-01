@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AppErrorBoundary,
@@ -41,9 +42,11 @@ const Boom = (): never => {
 const renderLayout = (child: React.ReactNode) =>
   render(
     <MemoryRouter>
-      <TVModeProvider>
-        <GlobalLayout>{child}</GlobalLayout>
-      </TVModeProvider>
+      <SignedInWithQuery>
+        <TVModeProvider>
+          <GlobalLayout>{child}</GlobalLayout>
+        </TVModeProvider>
+      </SignedInWithQuery>
     </MemoryRouter>
   );
 

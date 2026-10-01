@@ -1,4 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ClipList from "../../../src/components/clips/ClipList";
@@ -40,11 +41,13 @@ const mockClips = [
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
-    <MemoryRouter>
-      <AuthContext.Provider value={createAuthValue()}>
-        <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>
-      </AuthContext.Provider>
-    </MemoryRouter>
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <AuthContext.Provider value={createAuthValue()}>
+          <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 };
 

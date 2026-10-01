@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 import { NAV_DEFINITIONS, getNavDefinition } from "../../constants/navigation";
 import { ThemedIcon } from "../icons/index";
@@ -24,7 +24,12 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
   const [preferences, setPreferences] = useState<NavPreference[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Sync from the prop unless the user has edits: a save that fails puts
+  // the stored order back in the prop, and the edits stay marked unsaved
+  const hasChangesRef = useRef(hasChanges);
+  hasChangesRef.current = hasChanges;
   useEffect(() => {
+    if (hasChangesRef.current) return;
     // Sort by order on initial load
     const sorted = [...(navPreferences ?? [])].sort(
       (a, b) => a.order - b.order

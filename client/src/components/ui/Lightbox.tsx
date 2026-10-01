@@ -20,8 +20,9 @@ import {
   TransformComponent,
   TransformWrapper,
 } from "react-zoom-pan-pinch";
-import { apiGet, imageViewHistoryApi } from "../../api";
+import { imageViewHistoryApi } from "../../api";
 import { useUpdateFavorite, useUpdateRating } from "../../api/hooks";
+import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useImageDownload } from "../../hooks/useImageDownload";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
@@ -100,8 +101,10 @@ const Lightbox = ({
   const [zoomScale, setZoomScale] = useState(1);
   const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null);
 
-  // Double-tap/double-click preference and feedback
-  const [doubleTapAction, setDoubleTapAction] = useState("favorite");
+  // Double-tap/double-click preference (from the settings query) and feedback
+  const { data: userSettings } = useUserSettings();
+  const doubleTapAction =
+    userSettings?.settings.lightboxDoubleTapAction ?? "favorite";
   const [doubleTapFeedback, setDoubleTapFeedback] = useState<string | null>(
     null
   ); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
@@ -110,21 +113,6 @@ const Lightbox = ({
     typeof setTimeout
   > | null>(null);
   const doubleTapGuardRef = useRef(0);
-
-  // Fetch user's lightbox double-tap preference
-  useEffect(() => {
-    if (!isOpen) return;
-    apiGet("/user/settings")
-      .then((data) => {
-        const action = (
-          data as { settings?: { lightboxDoubleTapAction?: string } }
-        )?.settings?.lightboxDoubleTapAction;
-        if (action) setDoubleTapAction(action);
-      })
-      .catch(() => {
-        // Silently fall back to default
-      });
-  }, [isOpen]);
 
   // Reset index when initialIndex changes, lightbox opens, or page transition occurs.
   // transitionKey ensures this fires even when initialIndex is the same value

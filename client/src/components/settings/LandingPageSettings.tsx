@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LANDING_PAGE_OPTIONS } from "../../constants/navigation";
 import { Button, Switch } from "../ui/index";
 
@@ -27,8 +27,13 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [validationError, setValidationError] = useState("");
 
-  // Sync state when prop changes (e.g., after settings reload)
+  // Sync state when prop changes (e.g., after settings reload), unless the
+  // user has edits: a save that fails puts the stored value back in the
+  // prop, and the edits stay marked unsaved
+  const hasChangesRef = useRef(hasChanges);
+  hasChangesRef.current = hasChanges;
   useEffect(() => {
+    if (hasChangesRef.current) return;
     setRandomize(landingPagePreference?.randomize || false);
     setSelectedPages(landingPagePreference?.pages ?? ["home"]);
     setHasChanges(false);

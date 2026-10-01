@@ -93,7 +93,7 @@ Reorder or hide items in the main navigation sidebar to prioritize the pages you
 - **Hide rarely-used items** to declutter the sidebar
 - **Put your most-used pages at the top** for faster access
 - Hidden items are still accessible via direct URL
-- Changes take effect immediately after saving (page reloads)
+- Changes take effect as soon as you save
 
 ---
 

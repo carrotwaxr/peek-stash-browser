@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
@@ -24,7 +25,10 @@ vi.mock("react-router-dom", async () => {
 // Mock hooks
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: vi.fn(() => ({ user: { username: "testuser" } })),
+  useAuth: vi.fn(() => ({
+    isAuthenticated: true,
+    user: { username: "testuser" },
+  })),
 }));
 /** The fetch function of each hardcoded carousel, by fetchKey */
 let mockCarouselQueries: Record<string, () => Promise<unknown>> = {};
@@ -136,7 +140,28 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={client}>{children}</QueryClientProvider>
 );
 
-const renderHome = () => actAsync(() => render(<Home />, { wrapper }));
+/**
+ * Lets the settings query answer: TanStack Query tells React about a change
+ * on a timer a millisecond later (a fake clock is moved on instead).
+ */
+const letQueriesAnswer = () =>
+  vi.isFakeTimers()
+    ? advance(50)
+    : act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+const renderHome = async () => {
+  let view!: ReturnType<typeof render>;
+  await actAsync(() => {
+    view = render(<Home />, { wrapper });
+  });
+  await letQueriesAnswer();
+  return view;
+};
+
+const settingsRequests = () =>
+  mockApiGet.mock.calls.filter(([path]) => path === "/user/settings").length;
 
 /** Moves the clock on, running the timers and promises due by then. */
 const advance = (ms: number) =>
@@ -180,6 +205,9 @@ describe("Home", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useLocation).mockReturnValue({
+      key: "default",
+    } as ReturnType<typeof useLocation>);
     client = createQueryClient();
     mockCarouselQueries = {};
     mockApiGet.mockResolvedValue({
@@ -280,12 +308,31 @@ describe("Home", () => {
     });
 
     it("falls back to migrated empty prefs on API error", async () => {
-      mockApiGet.mockRejectedValue(new Error("Network error"));
+      mockApiGet.mockRejectedValue(new ApiError("Database busy", 500));
 
       await renderHome();
 
       // Should fall back to migrateCarouselPreferences([])
-      expect(mockMigrateCarouselPreferences).toHaveBeenCalledWith([]);
+      await waitFor(() => {
+        expect(mockMigrateCarouselPreferences).toHaveBeenCalledWith([]);
+      });
+    });
+
+    it("returning to Home sends no /user/settings request", async () => {
+      const { rerender } = await renderHome();
+      expect(settingsRequests()).toBe(1);
+      expect(mockGetCarousels).toHaveBeenCalledTimes(1);
+
+      // Another visit: the router gives the location a new key
+      vi.mocked(useLocation).mockReturnValue({
+        key: "second",
+      } as ReturnType<typeof useLocation>);
+      await actAsync(() => rerender(<Home />));
+      await letQueriesAnswer();
+
+      // The custom carousels refresh; the settings come from the cache
+      expect(mockGetCarousels).toHaveBeenCalledTimes(2);
+      expect(settingsRequests()).toBe(1);
     });
   });
 

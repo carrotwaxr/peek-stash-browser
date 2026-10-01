@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
-import { apiGet, libraryApi } from "../../api";
+import { libraryApi } from "../../api";
 import {
   isLibraryInitializing,
   useLibraryReady,
 } from "../../api/hooks/useLibraryReady";
+import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { queryKeys } from "../../api/queryKeys";
 import {
   CAROUSEL_DEFINITIONS,
@@ -116,43 +117,39 @@ const Home = () => {
   const location = useLocation();
   const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
-  const [carouselPreferences, setCarouselPreferences] = useState<any[]>([]);
   const [customCarousels, setCustomCarousels] = useState<
     Record<string, unknown>[]
   >([]);
-  const [_loadingPreferences, setLoadingPreferences] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load user preferences
-        const data = await apiGet<Record<string, any>>("/user/settings");
-        const prefs = migrateCarouselPreferences(
-          data.settings.carouselPreferences
-        );
-        setCarouselPreferences(prefs);
+  // The carousel order comes from the settings query, shared with every
+  // other reader: coming back to Home sends no request. Before it answers
+  // no carousel shows; after a failed load every carousel does.
+  const { data: userSettings, isError: settingsFailed } = useUserSettings();
+  const carouselPreferences = useMemo(() => {
+    if (userSettings) {
+      return migrateCarouselPreferences(
+        userSettings.settings.carouselPreferences
+      );
+    }
+    return settingsFailed ? migrateCarouselPreferences([]) : [];
+  }, [userSettings, settingsFailed]);
 
-        // Load custom carousels
-        try {
-          const { carousels } = (await libraryApi.getCarousels()) as Record<
-            string,
-            any
-          >;
-          setCustomCarousels(carousels || []);
-        } catch (err) {
-          console.error("Failed to load custom carousels:", err);
-        }
-      } catch {
-        // Fallback to all enabled if fetch fails
-        setCarouselPreferences(migrateCarouselPreferences([]));
-      } finally {
-        setLoadingPreferences(false);
+  useEffect(() => {
+    const loadCustomCarousels = async () => {
+      try {
+        const { carousels } = (await libraryApi.getCarousels()) as Record<
+          string,
+          any
+        >;
+        setCustomCarousels(carousels || []);
+      } catch (err) {
+        console.error("Failed to load custom carousels:", err);
       }
     };
 
-    void loadData();
+    void loadCustomCarousels();
     // Re-fetch when navigating to homepage (location.key changes on each navigation)
   }, [location.key]);
 
@@ -205,12 +202,12 @@ const Home = () => {
 
   // Build the list of active carousels (hardcoded + custom)
   const activeCarousels: CarouselDef[] = carouselPreferences
-    .filter((pref) => pref.enabled !== false)
-    .sort((a, b) => ((a.order as number) || 0) - ((b.order as number) || 0))
+    .filter((pref) => pref.enabled)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((pref) => {
       // Check if it's a custom carousel
-      if (isCustomCarousel(pref.id as string)) {
-        const carouselId = (pref.id as string).replace("custom-", "");
+      if (isCustomCarousel(pref.id)) {
+        const carouselId = pref.id.replace("custom-", "");
         const customCarousel = customCarousels.find((c) => c.id === carouselId);
         if (customCarousel) {
           const IconComponent =
@@ -220,7 +217,7 @@ const Home = () => {
           return {
             type: "custom",
             id: carouselId,
-            prefId: pref.id as string,
+            prefId: pref.id,
             title: customCarousel.title as string,
             iconComponent: IconComponent,
             iconProps: {
@@ -238,7 +235,7 @@ const Home = () => {
         return {
           type: "hardcoded",
           ...def,
-          prefId: pref.id as string,
+          prefId: pref.id,
         } as CarouselDef;
       }
       return null;

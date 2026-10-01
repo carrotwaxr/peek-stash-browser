@@ -3,8 +3,10 @@
  * never write the defaults over the user's stored playback settings.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { SignedInWithQuery } from "@tests/helpers/SignedInWithQuery";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../../../src/api";
+import { useUserSettings } from "../../../../src/api/hooks/useUserSettings";
 import PlaybackTab from "../../../../src/components/settings/tabs/PlaybackTab";
 import { showError, showSuccess } from "../../../../src/utils/toast";
 
@@ -25,6 +27,20 @@ vi.mock("../../../../src/utils/toast", () => ({
   showSuccess: vi.fn(),
 }));
 
+const renderTab = () =>
+  render(
+    <SignedInWithQuery>
+      <PlaybackTab />
+      <PlayerReading />
+    </SignedInWithQuery>
+  );
+
+/** What the video player reads when a scene starts */
+function PlayerReading() {
+  const { data } = useUserSettings();
+  return <p data-testid="player-reads">{data?.settings.minimumPlayPercent}</p>;
+}
+
 const STORED = {
   minimumPlayPercent: 50,
 };
@@ -38,7 +54,7 @@ describe("PlaybackTab", () => {
     mockApiGet
       .mockRejectedValueOnce(new api.ApiError("Database busy", 503))
       .mockResolvedValueOnce({ settings: STORED });
-    render(<PlaybackTab />);
+    renderTab();
 
     expect(await screen.findByText("Database busy")).toBeInTheDocument();
     expect(
@@ -64,7 +80,7 @@ describe("PlaybackTab", () => {
   it("saves the loaded values with the user's change", async () => {
     mockApiGet.mockResolvedValue({ settings: STORED });
     mockApiPut.mockResolvedValue({ success: true });
-    render(<PlaybackTab />);
+    renderTab();
 
     fireEvent.change(await screen.findByLabelText(/Minimum Play Percent/), {
       target: { value: "75" },
@@ -82,10 +98,29 @@ describe("PlaybackTab", () => {
     });
   });
 
+  it("a saved minimum play percent is what the player reads next, without a reload", async () => {
+    mockApiGet.mockResolvedValue({ settings: STORED });
+    mockApiPut.mockResolvedValue({ success: true });
+    renderTab();
+    await screen.findByLabelText(/Minimum Play Percent/);
+    expect(screen.getByTestId("player-reads")).toHaveTextContent("50");
+
+    fireEvent.change(screen.getByLabelText(/Minimum Play Percent/), {
+      target: { value: "75" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Settings" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("player-reads")).toHaveTextContent("75")
+    );
+    // Read from the cache: the save is not followed by a second GET
+    expect(mockApiGet).toHaveBeenCalledTimes(1);
+  });
+
   it("a failed save shows the server's message", async () => {
     mockApiGet.mockResolvedValue({ settings: STORED });
     mockApiPut.mockRejectedValue(new api.ApiError("Database busy", 503));
-    render(<PlaybackTab />);
+    renderTab();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Save Settings" })
@@ -101,7 +136,7 @@ describe("PlaybackTab", () => {
   it("the Playback tab offers no casting toggle", async () => {
     mockApiGet.mockResolvedValue({ settings: STORED });
     mockApiPut.mockResolvedValue({ success: true });
-    render(<PlaybackTab />);
+    renderTab();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Save Settings" })
@@ -123,7 +158,7 @@ describe("PlaybackTab", () => {
       },
     });
     mockApiPut.mockResolvedValue({ success: true });
-    render(<PlaybackTab />);
+    renderTab();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Save Settings" })
