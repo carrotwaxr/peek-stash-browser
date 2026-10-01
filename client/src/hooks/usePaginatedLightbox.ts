@@ -315,14 +315,17 @@ export function usePaginatedLightbox<TImage = unknown>({
 
   // The lightbox moved: track it for prefetching and name its image in the
   // URL. While a crossing's page loads (or before its image is named) the
-  // index is the old page's, so it names nothing.
+  // index is the old page's, so it names nothing; nor while an address's
+  // image waits for its page (a Back to another page and image), whose
+  // param the old index would overwrite.
   const handleLightboxIndexChange = useCallback(
     (index: number) => {
       setTrackedIndex(index);
       if (
         !lightboxOpen ||
         pendingLightboxNav.current !== null ||
-        landingIndex !== null
+        landingIndex !== null ||
+        resolveRef.current !== null
       ) {
         return;
       }

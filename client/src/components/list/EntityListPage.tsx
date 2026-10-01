@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo } from "react";
+import { Fragment, type Ref, useCallback, useMemo } from "react";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
@@ -34,10 +34,12 @@ import WallView from "../wall/WallView";
 import ListSkeleton from "./ListSkeleton";
 import type {
   CardContext,
+  ListLightbox,
   ListPageConfig,
   ListPageExtras,
 } from "./listPageConfigs";
 import { type ListRow, pickPage, rowKey, useHideFromList } from "./listSources";
+import type { ViewModeId } from "./listViewModes";
 import { timelineAndFolderFilters } from "./viewFilters";
 
 const NO_EXTRAS: ListPageExtras = {};
@@ -57,6 +59,13 @@ export interface ListEmbed {
   context?: string;
   /** The entity's default sort, over the config's */
   defaultSort?: string;
+  /** The default sort's direction, over the list's (descending) */
+  defaultDirection?: "ASC" | "DESC";
+  /**
+   * The view shown when neither the URL nor a default preset names one,
+   * over the user's card display setting (a gallery's wall)
+   */
+  defaultView?: ViewModeId;
   /**
    * The page's own filters (a performer's Scenes tab has its performer):
    * never in the URL, not offered in the panel, merged last into the request
@@ -71,6 +80,13 @@ export interface ListEmbed {
   fromPageTitle?: string;
   /** The folder view is offered (true unless set false) */
   folderView?: boolean;
+  /** What an empty list says, over the config's ("No images found") */
+  emptyMessage?: string;
+  /**
+   * Set by a list with a viewer (Images): the host's handle to open it (a
+   * gallery's Play Slideshow)
+   */
+  lightboxRef?: Ref<ListLightbox>;
 }
 
 /** The detail page a timeline or folder view sits on: its counts and folders are that page's */
@@ -145,9 +161,20 @@ const EntityListPage = ({
   );
   const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
-  const defaults = useListDefaults(
+  const emptyMessage = embed?.emptyMessage ?? config.emptyMessage;
+  const entityDefaults = useListDefaults(
     entityType,
     embed?.defaultSort ?? config.defaultSort
+  );
+  const defaultDirection = embed?.defaultDirection;
+  const defaultView = embed?.defaultView;
+  const defaults = useMemo(
+    () => ({
+      ...entityDefaults,
+      ...(defaultDirection ? { direction: defaultDirection } : {}),
+      ...(defaultView ? { viewMode: defaultView } : {}),
+    }),
+    [entityDefaults, defaultDirection, defaultView]
   );
   const withoutFolder = embed?.folderView === false;
   const viewModes = useMemo(
@@ -277,6 +304,7 @@ const EntityListPage = ({
     loading: isLoading || isPlaceholderData,
     title,
     fromPageTitle,
+    ...(embed?.lightboxRef ? { lightboxRef: embed.lightboxRef } : {}),
   });
 
   // One hide handler and one context for every card, so memoised cards keep
@@ -343,7 +371,7 @@ const EntityListPage = ({
           playbackMode={wallPlayback}
           onItemClick={cardContext.onItemClick}
           loading={isLoading}
-          emptyMessage={config.emptyMessage}
+          emptyMessage={emptyMessage}
         />
       );
     }
@@ -357,7 +385,7 @@ const EntityListPage = ({
           period={timelinePeriod}
           onPeriodChange={listState.setTimelinePeriod}
           loading={!awaitingPeriod && isLoading}
-          emptyMessage={`${config.emptyMessage} for this time period`}
+          emptyMessage={`${emptyMessage} for this time period`}
           gridDensity={gridDensity}
           filters={scope}
         />
@@ -398,7 +426,7 @@ const EntityListPage = ({
         loading: isLoading,
         gridDensity,
         ctx: cardContext,
-        emptyMessage: config.emptyMessage,
+        emptyMessage,
         selectionScope: listState.listKey,
       });
     }
@@ -417,7 +445,7 @@ const EntityListPage = ({
     if (items.length === 0) {
       return (
         <EmptyState
-          title={config.emptyMessage}
+          title={emptyMessage}
           description="Try adjusting your search filters"
         />
       );

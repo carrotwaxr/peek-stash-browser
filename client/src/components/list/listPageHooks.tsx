@@ -2,7 +2,13 @@
  * The list pages' own hooks (`ListPageConfig.usePage`): what a page adds to
  * the shared list page, its wall's click and the Images lightbox.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -72,6 +78,7 @@ export function useImageListPage({
   request,
   error,
   loading,
+  lightboxRef,
 }: ListPageData): ListPageExtras {
   const queryClient = useQueryClient();
   const { page, perPage, setPage } = listState;
@@ -94,6 +101,10 @@ export function useImageListPage({
   });
   const { openLightbox, consumePendingLightboxIndex, failPendingPage } =
     lightbox;
+  // A host's Play Slideshow (a gallery's) opens the viewer from outside
+  useImperativeHandle(lightboxRef, () => ({ open: openLightbox }), [
+    openLightbox,
+  ]);
 
   // A crossing's page that fails leaves the list with no rows until the
   // lightbox returns to its page: the open lightbox keeps the last rows
@@ -204,6 +215,7 @@ export function useImageListPage({
         isOpen={lightbox.lightboxOpen}
         images={lightboxImages}
         initialIndex={lightbox.lightboxIndex}
+        autoPlay={lightbox.lightboxAutoPlay}
         onClose={lightbox.closeLightbox}
         onImagesUpdate={onImagesUpdate}
         // Cross-page navigation, by the list's page and page size

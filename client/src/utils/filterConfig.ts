@@ -2096,18 +2096,28 @@ export const buildImageFilter = (filters: FilterState): ImageFilterInput => {
   );
 
   // Performers, studios and tags match through the image's galleries too
-  // (the server's gallery-umbrella inheritance)
+  // (the server's gallery-umbrella inheritance). Each takes a permanent
+  // criterion (a detail page's Images tab; the folder view's tag)
   put(
     imageFilter,
     "performers",
-    refCriterion(IMAGE_FIELDS.performers, filters, control("performerIds"))
+    refCriterion(
+      IMAGE_FIELDS.performers,
+      filters,
+      control("performerIds"),
+      filters.performers
+    )
   );
   put(
     imageFilter,
     "studios",
-    refCriterion(IMAGE_FIELDS.studios, filters, control("studioIds"))
+    refCriterion(
+      IMAGE_FIELDS.studios,
+      filters,
+      control("studioIds"),
+      filters.studios
+    )
   );
-  // The folder view's tag arrives as a permanent `tags` criterion
   put(
     imageFilter,
     "tags",
@@ -2116,7 +2126,12 @@ export const buildImageFilter = (filters: FilterState): ImageFilterInput => {
   put(
     imageFilter,
     "galleries",
-    refCriterion(IMAGE_FIELDS.galleries, filters, control("galleryIds"))
+    refCriterion(
+      IMAGE_FIELDS.galleries,
+      filters,
+      control("galleryIds"),
+      filters.galleries
+    )
   );
 
   // The timeline view's period
