@@ -47,6 +47,8 @@ Click on any user row in the User Management table to open the **User Edit Modal
 | **Permissions** | View and override individual permissions |
 | **Content Restrictions** | Set what content the user can see |
 
+Each change saves as you make it, and **Saved** appears beside the control (or the error, with the control back at its stored value). Changing the role asks you to confirm first. There is no Save button: **Close** closes the editor, and the user list updates.
+
 ### Quick Actions
 
 From the user table, you can also:
@@ -96,8 +98,9 @@ User groups allow you to manage permissions for multiple users at once. Users in
 
 1. Click on a user in the User Management table
 2. Go to the **Groups** section
-3. Check the groups you want the user to belong to
-4. Click **Save**
+3. Check the groups you want the user to belong to; each one saves at once
+
+Adding or removing members in a group's own editor also saves at once, even if you then click **Cancel**.
 
 ### Permission Resolution
 

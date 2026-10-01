@@ -107,7 +107,8 @@ describe("UserEditModal", () => {
   const renderModal = async (
     handlers: {
       onClose?: () => void;
-      onSave?: () => void;
+      onChanged?: () => void;
+      onDeleted?: (username: string) => void;
       onMessage?: (message: string) => void;
     } = {}
   ) => {
@@ -117,13 +118,24 @@ describe("UserEditModal", () => {
         groups={mockGroups}
         currentUser={mockCurrentUser}
         onClose={handlers.onClose ?? vi.fn()}
-        onSave={handlers.onSave}
+        onChanged={handlers.onChanged}
+        onDeleted={handlers.onDeleted}
         onMessage={handlers.onMessage}
       />
     );
     await act(async () => {});
     return utils;
   };
+
+  // The footer's Close button (the header's X is also named Close)
+  const footerClose = () =>
+    must(
+      screen.getAllByRole("button", { name: "Close" }).at(-1),
+      "footer Close"
+    );
+
+  const permissionSelects = () =>
+    screen.getAllByRole("combobox").filter((el) => el.id !== "userRole");
 
   describe("Rendering", () => {
     it("renders user info correctly", () => {
@@ -133,7 +145,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -149,7 +160,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -165,7 +175,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -182,7 +191,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -198,7 +206,6 @@ describe("UserEditModal", () => {
           groups={[]}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -219,7 +226,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
           onMessage={onMessage}
         />
       );
@@ -252,7 +258,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
           onMessage={onMessage}
         />
       );
@@ -284,7 +289,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -300,7 +304,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -335,7 +338,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -356,7 +358,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -372,7 +373,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -388,7 +388,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -397,20 +396,18 @@ describe("UserEditModal", () => {
   });
 
   describe("Modal Actions", () => {
-    it("calls onClose when cancel is clicked", () => {
+    it("has only a Close button in the footer", async () => {
       const onClose = vi.fn();
-      render(
-        <UserEditModal
-          user={mockUser}
-          groups={mockGroups}
-          currentUser={mockCurrentUser}
-          onClose={onClose}
-          onSave={vi.fn()}
-        />
-      );
+      await renderModal({ onClose });
 
-      fireEvent.click(screen.getByText("Cancel"));
-      expect(onClose).toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: "Save Changes" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Cancel" })
+      ).not.toBeInTheDocument();
+      fireEvent.click(footerClose());
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it("calls onClose when X button is clicked", () => {
@@ -421,28 +418,12 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={onClose}
-          onSave={vi.fn()}
         />
       );
 
       const closeButton = screen.getByLabelText("Close");
       fireEvent.click(closeButton);
       expect(onClose).toHaveBeenCalled();
-    });
-
-    it("disables save button when no changes", () => {
-      render(
-        <UserEditModal
-          user={mockUser}
-          groups={mockGroups}
-          currentUser={mockCurrentUser}
-          onClose={vi.fn()}
-          onSave={vi.fn()}
-        />
-      );
-
-      const saveButton = screen.getByText("Save Changes");
-      expect(saveButton).toBeDisabled();
     });
   });
 
@@ -454,7 +435,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -508,7 +488,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -656,20 +635,23 @@ describe("UserEditModal", () => {
   });
 
   describe("Deleting a user", () => {
-    it("deletes after confirmation, then closes and refreshes", async () => {
+    it('Delete User DELETEs and reports \'User "x" deleted\' through onDeleted, with no "updated" message after it', async () => {
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
       mockApiDelete.mockResolvedValue({});
       const onClose = vi.fn();
-      const onSave = vi.fn();
+      const onChanged = vi.fn();
+      const onDeleted = vi.fn();
       const onMessage = vi.fn();
 
-      await renderModal({ onClose, onSave, onMessage });
+      await renderModal({ onClose, onChanged, onDeleted, onMessage });
       fireEvent.click(screen.getByRole("button", { name: /Delete User/ }));
 
-      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("testuser"));
       expect(mockApiDelete).toHaveBeenCalledWith("/user/1");
-      expect(onSave).toHaveBeenCalled();
-      expect(onMessage).toHaveBeenCalledWith('User "testuser" deleted');
+      expect(onClose).toHaveBeenCalledTimes(1);
+      // The section words the message; nothing "updated" follows it
+      expect(onMessage).not.toHaveBeenCalled();
+      expect(onChanged).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
     });
 
@@ -699,57 +681,195 @@ describe("UserEditModal", () => {
     });
   });
 
-  describe("Saving and closing", () => {
-    it("saves a changed role", async () => {
-      mockApiPut.mockResolvedValue({});
-      const onSave = vi.fn();
-      const onMessage = vi.fn();
-
-      await renderModal({ onSave, onMessage });
-      fireEvent.change(screen.getByLabelText("Role"), {
-        target: { value: "ADMIN" },
+  describe("Saving each change at once", () => {
+    it("changing a permission override saves it at once and shows Saved beside the control; closing then asks nothing", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm");
+      mockUpdateUserPermissionOverrides.mockResolvedValue({
+        permissions: {
+          ...mockPermissions,
+          canDownloadFiles: true,
+          sources: { ...mockPermissions.sources, canDownloadFiles: "override" },
+        },
       });
-      const save = screen.getByRole("button", { name: "Save Changes" });
-      expect(save).toBeEnabled();
-      fireEvent.click(save);
+      const onClose = vi.fn();
 
-      await waitFor(() => expect(onSave).toHaveBeenCalled());
+      await renderModal({ onClose });
+      await screen.findByText(/Inherited from: Family/);
+      const select = must(permissionSelects()[1], "Can download files");
+      fireEvent.change(select, { target: { value: "true" } });
+
+      await waitFor(() => expect(select).toHaveAccessibleDescription("Saved"));
+      expect(mockUpdateUserPermissionOverrides).toHaveBeenCalledWith(1, {
+        canDownloadFilesOverride: true,
+      });
+      expect(select).toHaveValue("true");
+
+      fireEvent.click(footerClose());
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+      confirmSpy.mockRestore();
+    });
+
+    it("changing the role asks to confirm (Make <name> an admin?), and on confirm PUTs /user/:id/role and shows Saved", async () => {
+      mockApiPut.mockResolvedValue({});
+
+      await renderModal();
+      const role = screen.getByLabelText("Role");
+      fireEvent.change(role, { target: { value: "ADMIN" } });
+
+      const confirm = screen.getByRole("dialog", {
+        name: "Make testuser an admin?",
+      });
+      expect(mockApiPut).not.toHaveBeenCalled();
+      expect(role).toHaveValue("USER");
+      fireEvent.click(
+        within(confirm).getByRole("button", { name: "Make admin" })
+      );
+
+      await waitFor(() => expect(role).toHaveAccessibleDescription("Saved"));
       expect(mockApiPut).toHaveBeenCalledWith("/user/1/role", {
         role: "ADMIN",
       });
-      expect(onMessage).toHaveBeenCalledWith('User "testuser" updated');
+      expect(role).toHaveValue("ADMIN");
+      expect(
+        screen.queryByRole("dialog", { name: "Make testuser an admin?" })
+      ).not.toBeInTheDocument();
+      // An admin is never restricted, so the editor goes with the saved role
+      expect(
+        screen.getByText(/do not apply to administrators/)
+      ).toBeInTheDocument();
     });
 
-    it("does not send the role when it is back to the saved value", async () => {
-      mockAddGroupMember.mockResolvedValue({});
-      const onSave = vi.fn();
+    it("asks before making an admin a regular user", async () => {
+      mockApiPut.mockResolvedValue({});
+      render(
+        <UserEditModal
+          user={{ id: 3, username: "otheradmin", role: "ADMIN" }}
+          groups={mockGroups}
+          currentUser={mockCurrentUser}
+          onClose={vi.fn()}
+        />
+      );
+      await act(async () => {});
 
-      await renderModal({ onSave });
+      fireEvent.change(screen.getByLabelText("Role"), {
+        target: { value: "USER" },
+      });
+      const confirm = screen.getByRole("dialog", {
+        name: "Make otheradmin a regular user?",
+      });
+      fireEvent.click(
+        within(confirm).getByRole("button", { name: "Make user" })
+      );
+
+      await waitFor(() =>
+        expect(mockApiPut).toHaveBeenCalledWith("/user/3/role", {
+          role: "USER",
+        })
+      );
+      expect(screen.getByLabelText("Role")).toHaveValue("USER");
+    });
+
+    it("cancel leaves the role as it was", async () => {
+      const onClose = vi.fn();
+      const onChanged = vi.fn();
+
+      await renderModal({ onClose, onChanged });
+      const role = screen.getByLabelText("Role");
+      fireEvent.change(role, { target: { value: "ADMIN" } });
+      const confirm = screen.getByRole("dialog", {
+        name: "Make testuser an admin?",
+      });
+      fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+
+      expect(
+        screen.queryByRole("dialog", { name: "Make testuser an admin?" })
+      ).not.toBeInTheDocument();
+      expect(mockApiPut).not.toHaveBeenCalled();
+      expect(role).toHaveValue("USER");
+      fireEvent.click(footerClose());
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it("a failed write shows the error beside the control and reverts the control to the stored value", async () => {
+      mockUpdateUserPermissionOverrides.mockRejectedValue(
+        new Error("Override refused")
+      );
+      mockApiPut.mockRejectedValue(new Error("Role change refused"));
+
+      await renderModal();
+      await screen.findByText(/Inherited from: Family/);
+      const share = must(permissionSelects()[0], "Can share");
+      fireEvent.change(share, { target: { value: "false" } });
+
+      await waitFor(() =>
+        expect(share).toHaveAccessibleDescription("Override refused")
+      );
+      expect(share).toHaveValue("inherit");
+
+      const role = screen.getByLabelText("Role");
+      fireEvent.change(role, { target: { value: "ADMIN" } });
+      fireEvent.click(
+        within(
+          screen.getByRole("dialog", { name: "Make testuser an admin?" })
+        ).getByRole("button", { name: "Make admin" })
+      );
+
+      await waitFor(() =>
+        expect(role).toHaveAccessibleDescription("Role change refused")
+      );
+      expect(role).toHaveValue("USER");
+    });
+
+    it("closing after any write calls onChanged once", async () => {
+      mockAddGroupMember.mockResolvedValue({});
+      mockUpdateUserPermissionOverrides.mockResolvedValue({
+        permissions: mockPermissions,
+      });
+      const onClose = vi.fn();
+      const onChanged = vi.fn();
+
+      await renderModal({ onClose, onChanged });
       await waitFor(() =>
         expect(screen.getAllByRole("checkbox")[0]).toBeChecked()
       );
-      fireEvent.click(must(screen.getAllByRole("checkbox")[1]));
-      await waitFor(() => expect(mockAddGroupMember).toHaveBeenCalled());
-      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+      const friends = must(screen.getAllByRole("checkbox")[1], "Friends");
+      fireEvent.click(friends);
+      await waitFor(() => expect(friends).toHaveAccessibleDescription("Saved"));
+      fireEvent.change(must(permissionSelects()[2], "Can download playlists"), {
+        target: { value: "false" },
+      });
+      await waitFor(() =>
+        expect(mockUpdateUserPermissionOverrides).toHaveBeenCalled()
+      );
+      expect(onChanged).not.toHaveBeenCalled();
 
-      await waitFor(() => expect(onSave).toHaveBeenCalled());
-      expect(mockApiPut).not.toHaveBeenCalled();
+      fireEvent.click(footerClose());
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onChanged).toHaveBeenCalledTimes(1);
     });
 
-    it("shows the error when saving fails", async () => {
-      mockApiPut.mockRejectedValue(new Error("Role change refused"));
-      const onSave = vi.fn();
+    it("closing with no write does not call onChanged", async () => {
+      mockAddGroupMember.mockRejectedValue(new Error("Group gone"));
+      const onClose = vi.fn();
+      const onChanged = vi.fn();
 
-      await renderModal({ onSave });
-      fireEvent.change(screen.getByLabelText("Role"), {
-        target: { value: "ADMIN" },
+      await renderModal({ onClose, onChanged });
+      await waitFor(() =>
+        expect(screen.getAllByRole("checkbox")[0]).toBeChecked()
+      );
+      fireEvent.click(must(screen.getAllByRole("checkbox")[1], "Friends"));
+      await screen.findByText("Group gone");
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
       });
-      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
-      expect(
-        await screen.findByText("Role change refused")
-      ).toBeInTheDocument();
-      expect(onSave).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onChanged).not.toHaveBeenCalled();
     });
 
     it("does not let an admin change their own role", async () => {
@@ -771,30 +891,8 @@ describe("UserEditModal", () => {
         screen.getByText("You cannot change your own role")
       ).toBeInTheDocument();
       expect(screen.getByLabelText("Role")).toHaveValue("ADMIN");
-      expect(
-        screen.getByRole("button", { name: "Save Changes" })
-      ).toBeDisabled();
-    });
-
-    it("asks before discarding changes, and stays open on No", async () => {
-      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-      const onClose = vi.fn();
-
-      await renderModal({ onClose });
-      fireEvent.change(screen.getByLabelText("Role"), {
-        target: { value: "ADMIN" },
-      });
-      fireEvent.click(screen.getByLabelText("Close"));
-
-      expect(confirmSpy).toHaveBeenCalledWith(
-        "You have unsaved changes. Discard them?"
-      );
-      expect(onClose).not.toHaveBeenCalled();
-
-      confirmSpy.mockReturnValue(true);
-      fireEvent.click(screen.getByLabelText("Close"));
-      expect(onClose).toHaveBeenCalled();
-      confirmSpy.mockRestore();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+      expect(mockApiPut).not.toHaveBeenCalled();
     });
   });
 
@@ -915,7 +1013,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -931,7 +1028,6 @@ describe("UserEditModal", () => {
           groups={mockGroups}
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
-          onSave={vi.fn()}
         />
       );
 
@@ -952,7 +1048,6 @@ describe("UserEditModal", () => {
             groups={mockGroups}
             currentUser={mockCurrentUser}
             onClose={onClose}
-            onSave={vi.fn()}
           />
         </ShortcutScopeProvider>
       );
