@@ -86,6 +86,12 @@ export default defineConfig([
       "@typescript-eslint/no-confusing-void-expression": "off",
     },
   },
+  // Build scripts run in Node
+  {
+    files: ["scripts/**/*.mjs"],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.node },
+  },
   // untrusted() is the deliberate cast for invalid input: its type parameter
   // is the target type, used once by design (as on the server).
   {
