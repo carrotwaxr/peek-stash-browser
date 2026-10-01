@@ -5,7 +5,7 @@
  * regenerateRecoveryKey, adminResetPassword, adminRegenerateRecoveryKey,
  * getAllUsers, createUser, deleteUser, updateUserRole.
  */
-import type { User, UserContentRestriction } from "@prisma/client";
+import type { CustomTheme, User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import * as fs from "fs";
 import jwt from "jsonwebtoken";
@@ -193,6 +193,49 @@ describe("User Controller", () => {
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
     });
 
+    describe("theme", () => {
+      const settingsRow = (theme: string | null) =>
+        partialRow<User>({ id: 2, username: "testuser", role: "USER", theme });
+
+      async function readTheme() {
+        const req = reqFor(getUserSettings, { user: USER });
+        const res = resFor(getUserSettings);
+        await getUserSettings(req, res);
+        return res._getOkBody().settings.theme;
+      }
+
+      it("GET /user/settings returns theme null when the stored value is not a theme: the seeded 'dark'", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(settingsRow("dark"));
+        expect(await readTheme()).toBeNull();
+      });
+
+      it("GET /user/settings returns theme null for another user's or a deleted custom theme", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(settingsRow("custom-9"));
+        mockPrisma.customTheme.findFirst.mockResolvedValue(null);
+        expect(await readTheme()).toBeNull();
+        expect(mockPrisma.customTheme.findFirst).toHaveBeenCalledWith({
+          where: { id: 9, userId: 2 },
+          select: { id: true },
+        });
+      });
+
+      it("returns a built-in key or the user's own custom key as stored", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(settingsRow("midnight"));
+        expect(await readTheme()).toBe("midnight");
+
+        mockPrisma.user.findUnique.mockResolvedValue(settingsRow("custom-4"));
+        mockPrisma.customTheme.findFirst.mockResolvedValue(
+          partialRow<CustomTheme>({ id: 4 })
+        );
+        expect(await readTheme()).toBe("custom-4");
+      });
+
+      it("returns null for a null stored theme", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(settingsRow(null));
+        expect(await readTheme()).toBeNull();
+      });
+    });
+
     it("settings answer no preferredQuality or preferredPlaybackMode", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         partialRow({ id: 2, username: "testuser", role: "USER" })
@@ -252,6 +295,87 @@ describe("User Controller", () => {
       cardDisplaySettings: null,
       landingPagePreference: null,
       lightboxDoubleTapAction: null,
+    });
+
+    describe("theme", () => {
+      async function putTheme(
+        theme: string | null,
+        user = USER,
+        userId?: string
+      ) {
+        const req = reqFor(updateUserSettings, {
+          body: { theme },
+          ...(userId !== undefined && { params: { userId } }),
+          user,
+        });
+        const res = resFor(updateUserSettings);
+        await updateUserSettings(req, res);
+        return res;
+      }
+
+      it("PUT /user/settings with theme 'nope' answers 400 and stores nothing", async () => {
+        const res = await putTheme("nope");
+        expect(res._getStatus()).toBe(400);
+        expect(res._getBody()).toEqual({ error: "Unknown theme" });
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("PUT /user/settings with another user's custom key answers 400 and stores nothing", async () => {
+        mockPrisma.customTheme.findFirst.mockResolvedValue(null);
+        const res = await putTheme("custom-7");
+        expect(res._getStatus()).toBe(400);
+        expect(mockPrisma.customTheme.findFirst).toHaveBeenCalledWith({
+          where: { id: 7, userId: 2 },
+          select: { id: true },
+        });
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("an admin's PUT for another user checks the target user's custom themes", async () => {
+        mockPrisma.customTheme.findFirst.mockResolvedValue(null);
+        const res = await putTheme("custom-7", ADMIN, "2");
+        expect(res._getStatus()).toBe(400);
+        expect(mockPrisma.customTheme.findFirst).toHaveBeenCalledWith({
+          where: { id: 7, userId: 2 },
+          select: { id: true },
+        });
+
+        mockPrisma.customTheme.findFirst.mockResolvedValue(
+          partialRow<CustomTheme>({ id: 7 })
+        );
+        mockPrisma.user.update.mockResolvedValue(
+          partialRow<User>({ id: 2, theme: "custom-7" })
+        );
+        const ok = await putTheme("custom-7", ADMIN, "2");
+        expect(ok._getStatus()).toBe(200);
+      });
+
+      it("stores a built-in key and answers it", async () => {
+        mockPrisma.user.update.mockResolvedValue(
+          partialRow<User>({ id: 2, theme: "light" })
+        );
+        const res = await putTheme("light");
+        expect(res._getOkBody().settings.theme).toBe("light");
+        const query = must(
+          mockPrisma.user.update.mock.calls[0],
+          "update call"
+        )[0];
+        expect(query.data).toEqual({ theme: "light" });
+      });
+
+      it("theme null clears it, and the answer maps a stale stored 'dark' to null", async () => {
+        mockPrisma.user.update.mockResolvedValue(
+          partialRow<User>({ id: 2, theme: "dark" })
+        );
+        const res = await putTheme(null);
+        expect(res._getStatus()).toBe(200);
+        expect(res._getOkBody().settings.theme).toBeNull();
+        const query = must(
+          mockPrisma.user.update.mock.calls[0],
+          "update call"
+        )[0];
+        expect(query.data).toEqual({ theme: null });
+      });
     });
 
     it("returns 401 when user has no id", async () => {

@@ -17,9 +17,12 @@ import {
   updateCustomTheme,
 } from "../../controllers/customTheme.js";
 import prisma from "../../prisma/singleton.js";
+import { dbWriteBatch } from "../../utils/dbWrite.js";
+import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma — BEFORE imports
 vi.mock(
@@ -27,12 +30,19 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+// The real queue, watched
+vi.mock("../../utils/dbWrite.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof dbWriteModule>();
+  return { ...actual, dbWriteBatch: vi.fn(actual.dbWriteBatch) };
+});
+
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+const mockDbWriteBatch = vi.mocked(dbWriteBatch);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -731,6 +741,32 @@ describe("Custom Theme Controller", () => {
       await deleteCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(404);
+    });
+
+    it("deleting the custom theme a user has selected sets their theme to null in the same write unit", async () => {
+      mockPrisma.customTheme.findFirst.mockResolvedValue(themeRow({ id: 5 }));
+      mockPrisma.customTheme.delete.mockResolvedValue(themeRow({ id: 5 }));
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+
+      const req = reqFor(deleteCustomTheme, {
+        params: { id: "5" },
+        user: USER,
+      });
+      const res = resFor(deleteCustomTheme);
+      await deleteCustomTheme(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockDbWriteBatch).toHaveBeenCalledTimes(1);
+      const [label, ops] = must(mockDbWriteBatch.mock.calls[0], "batch call");
+      expect(label).toBe("theme.delete");
+      expect(ops).toHaveLength(2);
+      expect(mockPrisma.customTheme.delete).toHaveBeenCalledWith({
+        where: { id: 5 },
+      });
+      expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, theme: "custom-5" },
+        data: { theme: null },
+      });
     });
 
     it("deletes theme and returns success", async () => {

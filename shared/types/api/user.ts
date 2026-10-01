@@ -122,7 +122,8 @@ export type CardDisplaySettings = Record<string, unknown> | null;
 export interface GetUserSettingsResponse {
   settings: {
     preferredPreviewQuality: string | null;
-    theme: string;
+    /** A built-in key, the user's own `custom-<id>`, or null when none is chosen */
+    theme: string | null;
     carouselPreferences: CarouselPreference[];
     navPreferences: NavPreference[] | null;
     minimumPlayPercent: number;
@@ -148,7 +149,8 @@ export interface UpdateUserSettingsParams extends Record<string, string> {
 
 export interface UpdateUserSettingsBody {
   preferredPreviewQuality?: string;
-  theme?: string;
+  /** A built-in key or the target user's own `custom-<id>`; null clears it */
+  theme?: string | null;
   carouselPreferences?: CarouselPreference[];
   navPreferences?: NavPreference[];
   minimumPlayPercent?: number;
@@ -164,7 +166,7 @@ export interface UpdateUserSettingsBody {
 export interface UpdateUserSettingsResponse {
   success: true;
   settings: {
-    theme: string;
+    theme: string | null;
     carouselPreferences: CarouselPreference[];
     navPreferences: NavPreference[] | null;
     minimumPlayPercent: number;
