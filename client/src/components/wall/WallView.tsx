@@ -4,7 +4,12 @@ import "react-photo-album/rows.css";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import EmptyState from "../ui/EmptyState";
 import WallItem from "./WallItem";
+import { PreviewSlotProvider } from "./previewSlots";
 import { DEFAULT_ZOOM, ZOOM_LEVELS, wallConfig } from "./wallConfig";
+
+/** Previews playing at once: the browser opens 6 connections per origin
+ * (HTTP/1.1) and the proxy has 6 upstream slots */
+export const MAX_WALL_PREVIEWS = 6;
 
 /**
  * Justified gallery view using react-photo-album.
@@ -74,28 +79,30 @@ const WallView = ({
   }
 
   return (
-    <div className="wall-view">
-      <RowsPhotoAlbum
-        photos={photos}
-        targetRowHeight={targetRowHeight}
-        rowConstraints={{ maxPhotos: 8 }}
-        spacing={4}
-        render={{
-          photo: (_, { photo, width, height }) => (
-            <WallItem
-              key={photo.key}
-              item={photo._item}
-              config={config}
-              entityType={entityType}
-              width={width}
-              height={height}
-              playbackMode={playbackMode}
-              onClick={onItemClick}
-            />
-          ),
-        }}
-      />
-    </div>
+    <PreviewSlotProvider max={MAX_WALL_PREVIEWS}>
+      <div className="wall-view">
+        <RowsPhotoAlbum
+          photos={photos}
+          targetRowHeight={targetRowHeight}
+          rowConstraints={{ maxPhotos: 8 }}
+          spacing={4}
+          render={{
+            photo: (_, { photo, width, height }) => (
+              <WallItem
+                key={photo.key}
+                item={photo._item}
+                config={config}
+                entityType={entityType}
+                width={width}
+                height={height}
+                playbackMode={playbackMode}
+                onClick={onItemClick}
+              />
+            ),
+          }}
+        />
+      </div>
+    </PreviewSlotProvider>
   );
 };
 

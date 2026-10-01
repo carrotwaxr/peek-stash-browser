@@ -33,7 +33,7 @@ A justified gallery layout that preserves aspect ratios.
 
 | Mode | Behavior |
 |------|----------|
-| **Autoplay** | Videos play when visible, hover controls volume |
+| **Autoplay** | Videos play when visible, up to six at once; hover controls volume |
 | **Hover** | Static thumbnail until hover, then plays |
 | **Static** | Thumbnails only, no video playback |
 

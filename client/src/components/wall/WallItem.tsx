@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useInView } from "../../hooks/useInView";
 import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
+import { usePreviewSlot } from "./previewSlots";
 
 interface WallItemConfig {
   getImageUrl: (item: Record<string, unknown>) => string | null;
@@ -69,23 +70,35 @@ const WallItem = ({
     skip: playbackMode !== "autoplay" || !hasPreview,
   });
 
-  // Video playback control
+  const wantsToPlay =
+    !!hasPreview &&
+    (playbackMode === "autoplay"
+      ? isInView
+      : playbackMode === "hover"
+        ? isHovering
+        : false);
+
+  // Only a tile holding a slot plays; the wall hands out a few at a time
+  const slotId = useId();
+  const hasSlot = usePreviewSlot(slotId, wantsToPlay, containerRef);
+
+  // A tile with a slot loads and plays its preview; one without releases the
+  // download, so the connection goes to thumbnails and pages
   useEffect(() => {
-    if (!videoRef.current || !hasPreview) return;
+    const video = videoRef.current;
+    if (!video || !hasPreview) return;
 
-    const shouldPlay =
-      playbackMode === "autoplay"
-        ? isInView
-        : playbackMode === "hover"
-          ? isHovering
-          : false;
-
-    if (shouldPlay) {
-      videoRef.current.play().catch(() => {});
-    } else {
-      videoRef.current.pause();
+    if (hasSlot) {
+      if (video.getAttribute("src") !== previewUrl) {
+        video.setAttribute("src", previewUrl);
+      }
+      video.play().catch(() => {});
+    } else if (video.hasAttribute("src")) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     }
-  }, [playbackMode, isInView, isHovering, hasPreview]);
+  }, [hasSlot, hasPreview, previewUrl]);
 
   // Overlay show delay (500ms)
   useEffect(() => {
@@ -156,7 +169,6 @@ const WallItem = ({
       {hasPreview && playbackMode !== "static" && (
         <video
           ref={videoRef}
-          src={previewUrl}
           className="absolute inset-0 w-full h-full object-cover"
           muted
           loop
