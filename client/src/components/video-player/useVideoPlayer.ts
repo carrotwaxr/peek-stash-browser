@@ -8,6 +8,7 @@ import { canDecode } from "../../utils/browserPlayback";
 import { newClientToken } from "../../utils/clientToken";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getSceneTitle } from "../../utils/format";
+import { mayTakeFocus } from "../../utils/pageFocus";
 import { buildPlayerSources } from "./playerSources";
 import {
   SESSION_EXPIRED_PLAYBACK_MESSAGE,
@@ -54,6 +55,14 @@ async function retryWithBackoff(
     }
   }
   throw lastError;
+}
+
+/**
+ * Focus the player, so its keys work, unless the user has put focus on
+ * another control while the page or scene loaded (see `mayTakeFocus`)
+ */
+function focusPlayer(player: { el(): Element; focus(): void }) {
+  if (mayTakeFocus(player.el())) player.focus();
 }
 
 /**
@@ -212,7 +221,7 @@ export function useVideoPlayer({
 
     playerRef.current = player;
     registerPlayer(player as { paused(): boolean });
-    player.focus();
+    focusPlayer(player as { el(): Element; focus(): void });
 
     // Volume persistence is now handled by persistVolume plugin
     // Watch history tracking is now handled by the trackActivity plugin
@@ -463,7 +472,7 @@ export function useVideoPlayer({
 
     // Load the source (Stash line 693)
     player.load();
-    player.focus();
+    focusPlayer(player as { el(): Element; focus(): void });
 
     // Use player.ready() callback like Stash does (line 696)
     // This ensures player is truly ready to accept commands
