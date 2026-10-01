@@ -5,8 +5,10 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { actAsync } from "@tests/testUtils";
 import type * as lucideModule from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { libraryApi } from "@/api";
 import { ApiError } from "@/api/client";
 import { createQueryClient } from "@/api/queryClient";
+import { queryKeys } from "@/api/queryKeys";
 import Home from "@/components/pages/Home";
 import type * as bannerModule from "@/components/ui/LibraryInitializingBanner";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -321,7 +323,6 @@ describe("Home", () => {
     it("returning to Home sends no /user/settings request", async () => {
       const { rerender } = await renderHome();
       expect(settingsRequests()).toBe(1);
-      expect(mockGetCarousels).toHaveBeenCalledTimes(1);
 
       // Another visit: the router gives the location a new key
       vi.mocked(useLocation).mockReturnValue({
@@ -330,9 +331,56 @@ describe("Home", () => {
       await actAsync(() => rerender(<Home />));
       await letQueriesAnswer();
 
-      // The custom carousels refresh; the settings come from the cache
-      expect(mockGetCarousels).toHaveBeenCalledTimes(2);
       expect(settingsRequests()).toBe(1);
+    });
+
+    it("returning to Home sends no /carousels request", async () => {
+      const { rerender, unmount } = await renderHome();
+      expect(mockGetCarousels).toHaveBeenCalledTimes(1);
+
+      // Another visit: the router gives the location a new key
+      vi.mocked(useLocation).mockReturnValue({
+        key: "second",
+      } as ReturnType<typeof useLocation>);
+      await actAsync(() => rerender(<Home />));
+      await letQueriesAnswer();
+      expect(mockGetCarousels).toHaveBeenCalledTimes(1);
+
+      // Leaving and coming back: the answer is still in the cache
+      unmount();
+      await renderHome();
+      expect(mockGetCarousels).toHaveBeenCalledTimes(1);
+    });
+
+    it("an edited carousel makes Home ask for its scenes again", async () => {
+      const executeCarousel = vi.mocked(libraryApi.executeCarousel);
+      executeCarousel.mockResolvedValue({
+        carousel: { id: "c1", title: "Mine", icon: "Film" },
+        scenes: [{ id: "1" }],
+      } as never);
+      mockGetCarousels.mockResolvedValue({
+        carousels: [{ id: "c1", title: "Mine", icon: "Film", rules: {} }],
+      });
+      mockMigrateCarouselPreferences.mockReturnValue([
+        { id: "custom-c1", enabled: true, order: 0 },
+      ]);
+
+      await renderHome();
+      expect(await screen.findByText("Mine (1 scenes)")).toBeInTheDocument();
+      expect(executeCarousel).toHaveBeenCalledTimes(1);
+
+      // The builder's save marks the carousels stale
+      executeCarousel.mockResolvedValue({
+        carousel: { id: "c1", title: "Mine", icon: "Film" },
+        scenes: [{ id: "1" }, { id: "2" }],
+      } as never);
+      await act(async () => {
+        await client.invalidateQueries({ queryKey: queryKeys.carousels.all() });
+      });
+      await letQueriesAnswer();
+
+      expect(await screen.findByText("Mine (2 scenes)")).toBeInTheDocument();
+      expect(executeCarousel).toHaveBeenCalledTimes(2);
     });
   });
 

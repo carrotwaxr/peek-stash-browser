@@ -1,31 +1,33 @@
-// server/types/api/carousel.ts
+// shared/types/api/carousel.ts
 /**
  * Carousel API Types
  *
  * Request and response types for /api/carousels/* endpoints.
  */
-import type { JsonValue } from "@prisma/client/runtime/library";
-import type { NormalizedScene, PeekSceneFilter } from "../index.js";
+import type { NormalizedScene } from "../entities.js";
+import type { SceneFilterInput } from "../filters/index.js";
 import type { WithStashUrl } from "./library.js";
 
 // =============================================================================
 // COMMON TYPES
 // =============================================================================
 
+// Dates are ISO 8601 strings: that is what JSON carries.
+
 /**
  * Carousel data structure
- * Note: rules is JsonValue from Prisma since it's stored as JSON
+ * Note: rules is the scene filter stored as JSON, as the client saved it
  */
 export interface CarouselData {
   id: string;
   userId: number;
   title: string;
   icon: string;
-  rules: JsonValue;
+  rules: SceneFilterInput;
   sort: string;
   direction: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // =============================================================================
@@ -61,13 +63,20 @@ export interface GetCarouselResponse {
 // =============================================================================
 
 /**
+ * The rules a request sends: the scene filter the client builds
+ * (`SceneFilterInput`). The server reads them as an unvalidated object and
+ * checks them against the scene contract, so it takes any object.
+ */
+export type CarouselRulesInput = object;
+
+/**
  * POST /api/carousels
  * Create a new custom carousel
  */
 export interface CreateCarouselRequest {
   title: string;
   icon?: string;
-  rules: PeekSceneFilter;
+  rules: CarouselRulesInput;
   sort?: string;
   direction?: string;
 }
@@ -91,7 +100,7 @@ export interface UpdateCarouselParams extends Record<string, string> {
 export interface UpdateCarouselRequest {
   title?: string;
   icon?: string;
-  rules?: PeekSceneFilter;
+  rules?: CarouselRulesInput;
   sort?: string;
   direction?: string;
 }
@@ -126,7 +135,7 @@ export interface DeleteCarouselResponse {
  * Preview carousel results without saving
  */
 export interface PreviewCarouselRequest {
-  rules: PeekSceneFilter;
+  rules: CarouselRulesInput;
   sort?: string;
   direction?: string;
 }

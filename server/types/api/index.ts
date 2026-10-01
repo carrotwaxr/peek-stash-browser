@@ -417,7 +417,7 @@ export type {
   PreviewCarouselResponse,
   ExecuteCarouselByIdParams,
   ExecuteCarouselByIdResponse,
-} from "./carousel.js";
+} from "@peek/shared-types/api/carousel.js";
 
 // Custom Theme endpoint types
 export type {

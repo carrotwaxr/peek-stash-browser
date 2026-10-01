@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import type { PreviewCarouselResponse } from "@peek/shared-types";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -12,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { libraryApi } from "../../api";
+import { useSaveCarousel } from "../../api/hooks/useCarousels";
 import {
   CAROUSEL_FILTER_DEFINITIONS,
   SCENE_SORT_OPTIONS,
@@ -44,6 +46,7 @@ const CarouselBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const saveCarousel = useSaveCarousel();
 
   // Form state
   const [title, setTitle] = useState("");
@@ -57,7 +60,7 @@ const CarouselBuilder = () => {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewScenes, setPreviewScenes] = useState<
-    Record<string, unknown>[] | null
+    PreviewCarouselResponse["scenes"] | null
   >(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,20 +73,14 @@ const CarouselBuilder = () => {
     const loadCarousel = async () => {
       setLoading(true);
       try {
-        const result = (await libraryApi.getCarousel(id)) as Record<
-          string,
-          unknown
-        >;
-        const carousel = result.carousel as Record<string, unknown>;
-        setTitle(carousel.title as string);
-        setIcon(carousel.icon as string);
-        setSort(carousel.sort as string);
-        setDirection(carousel.direction as string);
+        const { carousel } = await libraryApi.getCarousel(id);
+        setTitle(carousel.title);
+        setIcon(carousel.icon);
+        setSort(carousel.sort);
+        setDirection(carousel.direction);
 
         // Convert stored rules back to editable format
-        const filterState = carouselRulesToFilterState(
-          carousel.rules as Record<string, unknown>[]
-        );
+        const filterState = carouselRulesToFilterState(carousel.rules);
         const ruleList = convertFilterStateToRules(filterState);
         setRules(ruleList);
       } catch (err) {
@@ -331,13 +328,13 @@ const CarouselBuilder = () => {
       const filterState = convertRulesToFilterState();
       const apiRules = buildSceneFilter(filterState);
 
-      const result = (await libraryApi.previewCarousel({
+      const result = await libraryApi.previewCarousel({
         rules: apiRules,
         sort,
         direction,
-      })) as Record<string, unknown>;
+      });
 
-      setPreviewScenes(result.scenes as Record<string, unknown>[]);
+      setPreviewScenes(result.scenes);
       setPreviewValid(true);
       setPreviewError(null);
     } catch (err) {
@@ -382,11 +379,8 @@ const CarouselBuilder = () => {
         direction,
       };
 
-      if (id) {
-        await libraryApi.updateCarousel(id, carouselData);
-      } else {
-        await libraryApi.createCarousel(carouselData);
-      }
+      // Home's list and every carousel's scenes are asked for again
+      await saveCarousel.mutateAsync({ id, data: carouselData });
 
       void navigate("/settings?section=user&tab=customization");
     } catch (err) {
@@ -680,11 +674,7 @@ const CarouselBuilder = () => {
 
         {/* Preview Section */}
         <CarouselPreview
-          scenes={
-            previewScenes as React.ComponentProps<
-              typeof CarouselPreview
-            >["scenes"]
-          }
+          scenes={previewScenes}
           error={previewError}
           loading={previewing}
           onPreview={() => void handlePreview()}
