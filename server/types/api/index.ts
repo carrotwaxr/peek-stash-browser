@@ -373,9 +373,6 @@ export type {
   RemoveSceneFromPlaylistParams,
   RemoveSceneFromPlaylistQuery,
   RemoveSceneFromPlaylistResponse,
-  ReorderPlaylistParams,
-  ReorderPlaylistRequest,
-  ReorderPlaylistResponse,
   SharedPlaylistData,
   GetSharedPlaylistsResponse,
   PlaylistShareInfo,
@@ -383,6 +380,25 @@ export type {
   UpdatePlaylistSharesRequest,
   UpdatePlaylistSharesResponse,
   DuplicatePlaylistResponse,
+  GetUserPlaylistsQuery,
+  PlaylistQueueEntry,
+  GetPlaylistQueueResponse,
+  AddScenesToPlaylistRequest,
+  AddScenesToPlaylistResponse,
+  MovePlaylistItemRequest,
+  MovePlaylistItemResponse,
+  RemovePlaylistItemsRequest,
+  RemovePlaylistItemsResponse,
+  SortPlaylistRequest,
+  SortPlaylistResponse,
+  RemoveUnavailableItemsResponse,
+} from "@peek/shared-types/api/playlist.js";
+
+// Playlist types that stay on the server
+export type {
+  ReorderPlaylistParams,
+  ReorderPlaylistRequest,
+  ReorderPlaylistResponse,
 } from "./playlist.js";
 
 // Carousel endpoint types

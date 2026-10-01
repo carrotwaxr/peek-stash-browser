@@ -450,6 +450,24 @@ export type SortOf<K extends ListKind> = (typeof SORTS)[K][number];
 /** A random sort with its seed: the same seed gives the same order */
 export type RandomSortKey = `random_${number}`;
 
+/**
+ * The sorts a playlist's item page offers: the playlist's own order, when the
+ * item was added, then every scene sort except `scene_index` (a playlist has
+ * no group). `random` also arrives as `random_<seed>`.
+ */
+export const PLAYLIST_ITEM_SORTS = [
+  "position",
+  "added_at",
+  ...SORTS.scene.filter((s) => s !== "scene_index"),
+] as const;
+export type PlaylistItemSort = (typeof PLAYLIST_ITEM_SORTS)[number];
+
+/** A playlist's items come in the playlist's own order unless asked */
+export const DEFAULT_PLAYLIST_ITEM_SORT = {
+  field: "position",
+  direction: "ASC",
+} as const;
+
 /** What a list sorts by when the request names no sort */
 export const DEFAULT_SORT = {
   scene: { field: "created_at", direction: "DESC" },
