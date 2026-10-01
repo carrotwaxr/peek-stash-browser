@@ -58,10 +58,14 @@ function playlistResponse(page: number): GetPlaylistResponse {
       items: [],
     },
     totalItems: 120,
+    unavailableItems: 0,
     page,
     perPage: 50,
+    sort: "position",
+    direction: "ASC",
     isOwner: true,
     accessLevel: "owner",
+    owner: { id: 1, username: "owner" },
   };
 }
 
