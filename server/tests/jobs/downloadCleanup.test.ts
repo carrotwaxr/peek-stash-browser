@@ -4,12 +4,14 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanupExpiredDownloads,
+  scheduleDownloadCleanup,
   sweepOrphanedDownloadFiles,
 } from "../../jobs/downloadCleanup.js";
 import prisma from "../../prisma/singleton.js";
 import { downloadJobQueue } from "../../services/DownloadJobQueue.js";
 import { downloadsDir, zipPath } from "../../utils/downloadPaths.js";
 import { downloadRow } from "../helpers/fixtures.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
@@ -193,6 +195,64 @@ describe("download cleanup", () => {
     it("a missing downloads folder is nothing to sweep", async () => {
       await expect(sweepOrphanedDownloadFiles()).resolves.toBeUndefined();
       expect(mockPrisma.user.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("scheduleDownloadCleanup", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Runs of the expiry pass: its read is the one filtering on expiresAt */
+    function expiryReads() {
+      return mockPrisma.download.findMany.mock.calls.filter(
+        ([args]) => args?.where?.expiresAt !== undefined
+      ).length;
+    }
+
+    it("runs at once, expiring finished zips before sweeping stray files, then every hour", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      const expiredFile = writeZip(1, 4);
+      const strayFile = writeZip(1, 9);
+      mockPrisma.user.findMany.mockResolvedValue([partialRow({ id: 1 })]);
+      mockPrisma.download.findMany.mockResolvedValueOnce([
+        downloadRow({
+          id: 4,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "COMPLETED",
+          filePath: expiredFile,
+          expiresAt: new Date(Date.now() - 1000),
+        }),
+      ]);
+      mockPrisma.download.update.mockResolvedValue(partialRow({}));
+
+      scheduleDownloadCleanup();
+
+      await vi.waitFor(() => {
+        expect(fs.existsSync(strayFile)).toBe(false);
+      });
+      expect(fs.existsSync(expiredFile)).toBe(false);
+      expect(mockPrisma.download.update).toHaveBeenCalledWith({
+        where: { id: 4 },
+        data: { status: "EXPIRED", filePath: null },
+      });
+      // The sweep reads the users' folders only after the expiry pass has
+      // marked the row EXPIRED
+      const expired = must(
+        mockPrisma.download.update.mock.invocationCallOrder[0]
+      );
+      const swept = must(mockPrisma.user.findMany.mock.invocationCallOrder[0]);
+      expect(expired).toBeLessThan(swept);
+      expect(expiryReads()).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(59 * 60 * 1000);
+      expect(expiryReads()).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(60 * 1000);
+      await vi.waitFor(() => {
+        expect(expiryReads()).toBe(2);
+      });
     });
   });
 });

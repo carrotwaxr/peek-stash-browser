@@ -7,8 +7,10 @@ import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import {
+  duplicateVisibleItems,
   loadPlaylistItems,
   loadPlaylistPreviews,
+  moveItem,
 } from "../../services/PlaylistQueryService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { NormalizedScene } from "../../types/index.js";
@@ -400,5 +402,166 @@ describe("loadPlaylistItems with paging", () => {
     expect(result).toEqual({ items: [], totalItems: 0 });
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
     expect(mockGetByRefs).not.toHaveBeenCalled();
+  });
+});
+
+describe("moveItem's order (movedOrder)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * Moves the item among rows listed in playlist order ("h" a visible
+   * item, "x" one the owner cannot see; the number is the item id), and
+   * answers the ids the renumbering was sent, or null when nothing was
+   * written.
+   */
+  async function moved(
+    rows: ReadonlyArray<readonly [number, "v" | "x"]>,
+    itemId: number,
+    index: number
+  ): Promise<number[] | null> {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue(
+      rows.map(([id, kind]) => ({ id, visible: kind === "v" ? 1n : 0n }))
+    );
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+    const written = await moveItem(9, USER_ID, ALLOWED, itemId, index);
+    if (!written) {
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      return null;
+    }
+    const call: unknown[] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    const order = call[1];
+    expect(typeof order).toBe("string");
+    return JSON.parse(String(order)) as number[];
+  }
+
+  const FOUR = [
+    [1, "v"],
+    [2, "v"],
+    [3, "v"],
+    [4, "v"],
+  ] as const;
+
+  it("reads the playlist's items in order with their visibility, and renumbers by the ids it writes", async () => {
+    await moved(FOUR, 1, 1);
+
+    const [sql, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[0]);
+    expect(sql).toContain("LEFT JOIN StashScene s");
+    expect(sql).toContain("ORDER BY pi.position, pi.id");
+    expect(params).toEqual(["a", "b", USER_ID, 9]);
+    const [renumber] = must(mockPrisma.$executeRawUnsafe.mock.calls[0]);
+    expect(renumber).toContain("UPDATE PlaylistItem SET position = o.pos");
+  });
+
+  it("moves an item down to the index among the others", async () => {
+    expect(await moved(FOUR, 1, 2)).toEqual([2, 3, 1, 4]);
+  });
+
+  it("moves an item up to the index among the others", async () => {
+    expect(await moved(FOUR, 4, 1)).toEqual([1, 4, 2, 3]);
+  });
+
+  it("index 0 puts the item first", async () => {
+    expect(await moved(FOUR, 3, 0)).toEqual([3, 1, 2, 4]);
+  });
+
+  it("an index past the end puts the item last", async () => {
+    expect(await moved(FOUR, 1, 99)).toEqual([2, 3, 4, 1]);
+  });
+
+  it("moving an item to the index it holds changes nothing", async () => {
+    expect(await moved(FOUR, 2, 1)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("counts the index among visible items only: hidden ones keep their place between their neighbours", async () => {
+    const rows = [
+      [1, "v"],
+      [2, "x"],
+      [3, "v"],
+      [4, "x"],
+      [5, "v"],
+    ] as const;
+
+    // Visible 1, 3, 5: item 5 goes before the visible item at index 1 (3);
+    // 2 stays after 1, and 4 stays between 3 and the moved item's old place
+    expect(await moved(rows, 5, 1)).toEqual([1, 2, 5, 3, 4]);
+    // Visible 1, 3, 5: item 1 to index 1 goes before visible 5, so after 4
+    expect(await moved(rows, 1, 1)).toEqual([2, 3, 4, 1, 5]);
+  });
+
+  it("past the end of the visible items lands right after the last visible one, before trailing hidden items", async () => {
+    const rows = [
+      [1, "v"],
+      [2, "v"],
+      [3, "x"],
+    ] as const;
+
+    expect(await moved(rows, 1, 5)).toEqual([2, 1, 3]);
+  });
+
+  it("the only visible item stays where it is, hidden ones around it untouched", async () => {
+    const rows = [
+      [1, "x"],
+      [2, "v"],
+      [3, "x"],
+    ] as const;
+
+    expect(await moved(rows, 2, 0)).toEqual([1, 2, 3]);
+    expect(await moved(rows, 2, 7)).toEqual([1, 2, 3]);
+  });
+
+  it("an item the owner cannot see, or one not in the playlist, writes nothing and answers false", async () => {
+    const rows = [
+      [1, "v"],
+      [2, "x"],
+    ] as const;
+
+    expect(await moved(rows, 2, 0)).toBeNull();
+    expect(await moved(rows, 99, 0)).toBeNull();
+  });
+});
+
+describe("duplicateVisibleItems", () => {
+  it("copies the visible items in position order, numbered from 0, into the new playlist", () => {
+    const copy = duplicateVisibleItems(USER_ID, ALLOWED, 12);
+    const { sql } = copy;
+
+    expect(sql).toContain("INSERT INTO PlaylistItem");
+    expect(sql).toContain(
+      "ROW_NUMBER() OVER (ORDER BY pi.position, pi.id) - 1"
+    );
+    expect(sql).toContain("CROSS JOIN StashScene s");
+    expect(sql).toContain(
+      "s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?)"
+    );
+    expect(placeholders(sql)).toBe(copy.paramsFor(34).length);
+  });
+
+  it("binds the new playlist id first, then the time, the viewer, the source playlist and the allowed instances, in statement order", () => {
+    const copy = duplicateVisibleItems(USER_ID, ALLOWED, 12);
+    const before = Date.now();
+
+    const params = copy.paramsFor(34);
+
+    const [newId, addedAt, ...rest] = params;
+    expect(newId).toBe(34);
+    expect(addedAt).toBeGreaterThanOrEqual(before);
+    expect(addedAt).toBeLessThanOrEqual(Date.now());
+    expect(rest).toEqual([USER_ID, 12, "a", "b"]);
+  });
+
+  it("each call to paramsFor takes its own playlist id", () => {
+    const copy = duplicateVisibleItems(USER_ID, ALLOWED, 12);
+
+    expect(copy.paramsFor(1)[0]).toBe(1);
+    expect(copy.paramsFor(2)[0]).toBe(2);
+  });
+
+  it("a viewer with no allowed instance copies nothing", () => {
+    const { sql } = duplicateVisibleItems(USER_ID, [], 12);
+
+    expect(sql).toContain("AND 1 = 0");
   });
 });
