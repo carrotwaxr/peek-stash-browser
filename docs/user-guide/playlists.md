@@ -159,6 +159,8 @@ The address follows the scene you are watching, and the queue stays with that pa
 - Back leaves the player for the page the queue started from (the playlist, the grid or the carousel), however many scenes you played.
 - Opening one of the queue's scenes later from somewhere else plays it on its own: the old queue does not come back.
 
+A scene in the queue that you can no longer see (hidden, restricted, deleted from Stash, or on a server you turned off) is skipped with a notice, in the direction you were going, and shown as **Unavailable** in the queue list. If nothing playable is left, the player shows "not found". A scene that fails to load for another reason (a network error, say) is not skipped: the player shows the error with **Retry**.
+
 ## Playlist Tips & Tricks
 
 ### Organization Ideas
