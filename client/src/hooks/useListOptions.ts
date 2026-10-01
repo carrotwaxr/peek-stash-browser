@@ -23,6 +23,22 @@ import type { ListEntity } from "../utils/urlParams";
 import type { ListDefaults } from "./useListUrlState";
 
 const NO_LOCKS: readonly string[] = [];
+const NO_FILTERS: Record<string, unknown> = {};
+
+/**
+ * Filters equal by content are one object, whatever object the page passed
+ * (a page's inline lock is a new object on every render)
+ */
+export function useFiltersByContent(
+  filters: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  const key = filters ? JSON.stringify(filters) : "";
+  return useMemo(
+    () =>
+      key === "" ? NO_FILTERS : (JSON.parse(key) as Record<string, unknown>),
+    [key]
+  );
+}
 
 /** A card display setting's value, or the fallback when it has none */
 const settingOr = (value: unknown, fallback: string) =>

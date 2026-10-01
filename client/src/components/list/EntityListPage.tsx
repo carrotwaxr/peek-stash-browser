@@ -5,6 +5,7 @@ import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 import {
   useFilterOptions,
+  useFiltersByContent,
   useListDefaults,
   useLockedFields,
 } from "../../hooks/useListOptions";
@@ -41,7 +42,6 @@ import { timelineAndFolderFilters } from "./viewFilters";
 
 const NO_EXTRAS: ListPageExtras = {};
 const useNoExtras = (): ListPageExtras => NO_EXTRAS;
-const NO_FILTERS: Record<string, unknown> = {};
 const NO_SETTINGS: typeof WALL_VIEW_SETTINGS = [];
 
 type WallZoom = React.ComponentProps<typeof WallView>["zoomLevel"];
@@ -99,18 +99,6 @@ function scopeOf(permanentFilters: Record<string, unknown>): PageScope | null {
     if (typeof first === "string" && first !== "") scope[param] = first;
   }
   return Object.keys(scope).length > 0 ? scope : null;
-}
-
-/** Filters equal by content are one object, whatever object the page passed */
-function useFiltersByContent(
-  filters: Record<string, unknown> | undefined
-): Record<string, unknown> {
-  const key = filters ? JSON.stringify(filters) : "";
-  return useMemo(
-    () =>
-      key === "" ? NO_FILTERS : (JSON.parse(key) as Record<string, unknown>),
-    [key]
-  );
 }
 
 /** Sets the document title (a list page does; a list inside a page leaves it to the page) */
