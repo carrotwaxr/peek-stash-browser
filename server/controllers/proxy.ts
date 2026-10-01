@@ -28,6 +28,7 @@ import {
 import {
   SCENE_ID_PATTERN,
   parseStashMediaPath,
+  stashMediaUrl,
 } from "../utils/stashMediaPath.js";
 import { stashFailure } from "../utils/streamProxy.js";
 
@@ -602,7 +603,15 @@ export const proxyClipPreview = async (
 
   const creds = credentialsOrRespond(instanceId, res);
   if (!creds) return;
-  const { apiKey } = creds;
+  const { baseUrl: stashUrl, apiKey } = creds;
+
+  // The stored path on the instance's address as it is now
+  const fullUrl = stashMediaUrl(stashUrl, mediaPath, apiKey);
+  if (!fullUrl) {
+    logger.warn("Clip preview path cannot be proxied", { clipId: id });
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
@@ -610,8 +619,6 @@ export const proxyClipPreview = async (
   await acquireConcurrencySlot();
 
   try {
-    const fullUrl = `${mediaPath}${mediaPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
-
     logger.debug("Proxying clip preview", { clipId: id });
 
     proxyHttpRequest({
@@ -707,21 +714,21 @@ export const proxyImage = async (
   if (!creds) return;
   const { baseUrl: stashUrl, apiKey } = creds;
 
+  // stashPath is a full URL (as Stash reported it) or a path; either way it
+  // goes to the instance's address as it is now
+  const fullUrl = stashMediaUrl(stashUrl, stashPath, apiKey);
+  if (!fullUrl) {
+    logger.warn("Image path cannot be proxied", { imageId, type });
+    res.status(404).json({ error: NOT_FOUND });
+    return;
+  }
+
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
 
   await acquireConcurrencySlot();
 
   try {
-    // Note: stashPath may already be a full URL (stored from Stash API response)
-    // or it could be a relative path - handle both cases
-    let fullUrl: string;
-    if (stashPath.startsWith("http://") || stashPath.startsWith("https://")) {
-      fullUrl = `${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
-    } else {
-      fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
-    }
-
     logger.debug("Proxying image request", { imageId, type });
 
     proxyHttpRequest({

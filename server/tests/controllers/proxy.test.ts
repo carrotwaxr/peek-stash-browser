@@ -1181,6 +1181,32 @@ describe("Proxy Controller", () => {
       );
     });
 
+    it("a clip with # in its stream path answers 404 and fetches nothing", async () => {
+      mockPrisma.stashClip.findUnique.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash:9999/scene/1/scene_marker/429/stream#x",
+          screenshotPath: null,
+          stashInstanceId: "inst-a",
+        })
+      );
+      setupHttpGetSuccess();
+
+      const res = resFor(proxyClipPreview);
+      await proxyClipPreview(
+        reqFor(proxyClipPreview, {
+          params: { id: "429" },
+          query: { instanceId: "inst-a" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+      expect(mockHttpsGet).not.toHaveBeenCalled();
+    });
+
     it("falls back to screenshotPath when streamPath is null", async () => {
       mockPrisma.stashClip.findUnique.mockResolvedValue(
         partialRow({
@@ -1366,6 +1392,59 @@ describe("Proxy Controller", () => {
       });
     });
 
+    it("an image whose stored path names another host is fetched from the instance's base URL", async () => {
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "http://old-host:9999/image/1/thumbnail?t=3",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "inst-a",
+        })
+      );
+      setupHttpGetSuccess();
+
+      await proxyImage(
+        reqFor(proxyImage, {
+          params: { imageId: "1", type: "thumbnail" },
+          query: { instanceId: "inst-a" },
+          user: USER,
+        }),
+        resFor(proxyImage)
+      );
+
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash:9999/image/1/thumbnail?t=3&apikey=test-api-key",
+        expect.any(Object),
+        expect.any(Function)
+      );
+    });
+
+    it("an image path holding # answers 404 and fetches nothing", async () => {
+      mockPrisma.stashImage.findUnique.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "/image/1/thumbnail#x",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "inst-a",
+        })
+      );
+      setupHttpGetSuccess();
+
+      const res = resFor(proxyImage);
+      await proxyImage(
+        reqFor(proxyImage, {
+          params: { imageId: "1", type: "thumbnail" },
+          query: { instanceId: "inst-a" },
+          user: USER,
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
     it("handles full URL paths (starting with http)", async () => {
       mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
@@ -1422,7 +1501,7 @@ describe("Proxy Controller", () => {
       );
     });
 
-    it("handles full https URL paths", async () => {
+    it("rebases a full https URL path onto the instance's address", async () => {
       mockPrisma.stashImage.findUnique.mockResolvedValue(
         partialRow({
           pathThumbnail: null,
@@ -1442,9 +1521,10 @@ describe("Proxy Controller", () => {
 
       await proxyImage(req, res);
 
-      // Full https URL: uses https.get, no stashUrl prefix
-      expect(mockHttpsGet).toHaveBeenCalledWith(
-        "https://stash-cdn.example.com/image/3/full?apikey=test-api-key",
+      // The stored host is not used: the key goes to the instance's address
+      expect(mockHttpsGet).not.toHaveBeenCalled();
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash:9999/image/3/full?apikey=test-api-key",
         expect.any(Object),
         expect.any(Function)
       );
