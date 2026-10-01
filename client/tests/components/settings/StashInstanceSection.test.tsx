@@ -434,6 +434,9 @@ describe("StashInstanceSection", () => {
       // Edit
       seed();
       fireEvent.click(must(screen.getAllByText("Edit")[1], "second Edit"));
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Renamed" },
+      });
       fireEvent.click(screen.getByText("Save Changes"));
       await expectRefreshed();
       await waitFor(() => {
@@ -750,8 +753,32 @@ describe("StashInstanceSection", () => {
       expect(screen.getByText("Test Stash")).toBeInTheDocument();
     });
 
-    it("editing sends the API key only when a new one is typed", async () => {
+    it("a rename sends only { name }", async () => {
       mockApiPut.mockResolvedValue({});
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+      fireEvent.change(screen.getByDisplayValue("Test Stash"), {
+        target: { value: "Renamed" },
+      });
+
+      fireEvent.click(screen.getByText("Save Changes"));
+
+      await waitFor(() => {
+        expect(mockApiPut).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1",
+          { name: "Renamed" }
+        );
+      });
+    });
+
+    it("clearing the description or the UI address sends null", async () => {
+      mockApiPut.mockResolvedValue({});
+      mockApiGet.mockResolvedValue({
+        instances: [{ ...mockInstance, uiUrl: "http://ui.example" }],
+      });
       renderSection();
       await waitFor(() => {
         expect(screen.getByText("Edit")).toBeInTheDocument();
@@ -760,22 +787,62 @@ describe("StashInstanceSection", () => {
       fireEvent.change(screen.getByPlaceholderText("Optional description"), {
         target: { value: "" },
       });
+      fireEvent.change(
+        screen.getByPlaceholderText("https://stash.example.com"),
+        {
+          target: { value: "" },
+        }
+      );
 
       fireEvent.click(screen.getByText("Save Changes"));
 
       await waitFor(() => {
         expect(mockApiPut).toHaveBeenCalledWith(
           "/setup/stash-instance/test-instance-1",
-          {
-            name: "Test Stash",
-            description: null,
-            url: "http://localhost:9999/graphql",
-            uiUrl: null,
-            enabled: true,
-            priority: 0,
-          }
+          { description: null, uiUrl: null }
         );
       });
+    });
+
+    it("saving with nothing changed sends nothing and closes the form", async () => {
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+
+      fireEvent.click(screen.getByText("Save Changes"));
+
+      await waitFor(() => {
+        expect(screen.queryByText("Edit Instance")).not.toBeInTheDocument();
+      });
+      expect(mockApiPut).not.toHaveBeenCalled();
+    });
+
+    it("a failed save shows the server's details under the message", async () => {
+      mockApiPut.mockRejectedValue(
+        new ApiError("Could not connect to Stash at the new address", 400, {
+          details: "connect ECONNREFUSED 10.0.0.5:9999",
+        })
+      );
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://elsewhere:9999/graphql" } }
+      );
+
+      fireEvent.click(screen.getByText("Save Changes"));
+
+      expect(
+        await screen.findByText("Could not connect to Stash at the new address")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("connect ECONNREFUSED 10.0.0.5:9999")
+      ).toBeInTheDocument();
     });
 
     it("editing with a new API key sends it", async () => {
@@ -847,6 +914,71 @@ describe("StashInstanceSection", () => {
           "Connected successfully! Stash version: unknown"
         )
       ).toBeInTheDocument();
+    });
+
+    it("editing with a blank key, Test Connection posts to /setup/stash-instance/:id/test-connection with no apiKey", async () => {
+      mockApiPost.mockResolvedValue({ version: "0.26.0" });
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+
+      fireEvent.click(screen.getByText("Test Connection"));
+
+      expect(
+        await screen.findByText("Connected successfully! Stash version: 0.26.0")
+      ).toBeInTheDocument();
+      expect(mockApiPost).toHaveBeenCalledTimes(1);
+      expect(mockApiPost).toHaveBeenCalledWith(
+        "/setup/stash-instance/test-instance-1/test-connection",
+        {}
+      );
+    });
+
+    it("editing, Test Connection sends the changed address and the typed key", async () => {
+      mockApiPost.mockResolvedValue({ version: "0.26.0" });
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://elsewhere:9999/graphql" } }
+      );
+      fireEvent.change(screen.getByPlaceholderText("••••••••"), {
+        target: { value: "typed-key" },
+      });
+
+      fireEvent.click(screen.getByText("Test Connection"));
+
+      await waitFor(() => {
+        expect(mockApiPost).toHaveBeenCalledWith(
+          "/setup/stash-instance/test-instance-1/test-connection",
+          { url: "http://elsewhere:9999/graphql", apiKey: "typed-key" }
+        );
+      });
+    });
+
+    it("a failed test of a saved instance shows Stash's details under the reason", async () => {
+      mockApiPost.mockRejectedValue(
+        new ApiError("Authentication failed. Check the API key.", 400, {
+          details: "401 Unauthorized",
+        })
+      );
+      renderSection();
+      await waitFor(() => {
+        expect(screen.getByText("Edit")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Edit"));
+
+      fireEvent.click(screen.getByText("Test Connection"));
+
+      expect(
+        await screen.findByText("Authentication failed. Check the API key.")
+      ).toBeInTheDocument();
+      expect(screen.getByText("401 Unauthorized")).toBeInTheDocument();
     });
 
     it("a failed test shows the reason, and a reasonless one says Connection failed", async () => {
