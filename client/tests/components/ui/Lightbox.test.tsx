@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import type { NormalizedImage } from "@peek/shared-types";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { libraryApi } from "@/api";
 import Lightbox from "../../../src/components/ui/Lightbox";
 import { useRatingHotkeys } from "../../../src/hooks/useRatingHotkeys";
@@ -645,6 +645,84 @@ describe("Lightbox", () => {
 
       press("Escape");
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("prefetch", () => {
+    const created: Array<{
+      src: string;
+      decoding: string;
+      fetchPriority: string;
+    }> = [];
+    const RealImage = globalThis.Image;
+
+    beforeEach(() => {
+      created.length = 0;
+      class FakeImage {
+        src = "";
+        decoding = "";
+        fetchPriority = "";
+        constructor() {
+          created.push(this);
+        }
+      }
+      globalThis.Image = FakeImage as unknown as typeof Image;
+    });
+
+    afterEach(() => {
+      globalThis.Image = RealImage;
+      vi.unstubAllGlobals();
+    });
+
+    it("prefetch creates Image objects for the neighbours' URLs and calls no fetch", () => {
+      const fetchSpy = vi.fn().mockResolvedValue({});
+      vi.stubGlobal("fetch", fetchSpy);
+      const current = createMockImages(1, 1) as NormalizedImage[];
+      const next = createMockImages(2, 2) as NormalizedImage[];
+      render(
+        <Lightbox
+          images={current}
+          prefetchImages={next}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(created.map((i) => i.src)).toEqual([
+        next[0]?.paths.image,
+        next[1]?.paths.image,
+      ]);
+      expect(created.every((i) => i.decoding === "async")).toBe(true);
+      expect(created.every((i) => i.fetchPriority === "low")).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("closing clears the prefetch images' src", () => {
+      const current = createMockImages(1, 1) as NormalizedImage[];
+      const next = createMockImages(2, 2) as NormalizedImage[];
+      const { rerender } = render(
+        <Lightbox
+          images={current}
+          prefetchImages={next}
+          initialIndex={0}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      );
+      expect(created.length).toBe(2);
+
+      rerender(
+        <Lightbox
+          images={current}
+          prefetchImages={next}
+          initialIndex={0}
+          isOpen={false}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(created.map((i) => i.src)).toEqual(["", ""]);
     });
   });
 });

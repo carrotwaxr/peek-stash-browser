@@ -239,23 +239,27 @@ const Lightbox = ({
   useEffect(() => {
     if (!isOpen || prefetchImages.length === 0) return;
 
-    // Use fetch with low priority to avoid blocking the main image request
-    // AbortController lets us cancel prefetches if component unmounts or images change
-    const controller = new AbortController();
+    // An Image loads at low priority, fills the HTTP cache and frees its
+    // connection when done; an unread fetch body would hold it under
+    // backpressure. Clearing src on cleanup cancels what is still loading.
+    const images: HTMLImageElement[] = [];
 
     prefetchImages.forEach((img) => {
       const url = img?.paths?.image || img?.paths?.preview;
       if (url) {
-        fetch(url, {
-          signal: controller.signal,
-          priority: "low",
-        }).catch(() => {
-          // Silently ignore - prefetch is best-effort
-        });
+        const el = new Image();
+        el.decoding = "async";
+        el.fetchPriority = "low";
+        el.src = url;
+        images.push(el);
       }
     });
 
-    return () => controller.abort();
+    return () => {
+      images.forEach((el) => {
+        el.src = "";
+      });
+    };
   }, [isOpen, prefetchImages]);
 
   // Navigation functions with cross-page support
