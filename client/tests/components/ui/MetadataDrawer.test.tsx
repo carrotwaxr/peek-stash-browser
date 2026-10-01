@@ -112,7 +112,7 @@ describe("MetadataDrawer subtitle", () => {
     const subtitle = container.querySelector("p");
     expect(subtitle).not.toBeNull();
     expect(subtitle?.textContent).toBe(
-      `Acme • ${new Date(date).toLocaleDateString()} • by Ansel • 1920×1080`
+      "Acme • Mar 5, 2024 • by Ansel • 1920×1080"
     );
     const link = screen.getByRole("link", { name: "Acme" });
     expect(link).toHaveAttribute("href", "/studio/9");

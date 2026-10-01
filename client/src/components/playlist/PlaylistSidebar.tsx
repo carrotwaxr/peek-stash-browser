@@ -14,6 +14,7 @@ import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import { formatDuration } from "../../utils/format";
 import Button from "../ui/Button";
 import { useLazyLoad } from "../ui/CardComponents";
 
@@ -76,20 +77,6 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
   const nextSceneIndex = upNextIndex;
   const nextScene =
     nextSceneIndex === null ? null : (playlist.scenes[nextSceneIndex] ?? null);
-
-  const formatDuration = (seconds: number | undefined) => {
-    if (!seconds) return "?:??";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
 
   const goToPlaylist = () => {
     void navigate(`/playlist/${playlist.id}`);
@@ -250,7 +237,6 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                     src={nextScene.scene?.paths?.screenshot}
                     alt={nextScene.scene?.title || "Next scene"}
                     duration={nextScene.scene?.files?.[0]?.duration}
-                    formatDuration={formatDuration}
                     fallbackText={nextSceneIndex + 1}
                     width="120px"
                     height="68px"
@@ -334,7 +320,6 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                       src={scene?.paths?.screenshot}
                       alt={scene?.title || `Scene ${index + 1}`}
                       duration={scene?.files?.[0]?.duration}
-                      formatDuration={formatDuration}
                       fallbackText={index + 1}
                       width="80px"
                       height="45px"
@@ -391,7 +376,6 @@ interface PlaylistThumbnailProps {
   src: string | null | undefined;
   alt: string;
   duration?: number;
-  formatDuration: (seconds: number | undefined) => string;
   fallbackText: ReactNode;
   width: string;
   height: string;
@@ -406,7 +390,6 @@ const PlaylistThumbnail = ({
   src,
   alt,
   duration,
-  formatDuration,
   fallbackText,
   width,
   height,
@@ -457,7 +440,7 @@ const PlaylistThumbnail = ({
             ...(small && { fontSize: "10px" }),
           }}
         >
-          {formatDuration(duration)}
+          {duration ? formatDuration(duration) : "?:??"}
         </div>
       )}
     </div>

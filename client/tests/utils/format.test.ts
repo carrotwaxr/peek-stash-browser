@@ -157,8 +157,9 @@ describe("format utilities", () => {
 
   describe("formatFileSize", () => {
     it("returns '0 B' for null/undefined/zero", () => {
-      expect(formatFileSize(untrusted(null))).toBe("0 B");
-      expect(formatFileSize(untrusted(undefined))).toBe("0 B");
+      expect(formatFileSize(untrusted(null))).toBe("-");
+      expect(formatFileSize(untrusted(undefined))).toBe("-");
+      expect(formatFileSize(untrusted(null), { empty: "N/A" })).toBe("N/A");
       expect(formatFileSize(0)).toBe("0 B");
     });
 
@@ -179,6 +180,25 @@ describe("format utilities", () => {
     it("formats gigabytes", () => {
       expect(formatFileSize(1073741824)).toBe("1 GB");
       expect(formatFileSize(5368709120)).toBe("5 GB");
+    });
+  });
+
+  describe("shared formatter contracts", () => {
+    it("a resume time past an hour shows hours", () => {
+      expect(formatDuration(5400)).toBe("1:30:00");
+      expect(formatDuration(754)).toBe("12:34");
+    });
+
+    it("formatFileSize keeps one decimal", () => {
+      expect(formatFileSize(1536)).toBe("1.5 KB");
+      expect(formatFileSize(1.25 * 1024 * 1024)).toBe("1.3 MB");
+      expect(formatFileSize(0)).toBe("0 B");
+    });
+
+    it("null gives the empty text", () => {
+      expect(formatFileSize(null, { empty: "?" })).toBe("?");
+      expect(formatDuration(untrusted(null), { empty: "?:??" })).toBe("?:??");
+      expect(formatDuration(0, { empty: "?" })).toBe("0:00");
     });
   });
 

@@ -7,31 +7,10 @@ import type {
 import { Trash2 } from "lucide-react";
 import { ApiError, apiDelete, apiGet, apiPost } from "../../../api";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
+import { formatDateTime } from "../../../utils/date";
+import { formatFileSize } from "../../../utils/format";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
-
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  // A terabyte or more is shown in GB
-  const i = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(k)),
-    sizes.length - 1
-  );
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i] ?? ""}`;
-};
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
 
 /** What made a backup, as its row says it. */
 const kindLabel = (backup: DatabaseBackup): string => {
@@ -213,14 +192,14 @@ const BackupTab = () => {
                       className="font-medium"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {formatDate(backup.createdAt)}
+                      {formatDateTime(backup.createdAt)}
                     </p>
                     <p
                       className="text-sm"
                       style={{ color: "var(--text-secondary)" }}
                     >
                       <span>{kindLabel(backup)}</span> ·{" "}
-                      {formatBytes(backup.size)}
+                      {formatFileSize(backup.size)}
                     </p>
                     <p
                       className="text-xs font-mono break-all"

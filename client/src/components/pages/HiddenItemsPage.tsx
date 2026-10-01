@@ -10,6 +10,7 @@ import {
   useHiddenItems,
 } from "../../hooks/useHiddenEntities";
 import { useNavigationState } from "../../hooks/useNavigationState";
+import { formatDate } from "../../utils/date";
 import Button from "../ui/Button";
 import { LazyImage } from "../ui/CardComponents";
 import EmptyState from "../ui/EmptyState";
@@ -49,13 +50,6 @@ const isTabId = (value: string | null): value is TabId =>
 /** The row's name, else its type (a row without details) */
 const getEntityName = (item: HiddenEntityItem): string =>
   item.summary?.name ?? ENTITY_TYPE_LABELS[item.entityType];
-
-const formatDate = (dateString: string): string =>
-  new Date(dateString).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 
 /**
  * HiddenItemsPage - View and restore hidden entities, a page of 50 at a

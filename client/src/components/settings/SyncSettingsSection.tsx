@@ -10,6 +10,7 @@ import { Square } from "lucide-react";
 import { apiGet, apiPost, apiPut } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { useVisibleInterval } from "../../hooks/useVisibleInterval";
+import { formatDateTime } from "../../utils/date";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper } from "../ui/index";
 
@@ -54,9 +55,6 @@ const POLL_MS = 10_000;
 /** A refused cleanup's counts: "Stash no longer lists 80 of 120 scenes (...)" */
 const refusalSummary = (lastError: string) =>
   lastError.slice(REFUSED.length).split("; ")[0];
-
-const formatTime = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString() : "Never";
 
 /** The newer of a type's two Stash timestamps: where its next sync starts */
 function lastChangeSynced(state: SyncEntityState): string | null {
@@ -406,13 +404,13 @@ const InstanceStatusTable = ({
                 className="py-2 px-3 whitespace-nowrap"
                 style={{ color: "var(--text-secondary)" }}
               >
-                {formatTime(state.lastFullSyncActual)}
+                {formatDateTime(state.lastFullSyncActual, { empty: "Never" })}
               </td>
               <td
                 className="py-2 px-3 whitespace-nowrap"
                 style={{ color: "var(--text-secondary)" }}
               >
-                {formatTime(lastChangeSynced(state))}
+                {formatDateTime(lastChangeSynced(state), { empty: "Never" })}
               </td>
               <td
                 className="py-2 px-3 whitespace-nowrap"

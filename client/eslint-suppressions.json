@@ -209,9 +209,6 @@
   "src/components/settings/CustomThemeManager.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
     }
   },
   "src/components/settings/GroupModal.tsx": {
@@ -378,11 +375,6 @@
   "src/components/ui/EmptyState.tsx": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
-    }
-  },
-  "src/components/ui/ErrorMessage.tsx": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 2
     }
   },
   "src/components/ui/ExternalPlayerButton.tsx": {

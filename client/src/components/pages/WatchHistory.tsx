@@ -15,6 +15,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useWatchedScenes } from "../../hooks/useWatchHistory";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import { formatDurationHumanReadable } from "../../utils/format";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
 import { showError } from "../../utils/toast";
 import Button from "../ui/Button";
@@ -109,16 +110,6 @@ const WatchHistory = () => {
     set("sort", next.sort, next.sort === DEFAULT_SORT);
     set("page", String(next.page), next.page === 1);
     setSearchParams(params);
-  };
-
-  const formatDuration = (seconds: number | null | undefined): string => {
-    if (!seconds) return "0m";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
   };
 
   const handleClearHistory = async () => {
@@ -238,7 +229,10 @@ const WatchHistory = () => {
               <span>{total} scenes</span>
               {total > 0 && (
                 <span>
-                  Total watch time: {formatDuration(data?.totalPlayDuration)}
+                  Total watch time:{" "}
+                  {formatDurationHumanReadable(data?.totalPlayDuration ?? 0, {
+                    includeDays: false,
+                  })}
                 </span>
               )}
             </div>

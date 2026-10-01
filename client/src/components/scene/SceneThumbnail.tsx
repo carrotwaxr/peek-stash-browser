@@ -1,5 +1,9 @@
 import type { NormalizedScene, WatchHistoryData } from "@peek/shared-types";
-import { formatDurationCompact, formatResolution } from "../../utils/format";
+import {
+  formatDuration,
+  formatDurationCompact,
+  formatResolution,
+} from "../../utils/format";
 import { SceneCardPreview } from "../ui/index";
 
 interface Props {
@@ -23,13 +27,6 @@ const SceneThumbnail = ({
   autoplayOnScroll = false,
   objectFit = "cover",
 }: Props) => {
-  const formatResumeTime = (seconds: number) => {
-    if (!seconds) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${String(secs).padStart(2, "0")}`;
-  };
-
   const duration = scene?.files?.[0]?.duration
     ? formatDurationCompact(scene.files[0].duration)
     : null;
@@ -75,7 +72,7 @@ const SceneThumbnail = ({
             style={{
               width: `${Math.min(100, (watchHistory.resumeTime / scene.files[0].duration) * 100)}%`,
             }}
-            title={`Resume from ${formatResumeTime(watchHistory.resumeTime)}`}
+            title={`Resume from ${formatDuration(watchHistory.resumeTime)}`}
           />
         </div>
       )}

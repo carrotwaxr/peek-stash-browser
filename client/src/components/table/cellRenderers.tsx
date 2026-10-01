@@ -17,6 +17,9 @@ import {
   formatFileSize,
 } from "./formatters";
 
+// An empty cell shows a dash
+const EMPTY_CELL = { empty: "-" };
+
 // Wrappers that default `hasMultipleInstances` to false
 const getEntityPath = (
   type: string,
@@ -251,10 +254,11 @@ const sceneRenderers: RendererMap = {
       entityType="scene"
     />
   ),
-  date: (scene) => formatDate(scene.date),
+  date: (scene) => formatDate(scene.date, EMPTY_CELL),
   duration: (scene) =>
     formatDuration(
-      scene.files?.[0]?.duration || scene.file?.duration || scene.duration
+      scene.files?.[0]?.duration || scene.file?.duration || scene.duration,
+      EMPTY_CELL
     ),
   rating: (scene) => <RatingCell rating={scene.rating100 ?? scene.rating} />,
   studio: (scene, options = {}) => {
@@ -300,7 +304,7 @@ const sceneRenderers: RendererMap = {
     const path = scene.path || scene.file?.path || scene.files?.[0]?.path;
     return <TruncatedTextCell text={path} />;
   },
-  created_at: (scene) => formatDate(scene.created_at),
+  created_at: (scene) => formatDate(scene.created_at, EMPTY_CELL),
 };
 
 /**
@@ -485,7 +489,7 @@ const galleryRenderers: RendererMap = {
       entityType="gallery"
     />
   ),
-  date: (gallery) => formatDate(gallery.date),
+  date: (gallery) => formatDate(gallery.date, EMPTY_CELL),
   rating: (gallery) => (
     <RatingCell rating={gallery.rating100 ?? gallery.rating} />
   ),
@@ -631,8 +635,8 @@ const groupRenderers: RendererMap = {
       />
     );
   },
-  date: (group) => formatDate(group.date),
-  duration: (group) => formatDuration(group.duration),
+  date: (group) => formatDate(group.date, EMPTY_CELL),
+  duration: (group) => formatDuration(group.duration, EMPTY_CELL),
   scene_count: (group) => <SimpleValueCell value={group.scene_count} />,
   performers: (group, options = {}) => {
     // The performers of the group's scenes: the list endpoint sends at most
@@ -733,10 +737,10 @@ const clipRenderers: RendererMap = {
       hasMultipleInstances={options.hasMultipleInstances || false}
     />
   ),
-  start_time: (clip) => formatDuration(clip.seconds),
+  start_time: (clip) => formatDuration(clip.seconds, EMPTY_CELL),
   duration: (clip) => {
     if (clip.endSeconds && clip.seconds) {
-      return formatDuration(clip.endSeconds - clip.seconds);
+      return formatDuration(clip.endSeconds - clip.seconds, EMPTY_CELL);
     }
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   },

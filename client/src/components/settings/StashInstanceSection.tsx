@@ -11,6 +11,7 @@ import { ApiError, getErrorMessage } from "../../api/client";
 import { invalidateInstanceQueries } from "../../api/hooks/useLibraryReady";
 import { useAuth } from "../../hooks/useAuth";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { formatDateTime } from "../../utils/date";
 import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper, StatusMessage } from "../ui/index";
 
@@ -156,11 +157,6 @@ const StashInstanceSection = () => {
     }, FIRST_SYNC_POLL_MS);
     return () => clearInterval(timer);
   }, [firstSyncRunning, showAddForm]);
-
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString();
-  };
 
   const getDisplayUrl = (url: string | null | undefined) => {
     if (!url) return "N/A";
@@ -719,7 +715,10 @@ const StashInstanceSection = () => {
                         </span>
                       )}
                       <span>Priority: {instance.priority}</span>
-                      <span>Added: {formatDate(instance.createdAt)}</span>
+                      <span>
+                        Added:{" "}
+                        {formatDateTime(instance.createdAt, { empty: "N/A" })}
+                      </span>
                     </div>
                   </div>
                   {isAdmin && (

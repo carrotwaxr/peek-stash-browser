@@ -1,6 +1,7 @@
 import { forwardRef, memo, useCallback, useMemo } from "react";
 import type { ImageListItem } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { formatDate } from "../../utils/date";
 import { getImagePath } from "../../utils/entityLinks";
 import { getImageTitle } from "../../utils/imageTitle";
 import { BaseCard } from "../ui/BaseCard";
@@ -78,7 +79,7 @@ const ImageCard = memo(
         }
 
         if (imageSettings.showDate && image.date) {
-          parts.push(new Date(image.date).toLocaleDateString());
+          parts.push(formatDate(image.date));
         }
 
         return parts.length > 0 ? parts.join(" • ") : null;

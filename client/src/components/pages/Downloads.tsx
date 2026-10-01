@@ -7,34 +7,10 @@ import {
   useRetryDownload,
 } from "../../api/hooks/useDownloads";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { formatDateTime } from "../../utils/date";
+import { formatFileSize } from "../../utils/format";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, PageHeader, PageLayout, StatusMessage } from "../ui/index";
-
-/**
- * Format bytes to human readable string
- * @param {number} bytes - Size in bytes
- * @returns {string} Formatted size string
- */
-const formatSize = (bytes: number | null | undefined): string => {
-  if (bytes === null || bytes === undefined) return "-";
-  if (bytes === 0) return "0 B";
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const k = 1024;
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  const size = bytes / Math.pow(k, i);
-
-  return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
-};
-
-/**
- * Format ISO date string to locale string
- * @param {Date | string} value - Date, or the ISO string it arrives as
- * @returns {string} Formatted date string
- */
-const formatDate = (value: Date | string): string => {
-  return new Date(value).toLocaleString();
-};
 
 /**
  * Get display name from fileName (strip extension for cleaner display)
@@ -353,9 +329,9 @@ const Downloads = () => {
                       style={{ color: "var(--text-muted)" }}
                     >
                       {fileSize > 0 ? (
-                        <span>{formatSize(fileSize)}</span>
+                        <span>{formatFileSize(fileSize)}</span>
                       ) : null}
-                      <span>{formatDate(download.createdAt)}</span>
+                      <span>{formatDateTime(download.createdAt)}</span>
                     </div>
 
                     {/* Progress bar for active downloads */}

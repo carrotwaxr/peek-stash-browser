@@ -6,6 +6,7 @@ import { useImageList, useRelationCounts } from "../../api/hooks";
 import { useEntityDetail } from "../../api/hooks/useEntityDetail";
 import type { LibrarySearchParams } from "../../api/library";
 import { useConfig } from "../../contexts/ConfigContext";
+import { formatDate } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
 import { galleryTitle } from "../../utils/gallery";
 import { libraryListTotal } from "../../utils/listQuery";
@@ -141,7 +142,7 @@ const GalleryPage = ({ detail }: { detail: FoundEntityDetail<"gallery"> }) => {
           {!!gallery.date && (
             <>
               <span>•</span>
-              <span>{new Date(gallery.date).toLocaleDateString()}</span>
+              <span>{formatDate(gallery.date)}</span>
             </>
           )}
           {!!gallery.photographer && (

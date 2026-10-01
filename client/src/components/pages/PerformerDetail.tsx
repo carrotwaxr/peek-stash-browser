@@ -6,6 +6,7 @@ import { useRelationCounts } from "../../api/hooks";
 import { useEntityDetail } from "../../api/hooks/useEntityDetail";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import { formatDate } from "../../utils/date";
 import {
   formatHeight,
   formatLength,
@@ -23,6 +24,7 @@ import StashIdLinks from "../detail/StashIdLinks";
 import type { DetailTabSpec } from "../detail/detailTabState";
 import { GalleryGrid, GroupGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import { calculateAge } from "../table/formatters";
 import { GenderIcon, SectionLink, TagChips } from "../ui/index";
 
 /** The tabs an entity grid lists: each grid's filter key */
@@ -91,18 +93,6 @@ const FieldGroup = ({
   </div>
 );
 
-/** Whole years since the birth date */
-const ageFrom = (birthdate: string): number | null => {
-  const birth = new Date(birthdate);
-  if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  const age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  return monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())
-    ? age - 1
-    : age;
-};
-
 /** The performer's attributes: personal, physical, body and other */
 const PerformerDetails = ({
   performer,
@@ -118,7 +108,8 @@ const PerformerDetails = ({
     if (isLoadingUnits) return "...";
     return value ? format(value, unitPreference) : null;
   };
-  const age = performer.birthdate ? ageFrom(performer.birthdate) : null;
+  const years = calculateAge(performer.birthdate);
+  const age = typeof years === "number" ? years : null;
 
   return (
     <DetailCard title="Details">
@@ -127,18 +118,14 @@ const PerformerDetails = ({
           label="Born"
           value={
             performer.birthdate
-              ? new Date(performer.birthdate).toLocaleDateString() +
+              ? formatDate(performer.birthdate) +
                 (age ? ` (${age} years old)` : "")
               : null
           }
         />
         <DetailField
           label="Died"
-          value={
-            performer.death_date
-              ? new Date(performer.death_date).toLocaleDateString()
-              : null
-          }
+          value={performer.death_date ? formatDate(performer.death_date) : null}
         />
         <DetailField label="Career" value={performer.career_length} />
         <DetailField label="Country" value={performer.country} />
