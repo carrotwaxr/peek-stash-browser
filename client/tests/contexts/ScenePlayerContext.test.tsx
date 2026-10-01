@@ -652,6 +652,43 @@ describe("ScenePlayerContext", () => {
       });
       expect(result.current.repeat).toBe("none");
     });
+
+    it("toggling shuffle, repeat or autoplay posts no second /library/scenes", async () => {
+      const playlist = {
+        id: "virtual-grid",
+        name: "Scene Grid",
+        shuffle: false,
+        repeat: "none",
+        scenes: [
+          { sceneId: "s-1", instanceId: "i-1" },
+          { sceneId: "s-2", instanceId: "i-1" },
+        ],
+        currentIndex: 0,
+      };
+      const { result } = renderHook(() => useScenePlayer(), {
+        wrapper: createWrapper({ sceneId: "s-1", instanceId: "i-1", playlist }),
+      });
+      await waitFor(() => {
+        expect(result.current.scene).not.toBeNull();
+      });
+      const loads = mockPost.mock.calls.length;
+
+      act(() => {
+        result.current.toggleShuffle();
+      });
+      act(() => {
+        result.current.toggleRepeat();
+      });
+      act(() => {
+        result.current.toggleAutoplayNext();
+      });
+      await actAsync(() => {});
+
+      expect(result.current.shuffle).toBe(true);
+      expect(result.current.repeat).toBe("all");
+      expect(result.current.autoplayNext).toBe(false);
+      expect(mockPost.mock.calls.length).toBe(loads);
+    });
   });
 
   // =========================================================================

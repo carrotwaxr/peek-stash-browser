@@ -5,13 +5,16 @@
  * scenes: moving from one to the other is a scene change, and every write
  * and stream URL carries the instance of the scene playing.
  */
+import type { NormalizedScene } from "@peek/shared-types";
 import { renderHook, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import videojs from "video.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost } from "@/api";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 import { useVideoPlayer } from "@/components/video-player/useVideoPlayer";
+import { type PlaybackQueue, buildPlaybackQueue } from "@/utils/playbackQueue";
 
 vi.mock("@/api", () => ({
   apiPost: vi.fn(() => Promise.resolve({ success: true })),
@@ -102,20 +105,28 @@ interface Scene {
   instanceId: string;
 }
 
+/** The player's queue and controls, as the context hands them over */
+interface Controls {
+  playlist?: PlaybackQueue | null;
+  autoplayNext?: boolean;
+  repeat?: "none" | "all" | "one";
+}
+
 function renderPlayer(
   player: FakePlayer,
   scene: Scene,
-  container: HTMLDivElement | null = null
+  container: HTMLDivElement | null = null,
+  controls: Controls = {}
 ) {
   const noop = () => {};
   // Stable across renders, as the reducer's dispatch and the refs are
-  const dispatch = vi.fn();
+  const dispatch = vi.fn<(action: unknown) => void>();
   const videoRef = { current: container };
   const playerRef = { current: player };
   const hasResumedRef = { current: false };
   const initialResumeTimeRef = { current: null };
   const location = { state: null };
-  return renderHook(
+  const rendered = renderHook(
     ({ current }: { current: Scene }) =>
       useVideoPlayer({
         // No container: the lifecycle effect creates no player, the test's
@@ -124,11 +135,12 @@ function renderPlayer(
         playerRef,
         scene: current,
         quality: "direct",
-        isAutoFallback: false,
         ready: false,
         shouldAutoplay: false,
-        playlist: null,
+        playlist: controls.playlist ?? null,
         currentIndex: 0,
+        autoplayNext: controls.autoplayNext ?? true,
+        repeat: controls.repeat ?? "none",
         dispatch,
         nextScene: noop,
         prevScene: noop,
@@ -141,6 +153,35 @@ function renderPlayer(
       }),
     { initialProps: { current: scene } }
   );
+  return Object.assign(rendered, { dispatch });
+}
+
+/** A queue as a grid, a carousel or a playlist row builds it: no autoplayNext */
+function rowQueue(shuffle = false) {
+  return buildPlaybackQueue({
+    id: "virtual-grid",
+    name: "Scene Grid",
+    scenes: untrusted<NormalizedScene[]>([
+      { id: "123", instanceId: "inst-a" },
+      { id: "124", instanceId: "inst-a" },
+      { id: "125", instanceId: "inst-a" },
+    ]),
+    currentIndex: 0,
+    shuffle,
+  });
+}
+
+/** Renders the player for scene A with `controls` and returns the end handler */
+function endOfVideo(controls: Controls) {
+  const player = fakePlayer();
+  const { dispatch } = renderPlayer(player, onA, null, controls);
+  // A dispatch from the render's own effects is not the end of the video
+  dispatch.mockClear();
+  return {
+    player,
+    dispatch,
+    ended: must(player.handlers.get("ended"), "ended handler"),
+  };
 }
 
 const onA = { id: "123", instanceId: "inst-a" };
@@ -219,5 +260,62 @@ describe("useVideoPlayer", () => {
     expect(options.plugins).not.toHaveProperty("airPlay");
     expect(options.plugins).not.toHaveProperty("chromecast");
     unmount();
+  });
+
+  it("at the end of a video started from a row link (queue without autoplayNext) the next entry loads with autoplay", () => {
+    const { dispatch, ended } = endOfVideo({
+      playlist: rowQueue(),
+      autoplayNext: true,
+    });
+
+    void ended();
+
+    expect(dispatch.mock.calls).toEqual([
+      [{ type: "NEXT_SCENE", payload: { autoplay: true } }],
+    ]);
+  });
+
+  it("with shuffle on and no history, the end of the video advances and throws nothing", () => {
+    // A queue that names autoplay but carries no shuffle history
+    const { dispatch, ended } = endOfVideo({
+      playlist: untrusted<PlaybackQueue>({
+        ...rowQueue(true),
+        autoplayNext: true,
+      }),
+      autoplayNext: true,
+    });
+
+    expect(() => void ended()).not.toThrow();
+    expect(dispatch.mock.calls).toEqual([
+      [{ type: "NEXT_SCENE", payload: { autoplay: true } }],
+    ]);
+  });
+
+  it("repeat one replays without dispatching", () => {
+    // The queue started with repeat off; the player's control says one
+    const { player, dispatch, ended } = endOfVideo({
+      playlist: rowQueue(),
+      autoplayNext: true,
+      repeat: "one",
+    });
+
+    void ended();
+
+    expect(player.currentTime).toHaveBeenCalledWith(0);
+    expect(player.play).toHaveBeenCalledTimes(1);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("autoplay off stops at the end", () => {
+    // The queue says on; the player's control, turned off, wins
+    const { player, dispatch, ended } = endOfVideo({
+      playlist: untrusted<PlaybackQueue>({ ...rowQueue(), autoplayNext: true }),
+      autoplayNext: false,
+    });
+
+    void ended();
+
+    expect(player.play).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

@@ -189,30 +189,25 @@ export function ScenePlayerProvider({
     setLoadAttempt((n) => n + 1);
   }, []);
 
-  // Load scene when sceneId or currentIndex changes, or on retry
-  useEffect(() => {
-    const playlistScene = state.playlist?.scenes?.[state.currentIndex];
-    const effectiveSceneId =
-      (playlistScene?.sceneId as string | undefined) || sceneId;
-    // A playlist entry loads on its own server: the entry's instance, else
-    // its scene's (a queue saved before entries carried one). The prop is
-    // the starting scene's instance, never another entry's.
-    const effectiveInstanceId = playlistScene
-      ? entryInstanceId(playlistScene)
-      : instanceId;
+  // The scene to show: the current queue entry's, else the route's
+  const playlistScene = state.playlist?.scenes?.[state.currentIndex];
+  const effectiveSceneId =
+    (playlistScene?.sceneId as string | undefined) || sceneId;
+  // A playlist entry loads on its own server: the entry's instance, else
+  // its scene's (a queue saved before entries carried one). The prop is
+  // the starting scene's instance, never another entry's.
+  const effectiveInstanceId = playlistScene
+    ? entryInstanceId(playlistScene)
+    : instanceId;
 
+  // Load the scene when the entry's (id, instance) changes, or on retry.
+  // Keyed on those strings, not the queue, so a control toggle never loads
+  // the scene again.
+  useEffect(() => {
     if (effectiveSceneId && ready) {
       void loadScene(effectiveSceneId, effectiveInstanceId);
     }
-  }, [
-    sceneId,
-    instanceId,
-    state.currentIndex,
-    state.playlist,
-    loadScene,
-    loadAttempt,
-    ready,
-  ]);
+  }, [effectiveSceneId, effectiveInstanceId, loadScene, loadAttempt, ready]);
 
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {

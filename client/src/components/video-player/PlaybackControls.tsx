@@ -17,7 +17,6 @@ const PlaybackControls = () => {
   const {
     scene: rawScene,
     sceneLoading,
-    videoLoading,
     oCounter,
     dispatch,
   } = useScenePlayer();
@@ -141,7 +140,7 @@ const PlaybackControls = () => {
     return null;
   }
 
-  const isLoading = sceneLoading || videoLoading;
+  const isLoading = sceneLoading;
   return (
     <section>
       <div

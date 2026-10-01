@@ -913,19 +913,19 @@
   },
   "src/components/video-player/useVideoPlayer.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 10
+      "count": 9
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 8
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 32
+      "count": 29
     },
     "@typescript-eslint/no-unsafe-call": {
-      "count": 50
+      "count": 49
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 99
+      "count": 88
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 2
@@ -1053,7 +1053,7 @@
   },
   "src/contexts/scenePlayerReducer.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 5
+      "count": 3
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5

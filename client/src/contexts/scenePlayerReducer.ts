@@ -43,18 +43,13 @@ export interface ScenePlayerReducerState {
   scene: WithStashUrl<NormalizedScene> | null;
   sceneLoading: boolean;
   sceneError: unknown;
-  video: Record<string, unknown> | null;
-  videoLoading: boolean;
-  videoError: unknown;
-  sessionId: string | null;
   quality: string;
-  isInitializing: boolean;
-  isAutoFallback: boolean;
-  isSwitchingMode: boolean;
   ready: boolean;
   shouldAutoplay: boolean;
+  /** The queue as it started; never rewritten after INITIALIZE */
   playlist: PlaylistData | null;
   currentIndex: number;
+  /** The playback controls: the reducer's own, read nowhere else */
   autoplayNext: boolean;
   shuffle: boolean;
   repeat: string;
@@ -68,6 +63,122 @@ interface ScenePlayerAction {
   payload?: unknown;
 }
 
+/** What NEXT_SCENE and PREV_SCENE read to pick the next index */
+type StepState = Pick<
+  ScenePlayerReducerState,
+  "playlist" | "currentIndex" | "shuffle" | "repeat" | "shuffleHistory"
+>;
+
+/** Where a step lands, and the shuffle history after it */
+export interface QueueStep {
+  index: number;
+  history: number[];
+}
+
+/** One of `items`, picked with `random` (0 <= random() < 1) */
+function pick(items: number[], random: () => number): number | undefined {
+  return items[Math.floor(random() * items.length)];
+}
+
+/** Every index of the queue but the current one */
+function otherIndexes(s: StepState, total: number): number[] {
+  return Array.from({ length: total }, (_, i) => i).filter(
+    (i) => i !== s.currentIndex
+  );
+}
+
+/**
+ * The index after the current one, or null at the end. Shuffle picks an
+ * index not yet played and adds the current one to the history; once every
+ * index is played, repeat all restarts the history with the current index.
+ * Sequential steps on, and repeat all wraps to the first. Repeat one only
+ * replays at the end of a video; a step moves as with repeat off.
+ */
+export function nextIndex(
+  s: StepState,
+  random: () => number = Math.random
+): QueueStep | null {
+  const total = s.playlist?.scenes?.length ?? 0;
+  if (total === 0) return null;
+
+  if (s.shuffle) {
+    const unplayed = otherIndexes(s, total).filter(
+      (i) => !s.shuffleHistory.includes(i)
+    );
+    const index = pick(unplayed, random);
+    if (index !== undefined) {
+      return { index, history: [...s.shuffleHistory, s.currentIndex] };
+    }
+    if (s.repeat !== "all") return null;
+    // Every scene played: start the history again from the current one
+    const restart = pick(otherIndexes(s, total), random);
+    return restart === undefined
+      ? null
+      : { index: restart, history: [s.currentIndex] };
+  }
+
+  if (s.currentIndex < total - 1) {
+    return { index: s.currentIndex + 1, history: s.shuffleHistory };
+  }
+  return s.repeat === "all" ? { index: 0, history: s.shuffleHistory } : null;
+}
+
+/**
+ * The index before the current one, or null at the start. Shuffle goes back
+ * through the history, and with none picks another index at random.
+ * Sequential steps back, and repeat all wraps to the last.
+ */
+export function prevIndex(
+  s: StepState,
+  random: () => number = Math.random
+): QueueStep | null {
+  const total = s.playlist?.scenes?.length ?? 0;
+  if (total === 0) return null;
+
+  if (s.shuffle) {
+    const last = s.shuffleHistory[s.shuffleHistory.length - 1];
+    if (last !== undefined) {
+      return { index: last, history: s.shuffleHistory.slice(0, -1) };
+    }
+    const index = pick(otherIndexes(s, total), random);
+    return index === undefined ? null : { index, history: s.shuffleHistory };
+  }
+
+  if (s.currentIndex > 0) {
+    return { index: s.currentIndex - 1, history: s.shuffleHistory };
+  }
+  return s.repeat === "all"
+    ? { index: total - 1, history: s.shuffleHistory }
+    : null;
+}
+
+/**
+ * The state after a step to another queue entry: the player waits for the
+ * new scene, quality starts at direct again, and the O count waits for the
+ * scene's own. `autoplay` sets whether the new scene starts playing; left
+ * out, the current choice stays.
+ */
+function stepTo(
+  state: ScenePlayerReducerState,
+  step: QueueStep,
+  autoplay: boolean | undefined
+): ScenePlayerReducerState {
+  return {
+    ...state,
+    currentIndex: step.index,
+    shuffleHistory: step.history,
+    ready: false,
+    quality: "direct",
+    oCounter: 0,
+    shouldAutoplay: autoplay ?? state.shouldAutoplay,
+  };
+}
+
+/** NEXT_SCENE's and PREV_SCENE's optional payload */
+function stepAutoplay(payload: unknown): boolean | undefined {
+  return (payload as { autoplay?: boolean } | undefined)?.autoplay;
+}
+
 // ============================================================================
 // INITIAL STATE
 // ============================================================================
@@ -77,18 +188,9 @@ export const initialState: ScenePlayerReducerState = {
   scene: null,
   sceneLoading: false,
   sceneError: null,
-
-  // Video playback data (from Peek API)
-  video: null,
-  videoLoading: false,
-  videoError: null,
-  sessionId: null,
   quality: "direct",
 
   // Player internal state
-  isInitializing: false,
-  isAutoFallback: false,
-  isSwitchingMode: false,
   ready: false, // Player ready to play (metadata loaded)
   shouldAutoplay: false, // Should trigger autoplay when ready
 
@@ -116,7 +218,7 @@ export const initialState: ScenePlayerReducerState = {
 export function scenePlayerReducer(
   state: ScenePlayerReducerState,
   action: ScenePlayerAction
-) {
+): ScenePlayerReducerState {
   switch (action.type) {
     // Scene loading
     case "LOAD_SCENE_START":
@@ -166,37 +268,6 @@ export function scenePlayerReducer(
         sceneError: action.payload,
       };
 
-    // Video loading
-    case "LOAD_VIDEO_START":
-      return {
-        ...state,
-        videoLoading: true,
-        videoError: null,
-      };
-
-    case "LOAD_VIDEO_SUCCESS": {
-      const payload = action.payload as {
-        video: Record<string, unknown>;
-        sessionId: string | null;
-      };
-      return {
-        ...state,
-        video: payload.video,
-        sessionId: payload.sessionId,
-        videoLoading: false,
-        videoError: null,
-        isInitializing: false,
-      };
-    }
-
-    case "LOAD_VIDEO_ERROR":
-      return {
-        ...state,
-        videoLoading: false,
-        videoError: action.payload,
-        isInitializing: false,
-      };
-
     // Quality management
     case "SET_QUALITY":
       return {
@@ -204,187 +275,16 @@ export function scenePlayerReducer(
         quality: action.payload as string,
       };
 
-    case "SET_VIDEO":
-      return {
-        ...state,
-        video: action.payload as Record<string, unknown> | null,
-      };
-
-    case "SET_SESSION_ID":
-      return {
-        ...state,
-        sessionId: action.payload as string | null,
-      };
-
-    case "CLEAR_VIDEO":
-      return {
-        ...state,
-        video: null,
-        sessionId: null,
-        videoLoading: false,
-        videoError: null,
-      };
-
-    // Playlist navigation
+    // Queue navigation: the one advance path (the controls, the end of a
+    // video and the media keys all step through here)
     case "NEXT_SCENE": {
-      if (!state.playlist || !state.playlist.scenes) {
-        return state;
-      }
-
-      let nextIndex = null;
-      const totalScenes = state.playlist.scenes.length;
-
-      if (state.shuffle) {
-        // Shuffle mode: pick random unplayed scene
-        const unplayedScenes = [];
-
-        for (let i = 0; i < totalScenes; i++) {
-          if (i !== state.currentIndex && !state.shuffleHistory.includes(i)) {
-            unplayedScenes.push(i);
-          }
-        }
-
-        if (unplayedScenes.length > 0) {
-          // Pick random from unplayed
-          nextIndex =
-            unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)] ??
-            null;
-        } else if (state.repeat === "all") {
-          // All scenes played, reset shuffle history and start over
-          const candidates = Array.from(
-            { length: totalScenes },
-            (_, i) => i
-          ).filter((i) => i !== state.currentIndex);
-          const candidate =
-            candidates[Math.floor(Math.random() * candidates.length)];
-          // A one-scene playlist has no other scene to go to
-          if (candidate === undefined) {
-            return state;
-          }
-
-          // Also return updated shuffle history
-          return {
-            ...state,
-            currentIndex: candidate,
-            shuffleHistory: [state.currentIndex], // Start new history
-            playlist: {
-              ...state.playlist,
-              shuffleHistory: [state.currentIndex],
-            },
-            video: null,
-            sessionId: null,
-            isInitializing: false,
-            ready: false,
-          };
-        }
-        // else: no more scenes and repeat is not "all", stay on current
-      } else {
-        // Sequential mode
-        if (state.currentIndex < totalScenes - 1) {
-          nextIndex = state.currentIndex + 1;
-        } else if (state.repeat === "all") {
-          nextIndex = 0; // Loop back to start
-        }
-        // else: last scene and repeat is not "all", stay on current
-      }
-
-      if (nextIndex === null) {
-        return state; // Can't advance
-      }
-
-      // Update shuffle history if in shuffle mode
-      const newHistory = state.shuffle
-        ? [...state.shuffleHistory, state.currentIndex]
-        : state.shuffleHistory;
-
-      return {
-        ...state,
-        currentIndex: nextIndex,
-        shuffleHistory: newHistory,
-        playlist: state.playlist
-          ? { ...state.playlist, shuffleHistory: newHistory }
-          : null,
-        video: null,
-        sessionId: null,
-        isInitializing: false,
-        ready: false,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
-        // Reset O counter immediately - will be set correctly when new scene loads
-        oCounter: 0,
-      };
+      const step = nextIndex(state);
+      return step ? stepTo(state, step, stepAutoplay(action.payload)) : state;
     }
 
     case "PREV_SCENE": {
-      if (!state.playlist || !state.playlist.scenes) {
-        return state;
-      }
-
-      let prevIndex = null;
-      const totalScenes = state.playlist.scenes.length;
-
-      if (state.shuffle) {
-        // In shuffle mode, go back to last played scene (from history)
-        const lastPlayed =
-          state.shuffleHistory[state.shuffleHistory.length - 1];
-        if (lastPlayed !== undefined) {
-          // Remove last item from history
-          const newHistory = state.shuffleHistory.slice(0, -1);
-
-          return {
-            ...state,
-            currentIndex: lastPlayed,
-            shuffleHistory: newHistory,
-            playlist: state.playlist
-              ? { ...state.playlist, shuffleHistory: newHistory }
-              : null,
-            video: null,
-            sessionId: null,
-            isInitializing: false,
-            ready: false,
-            // Reset quality to "direct" for new scene - will be auto-selected based on codec
-            quality: "direct",
-            // Reset O counter immediately - will be set correctly when new scene loads
-            oCounter: 0,
-          };
-        } else {
-          // No history - pick a random scene (excluding current)
-          if (state.repeat === "all" || totalScenes > 1) {
-            const candidates = Array.from(
-              { length: totalScenes },
-              (_, i) => i
-            ).filter((i) => i !== state.currentIndex);
-            prevIndex =
-              candidates[Math.floor(Math.random() * candidates.length)] ?? null;
-          }
-          // else: only 1 scene in playlist, can't go anywhere
-        }
-      } else {
-        // Sequential mode
-        if (state.currentIndex > 0) {
-          prevIndex = state.currentIndex - 1;
-        } else if (state.repeat === "all") {
-          prevIndex = totalScenes - 1; // Loop to end
-        }
-        // else: first scene and repeat is not "all", stay on current
-      }
-
-      if (prevIndex === null) {
-        return state; // Can't go back
-      }
-
-      return {
-        ...state,
-        currentIndex: prevIndex,
-        video: null,
-        sessionId: null,
-        isInitializing: false,
-        ready: false,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
-        // Reset O counter immediately - will be set correctly when new scene loads
-        oCounter: 0,
-      };
+      const step = prevIndex(state);
+      return step ? stepTo(state, step, stepAutoplay(action.payload)) : state;
     }
 
     case "GOTO_SCENE_INDEX": {
@@ -409,49 +309,14 @@ export function scenePlayerReducer(
         return state;
       }
 
-      return {
-        ...state,
-        currentIndex: index,
-        // Clear video data - will be fetched for new scene
-        video: null,
-        sessionId: null,
-        isInitializing: false,
-        ready: false, // Reset ready state for new scene
-        // Set shouldAutoplay based on payload
-        shouldAutoplay: shouldAutoplay,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
-        // Reset O counter immediately - will be set correctly when new scene loads
-        oCounter: 0,
-      };
-    }
-
-    case "SET_CURRENT_INDEX": {
-      return {
-        ...state,
-        currentIndex: action.payload as number,
-      };
+      return stepTo(
+        state,
+        { index, history: state.shuffleHistory },
+        shouldAutoplay
+      );
     }
 
     // Player state
-    case "SET_INITIALIZING":
-      return {
-        ...state,
-        isInitializing: action.payload as boolean,
-      };
-
-    case "SET_AUTO_FALLBACK":
-      return {
-        ...state,
-        isAutoFallback: action.payload as boolean,
-      };
-
-    case "SET_SWITCHING_MODE":
-      return {
-        ...state,
-        isSwitchingMode: action.payload as boolean,
-      };
-
     case "SET_READY":
       return {
         ...state,
@@ -471,15 +336,12 @@ export function scenePlayerReducer(
         oCounter: action.payload as number,
       };
 
-    // Playlist controls
+    // Playlist controls: only the control fields change, never the queue,
+    // so a toggle never loads the scene again
     case "TOGGLE_AUTOPLAY_NEXT":
       return {
         ...state,
         autoplayNext: !state.autoplayNext,
-        // Update playlist object as well
-        playlist: state.playlist
-          ? { ...state.playlist, autoplayNext: !state.autoplayNext }
-          : null,
       };
 
     case "TOGGLE_SHUFFLE": {
@@ -487,16 +349,8 @@ export function scenePlayerReducer(
       return {
         ...state,
         shuffle: newShuffle,
-        // Reset shuffle history when toggling
+        // Reset shuffle history when turning shuffle on
         shuffleHistory: newShuffle ? [] : state.shuffleHistory,
-        // Update playlist object as well
-        playlist: state.playlist
-          ? {
-              ...state.playlist,
-              shuffle: newShuffle,
-              shuffleHistory: newShuffle ? [] : state.shuffleHistory,
-            }
-          : null,
       };
     }
 
@@ -509,22 +363,6 @@ export function scenePlayerReducer(
       return {
         ...state,
         repeat: nextRepeat,
-        // Update playlist object as well
-        playlist: state.playlist
-          ? { ...state.playlist, repeat: nextRepeat }
-          : null,
-      };
-    }
-
-    case "SET_SHUFFLE_HISTORY": {
-      const newShuffleHistory = action.payload as number[];
-      return {
-        ...state,
-        shuffleHistory: newShuffleHistory,
-        // Update playlist object as well
-        playlist: state.playlist
-          ? { ...state.playlist, shuffleHistory: newShuffleHistory }
-          : null,
       };
     }
 
@@ -550,12 +388,12 @@ export function scenePlayerReducer(
         currentIndex: initPayload.currentIndex || 0,
         compatibility: initPayload.compatibility ?? null,
         quality: initPayload.initialQuality || "direct",
-        // Initialize playlist controls from playlist object
-        autoplayNext: (playlist?.autoplayNext as boolean | undefined) ?? true,
+        // A queue carries shuffle and repeat as starting values only;
+        // autoplay starts on wherever a queue starts
+        autoplayNext: true,
         shuffle: (playlist?.shuffle as boolean | undefined) ?? false,
         repeat: (playlist?.repeat as string | undefined) ?? "none",
-        shuffleHistory:
-          (playlist?.shuffleHistory as number[] | undefined) ?? [],
+        shuffleHistory: [],
         // Use the determined shouldAutoplay value
         shouldAutoplay: shouldAutoplay,
       };

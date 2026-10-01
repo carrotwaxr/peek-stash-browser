@@ -26,9 +26,6 @@ interface Playlist {
   id?: string;
   name?: string;
   scenes?: PlaylistScene[];
-  autoplayNext?: boolean;
-  shuffle?: boolean;
-  repeat?: string;
 }
 
 /**
@@ -43,6 +40,9 @@ const PlaylistStatusCard = () => {
     nextScene,
     prevScene,
     dispatch,
+    autoplayNext,
+    shuffle,
+    repeat,
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
@@ -276,17 +276,15 @@ const PlaylistStatusCard = () => {
                 onClick={toggleAutoplayNext}
                 className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
                 style={{
-                  backgroundColor: playlist.autoplayNext
+                  backgroundColor: autoplayNext
                     ? "var(--accent-primary)"
                     : "transparent",
-                  color: playlist.autoplayNext
-                    ? "white"
-                    : "var(--text-secondary)",
+                  color: autoplayNext ? "white" : "var(--text-secondary)",
                   border: "1px solid var(--border-color)",
                 }}
-                title={playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
+                title={autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
                 aria-label={
-                  playlist.autoplayNext ? "Disable autoplay" : "Enable autoplay"
+                  autoplayNext ? "Disable autoplay" : "Enable autoplay"
                 }
               >
                 <PlayCircle size={16} />
@@ -297,16 +295,14 @@ const PlaylistStatusCard = () => {
                 onClick={toggleShuffle}
                 className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
                 style={{
-                  backgroundColor: playlist.shuffle
+                  backgroundColor: shuffle
                     ? "var(--accent-primary)"
                     : "transparent",
-                  color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                  color: shuffle ? "white" : "var(--text-secondary)",
                   border: "1px solid var(--border-color)",
                 }}
-                title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
-                aria-label={
-                  playlist.shuffle ? "Disable shuffle" : "Enable shuffle"
-                }
+                title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
               >
                 <Shuffle size={16} />
               </button>
@@ -317,31 +313,26 @@ const PlaylistStatusCard = () => {
                 className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
                 style={{
                   backgroundColor:
-                    playlist.repeat !== "none"
-                      ? "var(--accent-primary)"
-                      : "transparent",
-                  color:
-                    playlist.repeat !== "none"
-                      ? "white"
-                      : "var(--text-secondary)",
+                    repeat !== "none" ? "var(--accent-primary)" : "transparent",
+                  color: repeat !== "none" ? "white" : "var(--text-secondary)",
                   border: "1px solid var(--border-color)",
                 }}
                 title={
-                  playlist.repeat === "one"
+                  repeat === "one"
                     ? "Repeat: One"
-                    : playlist.repeat === "all"
+                    : repeat === "all"
                       ? "Repeat: All"
                       : "Repeat: Off"
                 }
                 aria-label={
-                  playlist.repeat === "one"
+                  repeat === "one"
                     ? "Disable repeat one"
-                    : playlist.repeat === "all"
+                    : repeat === "all"
                       ? "Switch to repeat one"
                       : "Enable repeat all"
                 }
               >
-                {playlist.repeat === "one" ? (
+                {repeat === "one" ? (
                   <Repeat1 size={16} />
                 ) : (
                   <Repeat size={16} />
@@ -410,21 +401,15 @@ const PlaylistStatusCard = () => {
                   onClick={toggleAutoplayNext}
                   className="p-1.5 rounded transition-colors focus:outline-none"
                   style={{
-                    backgroundColor: playlist.autoplayNext
+                    backgroundColor: autoplayNext
                       ? "var(--accent-primary)"
                       : "transparent",
-                    color: playlist.autoplayNext
-                      ? "white"
-                      : "var(--text-secondary)",
+                    color: autoplayNext ? "white" : "var(--text-secondary)",
                     border: "1px solid var(--border-color)",
                   }}
-                  title={
-                    playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
-                  }
+                  title={autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
                   aria-label={
-                    playlist.autoplayNext
-                      ? "Disable autoplay"
-                      : "Enable autoplay"
+                    autoplayNext ? "Disable autoplay" : "Enable autoplay"
                   }
                 >
                   <PlayCircle size={16} />
@@ -435,16 +420,14 @@ const PlaylistStatusCard = () => {
                   onClick={toggleShuffle}
                   className="p-1.5 rounded transition-colors focus:outline-none"
                   style={{
-                    backgroundColor: playlist.shuffle
+                    backgroundColor: shuffle
                       ? "var(--accent-primary)"
                       : "transparent",
-                    color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                    color: shuffle ? "white" : "var(--text-secondary)",
                     border: "1px solid var(--border-color)",
                   }}
-                  title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
-                  aria-label={
-                    playlist.shuffle ? "Disable shuffle" : "Enable shuffle"
-                  }
+                  title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                  aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
                 >
                   <Shuffle size={16} />
                 </button>
@@ -455,31 +438,29 @@ const PlaylistStatusCard = () => {
                   className="p-1.5 rounded transition-colors focus:outline-none"
                   style={{
                     backgroundColor:
-                      playlist.repeat !== "none"
+                      repeat !== "none"
                         ? "var(--accent-primary)"
                         : "transparent",
                     color:
-                      playlist.repeat !== "none"
-                        ? "white"
-                        : "var(--text-secondary)",
+                      repeat !== "none" ? "white" : "var(--text-secondary)",
                     border: "1px solid var(--border-color)",
                   }}
                   title={
-                    playlist.repeat === "one"
+                    repeat === "one"
                       ? "Repeat: One"
-                      : playlist.repeat === "all"
+                      : repeat === "all"
                         ? "Repeat: All"
                         : "Repeat: Off"
                   }
                   aria-label={
-                    playlist.repeat === "one"
+                    repeat === "one"
                       ? "Disable repeat one"
-                      : playlist.repeat === "all"
+                      : repeat === "all"
                         ? "Switch to repeat one"
                         : "Enable repeat all"
                   }
                 >
-                  {playlist.repeat === "one" ? (
+                  {repeat === "one" ? (
                     <Repeat1 size={16} />
                   ) : (
                     <Repeat size={16} />
