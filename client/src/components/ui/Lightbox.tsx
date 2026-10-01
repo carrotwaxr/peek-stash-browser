@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Download,
   Heart,
   Info,
   Maximize,
@@ -21,6 +22,7 @@ import {
 } from "react-zoom-pan-pinch";
 import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { useFullscreen } from "../../hooks/useFullscreen";
+import { useImageDownload } from "../../hooks/useImageDownload";
 import { useShortcutScope } from "../../hooks/useShortcutScope";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import { isVideoImage } from "../../utils/imageMedia";
@@ -81,6 +83,11 @@ const Lightbox = ({
     autoOnLandscape: true,
     enabled: isOpen,
   });
+  const {
+    canDownload,
+    downloading,
+    download: downloadImage,
+  } = useImageDownload(isOpen);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The dialog element: the root of the lightbox's keyboard scope
@@ -866,6 +873,29 @@ const Lightbox = ({
           >
             <Info size={24} />
           </button>
+
+          {/* Download button (Can Download Files) */}
+          {canDownload && currentImage?.id && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                void downloadImage({
+                  id: currentImage.id,
+                  instanceId: currentImage.instanceId,
+                });
+              }}
+              disabled={downloading}
+              className="p-2 rounded-full transition-colors disabled:opacity-50"
+              style={{
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "var(--text-primary)",
+              }}
+              aria-label="Download image"
+              title={downloading ? "Starting download..." : "Download"}
+            >
+              <Download size={24} />
+            </button>
+          )}
 
           {/* Fullscreen button */}
           {supportsFullscreen && (

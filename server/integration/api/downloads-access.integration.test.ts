@@ -240,6 +240,15 @@ describe("Downloads access (integration)", () => {
     expect(hidden.status).toBe(404);
   });
 
+  it("an image the user may not see is refused with the server's text", async () => {
+    const hidden = await dl.client.post(
+      `/api/downloads/image/${FX_ID.HIDDEN_A}`,
+      { instanceId: FX.A }
+    );
+    expect(hidden.status).toBe(404);
+    expect(hidden.data).toEqual({ error: "Image not found" });
+  });
+
   it("the file route re-checks access to a scene", async () => {
     const created = await dl.client.post<DownloadResponse>(
       `/api/downloads/scene/${FX_ID.SAME}`,

@@ -41,10 +41,10 @@ Scene downloads stream directly from your Stash server—there's no waiting for 
 ### From Image Lightbox
 
 1. Open any image in the lightbox viewer
-2. Click the **Download** button
+2. Click the **Download** button in the top bar, beside Info (it shows only with the Can Download Files permission)
 3. The image downloads immediately
 
-Image downloads also stream directly from Stash.
+The file keeps its real extension. Image downloads also stream directly from Stash. An image you cannot see (hidden or restricted for you) is refused.
 
 ---
 
