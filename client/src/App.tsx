@@ -50,8 +50,8 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
           <ConfigProvider>
             <UnitPreferenceProvider>
               <TVModeProvider>
@@ -72,9 +72,9 @@ function App() {
               </TVModeProvider>
             </UnitPreferenceProvider>
           </ConfigProvider>
-          <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
     </AuthProvider>
   );
 }

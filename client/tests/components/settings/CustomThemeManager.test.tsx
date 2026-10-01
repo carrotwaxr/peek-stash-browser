@@ -4,7 +4,9 @@
  * the provider must accept a key it has only just loaded.
  */
 import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { userSettingsResponse } from "@tests/helpers/userSettings";
 import { createAuthValue } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CustomThemeManager from "@/components/settings/CustomThemeManager";
@@ -68,21 +70,39 @@ vi.mock("@/components/settings/CustomThemeEditor", () => ({
   ),
 }));
 
-const wrapper = (auth: AuthContextValue) =>
-  function Wrapper({ children }: { children: ReactNode }) {
+const wrapper = (auth: AuthContextValue) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <AuthContext.Provider value={auth}>
-        <ThemeProvider>{children}</ThemeProvider>
-      </AuthContext.Provider>
+      <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider value={auth}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </AuthContext.Provider>
+      </QueryClientProvider>
     );
   };
+};
+
+/** GET answers: the settings, and the custom themes the test sets */
+let customThemes: unknown[] = [];
+const customThemeGets = () =>
+  mockGet.mock.calls.filter(([path]) => path === "/themes/custom").length;
 
 describe("CustomThemeManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     document.documentElement.removeAttribute("style");
-    mockGet.mockResolvedValue({ themes: [] });
+    customThemes = [];
+    mockGet.mockImplementation((path: unknown) =>
+      Promise.resolve(
+        path === "/user/settings"
+          ? userSettingsResponse()
+          : { themes: customThemes }
+      )
+    );
   });
 
   it("creating a theme applies it: the root style gets its properties and localStorage app-theme is custom-<id>", async () => {
@@ -92,13 +112,11 @@ describe("CustomThemeManager", () => {
     );
     render(<CustomThemeManager />, { wrapper: Wrapper });
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(customThemeGets()).toBe(1);
     });
 
     // The refresh after the create answers with the new theme
-    mockGet.mockResolvedValue({
-      themes: [{ id: 7, name: "Night Owl", config }],
-    });
+    customThemes = [{ id: 7, name: "Night Owl", config }];
     fireEvent.click(
       await screen.findByRole("button", { name: /Create Your First Theme/ })
     );

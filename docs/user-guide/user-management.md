@@ -210,7 +210,7 @@ Each user can customize their own experience:
 | Setting | Options |
 |---------|---------|
 | **Preview Quality** | Sprite, WebP, MP4 |
-| **Theme** | Light, Dark, Deep Purple, The Hub, Custom |
+| **Theme** | Peek, Light, Midnight Blue, Deep Purple, The Hub, Custom |
 | **Home Carousels** | Enable/disable and reorder |
 | **Navigation** | Customize menu items |
 | **Wall Playback** | Autoplay, Hover, Static |

@@ -90,7 +90,9 @@ See [Upgrading - Backup Procedure](../getting-started/upgrading.md#backup-proced
 
 ### Can I customize the theme?
 
-Yes! Peek includes built-in themes (Light, Dark, Deep Purple, The Hub) and a custom theme editor where you can create your own color schemes.
+Yes! Peek includes built-in themes (Peek, Light, Midnight Blue, Deep Purple, The Hub) and a custom theme editor where you can create your own color schemes. Pick one under **Settings → User Preferences → Theme**.
+
+Your theme follows your account: it is saved with your settings, so every browser you sign in on shows it. If a saved theme is missing (a custom theme that was deleted, or another user's custom theme on a shared browser), Peek shows the default Peek theme instead.
 
 ## Features
 
