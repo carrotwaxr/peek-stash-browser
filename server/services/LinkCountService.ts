@@ -143,6 +143,13 @@ const TAG_SCENES = junctionCounts(
   { table: "StashScene", id: "sceneId", instanceId: "sceneInstanceId" }
 );
 
+/** The junction row `j`'s scene has no SceneTag row for its tag */
+const NOT_DIRECT = `NOT EXISTS (
+          SELECT 1 FROM SceneTag d
+          WHERE d.sceneId = j.sceneId AND d.sceneInstanceId = j.sceneInstanceId
+            AND d.tagId = j.tagId AND d.tagInstanceId = j.tagInstanceId
+        )`;
+
 /**
  * A tag's live scenes that inherit it (SceneInheritedTag) and hold no
  * SceneTag row for it, each once (the junction's key makes a scene one row
@@ -151,11 +158,6 @@ const TAG_SCENES = junctionCounts(
  * per junction row. The whole-library form reads the junction once; the
  * scoped form drives from the pairs by its tag index.
  */
-const NOT_DIRECT = `NOT EXISTS (
-          SELECT 1 FROM SceneTag d
-          WHERE d.sceneId = j.sceneId AND d.sceneInstanceId = j.sceneInstanceId
-            AND d.tagId = j.tagId AND d.tagInstanceId = j.tagInstanceId
-        )`;
 const inheritedOnly = (scoped: boolean) => `
       SELECT t.id, t.instanceId, t.n - COALESCE(dl.n, 0) AS n
       FROM (

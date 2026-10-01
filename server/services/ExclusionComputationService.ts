@@ -1246,9 +1246,9 @@ class ExclusionComputationService {
    * every target on `instanceId` linked to one of the sources in `idsJson`.
    * The same three shapes as `edgeQuery`, driven from the bound id list
    * (`json_each(?) j CROSS JOIN ...`, so each source is looked up by its
-   * junction's or column's index); the inherited-tag shape scans the
-   * instance's scenes with the ids as one IN list (107 ms for 500 tags on
-   * the prod copy).
+   * junction's or column's index); the inherited-tag shape reads
+   * SceneInheritedTag by its tag index for each id, then each scene by its
+   * key.
    */
   private holdAlongEdge(
     tx: HoldClient,
