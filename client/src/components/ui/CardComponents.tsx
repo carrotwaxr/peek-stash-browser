@@ -62,7 +62,7 @@ export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
     return (
       <div
         aria-label={entityDisplayType}
-        className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all focus:outline-none ${className}`}
+        className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all focus:outline-none [-webkit-touch-callout:none] ${className}`}
         ref={ref}
         style={{
           backgroundColor: "var(--bg-card)",

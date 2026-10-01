@@ -1,8 +1,14 @@
+import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import WallItem from "../../../src/components/wall/WallItem";
 import { PreviewSlotProvider } from "../../../src/components/wall/previewSlots";
+import {
+  MOUSE_QUERIES,
+  TOUCH_QUERIES,
+  matchMediaQueries,
+} from "../../helpers/matchMedia";
 
 vi.mock("../../../src/contexts/ConfigContext", () => ({
   useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
@@ -135,5 +141,47 @@ describe("WallItem preview slots", () => {
 
     fireEvent.mouseEnter(link(container, 0));
     expect(first?.getAttribute("src")).toBe("/preview/a.mp4");
+  });
+});
+
+describe("WallItem title overlay", () => {
+  let restoreMedia: (() => void) | null = null;
+  afterEach(() => {
+    restoreMedia?.();
+    restoreMedia = null;
+    vi.useRealTimers();
+  });
+
+  const titleBox = (container: HTMLElement) =>
+    container.querySelector("h3")?.parentElement as HTMLElement;
+
+  it("on touch the wall title shows without hover", () => {
+    restoreMedia = matchMediaQueries(TOUCH_QUERIES);
+    const { container } = renderItem();
+
+    expect(screen.getByText("A clip")).toBeInTheDocument();
+    expect(titleBox(container).style.opacity).toBe("1");
+  });
+
+  it("with a mouse the title waits 500 ms after the pointer enters", () => {
+    restoreMedia = matchMediaQueries(MOUSE_QUERIES);
+    vi.useFakeTimers();
+    const { container } = renderItem();
+    const link = container.querySelector("a") as HTMLElement;
+    expect(titleBox(container).style.opacity).toBe("0");
+
+    fireEvent.mouseEnter(link);
+    act(() => {
+      vi.advanceTimersByTime(499);
+    });
+    expect(titleBox(container).style.opacity).toBe("0");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(titleBox(container).style.opacity).toBe("1");
+
+    fireEvent.mouseLeave(link);
+    expect(titleBox(container).style.opacity).toBe("0");
   });
 });

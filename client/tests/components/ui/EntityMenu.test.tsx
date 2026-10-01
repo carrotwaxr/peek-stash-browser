@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import EntityMenu from "../../../src/components/ui/EntityMenu";
+import {
+  MOUSE_QUERIES,
+  TOUCH_QUERIES,
+  matchMediaQueries,
+} from "../../helpers/matchMedia";
 
 describe("EntityMenu", () => {
   it("the hide payload carries the entity's instance", () => {
@@ -76,5 +81,44 @@ describe("EntityMenu items", () => {
     render(<EntityMenu {...props} oCount={0} onRemoveLastO={vi.fn()} />);
 
     expect(screen.queryByLabelText("More options")).toBeNull();
+  });
+});
+
+describe("EntityMenu hit area", () => {
+  let restoreMedia: (() => void) | null = null;
+  afterEach(() => {
+    restoreMedia?.();
+    restoreMedia = null;
+  });
+
+  const menu = (
+    <EntityMenu
+      entityType="scene"
+      entityId="7"
+      entityName="A scene"
+      instanceId="inst-a"
+      onHide={vi.fn()}
+    />
+  );
+
+  it("on a coarse pointer the menu button has a 44 px hit area", () => {
+    restoreMedia = matchMediaQueries(TOUCH_QUERIES);
+    render(menu);
+
+    const button = screen.getByLabelText("More options");
+
+    // Drawn by a ::before outset from the button: its box is unchanged
+    expect(button.className).toContain("relative");
+    expect(button.className).toContain("before:absolute");
+    expect(button.className).toContain("before:-inset-[9px]");
+  });
+
+  it("with a mouse the menu button has no extra hit area", () => {
+    restoreMedia = matchMediaQueries(MOUSE_QUERIES);
+    render(menu);
+
+    expect(screen.getByLabelText("More options").className).not.toContain(
+      "before:"
+    );
   });
 });

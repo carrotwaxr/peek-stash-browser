@@ -11,8 +11,13 @@
 import { MemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import TagTreeNode from "../../../src/components/tags/TagTreeNode";
+import {
+  MOUSE_QUERIES,
+  TOUCH_QUERIES,
+  matchMediaQueries,
+} from "../../helpers/matchMedia";
 
 // Wrapper to provide router context
 const renderWithRouter = (ui: React.ReactElement) => {
@@ -288,5 +293,32 @@ describe("TagTreeNode", () => {
       const treeitem = screen.getByRole("treeitem");
       expect(treeitem).toHaveStyle({ marginLeft: "48px" }); // 2 * 24px
     });
+  });
+});
+
+describe("TagTreeNode open button on touch", () => {
+  let restoreMedia: (() => void) | null = null;
+  afterEach(() => {
+    restoreMedia?.();
+    restoreMedia = null;
+  });
+
+  it("on a touch device the tag tree's open button is visible", () => {
+    restoreMedia = matchMediaQueries(TOUCH_QUERIES);
+    renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />);
+
+    const open = screen.getByLabelText("Go to Leaf Tag");
+
+    expect(open.className).not.toContain("opacity-0");
+  });
+
+  it("with a mouse the open button shows on hover only", () => {
+    restoreMedia = matchMediaQueries(MOUSE_QUERIES);
+    renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />);
+
+    const open = screen.getByLabelText("Go to Leaf Tag");
+
+    expect(open.className).toContain("opacity-0");
+    expect(open.className).toContain("group-hover:opacity-100");
   });
 });

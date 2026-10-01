@@ -285,4 +285,97 @@ describe("useCardSelection", () => {
     // isLongPressing should be reset
     expect(result.current.isLongPressing).toBe(false);
   });
+
+  describe("context menu while a touch long press is armed", () => {
+    const contextMenu = () => {
+      const preventDefault = vi.fn();
+      return {
+        event: { preventDefault } as unknown as MouseEvent,
+        preventDefault,
+      };
+    };
+
+    it("a long press on a card suppresses the context menu", () => {
+      const onToggleSelect = vi.fn();
+      const { result } = renderHook(() =>
+        useCardSelection({
+          entity: { id: "1" },
+          selectionMode: false,
+          onToggleSelect,
+        })
+      );
+
+      act(() => {
+        result.current.selectionHandlers.onTouchStart(
+          touchEvent({
+            target: document.body,
+            touches: [{ clientX: 10, clientY: 10 }],
+          })
+        );
+      });
+      // The browser's own long-press menu comes at about the same time as ours
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      const { event, preventDefault } = contextMenu();
+      result.current.selectionHandlers.onContextMenu(event);
+
+      expect(onToggleSelect).toHaveBeenCalledTimes(1);
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+    });
+
+    it("a press that moved on or ended leaves the context menu alone", () => {
+      const { result } = renderHook(() =>
+        useCardSelection({ entity: { id: "1" }, selectionMode: false })
+      );
+
+      act(() => {
+        result.current.selectionHandlers.onTouchStart(
+          touchEvent({
+            target: document.body,
+            touches: [{ clientX: 10, clientY: 10 }],
+          })
+        );
+      });
+      act(() => {
+        result.current.selectionHandlers.onTouchEnd();
+      });
+      const ended = contextMenu();
+      result.current.selectionHandlers.onContextMenu(ended.event);
+      expect(ended.preventDefault).not.toHaveBeenCalled();
+
+      act(() => {
+        result.current.selectionHandlers.onTouchStart(
+          touchEvent({
+            target: document.body,
+            touches: [{ clientX: 10, clientY: 10 }],
+          })
+        );
+      });
+      act(() => {
+        result.current.selectionHandlers.onTouchMove(
+          touchEvent({ touches: [{ clientX: 40, clientY: 10 }] })
+        );
+      });
+      const moved = contextMenu();
+      result.current.selectionHandlers.onContextMenu(moved.event);
+      expect(moved.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("a mouse right-click keeps its context menu", () => {
+      const { result } = renderHook(() =>
+        useCardSelection({ entity: { id: "1" }, selectionMode: false })
+      );
+
+      act(() => {
+        result.current.selectionHandlers.onMouseDown(
+          mouseEvent({ target: document.body })
+        );
+      });
+      const { event, preventDefault } = contextMenu();
+      result.current.selectionHandlers.onContextMenu(event);
+
+      expect(preventDefault).not.toHaveBeenCalled();
+    });
+  });
 });

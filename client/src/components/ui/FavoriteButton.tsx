@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import { useCoarsePointer } from "../../hooks/useHoverCapable";
 
 interface Props {
   isFavorite: boolean;
@@ -29,6 +30,17 @@ const FavoriteButton = ({
 
   const iconSize = typeof size === "number" ? size : sizeMap[size];
 
+  // On a finger the button's box (28 px small, 36 and 40 px larger) gets a
+  // 44 px hit area from a ::before; the box itself does not change
+  const coarsePointer = useCoarsePointer();
+  const hitArea = !coarsePointer
+    ? ""
+    : size === "small"
+      ? "relative before:absolute before:-inset-2"
+      : size === "large"
+        ? "relative before:absolute before:-inset-0.5"
+        : "relative before:absolute before:-inset-1";
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -44,7 +56,7 @@ const FavoriteButton = ({
       disabled={disabled || !onChange}
       className={`transition-all hover:scale-110 active:scale-95 ${
         disabled || !onChange ? "cursor-default" : "cursor-pointer"
-      } ${className}`}
+      } ${hitArea} ${className}`}
       style={{
         background: "none",
         border: "none",

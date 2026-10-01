@@ -141,7 +141,7 @@ const SceneListItem = ({
     <div
       onClick={handleClick}
       {...selectionHandlers}
-      className="rounded-lg border transition-all hover:shadow-lg"
+      className="rounded-lg border transition-all hover:shadow-lg [-webkit-touch-callout:none]"
       style={{
         backgroundColor: "var(--bg-card)",
         border: isSelected

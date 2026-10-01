@@ -32,6 +32,9 @@ export const useCardSelection = ({
   const [isLongPressing, setIsLongPressing] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const hasMovedRef = useRef(false);
+  // A finger is down on the card and its long press may still come: the
+  // browser's own long-press menu (Android's contextmenu) must not open
+  const touchArmedRef = useRef(false);
 
   // Clear timer on unmount
   useEffect(() => {
@@ -94,6 +97,7 @@ export const useCardSelection = ({
       if (!touch) return;
       startPosRef.current = { x: touch.clientX, y: touch.clientY };
       hasMovedRef.current = false;
+      touchArmedRef.current = true;
 
       longPressTimerRef.current = setTimeout(() => {
         if (!hasMovedRef.current) {
@@ -114,6 +118,7 @@ export const useCardSelection = ({
 
       if (deltaX > moveThreshold || deltaY > moveThreshold) {
         hasMovedRef.current = true;
+        touchArmedRef.current = false;
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
@@ -126,6 +131,14 @@ export const useCardSelection = ({
       longPressTimerRef.current = null;
     }
     hasMovedRef.current = false;
+    touchArmedRef.current = false;
+  }, []);
+
+  // A long press on a touch screen would also open the browser's context
+  // menu (a link's open/copy sheet) over the selection it just made. A mouse's
+  // right-click is untouched: only a touch arms this.
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (touchArmedRef.current) e.preventDefault();
   }, []);
 
   // Click handler for navigation elements (CardImage, CardTitle)
@@ -178,6 +191,7 @@ export const useCardSelection = ({
       onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd,
       onTouchCancel: handleTouchEnd,
+      onContextMenu: handleContextMenu,
     },
     // Always return handler to intercept clicks from interactive elements
     handleNavigationClick,
