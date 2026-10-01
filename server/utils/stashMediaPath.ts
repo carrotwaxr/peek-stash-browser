@@ -171,3 +171,56 @@ const CAPTION_LANG_PATTERN = /^[A-Za-z0-9_-]{1,16}$/;
 export function isAllowedCaption(lang: string, type: string): boolean {
   return CAPTION_LANG_PATTERN.test(lang) && (type === "srt" || type === "vtt");
 }
+
+/**
+ * The URL that fetches a stored media path from the instance at `baseUrl`,
+ * with the instance's API key. Stash stores some paths as absolute URLs
+ * (image paths, marker streams) and some as paths; either way only the path
+ * and query are kept and put on the instance's address as it is now, so the
+ * key never goes to a host an old sync wrote. This is the rebasing
+ * `/api/proxy/stash` does. Any `apikey` parameter in the stored value (any
+ * case) is dropped before the instance's own is set.
+ *
+ * Returns null for a value that is not an http(s) URL or a rooted path, and
+ * for one holding `#`.
+ */
+export function stashMediaUrl(
+  baseUrl: string,
+  stored: string,
+  apiKey: string
+): string | null {
+  if (stored.includes("#")) return null;
+
+  let pathname: string;
+  let search: URLSearchParams;
+  if (/^https?:\/\//i.test(stored)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(stored);
+    } catch {
+      return null;
+    }
+    pathname = parsed.pathname;
+    search = parsed.searchParams;
+  } else if (stored.startsWith("/") && !stored.startsWith("//")) {
+    const queryIndex = stored.indexOf("?");
+    pathname = queryIndex === -1 ? stored : stored.slice(0, queryIndex);
+    search = new URLSearchParams(
+      queryIndex === -1 ? "" : stored.slice(queryIndex + 1)
+    );
+  } else {
+    return null;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(`${baseUrl}${pathname}`);
+  } catch {
+    return null;
+  }
+  search.forEach((value, key) => {
+    if (key.toLowerCase() !== "apikey") url.searchParams.append(key, value);
+  });
+  url.searchParams.set("apikey", apiKey);
+  return url.toString();
+}

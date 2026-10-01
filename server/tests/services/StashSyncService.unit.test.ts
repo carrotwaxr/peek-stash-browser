@@ -1182,6 +1182,57 @@ describe("StashSyncService", () => {
       );
       expect(pageRequest.scene_marker_filter).toEqual(CHANGED_SINCE);
     });
+
+    it("sync probe URLs use stashMediaUrl", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: SINCE,
+          lastError: null,
+        })
+      );
+      // The instance is at http://localhost:9999 (the mocked credentials);
+      // Stash reported the first marker's preview under another address with
+      // a query, and the second one's with a fragment
+      const marker = (id: string, preview: string) => ({
+        id,
+        title: "",
+        seconds: 1,
+        end_seconds: null,
+        preview,
+        screenshot: "",
+        stream: "",
+        created_at: SINCE,
+        updated_at: SINCE,
+        primary_tag: { id: "1", name: "t" },
+        tags: [],
+        scene: { id: "1" },
+      });
+      mockStashClient.findSceneMarkers.mockImplementation((vars) =>
+        Promise.resolve({
+          findSceneMarkers: {
+            scene_markers: vars?.scene_marker_filter?.updated_at
+              ? [
+                  marker(
+                    "7",
+                    "http://old-host:9999/scene/1/scene_marker/7/stream?t=1"
+                  ),
+                  marker("8", "http://old-host:9999/x#frag"),
+                ]
+              : [],
+            count: vars?.scene_marker_filter?.updated_at ? 2 : 0,
+          },
+        })
+      );
+
+      await stashSyncService.smartIncrementalSync(INSTANCE);
+
+      expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
+        "http://localhost:9999/scene/1/scene_marker/7/stream?t=1&apikey=test-api-key",
+      ]);
+    });
   });
 });
 
@@ -1615,6 +1666,31 @@ describe("StashSyncService reProbeUngeneratedClips", () => {
     expect(stashInstanceManager.getCredentials).toHaveBeenCalledWith("inst-b");
     expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
       `${PREVIEW}?apikey=key-b`,
+    ]);
+  });
+
+  it("re-probe URLs use the instance's base URL", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashInstanceManager.getCredentials).mockReturnValueOnce({
+      baseUrl: "http://stash-b:9999",
+      apiKey: "key-b",
+    });
+    mockPrisma.stashClip.findMany.mockResolvedValue([
+      partialRow({
+        id: "7",
+        previewPath: "http://old-host:9999/scene/1/scene_marker/7/stream?t=1",
+      }),
+      partialRow({ id: "8", previewPath: "http://old-host:9999/x#frag" }),
+    ]);
+    vi.mocked(clipPreviewProber.probeBatch).mockResolvedValueOnce(new Map());
+
+    await stashSyncService.reProbeUngeneratedClips("inst-b");
+
+    // The key goes to the address the instance has now, never the stored
+    // host; a path holding # is not probed
+    expect(clipPreviewProber.probeBatch).toHaveBeenCalledWith([
+      "http://stash-b:9999/scene/1/scene_marker/7/stream?t=1&apikey=key-b",
     ]);
   });
 

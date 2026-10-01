@@ -14,6 +14,7 @@ import {
   isAllowedStreamPath,
   parseStashMediaPath,
   pickStreamQuery,
+  stashMediaUrl,
 } from "../../utils/stashMediaPath.js";
 import { must } from "../helpers/must.js";
 
@@ -207,5 +208,57 @@ describe("id patterns", () => {
     expect(INSTANCE_ID_PATTERN.test("a".repeat(65))).toBe(false);
     expect(INSTANCE_ID_PATTERN.test("inst a")).toBe(false);
     expect(INSTANCE_ID_PATTERN.test("")).toBe(false);
+  });
+});
+
+describe("stashMediaUrl", () => {
+  it("puts a stored absolute URL's path and query on the instance's base URL and adds apikey", () => {
+    expect(
+      stashMediaUrl(
+        "http://stash:9999",
+        "http://old-host:9999/scene/1/scene_marker/7/stream?t=5",
+        "k"
+      )
+    ).toBe("http://stash:9999/scene/1/scene_marker/7/stream?t=5&apikey=k");
+  });
+
+  it("keeps a subpath on the base URL", () => {
+    expect(
+      stashMediaUrl("https://h.example/stash", "/image/3/thumbnail", "k")
+    ).toBe("https://h.example/stash/image/3/thumbnail?apikey=k");
+  });
+
+  it("a relative path with a query keeps it and adds apikey as a parameter", () => {
+    expect(
+      stashMediaUrl("http://stash:9999", "/image/3/thumbnail?width=100", "k")
+    ).toBe("http://stash:9999/image/3/thumbnail?width=100&apikey=k");
+  });
+
+  it("a stored path holding # returns null", () => {
+    expect(stashMediaUrl("http://stash:9999", "/image/3/a#b", "k")).toBeNull();
+    expect(
+      stashMediaUrl("http://stash:9999", "http://old:9999/image/3#frag", "k")
+    ).toBeNull();
+  });
+
+  it("an existing apikey parameter in any case is replaced, not duplicated", () => {
+    const url = stashMediaUrl(
+      "http://stash:9999",
+      "http://old:9999/image/3/thumbnail?APIKey=old-secret&x=1&apikey=other",
+      "k"
+    );
+    expect(url).toBe("http://stash:9999/image/3/thumbnail?x=1&apikey=k");
+    expect(url).not.toContain("old-secret");
+  });
+
+  it("returns null for a value that is neither an http(s) URL nor a rooted path", () => {
+    expect(stashMediaUrl("http://stash:9999", "image/3", "k")).toBeNull();
+    expect(
+      stashMediaUrl("http://stash:9999", "//evil/image/3", "k")
+    ).toBeNull();
+    expect(
+      stashMediaUrl("http://stash:9999", "ftp://h/image/3", "k")
+    ).toBeNull();
+    expect(stashMediaUrl("http://stash:9999", "", "k")).toBeNull();
   });
 });

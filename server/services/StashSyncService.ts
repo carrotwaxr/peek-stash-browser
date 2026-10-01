@@ -57,6 +57,7 @@ import {
 } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
+import { stashMediaUrl } from "../utils/stashMediaPath.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
 // Transform functions no longer needed - URLs transformed at read time
@@ -2526,12 +2527,17 @@ async function processClipsBatch(
 
   const instanceId = stashInstanceId;
 
-  // m.preview is already a full URL from Stash; the probe authenticates with
-  // this instance's key (another instance's key is refused, and the clip
-  // would be stored as not generated)
-  const { apiKey } = stashInstanceManager.getCredentials(instanceId);
-  const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
-  const probeResults = await clipPreviewProber.probeBatch(previewUrls);
+  // m.preview is a full URL from Stash, probed on the instance's address
+  // with this instance's key (another instance's key is refused, and the
+  // clip would be stored as not generated); a preview that cannot be built
+  // is stored as not generated
+  const { baseUrl, apiKey } = stashInstanceManager.getCredentials(instanceId);
+  const previewUrls = markers.map((m) =>
+    stashMediaUrl(baseUrl, m.preview, apiKey)
+  );
+  const probeResults = await clipPreviewProber.probeBatch(
+    previewUrls.filter((url): url is string => url !== null)
+  );
 
   const markerIds = markers.map((m) => m.id);
 
@@ -2549,7 +2555,7 @@ async function processClipsBatch(
     previewPath: marker.preview,
     screenshotPath: marker.screenshot,
     streamPath: marker.stream,
-    isGenerated: probeResults.get(previewUrls[i] as string) ? 1 : 0,
+    isGenerated: probeResults.get(previewUrls[i] ?? "") ? 1 : 0,
     stashCreatedAt: epochMs(marker.created_at),
     stashUpdatedAt: epochMs(marker.updated_at),
   }));
@@ -4850,9 +4856,11 @@ class StashSyncService extends EventEmitter {
 
     // Previews are probed with this instance's own key; an instance that is
     // not loaded (disabled or deleted) is skipped
+    let baseUrl: string;
     let apiKey: string;
     try {
-      ({ apiKey } = stashInstanceManager.getCredentials(stashInstanceId));
+      ({ baseUrl, apiKey } =
+        stashInstanceManager.getCredentials(stashInstanceId));
     } catch (error) {
       if (!(error instanceof UnknownInstanceError)) throw error;
       logger.warn("Re-probe skipped: the Stash instance is not loaded", {
@@ -4878,13 +4886,13 @@ class StashSyncService extends EventEmitter {
 
     logger.info(`Found ${clips.length} ungenerated clips to re-probe`);
 
-    // Build preview URLs with API key
+    // Preview URLs on the instance's address, with its API key; a path that cannot be built is skipped
     const urlMap = new Map<string, string>();
     for (const clip of clips) {
-      if (clip.previewPath) {
-        const url = `${clip.previewPath}?apikey=${apiKey}`;
-        urlMap.set(url, clip.id);
-      }
+      const url = clip.previewPath
+        ? stashMediaUrl(baseUrl, clip.previewPath, apiKey)
+        : null;
+      if (url) urlMap.set(url, clip.id);
     }
 
     // Probe in batches using ClipPreviewProber
