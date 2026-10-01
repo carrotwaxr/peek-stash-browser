@@ -69,8 +69,6 @@ function fullScene(n: number): NormalizedScene {
     play_count: 3,
     play_duration: 500,
     resume_time: 12,
-    play_history: ["2024-05-01T00:00:00Z"],
-    o_history: [],
     last_played_at: null,
     last_o_at: null,
     created_at: "2024-01-01T00:00:00Z",

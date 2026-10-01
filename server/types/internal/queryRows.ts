@@ -17,12 +17,8 @@
  *   - TEXT -> string
  *   - NULL -> null
  *   - JSON held in TEXT columns -> string (parsed in transformRow)
- *   - JSONB columns (WatchHistory's oHistory and playHistory) -> the decoded
- *     JSON value, as Prisma.JsonValue
  *   - LEFT JOIN columns -> T | null
  */
-import type { Prisma } from "@prisma/client";
-
 // ---------------------------------------------------------------------------
 // SceneQueryBuilder
 // ---------------------------------------------------------------------------
@@ -80,9 +76,8 @@ export interface SceneQueryRow {
   userLastPlayedAt: Date | null;
   userOCount: number | null;
   userResumeTime: number | null;
-  // JSONB, decoded: the list, or the JSON-encoded string older updates stored
-  userOHistory: Prisma.JsonValue | null;
-  userPlayHistory: Prisma.JsonValue | null;
+  // The newest O (ISO text), computed in SQL from WatchHistory.oHistory
+  userLastOAt: string | null;
 }
 
 /**

@@ -214,8 +214,6 @@ export function createMockScene(
     resume_time: 0,
     play_duration: 0,
     play_count: 0,
-    play_history: [],
-    o_history: [],
     captions: [],
     files: [
       {

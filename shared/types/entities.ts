@@ -159,9 +159,6 @@ export interface NormalizedScene {
   play_count: number;
   play_duration: number;
   resume_time: number;
-  play_history: string[];
-  /** ISO timestamps, as stored and as the JSON carries them */
-  o_history: string[];
   last_played_at: string | null;
   last_o_at: string | null;
 

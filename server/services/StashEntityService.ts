@@ -98,8 +98,6 @@ const DEFAULT_SCENE_USER_FIELDS = {
   play_count: 0,
   play_duration: 0,
   resume_time: 0,
-  play_history: [],
-  o_history: [],
   last_played_at: null,
   last_o_at: null,
 };

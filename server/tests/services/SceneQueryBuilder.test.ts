@@ -136,8 +136,7 @@ function sceneRow(overrides: Partial<SceneQueryRow> = {}): SceneQueryRow {
     userLastPlayedAt: null,
     userOCount: null,
     userResumeTime: null,
-    userOHistory: null,
-    userPlayHistory: null,
+    userLastOAt: null,
     ...overrides,
   };
 }
@@ -783,51 +782,34 @@ describe("SceneQueryBuilder", () => {
   });
 
   describe("user history", () => {
-    const O_AT = "2025-10-25T03:50:32.452Z";
-    const PLAYED_AT = ["2025-10-25T03:46:27.346Z", "2025-10-26T08:00:00.000Z"];
+    const O_AT = "2025-10-26T03:50:32.452Z";
 
-    // Prisma decodes the JSONB history columns in a raw query: a list stored
-    // as an array arrives as the array, one stored by the old updates
-    // (JSON.stringify(...) of the list) arrives as that string.
-    const executeWith = (
-      userOHistory: string[] | string,
-      userPlayHistory: string[] | string
-    ) =>
-      executeRow(
-        sceneRow({
-          userPlayCount: 2,
-          userPlayDuration: 100,
-          userOCount: 1,
-          userOHistory,
-          userPlayHistory,
-        })
+    it("a list row carries last_o_at from userLastOAt and no play_history or o_history keys", async () => {
+      const scene = await executeRow(
+        sceneRow({ userOCount: 2, userLastOAt: O_AT })
       );
 
-    it("reads a history stored as an array", async () => {
-      const scene = await executeWith([O_AT], PLAYED_AT);
-
-      expect(scene.o_history).toEqual([O_AT]);
       expect(scene.last_o_at).toBe(O_AT);
-      expect(scene.play_history).toEqual(PLAYED_AT);
+      expect(scene).not.toHaveProperty("play_history");
+      expect(scene).not.toHaveProperty("o_history");
     });
 
-    it("reads a history stored as a JSON-encoded string", async () => {
-      const scene = await executeWith(
-        JSON.stringify([O_AT]),
-        JSON.stringify(PLAYED_AT)
+    it("last_o_at is null for a scene with no O", async () => {
+      const scene = await executeRow(sceneRow());
+
+      expect(scene.last_o_at).toBeNull();
+    });
+
+    it("the select list has no `w.oHistory AS` or `w.playHistory`", async () => {
+      await run();
+
+      const { sql } = pageStatement();
+      expect(sql).not.toContain("w.oHistory AS");
+      expect(sql).not.toContain("w.playHistory");
+      // The newest O is computed in SQL, from the same column the sort reads
+      expect(sql).toContain(
+        "(SELECT MAX(j.value) FROM json_each(w.oHistory) j) AS userLastOAt"
       );
-
-      expect(scene.o_history).toEqual([O_AT]);
-      expect(scene.last_o_at).toBe(O_AT);
-      expect(scene.play_history).toEqual(PLAYED_AT);
-    });
-
-    it("o_history is the stored ISO strings", async () => {
-      const scene = await executeWith([O_AT], []);
-
-      // What the JSON carries, and what the API type declares: no Date
-      expect(scene.o_history).toEqual([O_AT]);
-      expect(scene.o_history.map((at) => typeof at)).toEqual(["string"]);
     });
   });
 
