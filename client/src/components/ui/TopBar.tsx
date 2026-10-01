@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   getNavKeyForPath,
@@ -36,6 +36,7 @@ const TopBar = ({ navPreferences = [] }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();
+  const navRef = useRef<HTMLElement>(null);
   const scrollDirection = useScrollDirection(100);
 
   // Help dialog hotkey (? or Shift+/)
@@ -53,12 +54,38 @@ const TopBar = ({ navPreferences = [] }: Props) => {
   const currentPage = getNavKeyForPath(location.pathname);
   const isSettingsActive = currentPage === "Settings";
 
+  // A route change closes the mobile menu
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // A press outside the bar closes it
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleMouseDown = (event: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [isMobileMenuOpen]);
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape" && isMobileMenuOpen) {
+      event.preventDefault();
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   // Determine if topbar should be visible
   const isVisible = scrollDirection === "top" || scrollDirection === "up";
 
   return (
     <>
       <nav
+        ref={navRef}
+        onKeyDown={handleKeyDown}
         className="lg:hidden fixed top-0 left-0 right-0 z-50 py-2 px-4 transition-transform duration-300 ease-in-out"
         style={{
           backgroundColor: "var(--bg-secondary)",
@@ -125,7 +152,7 @@ const TopBar = ({ navPreferences = [] }: Props) => {
 
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <div className="mt-4 pb-4">
+          <div className="mt-4 pb-4 max-h-[calc(100dvh-4rem)] overflow-y-auto">
             {/* Main navigation items */}
             <ul className="flex flex-col space-y-2">
               {navItems.map((item) => (

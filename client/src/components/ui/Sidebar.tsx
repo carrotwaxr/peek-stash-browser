@@ -11,6 +11,7 @@ import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
 import HelpModal from "./HelpModal";
 import Tooltip from "./Tooltip";
+import UserMenu from "./UserMenu";
 
 /**
  * Sidebar Navigation Component
@@ -215,62 +216,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                   <div>
                     {/* User menu toggle - collapsed view with flyout */}
                     <div className="xl:hidden">
-                      <Tooltip
-                        position="right"
-                        clickable={true}
-                        content={
-                          <div className="flex flex-col gap-1 min-w-[160px]">
-                            <div
-                              className="px-2 py-1 text-xs font-medium opacity-60 border-b mb-1"
-                              style={{ borderColor: "var(--border-color)" }}
-                            >
-                              {user?.username || "User"}
-                            </div>
-                            <Link
-                              to="/watch-history"
-                              className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 nav-link"
-                            >
-                              <ThemedIcon name="history" size={16} />
-                              <span>Watch History</span>
-                            </Link>
-                            <Link
-                              to="/user-stats"
-                              className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 nav-link"
-                            >
-                              <ThemedIcon name="bar-chart-3" size={16} />
-                              <span>My Stats</span>
-                            </Link>
-                            <button
-                              onClick={toggleTVMode}
-                              className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 nav-link"
-                            >
-                              <div className="flex items-center gap-3">
-                                <ThemedIcon name="tv" size={16} />
-                                <span>TV Mode</span>
-                              </div>
-                              {isTVMode && <span className="text-sm">✓</span>}
-                            </button>
-                            <button
-                              onClick={() => void logout()}
-                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 text-red-600 hover:bg-red-50"
-                            >
-                              <ThemedIcon
-                                name="logout"
-                                size={16}
-                                color="currentColor"
-                              />
-                              <span>Sign Out</span>
-                            </button>
-                          </div>
-                        }
-                      >
-                        <button
-                          className="flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 nav-link"
-                          aria-label="User menu"
-                        >
-                          <ThemedIcon name="circle-user-round" size={20} />
-                        </button>
-                      </Tooltip>
+                      <UserMenu placement="right-end" />
                     </div>
 
                     {/* User menu toggle - expanded view */}

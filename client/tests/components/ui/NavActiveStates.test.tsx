@@ -1,5 +1,6 @@
 import { MemoryRouter } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import Sidebar from "@/components/ui/Sidebar";
 
@@ -36,5 +37,15 @@ describe("Sidebar active states", () => {
     for (const link of screen.getAllByRole("link", { name: "Settings" })) {
       expect(link.className).not.toContain("nav-link-active");
     }
+  });
+
+  it("the collapsed sidebar's user menu has Downloads", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    // The collapsed (icon-only) menu is the one with a "User menu" button
+    await user.click(screen.getByRole("button", { name: "User menu" }));
+
+    expect(screen.getByRole("link", { name: "Downloads" })).toBeTruthy();
   });
 });
