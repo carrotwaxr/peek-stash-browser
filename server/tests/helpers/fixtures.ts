@@ -50,8 +50,6 @@ export function userRow(overrides: Partial<User> = {}): User {
     role: "USER",
     createdAt: EPOCH,
     updatedAt: EPOCH,
-    preferredQuality: "auto",
-    preferredPlaybackMode: "auto",
     preferredPreviewQuality: "sprite",
     wallPlayback: "autoplay",
     theme: "dark",

@@ -54,8 +54,6 @@ async function snapshot(): Promise<Snapshot> {
       id: true,
       role: true,
       theme: true,
-      preferredQuality: true,
-      preferredPlaybackMode: true,
       preferredPreviewQuality: true,
       wallPlayback: true,
       unitPreference: true,

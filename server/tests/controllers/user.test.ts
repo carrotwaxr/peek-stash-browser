@@ -160,8 +160,6 @@ describe("User Controller", () => {
           id: 2,
           username: "testuser",
           role: "USER",
-          preferredQuality: "1080p",
-          preferredPlaybackMode: null,
           preferredPreviewQuality: null,
           theme: "dark",
           carouselPreferences: null,
@@ -184,7 +182,6 @@ describe("User Controller", () => {
       await getUserSettings(req, res);
 
       const body = res._getOkBody();
-      expect(body.settings.preferredQuality).toBe("1080p");
       expect(body.settings.unitPreference).toBe("metric"); // default
       expect(body.settings.wallPlayback).toBe("autoplay"); // default
       expect(body.settings.lightboxDoubleTapAction).toBe("favorite"); // default
@@ -194,6 +191,25 @@ describe("User Controller", () => {
       }); // default
       expect(body.settings.carouselPreferences).toBeInstanceOf(Array); // default carousel prefs
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
+    });
+
+    it("settings answer no preferredQuality or preferredPlaybackMode", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({ id: 2, username: "testuser", role: "USER" })
+      );
+      const req = reqFor(getUserSettings, { user: USER });
+      const res = resFor(getUserSettings);
+      await getUserSettings(req, res);
+
+      const { settings } = res._getOkBody();
+      expect(settings).not.toHaveProperty("preferredQuality");
+      expect(settings).not.toHaveProperty("preferredPlaybackMode");
+      const query = must(
+        mockPrisma.user.findUnique.mock.calls[0],
+        "findUnique call"
+      )[0];
+      expect(query.select).not.toHaveProperty("preferredQuality");
+      expect(query.select).not.toHaveProperty("preferredPlaybackMode");
     });
 
     it("settings answer no enableCast", async () => {
@@ -226,8 +242,6 @@ describe("User Controller", () => {
   describe("updateUserSettings", () => {
     const mockUpdatedUser: User = partialRow({
       id: 2,
-      preferredQuality: "720p",
-      preferredPlaybackMode: null,
       theme: null,
       carouselPreferences: null,
       navPreferences: null,
@@ -260,7 +274,7 @@ describe("User Controller", () => {
     it("allows admin to update another user's settings", async () => {
       mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       const req = reqFor(updateUserSettings, {
-        body: { preferredQuality: "720p" },
+        body: { theme: "light" },
         params: { userId: "2" },
         user: ADMIN,
       });
@@ -275,7 +289,7 @@ describe("User Controller", () => {
     it("updates own settings successfully", async () => {
       mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       const req = reqFor(updateUserSettings, {
-        body: { preferredQuality: "720p" },
+        body: { theme: "light" },
         user: USER,
       });
       const res = resFor(updateUserSettings);
@@ -283,11 +297,38 @@ describe("User Controller", () => {
       expect(res._getOkBody().success).toBe(true);
     });
 
+    it("an update that still sends preferredQuality or preferredPlaybackMode succeeds and changes nothing", async () => {
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
+      // An older open tab still sends the removed fields, even invalid values
+      const req = reqFor(updateUserSettings, {
+        body: malformed({
+          theme: "light",
+          preferredQuality: "4k",
+          preferredPlaybackMode: "turbo",
+        }),
+        user: USER,
+      });
+      const res = resFor(updateUserSettings);
+      await updateUserSettings(req, res);
+
+      const body = res._getOkBody();
+      expect(body.success).toBe(true);
+      expect(body.settings).not.toHaveProperty("preferredQuality");
+      expect(body.settings).not.toHaveProperty("preferredPlaybackMode");
+      const query = must(
+        mockPrisma.user.update.mock.calls[0],
+        "update call"
+      )[0];
+      expect(query.data).toEqual({ theme: "light" });
+      expect(query.select).not.toHaveProperty("preferredQuality");
+      expect(query.select).not.toHaveProperty("preferredPlaybackMode");
+    });
+
     it("an update that still sends enableCast succeeds and changes nothing", async () => {
       mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       // An older open tab still sends the removed field
       const req = reqFor(updateUserSettings, {
-        body: malformed({ preferredQuality: "720p", enableCast: false }),
+        body: malformed({ theme: "light", enableCast: false }),
         user: USER,
       });
       const res = resFor(updateUserSettings);
@@ -300,33 +341,11 @@ describe("User Controller", () => {
         mockPrisma.user.update.mock.calls[0],
         "update call"
       )[0];
-      expect(query.data).toEqual({ preferredQuality: "720p" });
+      expect(query.data).toEqual({ theme: "light" });
       expect(query.select).not.toHaveProperty("enableCast");
     });
 
     // Validation tests
-    it("rejects invalid quality", async () => {
-      const req = reqFor(updateUserSettings, {
-        body: { preferredQuality: "4k" },
-        user: USER,
-      });
-      const res = resFor(updateUserSettings);
-      await updateUserSettings(req, res);
-      expect(res._getStatus()).toBe(400);
-      expect(res._getErrorBody().error).toMatch(/Invalid quality/);
-    });
-
-    it("rejects invalid playback mode", async () => {
-      const req = reqFor(updateUserSettings, {
-        body: { preferredPlaybackMode: "turbo" },
-        user: USER,
-      });
-      const res = resFor(updateUserSettings);
-      await updateUserSettings(req, res);
-      expect(res._getStatus()).toBe(400);
-      expect(res._getErrorBody().error).toMatch(/Invalid playback mode/);
-    });
-
     it("rejects invalid preview quality", async () => {
       const req = reqFor(updateUserSettings, {
         body: { preferredPreviewQuality: "gif" },

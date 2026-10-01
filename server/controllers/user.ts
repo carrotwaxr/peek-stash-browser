@@ -156,8 +156,6 @@ export const getUserSettings = async (
       id: true,
       username: true,
       role: true,
-      preferredQuality: true,
-      preferredPlaybackMode: true,
       preferredPreviewQuality: true,
       theme: true,
       carouselPreferences: true,
@@ -182,8 +180,6 @@ export const getUserSettings = async (
 
   res.json({
     settings: {
-      preferredQuality: user.preferredQuality ?? "auto",
-      preferredPlaybackMode: user.preferredPlaybackMode ?? "auto",
       preferredPreviewQuality: user.preferredPreviewQuality ?? null,
       theme: user.theme ?? "dark",
       carouselPreferences:
@@ -238,8 +234,6 @@ export const updateUserSettings = async (
   }
 
   const {
-    preferredQuality,
-    preferredPlaybackMode,
     preferredPreviewQuality,
     theme,
     carouselPreferences,
@@ -255,22 +249,7 @@ export const updateUserSettings = async (
   } = req.body;
 
   // Validate values
-  const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
-  const validPlaybackModes = ["auto", "direct", "transcode"];
   const validPreviewQualities = ["sprite", "webp", "mp4"];
-
-  if (preferredQuality && !validQualities.includes(preferredQuality)) {
-    res.status(400).json({ error: "Invalid quality setting" });
-    return;
-  }
-
-  if (
-    preferredPlaybackMode &&
-    !validPlaybackModes.includes(preferredPlaybackMode)
-  ) {
-    res.status(400).json({ error: "Invalid playback mode setting" });
-    return;
-  }
 
   if (
     preferredPreviewQuality &&
@@ -521,8 +500,6 @@ export const updateUserSettings = async (
   const updatedUser = await prisma.user.update({
     where: { id: targetUserId },
     data: {
-      ...(preferredQuality !== undefined && { preferredQuality }),
-      ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
       ...(preferredPreviewQuality !== undefined && {
         preferredPreviewQuality,
       }),
@@ -554,8 +531,6 @@ export const updateUserSettings = async (
       id: true,
       username: true,
       role: true,
-      preferredQuality: true,
-      preferredPlaybackMode: true,
       theme: true,
       carouselPreferences: true,
       navPreferences: true,
@@ -572,8 +547,6 @@ export const updateUserSettings = async (
   res.json({
     success: true as const,
     settings: {
-      preferredQuality: updatedUser.preferredQuality ?? "auto",
-      preferredPlaybackMode: updatedUser.preferredPlaybackMode ?? "auto",
       theme: updatedUser.theme ?? "dark",
       carouselPreferences:
         (updatedUser.carouselPreferences as CarouselPreference[] | null) ??

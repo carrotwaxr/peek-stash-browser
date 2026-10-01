@@ -206,8 +206,6 @@ Each user can customize their own experience:
 
 | Setting | Options |
 |---------|---------|
-| **Video Quality** | Auto, 1080p, 720p, 480p, 360p |
-| **Playback Mode** | Direct, Transcode, Auto |
 | **Preview Quality** | Sprite, WebP, MP4 |
 | **Theme** | Light, Dark, Deep Purple, The Hub, Custom |
 | **Home Carousels** | Enable/disable and reorder |

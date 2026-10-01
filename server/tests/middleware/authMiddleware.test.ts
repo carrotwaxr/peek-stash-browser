@@ -88,8 +88,6 @@ const MOCK_USER: User = partialRow({
   id: 1,
   username: "testuser",
   role: "USER",
-  preferredQuality: null,
-  preferredPlaybackMode: null,
   preferredPreviewQuality: null,
   theme: null,
   hideConfirmationDisabled: false,

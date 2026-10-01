@@ -10,8 +10,6 @@ const PlaybackTab = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [preferredQuality, setPreferredQuality] = useState("auto");
-  const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
 
   // Load settings on mount
@@ -25,10 +23,6 @@ const PlaybackTab = () => {
         );
         const { settings } = data;
 
-        setPreferredQuality((settings.preferredQuality as string) || "auto");
-        setPreferredPlaybackMode(
-          (settings.preferredPlaybackMode as string) || "auto"
-        );
         setMinimumPlayPercent((settings.minimumPlayPercent as number) ?? 20);
       } catch (err) {
         setLoadError(getErrorMessage(err));
@@ -46,8 +40,6 @@ const PlaybackTab = () => {
       setSaving(true);
 
       await apiPut("/user/settings", {
-        preferredQuality,
-        preferredPlaybackMode,
         minimumPlayPercent,
       });
 
@@ -90,67 +82,6 @@ const PlaybackTab = () => {
         }}
       >
         <div className="space-y-6">
-          {/* Preferred Quality */}
-          <div>
-            <label
-              htmlFor="preferredQuality"
-              className="block text-sm font-medium mb-2"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Preferred Quality
-            </label>
-            <select
-              id="preferredQuality"
-              value={preferredQuality}
-              onChange={(e) => setPreferredQuality(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
-            >
-              <option value="auto">Auto (Recommended)</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-              <option value="480p">480p</option>
-              <option value="360p">360p</option>
-            </select>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Default quality for video playback. Auto selects the best quality
-              based on your connection.
-            </p>
-          </div>
-
-          {/* Preferred Playback Mode */}
-          <div>
-            <label
-              htmlFor="preferredPlaybackMode"
-              className="block text-sm font-medium mb-2"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Preferred Playback Mode
-            </label>
-            <select
-              id="preferredPlaybackMode"
-              value={preferredPlaybackMode}
-              onChange={(e) => setPreferredPlaybackMode(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
-            >
-              <option value="auto">Auto (Recommended)</option>
-              <option value="direct">Direct Play</option>
-            </select>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Auto uses direct play when supported, otherwise streams via Stash.
-              Direct play offers best quality but limited codec support.
-            </p>
-          </div>
-
           {/* Minimum Play Percent */}
           <div>
             <label

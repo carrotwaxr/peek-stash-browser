@@ -26,8 +26,6 @@ vi.mock("../../../../src/utils/toast", () => ({
 }));
 
 const STORED = {
-  preferredQuality: "720p",
-  preferredPlaybackMode: "direct",
   minimumPlayPercent: 50,
 };
 
@@ -47,16 +45,13 @@ describe("PlaybackTab", () => {
       screen.queryByRole("button", { name: "Save Settings" })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByLabelText("Preferred Quality")
+      screen.queryByLabelText(/Minimum Play Percent/)
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findByLabelText("Preferred Quality")).toHaveValue(
-      "720p"
-    );
-    expect(screen.getByLabelText("Preferred Playback Mode")).toHaveValue(
-      "direct"
+    expect(await screen.findByLabelText(/Minimum Play Percent/)).toHaveValue(
+      "50"
     );
     expect(
       screen.getByRole("button", { name: "Save Settings" })
@@ -71,8 +66,8 @@ describe("PlaybackTab", () => {
     mockApiPut.mockResolvedValue({ success: true });
     render(<PlaybackTab />);
 
-    fireEvent.change(await screen.findByLabelText("Preferred Quality"), {
-      target: { value: "1080p" },
+    fireEvent.change(await screen.findByLabelText(/Minimum Play Percent/), {
+      target: { value: "75" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Settings" }));
 
@@ -81,9 +76,9 @@ describe("PlaybackTab", () => {
         "Playback settings saved successfully!"
       )
     );
+    // The body names the play percent and nothing else
     expect(mockApiPut).toHaveBeenCalledWith("/user/settings", {
-      ...STORED,
-      preferredQuality: "1080p",
+      minimumPlayPercent: 75,
     });
   });
 
@@ -116,5 +111,32 @@ describe("PlaybackTab", () => {
     expect(screen.queryByLabelText(/Chromecast|AirPlay/)).toBeNull();
     await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
     expect(mockApiPut.mock.calls[0]?.[1]).not.toHaveProperty("enableCast");
+  });
+
+  it("the Playback tab offers no quality or playback-mode control", async () => {
+    // A stored row from before the removal may still carry the old fields
+    mockApiGet.mockResolvedValue({
+      settings: {
+        ...STORED,
+        preferredQuality: "720p",
+        preferredPlaybackMode: "direct",
+      },
+    });
+    mockApiPut.mockResolvedValue({ success: true });
+    render(<PlaybackTab />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save Settings" })
+    );
+
+    expect(screen.queryByText(/Preferred (Quality|Playback Mode)/)).toBeNull();
+    expect(
+      screen.queryByLabelText(/Preferred (Quality|Playback Mode)/)
+    ).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    await waitFor(() => expect(mockApiPut).toHaveBeenCalled());
+    const body: unknown = mockApiPut.mock.calls[0]?.[1];
+    expect(body).not.toHaveProperty("preferredQuality");
+    expect(body).not.toHaveProperty("preferredPlaybackMode");
   });
 });

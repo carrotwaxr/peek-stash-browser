@@ -38,8 +38,6 @@ export interface RequestUser {
   id: number;
   username: string;
   role: string;
-  preferredQuality?: string | null;
-  preferredPlaybackMode?: string | null;
   preferredPreviewQuality?: string | null;
   theme?: string | null;
   hideConfirmationDisabled?: boolean;
@@ -151,8 +149,6 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       id: true,
       username: true,
       role: true,
-      preferredQuality: true,
-      preferredPlaybackMode: true,
       preferredPreviewQuality: true,
       theme: true,
       hideConfirmationDisabled: true,
