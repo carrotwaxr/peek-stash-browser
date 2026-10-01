@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import "video.js/dist/video-js.css";
-import { getClipsForScene } from "../../api";
+import { useSceneClips } from "../../api/hooks/useSceneClips";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
 import { useQueueNavigation } from "../../hooks/useQueueNavigation";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
-import { makeCompositeKey } from "../../utils/compositeKey";
 import "./VideoPlayer.css";
 import type { ClipMarkerInput } from "./plugins/markers";
 import { useOrientationFullscreen } from "./useOrientationFullscreen";
@@ -47,10 +46,6 @@ const VideoPlayer = () => {
   // The shared user-settings query: one request per session, not one per scene
   const { data: userSettings } = useUserSettings();
   const minimumPlayPercent = userSettings?.settings.minimumPlayPercent ?? 20;
-  const [clipSet, setClipSet] = useState<{
-    key: string;
-    clips: ClipMarkerInput[];
-  } | null>(null);
 
   // ============================================================================
   // CONTEXT
@@ -78,34 +73,14 @@ const VideoPlayer = () => {
   const videoHeight = firstFile?.height || 1080;
   const aspectRatio = `${videoWidth} / ${videoHeight}`;
 
-  // Fetch clips when scene changes. An answer for a scene that is no longer
-  // the current one is dropped (abort, and a key check as the second guard).
-  const sceneKey = scene?.id
-    ? makeCompositeKey(scene.id, scene.instanceId)
-    : null;
-  const sceneId = scene?.id;
-  const sceneInstanceId = scene?.instanceId;
-  useEffect(() => {
-    if (!sceneId || !sceneInstanceId || !sceneKey) {
-      setClipSet(null);
-      return;
-    }
-    const controller = new AbortController();
-    getClipsForScene(sceneId, sceneInstanceId, true, controller.signal)
-      .then((response) => {
-        if (controller.signal.aborted) return;
-        setClipSet({
-          key: sceneKey,
-          clips: (response as { clips?: ClipMarkerInput[] }).clips ?? [],
-        });
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        console.error("Failed to fetch clips for timeline", err);
-        setClipSet({ key: sceneKey, clips: [] });
-      });
-    return () => controller.abort();
-  }, [sceneId, sceneInstanceId, sceneKey]);
+  // The scene's clips, shared with the details panel. The query is keyed by
+  // the scene and its instance, so an answer for a scene the user has left
+  // never reaches this one's timeline.
+  const { data: clipsAnswer } = useSceneClips(
+    scene?.id ?? "",
+    scene?.instanceId ?? ""
+  );
+  const clips: ClipMarkerInput[] | undefined = clipsAnswer?.clips;
 
   // Add clip markers to timeline using the markers plugin
   useEffect(() => {
@@ -119,10 +94,10 @@ const VideoPlayer = () => {
     markersPlugin.clearMarkers();
 
     // Every clip gets a dot; one with no generated preview is drawn hollow
-    if (clipSet && clipSet.key === sceneKey && clipSet.clips.length > 0) {
-      markersPlugin.addClipMarkers(clipSet.clips);
+    if (clips && clips.length > 0) {
+      markersPlugin.addClipMarkers(clips);
     }
-  }, [clipSet, sceneKey]);
+  }, [clips]);
 
   // ============================================================================
   // WATCH HISTORY TRACKING

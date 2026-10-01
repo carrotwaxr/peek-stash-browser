@@ -24,6 +24,7 @@
  * the clip first (`CROSS JOIN`) made a studio's page 13 times slower.
  */
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
+import type { ClipTagRef } from "../types/api/clips.js";
 import type { ClipRow, ClipTagRefRow } from "../types/internal/queryRows.js";
 import type {
   ClipListRequest,
@@ -54,14 +55,11 @@ import {
   loadNestedRefs,
 } from "./query/nestedRefs.js";
 
-/** A clip's tag as the row carries it */
-export interface ClipTagRef {
-  id: string;
-  name: string;
-  color: string | null;
-}
-
-/** A clip with its scene and tags (ClipService turns the paths into proxy URLs) */
+/**
+ * A clip with its scene and tags as the database holds them: ClipService
+ * turns the paths into proxy URLs and the dates into ISO strings
+ * (`ClipWithRelations` in `shared/types/api/clips.ts`)
+ */
 export interface ClipWithRelations {
   id: string;
   instanceId: string;

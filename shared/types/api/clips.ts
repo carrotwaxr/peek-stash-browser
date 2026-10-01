@@ -8,6 +8,45 @@ import type { ListCount } from "./library.js";
  */
 
 // =============================================================================
+// CLIP ROW
+// =============================================================================
+
+/** A clip's tag as the row carries it */
+export interface ClipTagRef {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+/**
+ * A clip as the clips endpoints answer it, with its instance and its
+ * scene's. Raw Stash paths are not sent: the screenshots are proxy URLs, and
+ * the preview is `/api/proxy/clip/:id/preview`. Dates are ISO strings.
+ */
+export interface ClipWithRelations {
+  id: string;
+  instanceId: string;
+  sceneId: string;
+  title: string | null;
+  seconds: number;
+  endSeconds: number | null;
+  primaryTagId: string | null;
+  screenshotUrl: string | null;
+  isGenerated: boolean;
+  stashCreatedAt: string | null;
+  stashUpdatedAt: string | null;
+  primaryTag: ClipTagRef | null;
+  tags: ClipTagRef[];
+  scene: {
+    id: string;
+    instanceId: string;
+    title: string | null;
+    pathScreenshot: string | null;
+    studioId: string | null;
+  };
+}
+
+// =============================================================================
 // GET CLIPS
 // =============================================================================
 
@@ -34,7 +73,7 @@ export interface GetClipsQuery extends Record<
 
 /** `total` and `totalPages` are null when the request said `count=false` */
 export interface GetClipsResponse<Count extends ListCount = number> {
-  clips: unknown[];
+  clips: ClipWithRelations[];
   total: Count;
   page: number;
   perPage: number;
@@ -50,8 +89,8 @@ export interface GetClipByIdParams extends Record<string, string> {
   id: string;
 }
 
-// Note: GetClipByIdResponse depends on server-internal ClipService types
-// and is re-exported from server/types/api/clips.ts instead.
+/** The clip; a bare id held by several instances answers 400 instead */
+export type GetClipByIdResponse = ClipWithRelations;
 
 // =============================================================================
 // GET CLIPS FOR SCENE
@@ -71,5 +110,5 @@ export interface GetClipsForSceneQuery extends Record<
 }
 
 export interface GetClipsForSceneResponse {
-  clips: unknown[];
+  clips: ClipWithRelations[];
 }

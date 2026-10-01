@@ -3,7 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSceneList } from "../../../src/api/hooks/useScenes";
+import type * as ApiClient from "../../../src/api/client";
+import { apiGet } from "../../../src/api/client";
+import {
+  type SimilarScenesResponse,
+  useSceneList,
+  useSimilarScenes,
+} from "../../../src/api/hooks/useScenes";
 import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
@@ -12,22 +18,9 @@ vi.mock("../../../src/api/library", () => ({
   },
 }));
 
-vi.mock("../../../src/api/queryKeys", () => ({
-  queryKeys: {
-    scenes: {
-      all: () => ["scenes"],
-      list: (
-        instanceId: string | undefined,
-        params: Record<string, unknown>
-      ) => ["scenes", instanceId, "list", params],
-      detail: (instanceId: string | undefined, id: string) => [
-        "scenes",
-        instanceId,
-        "detail",
-        id,
-      ],
-    },
-  },
+vi.mock("../../../src/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiClient>()),
+  apiGet: vi.fn(),
 }));
 
 function createWrapper() {
@@ -120,5 +113,76 @@ describe("useSceneList", () => {
 
     expect(result.current.data).toEqual(page1);
     expect(result.current.isPlaceholderData).toBe(true);
+  });
+});
+
+describe("useSimilarScenes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Told apart by their count: the hook never reads the scenes
+  const similarPage = (count: number): SimilarScenesResponse => ({
+    scenes: [],
+    count,
+    page: 1,
+    perPage: 1,
+  });
+
+  it("on a new scene the similar list is empty until its own answer arrives", async () => {
+    const forFirst = similarPage(2);
+    vi.mocked(apiGet)
+      .mockResolvedValueOnce(forFirst)
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const { result, rerender } = renderHook(
+      ({ sceneId }: { sceneId: string }) =>
+        useSimilarScenes(sceneId, "inst-a", 1),
+      { wrapper: createWrapper(), initialProps: { sceneId: "1" } }
+    );
+    await waitFor(() => expect(result.current.data).toEqual(forFirst));
+
+    rerender({ sceneId: "2" });
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isPending).toBe(true);
+  });
+
+  it("page 2 of the same scene keeps page 1 on screen while it loads", async () => {
+    const page1 = similarPage(2);
+    vi.mocked(apiGet)
+      .mockResolvedValueOnce(page1)
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const { result, rerender } = renderHook(
+      ({ page }: { page: number }) => useSimilarScenes("1", "inst-a", page),
+      { wrapper: createWrapper(), initialProps: { page: 1 } }
+    );
+    await waitFor(() => expect(result.current.data).toEqual(page1));
+
+    rerender({ page: 2 });
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    expect(result.current.data).toEqual(page1);
+    expect(result.current.isPlaceholderData).toBe(true);
+  });
+
+  it("the same scene id on another instance does not keep the list", async () => {
+    vi.mocked(apiGet)
+      .mockResolvedValueOnce(similarPage(3))
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const { result, rerender } = renderHook(
+      ({ instanceId }: { instanceId: string }) =>
+        useSimilarScenes("1", instanceId, 1),
+      { wrapper: createWrapper(), initialProps: { instanceId: "inst-a" } }
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    rerender({ instanceId: "inst-b" });
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    expect(result.current.data).toBeUndefined();
   });
 });
