@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ShortcutScopeProvider } from "@/contexts/ShortcutScopeContext";
 import ConfirmDialog from "../../../src/components/ui/ConfirmDialog";
 
 describe("ConfirmDialog", () => {
@@ -44,6 +45,38 @@ describe("ConfirmDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onParentClick).not.toHaveBeenCalled();
     expect(onParentMouseDown).not.toHaveBeenCalled();
+  });
+
+  it("renders through Modal: Escape cancels", () => {
+    const onClose = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <ShortcutScopeProvider>
+        <ConfirmDialog
+          isOpen
+          onClose={onClose}
+          onConfirm={onConfirm}
+          title="Delete it"
+          message="Sure?"
+        />
+      </ShortcutScopeProvider>
+    );
+
+    // Modal's title id names the dialog (no fixed "dialog-title" id)
+    expect(screen.getByRole("dialog", { name: "Delete it" })).toBeTruthy();
+    expect(document.getElementById("dialog-title")).toBeNull();
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      (document.activeElement ?? document.body).dispatchEvent(event);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it("renders nothing while closed", () => {

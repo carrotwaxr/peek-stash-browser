@@ -46,6 +46,7 @@ export { default as LibraryInitializingBanner } from "./LibraryInitializingBanne
 export { default as Lightbox } from "./Lightbox";
 export { default as LoadingSpinner } from "./LoadingSpinner";
 export { default as MediaImage } from "./MediaImage";
+export { default as Modal } from "./Modal";
 export { default as OCounterButton } from "./OCounterButton";
 export { default as PageHeader } from "./PageHeader";
 export { default as PageLayout } from "./PageLayout";
