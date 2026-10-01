@@ -1271,6 +1271,31 @@ function parsePlaylistSort(
 }
 
 /**
+ * The sort a playlist item request reads: the playlist's order when none is
+ * sent; without a direction, `position` and `added_at` read ASC and a scene
+ * sort the scene list's default; a bare `random` takes the user's daily seed
+ */
+function playlistItemSort(
+  sortField: ReturnType<typeof parsePlaylistSort>,
+  direction: SortDirection | undefined,
+  options: ParseOptions
+): ParsedPlaylistItemSort {
+  const field = sortField?.field ?? DEFAULT_PLAYLIST_ITEM_SORT.field;
+  return {
+    field,
+    direction:
+      direction ??
+      (PLAYLIST_OWN_SORTS.has(field)
+        ? DEFAULT_PLAYLIST_ITEM_SORT.direction
+        : DEFAULT_SORT.scene.direction),
+    seed:
+      field === "random"
+        ? (sortField?.seed ?? generateDailySeed(options.userId))
+        : undefined,
+  };
+}
+
+/**
  * `GET /api/playlists/:id`: a page of the items the viewer can see, in the
  * request's sort: the playlist's order (`position`, the default), when each
  * item was added (`added_at`), or any scene sort as the Scenes page sorts.
@@ -1307,19 +1332,7 @@ export function parsePlaylistItemsRequest(
   walk(input, "", handlers, problems, "Unknown query parameter");
   problems.finish();
 
-  const field = sortField?.field ?? DEFAULT_PLAYLIST_ITEM_SORT.field;
-  const sort: ParsedPlaylistItemSort = {
-    field,
-    direction:
-      direction ??
-      (PLAYLIST_OWN_SORTS.has(field)
-        ? DEFAULT_PLAYLIST_ITEM_SORT.direction
-        : DEFAULT_SORT.scene.direction),
-    seed:
-      field === "random"
-        ? (sortField?.seed ?? generateDailySeed(options.userId))
-        : undefined,
-  };
+  const sort = playlistItemSort(sortField, direction, options);
   const unpaged =
     page === undefined &&
     perPage === undefined &&
@@ -1339,6 +1352,41 @@ export function parsePlaylistItemsRequest(
         },
     sort,
   };
+}
+
+/**
+ * `POST /api/playlists/:id/sort`: the view sort to save as the playlist's
+ * order, the `sort` and `direction` the page read (both required; a random
+ * one as `random_<seed>`, so the save stores the order the page showed)
+ */
+export function parseSortPlaylistRequest(
+  body: unknown,
+  options: ParseOptions
+): ParsedPlaylistItemSort {
+  const input = requireObject(body, "body");
+  const problems = new Problems();
+  let sortField: ReturnType<typeof parsePlaylistSort>;
+  let direction: SortDirection | undefined;
+
+  const handlers = new Map<string, (raw: unknown, path: string) => void>([
+    [
+      "sort",
+      (raw, path) => (sortField = parsePlaylistSort(raw, path, problems)),
+    ],
+    [
+      "direction",
+      (raw, path) => (direction = parseDirection(raw, path, problems)),
+    ],
+  ]);
+  walk(input, "", handlers, problems, "Unknown request field");
+  for (const key of ["sort", "direction"]) {
+    if (input[key] === undefined || input[key] === null) {
+      problems.add(key, "Required");
+    }
+  }
+  problems.finish();
+
+  return playlistItemSort(sortField, direction, options);
 }
 
 /**

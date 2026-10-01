@@ -4,6 +4,7 @@
  * Verifies that shared users CANNOT perform owner-only operations:
  * - Remove a scene from a shared playlist
  * - Reorder scenes in a shared playlist
+ * - Save a view sort as a shared playlist's order
  * - Rename/update a shared playlist
  * - Delete a shared playlist
  *
@@ -16,10 +17,19 @@ import {
   deletePlaylist,
   removeSceneFromPlaylist,
   reorderPlaylist,
+  sortPlaylist,
   updatePlaylist,
 } from "../../controllers/playlist.js";
+import { ValidationError } from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
-import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { sortPlaylistItems } from "../../services/PlaylistQueryService.js";
+import type { SortPlaylistRequest } from "../../types/api/index.js";
+import {
+  type Malformed,
+  malformed,
+  reqFor,
+  resFor,
+} from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
 vi.mock(
@@ -37,6 +47,7 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 vi.mock("../../services/PlaylistQueryService.js", () => ({
   loadPlaylistPreviews: vi.fn(() => Promise.resolve(new Map())),
   loadPlaylistItems: vi.fn(() => Promise.resolve({ items: [], totalItems: 0 })),
+  sortPlaylistItems: vi.fn(),
 }));
 
 // Mock PermissionService
@@ -50,6 +61,7 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+const mockSortPlaylistItems = vi.mocked(sortPlaylistItems);
 
 /** User IDs: owner = 1, shared user = 2 */
 const OWNER_ID = 1;
@@ -181,6 +193,76 @@ describe("Shared playlist authorization boundaries", () => {
       await reorderPlaylist(req, res);
 
       expect(mockPrisma.playlistItem.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("sortPlaylist - owner only", () => {
+    const sortAs = (
+      user: { id: number; username: string; role: string },
+      body: SortPlaylistRequest | Malformed
+    ) => {
+      const req = reqFor(sortPlaylist, {
+        params: { id: "1" },
+        body,
+        user,
+        allowedInstanceIds: ["instance-1"],
+      });
+      const res = resFor(sortPlaylist);
+      return { run: () => sortPlaylist(req, res), res };
+    };
+
+    it("a recipient's sort answers 404 and writes nothing", async () => {
+      const { run, res } = sortAs(SHARED_USER, {
+        sort: "title",
+        direction: "ASC",
+      });
+
+      await run();
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(mockSortPlaylistItems).not.toHaveBeenCalled();
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["sort=scene_index", { sort: "scene_index", direction: "ASC" }],
+      ["an unknown sort", { sort: "bogus", direction: "ASC" }],
+      ["no sort", { direction: "ASC" }],
+      ["no direction", { sort: "title" }],
+      ["an unknown field", { sort: "title", direction: "ASC", page: 2 }],
+    ])("%s answers 400", async (_name, body) => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
+      const { run } = sortAs(
+        { id: OWNER_ID, username: "owner", role: "USER" },
+        malformed(body)
+      );
+
+      await expect(run()).rejects.toBeInstanceOf(ValidationError);
+      expect(mockSortPlaylistItems).not.toHaveBeenCalled();
+    });
+
+    it("the owner's save renumbers in the sort it names (control test)", async () => {
+      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
+      mockSortPlaylistItems.mockResolvedValue(6);
+      const { run, res } = sortAs(
+        { id: OWNER_ID, username: "owner", role: "USER" },
+        { sort: "random_7", direction: "DESC" }
+      );
+
+      await run();
+
+      expect(mockPrisma.playlist.findFirst).toHaveBeenCalledWith({
+        where: { id: 1, userId: OWNER_ID },
+        select: { id: true },
+      });
+      expect(mockSortPlaylistItems).toHaveBeenCalledWith({
+        userId: OWNER_ID,
+        allowedInstanceIds: ["instance-1"],
+        playlistId: 1,
+        sort: { field: "random", direction: "DESC", seed: 7 },
+      });
+      expect(res._getOkBody()).toEqual({ success: true, itemCount: 6 });
     });
   });
 

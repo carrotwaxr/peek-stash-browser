@@ -11,6 +11,7 @@ import {
   loadPlaylistItems,
   loadPlaylistPreviews,
   playlistsHoldingScene,
+  sortPlaylistItems,
 } from "../services/PlaylistQueryService.js";
 import type {
   AddSceneToPlaylistParams,
@@ -37,6 +38,8 @@ import type {
   ReorderPlaylistParams,
   ReorderPlaylistRequest,
   ReorderPlaylistResponse,
+  SortPlaylistRequest,
+  SortPlaylistResponse,
   TypedAuthRequest,
   TypedLibraryRequest,
   TypedResponse,
@@ -51,6 +54,7 @@ import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import {
   parsePlaylistItemsRequest,
   parsePlaylistsQuery,
+  parseSortPlaylistRequest,
 } from "../utils/listRequest.js";
 import { emptyToNull } from "../utils/sqlHelpers.js";
 import { INSTANCE_ID_PATTERN } from "../utils/stashMediaPath.js";
@@ -699,6 +703,44 @@ export const reorderPlaylist = async (
   );
 
   res.json({ success: true, message: "Playlist reordered" });
+};
+
+/**
+ * Save a view sort as the playlist's order (owner only, as reorder): the
+ * owner's visible items take positions 0..n-1 in the sort the page read,
+ * the items they cannot see follow in their own order
+ * (PlaylistQueryService.sortPlaylistItems). No item list crosses the wire.
+ */
+export const sortPlaylist = async (
+  req: TypedLibraryRequest<SortPlaylistRequest, ReorderPlaylistParams>,
+  res: TypedResponse<SortPlaylistResponse | ApiErrorResponse>
+) => {
+  const userId = req.user.id;
+  // A ValidationError (400) reaches the central error handler
+  const sort = parseSortPlaylistRequest(req.body, { userId });
+  const playlistId = parseInt(req.params.id);
+
+  if (isNaN(playlistId)) {
+    res.status(400).json({ error: "Invalid playlist ID" });
+    return;
+  }
+
+  const playlist = await prisma.playlist.findFirst({
+    where: { id: playlistId, userId },
+    select: { id: true },
+  });
+  if (!playlist) {
+    res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  const itemCount = await sortPlaylistItems({
+    userId,
+    allowedInstanceIds: req.allowedInstanceIds,
+    playlistId,
+    sort,
+  });
+  res.json({ success: true, itemCount });
 };
 
 /**

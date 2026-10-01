@@ -11,6 +11,7 @@ import {
   getUserPlaylists,
   removeSceneFromPlaylist,
   reorderPlaylist,
+  sortPlaylist,
   updatePlaylist,
   updatePlaylistShares,
 } from "../controllers/playlist.js";
@@ -59,6 +60,9 @@ router.delete("/:id/items/:sceneId", authenticated(removeSceneFromPlaylist));
 
 // Reorder playlist items
 router.put("/:id/reorder", authenticated(reorderPlaylist));
+
+// Save a view sort as the playlist's order (owner only)
+router.post("/:id/sort", withAllowedInstances, libraryHandler(sortPlaylist));
 
 // Get sharing info for a playlist
 router.get("/:id/shares", authenticated(getPlaylistShares));

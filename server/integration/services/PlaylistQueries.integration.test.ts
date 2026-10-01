@@ -22,7 +22,8 @@
  * P5. A third user selects only A.
  *
  * The owner's playlist SORTED, shared with the same group, holds T3, X1,
- * T4, T1 and T2 on A (SORTED_ITEMS), for the view sorts.
+ * T4, T1 and T2 on A (SORTED_ITEMS), for the view sorts; "Save as playlist
+ * order" saves copies of its own.
  */
 import type { PlaylistItemSort } from "@peek/shared-types/filters/index.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -31,6 +32,7 @@ import {
   getPlaylist,
   getSharedPlaylists,
   getUserPlaylists,
+  sortPlaylist,
   updatePlaylist,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
@@ -906,6 +908,143 @@ describe("Playlist queries (integration)", () => {
       } finally {
         await planner.close();
       }
+    });
+  });
+
+  describe("save as playlist order", () => {
+    /** Saves the sort as the playlist's order through the handler, as `user` */
+    const saveAs = async (
+      user: User,
+      playlistId: number,
+      body: { sort: string; direction: "ASC" | "DESC" }
+    ) => {
+      const req = reqFor(sortPlaylist, {
+        params: { id: String(playlistId) },
+        body,
+        user: testUser({ id: user.id, username: user.username }),
+        allowedInstanceIds: await getUserAllowedInstanceIds(user.id),
+      });
+      const res = resFor(sortPlaylist);
+      await sortPlaylist(req, res);
+      return res;
+    };
+
+    /** The writes among the recorded statements */
+    const writesOf = (recorder: ReturnType<typeof recordStatements>) =>
+      recorder.statements.filter((st) =>
+        /^\s*(WITH[\s\S]*\)\s*)?(UPDATE|INSERT|DELETE)\b/i.test(st.sql)
+      );
+
+    it("saving title order numbers the visible items 0..n-1 by title, and the owner's hidden and soft-deleted items keep their relative order after them", async () => {
+      // X1 is hidden by the owner, DELETED soft-deleted, ON_OFF on a
+      // disabled instance; T2 "alpha", T1 "Bravo", T3 "Charlie"
+      const playlistId = await createPlaylist(owner.id, "save title", [
+        [X1, A],
+        [T1, A],
+        [DELETED, A],
+        [T2, A],
+        [ON_OFF, OFF],
+        [T3, A],
+      ]);
+
+      const res = await saveAs(owner, playlistId, {
+        sort: "title",
+        direction: "ASC",
+      });
+
+      expect(res._getOkBody()).toEqual({ success: true, itemCount: 6 });
+      expect(await positioned(playlistId)).toEqual([
+        [T2, A, 0],
+        [T1, A, 1],
+        [T3, A, 2],
+        [X1, A, 3],
+        [DELETED, A, 4],
+        [ON_OFF, OFF, 5],
+      ]);
+    });
+
+    it("saving the shown random order stores the order the page showed for that seed", async () => {
+      const playlistId = await createPlaylist(owner.id, "save random", [
+        [T3, A],
+        [X1, A],
+        [T4, A],
+        [P1, A],
+        [T1, A],
+        [P3, A],
+        [T2, A],
+      ]);
+      const shown = (
+        await itemsFor(
+          owner,
+          playlistId,
+          { page: 1, perPage: 100 },
+          { field: "random", direction: "DESC", seed: 7 }
+        )
+      ).items.map((i) => i.sceneId);
+
+      await saveAs(owner, playlistId, { sort: "random_7", direction: "DESC" });
+
+      const saved = await positioned(playlistId);
+      expect(saved.map(([id]) => id)).toEqual([...shown, X1]);
+      expect(saved.map(([, , position]) => position)).toEqual([
+        0, 1, 2, 3, 4, 5, 6,
+      ]);
+      // The saved order is now the playlist's own
+      expect(
+        (
+          await itemsFor(owner, playlistId, { page: 1, perPage: 100 })
+        ).items.map((i) => i.sceneId)
+      ).toEqual(shown);
+    });
+
+    it("saving rating order reads the owner's own ratings", async () => {
+      // The owner rated P1 80 and T1 80, the recipient T2 80
+      const playlistId = await createPlaylist(owner.id, "save rating", [
+        [T2, A],
+        [T1, A],
+        [T3, A],
+        [P1, A],
+      ]);
+
+      await saveAs(owner, playlistId, { sort: "rating", direction: "DESC" });
+
+      expect(await positioned(playlistId)).toEqual([
+        [T1, A, 0],
+        [P1, A, 1],
+        [T2, A, 2],
+        [T3, A, 3],
+      ]);
+    });
+
+    it("a save is one unit and writes nothing when the playlist is gone", async () => {
+      const playlistId = await createPlaylist(owner.id, "save unit", [
+        [T3, A],
+        [T2, A],
+        [T1, A],
+      ]);
+
+      const recorder = recordStatements();
+      try {
+        await saveAs(owner, playlistId, { sort: "title", direction: "ASC" });
+      } finally {
+        recorder.restore();
+      }
+      expect(writesOf(recorder)).toHaveLength(1);
+      expect(recorder.transactions()).toBe(0);
+
+      await prisma.playlist.delete({ where: { id: playlistId } });
+      const gone = recordStatements();
+      let res: Awaited<ReturnType<typeof saveAs>>;
+      try {
+        res = await saveAs(owner, playlistId, {
+          sort: "title",
+          direction: "ASC",
+        });
+      } finally {
+        gone.restore();
+      }
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(writesOf(gone)).toEqual([]);
     });
   });
 });
