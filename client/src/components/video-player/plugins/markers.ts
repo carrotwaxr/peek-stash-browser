@@ -1,5 +1,5 @@
 import videojs from "video.js";
-import CryptoJS from "crypto-js";
+import { sha256Hex } from "../../../utils/sha256";
 
 interface MarkerSet {
   dot?: HTMLElement;
@@ -231,8 +231,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
 
   // Compute base hue from tag name
   computeBaseHue(tag: string) {
-    const hash = CryptoJS.SHA256(tag);
-    const hashHex = hash.toString(CryptoJS.enc.Hex);
+    const hashHex = sha256Hex(tag);
     const hashInt = BigInt(`0x${hashHex}`);
     const baseHue = Number(hashInt % BigInt(360)); // Map to [0, 360)
     return baseHue;

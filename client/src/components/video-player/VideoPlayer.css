@@ -573,16 +573,6 @@ section.video-container {
   display: inline-block;
 }
 
-/* VR Selector - VR mode toggle */
-.video-js .vjs-vr-selector .vjs-menu li {
-  font-size: 0.8em;
-}
-
-.video-js .vjs-vr-selector .vjs-button {
-  background: url("/vr.svg") center center no-repeat;
-  width: 50%;
-}
-
 /* Seek Buttons - videojs-seek-buttons styling */
 .video-js .vjs-seek-button.skip-back span.vjs-icon-placeholder::before {
   transform: none;

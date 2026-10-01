@@ -47,7 +47,6 @@ vi.mock("@/components/video-player/plugins/persist-volume", () => ({}));
 vi.mock("@/components/video-player/plugins/skip-buttons", () => ({}));
 vi.mock("@/components/video-player/plugins/source-selector", () => ({}));
 vi.mock("@/components/video-player/plugins/track-activity", () => ({}));
-vi.mock("@/components/video-player/plugins/vrmode", () => ({}));
 vi.mock("@/components/video-player/plugins/media-session", () => ({}));
 
 interface SendOptions {

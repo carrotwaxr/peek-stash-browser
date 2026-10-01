@@ -14,8 +14,8 @@ export const budgets = {
   // Named chunks with their own limit. Chunk names are the file name without
   // the content hash.
   chunkKB: {
-    // 861 kB measured: videojs-vr with three.js, crypto-js, localforage.
-    Scene: 905,
+    // 117 kB measured (861 before VR, crypto-js and localforage went).
+    Scene: 123,
     // 621 kB measured: video.js with VHS (Peek plays HLS and DASH), which has
     // no smaller build.
     "video-vendor": 650,

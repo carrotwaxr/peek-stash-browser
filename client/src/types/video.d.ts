@@ -47,29 +47,6 @@ declare module "video.js" {
 // ---------------------------------------------------------------------------
 // Packages that ship no types
 // ---------------------------------------------------------------------------
-declare module "crypto-js" {
-  const CryptoJS: {
-    SHA256(message: string): any;
-    enc: { Hex: any; [key: string]: any };
-    [key: string]: any;
-  };
-  export default CryptoJS;
-}
-
-declare module "videojs-vr" {
-  // Side-effect import only — registers itself on the player prototype
-}
-
 declare module "videojs-seek-buttons" {
   // Side-effect import only
-}
-
-declare module "localforage" {
-  const localForage: {
-    getItem<T = any>(key: string): Promise<T | null>;
-    setItem<T = any>(key: string, value: T): Promise<T>;
-    removeItem(key: string): Promise<void>;
-    [key: string]: any;
-  };
-  export default localForage;
 }
