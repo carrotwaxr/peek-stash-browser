@@ -26,6 +26,7 @@ import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import type * as stashInstanceManagerModule from "../../services/StashInstanceManager.js";
 import { logger } from "../../utils/logger.js";
 import type * as mediaAccessModule from "../../utils/mediaAccess.js";
+import { mediaProxyLimiter } from "../../utils/proxyLimiter.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 import { stringContaining } from "../helpers/matchers.js";
@@ -146,12 +147,18 @@ describe("the media proxy's log when a response ends early", () => {
     }) as unknown as typeof http.get);
   }
 
-  /** A browser asking for a video; resolves with its connection once Peek has piped. */
-  async function browserRequests(): Promise<net.Socket> {
+  /** A browser asking for a video; its connection, at once. */
+  function browserAsks(): net.Socket {
     const browser = net.connect(peekPort, "127.0.0.1");
     browser.write(
       "GET /api/proxy/stash?path=/scene/1/screenshot&instanceId=inst-a HTTP/1.1\r\nHost: peek\r\n\r\n"
     );
+    return browser;
+  }
+
+  /** A browser asking for a video; resolves with its connection once Peek has piped. */
+  async function browserRequests(): Promise<net.Socket> {
+    const browser = browserAsks();
     await vi.waitFor(() => expect(state.pipelineCalls).toHaveLength(1));
     return browser;
   }
@@ -196,5 +203,32 @@ describe("the media proxy's log when a response ends early", () => {
       stringContaining("Client disconnected")
     );
     browser.destroy();
+  });
+
+  it("a browser that closes while its request is queued leaves the queue at once, and Stash never sees it", async () => {
+    // Earlier cases' responses have closed and freed their slots
+    await vi.waitFor(() => expect(mediaProxyLimiter.activeCount).toBe(0));
+    // Transfers that never finish: six browsers hold every slot
+    stashAnswersWith({ destroyed: false, complete: false });
+    const holding: net.Socket[] = [];
+    for (let i = 0; i < 6; i++) {
+      holding.push(browserAsks());
+      await vi.waitFor(() => expect(state.pipelineCalls).toHaveLength(i + 1));
+    }
+    expect(mediaProxyLimiter.activeCount).toBe(6);
+
+    const queued = browserAsks();
+    await vi.waitFor(() => expect(mediaProxyLimiter.queuedCount).toBe(1));
+
+    queued.destroy();
+
+    // It leaves while every slot is still held
+    await vi.waitFor(() => expect(mediaProxyLimiter.queuedCount).toBe(0));
+    expect(mediaProxyLimiter.activeCount).toBe(6);
+    expect(http.get).toHaveBeenCalledTimes(6);
+
+    for (const browser of holding) browser.destroy();
+    await vi.waitFor(() => expect(mediaProxyLimiter.activeCount).toBe(0));
+    expect(http.get).toHaveBeenCalledTimes(6);
   });
 });

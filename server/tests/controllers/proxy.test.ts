@@ -11,12 +11,17 @@ import {
   proxySceneWebp,
   proxyStashMedia,
 } from "../../controllers/proxy.js";
+import {
+  ServiceUnavailableError,
+  errorHandler,
+} from "../../middleware/errorHandler.js";
 import prisma from "../../prisma/singleton.js";
 import {
   canUserAccessEntity,
   canUserSeeApartFromOwnHides,
 } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { mediaProxyLimiter } from "../../utils/proxyLimiter.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { stashInstanceRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
@@ -1880,6 +1885,128 @@ describe("Proxy Controller", () => {
           true
         );
         expect(url.endsWith("apikey=test-api-key")).toBe(true);
+      }
+    });
+  });
+
+  // ===========================================================================
+  // The queue for Stash's six slots: refusals answer 503 in the central shape
+  // ===========================================================================
+
+  describe("the media proxy queue", () => {
+    const THUMBNAIL = { path: "/image/1/thumbnail", instanceId: "inst-a" };
+
+    /** A request for the thumbnail as USER. */
+    const thumbnailReq = () =>
+      reqFor(proxyStashMedia, { query: THUMBNAIL, user: USER });
+
+    /** A response that can wait in the queue, which listens for its close. */
+    const queuedRes = () =>
+      Object.assign(resFor(proxyStashMedia), { once: vi.fn(), off: vi.fn() });
+
+    /**
+     * Six transfers that do not finish, so every slot is taken; the returned
+     * function finishes them, and the queued requests are then served.
+     */
+    async function holdEverySlot(): Promise<() => void> {
+      const finish: ((error: Error | null) => void)[] = [];
+      for (let i = 0; i < 6; i++) {
+        mockPipeline.mockImplementationOnce((_source, destination, done) => {
+          finish.push(done);
+          return destination;
+        });
+        await proxyStashMedia(thumbnailReq(), resFor(proxyStashMedia));
+      }
+      expect(mediaProxyLimiter.activeCount).toBe(6);
+      return () => {
+        for (const done of finish) done(null);
+      };
+    }
+
+    /** Waits (on real ticks) until `count` requests are queued. */
+    async function untilQueued(count: number): Promise<void> {
+      for (let i = 0; i < 1000; i++) {
+        if (mediaProxyLimiter.queuedCount >= count) break;
+        await new Promise<void>((resolve) => {
+          setImmediate(resolve);
+        });
+      }
+      expect(mediaProxyLimiter.queuedCount).toBe(count);
+    }
+
+    /** What the handler rejected with, answered by the central handler. */
+    async function answerThroughErrorHandler(
+      req: ReturnType<typeof thumbnailReq>,
+      res: ReturnType<typeof queuedRes>,
+      answer: Promise<unknown>
+    ) {
+      const error = await answer;
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
+      errorHandler(error, req, res, vi.fn());
+    }
+
+    it("a full queue answers 503 with Retry-After: 1 in the central shape", async () => {
+      setupHttpGetSuccess();
+      const finish = await holdEverySlot();
+      const waiting = Array.from({ length: 300 }, () =>
+        proxyStashMedia(thumbnailReq(), queuedRes())
+      );
+      await untilQueued(300);
+
+      const req = thumbnailReq();
+      const res = queuedRes();
+      await answerThroughErrorHandler(
+        req,
+        res,
+        proxyStashMedia(req, res).then(
+          () => undefined,
+          (error: unknown) => error
+        )
+      );
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "1");
+      expect(res._getErrorBody().errorType).toBe("SERVICE_UNAVAILABLE");
+      expect(mediaProxyLimiter.queuedCount).toBe(300);
+
+      // The waiting ones are served once the slots free
+      mockHttpGet.mockClear();
+      finish();
+      await Promise.all(waiting);
+      expect(mockHttpGet).toHaveBeenCalledTimes(300);
+      expect(mediaProxyLimiter.queuedCount).toBe(0);
+      expect(mediaProxyLimiter.activeCount).toBe(0);
+    });
+
+    it("a queue wait past the limit answers 503", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        setupHttpGetSuccess();
+        const finish = await holdEverySlot();
+        const req = thumbnailReq();
+        const res = queuedRes();
+        const answer = proxyStashMedia(req, res).then(
+          () => undefined,
+          (error: unknown) => error
+        );
+        await untilQueued(1);
+
+        await vi.advanceTimersByTimeAsync(29_999);
+        expect(mediaProxyLimiter.queuedCount).toBe(1);
+        await vi.advanceTimersByTimeAsync(1);
+
+        await answerThroughErrorHandler(req, res, answer);
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "1");
+        expect(res._getErrorBody().errorType).toBe("SERVICE_UNAVAILABLE");
+        expect(mediaProxyLimiter.queuedCount).toBe(0);
+        // Stash never saw the refused request
+        expect(mockHttpGet).toHaveBeenCalledTimes(6);
+
+        finish();
+        expect(mediaProxyLimiter.activeCount).toBe(0);
+      } finally {
+        vi.useRealTimers();
       }
     });
   });
