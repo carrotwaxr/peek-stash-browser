@@ -592,8 +592,6 @@ export function usePaginatedLightbox<TImage = unknown>({
     transitionKey,
     /** The address's image read by id, shown alone; null otherwise */
     soloImage,
-    /** The viewer's own change to the image shown alone */
-    updateSoloImage: setSoloImage,
 
     // Lightbox handlers
     openLightbox,
