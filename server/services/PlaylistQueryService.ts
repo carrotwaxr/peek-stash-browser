@@ -17,7 +17,8 @@
  * whose joins carry the viewer's own rating, favorite, O and play fields.
  *
  * Adds go through `appendItems`: the scenes the adder can see, numbered
- * after the playlist's last item inside the insert itself.
+ * after the playlist's last item inside the insert itself. "Save as
+ * playlist order" goes through `sortPlaylistItems`, in the same order.
  */
 import { PER_PAGE_MAX } from "@peek/shared-types/filters/index.js";
 import prisma from "../prisma/singleton.js";
@@ -115,18 +116,22 @@ const POSITION_ASC: ParsedPlaylistItemSort = {
 
 /**
  * What makes item `pi` visible: its scene `s` on the item's instance (`join`,
- * after `pi`), and that scene live, allowed and not excluded (`where`)
+ * after `pi`), and that scene live, allowed and not excluded (`where`). The
+ * scene join is a `CROSS JOIN` for reads of the visible items alone; a
+ * `LEFT JOIN` keeps every item, and then `s.id IS NOT NULL` belongs with
+ * `where`.
  */
 function visibleItem(
   userId: number,
-  allowedInstanceIds: readonly string[]
+  allowedInstanceIds: readonly string[],
+  sceneJoin: "CROSS JOIN" | "LEFT JOIN" = "CROSS JOIN"
 ): { join: SqlFragment; where: SqlFragment } {
   const instances = instanceColumnClause("s.stashInstanceId", [
     ...allowedInstanceIds,
   ]);
   return {
     join: {
-      sql: `CROSS JOIN StashScene s ON s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId
+      sql: `${sceneJoin} StashScene s ON s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId
 LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = pi.sceneId AND (e.instanceId = '' OR e.instanceId = pi.instanceId)`,
       params: [userId],
     },
@@ -336,6 +341,72 @@ export async function appendItems(
     prisma.$executeRawUnsafe(APPEND_ITEMS_SQL, ...params)
   );
   return { added, alreadyInPlaylist: visible.length - added, unavailable };
+}
+
+export interface SortPlaylistItemsOptions {
+  /** The owner, whose view the save keeps */
+  readonly userId: number;
+  /** `getUserAllowedInstanceIds`: none means nothing is visible */
+  readonly allowedInstanceIds: readonly string[];
+  readonly playlistId: number;
+  readonly sort: ParsedPlaylistItemSort;
+}
+
+/**
+ * "Save as playlist order" (item 86): renumbers every item of the playlist
+ * 0..n-1 in one statement, in one write unit. The items the owner sees come
+ * first, in the view's sort (`orderTerms`, as the page and the queue order
+ * them, so the saved order is the order shown); the rest (hidden,
+ * restricted, deleted from Stash or on an instance the owner does not use)
+ * follow in their own relative order, so they keep it if they come back.
+ * The caller has checked the requester owns the playlist. Answers how many
+ * items were renumbered.
+ *
+ * `vis` marks each item visible or not; `numbered` ranks each side: the
+ * visible by the sort, the rest by position, with how many are visible. A
+ * window's ORDER BY cannot name a column alias of its own SELECT, so the
+ * mark comes from its own CTE. The parameters follow the text: `vis`'s
+ * select list, join and WHERE, then the window's order, then the sort's
+ * joins.
+ */
+export async function sortPlaylistItems(
+  options: SortPlaylistItemsOptions
+): Promise<number> {
+  const { userId, allowedInstanceIds, playlistId, sort } = options;
+  const { join, where } = visibleItem(userId, allowedInstanceIds, "LEFT JOIN");
+  const { joins: sortJoins, order } = orderTerms(userId, sort);
+
+  const sql = `WITH vis AS (
+  SELECT pi.id AS itemId,
+    CASE WHEN s.id IS NOT NULL AND ${where.sql} THEN 1 ELSE 0 END AS v
+  FROM PlaylistItem pi
+  ${join.sql}
+  WHERE pi.playlistId = ?
+), numbered AS (
+  SELECT pi.id AS itemId, vis.v,
+    ROW_NUMBER() OVER (PARTITION BY vis.v ORDER BY ${order.sql}) AS rsort,
+    ROW_NUMBER() OVER (PARTITION BY vis.v ORDER BY pi.position, pi.id) AS rpos,
+    SUM(vis.v) OVER () AS nvis
+  FROM vis
+  CROSS JOIN PlaylistItem pi ON pi.id = vis.itemId
+  LEFT JOIN StashScene s ON s.id = pi.sceneId AND s.stashInstanceId = pi.instanceId
+  ${sortJoins.map((j) => j.sql).join("\n  ")}
+)
+UPDATE PlaylistItem
+SET position = CASE WHEN n.v = 1 THEN n.rsort - 1 ELSE n.nvis + n.rpos - 1 END
+FROM numbered n
+WHERE PlaylistItem.id = n.itemId`;
+  const params = [
+    ...where.params,
+    ...join.params,
+    playlistId,
+    ...order.params,
+    ...sortJoins.flatMap((j) => j.params),
+  ];
+
+  return dbWrite("playlist.sort", () =>
+    prisma.$executeRawUnsafe(sql, ...params)
+  );
 }
 
 /**

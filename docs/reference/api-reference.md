@@ -736,6 +736,42 @@ interface ReorderPlaylistResponse {
 
 ---
 
+### POST /api/playlists/:id/sort
+
+**Authentication:** Required
+
+Saves a view sort as the playlist's order (owner only): "Save as playlist order". `sort` and `direction` are the ones `GET /api/playlists/:id` read and answered, a random order as `random_<seed>`, so the saved order is the order the page showed. The items the owner can see take positions 0 to n-1 in that order; the items the owner cannot see (hidden, restricted, deleted from Stash or on an instance they do not use) follow, in their own order, so they keep it if they come back. No item list is sent. The renumbering is one statement. Answers 400 for a missing or unknown `sort` (`scene_index` included) or `direction`, or any other field, and 404 when the playlist is not the user's (a recipient's save is refused this way), with nothing written.
+
+**Request Body:**
+
+```typescript
+interface SortPlaylistRequest {
+  sort: string; // as GET /api/playlists/:id takes it
+  direction: "ASC" | "DESC";
+}
+```
+
+**URL Parameters:**
+
+```typescript
+interface ReorderPlaylistParams {
+  id: string;
+}
+```
+
+**Response:**
+
+```typescript
+interface SortPlaylistResponse {
+  success: true;
+  itemCount: number; // the items renumbered, the ones the owner cannot see included
+}
+```
+
+**Controller:** `sortPlaylist` in `../controllers/playlist.ts`
+
+---
+
 ## Carousels
 
 Custom carousel configuration endpoints.
