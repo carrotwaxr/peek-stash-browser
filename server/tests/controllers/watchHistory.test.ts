@@ -9,7 +9,7 @@
  * - clearAllWatchHistory (bulk deletion)
  * - the entity access check on every write
  */
-import type { Prisma } from "@prisma/client";
+import type { Prisma, WatchHistory } from "@prisma/client";
 import type { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
@@ -602,6 +602,186 @@ describe("Watch History Controller", () => {
       ).rejects.toThrow("stats refused");
       expect(res.json).not.toHaveBeenCalled();
       expect(mockStats.bumpWriteGeneration).not.toHaveBeenCalled();
+    });
+
+    describe("play token", () => {
+      /** The play row as the database holds it after `playCount` plays */
+      function playRow(playCount: number) {
+        return partialRow<WatchHistory>({
+          id: 1,
+          playCount,
+          playDuration: 0,
+          resumeTime: 0,
+          lastPlayedAt: new Date(),
+          playHistory: [],
+        });
+      }
+
+      beforeEach(() => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({ id: 1, syncToStash: false })
+        );
+        mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+        mockPrisma.watchHistory.create.mockResolvedValue(playRow(1));
+      });
+
+      /** One press of the play count, as user `userId` */
+      async function press(
+        playToken: string | undefined,
+        userId = 1,
+        sceneId = "123"
+      ) {
+        const res = resFor(incrementPlayCount);
+        await incrementPlayCount(
+          reqFor(incrementPlayCount, {
+            body:
+              playToken === undefined
+                ? { sceneId, instanceId: "test-instance" }
+                : { sceneId, instanceId: "test-instance", playToken },
+            user: testUser({ id: userId }),
+          }),
+          res
+        );
+        return res;
+      }
+
+      it("a second increment with the same playToken within 10 minutes adds no play", async () => {
+        await press("token-same");
+        mockPrisma.watchHistory.findUnique.mockResolvedValue(playRow(1));
+        mockPrisma.watchHistory.create.mockClear();
+        mockPrisma.watchHistory.update.mockClear();
+
+        const res = await press("token-same");
+
+        expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+        expect(mockStats.statsWritesForScene).toHaveBeenCalledTimes(1);
+        // The repeat answers the row as it stands
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            success: true,
+            watchHistory: objectContaining({ playCount: 1 }),
+          })
+        );
+      });
+
+      it("a different token adds one", async () => {
+        await press("token-one");
+        mockPrisma.watchHistory.findUnique.mockResolvedValue(
+          partialRow({ id: 1, playCount: 1, playHistory: [] })
+        );
+        mockPrisma.watchHistory.update.mockResolvedValue(playRow(2));
+
+        await press("token-two");
+
+        expect(mockPrisma.watchHistory.update).toHaveBeenCalledTimes(1);
+      });
+
+      it("a request without a token still counts, every time", async () => {
+        await press(undefined);
+        mockPrisma.watchHistory.findUnique.mockResolvedValue(
+          partialRow({ id: 1, playCount: 1, playHistory: [] })
+        );
+        mockPrisma.watchHistory.update.mockResolvedValue(playRow(2));
+        await press(undefined);
+
+        expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.watchHistory.update).toHaveBeenCalledTimes(1);
+      });
+
+      it("two increments with the same token sent together add one play", async () => {
+        const [first, second] = await Promise.all([
+          press("token-together"),
+          press("token-together"),
+        ]);
+
+        expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(1);
+        expect(mockStats.statsWritesForScene).toHaveBeenCalledTimes(1);
+        expect(first.json).toHaveBeenCalledWith(
+          expect.objectContaining({ success: true })
+        );
+        expect(second.json).toHaveBeenCalledWith(
+          expect.objectContaining({ success: true })
+        );
+      });
+
+      it("a token is the user's and the scene's: another user or scene with it still counts", async () => {
+        await press("token-shared");
+        mockPrisma.watchHistory.create.mockClear();
+
+        await press("token-shared", 2);
+        await press("token-shared", 1, "456");
+
+        expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(2);
+      });
+
+      it("a failed write releases the token, so the retry counts", async () => {
+        mockStatsWrites.mockRejectedValueOnce(new Error("stats refused"));
+        await expect(press("token-failed")).rejects.toThrow("stats refused");
+        mockPrisma.watchHistory.create.mockClear();
+
+        await press("token-failed");
+
+        expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(1);
+      });
+
+      it("a token counts again after 10 minutes", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          await press("token-expiring");
+          mockPrisma.watchHistory.create.mockClear();
+
+          vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1);
+          await press("token-expiring");
+
+          expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("keeps at most 5,000 tokens: the oldest is forgotten first", async () => {
+        await press("token-oldest");
+        for (let i = 0; i < 5000; i++) await press(`token-fill-${i}`);
+        mockPrisma.watchHistory.create.mockClear();
+
+        await press("token-oldest");
+        expect(mockPrisma.watchHistory.create).toHaveBeenCalledTimes(1);
+
+        mockPrisma.watchHistory.create.mockClear();
+        await press("token-fill-4999");
+        expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["longer than 64 characters", "x".repeat(65)],
+        ["empty", ""],
+        ["not a string", 42],
+      ])("a token %s is a 400 and writes nothing", async (_name, token) => {
+        const res = resFor(incrementPlayCount);
+        await incrementPlayCount(
+          reqFor(incrementPlayCount, {
+            body: malformed({
+              sceneId: "123",
+              instanceId: "test-instance",
+              playToken: token,
+            }),
+            user: testUser({ id: 1 }),
+          }),
+          res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+      });
+
+      it("a token of 64 characters is accepted", async () => {
+        const res = await press("y".repeat(64));
+
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({ success: true })
+        );
+      });
     });
   });
 

@@ -53,6 +53,12 @@ export interface IncrementPlayCountRequest {
   /** The scene's instance: required, the server never guesses one */
   instanceId: string;
   sceneId: string;
+  /**
+   * One viewing's token (1 to 64 characters), the same on every retry of its
+   * request: the server counts a token once for 10 minutes. A request
+   * without one always counts.
+   */
+  playToken?: string;
 }
 
 export interface IncrementPlayCountResponse {

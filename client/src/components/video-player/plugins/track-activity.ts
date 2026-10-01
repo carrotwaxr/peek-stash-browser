@@ -3,18 +3,29 @@ import videojs from "video.js";
 const intervalSeconds = 1; // check every second
 const sendInterval = 10; // send every 10 seconds
 
+/** How a save or a play count is sent: `keepalive` outlives the page */
+export interface SendOptions {
+  keepalive?: boolean;
+}
+
 class TrackActivityPlugin extends videojs.getPlugin("plugin") {
   totalPlayDuration: number;
   currentPlayDuration: number;
   minimumPlayPercent: number;
-  incrementPlayCount: () => Promise<void>;
-  saveActivity: (resumeTime: number, playDuration: number) => Promise<void>;
+  incrementPlayCount: (options?: SendOptions) => Promise<void>;
+  saveActivity: (
+    resumeTime: number,
+    playDuration: number,
+    options?: SendOptions
+  ) => Promise<void>;
   enabled: boolean;
   playCountIncremented: boolean;
   intervalID: number | undefined;
   lastResumeTime: number;
   lastDuration: number;
   declare player: any;
+  private readonly onVisibilityChange: () => void;
+  private readonly onPageHide: () => void;
 
   constructor(player: any) {
     super(player);
@@ -48,8 +59,22 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
       this.stop();
     });
 
+    // The seconds played since the last save are lost when the tab goes to
+    // the background (a phone may never come back) or the page closes, so
+    // they are sent then, with a request that outlives the page.
+    this.onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") this.flush(true);
+    };
+    this.onPageHide = () => {
+      this.flush(true);
+    };
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    window.addEventListener("pagehide", this.onPageHide);
+
     player.on("dispose", () => {
       this.stop();
+      document.removeEventListener("visibilitychange", this.onVisibilityChange);
+      window.removeEventListener("pagehide", this.onPageHide);
     });
   }
 
@@ -78,11 +103,25 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
     this.playCountIncremented = false;
   }
 
+  /**
+   * Send what was played since the last save without stopping the
+   * interval: the tab is hidden or the page is going away, and playback
+   * (or the next show of the tab) goes on from here.
+   */
+  flush(keepalive: boolean) {
+    if (this.currentPlayDuration <= 0) return;
+    this.sendActivity(keepalive);
+  }
+
   setEnabled(enabled: boolean) {
-    this.enabled = enabled;
     if (!enabled) {
+      // Stop first: it sends the partial interval, which needs `enabled`
       this.stop();
-    } else if (!this.player.paused()) {
+      this.enabled = false;
+      return;
+    }
+    this.enabled = true;
+    if (!this.player.paused()) {
       this.start();
     }
   }
@@ -100,8 +139,10 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
     }
   }
 
-  sendActivity() {
+  sendActivity(keepalive = false) {
     if (!this.enabled) return;
+    // A request that outlives the page; a normal one has no extra argument
+    const options: [SendOptions] | [] = keepalive ? [{ keepalive: true }] : [];
 
     if (this.totalPlayDuration > 0) {
       let resumeTime = this.player?.currentTime() ?? this.lastResumeTime;
@@ -123,7 +164,7 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
         !this.playCountIncremented &&
         percentPlayed >= this.minimumPlayPercent
       ) {
-        void this.incrementPlayCount();
+        void this.incrementPlayCount(...options);
         this.playCountIncremented = true;
       }
 
@@ -132,7 +173,7 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
         resumeTime = 0;
       }
 
-      void this.saveActivity(resumeTime, this.currentPlayDuration);
+      void this.saveActivity(resumeTime, this.currentPlayDuration, ...options);
       this.currentPlayDuration = 0;
     }
   }
