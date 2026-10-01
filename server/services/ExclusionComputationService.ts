@@ -70,6 +70,7 @@ import { dbWrite } from "../utils/dbWrite.js";
 import { compositeKey, entityKey, pairsJson } from "../utils/entityRef.js";
 import { logger } from "../utils/logger.js";
 import { instanceColumnClause } from "../utils/sqlClauses.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import type { BatchChanges } from "./SyncChangeSet.js";
 import {
   getUserInstanceScope,
@@ -1683,7 +1684,7 @@ class ExclusionComputationService {
         entityType === "tag"
           ? `SELECT c.id, c.stashInstanceId FROM StashTag c
              JOIN listed p ON c.stashInstanceId = p.inst
-             JOIN json_each(COALESCE(c.parentIds, '[]')) je ON je.value = p.id
+             JOIN json_each(${jsonListOrEmpty("c.parentIds")}) je ON je.value = p.id
              WHERE c.deletedAt IS NULL`
           : `SELECT c.id, c.stashInstanceId FROM StashStudio c
              JOIN listed p ON c.parentId = p.id AND c.stashInstanceId = p.inst
@@ -2550,7 +2551,7 @@ class ExclusionComputationService {
       )
       AND NOT EXISTS (
         SELECT 1 FROM StashTag child
-        JOIN json_each(COALESCE(child.parentIds, '[]')) cp ON cp.value = t.id
+        JOIN json_each(${jsonListOrEmpty("child.parentIds")}) cp ON cp.value = t.id
         WHERE child.deletedAt IS NULL
           AND child.stashInstanceId = t.stashInstanceId
       )

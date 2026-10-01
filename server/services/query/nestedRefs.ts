@@ -46,6 +46,7 @@ import {
 import { toProxyUrl } from "../../utils/proxyUrl.js";
 import { type JunctionTarget, exclusionJoin } from "../../utils/sqlClauses.js";
 import { emptyToNull } from "../../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../../utils/sqlJson.js";
 import { getGalleryFallbackTitle } from "../../utils/titleUtils.js";
 import type { ExclusionEntityType } from "./EntityQueryBuilder.js";
 
@@ -316,7 +317,7 @@ export async function loadTagChildren(
     `${pairs("page", "pid", "pinst")}
 SELECT je.value AS pid, x.stashInstanceId AS pinst, x.id, x.stashInstanceId, ${TAG_REF.columns}
 FROM StashTag x
-CROSS JOIN json_each(x.parentIds) je${visible.join}
+CROSS JOIN json_each(${jsonListOrEmpty("x.parentIds")}) je${visible.join}
 ${visible.where}
   AND x.stashInstanceId IN (SELECT pinst FROM page)
   AND (je.value, x.stashInstanceId) IN (SELECT pid, pinst FROM page)`,
