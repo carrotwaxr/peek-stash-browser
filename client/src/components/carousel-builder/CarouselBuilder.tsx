@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { PreviewCarouselResponse } from "@peek/shared-types";
-import * as LucideIcons from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,6 +22,7 @@ import { Button } from "../ui/index";
 import CarouselPreview from "./CarouselPreview";
 import IconPickerButton from "./IconPickerButton";
 import RuleEditor from "./RuleEditor";
+import { getCarouselIcon } from "./carouselIcons";
 
 // Simple ID generator for rule keys (doesn't need to be cryptographically secure)
 let ruleIdCounter = 0;
@@ -390,9 +389,7 @@ const CarouselBuilder = () => {
     }
   };
 
-  const IconComponent =
-    (LucideIcons as unknown as Record<string, LucideIcon>)[icon] ??
-    LucideIcons.Film;
+  const IconComponent = getCarouselIcon(icon);
   const canSave = title.trim() && rules.length > 0 && previewValid;
   const usedFilterKeys = new Set(rules.map((r) => r.filterKey));
   const hasMoreFilters = CAROUSEL_FILTER_DEFINITIONS.some(

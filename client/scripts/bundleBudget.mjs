@@ -19,10 +19,14 @@ export const budgets = {
     // 621 kB measured: video.js with VHS (Peek plays HLS and DASH), which has
     // no smaller build.
     "video-vendor": 650,
+    // 11.9 kB measured: react-hot-toast only. lucide-react is in no manual
+    // chunk, so each chunk carries the icons it draws.
+    "ui-vendor": 13,
   },
-  // Entry plus its modulepreloads, gzip. 338 kB measured (entry 159, ui-vendor
-  // 152 with every lucide icon, react-vendor 17, query-vendor 11), set at 357.
-  firstLoadGzipKB: 357,
+  // Entry plus its modulepreloads, gzip. 198.4 kB measured (entry 165.7,
+  // react-vendor 17.4, query-vendor 10.6, ui-vendor 4.7; was 340.8 with every
+  // lucide icon in ui-vendor), set at 208.
+  firstLoadGzipKB: 208,
 };
 
 const kb = (bytes) => Math.round(bytes / 1000);

@@ -48,7 +48,9 @@ export default defineConfig(({ mode }) => ({
           "react-vendor": ["react", "react-dom", "react-router-dom"],
           "query-vendor": ["@tanstack/react-query"],
           "video-vendor": ["video.js"],
-          "ui-vendor": ["lucide-react", "react-hot-toast"],
+          // lucide-react stays out: each chunk that imports an icon carries it,
+          // so the first load holds only the icons the shell draws
+          "ui-vendor": ["react-hot-toast"],
         },
       },
     },

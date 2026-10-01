@@ -69,7 +69,7 @@
   },
   "src/components/pages/Home.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-non-null-assertion": {
       "count": 2
@@ -77,11 +77,8 @@
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
     },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 5
+      "count": 4
     }
   },
   "src/components/pages/Login.tsx": {
@@ -944,11 +941,6 @@
   },
   "src/hooks/useUserStats.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 1
-    }
-  },
-  "src/themes/icons/iconSets.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
     }
   },

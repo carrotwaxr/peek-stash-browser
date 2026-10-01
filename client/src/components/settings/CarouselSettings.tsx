@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CarouselData } from "@peek/shared-types";
 import {
+  AlertCircle,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -11,10 +12,10 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { getErrorMessage } from "../../api";
 import { useCarousels, useDeleteCarousel } from "../../api/hooks/useCarousels";
 import { showError } from "../../utils/toast";
+import { getCarouselIcon } from "../carousel-builder/carouselIcons";
 import { Button, ErrorMessage } from "../ui/index";
 
 /**
@@ -238,16 +239,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
       const actualId = prefId.replace("custom-", "");
       const carousel = customCarousels.find((c) => c.id === actualId);
       if (carousel) {
-        const IconComponent =
-          (
-            LucideIcons as unknown as Record<
-              string,
-              React.ComponentType<{
-                className?: string;
-                style?: React.CSSProperties;
-              }>
-            >
-          )[carousel.icon] ?? LucideIcons.Film;
+        const IconComponent = getCarouselIcon(carousel.icon);
         return {
           title: carousel.title,
           description: "Custom carousel",
@@ -259,7 +251,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
         title: "Unknown Carousel",
         description: "Custom carousel not found",
         isCustom: true,
-        icon: LucideIcons.AlertCircle,
+        icon: AlertCircle,
       };
     }
 
