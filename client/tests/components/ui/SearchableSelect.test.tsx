@@ -15,6 +15,7 @@ import { untrusted } from "@tests/helpers/untrusted";
 import { actAsync, flushPromises, must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
+import Modal from "../../../src/components/ui/Modal";
 import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
 // --- Hoisted mocks (available before vi.mock factory runs) ---
@@ -444,5 +445,38 @@ describe("SearchableSelect stored bare values", () => {
     fireEvent.click(await screen.findByLabelText("Remove Tag 466"));
 
     expect(onChange).toHaveBeenCalledWith("");
+  });
+});
+
+describe("SearchableSelect inside a Modal", () => {
+  // Modal stops the press React would bubble to its ancestors; the dropdown's
+  // outside-press listener on the document must still hear it
+  it("a press elsewhere in the dialog closes the open dropdown", async () => {
+    render(
+      <div onMouseDown={vi.fn()} onClick={vi.fn()}>
+        <Modal isOpen onClose={vi.fn()} title="Restrictions">
+          <p>Elsewhere in the dialog</p>
+          <SearchableSelect
+            entityType="performers"
+            value={[]}
+            onChange={vi.fn()}
+            multi
+          />
+        </Modal>
+      </div>
+    );
+
+    fireEvent.click(trigger(document.body));
+    expect(
+      await screen.findByPlaceholderText("Type to search...")
+    ).toBeTruthy();
+
+    const elsewhere = screen.getByText("Elsewhere in the dialog");
+    fireEvent.mouseDown(elsewhere);
+    fireEvent.click(elsewhere);
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Type to search...")).toBeNull();
+    });
   });
 });

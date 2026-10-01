@@ -135,7 +135,8 @@ const AddToPlaylistButton = ({
     }
   }, [showMenu, dropdownPositionProp]);
 
-  // Click outside to close
+  // Click outside to close,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -144,9 +145,9 @@ const AddToPlaylistButton = ({
     };
 
     if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside, true);
       return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("mousedown", handleClickOutside, true);
     }
     return undefined;
   }, [showMenu]);

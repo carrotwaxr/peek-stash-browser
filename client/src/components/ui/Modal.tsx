@@ -66,7 +66,9 @@ const Modal = ({
   if (!isOpen) return null;
 
   // React bubbles a portal's events to its React ancestors (a card's click
-  // and mousedown handlers), so the backdrop stops them
+  // and mousedown handlers), so the backdrop stops them. That stops the native
+  // event too: a listener for a press outside a popover inside a Modal listens
+  // on the document in the capture phase
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"

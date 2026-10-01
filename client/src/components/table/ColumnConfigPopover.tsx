@@ -40,7 +40,8 @@ const ColumnConfigPopover = ({
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
 
-  // Close popover when clicking outside
+  // Close popover when clicking outside,
+  // in the capture phase: a Modal stops the press bubbling past its backdrop
   useEffect(() => {
     if (!isOpen) return;
 
@@ -55,12 +56,12 @@ const ColumnConfigPopover = ({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside, true);
+    document.addEventListener("touchstart", handleClickOutside, true);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
+      document.removeEventListener("touchstart", handleClickOutside, true);
     };
   }, [isOpen]);
 
