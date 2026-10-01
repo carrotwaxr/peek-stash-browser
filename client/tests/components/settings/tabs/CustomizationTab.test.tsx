@@ -339,7 +339,10 @@ describe("CustomizationTab", () => {
       const select = await screen.findByLabelText("Scene Card Preview Quality");
       // The sprite preview loaded first
       await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith("/api/proxy/scene/42/vtt.vtt")
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/proxy/scene/42/vtt.vtt",
+          expect.objectContaining({})
+        )
       );
 
       fireEvent.change(select, { target: { value: "mp4" } });

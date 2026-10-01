@@ -56,20 +56,6 @@ declare module "crypto-js" {
   export default CryptoJS;
 }
 
-declare module "videojs-vtt.js" {
-  export const WebVTT: {
-    Parser: new (
-      window: Window,
-      decoder: any
-    ) => {
-      oncue: ((cue: any) => void) | null;
-      parse(data: any): void;
-      flush(): void;
-    };
-    StringDecoder(): any;
-  };
-}
-
 declare module "videojs-vr" {
   // Side-effect import only — registers itself on the player prototype
 }

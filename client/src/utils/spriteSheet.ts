@@ -3,19 +3,14 @@
  */
 
 /**
- * Parse a WebVTT file for sprite sheet thumbnails
- * VTT format example:
- * WEBVTT
- *
- * 00:00:00.000 --> 00:00:10.000
- * sprite#xywh=0,0,160,90
- *
- * @param {string} vttContent - The raw VTT file content
- * @returns {Array<Object>} Array of cue objects with timing and sprite position
+ * One cue of a sprite VTT: Stash's seek-thumbnail files, where each cue's text
+ * is `<sprite image>#xywh=x,y,width,height`.
  */
-interface SpriteCue {
+export interface SpriteCue {
   startTime: number;
   endTime: number;
+  /** The sprite image the cue names; empty when the cue names none */
+  image: string;
   x: number;
   y: number;
   width: number;
@@ -29,85 +24,79 @@ interface SpritePosition {
   height: number;
 }
 
-function parseVTT(vttContent: string): SpriteCue[] {
-  const cues = [];
-  const lines = vttContent.split("\n");
+const TIMING = /^([\d:.]+)\s*-->\s*([\d:.]+)/;
+const SPRITE_POSITION = /^(.*?)#xywh=(\d+),(\d+),(\d+),(\d+)\s*$/i;
 
-  let i = 0;
-  // Skip WEBVTT header
-  while (i < lines.length && !lines[i]?.includes("-->")) {
-    i++;
-  }
+/**
+ * Parse a sprite VTT, the one parser for the cards' previews and the player's
+ * seek thumbnails. Takes LF, CRLF or CR line ends, a byte-order mark, cue ids,
+ * NOTE blocks, cue settings and hour or minute timestamps; a cue whose text is
+ * not a sprite position is skipped.
+ */
+export function parseSpriteVtt(text: string): SpriteCue[] {
+  const cues: SpriteCue[] = [];
+  const blocks = text
+    .replace(/^\uFEFF/, "")
+    .split(/\r\n|\r|\n/)
+    .join("\n")
+    .split(/\n[ \t]*\n/);
 
-  while (i < lines.length) {
-    const rawLine = lines[i];
-    if (rawLine === undefined) break;
-    const line = rawLine.trim();
+  for (const block of blocks) {
+    const lines = block.split("\n").map((line) => line.trim());
+    const timingIndex = lines.findIndex((line) => line.includes("-->"));
+    if (timingIndex < 0) continue;
 
-    // Look for timestamp lines (format: 00:00:00.000 --> 00:00:10.000)
-    if (line.includes("-->")) {
-      const [startTime, endTime] = line
-        .split("-->")
-        .map((t: string) => t.trim());
+    const timing = TIMING.exec(lines[timingIndex] ?? "");
+    const position = SPRITE_POSITION.exec(
+      lines.slice(timingIndex + 1).find((line) => line !== "") ?? ""
+    );
+    if (!timing || !position) continue;
+    const [, start = "", end = ""] = timing;
+    const [, image = "", x = "", y = "", width = "", height = ""] = position;
 
-      // Next line should have the sprite position
-      i++;
-      const nextLine = lines[i];
-      if (
-        nextLine !== undefined &&
-        startTime !== undefined &&
-        endTime !== undefined
-      ) {
-        const positionLine = nextLine.trim();
+    const startTime = parseTimestamp(start);
+    const endTime = parseTimestamp(end);
+    if (Number.isNaN(startTime) || Number.isNaN(endTime)) continue;
 
-        // Parse sprite position (format: sprite#xywh=x,y,width,height)
-        const match = positionLine.match(/xywh=(\d+),(\d+),(\d+),(\d+)/);
-        const [, x, y, width, height] = match ?? [];
-        if (x && y && width && height) {
-          cues.push({
-            startTime: parseTimestamp(startTime),
-            endTime: parseTimestamp(endTime),
-            x: parseInt(x),
-            y: parseInt(y),
-            width: parseInt(width),
-            height: parseInt(height),
-          });
-        }
-      }
-    }
-    i++;
+    cues.push({
+      startTime,
+      endTime,
+      image,
+      x: parseInt(x, 10),
+      y: parseInt(y, 10),
+      width: parseInt(width, 10),
+      height: parseInt(height, 10),
+    });
   }
 
   return cues;
 }
 
 /**
- * Convert VTT timestamp to seconds
- * Format: HH:MM:SS.mmm or MM:SS.mmm
- * @param {string} timestamp - VTT timestamp string
- * @returns {number} Time in seconds
+ * Convert a VTT timestamp (`HH:MM:SS.mmm` or `MM:SS.mmm`) to seconds; NaN for
+ * anything else
  */
 function parseTimestamp(timestamp: string): number {
   const parts = timestamp.split(":");
-  // The length checks below guarantee each part they read, so the defaults
-  // never apply
-  const [first = "", second = "", third = ""] = parts;
-  let hours = 0,
-    minutes = 0,
-    seconds = 0;
+  if (parts.length < 2 || parts.length > 3) return NaN;
+  return parts.reduce((total, part) => total * 60 + Number(part), 0);
+}
 
-  if (parts.length === 3) {
-    hours = parseInt(first);
-    minutes = parseInt(second);
-    seconds = parseFloat(third);
-  } else if (parts.length === 2) {
-    minutes = parseInt(first);
-    seconds = parseFloat(second);
-  } else {
-    seconds = parseFloat(first);
+/**
+ * Fetch and parse a sprite VTT. Rejects on an error status, and with an
+ * `AbortError` once `signal` aborts.
+ */
+export async function fetchSpriteVtt(
+  url: string,
+  signal?: AbortSignal
+): Promise<SpriteCue[]> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch VTT: ${response.status} ${response.statusText}`
+    );
   }
-
-  return hours * 3600 + minutes * 60 + seconds;
+  return parseSpriteVtt(await response.text());
 }
 
 /**
@@ -125,18 +114,12 @@ function extractSpritePosition(cue: SpriteCue): SpritePosition {
 }
 
 /**
- * Fetch and parse a VTT file from a URL
- * @param {string} vttUrl - URL to the VTT file
- * @returns {Promise<Array<Object>>} Promise resolving to parsed cues
+ * Fetch and parse a sprite VTT for a card preview: an empty list when it
+ * cannot be loaded
  */
 export async function fetchAndParseVTT(vttUrl: string): Promise<SpriteCue[]> {
   try {
-    const response = await fetch(vttUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch VTT: ${response.statusText}`);
-    }
-    const vttContent = await response.text();
-    return parseVTT(vttContent);
+    return await fetchSpriteVtt(vttUrl);
   } catch (error) {
     console.error("Error fetching VTT file:", error);
     return [];

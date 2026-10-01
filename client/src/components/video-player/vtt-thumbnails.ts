@@ -1,11 +1,15 @@
 import videojs from "video.js";
-import { WebVTT } from "videojs-vtt.js";
+import { type SpriteCue, fetchSpriteVtt } from "../../utils/spriteSheet";
 
 /**
  * VTT Thumbnails Plugin for Video.js
  *
  * Based on Stash's implementation - shows sprite sheet thumbnails when hovering over seek bar.
- * Parses VTT files with sprite coordinates and displays thumbnails using CSS background positioning.
+ * Parses VTT files with sprite coordinates (`parseSpriteVtt`, the cards'
+ * parser) and displays thumbnails using CSS background positioning. A new
+ * `src`, `detach` or the player's dispose aborts the load in flight, and an
+ * answer for an earlier `src` is dropped, so a player shows one scene's
+ * thumbnails in one holder.
  */
 
 interface VttThumbnailStyle {
@@ -20,6 +24,12 @@ interface VttDataItem {
   style: VttThumbnailStyle | null;
 }
 
+/** The parts of the player the plugin reads after it is built */
+interface ThumbnailPlayer {
+  $(selector: string): HTMLElement | null;
+  duration(): number;
+}
+
 class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   source: string | null;
   spriteUrl: string | null;
@@ -30,7 +40,9 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   vttData: VttDataItem[] | null;
   lastStyle: VttThumbnailStyle | null;
   isTouching: boolean;
-  declare player: any;
+  /** The load in flight; replaced by each `src`, aborted on reset */
+  loadController: AbortController | null;
+  declare player: ThumbnailPlayer;
 
   constructor(player: any, options: any) {
     super(player, options);
@@ -45,10 +57,12 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     this.vttData = null;
     this.lastStyle = null;
     this.isTouching = false;
+    this.loadController = null;
 
     player.ready(() => {
       player.addClass("vjs-vtt-thumbnails");
-      this.initializeThumbnails();
+      // A `src` called before ready has started its own load
+      if (!this.loadController && !this.vttData) this.initializeThumbnails();
     });
   }
 
@@ -65,7 +79,21 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     this.resetPlugin();
   }
 
+  dispose() {
+    this.resetPlugin();
+    super.dispose();
+  }
+
   resetPlugin() {
+    this.loadController?.abort();
+    this.loadController = null;
+    this.removeThumbnailElement();
+    this.vttData = null;
+    this.lastStyle = null;
+  }
+
+  /** Removes the holder and every listener `setupThumbnailElement` added */
+  removeThumbnailElement() {
     this.showing = false;
 
     if (this.thumbnailHolder) {
@@ -75,7 +103,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
 
     if (this.progressBar) {
       this.progressBar.removeEventListener(
-        "pointerenter",
+        "pointerover",
         this.onBarPointerEnter
       );
       this.progressBar.removeEventListener(
@@ -83,7 +111,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
         this.onBarPointerMove
       );
       this.progressBar.removeEventListener(
-        "pointerleave",
+        "pointerout",
         this.onBarPointerLeave
       );
       this.progressBar.removeEventListener("touchstart", this.onTouchStart);
@@ -91,25 +119,31 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
       this.progressBar.removeEventListener("touchend", this.onTouchEnd);
       this.progressBar = null;
     }
-
-    this.vttData = null;
-    this.lastStyle = null;
   }
 
   initializeThumbnails() {
+    this.loadController?.abort();
+    this.loadController = null;
     if (!this.source) {
       return;
     }
 
     const baseUrl = this.getBaseUrl();
     const url = this.getFullyQualifiedUrl(this.source, baseUrl);
+    const controller = new AbortController();
+    this.loadController = controller;
 
-    this.getVttFile(url)
-      .then((data) => {
-        this.vttData = this.processVtt(data);
+    fetchSpriteVtt(url, controller.signal)
+      .then((cues) => {
+        // An answer for an earlier src, or one after a reset, is not shown
+        if (this.loadController !== controller) return;
+        this.loadController = null;
+        this.vttData = cues.map((cue) => this.toVttDataItem(cue));
         this.setupThumbnailElement();
       })
       .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        if (this.loadController === controller) this.loadController = null;
         console.error("[VTT Thumbnails] Failed to load VTT file:", err);
       });
   }
@@ -128,21 +162,9 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     ); // split() always returns a first part
   }
 
-  getVttFile(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const req = new XMLHttpRequest();
-      req.addEventListener("load", () => {
-        resolve(req.responseText);
-      });
-      req.addEventListener("error", () => {
-        reject(new Error(`Request for ${url} failed`));
-      });
-      req.open("GET", url);
-      req.send();
-    });
-  }
-
   setupThumbnailElement() {
+    // One holder per player: drop any earlier one with its listeners
+    this.removeThumbnailElement();
     const progressBar = this.player.$(".vjs-progress-control");
     if (!progressBar) return;
     this.progressBar = progressBar;
@@ -287,21 +309,12 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     Object.assign(this.thumbnailHolder.style, currentStyle);
   }
 
-  processVtt(data: string): VttDataItem[] {
-    const processedVtts: VttDataItem[] = [];
-
-    const parser = new WebVTT.Parser(window, WebVTT.StringDecoder());
-    parser.oncue = (cue: any) => {
-      processedVtts.push({
-        start: cue.startTime,
-        end: cue.endTime,
-        style: this.getVttStyle(cue.text),
-      });
+  toVttDataItem(cue: SpriteCue): VttDataItem {
+    return {
+      start: cue.startTime,
+      end: cue.endTime,
+      style: this.getVttStyle(cue),
     };
-    parser.parse(data);
-    parser.flush();
-
-    return processedVtts;
   }
 
   getFullyQualifiedUrl(path: string, base: string) {
@@ -321,32 +334,15 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     return path;
   }
 
-  getPropsFromDef(def: string) {
-    const match = def.match(/^([^#]*)#xywh=(\d+),(\d+),(\d+),(\d+)$/i);
-    if (!match) return null;
-
-    return {
-      image: match[1],
-      x: match[2],
-      y: match[3],
-      w: match[4],
-      h: match[5],
-    };
-  }
-
-  getVttStyle(vttImageDef: string) {
-    // Parse the coordinates from the VTT definition
-    const imageProps = this.getPropsFromDef(vttImageDef);
-    if (!imageProps) return null;
-
+  getVttStyle(cue: SpriteCue): VttThumbnailStyle {
     // Use the sprite URL provided by scene.paths.sprite (already properly proxied)
     // instead of parsing from VTT file which has Stash's internal paths
-    const spriteUrl = this.spriteUrl || imageProps.image;
+    const spriteUrl = this.spriteUrl || cue.image;
 
     return {
-      background: `url("${spriteUrl}") no-repeat -${imageProps.x}px -${imageProps.y}px`,
-      width: `${imageProps.w}px`,
-      height: `${imageProps.h}px`,
+      background: `url("${spriteUrl}") no-repeat -${cue.x}px -${cue.y}px`,
+      width: `${cue.width}px`,
+      height: `${cue.height}px`,
     };
   }
 
