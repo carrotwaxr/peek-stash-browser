@@ -19,7 +19,13 @@ describe("HighlightCard", () => {
       <HighlightCard
         title="Most O'd Performer"
         entityType="performer"
-        item={{ id: "12", instanceId: "inst-b", name: "B-12" }}
+        item={{
+          id: "12",
+          instanceId: "inst-b",
+          name: "B-12",
+          imageUrl: null,
+          oCount: 3,
+        }}
         statLabel="Os"
         statValue={3}
       />
@@ -37,7 +43,13 @@ describe("HighlightCard", () => {
     renderWithProviders(
       <HighlightCard
         title="Most Watched Scene"
-        item={{ id: "5", instanceId: "inst-a", title: "Five" }}
+        item={{
+          id: "5",
+          instanceId: "inst-a",
+          title: "Five",
+          filePath: null,
+          imageUrl: null,
+        }}
         statLabel="plays"
         statValue={2}
       />

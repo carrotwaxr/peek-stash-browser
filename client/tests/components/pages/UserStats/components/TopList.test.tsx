@@ -14,6 +14,7 @@ const entry = (id: string, instanceId: string, name: string) => ({
   id,
   instanceId,
   name,
+  imageUrl: null,
   playDuration: 0,
   playCount: 1,
   oCount: 0,

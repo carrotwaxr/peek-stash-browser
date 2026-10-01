@@ -1,12 +1,13 @@
 /**
  * Hook for fetching user stats via TanStack Query.
  */
+import type { UserStatsResponse } from "@peek/shared-types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet } from "../api";
+import { apiGet, getErrorMessage } from "../api";
 import { queryKeys } from "../api/queryKeys";
 import { useAuth } from "./useAuth";
 
-type TopListSortBy = "engagement" | "oCount" | "playCount";
+export type TopListSortBy = "engagement" | "oCount" | "playCount";
 
 interface UseUserStatsOptions {
   sortBy?: TopListSortBy;
@@ -18,9 +19,9 @@ export function useUserStats({
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<UserStatsResponse>({
     queryKey: [...queryKeys.user.stats(), sortBy],
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (sortBy && sortBy !== "engagement") {
         params.set("sortBy", sortBy);
@@ -29,7 +30,7 @@ export function useUserStats({
       const endpoint = queryString
         ? `/user-stats?${queryString}`
         : "/user-stats";
-      return apiGet(endpoint);
+      return apiGet<UserStatsResponse>(endpoint, signal);
     },
     enabled: isAuthenticated,
   });
@@ -39,9 +40,9 @@ export function useUserStats({
   };
 
   return {
-    data: (data as Record<string, unknown>) ?? null,
+    data: data ?? null,
     loading: isLoading,
-    error: error ? error.message || "Failed to fetch stats" : null,
+    error: error ? getErrorMessage(error, "Failed to fetch stats") : null,
     refresh,
   };
 }
