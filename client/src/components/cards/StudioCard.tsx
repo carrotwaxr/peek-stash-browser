@@ -50,18 +50,8 @@ const StudioCard = memo(
               | boolean
               | undefined,
           }}
-          ratingControlsProps={{
-            entityId: studio.id,
-            instanceId: studio.instanceId,
-            initialRating: studio.rating100,
-            initialFavorite: studio.favorite || false,
-            initialOCounter: studio.o_counter,
-            onHideSuccess,
-            showRating: studioSettings.showRating as boolean | undefined,
-            showFavorite: studioSettings.showFavorite as boolean | undefined,
-            showOCounter: studioSettings.showOCounter as boolean | undefined,
-            showMenu: studioSettings.showMenu as boolean | undefined,
-          }}
+          ratingEntity={studio}
+          ratingControlsProps={{ onHideSuccess }}
           {...rest}
         />
       );

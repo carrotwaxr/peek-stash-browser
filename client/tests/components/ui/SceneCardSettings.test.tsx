@@ -53,12 +53,14 @@ describe("SceneCard respects card display settings", () => {
   // A partial scene: the fields SceneCard shows
   const mockScene = {
     id: "scene-123",
+    instanceId: "inst-1",
     title: "Test Scene Title",
     code: "SCENE-CODE-001",
     paths: { screenshot: "/screenshot.jpg" },
     date: "2024-01-15",
     files: [{ duration: 3600, width: 1920, height: 1080 }],
     rating: 80,
+    rating100: 80,
     favorite: true,
     o_counter: 5,
     play_count: 10,
@@ -191,7 +193,7 @@ describe("SceneCard respects card display settings", () => {
   });
 
   describe("rating controls settings", () => {
-    it("passes showRating to BaseCard ratingControlsProps", () => {
+    it("shows the rating badge when showRating is on", () => {
       const { container } = render(<SceneCard scene={mockScene} />, {
         wrapper,
       });
@@ -201,7 +203,7 @@ describe("SceneCard respects card display settings", () => {
       expect(container.innerHTML).toMatch(/rating|star|★/i);
     });
 
-    it("passes showFavorite to BaseCard ratingControlsProps", () => {
+    it("shows the favorite button when showFavorite is on", () => {
       const { container } = render(<SceneCard scene={mockScene} />, {
         wrapper,
       });
@@ -210,7 +212,7 @@ describe("SceneCard respects card display settings", () => {
       expect(container.innerHTML).toMatch(/favorite|heart/i);
     });
 
-    it("passes showOCounter to BaseCard ratingControlsProps", () => {
+    it("shows the O count when showOCounter is on", () => {
       render(<SceneCard scene={mockScene} />, { wrapper });
 
       // When showOCounter is true, the O counter should be present

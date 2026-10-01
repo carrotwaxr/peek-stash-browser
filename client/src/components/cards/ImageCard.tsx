@@ -162,20 +162,12 @@ const ImageCard = memo(
               | boolean
               | undefined,
           }}
+          ratingEntity={image}
           ratingControlsProps={{
-            entityId: image.id,
-            instanceId: image.instanceId,
-            initialRating: image.rating100,
-            initialFavorite: image.favorite,
-            initialOCounter: image.oCounter,
             onHideSuccess,
             onOCounterChange: onOCounterChange && handleOCounterChange,
             onRatingChange: onRatingChange && handleRatingChange,
             onFavoriteChange: onFavoriteChange && handleFavoriteChange,
-            showRating: imageSettings.showRating as boolean | undefined,
-            showFavorite: imageSettings.showFavorite as boolean | undefined,
-            showOCounter: imageSettings.showOCounter as boolean | undefined,
-            showMenu: imageSettings.showMenu as boolean | undefined,
           }}
           {...rest}
         />

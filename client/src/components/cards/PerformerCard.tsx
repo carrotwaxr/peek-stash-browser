@@ -57,19 +57,11 @@ const PerformerCard = memo(
               | boolean
               | undefined,
           }}
+          ratingEntity={performer}
           ratingControlsProps={{
-            entityId: performer.id,
-            instanceId: performer.instanceId,
             // The title is JSX (name and gender icon), so name the performer
             entityTitle: performer.name,
-            initialRating: performer.rating,
-            initialFavorite: performer.favorite || false,
-            initialOCounter: performer.o_counter,
             onHideSuccess,
-            showRating: performerSettings.showRating as boolean | undefined,
-            showFavorite: performerSettings.showFavorite as boolean | undefined,
-            showOCounter: performerSettings.showOCounter as boolean | undefined,
-            showMenu: performerSettings.showMenu as boolean | undefined,
           }}
           {...rest}
         />

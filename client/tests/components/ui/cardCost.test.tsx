@@ -42,7 +42,7 @@ vi.mock("@/components/ui/BaseCard", async (importOriginal) => {
     createElement(
       Profiler,
       {
-        id: props.ratingControlsProps?.entityId ?? "?",
+        id: props.ratingEntity?.id ?? "?",
         onRender: recordCommit,
       },
       createElement(actual.BaseCard, { ...props, ref })
@@ -148,6 +148,7 @@ const fullScene = (i: number) =>
     code: `CODE-${i}`,
     date: "2024-01-01",
     rating: 80,
+    rating100: 80,
     favorite: false,
     o_counter: 2,
     play_count: 3,
@@ -333,7 +334,7 @@ describe("the cost of a grid of scene cards", () => {
       commits.clear();
 
       serverRows = serverRows.map((scene) =>
-        scene.id === "5" ? { ...scene, rating: 40 } : scene
+        scene.id === "5" ? { ...scene, rating: 40, rating100: 40 } : scene
       );
       await refetch(container);
 

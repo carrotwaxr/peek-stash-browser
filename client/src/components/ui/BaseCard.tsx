@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { isRatableEntityType } from "@peek/shared-types";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
 import {
   type ToggleSelectOptions,
@@ -57,6 +58,31 @@ export interface RatingControlsProps {
   showMenu?: boolean;
 }
 
+/**
+ * What a card knows of the viewer's own data on an entity: a list row, a
+ * detail entity or a clip (which has none). The rating row reads it. The O
+ * count is `o_counter` on scenes, performers, studios and tags and
+ * `oCounter` on images.
+ */
+export interface RatingEntity {
+  id: string;
+  instanceId: string;
+  rating100?: number | null;
+  favorite?: boolean | null;
+  o_counter?: number | null;
+  oCounter?: number | null;
+}
+
+/** A card setting, when the stored value is a switch */
+const switchOf = (value: unknown): boolean | undefined =>
+  typeof value === "boolean" ? value : undefined;
+
+/** The fields set to a value: an `undefined` field leaves the default alone */
+const definedFields = <T extends object>(fields: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+
 export interface BaseCardProps {
   entityType: string;
   entity?: Record<string, unknown>;
@@ -74,7 +100,14 @@ export interface BaseCardProps {
   indicators?: CardIndicator[];
   /** A text label shown before the count indicators, such as a resolution */
   indicatorBadge?: CardBadge;
-  ratingControlsProps?: RatingControlsProps;
+  /**
+   * The entity the rating row shows: its ids, rating, favorite and O count,
+   * with the entity type's card settings, build the row. A card with none
+   * has no row and no menu.
+   */
+  ratingEntity?: RatingEntity;
+  /** Fields that win over what `ratingEntity` and the card settings give */
+  ratingControlsProps?: Partial<RatingControlsProps>;
   displayPreferences?: { showDescription?: boolean };
   hideDescription?: boolean;
   hideSubtitle?: boolean;
@@ -120,7 +153,8 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
       // Indicators & Rating
       indicators = [],
       indicatorBadge,
-      ratingControlsProps,
+      ratingEntity,
+      ratingControlsProps: explicitControls,
 
       // Display preferences
       displayPreferences = {},
@@ -151,6 +185,32 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
     ref
   ) => {
     const aspectRatio = useEntityImageAspectRatio(entityType);
+
+    // The rating row: the entity's data and the card settings, then what the
+    // card set itself
+    const { getSettings } = useCardDisplaySettings();
+    const cardSettings = getSettings(
+      explicitControls?.entityType ?? entityType
+    );
+    const entityId = explicitControls?.entityId ?? ratingEntity?.id;
+    const controlsInstanceId =
+      explicitControls?.instanceId ?? ratingEntity?.instanceId;
+    const ratingControlsProps: RatingControlsProps | undefined =
+      entityId !== undefined && controlsInstanceId !== undefined
+        ? {
+            entityId,
+            instanceId: controlsInstanceId,
+            initialRating: ratingEntity?.rating100,
+            initialFavorite: ratingEntity?.favorite ?? false,
+            initialOCounter:
+              ratingEntity?.o_counter ?? ratingEntity?.oCounter ?? undefined,
+            showRating: switchOf(cardSettings.showRating),
+            showFavorite: switchOf(cardSettings.showFavorite),
+            showOCounter: switchOf(cardSettings.showOCounter),
+            showMenu: switchOf(cardSettings.showMenu),
+            ...definedFields(explicitControls ?? {}),
+          }
+        : undefined;
 
     // Selection hook
     const { selectionHandlers, handleNavigationClick } = useCardSelection({

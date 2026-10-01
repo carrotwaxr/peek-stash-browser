@@ -68,17 +68,8 @@ const GroupCard = memo(
               | boolean
               | undefined,
           }}
-          ratingControlsProps={{
-            entityId: group.id,
-            instanceId: group.instanceId,
-            initialRating: group.rating100,
-            initialFavorite: group.favorite || false,
-            onHideSuccess,
-            showRating: groupSettings.showRating as boolean | undefined,
-            showFavorite: groupSettings.showFavorite as boolean | undefined,
-            showOCounter: groupSettings.showOCounter as boolean | undefined,
-            showMenu: groupSettings.showMenu as boolean | undefined,
-          }}
+          ratingEntity={group}
+          ratingControlsProps={{ onHideSuccess }}
           {...rest}
         />
       );

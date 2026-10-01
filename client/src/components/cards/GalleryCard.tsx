@@ -67,17 +67,8 @@ const GalleryCard = memo(
               | boolean
               | undefined,
           }}
-          ratingControlsProps={{
-            entityId: gallery.id,
-            instanceId: gallery.instanceId,
-            initialRating: gallery.rating100,
-            initialFavorite: gallery.favorite || false,
-            onHideSuccess,
-            showRating: gallerySettings.showRating as boolean | undefined,
-            showFavorite: gallerySettings.showFavorite as boolean | undefined,
-            showOCounter: gallerySettings.showOCounter as boolean | undefined,
-            showMenu: gallerySettings.showMenu as boolean | undefined,
-          }}
+          ratingEntity={gallery}
+          ratingControlsProps={{ onHideSuccess }}
           {...rest}
         />
       );

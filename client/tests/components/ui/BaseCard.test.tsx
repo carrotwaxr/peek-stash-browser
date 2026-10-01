@@ -18,6 +18,15 @@ vi.mock("../../../src/hooks/useHiddenEntities", () => ({
   }),
 }));
 
+// The card settings the card under test reads; a test sets them
+let cardSettings: Record<string, unknown> = {};
+vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
+  useCardDisplaySettings: () => ({ getSettings: () => cardSettings }),
+}));
+afterEach(() => {
+  cardSettings = {};
+});
+
 describe("BaseCard", () => {
   const defaultProps = {
     entityType: "scene",
@@ -231,5 +240,117 @@ describe("BaseCard navigation", () => {
     // Not prevented: the browser's own new-tab or new-window handling runs
     expect(notPrevented).toEqual([true, true, true]);
     expect(router.state.location.pathname).toBe("/scenes");
+  });
+});
+
+describe("BaseCard rating controls from the entity", () => {
+  const allOn = {
+    showRating: true,
+    showFavorite: true,
+    showOCounter: true,
+    showMenu: true,
+  };
+  const renderCard = (
+    props: Partial<BaseCardProps>,
+    settings: Record<string, unknown> = allOn
+  ) => {
+    cardSettings = settings;
+    return render(
+      <MemoryRouter>
+        <BaseCard entityType="scene" title="Test" {...props} />
+      </MemoryRouter>,
+      { wrapper: createQueryWrapper() }
+    );
+  };
+
+  it("the rating row reads the entity's rating, favorite and O count", () => {
+    renderCard({
+      ratingEntity: {
+        id: "s1",
+        instanceId: "inst-1",
+        rating100: 80,
+        favorite: true,
+        o_counter: 4,
+      },
+    });
+    expect(screen.getByLabelText("Rating: 8.0")).toBeInTheDocument();
+    expect(screen.getByLabelText("Remove from favorites")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Increment O counter (current: 4)")
+    ).toBeInTheDocument();
+  });
+
+  it("an image's oCounter is read the same way", () => {
+    renderCard(
+      {
+        entityType: "image",
+        ratingEntity: {
+          id: "i1",
+          instanceId: "inst-1",
+          rating100: null,
+          favorite: false,
+          oCounter: 2,
+        },
+      },
+      allOn
+    );
+    expect(screen.getByLabelText("Not rated")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Increment O counter (current: 2)")
+    ).toBeInTheDocument();
+  });
+
+  it("a card setting that hides the rating hides it", () => {
+    renderCard(
+      {
+        ratingEntity: {
+          id: "s1",
+          instanceId: "inst-1",
+          rating100: 80,
+          favorite: true,
+          o_counter: 4,
+        },
+      },
+      { ...allOn, showRating: false }
+    );
+    expect(screen.queryByLabelText("Rating: 8.0")).toBeNull();
+    expect(screen.getByLabelText("Remove from favorites")).toBeInTheDocument();
+  });
+
+  it("explicit ratingControlsProps fields win", () => {
+    renderCard({
+      ratingEntity: {
+        id: "s1",
+        instanceId: "inst-1",
+        rating100: 80,
+        favorite: true,
+        o_counter: 4,
+      },
+      ratingControlsProps: { showRating: false, initialOCounter: 9 },
+    });
+    expect(screen.queryByLabelText("Rating: 8.0")).toBeNull();
+    expect(
+      screen.getByLabelText("Increment O counter (current: 9)")
+    ).toBeInTheDocument();
+  });
+
+  it("a gallery card has no O counter to press", () => {
+    renderCard({
+      entityType: "gallery",
+      ratingEntity: {
+        id: "g1",
+        instanceId: "inst-1",
+        rating100: 20,
+        favorite: false,
+      },
+    });
+    expect(screen.queryByLabelText(/Increment O counter/)).toBeNull();
+    expect(screen.getByLabelText("O Counter: 0")).toBeInTheDocument();
+  });
+
+  it("no ratingEntity and no ids in the props means no rating row", () => {
+    renderCard({});
+    expect(screen.queryByLabelText("Not rated")).toBeNull();
+    expect(screen.queryByLabelText("More options")).toBeNull();
   });
 });
