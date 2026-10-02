@@ -54,7 +54,7 @@ The **Continue Watching** section shows all partially-watched scenes:
 **Location:** Home page (top section)
 
 **What appears here:**
-- Scenes you've started but not finished: you stopped before the last 10% of the scene, after watching at least 2% of it
+- Scenes you've started but not finished: you stopped before the last 10% of the scene, however little you had watched
 - Sorted by most recently watched
 - Shows progress percentage
 - Up to 12 scenes, always filled from your whole history (a finished, deleted or hidden scene never takes a slot)
@@ -87,7 +87,7 @@ Open **Watch History** from the navigation (or the **See more** link on Continue
 **Filter:**
 
 - **All** - every scene you have played, watched for any length of time, or left with a resume point
-- **In Progress** - scenes you stopped before the last 10%, after watching at least 2% of the scene (the same as Continue Watching)
+- **In Progress** - scenes you stopped before the last 10% of the scene, however little you had watched (the same list as Continue Watching, and the same as the **In progress** filter on the Scenes page)
 - **Completed** - scenes you played at least once and whose last session finished, or stopped within the final 10% of the scene
 
 **Sort:** Recently Watched, Most Watched (play count) or Longest Duration (time you watched).

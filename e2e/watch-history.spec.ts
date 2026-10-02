@@ -39,7 +39,7 @@ test.describe("Watch history", () => {
     }
   });
 
-  test("Continue Watching shows only the scene left at 40%, and Watch History splits All, In Progress and Completed", async ({
+  test("Continue Watching shows the scenes left before the last 10%, and Watch History splits All, In Progress and Completed", async ({
     browser,
     baseURL,
     request,
@@ -98,7 +98,9 @@ test.describe("Watch history", () => {
 
       const page = await context.newPage();
 
-      // Home: Continue Watching holds the 40% scene alone
+      // Home: Continue Watching holds the scenes left at 40% and 1% (a
+      // resume point before the last 10% is in progress, however little was
+      // watched), not the finished one
       await page.goto("/");
       const heading = page.getByRole("heading", {
         level: 2,
@@ -109,8 +111,8 @@ test.describe("Watch history", () => {
       await expect(sceneLinks(carousel, partial).first()).toBeVisible({
         timeout: 15_000,
       });
+      await expect(sceneLinks(carousel, glance).first()).toBeVisible();
       await expect(sceneLinks(carousel, finished)).toHaveCount(0);
-      await expect(sceneLinks(carousel, glance)).toHaveCount(0);
 
       // Watch History: All lists all three
       await page.goto("/watch-history");
@@ -120,12 +122,12 @@ test.describe("Watch history", () => {
         });
       }
 
-      // In Progress: the 40% scene only
+      // In Progress: the 40% and 1% scenes, the same as Continue Watching
       await page.getByLabel("Filter:").selectOption("in_progress");
       await expect(page).toHaveURL(/[?&]view=in_progress(&|$)/);
       await expect(sceneLinks(page, partial).first()).toBeVisible();
+      await expect(sceneLinks(page, glance).first()).toBeVisible();
       await expect(sceneLinks(page, finished)).toHaveCount(0);
-      await expect(sceneLinks(page, glance)).toHaveCount(0);
 
       // Completed: the finished scene only
       await page.getByLabel("Filter:").selectOption("completed");
