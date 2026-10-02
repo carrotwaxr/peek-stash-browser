@@ -38,11 +38,10 @@ const StatField = ({ stat, activeTab, onTab, onPath }: StatFieldProps) => {
             if (tab !== undefined) onTab(tab);
             else if (to !== undefined) onPath(to);
           }}
-          disabled={isActive}
-          className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+          className="font-medium transition-opacity hover:opacity-70"
           style={{
             color: "var(--accent-primary)",
-            cursor: isActive ? "default" : "pointer",
+            cursor: "pointer",
             textDecoration: isActive ? "underline" : "none",
           }}
         >
