@@ -324,10 +324,25 @@ export const GROUP_FIELDS = {
   scenes: ref("scene"),
   /** Groups holding scenes of these performers */
   performers: ref("performer", { excludable: true }),
-  /** The direct sub-groups of these groups (no depth, as the card counts them) */
-  containing_groups: ref("group"),
+  /**
+   * Collections under these within depth + 1 levels, through a visible
+   * containing collection (no depth: their direct sub-collections, as the
+   * card counts them)
+   */
+  containing_groups: ref("group", { hierarchical: true }),
+  /** Collections holding these within depth + 1 levels, through a visible sub-collection */
+  sub_groups: ref("group", { hierarchical: true }),
+  /** A favourite performer of the viewer's in one of its visible scenes */
+  performer_favorite: bool(),
   rating100: nullableNum(),
+  /** The viewer's O count and plays, summed over its visible scenes */
+  o_counter: num(),
+  play_count: num(),
   scene_count: num(),
+  /** Counts as the viewer sees them: live, visible collections and tags */
+  sub_group_count: num(),
+  containing_group_count: num(),
+  tag_count: num(),
   duration: nullableNum(),
   date: date(),
   created_at: date(),

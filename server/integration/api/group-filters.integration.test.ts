@@ -1,8 +1,13 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { expectRefused } from "../helpers/refused.js";
 import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 /**
  * Group Filters Integration Tests
@@ -13,11 +18,11 @@ import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
  * - performers filter (groups containing scenes with performer)
  * - studios filter
  * - rating100 filter
- * - o_counter filter
- * - play_count filter
  * - scene_count filter
  * - name text search
  * - synopsis and director text filters
+ * - the viewer's O count and plays, favourite performers, the tag count
+ *   (seeded)
  */
 
 interface FindGroupsResponse {
@@ -281,22 +286,6 @@ describe("Group Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
-  });
-
-  describe("Stash group filters Peek does not apply", () => {
-    // Groups carry no O count or play count of their own; the request
-    // parser refuses the criteria rather than ignore them
-    it.each(["o_counter", "play_count"])(
-      "%s answers 400 naming it",
-      async (field) => {
-        const response = await adminClient.post("/api/library/groups", {
-          filter: { per_page: 50 },
-          group_filter: { [field]: { value: 0, modifier: "GREATER_THAN" } },
-        });
-
-        expectRefused(response, [`group_filter.${field}`]);
-      }
-    );
   });
 
   describe("synopsis and director filters", () => {
@@ -584,3 +573,283 @@ describe("Group Filters", () => {
     });
   });
 });
+
+/**
+ * The collection's O count and plays (the viewer's, over its visible
+ * scenes), favourite performers and tag count, on seeded rows under two
+ * made-up instances reusing the same ids (invariant 7). The viewer hid GH,
+ * scene S2, performer P2 and tag T2 (invariant 3, lead decision 4); another
+ * user hid nothing and has their own plays and favourites (invariant 6).
+ *
+ * gf2-a: G1 (7741001) holds S1 (7742001) and S3 (7742003, deleted); G2
+ *   (7741002) holds S1; G3 (7741003) holds S4 (7742004); G4 (7741004)
+ *   holds S2 (7742002, hidden); GH (7741005, hidden) holds S1. S1 has P1
+ *   (7743001), S2 has P3 (7743003), S3 has P1, S4 has P2 (7743002,
+ *   hidden). G1 holds tags T1 (7744001), T2 (7744002, hidden) and T3
+ *   (7744003, deleted); G2 holds T2.
+ * gf2-b: G1 holds S1, which has P1; G1 holds T1.
+ */
+describeWithDb(
+  "Collection O count, plays, favourites and tags (seeded)",
+  () => {
+    const A = "gf2-a";
+    const B = "gf2-b";
+    const VIEWER = "gf2-viewer";
+    const OTHER = "gf2-other";
+    let viewerId = 0;
+    let otherId = 0;
+
+    const [G1, G2, G3, G4, GH] = [
+      "7741001",
+      "7741002",
+      "7741003",
+      "7741004",
+      "7741005",
+    ];
+    const [S1, S2, S3, S4] = ["7742001", "7742002", "7742003", "7742004"];
+    const [P1, P2, P3] = ["7743001", "7743002", "7743003"];
+    const [T1, T2, T3] = ["7744001", "7744002", "7744003"];
+    const k = (id: string, instance = A) => `${id}:${instance}`;
+
+    async function removeRows(): Promise<void> {
+      const where = { stashInstanceId: { in: [A, B] } };
+      // Junction rows cascade from their entities; the users' rows from them
+      await prisma.stashGroup.deleteMany({ where });
+      await prisma.stashScene.deleteMany({ where });
+      await prisma.stashPerformer.deleteMany({ where });
+      await prisma.stashTag.deleteMany({ where });
+      await prisma.user.deleteMany({
+        where: { username: { in: [VIEWER, OTHER] } },
+      });
+    }
+
+    /** The collections a wire `group_filter` lists, as sorted keys */
+    async function listed(
+      filter: Record<string, unknown>,
+      userId = viewerId
+    ): Promise<string[]> {
+      const request = parseListRequest(
+        "group",
+        { filter: { per_page: 100 }, group_filter: filter },
+        { userId }
+      );
+      const { items, total } = await groupQueryBuilder.execute({
+        userId,
+        allowedInstanceIds: [A, B],
+        request,
+      });
+      expect(total).toBe(items.length);
+      return items.map((g) => k(g.id, g.instanceId)).sort();
+    }
+
+    beforeAll(async () => {
+      await removeRows();
+      const user = async (username: string) =>
+        (
+          await prisma.user.create({
+            data: { username, password: "not-a-real-hash", role: "USER" },
+          })
+        ).id;
+      viewerId = await user(VIEWER);
+      otherId = await user(OTHER);
+
+      const named =
+        (prefix: string) =>
+        (id: string, instance = A) => ({
+          id,
+          stashInstanceId: instance,
+          name: `GF2 ${prefix} ${id} ${instance}`,
+        });
+      const group = named("group");
+      const performer = named("performer");
+      const tag = named("tag");
+      const deleted = { deletedAt: new Date() };
+      await prisma.stashGroup.createMany({
+        data: [G1, G2, G3, G4, GH].map((id) => group(id)).concat(group(G1, B)),
+      });
+      await prisma.stashScene.createMany({
+        data: [
+          { id: S1, stashInstanceId: A },
+          { id: S2, stashInstanceId: A },
+          { id: S3, stashInstanceId: A, ...deleted },
+          { id: S4, stashInstanceId: A },
+          { id: S1, stashInstanceId: B },
+        ],
+      });
+      await prisma.stashPerformer.createMany({
+        data: [performer(P1), performer(P2), performer(P3), performer(P1, B)],
+      });
+      await prisma.stashTag.createMany({
+        data: [tag(T1), tag(T2), { ...tag(T3), ...deleted }, tag(T1, B)],
+      });
+      const sceneGroup = (groupId: string, sceneId: string, inst = A) => ({
+        sceneId,
+        sceneInstanceId: inst,
+        groupId,
+        groupInstanceId: inst,
+      });
+      await prisma.sceneGroup.createMany({
+        data: [
+          sceneGroup(G1, S1),
+          sceneGroup(G1, S3),
+          sceneGroup(G2, S1),
+          sceneGroup(G3, S4),
+          sceneGroup(G4, S2),
+          sceneGroup(GH, S1),
+          sceneGroup(G1, S1, B),
+        ],
+      });
+      const scenePerformer = (
+        sceneId: string,
+        performerId: string,
+        inst = A
+      ) => ({
+        sceneId,
+        sceneInstanceId: inst,
+        performerId,
+        performerInstanceId: inst,
+      });
+      await prisma.scenePerformer.createMany({
+        data: [
+          scenePerformer(S1, P1),
+          scenePerformer(S2, P3),
+          scenePerformer(S3, P1),
+          scenePerformer(S4, P2),
+          scenePerformer(S1, P1, B),
+        ],
+      });
+      const groupTag = (groupId: string, tagId: string, inst = A) => ({
+        groupId,
+        groupInstanceId: inst,
+        tagId,
+        tagInstanceId: inst,
+      });
+      await prisma.groupTag.createMany({
+        data: [
+          groupTag(G1, T1),
+          groupTag(G1, T2),
+          groupTag(G1, T3),
+          groupTag(G2, T2),
+          groupTag(G1, T1, B),
+        ],
+      });
+      const played = (
+        userId: number,
+        sceneId: string,
+        oCount: number,
+        playCount: number,
+        instanceId = A
+      ) => ({ userId, instanceId, sceneId, oCount, playCount });
+      await prisma.watchHistory.createMany({
+        data: [
+          played(viewerId, S1, 2, 3),
+          played(viewerId, S2, 5, 7),
+          played(viewerId, S3, 11, 13),
+          played(viewerId, S1, 1, 1, B),
+          played(otherId, S1, 100, 100),
+          played(otherId, S4, 9, 9),
+        ],
+      });
+      const favourite = (
+        userId: number,
+        performerId: string,
+        instanceId = A
+      ) => ({
+        userId,
+        instanceId,
+        performerId,
+        favorite: true,
+      });
+      await prisma.performerRating.createMany({
+        data: [
+          favourite(viewerId, P1),
+          favourite(viewerId, P2),
+          favourite(viewerId, P3),
+          favourite(otherId, P1, B),
+        ],
+      });
+      const hidden = (entityType: string, entityId: string) => ({
+        userId: viewerId,
+        entityType,
+        entityId,
+        instanceId: A,
+        reason: "hidden",
+      });
+      await prisma.userExcludedEntity.createMany({
+        data: [
+          hidden("group", GH),
+          hidden("scene", S2),
+          hidden("performer", P2),
+          hidden("tag", T2),
+        ],
+      });
+    });
+
+    afterAll(removeRows);
+
+    it("o_counter sums only the viewer's rows, over the collection's live scenes they can see", async () => {
+      expect(
+        await listed({ o_counter: { value: 2, modifier: "EQUALS" } })
+      ).toEqual([k(G1), k(G2)].sort());
+      expect(
+        await listed({ o_counter: { value: 0, modifier: "GREATER_THAN" } })
+      ).toEqual([k(G1), k(G2), k(G1, B)].sort());
+      // G4's only scene is hidden, G3's unplayed by the viewer
+      expect(
+        await listed({ o_counter: { value: 0, modifier: "EQUALS" } })
+      ).toEqual([k(G3), k(G4)].sort());
+      // A second user's O count is not added
+      expect(
+        await listed({ o_counter: { value: 50, modifier: "GREATER_THAN" } })
+      ).toEqual([]);
+      expect(
+        await listed({ o_counter: { value: 100, modifier: "EQUALS" } }, otherId)
+      ).toEqual([k(G1), k(G2), k(GH)].sort());
+    });
+
+    it("play_count sums only the viewer's rows", async () => {
+      expect(
+        await listed({ play_count: { value: 3, modifier: "EQUALS" } })
+      ).toEqual([k(G1), k(G2)].sort());
+      expect(
+        await listed({
+          play_count: { value: 1, value2: 3, modifier: "BETWEEN" },
+        })
+      ).toEqual([k(G1), k(G2), k(G1, B)].sort());
+      expect(
+        await listed({ play_count: { value: 3, modifier: "GREATER_THAN" } })
+      ).toEqual([]);
+      expect(
+        await listed({ play_count: { value: 9, modifier: "EQUALS" } }, otherId)
+      ).toEqual([k(G3)]);
+    });
+
+    it("performer_favorite: a favourite performer in a visible scene, the favourite on the scene's own instance", async () => {
+      // P2 is hidden and S2 is hidden; P1 on gf2-b is not the viewer's
+      expect(await listed({ performer_favorite: true })).toEqual(
+        [k(G1), k(G2)].sort()
+      );
+      expect(await listed({ performer_favorite: false })).toEqual(
+        [k(G3), k(G4), k(G1, B)].sort()
+      );
+      expect(await listed({ performer_favorite: true }, otherId)).toEqual([
+        k(G1, B),
+      ]);
+      expect(await listed({ performer_favorite: false }, otherId)).toEqual(
+        [k(G1), k(G2), k(G3), k(G4), k(GH)].sort()
+      );
+    });
+
+    it("tag_count counts the live tags the viewer can see", async () => {
+      expect(
+        await listed({ tag_count: { value: 1, modifier: "EQUALS" } })
+      ).toEqual([k(G1), k(G1, B)].sort());
+      expect(
+        await listed({ tag_count: { value: 0, modifier: "EQUALS" } })
+      ).toEqual([k(G2), k(G3), k(G4)].sort());
+      expect(
+        await listed({ tag_count: { value: 2, modifier: "EQUALS" } }, otherId)
+      ).toEqual([k(G1)]);
+    });
+  }
+);
