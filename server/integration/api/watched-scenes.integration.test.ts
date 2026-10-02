@@ -131,7 +131,7 @@ describe("Watched scenes (integration)", () => {
     await prisma.userHiddenEntity.deleteMany({ where: { userId: viewer.id } });
   });
 
-  it("in_progress lists scenes with a resume point between 0 and 90% of the length and at least 2% watched, newest played first; a finished scene (resume 0) is not in progress", async () => {
+  it("in_progress lists scenes with a resume point between 0 and 90% of the length, however little was watched, newest played first; a finished scene (resume 0) is not in progress", async () => {
     await seed([
       // in progress
       {
@@ -168,7 +168,7 @@ describe("Watched scenes (integration)", () => {
         playDuration: 900,
         lastPlayedAt: hoursAgo(0.5),
       },
-      // under 2% watched
+      // a little watched: in progress all the same (no 2% clause)
       {
         sceneId: sid(5),
         resumeTime: 100,
@@ -183,12 +183,13 @@ describe("Watched scenes (integration)", () => {
 
     expect(res.status).toBe(200);
     expect(res.data.scenes.map((s) => `${s.id}@${s.instanceId}`)).toEqual([
+      a(5),
       a(2),
       `${NO_DURATION}@${FX.A}`,
       a(1),
     ]);
-    expect(res.data.total).toBe(3);
-    expect(res.data.totalPlayDuration).toBe(121);
+    expect(res.data.total).toBe(4);
+    expect(res.data.totalPlayDuration).toBe(131);
   });
 
   it("the limit applies after filtering: 12 asked with 8 recent finished or excluded rows still returns 12", async () => {

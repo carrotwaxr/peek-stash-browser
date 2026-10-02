@@ -36,6 +36,7 @@ import {
   exclusionJoin,
   instanceClause,
 } from "../utils/sqlClauses.js";
+import { COMPLETED_SQL, IN_PROGRESS_SQL } from "../utils/watchStateSql.js";
 import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
 
 export const WATCHED_SCENES_PER_PAGE_DEFAULT = 24;
@@ -145,14 +146,9 @@ export function parseWatchedScenesQuery(query: unknown): WatchedScenesRequest {
 const VIEW_CLAUSES: Record<WatchedScenesView, string> = {
   // Played, watched or left with a resume point: a row with only an O stays out
   all: "w.playCount > 0 OR w.playDuration > 0 OR w.resumeTime > 0",
-  // Before the final 10%, with at least 2% watched; any resume point when
-  // the length is unknown
-  in_progress:
-    "w.resumeTime > 0 AND (s.duration IS NULL OR s.duration <= 0 OR (w.resumeTime < 0.9 * s.duration AND w.playDuration >= 0.02 * s.duration))",
-  // Played at least once, and the last session finished (resume point 0 or
-  // none) or stopped within the final 10% (owner, 2026-09-30)
-  completed:
-    "w.playCount > 0 AND (COALESCE(w.resumeTime, 0) = 0 OR (s.duration > 0 AND w.resumeTime >= 0.9 * s.duration))",
+  // The scene filters' rules (utils/watchStateSql.ts)
+  in_progress: IN_PROGRESS_SQL,
+  completed: COMPLETED_SQL,
 };
 
 /** Each sort's terms before the key; NULLs sort last in SQLite's DESC */
