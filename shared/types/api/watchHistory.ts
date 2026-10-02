@@ -112,8 +112,9 @@ export interface DecrementOCounterResponse {
  * The views of `GET /api/watch-history/scenes`:
  * - `all`: played, watched for any time, or left with a resume point (a
  *   scene with only an O is not watched)
- * - `in_progress`: a resume point before the final 10% of the scene, with at
- *   least 2% of it watched (any resume point when the length is unknown)
+ * - `in_progress`: a resume point before the final 10% of the scene, however
+ *   little was watched (any resume point when the length is unknown); the
+ *   scene filter `in_progress` reads the same rule
  * - `completed`: played at least once, and the last session finished
  *   (resume point 0) or stopped within the final 10% of the scene
  */

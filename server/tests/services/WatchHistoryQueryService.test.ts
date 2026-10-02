@@ -18,6 +18,7 @@ import type {
   WatchedSceneQueryRow,
   WatchedScenesTotalsRow,
 } from "../../types/internal/queryRows.js";
+import { COMPLETED_SQL, IN_PROGRESS_SQL } from "../../utils/watchStateSql.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 import { untrusted } from "../helpers/untrusted.js";
@@ -99,14 +100,8 @@ describe("watchedScenesStatements", () => {
 
   it.each([
     ["all", "w.playCount > 0 OR w.playDuration > 0 OR w.resumeTime > 0"],
-    [
-      "in_progress",
-      "w.resumeTime > 0 AND (s.duration IS NULL OR s.duration <= 0 OR (w.resumeTime < 0.9 * s.duration AND w.playDuration >= 0.02 * s.duration))",
-    ],
-    [
-      "completed",
-      "w.playCount > 0 AND (COALESCE(w.resumeTime, 0) = 0 OR (s.duration > 0 AND w.resumeTime >= 0.9 * s.duration))",
-    ],
+    ["in_progress", IN_PROGRESS_SQL],
+    ["completed", COMPLETED_SQL],
   ] as const)("view %s", (view, clause) => {
     const { page, count } = watchedScenesStatements({ ...base, view });
 

@@ -66,6 +66,11 @@ import {
 import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import {
+  COMPLETED_SQL,
+  IN_PROGRESS_SQL,
+  watchStateClause,
+} from "../utils/watchStateSql.js";
+import {
   EntityQueryBuilder,
   type EntitySpec,
   type FieldClauses,
@@ -491,6 +496,12 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     rating100: (c) => buildNumericFilter(c, "r.rating"),
     play_count: (c) => buildNumericFilter(c, "COALESCE(w.playCount, 0)"),
     o_counter: (c) => buildNumericFilter(c, "COALESCE(w.oCount, 0)"),
+    // The History page's rules (utils/watchStateSql.ts), over the viewer's row
+    watched: (on) => ({ sql: watchStateClause(COMPLETED_SQL, on), params: [] }),
+    in_progress: (on) => ({
+      sql: watchStateClause(IN_PROGRESS_SQL, on),
+      params: [],
+    }),
 
     // Text
     title: (c) => buildTextFilter(c, "s.title"),

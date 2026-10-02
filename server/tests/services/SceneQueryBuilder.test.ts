@@ -16,6 +16,11 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { viewablePlaylistSql } from "../../utils/playlistAccessSql.js";
+import {
+  COMPLETED_SQL,
+  IN_PROGRESS_SQL,
+  watchStateClause,
+} from "../../utils/watchStateSql.js";
 import { expandRefsEach } from "../helpers/hierarchyMock.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -390,6 +395,31 @@ describe("SceneQueryBuilder", () => {
         "ORDER BY s.titleSort ASC, s.id ASC, s.stashInstanceId ASC"
       );
       expect(sql).not.toContain("COLLATE NOCASE");
+    });
+
+    it("watched and in_progress read the shared rules over the viewer's history row; false is the negation", async () => {
+      await run({ filter: { watched: true } });
+      await run({ filter: { watched: false } });
+      await run({ filter: { in_progress: true } });
+      await run({ filter: { in_progress: false } });
+
+      const pages = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      expect(pages).toHaveLength(4);
+      expect(pages[0]).toContain(
+        `AND ${watchStateClause(COMPLETED_SQL, true)}`
+      );
+      expect(pages[1]).toContain(
+        `AND ${watchStateClause(COMPLETED_SQL, false)}`
+      );
+      expect(pages[2]).toContain(
+        `AND ${watchStateClause(IN_PROGRESS_SQL, true)}`
+      );
+      expect(pages[3]).toContain(
+        `AND ${watchStateClause(IN_PROGRESS_SQL, false)}`
+      );
+      expect(pages[0]).toContain("LEFT JOIN WatchHistory w ON");
     });
 
     it("tagged false is a scene with no tag, own or inherited; true is its negation", async () => {

@@ -131,6 +131,18 @@ export const SCENE_FIELDS = {
   o_counter: num(),
   play_count: num(),
   play_duration: num(),
+  /**
+   * Scenes the viewer finished (true: played, and the last session ended or
+   * stopped within the final 10%) or the rest, scenes never opened included
+   */
+  watched: bool(),
+  /**
+   * Scenes the viewer left with a resume point before the final 10%, played
+   * or not (a resume point with an unknown length counts); false is the
+   * rest, scenes never opened included. The History page's In progress tab
+   * reads the same rule.
+   */
+  in_progress: bool(),
   duration: num(),
   bitrate: num(),
   framerate: num(),
