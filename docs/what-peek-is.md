@@ -36,7 +36,7 @@ Every user can also hide items for themselves. Hidden items belong to the person
 
 ## Several Stash servers
 
-One Peek can sit in front of several Stash servers. Each user picks which of the enabled servers they see. That choice is a preference, not access control: it only narrows what you see. Servers an admin has disabled never show, and an empty choice means all enabled servers. Ratings, history and playlists remember which server an item came from. See [Configuration](getting-started/configuration.md#multi-instance-support).
+One Peek can sit in front of several Stash servers. Each user picks which of the enabled servers they see. That choice is a preference, not access control: it only narrows what you see. Servers an admin has disabled never show, and an empty choice means all enabled servers. Ratings, history and playlists remember which server an item came from. See [Using Several Stash Servers](user-guide/multiple-stash-servers.md), and [Configuration](getting-started/configuration.md#multi-instance-support) for adding servers.
 
 ## Media through Peek
 

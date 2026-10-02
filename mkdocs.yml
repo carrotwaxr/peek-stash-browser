@@ -134,6 +134,7 @@ nav:
       - Images: user-guide/images.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Merge Detection: user-guide/merge-detection.md
+      - Multiple Stash Servers: user-guide/multiple-stash-servers.md
       - Personalization: user-guide/personalization.md
       - Playlists: user-guide/playlists.md
       - Recommendations: user-guide/recommendations.md

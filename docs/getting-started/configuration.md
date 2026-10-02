@@ -68,6 +68,8 @@ When multiple instances are configured, each user can choose which instances the
 !!! tip "First-Login Setup"
     When a new user logs in and multiple instances are available, they're prompted to select which instances they want to see.
 
+Users have a page of their own on this: [Using Several Stash Servers](../user-guide/multiple-stash-servers.md).
+
 ### How Multi-Instance Content Works
 
 - Content from all selected instances appears together in search results, carousels, and browsing pages
