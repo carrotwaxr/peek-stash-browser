@@ -364,6 +364,29 @@ describe("ScenePlayerContext", () => {
       expect(result.current.playlist).toBeNull();
     });
 
+    // The Scene page's initial focus takes the load's start from the first
+    // render that is loading: a first render not loading would let a control
+    // the user focuses before the load starts count as that start, and lose
+    // its focus to the player when the scene lands
+    it("is loading from the first render, before the load starts", async () => {
+      const seen: boolean[] = [];
+      const { result } = renderHook(
+        () => {
+          const value = useScenePlayer();
+          seen.push(value.sceneLoading);
+          return value;
+        },
+        { wrapper: createWrapper() }
+      );
+
+      expect(seen[0]).toBe(true);
+      await waitFor(() => {
+        expect(result.current.scene).toEqual(mockScene);
+      });
+      expect(result.current.sceneLoading).toBe(false);
+      expect(seen.indexOf(false)).toBe(seen.length - 1);
+    });
+
     it("initializes with playlist props", async () => {
       const playlist = {
         userId: SIGNED_IN_USER,
