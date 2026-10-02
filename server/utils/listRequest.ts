@@ -54,7 +54,7 @@ import type {
   EnumCriterion,
   FilterRef,
   MinimalKind,
-  MultiEnumCriterion,
+  MultiEnumFieldCriterion,
   ParsedClipFilter,
   ParsedClipQuery,
   ParsedFields,
@@ -558,28 +558,40 @@ function textSchema(spec: TextSpec): z.ZodType<TextCriterion> {
     });
 }
 
+/**
+ * An enum criterion. A multi-valued one matches any of its values, or with
+ * IS_NULL or NOT_NULL (where the field offers them) needs no value and
+ * ignores one.
+ */
 function enumSchema(
   spec: EnumSpec
-): z.ZodType<EnumCriterion<string> | MultiEnumCriterion<string>> {
+): z.ZodType<EnumCriterion<string> | MultiEnumFieldCriterion<string>> {
   const modifier = z.enum(spec.modifiers).nullish();
   if (spec.multi) {
     return z
       .strictObject({
         modifier,
-        value: z.array(z.enum(spec.values)).min(1, "Required"),
+        value: z.array(z.enum(spec.values)).nullish(),
       })
-      .transform(
-        (c): MultiEnumCriterion<string> => ({
-          modifier: "INCLUDES",
-          values: c.value,
-        })
-      );
+      .transform((c, ctx): MultiEnumFieldCriterion<string> => {
+        const resolved = c.modifier ?? spec.defaultModifier;
+        if (isPresence(resolved)) return { modifier: resolved };
+        if (!c.value || c.value.length === 0) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["value"],
+            message: "Required",
+          });
+          return z.NEVER;
+        }
+        return { modifier: "INCLUDES", values: c.value };
+      });
   }
   return z
     .strictObject({ modifier, value: z.enum(spec.values) })
     .transform((c, ctx): EnumCriterion<string> => {
       const resolved = c.modifier ?? spec.defaultModifier;
-      if (resolved === "INCLUDES") {
+      if (resolved === "INCLUDES" || isPresence(resolved)) {
         // Declared only on multi-valued enums
         ctx.addIssue({
           code: "custom",

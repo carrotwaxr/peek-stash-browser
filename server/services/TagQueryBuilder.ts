@@ -234,8 +234,8 @@ class TagQueryBuilder extends EntityQueryBuilder<
     parents: (c, ctx) => this.parentClause(c, ctx),
     performers: (c, ctx) => this.junction(PERFORMER_TAGS, c, ctx),
     studios: (c, ctx) => this.junction(STUDIO_TAGS, c, ctx),
-    scenes: (c) => viaSceneClause(TAGS_BY_SCENE, c.refs, c.modifier),
-    groups: (c) => viaSceneClause(TAGS_BY_GROUP, c.refs, c.modifier),
+    scenes: (c, ctx) => viaSceneClause(TAGS_BY_SCENE, c.refs, c.modifier, ctx),
+    groups: (c, ctx) => viaSceneClause(TAGS_BY_GROUP, c.refs, c.modifier, ctx),
 
     // Counts, as the viewer sees them
     scene_count: (c, ctx) => buildNumericFilter(c, sceneCount(ctx)),

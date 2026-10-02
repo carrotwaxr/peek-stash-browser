@@ -11,23 +11,29 @@ import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { NormalizedPerformer, TagRef } from "../types/index.js";
 import type { PerformerQueryRow } from "../types/internal/queryRows.js";
 import type {
+  MultiEnumFieldCriterion,
   NumberCriterion,
   ParsedFilter,
+  RefCriterion,
   RefFieldCriterion,
+  TextCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
+import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   type JunctionTarget,
   type ViaSceneSpec,
   ageYearsSql,
+  allOf,
   buildDayFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
   careerYearsSql,
+  exclusionJoin,
   fullDateSql,
   noClause,
   searchAll,
@@ -40,6 +46,7 @@ import {
   parseStashIds,
   searchTerms,
 } from "../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -48,6 +55,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
@@ -139,6 +147,110 @@ const PERFORMERS_BY_STUDIO: ViaSceneSpec = {
     refInstanceCol: "stashInstanceId",
   },
 };
+
+/**
+ * Performers sharing a scene with one of the performers ("appears with"),
+ * never the performer itself; a performer named counts only while live and
+ * not excluded for the viewer
+ */
+const PERFORMERS_BY_PERFORMER: ViaSceneSpec = {
+  ...PERFORMERS_BY_SCENE,
+  via: {
+    table: "ScenePerformer",
+    alias: "spw",
+    sceneIdCol: "sceneId",
+    sceneInstanceCol: "sceneInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+    related: { table: "StashPerformer", entityType: "performer" },
+  },
+  where:
+    "NOT (spw.performerId = sp.performerId AND spw.performerInstanceId = sp.performerInstanceId)",
+};
+
+/**
+ * A count over related rows as a number filter: the count's own parameters
+ * (the viewer's id) come first, as the expression appears once, before the
+ * criterion's values, in every form `buildNumericFilter` writes
+ */
+function countFilter(criterion: NumberCriterion, count: FilterClause) {
+  const clause = buildNumericFilter(criterion, count.sql);
+  if (!clause.sql) return clause;
+  return { sql: clause.sql, params: [...count.params, ...clause.params] };
+}
+
+/** The performer's live tags the viewer can see */
+function visibleTagCount(ctx: QueryContext): FilterClause {
+  const viewer = ctx.applyExclusions;
+  return {
+    sql: `(SELECT COUNT(*) FROM PerformerTag ptc JOIN StashTag ptct ON ptct.id = ptc.tagId AND ptct.stashInstanceId = ptc.tagInstanceId${viewer ? ` ${exclusionJoin("ptcx", "tag", "ptc.tagId", "ptc.tagInstanceId")}` : ""} WHERE ptc.performerId = p.id AND ptc.performerInstanceId = p.stashInstanceId AND ptct.deletedAt IS NULL${viewer ? " AND ptcx.id IS NULL" : ""})`,
+    params: viewer ? [ctx.userId] : [],
+  };
+}
+
+/**
+ * The live clips (Stash's markers) the viewer can see in the performer's
+ * live scenes they can see, as the Clips page reads them: the clip's own
+ * exclusion rows and its scene's
+ */
+function visibleMarkerCount(ctx: QueryContext): FilterClause {
+  const viewer = ctx.applyExclusions;
+  const excluded = viewer
+    ? ` ${exclusionJoin("mcsx", "scene", "mcs.id", "mcs.stashInstanceId")} ${exclusionJoin("mccx", "clip", "mcc.id", "mcc.stashInstanceId")}`
+    : "";
+  return {
+    sql: `(SELECT COUNT(*) FROM ScenePerformer mcp JOIN StashScene mcs ON mcs.id = mcp.sceneId AND mcs.stashInstanceId = mcp.sceneInstanceId JOIN StashClip mcc ON mcc.sceneId = mcs.id AND mcc.sceneInstanceId = mcs.stashInstanceId${excluded} WHERE mcp.performerId = p.id AND mcp.performerInstanceId = p.stashInstanceId AND mcs.deletedAt IS NULL AND mcc.deletedAt IS NULL${viewer ? " AND mcsx.id IS NULL AND mccx.id IS NULL" : ""})`,
+    params: viewer ? [ctx.userId, ctx.userId] : [],
+  };
+}
+
+/**
+ * The stash-box ids on the performer (`stashIds`, a JSON list of
+ * `{ endpoint, stash_id }`): EQUALS one of them, ignoring case; IS_NULL
+ * none, NOT_NULL any. An element that is not an object holds none.
+ */
+function stashIdClause(criterion: TextCriterion): FilterClause {
+  const id =
+    "CASE WHEN si.type = 'object' THEN json_extract(si.value, '$.stash_id') END";
+  const any = (where: string) =>
+    `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty("p.stashIds")}) si WHERE ${where})`;
+  switch (criterion.modifier) {
+    case "EQUALS":
+      return { sql: any(`LOWER(${id}) = LOWER(?)`), params: [criterion.value] };
+    case "IS_NULL":
+      return { sql: `NOT ${any(`COALESCE(${id}, '') != ''`)}`, params: [] };
+    case "NOT_NULL":
+      return { sql: any(`COALESCE(${id}, '') != ''`), params: [] };
+    // Not offered: the parser refuses them
+    case "INCLUDES":
+    case "EXCLUDES":
+    case "NOT_EQUALS":
+      return noClause();
+  }
+}
+
+/** Circumcised: any of the values, or not set ('' or NULL) and set */
+function circumcisedClause(
+  criterion: MultiEnumFieldCriterion<"CUT" | "UNCUT">
+): FilterClause {
+  switch (criterion.modifier) {
+    case "IS_NULL":
+      return {
+        sql: "(p.circumcised IS NULL OR p.circumcised = '')",
+        params: [],
+      };
+    case "NOT_NULL":
+      return {
+        sql: "(p.circumcised IS NOT NULL AND p.circumcised != '')",
+        params: [],
+      };
+    case "INCLUDES":
+      return {
+        sql: `p.circumcised IN (${criterion.values.map(() => "?").join(", ")})`,
+        params: [...criterion.values],
+      };
+  }
+}
 
 /**
  * A performer's age, Stash's way: today's, or the age reached at death. A
@@ -266,16 +378,35 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
 
     // Related entities
     tags: (c, ctx) => this.tagClause(c, ctx),
-    studios: (c) => viaSceneClause(PERFORMERS_BY_STUDIO, c.refs, c.modifier),
-    scenes: (c) => viaSceneClause(PERFORMERS_BY_SCENE, c.refs, c.modifier),
-    groups: (c) => viaSceneClause(PERFORMERS_BY_GROUP, c.refs, c.modifier),
+    tag_favorite: (on, ctx) => this.tagFavoriteClause(on, ctx),
+    // Through the scenes the viewer can see
+    studios: (c, ctx) => this.studioClause(c, ctx),
+    scenes: (c, ctx) =>
+      viaSceneClause(PERFORMERS_BY_SCENE, c.refs, c.modifier, ctx),
+    groups: (c, ctx) =>
+      viaSceneClause(PERFORMERS_BY_GROUP, c.refs, c.modifier, ctx),
+    performers: (c, ctx) =>
+      viaSceneClause(PERFORMERS_BY_PERFORMER, c.refs, c.modifier, ctx),
 
     // Counts, as the viewer sees them
     scene_count: (c, ctx) =>
       buildNumericFilter(c, visibleCount(ctx, "p.sceneCount", "scenes")),
+    image_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "p.imageCount", "images")),
+    gallery_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "p.galleryCount", "galleries")),
+    tag_count: (c, ctx) => countFilter(c, visibleTagCount(ctx)),
+    marker_count: (c, ctx) => countFilter(c, visibleMarkerCount(ctx)),
 
-    // Text; the name also matches the aliases
+    // Text; the name also matches the aliases, each on its own
     name: (c) => buildTextFilter(c, "p.name", { lists: ["p.aliasList"] }),
+    aliases: (c) => buildTextFilter(c, null, { lists: ["p.aliasList"] }),
+    disambiguation: (c) => buildTextFilter(c, "p.disambiguation"),
+    country: (c) => buildTextFilter(c, "p.country"),
+    // Any one of the performer's links
+    url: (c) => buildTextFilter(c, null, { lists: ["p.urls"] }),
+    stash_id: (c) => stashIdClause(c),
+    circumcised: (c) => circumcisedClause(c),
     details: (c) => buildTextFilter(c, "p.details"),
     tattoos: (c) => buildTextFilter(c, "p.tattoos"),
     piercings: (c) => buildTextFilter(c, "p.piercings"),
@@ -332,6 +463,58 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       name: ctx.name,
       related: { table: "StashTag", entityType: "tag" },
     });
+  }
+
+  /**
+   * Performers in the visible scenes of the studios, with the studios'
+   * descendants to the depth (a studio page's Performers tab with its
+   * sub-studios). INCLUDES_ALL is one clause per selected studio, each with
+   * its own descendants, AND-ed, as the hierarchical filters take it.
+   */
+  private async studioClause(
+    criterion: RefCriterion,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    if (criterion.modifier === "INCLUDES_ALL") {
+      const groups = await expandRefsEach(
+        "studio",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds
+      );
+      return allOf(
+        groups.map((group) =>
+          viaSceneClause(PERFORMERS_BY_STUDIO, group, "INCLUDES", ctx)
+        )
+      );
+    }
+    const refs = await expandRefs(
+      "studio",
+      criterion.refs,
+      criterion.depth,
+      ctx.allowedInstanceIds
+    );
+    return viaSceneClause(PERFORMERS_BY_STUDIO, refs, criterion.modifier, ctx);
+  }
+
+  /**
+   * `tag_favorite`: the performer has (`true`) or lacks (`false`) one of the
+   * viewer's favourite tags (a favourite they hid does not count) or a tag
+   * under one, through the tag filter's shapes. With no favourites `true`
+   * matches nothing and `false` is no filter.
+   */
+  private async tagFavoriteClause(
+    on: boolean,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const refs = await favoriteRefs("tag", ctx);
+    if (refs.length === 0) {
+      return on ? { sql: "1 = 0", params: [] } : noClause();
+    }
+    return this.tagClause(
+      { refs, modifier: on ? "INCLUDES" : "EXCLUDES", depth: -1 },
+      ctx
+    );
   }
 
   /**

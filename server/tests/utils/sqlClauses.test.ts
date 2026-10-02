@@ -119,6 +119,26 @@ const many = (n: number, from = 1): FilterRef[] =>
 
 const OPTS = { name: "tags", allowedInstanceIds: [A, B] };
 
+/** A viewer whose exclusions apply, and a read that applies none */
+const VIEWER = { userId: 7, applyExclusions: true };
+const NO_EXCLUSIONS = { userId: 7, applyExclusions: false };
+
+/** Performers sharing a scene with one of the performers ("appears with") */
+const PERFORMERS_BY_PERFORMER: ViaSceneSpec = {
+  ...PERFORMERS_BY_GROUP,
+  via: {
+    table: "ScenePerformer",
+    alias: "spw",
+    sceneIdCol: "sceneId",
+    sceneInstanceCol: "sceneInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+    related: { table: "StashPerformer", entityType: "performer" },
+  },
+  where:
+    "NOT (spw.performerId = sp.performerId AND spw.performerInstanceId = sp.performerInstanceId)",
+};
+
 describe("pairs", () => {
   it("matches a composite ref on both columns and a bare ref on the id alone", () => {
     expect(
@@ -141,7 +161,8 @@ describe("viaSceneClause", () => {
     const clause = viaSceneClause(
       GROUPS_BY_SCENE,
       [ref("5"), bare("7"), ref("9", B)],
-      "INCLUDES"
+      "INCLUDES",
+      NO_EXCLUSIONS
     );
 
     expect(clause).toEqual({
@@ -151,7 +172,12 @@ describe("viaSceneClause", () => {
   });
 
   it("EXCLUDES emits NOT EXISTS", () => {
-    const clause = viaSceneClause(GROUPS_BY_SCENE, [ref("5")], "EXCLUDES");
+    const clause = viaSceneClause(
+      GROUPS_BY_SCENE,
+      [ref("5")],
+      "EXCLUDES",
+      NO_EXCLUSIONS
+    );
 
     expect(clause).toEqual({
       sql: `NOT ${GROUP_BY_SCENE_EXISTS}(sg.sceneId = ? AND sg.sceneInstanceId = ?)))`,
@@ -163,7 +189,8 @@ describe("viaSceneClause", () => {
     const clause = viaSceneClause(
       GROUPS_BY_SCENE,
       [ref("5"), bare("7")],
-      "INCLUDES_ALL"
+      "INCLUDES_ALL",
+      NO_EXCLUSIONS
     );
 
     expect(clause).toEqual({
@@ -173,7 +200,12 @@ describe("viaSceneClause", () => {
   });
 
   it("the via form's INCLUDES is a row-value IN driven from the ref: the via table, the junction on the scene, the live scene", () => {
-    const clause = viaSceneClause(PERFORMERS_BY_GROUP, [ref("3")], "INCLUDES");
+    const clause = viaSceneClause(
+      PERFORMERS_BY_GROUP,
+      [ref("3")],
+      "INCLUDES",
+      NO_EXCLUSIONS
+    );
 
     expect(clause).toEqual({
       sql: `(p.id, p.stashInstanceId) IN (SELECT sp.performerId, sp.performerInstanceId FROM SceneGroup sg JOIN ScenePerformer sp ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId ${LIVE_SCENE_OF_SG} WHERE lsc.deletedAt IS NULL AND ((sg.groupId = ? AND sg.groupInstanceId = ?)))`,
@@ -185,7 +217,8 @@ describe("viaSceneClause", () => {
     const clause = viaSceneClause(
       PERFORMERS_BY_GROUP,
       [ref("3"), ref("4")],
-      "INCLUDES_ALL"
+      "INCLUDES_ALL",
+      NO_EXCLUSIONS
     );
 
     expect(
@@ -197,7 +230,12 @@ describe("viaSceneClause", () => {
   });
 
   it("the via form's EXCLUDES stays a keyed NOT EXISTS, never NOT IN, on live scenes", () => {
-    const clause = viaSceneClause(PERFORMERS_BY_GROUP, [ref("3")], "EXCLUDES");
+    const clause = viaSceneClause(
+      PERFORMERS_BY_GROUP,
+      [ref("3")],
+      "EXCLUDES",
+      NO_EXCLUSIONS
+    );
 
     expect(clause).toEqual({
       sql: `NOT EXISTS (SELECT 1 FROM ScenePerformer sp JOIN SceneGroup sg ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId JOIN StashScene lsc ON lsc.id = sp.sceneId AND lsc.stashInstanceId = sp.sceneInstanceId WHERE sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId AND lsc.deletedAt IS NULL AND ((sg.groupId = ? AND sg.groupInstanceId = ?)))`,
@@ -210,7 +248,8 @@ describe("viaSceneClause", () => {
     const clause = viaSceneClause(
       { ...PERFORMERS_BY_STUDIO, where: "sc.organized = 1" },
       [ref("4")],
-      "INCLUDES"
+      "INCLUDES",
+      NO_EXCLUSIONS
     );
 
     expect(clause.sql).toBe(
@@ -220,14 +259,143 @@ describe("viaSceneClause", () => {
   });
 
   it("is empty with no refs or an unknown modifier", () => {
-    expect(viaSceneClause(GROUPS_BY_SCENE, [], "INCLUDES")).toEqual({
+    expect(viaSceneClause(GROUPS_BY_SCENE, [], "INCLUDES", VIEWER)).toEqual({
       sql: "",
       params: [],
     });
-    expect(viaSceneClause(GROUPS_BY_SCENE, [ref("5")], "EQUALS")).toEqual({
+    expect(
+      viaSceneClause(GROUPS_BY_SCENE, [ref("5")], "EQUALS", VIEWER)
+    ).toEqual({
       sql: "",
       params: [],
     });
+  });
+});
+
+describe("viaSceneClause with the viewer's exclusions", () => {
+  const SCENE_HIDDEN_LSC = exclusionJoin(
+    "vse",
+    "scene",
+    "lsc.id",
+    "lsc.stashInstanceId"
+  );
+
+  it("the scene-keyed EXISTS anti-joins the scene's exclusion rows under vse, the every-instance ('') arm included, binding the viewer first", () => {
+    const clause = viaSceneClause(
+      GROUPS_BY_SCENE,
+      [ref("5")],
+      "INCLUDES",
+      VIEWER
+    );
+
+    expect(clause).toEqual({
+      sql: `EXISTS (SELECT 1 FROM SceneGroup sg ${LIVE_SCENE_OF_SG} ${SCENE_HIDDEN_LSC} WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))`,
+      params: [7, "5", "inst-a"],
+    });
+    expect(clause.sql).toContain("vse.instanceId = ''");
+  });
+
+  it("EXCLUDES keeps the anti-join inside its NOT EXISTS, so a hidden scene excludes nothing", () => {
+    const clause = viaSceneClause(
+      GROUPS_BY_SCENE,
+      [ref("5")],
+      "EXCLUDES",
+      VIEWER
+    );
+
+    expect(clause.sql).toBe(
+      `NOT EXISTS (SELECT 1 FROM SceneGroup sg ${LIVE_SCENE_OF_SG} ${SCENE_HIDDEN_LSC} WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))`
+    );
+    expect(clause.params).toEqual([7, "5", "inst-a"]);
+  });
+
+  it("the via form's row-value IN anti-joins the live scene", () => {
+    const clause = viaSceneClause(
+      PERFORMERS_BY_GROUP,
+      [ref("3")],
+      "INCLUDES",
+      VIEWER
+    );
+
+    expect(clause).toEqual({
+      sql: `(p.id, p.stashInstanceId) IN (SELECT sp.performerId, sp.performerInstanceId FROM SceneGroup sg JOIN ScenePerformer sp ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId ${LIVE_SCENE_OF_SG} ${SCENE_HIDDEN_LSC} WHERE lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sg.groupId = ? AND sg.groupInstanceId = ?)))`,
+      params: [7, "3", "inst-a"],
+    });
+  });
+
+  it("a via that is the scene table anti-joins that row", () => {
+    const clause = viaSceneClause(
+      PERFORMERS_BY_STUDIO,
+      [ref("4")],
+      "INCLUDES",
+      VIEWER
+    );
+
+    expect(clause.sql).toBe(
+      `(p.id, p.stashInstanceId) IN (SELECT sp.performerId, sp.performerInstanceId FROM StashScene sc JOIN ScenePerformer sp ON sp.sceneId = sc.id AND sp.sceneInstanceId = sc.stashInstanceId ${exclusionJoin("vse", "scene", "sc.id", "sc.stashInstanceId")} WHERE sc.deletedAt IS NULL AND vse.id IS NULL AND ((sc.studioId = ? AND sc.stashInstanceId = ?)))`
+    );
+    expect(clause.params).toEqual([7, "4", "inst-a"]);
+  });
+
+  it("INCLUDES_ALL binds the viewer once per ref's clause", () => {
+    const clause = viaSceneClause(
+      PERFORMERS_BY_GROUP,
+      [ref("3"), ref("4")],
+      "INCLUDES_ALL",
+      VIEWER
+    );
+
+    expect(clause.sql.match(/vse\.id IS NULL/g)).toHaveLength(2);
+    expect(clause.params).toEqual([7, "3", "inst-a", 7, "4", "inst-a"]);
+  });
+
+  it("never names the outer statement's exclusion alias `e`", () => {
+    for (const modifier of ["INCLUDES", "EXCLUDES", "INCLUDES_ALL"]) {
+      for (const spec of [
+        GROUPS_BY_SCENE,
+        PERFORMERS_BY_GROUP,
+        PERFORMERS_BY_STUDIO,
+      ]) {
+        const { sql } = viaSceneClause(
+          spec,
+          [ref("3"), ref("4")],
+          modifier,
+          VIEWER
+        );
+        expect(sql).not.toMatch(/UserExcludedEntity e\b/);
+        expect(sql).not.toMatch(/\be\.id IS NULL/);
+      }
+    }
+  });
+
+  it("a via with a related table counts its row only when the ref is live and not excluded, after the scene's guard", () => {
+    const clause = viaSceneClause(
+      PERFORMERS_BY_PERFORMER,
+      [ref("3")],
+      "INCLUDES",
+      VIEWER
+    );
+
+    expect(clause).toEqual({
+      sql: `(p.id, p.stashInstanceId) IN (SELECT sp.performerId, sp.performerInstanceId FROM ScenePerformer spw JOIN ScenePerformer sp ON sp.sceneId = spw.sceneId AND sp.sceneInstanceId = spw.sceneInstanceId JOIN StashScene lsc ON lsc.id = spw.sceneId AND lsc.stashInstanceId = spw.sceneInstanceId ${SCENE_HIDDEN_LSC} JOIN StashPerformer vr ON vr.id = spw.performerId AND vr.stashInstanceId = spw.performerInstanceId ${exclusionJoin("vre", "performer", "vr.id", "vr.stashInstanceId")} WHERE lsc.deletedAt IS NULL AND vse.id IS NULL AND vr.deletedAt IS NULL AND vre.id IS NULL AND NOT (spw.performerId = sp.performerId AND spw.performerInstanceId = sp.performerInstanceId) AND ((spw.performerId = ? AND spw.performerInstanceId = ?)))`,
+      params: [7, 7, "3", "inst-a"],
+    });
+  });
+
+  it("without the viewer's exclusions a related ref still has to be live, and nothing is bound", () => {
+    const clause = viaSceneClause(
+      PERFORMERS_BY_PERFORMER,
+      [ref("3")],
+      "EXCLUDES",
+      NO_EXCLUSIONS
+    );
+
+    expect(clause.sql).toContain(
+      "JOIN StashPerformer vr ON vr.id = spw.performerId AND vr.stashInstanceId = spw.performerInstanceId WHERE"
+    );
+    expect(clause.sql).toContain("vr.deletedAt IS NULL");
+    expect(clause.sql).not.toContain("UserExcludedEntity");
+    expect(clause.params).toEqual(["3", "inst-a"]);
   });
 });
 

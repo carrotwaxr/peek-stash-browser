@@ -11,6 +11,7 @@
  * filter or sort starts here.
  */
 import {
+  CIRCUMCISED,
   COMPARISON_MODIFIERS,
   type EntityKind,
   type FieldSpec,
@@ -139,17 +140,42 @@ export const PERFORMER_FIELDS = {
   hair_color: freeText(),
   eye_color: freeText(),
   fake_tits: freeText(),
+  disambiguation: text(),
+  /** Stash's free-text country (an ISO code as Stash's editor sets it) */
+  country: text(),
+  circumcised: enumOf(CIRCUMCISED, {
+    multi: true,
+    modifiers: ["INCLUDES", ...PRESENCE_MODIFIERS],
+  }),
+  /** Any one alias */
+  aliases: text(),
+  /** Any one of the performer's links */
+  url: text(),
+  /** A StashDB (or other stash-box) id the performer is linked to */
+  stash_id: text({
+    modifiers: ["EQUALS", ...PRESENCE_MODIFIERS],
+    defaultModifier: "EQUALS",
+    maxLength: 100,
+  }),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
-  /** Performers in scenes of these studios */
-  studios: ref("studio", { excludable: true }),
+  /** Performers in the visible scenes of these studios (depth: sub-studios) */
+  studios: ref("studio", { hierarchical: true, excludable: true }),
   /** Performers in these scenes */
   scenes: ref("scene"),
   /** Performers in scenes of these groups */
   groups: ref("group"),
+  /** Performers sharing a visible scene with these ("appears with") */
+  performers: ref("performer", { excludable: true }),
   rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
+  /** Counts as the viewer sees them */
+  tag_count: num(),
+  image_count: num(),
+  gallery_count: num(),
+  /** The visible clips in the performer's visible scenes */
+  marker_count: num(),
   height: nullableNum(),
   weight: nullableNum(),
   penis_length: nullableNum(),
@@ -163,6 +189,8 @@ export const PERFORMER_FIELDS = {
   created_at: date(),
   updated_at: date(),
   favorite: bool(),
+  /** The performer has (true) or lacks (false) a favourite tag or one under it */
+  tag_favorite: bool(),
 } as const satisfies Record<string, FieldSpec>;
 
 export const STUDIO_FIELDS = {

@@ -224,7 +224,7 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
         ? refPresence(GALLERY_SCENES, c.modifier, ctx, {
             related: { table: "StashScene", entityType: "scene" },
           })
-        : viaSceneClause(GALLERIES_BY_SCENE, c.refs, c.modifier),
+        : viaSceneClause(GALLERIES_BY_SCENE, c.refs, c.modifier, ctx),
     performers: (c, ctx) =>
       refFieldClause(GALLERY_PERFORMERS, c, ctx, {
         table: "StashPerformer",

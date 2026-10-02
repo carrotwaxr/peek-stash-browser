@@ -345,7 +345,7 @@ describe("GalleryQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["7", "inst-a", "8", "inst-b"]));
     });
 
-    it("scenes match through SceneGallery with the scene live, as pairs", async () => {
+    it("scenes match through SceneGallery with the scene live and not excluded for the viewer, as pairs", async () => {
       await run({
         filter: {
           scenes: { refs: [ref("3")], modifier: "INCLUDES", depth: 0 },
@@ -354,9 +354,9 @@ describe("GalleryQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "EXISTS (SELECT 1 FROM SceneGallery sg JOIN StashScene lsc ON lsc.id = sg.sceneId AND lsc.stashInstanceId = sg.sceneInstanceId WHERE sg.galleryId = g.id AND sg.galleryInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))"
+        "EXISTS (SELECT 1 FROM SceneGallery sg JOIN StashScene lsc ON lsc.id = sg.sceneId AND lsc.stashInstanceId = sg.sceneInstanceId LEFT JOIN UserExcludedEntity vse ON vse.userId = ? AND vse.entityType = 'scene' AND vse.entityId = lsc.id AND (vse.instanceId = '' OR vse.instanceId = lsc.stashInstanceId) WHERE sg.galleryId = g.id AND sg.galleryInstanceId = g.stashInstanceId AND lsc.deletedAt IS NULL AND vse.id IS NULL AND ((sg.sceneId = ? AND sg.sceneInstanceId = ?)))"
       );
-      expect(params).toEqual(arrayContaining(["3", "inst-a"]));
+      expect(params.join("|")).toContain(["1", "3", "inst-a"].join("|"));
     });
 
     it("hasFavoriteImage asks for an image the viewer favorited; false is no filter", async () => {
