@@ -20,14 +20,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { buildCustomCarouselUrl } from "../../utils/carouselUrl";
 import { getEntityPath } from "../../utils/entityLinks";
-import {
-  type FilterOption,
-  SCENE_FILTER_OPTIONS,
-  carouselRulesToFilterState,
-} from "../../utils/filterConfig";
 import { buildPlaybackQueue } from "../../utils/playbackQueue";
-import { buildSearchParams } from "../../utils/urlParams";
 import { getCarouselIcon } from "../carousel-builder/carouselIcons";
 import {
   AddToPlaylistButton,
@@ -76,40 +71,6 @@ const getSeeMoreUrl = (fetchKey: string): string | null => {
     continueWatching: "/watch-history",
   };
   return urlMap[fetchKey as keyof typeof urlMap] || null;
-};
-
-/**
- * Build a "See More" URL for a custom carousel from its rules
- */
-const buildCustomCarouselUrl = (
-  rules: Record<string, unknown> | null | undefined,
-  sort: string | undefined,
-  direction: string | undefined
-): string => {
-  if (!rules || typeof rules !== "object") {
-    return "/scenes";
-  }
-
-  // Convert API rules format to UI filter state
-  const filterState = carouselRulesToFilterState(rules);
-
-  // Build URL params using existing utility
-  const params = buildSearchParams({
-    searchText: "",
-    sortField: sort || "random",
-    sortDirection: direction || "DESC",
-    currentPage: 1,
-    perPage: 24,
-    filters: filterState as Record<string, unknown>,
-    filterOptions: SCENE_FILTER_OPTIONS as FilterOption[],
-    viewMode: "grid",
-    zoomLevel: "medium",
-    gridDensity: "medium",
-    timelinePeriod: null,
-  });
-
-  const queryString = params.toString();
-  return queryString ? `/scenes?${queryString}` : "/scenes";
 };
 
 const Home = () => {

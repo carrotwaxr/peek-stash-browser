@@ -8,6 +8,7 @@ mkdocs.yml
 # Generated
 server/graphql/generated/
 server/integration/stash-replay/fixture/
+client/tests/utils/__golden__/
 package-lock.json
 **/eslint-suppressions.json
 

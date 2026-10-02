@@ -1,0 +1,298 @@
+{
+  "options": [
+    {
+      "type": "section-header",
+      "label": "Common Filters",
+      "key": "section-common",
+      "collapsible": true,
+      "defaultOpen": true
+    },
+    {
+      "key": "title",
+      "label": "Title Search",
+      "type": "text",
+      "defaultValue": "",
+      "placeholder": "Search title...",
+      "maxLength": 500
+    },
+    {
+      "key": "performerIds",
+      "label": "Performers",
+      "type": "searchable-select",
+      "entityType": "performers",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select performers...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "performerIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "countFilterContext": "galleries"
+    },
+    {
+      "key": "studioIds",
+      "label": "Studios",
+      "type": "searchable-select",
+      "entityType": "studios",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select studios...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "studioIdsModifier",
+      "defaultModifier": "INCLUDES",
+      "supportsHierarchy": true,
+      "hierarchyKey": "studioIdsDepth",
+      "hierarchyLabel": "Include sub-studios",
+      "countFilterContext": "galleries"
+    },
+    {
+      "key": "tagIds",
+      "label": "Tags",
+      "type": "searchable-select",
+      "entityType": "tags",
+      "multi": true,
+      "defaultValue": [],
+      "placeholder": "Select tags...",
+      "modifierOptions": [
+        {
+          "value": "INCLUDES_ALL",
+          "label": "Has ALL of these"
+        },
+        {
+          "value": "INCLUDES",
+          "label": "Has ANY of these"
+        },
+        {
+          "value": "EXCLUDES",
+          "label": "Has NONE of these"
+        }
+      ],
+      "modifierKey": "tagIdsModifier",
+      "defaultModifier": "INCLUDES_ALL",
+      "supportsHierarchy": true,
+      "hierarchyKey": "tagIdsDepth",
+      "hierarchyLabel": "Include sub-tags",
+      "countFilterContext": "galleries"
+    },
+    {
+      "key": "rating",
+      "label": "Rating (0-100)",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 100
+    },
+    {
+      "key": "imageCount",
+      "label": "Image Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "key": "tagCount",
+      "label": "Tag Count",
+      "type": "range",
+      "defaultValue": {},
+      "min": 0,
+      "max": 50
+    },
+    {
+      "key": "favorite",
+      "label": "Favorite Galleries",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Favorites Only"
+    },
+    {
+      "key": "hasFavoriteImage",
+      "label": "Has Favorite Image",
+      "type": "checkbox",
+      "defaultValue": false,
+      "placeholder": "Has at least one favorited image"
+    }
+  ],
+  "imperialOptions": "same as the metric options",
+  "locks": [
+    {
+      "field": "title",
+      "lockedFieldsTop": [
+        "title"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "title"
+      ],
+      "removedStateKeys": [
+        "title"
+      ],
+      "removedOptions": [
+        "text:title"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "performers",
+      "lockedFieldsTop": [
+        "performers"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "performers"
+      ],
+      "removedStateKeys": [
+        "performerIds",
+        "performerIdsModifier"
+      ],
+      "removedOptions": [
+        "searchable-select:performerIds"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "studios",
+      "lockedFieldsTop": [
+        "studios"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "studios"
+      ],
+      "removedStateKeys": [
+        "studioIds",
+        "studioIdsModifier",
+        "studioIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:studioIds"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "tags",
+      "lockedFieldsTop": [
+        "tags"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "tags"
+      ],
+      "removedStateKeys": [
+        "tagIds",
+        "tagIdsModifier",
+        "tagIdsDepth"
+      ],
+      "removedOptions": [
+        "searchable-select:tagIds"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "rating100",
+      "lockedFieldsTop": [
+        "rating100"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "rating100"
+      ],
+      "removedStateKeys": [
+        "rating"
+      ],
+      "removedOptions": [
+        "range:rating"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "image_count",
+      "lockedFieldsTop": [
+        "image_count"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "image_count"
+      ],
+      "removedStateKeys": [
+        "imageCount"
+      ],
+      "removedOptions": [
+        "range:imageCount"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "tag_count",
+      "lockedFieldsTop": [
+        "tag_count"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "tag_count"
+      ],
+      "removedStateKeys": [
+        "tagCount"
+      ],
+      "removedOptions": [
+        "range:tagCount"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "favorite",
+      "lockedFieldsTop": [
+        "favorite"
+      ],
+      "lockedFieldsInner": [
+        "favorite",
+        "gallery_filter"
+      ],
+      "removedStateKeys": [
+        "favorite"
+      ],
+      "removedOptions": [
+        "checkbox:favorite"
+      ],
+      "optionCountAfter": 9
+    },
+    {
+      "field": "hasFavoriteImage",
+      "lockedFieldsTop": [
+        "hasFavoriteImage"
+      ],
+      "lockedFieldsInner": [
+        "gallery_filter",
+        "hasFavoriteImage"
+      ],
+      "removedStateKeys": [
+        "hasFavoriteImage"
+      ],
+      "removedOptions": [
+        "checkbox:hasFavoriteImage"
+      ],
+      "optionCountAfter": 9
+    }
+  ]
+}

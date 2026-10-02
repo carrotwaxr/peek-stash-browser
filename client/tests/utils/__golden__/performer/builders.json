@@ -1,0 +1,1784 @@
+{
+  "samples": [
+    {
+      "label": "name: text",
+      "state": {
+        "name": "contract"
+      },
+      "request": {
+        "name": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "gender: MALE",
+      "state": {
+        "gender": "MALE"
+      },
+      "request": {
+        "gender": {
+          "value": "MALE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "gender: FEMALE",
+      "state": {
+        "gender": "FEMALE"
+      },
+      "request": {
+        "gender": {
+          "value": "FEMALE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "gender: TRANSGENDER_MALE",
+      "state": {
+        "gender": "TRANSGENDER_MALE"
+      },
+      "request": {
+        "gender": {
+          "value": "TRANSGENDER_MALE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "gender: TRANSGENDER_FEMALE",
+      "state": {
+        "gender": "TRANSGENDER_FEMALE"
+      },
+      "request": {
+        "gender": {
+          "value": "TRANSGENDER_FEMALE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "gender: INTERSEX",
+      "state": {
+        "gender": "INTERSEX"
+      },
+      "request": {
+        "gender": {
+          "value": "INTERSEX",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "gender: NON_BINARY",
+      "state": {
+        "gender": "NON_BINARY"
+      },
+      "request": {
+        "gender": {
+          "value": "NON_BINARY",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "rating: min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      }
+    },
+    {
+      "label": "rating: max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      }
+    },
+    {
+      "label": "rating: min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "oCounter: min only",
+      "state": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "oCounter: max only",
+      "state": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "oCounter: min and max",
+      "state": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "sceneCount: min only",
+      "state": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "sceneCount: max only",
+      "state": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "sceneCount: min and max",
+      "state": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "favorite: checked",
+      "state": {
+        "favorite": true
+      },
+      "request": {
+        "favorite": true
+      }
+    },
+    {
+      "label": "age: min only",
+      "state": {
+        "age": {
+          "min": "39"
+        }
+      },
+      "request": {
+        "age": {
+          "modifier": "GREATER_THAN",
+          "value": 38
+        }
+      }
+    },
+    {
+      "label": "age: max only",
+      "state": {
+        "age": {
+          "max": "80"
+        }
+      },
+      "request": {
+        "age": {
+          "modifier": "LESS_THAN",
+          "value": 81
+        }
+      }
+    },
+    {
+      "label": "age: min and max",
+      "state": {
+        "age": {
+          "min": "39",
+          "max": "80"
+        }
+      },
+      "request": {
+        "age": {
+          "modifier": "BETWEEN",
+          "value": 39,
+          "value2": 80
+        }
+      }
+    },
+    {
+      "label": "birthYear: min only",
+      "state": {
+        "birthYear": {
+          "min": "1928"
+        }
+      },
+      "request": {
+        "birth_year": {
+          "modifier": "GREATER_THAN",
+          "value": 1927
+        }
+      }
+    },
+    {
+      "label": "birthYear: max only",
+      "state": {
+        "birthYear": {
+          "max": "1983"
+        }
+      },
+      "request": {
+        "birth_year": {
+          "modifier": "LESS_THAN",
+          "value": 1984
+        }
+      }
+    },
+    {
+      "label": "birthYear: min and max",
+      "state": {
+        "birthYear": {
+          "min": "1928",
+          "max": "1983"
+        }
+      },
+      "request": {
+        "birth_year": {
+          "modifier": "BETWEEN",
+          "value": 1928,
+          "value2": 1983
+        }
+      }
+    },
+    {
+      "label": "deathYear: min only",
+      "state": {
+        "deathYear": {
+          "min": "1950"
+        }
+      },
+      "request": {
+        "death_year": {
+          "modifier": "GREATER_THAN",
+          "value": 1949
+        }
+      }
+    },
+    {
+      "label": "deathYear: max only",
+      "state": {
+        "deathYear": {
+          "max": "2050"
+        }
+      },
+      "request": {
+        "death_year": {
+          "modifier": "LESS_THAN",
+          "value": 2051
+        }
+      }
+    },
+    {
+      "label": "deathYear: min and max",
+      "state": {
+        "deathYear": {
+          "min": "1950",
+          "max": "2050"
+        }
+      },
+      "request": {
+        "death_year": {
+          "modifier": "BETWEEN",
+          "value": 1950,
+          "value2": 2050
+        }
+      }
+    },
+    {
+      "label": "careerLength: min only",
+      "state": {
+        "careerLength": {
+          "min": "13"
+        }
+      },
+      "request": {
+        "career_length": {
+          "modifier": "GREATER_THAN",
+          "value": 12
+        }
+      }
+    },
+    {
+      "label": "careerLength: max only",
+      "state": {
+        "careerLength": {
+          "max": "38"
+        }
+      },
+      "request": {
+        "career_length": {
+          "modifier": "LESS_THAN",
+          "value": 39
+        }
+      }
+    },
+    {
+      "label": "careerLength: min and max",
+      "state": {
+        "careerLength": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "request": {
+        "career_length": {
+          "modifier": "BETWEEN",
+          "value": 13,
+          "value2": 38
+        }
+      }
+    },
+    {
+      "label": "birthdate: start only",
+      "state": {
+        "birthdate": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "birthdate": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "birthdate: end only",
+      "state": {
+        "birthdate": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "birthdate": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "birthdate: start and end",
+      "state": {
+        "birthdate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "birthdate": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "deathDate: start only",
+      "state": {
+        "deathDate": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "death_date": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "deathDate: end only",
+      "state": {
+        "deathDate": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "death_date": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "deathDate: start and end",
+      "state": {
+        "deathDate": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "death_date": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start only",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "createdAt: end only",
+      "state": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start and end",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start only",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: end only",
+      "state": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start and end",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "hairColor: BLONDE",
+      "state": {
+        "hairColor": "BLONDE"
+      },
+      "request": {
+        "hair_color": {
+          "value": "BLONDE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: BRUNETTE",
+      "state": {
+        "hairColor": "BRUNETTE"
+      },
+      "request": {
+        "hair_color": {
+          "value": "BRUNETTE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: BLACK",
+      "state": {
+        "hairColor": "BLACK"
+      },
+      "request": {
+        "hair_color": {
+          "value": "BLACK",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: RED",
+      "state": {
+        "hairColor": "RED"
+      },
+      "request": {
+        "hair_color": {
+          "value": "RED",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: AUBURN",
+      "state": {
+        "hairColor": "AUBURN"
+      },
+      "request": {
+        "hair_color": {
+          "value": "AUBURN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: GREY",
+      "state": {
+        "hairColor": "GREY"
+      },
+      "request": {
+        "hair_color": {
+          "value": "GREY",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: BALD",
+      "state": {
+        "hairColor": "BALD"
+      },
+      "request": {
+        "hair_color": {
+          "value": "BALD",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: VARIOUS",
+      "state": {
+        "hairColor": "VARIOUS"
+      },
+      "request": {
+        "hair_color": {
+          "value": "VARIOUS",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "hairColor: OTHER",
+      "state": {
+        "hairColor": "OTHER"
+      },
+      "request": {
+        "hair_color": {
+          "value": "OTHER",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: BROWN",
+      "state": {
+        "eyeColor": "BROWN"
+      },
+      "request": {
+        "eye_color": {
+          "value": "BROWN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: BLUE",
+      "state": {
+        "eyeColor": "BLUE"
+      },
+      "request": {
+        "eye_color": {
+          "value": "BLUE",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: GREEN",
+      "state": {
+        "eyeColor": "GREEN"
+      },
+      "request": {
+        "eye_color": {
+          "value": "GREEN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: GREY",
+      "state": {
+        "eyeColor": "GREY"
+      },
+      "request": {
+        "eye_color": {
+          "value": "GREY",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: HAZEL",
+      "state": {
+        "eyeColor": "HAZEL"
+      },
+      "request": {
+        "eye_color": {
+          "value": "HAZEL",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "eyeColor: OTHER",
+      "state": {
+        "eyeColor": "OTHER"
+      },
+      "request": {
+        "eye_color": {
+          "value": "OTHER",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: CAUCASIAN",
+      "state": {
+        "ethnicity": "CAUCASIAN"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "CAUCASIAN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: BLACK",
+      "state": {
+        "ethnicity": "BLACK"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "BLACK",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: ASIAN",
+      "state": {
+        "ethnicity": "ASIAN"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "ASIAN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: INDIAN",
+      "state": {
+        "ethnicity": "INDIAN"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "INDIAN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: LATIN",
+      "state": {
+        "ethnicity": "LATIN"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "LATIN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: MIDDLE_EASTERN",
+      "state": {
+        "ethnicity": "MIDDLE_EASTERN"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "MIDDLE_EASTERN",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: MIXED",
+      "state": {
+        "ethnicity": "MIXED"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "MIXED",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "ethnicity: OTHER",
+      "state": {
+        "ethnicity": "OTHER"
+      },
+      "request": {
+        "ethnicity": {
+          "value": "OTHER",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "fakeTits: Fake",
+      "state": {
+        "fakeTits": "Fake"
+      },
+      "request": {
+        "fake_tits": {
+          "value": "Fake",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "fakeTits: Natural",
+      "state": {
+        "fakeTits": "Natural"
+      },
+      "request": {
+        "fake_tits": {
+          "value": "Natural",
+          "modifier": "EQUALS"
+        }
+      }
+    },
+    {
+      "label": "measurements: text",
+      "state": {
+        "measurements": "contract"
+      },
+      "request": {
+        "measurements": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tattoos: text",
+      "state": {
+        "tattoos": "contract"
+      },
+      "request": {
+        "tattoos": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "piercings: text",
+      "state": {
+        "piercings": "contract"
+      },
+      "request": {
+        "piercings": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "height: min only",
+      "state": {
+        "height": {
+          "min": "138"
+        }
+      },
+      "request": {
+        "height": {
+          "modifier": "GREATER_THAN",
+          "value": 137
+        }
+      }
+    },
+    {
+      "label": "height: max only",
+      "state": {
+        "height": {
+          "max": "213"
+        }
+      },
+      "request": {
+        "height": {
+          "modifier": "LESS_THAN",
+          "value": 214
+        }
+      }
+    },
+    {
+      "label": "height: min and max",
+      "state": {
+        "height": {
+          "min": "138",
+          "max": "213"
+        }
+      },
+      "request": {
+        "height": {
+          "modifier": "BETWEEN",
+          "value": 138,
+          "value2": 213
+        }
+      }
+    },
+    {
+      "label": "weight: min only",
+      "state": {
+        "weight": {
+          "min": "73"
+        }
+      },
+      "request": {
+        "weight": {
+          "modifier": "GREATER_THAN",
+          "value": 72
+        }
+      }
+    },
+    {
+      "label": "weight: max only",
+      "state": {
+        "weight": {
+          "max": "158"
+        }
+      },
+      "request": {
+        "weight": {
+          "modifier": "LESS_THAN",
+          "value": 159
+        }
+      }
+    },
+    {
+      "label": "weight: min and max",
+      "state": {
+        "weight": {
+          "min": "73",
+          "max": "158"
+        }
+      },
+      "request": {
+        "weight": {
+          "modifier": "BETWEEN",
+          "value": 73,
+          "value2": 158
+        }
+      }
+    },
+    {
+      "label": "penisLength: min only",
+      "state": {
+        "penisLength": {
+          "min": "10"
+        }
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "GREATER_THAN",
+          "value": 9
+        }
+      }
+    },
+    {
+      "label": "penisLength: max only",
+      "state": {
+        "penisLength": {
+          "max": "30"
+        }
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "LESS_THAN",
+          "value": 31
+        }
+      }
+    },
+    {
+      "label": "penisLength: min and max",
+      "state": {
+        "penisLength": {
+          "min": "10",
+          "max": "30"
+        }
+      },
+      "request": {
+        "penis_length": {
+          "modifier": "BETWEEN",
+          "value": 10,
+          "value2": 30
+        }
+      }
+    },
+    {
+      "label": "playCount: min only",
+      "state": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "playCount: max only",
+      "state": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "playCount: min and max",
+      "state": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "details: text",
+      "state": {
+        "details": "contract"
+      },
+      "request": {
+        "details": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    }
+  ],
+  "permanent": [],
+  "imperial": {
+    "imperialOptions": [
+      {
+        "label": "height: min only",
+        "state": {
+          "height": {
+            "feetMin": "5",
+            "inchesMin": "6"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "GREATER_THAN",
+            "value": 167
+          }
+        }
+      },
+      {
+        "label": "height: max only",
+        "state": {
+          "height": {
+            "feetMax": "6",
+            "inchesMax": "2"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "LESS_THAN",
+            "value": 189
+          }
+        }
+      },
+      {
+        "label": "height: min and max",
+        "state": {
+          "height": {
+            "feetMin": "5",
+            "inchesMin": "6",
+            "feetMax": "6",
+            "inchesMax": "2"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 168,
+            "value2": 188
+          }
+        }
+      },
+      {
+        "label": "height: feet only",
+        "state": {
+          "height": {
+            "feetMin": "5",
+            "feetMax": "6"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 152,
+            "value2": 183
+          }
+        }
+      },
+      {
+        "label": "height: inches only",
+        "state": {
+          "height": {
+            "inchesMin": "10",
+            "inchesMax": "11"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 25,
+            "value2": 28
+          }
+        }
+      },
+      {
+        "label": "weight: min only",
+        "state": {
+          "weight": {
+            "min": "163"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "GREATER_THAN",
+            "value": 73
+          }
+        }
+      },
+      {
+        "label": "weight: max only",
+        "state": {
+          "weight": {
+            "max": "388"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "LESS_THAN",
+            "value": 177
+          }
+        }
+      },
+      {
+        "label": "weight: min and max",
+        "state": {
+          "weight": {
+            "min": "163",
+            "max": "388"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "BETWEEN",
+            "value": 74,
+            "value2": 176
+          }
+        }
+      },
+      {
+        "label": "penisLength: min only",
+        "state": {
+          "penisLength": {
+            "min": "5"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "GREATER_THAN",
+            "value": 11
+          }
+        }
+      },
+      {
+        "label": "penisLength: max only",
+        "state": {
+          "penisLength": {
+            "max": "12"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "LESS_THAN",
+            "value": 31
+          }
+        }
+      },
+      {
+        "label": "penisLength: min and max",
+        "state": {
+          "penisLength": {
+            "min": "5",
+            "max": "12"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "BETWEEN",
+            "value": 12,
+            "value2": 30
+          }
+        }
+      }
+    ],
+    "metricOptions": [
+      {
+        "label": "height: min only",
+        "state": {
+          "height": {
+            "min": "138"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "GREATER_THAN",
+            "value": 137
+          }
+        }
+      },
+      {
+        "label": "height: max only",
+        "state": {
+          "height": {
+            "max": "213"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "LESS_THAN",
+            "value": 214
+          }
+        }
+      },
+      {
+        "label": "height: min and max",
+        "state": {
+          "height": {
+            "min": "138",
+            "max": "213"
+          }
+        },
+        "request": {
+          "height": {
+            "modifier": "BETWEEN",
+            "value": 138,
+            "value2": 213
+          }
+        }
+      },
+      {
+        "label": "weight: min only",
+        "state": {
+          "weight": {
+            "min": "73"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "GREATER_THAN",
+            "value": 32
+          }
+        }
+      },
+      {
+        "label": "weight: max only",
+        "state": {
+          "weight": {
+            "max": "158"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "LESS_THAN",
+            "value": 73
+          }
+        }
+      },
+      {
+        "label": "weight: min and max",
+        "state": {
+          "weight": {
+            "min": "73",
+            "max": "158"
+          }
+        },
+        "request": {
+          "weight": {
+            "modifier": "BETWEEN",
+            "value": 33,
+            "value2": 72
+          }
+        }
+      },
+      {
+        "label": "penisLength: min only",
+        "state": {
+          "penisLength": {
+            "min": "10"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "GREATER_THAN",
+            "value": 24
+          }
+        }
+      },
+      {
+        "label": "penisLength: max only",
+        "state": {
+          "penisLength": {
+            "max": "30"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "LESS_THAN",
+            "value": 77
+          }
+        }
+      },
+      {
+        "label": "penisLength: min and max",
+        "state": {
+          "penisLength": {
+            "min": "10",
+            "max": "30"
+          }
+        },
+        "request": {
+          "penis_length": {
+            "modifier": "BETWEEN",
+            "value": 25,
+            "value2": 76
+          }
+        }
+      }
+    ]
+  },
+  "prodPresets": [
+    {
+      "name": "Fave Ladies",
+      "stored": {
+        "id": "6a1cdecf-5228-4e23-9205-d235bc8df240",
+        "name": "Fave Ladies",
+        "filters": {
+          "gender": "FEMALE"
+        },
+        "sort": "rating",
+        "direction": "DESC",
+        "createdAt": "2025-11-08T02:04:38.675Z"
+      },
+      "asDefault": {
+        "panelFilters": {
+          "gender": "FEMALE"
+        },
+        "url": "",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "rating",
+            "direction": "DESC"
+          },
+          "performer_filter": {
+            "gender": {
+              "value": "FEMALE",
+              "modifier": "EQUALS"
+            }
+          }
+        }
+      },
+      "afterLoad": {
+        "panelFilters": {
+          "gender": "FEMALE"
+        },
+        "url": "?gender=FEMALE&sort=rating&dir=DESC",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "rating",
+            "direction": "DESC"
+          },
+          "performer_filter": {
+            "gender": {
+              "value": "FEMALE",
+              "modifier": "EQUALS"
+            }
+          }
+        }
+      },
+      "buildListQueryFromItsFilters": {
+        "filter": {
+          "page": 1,
+          "per_page": 24,
+          "q": "",
+          "sort": "rating",
+          "direction": "DESC"
+        },
+        "performer_filter": {
+          "gender": {
+            "value": "FEMALE",
+            "modifier": "EQUALS"
+          }
+        }
+      }
+    }
+  ]
+}

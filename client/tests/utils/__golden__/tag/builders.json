@@ -1,0 +1,446 @@
+{
+  "samples": [
+    {
+      "label": "name: text",
+      "state": {
+        "name": "contract"
+      },
+      "request": {
+        "name": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "description: text",
+      "state": {
+        "description": "contract"
+      },
+      "request": {
+        "description": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "rating: min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      }
+    },
+    {
+      "label": "rating: max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      }
+    },
+    {
+      "label": "rating: min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "sceneCount: min only",
+      "state": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "sceneCount: max only",
+      "state": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "sceneCount: min and max",
+      "state": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "scene_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "oCounter: min only",
+      "state": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "oCounter: max only",
+      "state": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "oCounter: min and max",
+      "state": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "o_counter": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "playCount: min only",
+      "state": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "playCount: max only",
+      "state": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "playCount: min and max",
+      "state": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "play_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "favorite: checked",
+      "state": {
+        "favorite": true
+      },
+      "request": {
+        "favorite": true
+      }
+    },
+    {
+      "label": "performerIds: one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioId: one id",
+      "state": {
+        "studioId": "1:inst-a"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "groupIds: one id",
+      "state": {
+        "groupIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "scenes_filter": {
+          "groups": {
+            "value": [
+              "1:inst-a"
+            ],
+            "modifier": "INCLUDES"
+          }
+        }
+      }
+    },
+    {
+      "label": "groupIds: two ids",
+      "state": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "scenes_filter": {
+          "groups": {
+            "value": [
+              "1:inst-a",
+              "2:inst-b"
+            ],
+            "modifier": "INCLUDES"
+          }
+        }
+      }
+    },
+    {
+      "label": "createdAt: start only",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "createdAt: end only",
+      "state": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "createdAt: start and end",
+      "state": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "created_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start only",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: end only",
+      "state": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "updatedAt: start and end",
+      "state": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "updated_at": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    }
+  ],
+  "permanent": [],
+  "imperial": {
+    "imperialOptions": [],
+    "metricOptions": []
+  },
+  "prodPresets": [
+    {
+      "name": "Hierarchy",
+      "stored": {
+        "id": "3abe5163-e661-4853-8009-f161758e9efe",
+        "name": "Hierarchy",
+        "filters": {},
+        "sort": "name",
+        "direction": "ASC",
+        "viewMode": "hierarchy",
+        "zoomLevel": "medium",
+        "tableColumns": null,
+        "createdAt": "2026-01-23T19:04:44.835Z"
+      },
+      "asDefault": {
+        "panelFilters": {},
+        "url": "",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "name",
+            "direction": "ASC"
+          },
+          "tag_filter": {}
+        }
+      },
+      "afterLoad": {
+        "panelFilters": {},
+        "url": "?filters=none&sort=name&dir=ASC&view=hierarchy",
+        "request": {
+          "filter": {
+            "page": 1,
+            "per_page": 24,
+            "q": "",
+            "sort": "name",
+            "direction": "ASC"
+          },
+          "tag_filter": {}
+        }
+      },
+      "buildListQueryFromItsFilters": {
+        "filter": {
+          "page": 1,
+          "per_page": 24,
+          "q": "",
+          "sort": "name",
+          "direction": "DESC"
+        },
+        "tag_filter": {}
+      }
+    }
+  ]
+}

@@ -1,0 +1,665 @@
+{
+  "ownedKeys": [
+    "name",
+    "name_min",
+    "name_max",
+    "name_start",
+    "name_end",
+    "description",
+    "description_min",
+    "description_max",
+    "description_start",
+    "description_end",
+    "rating",
+    "rating_min",
+    "rating_max",
+    "rating_start",
+    "rating_end",
+    "sceneCount",
+    "sceneCount_min",
+    "sceneCount_max",
+    "sceneCount_start",
+    "sceneCount_end",
+    "oCounter",
+    "oCounter_min",
+    "oCounter_max",
+    "oCounter_start",
+    "oCounter_end",
+    "playCount",
+    "playCount_min",
+    "playCount_max",
+    "playCount_start",
+    "playCount_end",
+    "favorite",
+    "favorite_min",
+    "favorite_max",
+    "favorite_start",
+    "favorite_end",
+    "performerIds",
+    "performerId",
+    "performerIds_min",
+    "performerIds_max",
+    "performerIds_start",
+    "performerIds_end",
+    "studioId",
+    "studioId_min",
+    "studioId_max",
+    "studioId_start",
+    "studioId_end",
+    "groupIds",
+    "groupId",
+    "groupIds_min",
+    "groupIds_max",
+    "groupIds_start",
+    "groupIds_end",
+    "createdAt",
+    "createdAt_min",
+    "createdAt_max",
+    "createdAt_start",
+    "createdAt_end",
+    "updatedAt",
+    "updatedAt_min",
+    "updatedAt_max",
+    "updatedAt_start",
+    "updatedAt_end",
+    "filters",
+    "q",
+    "sort",
+    "dir",
+    "page",
+    "per_page",
+    "view",
+    "zoom",
+    "grid_density",
+    "timeline_period",
+    "folderPath"
+  ],
+  "roundTrip": [
+    {
+      "label": "name: text",
+      "params": "name=contract",
+      "parsed": {
+        "name": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "description: text",
+      "params": "description=contract",
+      "parsed": {
+        "description": "contract"
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min only",
+      "params": "rating_min=25",
+      "parsed": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: max only",
+      "params": "rating_max=75",
+      "parsed": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "rating: min and max",
+      "params": "rating_min=25&rating_max=75",
+      "parsed": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: min only",
+      "params": "sceneCount_min=250",
+      "parsed": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: max only",
+      "params": "sceneCount_max=750",
+      "parsed": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "sceneCount: min and max",
+      "params": "sceneCount_min=250&sceneCount_max=750",
+      "parsed": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min only",
+      "params": "oCounter_min=250",
+      "parsed": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: max only",
+      "params": "oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "params": "oCounter_min=250&oCounter_max=750",
+      "parsed": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min only",
+      "params": "playCount_min=250",
+      "parsed": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: max only",
+      "params": "playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "playCount: min and max",
+      "params": "playCount_min=250&playCount_max=750",
+      "parsed": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "favorite: checked",
+      "params": "favorite=true",
+      "parsed": {
+        "favorite": true
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: one id",
+      "params": "performerIds=1%3Ainst-a",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "params": "performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "studioId: one id",
+      "params": "studioId=1%3Ainst-a",
+      "parsed": {
+        "studioId": "1:inst-a"
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: one id",
+      "params": "groupIds=1%3Ainst-a",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "groupIds: two ids",
+      "params": "groupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "parsed": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start only",
+      "params": "createdAt_start=2020-01-01",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: end only",
+      "params": "createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "params": "createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "parsed": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "params": "updatedAt_start=2020-01-01",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "params": "updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "params": "updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "parsed": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "lossless": true
+    }
+  ],
+  "imperialRoundTrip": [],
+  "listParams": [
+    {
+      "label": "name: text",
+      "written": "instance=inst-a&tab=x&name=contract",
+      "filters": {
+        "name": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "description: text",
+      "written": "instance=inst-a&tab=x&description=contract",
+      "filters": {
+        "description": "contract"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min only",
+      "written": "instance=inst-a&tab=x&rating_min=25",
+      "filters": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: max only",
+      "written": "instance=inst-a&tab=x&rating_max=75",
+      "filters": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "rating: min and max",
+      "written": "instance=inst-a&tab=x&rating_min=25&rating_max=75",
+      "filters": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: min only",
+      "written": "instance=inst-a&tab=x&sceneCount_min=250",
+      "filters": {
+        "sceneCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: max only",
+      "written": "instance=inst-a&tab=x&sceneCount_max=750",
+      "filters": {
+        "sceneCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "sceneCount: min and max",
+      "written": "instance=inst-a&tab=x&sceneCount_min=250&sceneCount_max=750",
+      "filters": {
+        "sceneCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min only",
+      "written": "instance=inst-a&tab=x&oCounter_min=250",
+      "filters": {
+        "oCounter": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: max only",
+      "written": "instance=inst-a&tab=x&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "oCounter: min and max",
+      "written": "instance=inst-a&tab=x&oCounter_min=250&oCounter_max=750",
+      "filters": {
+        "oCounter": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min only",
+      "written": "instance=inst-a&tab=x&playCount_min=250",
+      "filters": {
+        "playCount": {
+          "min": "250"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: max only",
+      "written": "instance=inst-a&tab=x&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "playCount: min and max",
+      "written": "instance=inst-a&tab=x&playCount_min=250&playCount_max=750",
+      "filters": {
+        "playCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "favorite: checked",
+      "written": "instance=inst-a&tab=x&favorite=true",
+      "filters": {
+        "favorite": true
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: one id",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a",
+      "filters": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "performerIds: two ids",
+      "written": "instance=inst-a&tab=x&performerIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "studioId: one id",
+      "written": "instance=inst-a&tab=x&studioId=1%3Ainst-a",
+      "filters": {
+        "studioId": "1:inst-a"
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: one id",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a",
+      "filters": {
+        "groupIds": [
+          "1:inst-a"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "groupIds: two ids",
+      "written": "instance=inst-a&tab=x&groupIds=1%3Ainst-a%2C2%3Ainst-b",
+      "filters": {
+        "groupIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start only",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: end only",
+      "written": "instance=inst-a&tab=x&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "createdAt: start and end",
+      "written": "instance=inst-a&tab=x&createdAt_start=2020-01-01&createdAt_end=2024-12-31",
+      "filters": {
+        "createdAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start only",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: end only",
+      "written": "instance=inst-a&tab=x&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    },
+    {
+      "label": "updatedAt: start and end",
+      "written": "instance=inst-a&tab=x&updatedAt_start=2020-01-01&updatedAt_end=2024-12-31",
+      "filters": {
+        "updatedAt": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "hasFilters": true
+    }
+  ],
+  "imperialListParams": [],
+  "filteredListPath": [
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "scenes",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": true,
+      "withInstance": "/tags?performerId=5&instance=inst-a",
+      "numericIdNoInstance": "/tags?performerId=7"
+    },
+    {
+      "entityType": "performers",
+      "hasMultipleInstances": false,
+      "withInstance": "/tags?performerId=5",
+      "numericIdNoInstance": "/tags?performerId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": true,
+      "withInstance": "/tags?studioId=5&instance=inst-a",
+      "numericIdNoInstance": "/tags?studioId=7"
+    },
+    {
+      "entityType": "studios",
+      "hasMultipleInstances": false,
+      "withInstance": "/tags?studioId=5",
+      "numericIdNoInstance": "/tags?studioId=7"
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "tags",
+      "hasMultipleInstances": false
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": true,
+      "withInstance": "/tags?groupId=5&instance=inst-a",
+      "numericIdNoInstance": "/tags?groupId=7"
+    },
+    {
+      "entityType": "groups",
+      "hasMultipleInstances": false,
+      "withInstance": "/tags?groupId=5",
+      "numericIdNoInstance": "/tags?groupId=7"
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": true
+    },
+    {
+      "entityType": "galleries",
+      "hasMultipleInstances": false
+    }
+  ]
+}

@@ -1,0 +1,961 @@
+{
+  "samples": [
+    {
+      "label": "title: text",
+      "state": {
+        "title": "contract"
+      },
+      "request": {
+        "title": {
+          "value": "contract",
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES_ALL two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: INCLUDES two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: EXCLUDES one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: EXCLUDES two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "performerIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: one id",
+      "state": {
+        "performerIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "performerIds: two ids",
+      "state": {
+        "performerIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "performers": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: INCLUDES one id",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: INCLUDES two ids",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: INCLUDES one id, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: EXCLUDES one id",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: EXCLUDES two ids",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsDepth": -1,
+        "studioIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: one id",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: two ids",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "studioIds: one id, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a"
+        ],
+        "studioIdsDepth": -1
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "studioIds: two ids, with sub-items",
+      "state": {
+        "studioIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "studioIdsDepth": -1
+      },
+      "request": {
+        "studios": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES_ALL two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES_ALL"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: INCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "INCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: EXCLUDES two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1,
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "EXCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: one id",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ]
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: two ids",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ]
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL"
+        }
+      }
+    },
+    {
+      "label": "tagIds: one id, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tagIds: two ids, with sub-items",
+      "state": {
+        "tagIds": [
+          "1:inst-a",
+          "2:inst-b"
+        ],
+        "tagIdsDepth": -1
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "1:inst-a",
+            "2:inst-b"
+          ],
+          "modifier": "INCLUDES_ALL",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "rating: min only",
+      "state": {
+        "rating": {
+          "min": "25"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "GREATER_THAN",
+          "value": 24
+        }
+      }
+    },
+    {
+      "label": "rating: max only",
+      "state": {
+        "rating": {
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "LESS_THAN",
+          "value": 76
+        }
+      }
+    },
+    {
+      "label": "rating: min and max",
+      "state": {
+        "rating": {
+          "min": "25",
+          "max": "75"
+        }
+      },
+      "request": {
+        "rating100": {
+          "modifier": "BETWEEN",
+          "value": 25,
+          "value2": 75
+        }
+      }
+    },
+    {
+      "label": "imageCount: min only",
+      "state": {
+        "imageCount": {
+          "min": "250"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "GREATER_THAN",
+          "value": 249
+        }
+      }
+    },
+    {
+      "label": "imageCount: max only",
+      "state": {
+        "imageCount": {
+          "max": "750"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "LESS_THAN",
+          "value": 751
+        }
+      }
+    },
+    {
+      "label": "imageCount: min and max",
+      "state": {
+        "imageCount": {
+          "min": "250",
+          "max": "750"
+        }
+      },
+      "request": {
+        "image_count": {
+          "modifier": "BETWEEN",
+          "value": 250,
+          "value2": 750
+        }
+      }
+    },
+    {
+      "label": "tagCount: min only",
+      "state": {
+        "tagCount": {
+          "min": "13"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "GREATER_THAN",
+          "value": 12
+        }
+      }
+    },
+    {
+      "label": "tagCount: max only",
+      "state": {
+        "tagCount": {
+          "max": "38"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "LESS_THAN",
+          "value": 39
+        }
+      }
+    },
+    {
+      "label": "tagCount: min and max",
+      "state": {
+        "tagCount": {
+          "min": "13",
+          "max": "38"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "BETWEEN",
+          "value": 13,
+          "value2": 38
+        }
+      }
+    },
+    {
+      "label": "favorite: checked",
+      "state": {
+        "favorite": true
+      },
+      "request": {
+        "favorite": true
+      }
+    },
+    {
+      "label": "hasFavoriteImage: checked",
+      "state": {
+        "hasFavoriteImage": true
+      },
+      "request": {
+        "hasFavoriteImage": true
+      }
+    }
+  ],
+  "permanent": [
+    {
+      "label": "untagged",
+      "state": {
+        "tag_count": {
+          "modifier": "EQUALS",
+          "value": 0
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "EQUALS",
+          "value": 0
+        }
+      }
+    },
+    {
+      "label": "untagged beside the tag count range",
+      "state": {
+        "tag_count": {
+          "modifier": "EQUALS",
+          "value": 0
+        },
+        "tagCount": {
+          "min": "2"
+        }
+      },
+      "request": {
+        "tag_count": {
+          "modifier": "EQUALS",
+          "value": 0
+        }
+      }
+    },
+    {
+      "label": "tags",
+      "state": {
+        "tags": {
+          "value": [
+            "12:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "12:inst-a"
+          ],
+          "modifier": "INCLUDES",
+          "depth": -1
+        }
+      }
+    },
+    {
+      "label": "tags beside the picker",
+      "state": {
+        "tags": {
+          "value": [
+            "12:inst-a"
+          ],
+          "modifier": "INCLUDES"
+        },
+        "tagIds": [
+          "3:inst-a"
+        ],
+        "tagIdsModifier": "EXCLUDES"
+      },
+      "request": {
+        "tags": {
+          "value": [
+            "12:inst-a",
+            "3:inst-a"
+          ],
+          "modifier": "EXCLUDES"
+        }
+      }
+    },
+    {
+      "label": "timeline date, both",
+      "state": {
+        "date": {
+          "start": "2020-01-01",
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "BETWEEN",
+          "value": "2020-01-01",
+          "value2": "2024-12-31"
+        }
+      }
+    },
+    {
+      "label": "timeline date, start",
+      "state": {
+        "date": {
+          "start": "2020-01-01"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "GREATER_THAN",
+          "value": "2020-01-01"
+        }
+      }
+    },
+    {
+      "label": "timeline date, end",
+      "state": {
+        "date": {
+          "end": "2024-12-31"
+        }
+      },
+      "request": {
+        "date": {
+          "modifier": "LESS_THAN",
+          "value": "2024-12-31"
+        }
+      }
+    }
+  ],
+  "imperial": {
+    "imperialOptions": [],
+    "metricOptions": []
+  },
+  "prodPresets": []
+}

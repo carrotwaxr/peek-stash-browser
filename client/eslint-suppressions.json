@@ -78,7 +78,7 @@
       "count": 2
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 4
+      "count": 2
     }
   },
   "src/components/pages/Login.tsx": {
