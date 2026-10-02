@@ -84,7 +84,6 @@ Outside TV Mode the arrow keys scroll the page, and `Tab` moves through the page
 
 1. Use `Tab` or arrow keys to focus a scene card
 2. Press `Enter` to open the scene detail page
-3. Press `Escape` to go back to the grid
 
 **On a focused scene card:**
 
@@ -94,13 +93,7 @@ Outside TV Mode the arrow keys scroll the page, and `Tab` moves through the page
 
 ### Scene Detail Page
 
-**While viewing scene details:**
-
-| Key | Action |
-|-----|--------|
-| `Space` or `Enter` | Play video |
-| `Escape` | Return to previous page |
-| `Tab` | Navigate between action buttons |
+`Tab` moves between the action buttons, and `Enter` presses the focused one. To go back, use the **Back** button at the top of the page or your browser's back button; `Escape` does not leave the page. The player's own keys are listed below.
 
 ## Video Player Controls
 
@@ -128,16 +121,28 @@ The player's keys work when the player, or nothing, has focus. With focus on a b
 
 | Key | Action |
 |-----|--------|
-| `↑` | Increase volume |
-| `↓` | Decrease volume |
+| `↑` | Increase volume by 5% |
+| `↓` | Decrease volume by 5% |
 | `M` | Mute/unmute |
+
+### Playback Speed
+
+| Key | Action |
+|-----|--------|
+| `Shift+>` | Speed up by 0.25 (up to 2x) |
+| `Shift+<` | Slow down by 0.25 (down to 0.25x) |
+
+### Rating
+
+The rating keys from [Rate and Favorite](#rate-and-favorite) work on a scene page, with the player or nothing focused: `r` then `1` to `5` rates the scene, `r` `0` clears the rating and `r` `f` toggles the favorite. The number keys after `r` rate; they do not seek.
 
 ### Display Controls
 
 | Key | Action |
 |-----|--------|
 | `F` | Toggle fullscreen |
-| `Escape` | Exit fullscreen |
+
+In fullscreen, your browser's own `Escape` exits it.
 
 ### Playlist Playback
 
@@ -172,26 +177,9 @@ The player's keys work when the player, or nothing, has focus. With focus on a b
 
 ## Playlists
 
-### Playlist Management
+The Playlists page and a playlist's page have no keys of their own: `Tab` or the arrow keys (TV Mode) move between playlists and scenes, and `Enter` opens or presses the focused one. To create, edit or delete, use the buttons on the page.
 
-| Key | Action |
-|-----|--------|
-| `N` | Create new playlist (when on Playlists page) |
-| `Enter` | Open focused playlist |
-| `Delete` | Delete focused playlist (with confirmation) |
-
-### Editing Playlists
-
-**In edit mode:**
-
-| Key | Action |
-|-----|--------|
-| `Tab` | Navigate between scenes |
-| `Delete` | Remove focused scene from playlist |
-| `Escape` | Exit edit mode |
-| `Enter` | Save changes |
-
-**Reordering scenes:**
+### Reordering Scenes
 - Click **Reorder**, then `Tab` to a scene's arrow buttons and press `Enter`, or type its new position in the box and press `Enter`
 - Each move is saved at once
 
@@ -229,42 +217,12 @@ Turn it on or off from the user menu (**TV Mode**). Peek remembers the choice in
 1. **Use fullscreen browser mode** (F11) for immersive experience
 2. **Enable auto-hide cursor** in your OS settings
 3. **Increase font size** in browser settings (Ctrl +)
-4. **Use dark theme** for better viewing in dark rooms
+4. **Pick a dark theme** (Settings → User Preferences → Theme) for better viewing in dark rooms
 5. **Keep a keyboard nearby** for typing, such as a search or a playlist position
 
-## Settings Navigation
+## Settings and Dialogs
 
-### Navigating Settings Pages
-
-| Key | Action |
-|-----|--------|
-| `Tab` | Move between settings sections |
-| `Enter` | Open/edit focused setting |
-| `Space` | Toggle switches and checkboxes |
-| `Escape` | Cancel without saving |
-
-### Saving Settings
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Save changes (when focused on Save button) |
-| `Escape` | Cancel changes |
-
-## Modal Dialogs
-
-### Dialog Controls
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Confirm action (OK, Save, Submit) |
-| `Escape` | Cancel and close dialog |
-| `Tab` | Navigate between dialog buttons |
-
-**Examples:**
-- Delete confirmation dialogs
-- Playlist selector
-- Add to playlist modal
-- Login form
+Settings pages and dialogs use the browser's own behavior: `Tab` moves between controls, and `Enter` or `Space` presses the focused button or toggles the focused switch or checkbox. Peek adds one thing: `Escape` closes a dialog, and with a dialog open `Tab` stays inside it.
 
 ## Accessibility Features
 
@@ -310,7 +268,7 @@ Basic screen reader support:
 
 **Solution:**
 - Your browser theme may be hiding focus outlines
-- Try a different theme in Peek (Settings → My Settings)
+- Try a different theme in Peek (Settings → User Preferences → Theme)
 - Check browser zoom level (Ctrl + 0 to reset)
 - Report as a bug if it persists
 
@@ -335,8 +293,7 @@ Basic screen reader support:
 
 1. **Use `/` to search instantly** from any page
 2. **Use number keys (0-9) to scrub through videos** quickly
-3. **Press `Escape` repeatedly** to navigate back multiple levels
-4. **Use `Tab + Enter` combo** for rapid clicking
+3. **Use `Tab` then `Enter`** to press the focused button without the mouse
 
 ### Couch Potato Mode
 
@@ -347,8 +304,8 @@ Perfect setup for couch browsing:
 3. Start playlist playback
 4. Use only these keys:
    - `Space` - Play/Pause
-   - `N` - Next video
-   - `P` - Previous video
+   - `Shift+N` - Next video
+   - `Shift+P` - Previous video
    - `↑/↓` - Volume
    - `F` - Fullscreen on/off
 

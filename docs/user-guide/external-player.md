@@ -20,7 +20,7 @@ Peek allows you to open scenes in external media players like VLC for enhanced p
 
 ## Using the External Player Button
 
-On the scene page, you'll find an external player button (external link icon) next to the "View in Stash" button. The behavior differs by platform:
+On the scene page, you'll find an external player button (external link icon) beside the **Back** button, at the top of the page. (Admins also see a "View in Stash" button next to it.) The behavior differs by platform:
 
 ### Mobile Devices
 
