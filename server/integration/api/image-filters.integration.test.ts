@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { must } from "../../tests/helpers/must.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -861,4 +864,358 @@ describe("Image Filters", () => {
       });
     }
   );
+});
+
+/**
+ * Image title, details, code, photographer, path, URL, organized,
+ * resolution and orientation (items 63 and 66), from the wire through the
+ * parser into the image builder, on seeded rows.
+ *
+ * Two made-up instances reusing ids, as two Stash servers do: spi-x and
+ * spi-y, both enabled and both selected by every viewer. Image ids are
+ * 7898000 + n. Users: A, whose hides are none, and B, who hid image 60@x.
+ * Every seeded row is deleted before the describe ends.
+ */
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+const IX = "spi-x";
+const IY = "spi-y";
+const IMAGE_INSTANCES = [IX, IY];
+const IMAGE_PREFIX = "spi-it";
+const imageId = (n: number) => String(7898000 + n);
+
+describeWithDb("Image own fields (seeded)", () => {
+  const user = { A: 0, B: 0 };
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { username: { startsWith: IMAGE_PREFIX } },
+    });
+    await prisma.stashImage.deleteMany({
+      where: { stashInstanceId: { in: IMAGE_INSTANCES } },
+    });
+    await prisma.stashInstance.deleteMany({
+      where: { id: { in: IMAGE_INSTANCES } },
+    });
+  }
+
+  /** The images of one instance a wire `image_filter` lists, as numbers; the count is checked */
+  async function ns(
+    viewer: number,
+    imageFilter: Record<string, unknown>,
+    instance = IX
+  ): Promise<number[]> {
+    const request = parseListRequest(
+      "image",
+      { filter: { per_page: 250 }, image_filter: imageFilter },
+      { userId: viewer }
+    );
+    const { items, total } = await imageQueryBuilder.execute({
+      userId: viewer,
+      allowedInstanceIds: await getUserAllowedInstanceIds(viewer),
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items
+      .filter((image) => image.instanceId === instance)
+      .map((image) => Number(image.id) - 7898000)
+      .sort((a, b) => a - b);
+  }
+
+  const text = (field: string, modifier: string, value?: string) => ({
+    [field]: value === undefined ? { modifier } : { value, modifier },
+  });
+
+  beforeAll(async () => {
+    await removeRows();
+
+    for (const [i, id] of IMAGE_INSTANCES.entries()) {
+      await prisma.stashInstance.create({
+        data: {
+          id,
+          name: id,
+          url: "http://127.0.0.1:9/graphql",
+          apiKey: "fixture-key",
+          enabled: true,
+          priority: 960 + i,
+          firstSyncedAt: new Date(),
+        },
+      });
+    }
+
+    const makeUser = async (name: string) =>
+      (
+        await prisma.user.create({
+          data: {
+            username: `${IMAGE_PREFIX}-${name}`,
+            password: "not-a-real-hash",
+            role: "USER",
+            stashInstances: {
+              create: IMAGE_INSTANCES.map((instanceId) => ({ instanceId })),
+            },
+          },
+        })
+      ).id;
+    user.A = await makeUser("a");
+    user.B = await makeUser("b");
+
+    const image = (
+      n: number,
+      instance: string,
+      extra: Record<string, unknown> = {}
+    ) => ({
+      id: imageId(n),
+      stashInstanceId: instance,
+      title: `SPI ${n} ${instance}`,
+      ...extra,
+    });
+    await prisma.stashImage.createMany({
+      data: [
+        // Titles, details, codes, photographers: 1 holds an underscore, 2 a
+        // lookalike, 3 a percent
+        image(1, IX, {
+          title: "a_b title",
+          details: "d_1",
+          code: "C_1",
+          photographer: "p_1",
+        }),
+        image(2, IX, {
+          title: "axb title",
+          details: "dx1",
+          code: "CX1",
+          photographer: "px1",
+        }),
+        image(3, IX, {
+          title: "100% title",
+          details: "100% detail",
+          code: "100%",
+          photographer: "100% shots",
+        }),
+        image(1, IY, {
+          title: "a_b title",
+          details: "d_1",
+          code: "C_1",
+          photographer: "p_1",
+        }),
+        image(3, IY, { details: "100% elsewhere" }),
+        // Paths
+        image(4, IX, { filePath: "/a_b/x.jpg" }),
+        image(5, IX, { filePath: "/axb/x.jpg" }),
+        image(6, IX, { filePath: "/z/a_b/x.jpg" }),
+        image(7, IX, { filePath: "/100%/y.jpg" }),
+        image(4, IY, { filePath: "/a_b/other.jpg" }),
+        image(7, IY, { filePath: "/plain/other.jpg" }),
+        // URLs
+        image(10, IX, {
+          urls: JSON.stringify(["https://a.test/1", "https://example.com/2"]),
+        }),
+        image(11, IX, { urls: JSON.stringify(["https://other.test/"]) }),
+        image(12, IX, { urls: null }),
+        image(13, IX, { urls: "" }),
+        image(14, IX, { urls: "[]" }),
+        image(10, IY, { urls: JSON.stringify(["https://nothing.test/"]) }),
+        // Organized
+        image(20, IX, { organized: true }),
+        image(21, IX),
+        image(20, IY),
+        // Resolution and orientation: 30 is 1080 by 1920 (portrait), 31
+        // 1920 by 1080, 32 square 2000, 33 has no size
+        image(30, IX, { width: 1080, height: 1920 }),
+        image(31, IX, { width: 1920, height: 1080 }),
+        image(32, IX, { width: 2000, height: 2000 }),
+        image(33, IX, { width: null, height: null }),
+        image(30, IY, { width: 640, height: 480 }),
+        // Hidden by B, with every field set
+        image(60, IX, {
+          title: "hidden title",
+          details: "hidden details",
+          code: "HID",
+          photographer: "hidden photographer",
+          filePath: "/hidden/x.jpg",
+          urls: JSON.stringify(["https://hidden.test/"]),
+          organized: false,
+          width: 1080,
+          height: 1920,
+        }),
+      ],
+    });
+
+    await prisma.userHiddenEntity.create({
+      data: {
+        userId: user.B,
+        entityType: "image",
+        entityId: imageId(60),
+        instanceId: IX,
+      },
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: user.B,
+        entityType: "image",
+        entityId: imageId(60),
+        instanceId: IX,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("title, details, code and photographer match literally, per instance", async () => {
+    for (const field of ["title", "details", "code", "photographer"]) {
+      const underscore = {
+        title: "a_b",
+        details: "d_",
+        code: "C_",
+        photographer: "p_",
+      }[field] as string;
+      expect(await ns(user.A, text(field, "INCLUDES", underscore))).toEqual([
+        1,
+      ]);
+      // The same id on the other instance is another image
+      expect(await ns(user.A, text(field, "INCLUDES", underscore), IY)).toEqual(
+        [1]
+      );
+    }
+    expect(await ns(user.A, text("title", "INCLUDES", "100%"))).toEqual([3]);
+    expect(await ns(user.A, text("details", "INCLUDES", "100%"))).toEqual([3]);
+    expect(await ns(user.A, text("details", "INCLUDES", "100%"), IY)).toEqual([
+      3,
+    ]);
+    expect(await ns(user.A, text("code", "EQUALS", "C_1"))).toEqual([1]);
+    expect(await ns(user.A, text("code", "EQUALS", "C%"))).toEqual([]);
+    expect(await ns(user.A, text("photographer", "EQUALS", "p_1"))).toEqual([
+      1,
+    ]);
+    expect(
+      await ns(user.A, text("photographer", "NOT_EQUALS", "p_1"))
+    ).not.toContain(1);
+  });
+
+  it("path STARTS_WITH matches the start only, literally", async () => {
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/a_b/"))).toEqual([4]);
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/a_b/"), IY)).toEqual([
+      4,
+    ]);
+    expect(await ns(user.A, text("path", "STARTS_WITH", "/z/"))).toEqual([6]);
+    expect(await ns(user.A, text("path", "INCLUDES", "%"))).toEqual([7]);
+    expect(await ns(user.A, text("path", "INCLUDES", "%"), IY)).toEqual([]);
+    expect(await ns(user.A, text("path", "EQUALS", "/axb/x.jpg"))).toEqual([5]);
+  });
+
+  it("url matches any of the image's URLs, not the JSON text", async () => {
+    expect(await ns(user.A, text("url", "INCLUDES", '"'))).toEqual([]);
+    expect(await ns(user.A, text("url", "INCLUDES", "]"))).toEqual([]);
+    expect(await ns(user.A, text("url", "INCLUDES", "example.com"))).toEqual([
+      10,
+    ]);
+    expect(
+      await ns(user.A, text("url", "INCLUDES", "nothing.test"), IY)
+    ).toEqual([10]);
+    expect(await ns(user.A, text("url", "INCLUDES", "nothing.test"))).toEqual(
+      []
+    );
+    expect(
+      await ns(user.A, text("url", "EQUALS", "https://other.test/"))
+    ).toEqual([11]);
+    // NULL, '' and [] are all "no URL"
+    expect(await ns(user.A, text("url", "IS_NULL"))).toEqual(
+      expect.arrayContaining([12, 13, 14])
+    );
+    expect(await ns(user.A, text("url", "IS_NULL"))).not.toContain(10);
+    expect(await ns(user.A, text("url", "NOT_NULL"))).toEqual(
+      expect.arrayContaining([10, 11])
+    );
+    expect(
+      await ns(user.A, text("url", "EXCLUDES", "example.com"))
+    ).not.toContain(10);
+  });
+
+  it("organized false matches the default and true the marked", async () => {
+    expect(await ns(user.A, { organized: true })).toEqual([20]);
+    expect(await ns(user.A, { organized: false })).toEqual(
+      expect.arrayContaining([21])
+    );
+    expect(await ns(user.A, { organized: false })).not.toContain(20);
+    expect(await ns(user.A, { organized: true }, IY)).toEqual([]);
+    expect(await ns(user.A, { organized: false }, IY)).toContain(20);
+  });
+
+  it("resolution reads the shorter side, so a portrait 1080 is Full HD", async () => {
+    const resolution = (value: string, modifier: string) => ({
+      resolution: { value, modifier },
+    });
+    const full = await ns(user.A, resolution("FULL_HD", "EQUALS"));
+    expect(full).toEqual(expect.arrayContaining([30, 31]));
+    expect(full).not.toContain(32);
+    expect(full).not.toContain(33);
+    expect(await ns(user.A, resolution("FULL_HD", "GREATER_THAN"))).toEqual(
+      expect.arrayContaining([32])
+    );
+    expect(
+      await ns(user.A, resolution("FULL_HD", "GREATER_THAN"))
+    ).not.toContain(30);
+    // An image with no size never matches, NOT_EQUALS included
+    expect(await ns(user.A, resolution("FULL_HD", "NOT_EQUALS"))).not.toContain(
+      33
+    );
+    // The other instance's 640 by 480 is its own
+    expect(await ns(user.A, resolution("FULL_HD", "EQUALS"), IY)).toEqual([]);
+    expect(await ns(user.A, resolution("STANDARD", "EQUALS"), IY)).toEqual([
+      30,
+    ]);
+  });
+
+  it("orientation matches portrait, landscape and square, and several at once", async () => {
+    const orientation = (...value: string[]) => ({ orientation: { value } });
+    expect(await ns(user.A, orientation("PORTRAIT"))).toEqual(
+      expect.arrayContaining([30])
+    );
+    expect(await ns(user.A, orientation("PORTRAIT"))).not.toContain(31);
+    expect(await ns(user.A, orientation("LANDSCAPE"))).toContain(31);
+    expect(await ns(user.A, orientation("SQUARE"))).toEqual([32]);
+    const either = await ns(user.A, orientation("SQUARE", "LANDSCAPE"));
+    expect(either).toEqual(expect.arrayContaining([31, 32]));
+    expect(either).not.toContain(30);
+    expect(either).not.toContain(33);
+    expect(await ns(user.A, orientation("LANDSCAPE"), IY)).toEqual([30]);
+  });
+
+  it("an image the viewer hid is never listed under a new field", async () => {
+    // A sees it, so every field below really matches it
+    for (const filter of [
+      text("title", "INCLUDES", "hidden"),
+      text("details", "INCLUDES", "hidden"),
+      text("code", "EQUALS", "HID"),
+      text("photographer", "INCLUDES", "hidden"),
+      text("path", "STARTS_WITH", "/hidden/"),
+      text("url", "INCLUDES", "hidden.test"),
+      { organized: false },
+      { resolution: { value: "FULL_HD", modifier: "EQUALS" } },
+      { orientation: { value: ["PORTRAIT"] } },
+    ]) {
+      expect(await ns(user.A, filter), JSON.stringify(filter)).toContain(60);
+      expect(await ns(user.B, filter), JSON.stringify(filter)).not.toContain(
+        60
+      );
+    }
+    // The negative forms never list it either
+    for (const filter of [
+      text("title", "EXCLUDES", "zzz"),
+      text("title", "NOT_EQUALS", "zzz"),
+      text("path", "EXCLUDES", "zzz"),
+      text("url", "EXCLUDES", "zzz"),
+      text("url", "NOT_NULL"),
+      text("code", "NOT_NULL"),
+      { resolution: { value: "FULL_HD", modifier: "NOT_EQUALS" } },
+      { resolution: { value: "FULL_HD", modifier: "LESS_THAN" } },
+      { organized: false },
+    ]) {
+      expect(await ns(user.B, filter), JSON.stringify(filter)).not.toContain(
+        60
+      );
+    }
+  });
 });

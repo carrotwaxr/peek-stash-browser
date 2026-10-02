@@ -22,7 +22,6 @@ import type {
   SceneQueryRow,
 } from "../types/internal/queryRows.js";
 import type {
-  MultiEnumCriterion,
   ParsedFilter,
   PlaylistCriterion,
   RefCriterion,
@@ -54,6 +53,7 @@ import {
   instanceClause,
   matchedSetClause,
   noClause,
+  orientationClause,
   performerAgeExists,
   performerTagsClause,
   refClause,
@@ -547,7 +547,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       ),
 
     // Enums
-    orientation: (c) => this.orientationClause(c),
+    orientation: (c) => orientationClause(c, "s.fileWidth", "s.fileHeight"),
     video_codec: (c) => buildTextFilter(c, "s.fileVideoCodec"),
     audio_codec: (c) => buildTextFilter(c, "s.fileAudioCodec"),
 
@@ -771,20 +771,6 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     if (kind === "tag") return this.tagClause(criterion, ctx);
     if (kind === "studio") return this.studioClause(criterion, ctx);
     return this.refs(SCENE_PERFORMERS, { ...criterion, depth: 0 }, ctx);
-  }
-
-  private orientationClause(
-    criterion: MultiEnumCriterion<"LANDSCAPE" | "PORTRAIT" | "SQUARE">
-  ): FilterClause {
-    const conditions = criterion.values.map(
-      (orientation) =>
-        ({
-          LANDSCAPE: "(s.fileWidth > s.fileHeight)",
-          PORTRAIT: "(s.fileWidth < s.fileHeight)",
-          SQUARE: "(s.fileWidth = s.fileHeight AND s.fileWidth > 0)",
-        })[orientation]
-    );
-    return { sql: `(${conditions.join(" OR ")})`, params: [] };
   }
 
   /**

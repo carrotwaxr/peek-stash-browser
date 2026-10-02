@@ -28,7 +28,10 @@ import {
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
+  buildTextFilter,
+  orientationClause,
   refClause,
+  resolutionClause,
   searchAll,
 } from "../utils/sqlClauses.js";
 import {
@@ -183,6 +186,23 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     tags: (c, ctx) => this.tagClause(c, ctx),
     studios: (c, ctx) => this.studioClause(c, ctx),
     galleries: (c, ctx) => this.galleryClause(c, ctx),
+
+    // Text; the URL is matched one element of the list at a time
+    title: (c) => buildTextFilter(c, "i.title"),
+    details: (c) => buildTextFilter(c, "i.details"),
+    code: (c) => buildTextFilter(c, "i.code"),
+    photographer: (c) => buildTextFilter(c, "i.photographer"),
+    path: (c) => buildTextFilter(c, "i.filePath"),
+    url: (c) => buildTextFilter(c, null, { lists: ["i.urls"] }),
+
+    organized: (organized) => ({
+      sql: "i.organized = ?",
+      params: [organized ? 1 : 0],
+    }),
+
+    // The shorter side against Stash's ranges, as the scene list reads it
+    resolution: (c) => resolutionClause(c, "i.width", "i.height"),
+    orientation: (c) => orientationClause(c, "i.width", "i.height"),
 
     // Dates
     date: (c) => buildDayFilter(c, "i.date"),

@@ -31,6 +31,7 @@ import type {
   DateCriterion,
   EnumCriterion,
   FilterRef,
+  MultiEnumCriterion,
   NumberCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
@@ -1589,4 +1590,25 @@ export function resolutionClause(
     LESS_THAN: `${shorter} < ${min}`,
   }[criterion.modifier];
   return { sql, params: [] };
+}
+
+/**
+ * The orientation filter over a file's width and height columns: landscape
+ * is wider than tall, portrait taller than wide, square equal and not zero.
+ * Several values match any one of them; a file with no size matches none.
+ */
+export function orientationClause(
+  criterion: MultiEnumCriterion<"LANDSCAPE" | "PORTRAIT" | "SQUARE">,
+  widthCol: string,
+  heightCol: string
+): FilterClause {
+  const conditions = criterion.values.map(
+    (orientation) =>
+      ({
+        LANDSCAPE: `(${widthCol} > ${heightCol})`,
+        PORTRAIT: `(${widthCol} < ${heightCol})`,
+        SQUARE: `(${widthCol} = ${heightCol} AND ${widthCol} > 0)`,
+      })[orientation]
+  );
+  return { sql: `(${conditions.join(" OR ")})`, params: [] };
 }
