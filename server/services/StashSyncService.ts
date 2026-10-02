@@ -596,6 +596,11 @@ function escapeSqlNullable(value: string | null | undefined): string {
   return `'${escapeSql(value)}'`;
 }
 
+/** A list as the JSON text stored in a column; an empty or missing one is NULL. */
+function listJson(list: readonly string[] | null | undefined): string | null {
+  return list && list.length > 0 ? JSON.stringify(list) : null;
+}
+
 // ==================== Change detection helpers ====================
 
 /**
@@ -1756,6 +1761,7 @@ async function processPerformersBatch(
     ${escapeSqlNullable(performer.career_length)},
     ${escapeSqlNullable(performer.death_date)},
     ${escapeSqlNullable(performer.url)},
+    ${escapeSqlNullable(listJson(performer.urls))},
     ${escapeSqlNullable(performer.image_path)},
     ${performer.scene_count},
     ${performer.image_count},
@@ -1779,7 +1785,7 @@ async function processPerformersBatch(
     rating100, details, aliasList,
     country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements, fakeTits,
     penisLength, circumcised,
-    tattoos, piercings, careerLength, deathDate, url, imagePath,
+    tattoos, piercings, careerLength, deathDate, url, urls, imagePath,
     sceneCount, imageCount, galleryCount, groupCount,
     stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
   ) VALUES ${values}
@@ -1808,6 +1814,7 @@ async function processPerformersBatch(
     careerLength = excluded.careerLength,
     deathDate = excluded.deathDate,
     url = excluded.url,
+    urls = excluded.urls,
     imagePath = excluded.imagePath,
     stashCreatedAt = excluded.stashCreatedAt,
     stashUpdatedAt = excluded.stashUpdatedAt,
@@ -1896,6 +1903,7 @@ async function processStudiosBatch(
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${escapeSqlNullable(stashIdsJson)},
     ${escapeSqlNullable(studio.name)},
+    ${escapeSqlNullable(listJson(studio.aliases))},
     ${studio.parent_studio?.id ? `'${escapeSql(studio.parent_studio.id)}'` : "NULL"},
     ${studio.favorite ? 1 : 0},
     ${studio.rating100 ?? "NULL"},
@@ -1918,7 +1926,7 @@ async function processStudiosBatch(
   // The counts are set on insert only, as for performers
   const upsertStudios = `
   INSERT INTO StashStudio (
-    id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
+    id, stashInstanceId, stashIds, name, aliases, parentId, favorite, rating100,
     sceneCount, imageCount, galleryCount, performerCount, groupCount,
     details, url, imagePath, stashCreatedAt,
     stashUpdatedAt, syncedAt, deletedAt
@@ -1926,6 +1934,7 @@ async function processStudiosBatch(
   ON CONFLICT(id, stashInstanceId) DO UPDATE SET
     stashIds = excluded.stashIds,
     name = excluded.name,
+    aliases = excluded.aliases,
     parentId = excluded.parentId,
     favorite = excluded.favorite,
     rating100 = excluded.rating100,
@@ -2110,6 +2119,7 @@ async function processGroupsBatch(
     '${escapeSql(group.id)}',
     ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
     ${escapeSqlNullable(group.name)},
+    ${escapeSqlNullable(group.aliases === "" ? null : group.aliases)},
     ${escapeSqlNullable(group.date)},
     ${group.studio?.id ? `'${escapeSql(group.studio.id)}'` : "NULL"},
     ${group.rating100 ?? "NULL"},
@@ -2132,13 +2142,14 @@ async function processGroupsBatch(
   // The counts are set on insert only, as for performers
   const upsertGroups = `
   INSERT INTO StashGroup (
-    id, stashInstanceId, name, date, studioId, rating100, duration,
+    id, stashInstanceId, name, aliases, date, studioId, rating100, duration,
     sceneCount, performerCount,
     director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
     stashUpdatedAt, syncedAt, deletedAt
   ) VALUES ${values}
   ON CONFLICT(id, stashInstanceId) DO UPDATE SET
     name = excluded.name,
+    aliases = excluded.aliases,
     date = excluded.date,
     studioId = excluded.studioId,
     rating100 = excluded.rating100,
@@ -2216,6 +2227,8 @@ async function processGalleriesBatch(
       const folder = gallery.folder;
       // Get first file's basename for zip gallery title fallback
       const fileBasename = gallery.files[0]?.basename ?? null;
+      // A zip gallery's file path (a folder gallery has no file)
+      const filePath = gallery.files[0]?.path ?? null;
       // Cover image ID for dimension lookup
       const coverImageId = gallery.cover?.id ?? null;
       // A gallery's studio is on the gallery's own Stash, so it takes the
@@ -2237,6 +2250,8 @@ async function processGalleriesBatch(
     ${escapeSqlNullable(JSON.stringify(gallery.urls))},
     ${escapeSqlNullable(folder?.path)},
     ${escapeSqlNullable(fileBasename)},
+    ${escapeSqlNullable(filePath)},
+    ${gallery.organized ? 1 : 0},
     ${escapeSqlNullable(gallery.paths.cover)},
     ${epochMs(gallery.created_at) ?? "NULL"},
     ${epochMs(gallery.updated_at) ?? "NULL"},
@@ -2250,7 +2265,7 @@ async function processGalleriesBatch(
   const upsertGalleries = `
   INSERT INTO StashGallery (
     id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
-    details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
+    details, url, code, photographer, urls, folderPath, fileBasename, filePath, organized, coverPath, stashCreatedAt, stashUpdatedAt,
     syncedAt, deletedAt
   ) VALUES ${values}
   ON CONFLICT(id, stashInstanceId) DO UPDATE SET
@@ -2267,6 +2282,8 @@ async function processGalleriesBatch(
     urls = excluded.urls,
     folderPath = excluded.folderPath,
     fileBasename = excluded.fileBasename,
+    filePath = excluded.filePath,
+    organized = excluded.organized,
     coverPath = excluded.coverPath,
     stashCreatedAt = excluded.stashCreatedAt,
     stashUpdatedAt = excluded.stashUpdatedAt,

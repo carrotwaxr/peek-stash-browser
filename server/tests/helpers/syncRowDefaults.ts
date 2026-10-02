@@ -27,11 +27,12 @@ export const SCENE_DEFAULTS = {
 
 export const PERFORMER_DEFAULTS = {
   alias_list: [],
+  urls: [],
   tags: [],
   ...COUNTS,
 };
 
-export const STUDIO_DEFAULTS = { tags: [], ...COUNTS };
+export const STUDIO_DEFAULTS = { aliases: [], tags: [], ...COUNTS };
 
 export const TAG_DEFAULTS = {
   parents: [],

@@ -35,7 +35,13 @@ import {
 } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
-import { SCENE_DEFAULTS } from "../helpers/syncRowDefaults.js";
+import {
+  GALLERY_DEFAULTS,
+  GROUP_DEFAULTS,
+  PERFORMER_DEFAULTS,
+  SCENE_DEFAULTS,
+  STUDIO_DEFAULTS,
+} from "../helpers/syncRowDefaults.js";
 import { untrusted } from "../helpers/untrusted.js";
 
 // Test the formatTimestampForStash logic directly (re-implemented here for testing)
@@ -1844,5 +1850,161 @@ describe("StashSyncService scene batches", () => {
       ).slice(1);
     expect(timestamps("1")).toEqual(["1634079762000", "1634079762000"]);
     expect(timestamps("2")).toEqual(["NULL", "NULL"]);
+  });
+});
+
+type GalleryFile = SyncEntityOf<"gallery">["files"][number];
+
+describe("StashSyncService stored aliases, links and gallery fields", () => {
+  const RUN = () => ({
+    signal: new AbortController().signal,
+    changes: {} as never,
+    holdUsers: new Map([["inst-1", []]]),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+  });
+
+  const upsertOf = (table: string): string =>
+    must(
+      mockPrisma.$executeRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .find((sql) => sql.includes(`INSERT INTO ${table} `)),
+      `the ${table} upsert`
+    );
+
+  /** The text of one row's tuple: from its quoted id to the next row. */
+  const rowOf = (upsert: string, id: string): string =>
+    must(
+      new RegExp(`\\(\\s+'${id}',[\\s\\S]*?\\n  \\)`).exec(upsert),
+      `row ${id}`
+    )[0];
+
+  it("stores a studio's aliases as a JSON list", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    const studio = (id: string, aliases: string[]) =>
+      partialRow<SyncEntityOf<"studio">>({
+        ...STUDIO_DEFAULTS,
+        id,
+        name: `Studio ${id}`,
+        stash_ids: [],
+        aliases,
+      });
+
+    await ENTITY_SYNC.studio.processBatch(
+      [studio("1", ["A", "B"]), studio("2", [])],
+      "inst-1",
+      RUN()
+    );
+
+    const upsert = upsertOf("StashStudio");
+    expect(upsert).toMatch(/aliases/);
+    expect(upsert).toContain("aliases = excluded.aliases");
+    expect(rowOf(upsert, "1")).toContain(`'["A","B"]'`);
+    expect(rowOf(upsert, "2")).not.toContain("[]");
+    // Name, then the aliases column, the parent and favorite: an empty list
+    // is NULL
+    expect(rowOf(upsert, "2")).toMatch(/'Studio 2',\s+NULL,\s+NULL,\s+0,/);
+  });
+
+  it("stores a collection's aliases as text", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    const group = (id: string, aliases: string | null) =>
+      partialRow<SyncEntityOf<"group">>({
+        ...GROUP_DEFAULTS,
+        id,
+        name: `Group ${id}`,
+        aliases,
+      });
+
+    await ENTITY_SYNC.group.processBatch(
+      [group("1", "Part One, P1"), group("2", null), group("3", "")],
+      "inst-1",
+      RUN()
+    );
+
+    const upsert = upsertOf("StashGroup");
+    expect(upsert).toContain("aliases = excluded.aliases");
+    expect(rowOf(upsert, "1")).toContain(`'Part One, P1'`);
+    for (const id of ["2", "3"]) {
+      // Name, then the aliases column: NULL
+      expect(rowOf(upsert, id)).toMatch(
+        new RegExp(`'Group ${id}',\\s+NULL,\\s+NULL,`)
+      );
+    }
+  });
+
+  it("stores every performer URL", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    await ENTITY_SYNC.performer.processBatch(
+      [
+        partialRow<SyncEntityOf<"performer">>({
+          ...PERFORMER_DEFAULTS,
+          id: "1",
+          name: "P",
+          stash_ids: [],
+          urls: ["https://a", "https://b"],
+          url: "https://a",
+        }),
+        partialRow<SyncEntityOf<"performer">>({
+          ...PERFORMER_DEFAULTS,
+          id: "2",
+          name: "Q",
+          stash_ids: [],
+          urls: [],
+        }),
+      ],
+      "inst-1",
+      RUN()
+    );
+
+    const upsert = upsertOf("StashPerformer");
+    expect(upsert).toContain("urls = excluded.urls");
+    expect(rowOf(upsert, "1")).toContain(`'["https://a","https://b"]'`);
+    // url keeps the first link
+    expect(rowOf(upsert, "1")).toContain(`'https://a'`);
+    // No links: url, urls and imagePath are NULL before the four counts
+    expect(rowOf(upsert, "2")).toMatch(
+      /NULL,\s+NULL,\s+NULL,\s+0,\s+0,\s+0,\s+0,/
+    );
+  });
+
+  it("stores a gallery's organized flag and its zip path", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    const gallery = (
+      id: string,
+      organized: boolean,
+      files: { path: string; basename: string }[],
+      folder: { path: string } | null
+    ) =>
+      partialRow<SyncEntityOf<"gallery">>({
+        ...GALLERY_DEFAULTS,
+        id,
+        title: `Gallery ${id}`,
+        organized,
+        files: files.map((f) => partialRow<GalleryFile>(f)),
+        folder,
+      });
+
+    await ENTITY_SYNC.gallery.processBatch(
+      [
+        gallery("1", true, [{ path: "/z/a.cbz", basename: "a.cbz" }], null),
+        gallery("2", false, [], { path: "/f/dir" }),
+      ],
+      "inst-1",
+      RUN()
+    );
+
+    const upsert = upsertOf("StashGallery");
+    expect(upsert).toContain("organized = excluded.organized");
+    expect(upsert).toContain("filePath = excluded.filePath");
+    // The folder path, the file basename, the zip's path, then organized
+    expect(rowOf(upsert, "1")).toMatch(
+      /NULL,\s+'a\.cbz',\s+'\/z\/a\.cbz',\s+1,/
+    );
+    expect(rowOf(upsert, "2")).toMatch(/'\/f\/dir',\s+NULL,\s+NULL,\s+0,/);
   });
 });

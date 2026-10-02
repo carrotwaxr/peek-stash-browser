@@ -8,6 +8,8 @@
  * computing them per scene on every request. Images store the same
  * `titleSort` (routed C7): their title, else `getImageFallbackTitle`. Every
  * type stores Stash's created_at and updated_at as epoch milliseconds.
+ * Studio and collection aliases, every performer link, and a gallery's
+ * organized flag and zip path are stored as Stash returns them.
  *
  * The first case of each block reads every row the startup sync wrote. The
  * others write through the batch writers under a made-up instance,
@@ -22,8 +24,10 @@ import {
 import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 import {
+  GALLERY_DEFAULTS,
   IMAGE_DEFAULTS,
   SCENE_DEFAULTS,
+  STUDIO_DEFAULTS,
 } from "../../tests/helpers/syncRowDefaults.js";
 import {
   getImageFallbackTitle,
@@ -433,5 +437,115 @@ describeWithDb("Stash timestamps (integration)", () => {
     expect(storage).toEqual(
       Object.fromEntries(TIMESTAMP_TABLES.map((table) => [table, ["integer"]]))
     );
+  });
+});
+
+describeWithDb("Aliases, links and gallery fields (integration)", () => {
+  const run = () => ({
+    signal: new AbortController().signal,
+    changes: new SyncChangeSet(),
+  });
+
+  afterAll(async () => {
+    await prisma.stashGallery.deleteMany({
+      where: { stashInstanceId: DERIVED },
+    });
+    await prisma.stashStudio.deleteMany({
+      where: { stashInstanceId: DERIVED },
+    });
+  });
+
+  it("every performer's links come in as a JSON list, the replay's with two links among them", async () => {
+    const rows = await prisma.$queryRawUnsafe<Array<{ urls: string | null }>>(
+      `SELECT urls FROM StashPerformer
+       WHERE stashInstanceId IN (SELECT id FROM StashInstance)`
+    );
+    const lists = rows.map((r) => ({
+      urls: r.urls === null ? null : (JSON.parse(r.urls) as string[]),
+    }));
+    expect(lists.length).toBeGreaterThan(0);
+    // A list is never stored empty
+    expect(lists.filter(({ urls }) => urls?.length === 0)).toEqual([]);
+    expect(lists.some(({ urls }) => (urls?.length ?? 0) >= 2)).toBe(true);
+  });
+
+  it("a replay gallery stores its organized flag, and a collection its aliases", async () => {
+    // Through the client, which reads a boolean as one (a raw read does not
+    // always). Other files seed galleries under made-up instances, so the
+    // replay's are the organized ones; none of them is a zip
+    const instances = await prisma.stashInstance.findMany({
+      select: { id: true },
+    });
+    const galleries = await prisma.stashGallery.findMany({
+      where: { stashInstanceId: { in: instances.map((i) => i.id) } },
+      select: { organized: true, filePath: true },
+    });
+    expect(galleries.some((g) => g.organized)).toBe(true);
+    expect(galleries.filter((g) => g.filePath !== null)).toEqual([]);
+
+    const groups = await prisma.$queryRawUnsafe<Array<{ aliases: string }>>(
+      `SELECT aliases FROM StashGroup
+       WHERE aliases = 'Group 100002 aliases'
+         AND stashInstanceId IN (SELECT id FROM StashInstance)`
+    );
+    expect(groups.length).toBeGreaterThan(0);
+  });
+
+  // The replay library has no studio with aliases and no zip gallery, so these
+  // two go through the batch writers with the sync's test fakes
+  it("a studio's aliases and a zip gallery's path are stored through the batch writers", async () => {
+    await ENTITY_SYNC.studio.processBatch(
+      [
+        partialRow<SyncEntityOf<"studio">>({
+          ...STUDIO_DEFAULTS,
+          id: "1",
+          name: "Derived IT studio",
+          stash_ids: [],
+          aliases: ["A", "B"],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-02T00:00:00Z",
+        }),
+      ],
+      DERIVED,
+      run()
+    );
+    await ENTITY_SYNC.gallery.processBatch(
+      [
+        partialRow<SyncEntityOf<"gallery">>({
+          ...GALLERY_DEFAULTS,
+          id: "1",
+          title: "Derived IT zip",
+          organized: true,
+          files: [partialRow({ path: "/z/a.cbz", basename: "a.cbz" })],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-02T00:00:00Z",
+        }),
+        partialRow<SyncEntityOf<"gallery">>({
+          ...GALLERY_DEFAULTS,
+          id: "2",
+          title: "Derived IT folder",
+          organized: false,
+          folder: partialRow({ path: "/f/dir" }),
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-02T00:00:00Z",
+        }),
+      ],
+      DERIVED,
+      run()
+    );
+
+    const studio = await prisma.stashStudio.findUnique({
+      where: { id_stashInstanceId: { id: "1", stashInstanceId: DERIVED } },
+    });
+    expect(studio?.aliases).toBe('["A","B"]');
+
+    const zip = await prisma.stashGallery.findUnique({
+      where: { id_stashInstanceId: { id: "1", stashInstanceId: DERIVED } },
+    });
+    expect(zip).toMatchObject({ organized: true, filePath: "/z/a.cbz" });
+    const folder = await prisma.stashGallery.findUnique({
+      where: { id_stashInstanceId: { id: "2", stashInstanceId: DERIVED } },
+    });
+    expect(folder).toMatchObject({ organized: false, filePath: null });
   });
 });

@@ -813,6 +813,7 @@ model StashPerformer {
   careerLength String?
   deathDate    String?
   url          String? // Homepage
+  urls         String? // JSON list of every link
 
   // === Stash paths (raw, transformed at read time) ===
   imagePath String? // Profile image path
@@ -861,6 +862,7 @@ model StashStudio {
   // === Extended fields ===
   details String? // Studio description
   url     String? // Studio website
+  aliases String? // JSON list of alias strings
 
   // === Stash paths (raw, transformed at read time) ===
   imagePath String? // Logo image path
@@ -964,6 +966,7 @@ model StashGroup {
   director String?
   synopsis String?
   urls     String? // JSON array of URLs
+  aliases  String? // Stash's free text
 
   // === Stash paths (raw, transformed at read time) ===
   frontImagePath String? // Front cover image
@@ -1012,10 +1015,12 @@ model StashGallery {
   code         String? // Gallery code
   photographer String?
   urls         String? // JSON array of URLs
+  organized    Boolean @default(false)
 
   // === File metadata ===
   folderPath   String? // Folder path if folder-based
   fileBasename String? // First file's basename (for zip galleries)
+  filePath     String? // A zip gallery's file path
 
   // === Stash paths (raw, transformed at read time) ===
   coverPath String? // Cover image path
