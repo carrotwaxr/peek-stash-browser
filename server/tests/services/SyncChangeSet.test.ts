@@ -17,8 +17,9 @@ import {
 import type { EntityRef } from "../../utils/entityRef.js";
 
 const INSTANCE = "cs-a";
-const UPDATED = "2026-01-02T03:04:05-08:00";
-const LATER = "2026-01-03T00:00:00-08:00";
+// Stash's updated_at as every type stores and compares it: epoch milliseconds
+const UPDATED = Date.parse("2026-01-02T03:04:05-08:00");
+const LATER = Date.parse("2026-01-03T00:00:00-08:00");
 
 const ref = (id: string, instanceId = INSTANCE): EntityRef => ({
   id,
@@ -113,20 +114,25 @@ describe("detectChanges", () => {
     ]);
   });
 
-  it("clips compare stashUpdatedAt as epoch milliseconds", () => {
-    const at = Date.parse(UPDATED);
+  it("an entity whose stored and incoming updatedAt are the same epoch is unchanged", () => {
     const changes = detectChanges({
       instanceId: INSTANCE,
       stored: stored({
-        "1": { updatedAt: at, deleted: false },
-        "2": { updatedAt: at, deleted: false },
+        "1": { updatedAt: UPDATED, deleted: false },
+        "2": { updatedAt: UPDATED, deleted: false },
+        "3": { updatedAt: null, deleted: false },
+        "4": { updatedAt: null, deleted: false },
       }),
       incoming: [
-        { id: "1", updatedAt: at },
-        { id: "2", updatedAt: at + 1000 },
+        { id: "1", updatedAt: UPDATED },
+        // One second later
+        { id: "2", updatedAt: UPDATED + 1000 },
+        // Stash sent no updated_at, and none was stored
+        { id: "3", updatedAt: null },
+        { id: "4", updatedAt: UPDATED },
       ],
     });
-    expect(refs(changes.changed)).toEqual(["2@cs-a"]);
+    expect(refs(changes.changed)).toEqual(["2@cs-a", "4@cs-a"]);
   });
 
   it("an image is changed only when new, updated or resurrected: its junction rows and studio are not compared", () => {

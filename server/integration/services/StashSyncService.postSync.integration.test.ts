@@ -47,7 +47,11 @@ import {
   ENTITY_SYNC,
   stashSyncService,
 } from "../../services/StashSyncService.js";
-import { SCOPE_LIMIT } from "../../services/SyncChangeSet.js";
+import {
+  type BatchChanges,
+  SCOPE_LIMIT,
+  SyncChangeSet,
+} from "../../services/SyncChangeSet.js";
 import { syncScheduler } from "../../services/SyncScheduler.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { must } from "../../tests/helpers/must.js";
@@ -61,6 +65,7 @@ import {
   STUDIO_DEFAULTS,
   TAG_DEFAULTS,
 } from "../../tests/helpers/syncRowDefaults.js";
+import { untrusted } from "../../tests/helpers/untrusted.js";
 import { logger } from "../../utils/logger.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { createApiUser } from "../helpers/accessFixture.js";
@@ -489,6 +494,7 @@ function stubClients(byInstance: Record<string, StashClient>): void {
 
 /** Seed one instance's library as a completed sync would have stored it. */
 async function seedLibrary(instanceId: string): Promise<void> {
+  // Prisma's create stores stashUpdatedAt as epoch milliseconds, as sync does
   const base = { stashInstanceId: instanceId, stashUpdatedAt: UPDATED_AT };
   await prisma.stashTag.create({
     data: { id: ID, ...base, name: "PostSync IT tag" },
@@ -517,17 +523,6 @@ async function seedLibrary(instanceId: string): Promise<void> {
       primaryTagInstanceId: instanceId,
     },
   });
-  // Sync stores stashUpdatedAt as the text Stash sent (Prisma's typed
-  // create above stored it as a number); clips are Prisma-written for real
-  for (const table of TABLES) {
-    if (table === "StashClip") continue;
-    await prisma.$executeRawUnsafe(
-      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
-      UPDATED_AT,
-      instanceId
-    );
-  }
-
   const junctions: Array<[string, string, string, string, string]> = [
     [
       "GalleryPerformer",
@@ -656,17 +651,18 @@ async function pendingRows(userIds: number[]): Promise<number> {
   });
 }
 
-/** The scene's stashUpdatedAt as sync stored it (Stash's own text). */
-async function sceneUpdatedAt(instanceId: string): Promise<string | null> {
+/** The scene's stashUpdatedAt as sync stored it (epoch milliseconds). */
+async function sceneUpdatedAt(instanceId: string): Promise<number | null> {
   const [row] = await prisma.$queryRawUnsafe<
-    Array<{ updatedAt: string | null }>
+    Array<{ updatedAt: bigint | number | null }>
   >(
-    `SELECT CAST("stashUpdatedAt" AS TEXT) AS updatedAt FROM "StashScene"
+    `SELECT CAST("stashUpdatedAt" AS INTEGER) AS updatedAt FROM "StashScene"
      WHERE "id" = ? AND "stashInstanceId" = ?`,
     ID,
     instanceId
   );
-  return row?.updatedAt ?? null;
+  const updatedAt = row?.updatedAt ?? null;
+  return updatedAt === null ? null : Number(updatedAt);
 }
 
 /** What every seeded scene's inheritedTagIds holds until a step rewrites it. */
@@ -703,15 +699,6 @@ async function seedInheritanceSources(instanceId: string): Promise<void> {
       { id: "4", ...base, title: "PostSync IT group's scene" },
     ],
   });
-  for (const table of TABLES) {
-    if (table === "StashClip") continue;
-    await prisma.$executeRawUnsafe(
-      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
-      UPDATED_AT,
-      instanceId
-    );
-  }
-
   const links: Array<[string, string, string, string, string, string]> = [
     ["PerformerTag", "performerId", "performerInstanceId", "2", "tagId", "3"],
     ["StudioTag", "studioId", "studioInstanceId", ID, "tagId", "3"],
@@ -924,15 +911,6 @@ async function seedImageCountSources(instanceId: string): Promise<void> {
       { id: "3", ...base, title: "PostSync IT image 3" },
     ],
   });
-  for (const table of TABLES) {
-    if (table === "StashClip") continue;
-    await prisma.$executeRawUnsafe(
-      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
-      UPDATED_AT,
-      instanceId
-    );
-  }
-
   const links: Array<[string, string, string, string, string, string]> = [
     ["ImagePerformer", "imageId", "imageInstanceId", "2", "performerId", "2"],
     ["ImageTag", "imageId", "imageInstanceId", "2", "tagId", "2"],
@@ -1241,7 +1219,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       INSTANCES.map((id) => ({ id, name: id }))
     );
     // What both instances' scenes carry when the steps run
-    const seenAtSteps: Array<string | null> = [];
+    const seenAtSteps: Array<number | null> = [];
     steps.imageCounts.mockImplementation(async () => {
       seenAtSteps.push(await sceneUpdatedAt(PC_A), await sceneUpdatedAt(PC_B));
     });
@@ -1256,7 +1234,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
       stats: 1,
       tagCounts: 1,
     });
-    expect(seenAtSteps).toEqual([LATER_AT, LATER_AT]);
+    expect(seenAtSteps).toEqual([Date.parse(LATER_AT), Date.parse(LATER_AT)]);
     // Each affected user once, not once per instance
     const perUser = Object.values(users).map(
       (id) => recompute.mock.calls.filter((call) => call[0] === id).length
@@ -1318,6 +1296,91 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
     expect(recomputed).toEqual(everyUser);
     expect(await inheritedRows(PC_A)).toEqual({ performers: 1, tags: 1 });
     expect(await pendingRows(Object.values(users))).toBe(0);
+  }, 60_000);
+
+  it("a stored timestamp reads as unchanged", async () => {
+    // A studio and a collection beside the library, stored as sync stores them
+    const base = {
+      stashInstanceId: PC_A,
+      stashUpdatedAt: new Date(UPDATED_AT),
+    };
+    await prisma.stashStudio.create({
+      data: { id: ID, ...base, name: "PostSync IT studio" },
+    });
+    await prisma.stashGroup.create({
+      data: { id: ID, ...base, name: "PostSync IT group" },
+    });
+
+    /** Each type's batch of what is stored, with this updated_at: the ids it counts changed */
+    const changedIds = async (updatedAt: string | null) => {
+      const lib = library();
+      const at = <T>(rows: T[]): T[] =>
+        rows.map((row) => ({
+          ...row,
+          updated_at: untrusted<string>(updatedAt),
+        }));
+      const run = () => ({
+        signal: new AbortController().signal,
+        changes: new SyncChangeSet(),
+      });
+      const ids = ({ changed }: BatchChanges) =>
+        changed.map((r) => `${r.id}@${r.instanceId}`);
+      return {
+        tag: ids(await ENTITY_SYNC.tag.processBatch(at(lib.tag), PC_A, run())),
+        studio: ids(
+          await ENTITY_SYNC.studio.processBatch(
+            at([studioRow([], UPDATED_AT)]),
+            PC_A,
+            run()
+          )
+        ),
+        performer: ids(
+          await ENTITY_SYNC.performer.processBatch(
+            at(lib.performer),
+            PC_A,
+            run()
+          )
+        ),
+        group: ids(
+          await ENTITY_SYNC.group.processBatch(
+            at([groupRow([], UPDATED_AT)]),
+            PC_A,
+            run()
+          )
+        ),
+        gallery: ids(
+          await ENTITY_SYNC.gallery.processBatch(at(lib.gallery), PC_A, run())
+        ),
+        scene: ids(
+          await ENTITY_SYNC.scene.processBatch(at(lib.scene), PC_A, run())
+        ),
+        image: ids(
+          await ENTITY_SYNC.image.processBatch(at(lib.image), PC_A, run())
+        ),
+      };
+    };
+    const none = {
+      tag: [],
+      studio: [],
+      performer: [],
+      group: [],
+      gallery: [],
+      scene: [],
+      image: [],
+    };
+
+    // Stash sends the updated_at each row was stored with
+    expect(await changedIds(UPDATED_AT)).toEqual(none);
+
+    // Neither Stash nor the stored row has one
+    for (const table of TABLES) {
+      if (table === "StashClip") continue;
+      await prisma.$executeRawUnsafe(
+        `UPDATE "${table}" SET "stashUpdatedAt" = NULL WHERE "stashInstanceId" = ?`,
+        PC_A
+      );
+    }
+    expect(await changedIds(null)).toEqual(none);
   }, 60_000);
 
   it("users with pending holds are recomputed even when nothing changed", async () => {
@@ -1755,11 +1818,6 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
           name: "PostSync IT studio 2",
         },
       });
-      await prisma.$executeRawUnsafe(
-        `UPDATE "StashStudio" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
-        UPDATED_AT,
-        PC_A
-      );
       await prisma.stashGroup.update({
         where: { id_stashInstanceId: { id: ID, stashInstanceId: PC_A } },
         data: { studioId: ID },
@@ -1871,13 +1929,13 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
         PC_A
       );
       await prisma.stashImage.create({
-        data: { id: "5", stashInstanceId: PC_A, title: "PostSync IT image 5" },
+        data: {
+          id: "5",
+          stashInstanceId: PC_A,
+          stashUpdatedAt: UPDATED_AT,
+          title: "PostSync IT image 5",
+        },
       });
-      await prisma.$executeRawUnsafe(
-        `UPDATE "StashImage" SET "stashUpdatedAt" = ? WHERE "id" = '5' AND "stashInstanceId" = ?`,
-        UPDATED_AT,
-        PC_A
-      );
       await prisma.imageGallery.create({
         data: {
           imageId: "5",
@@ -2158,11 +2216,6 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
           name: "PostSync IT tag 2",
         },
       });
-      await prisma.$executeRawUnsafe(
-        `UPDATE "StashTag" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
-        UPDATED_AT,
-        instanceId
-      );
     }
 
     /** The library with tag 2 beside tag 1. */

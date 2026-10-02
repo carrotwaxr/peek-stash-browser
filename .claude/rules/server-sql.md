@@ -98,6 +98,8 @@ A `||` on an id, an instance id or a count needs a `??` review before it changes
 
 SQLite can return `5.0000000001` from an integer column, and BigInt from a large one. Wrap counts in `Math.round(Number(x))` before writing them to an `Int` field (#410), and convert BigInt with `Number()` before JSON.
 
+Stash's timestamps (`stashCreatedAt`, `stashUpdatedAt` on every cached type) hold epoch milliseconds like Prisma's own DateTimes, since migration `20261002000600`; sync stored Stash's RFC 3339 text before it. Compare them as numbers.
+
 Prisma's raw queries return `COUNT`, `SUM` and `COALESCE` over integers as `bigint`, a `BIGINT` column such as `fileSize` as `bigint`, a `BOOLEAN` column as `boolean` (never 0 or 1), and a `DATETIME` column as a `Date`, whether it holds text or epoch milliseconds (text it cannot parse fails the query). A raw row type says so, and its `Number()` stays: `no-unnecessary-type-conversion` flags one only when the row type wrongly claims `number`. A transform writes a `Date` out with `toISOString()`, the string the JSON carried anyway.
 
 - The clip list: `StashClip_browse_idx` (deletedAt, stashCreatedAt DESC, id, instance, title, isGenerated, scene key) drives the default list; the spec's `+s.deletedAt IS NULL` keeps the scene's `deletedAt` from driving the join. Clip tag, scene tag and performer INCLUDES read their junction as an IN list (`sortedByIndex: false`) except with a studio or scene filter, which keeps the per-clip EXISTS; scene tags go through the clip's own scene key (`parentKey: ["c.sceneId", "c.sceneInstanceId"]`) and match inherited tags too.

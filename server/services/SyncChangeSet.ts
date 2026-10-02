@@ -71,8 +71,8 @@ export function noChanges(): BatchChanges {
 
 /** What was stored of an entity before its batch wrote it. */
 export interface StoredEntity {
-  /** As the type compares it: RFC3339 text, or epoch ms for clips */
-  updatedAt: string | number | null;
+  /** Stash's updated_at as stored: epoch milliseconds */
+  updatedAt: number | null;
   /** Soft-deleted: the row comes back with this write */
   deleted: boolean;
   studioId?: string | null;
@@ -81,7 +81,8 @@ export interface StoredEntity {
 /** An entity as Stash returned it, reduced to what the diff reads. */
 export interface IncomingEntity {
   id: string;
-  updatedAt: string | number | null;
+  /** Stash's updated_at as epoch milliseconds (`epochMs`) */
+  updatedAt: number | null;
   studioId?: string | null;
   /**
    * Far-side ids on the entity's own instance, per junction the batch

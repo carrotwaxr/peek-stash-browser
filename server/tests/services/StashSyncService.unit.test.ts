@@ -26,6 +26,7 @@ import {
   UnknownInstanceError,
   stashInstanceManager,
 } from "../../services/StashInstanceManager.js";
+import type { SyncEntityOf } from "../../services/StashSyncService.js";
 import { logger } from "../../utils/logger.js";
 import {
   anyOf,
@@ -34,6 +35,8 @@ import {
 } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { SCENE_DEFAULTS } from "../helpers/syncRowDefaults.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Test the formatTimestampForStash logic directly (re-implemented here for testing)
 // This mirrors the function in StashSyncService.ts
@@ -1793,5 +1796,53 @@ describe("StashSyncService scene batches", () => {
         `'No files',\\s+${nulls(5)},\\s+0,\\s+NULL,\\s+NULL,\\s+'\\[\\]',\\s+${nulls(8)}`
       )
     );
+  });
+
+  it("a scene batch writes created_at and updated_at as epoch milliseconds", async () => {
+    const { ENTITY_SYNC } = await import("../../services/StashSyncService.js");
+    const scene = (
+      id: string,
+      createdAt: string | null,
+      updatedAt: string | null
+    ): SyncEntityOf<"scene"> =>
+      partialRow<SyncEntityOf<"scene">>({
+        ...SCENE_DEFAULTS,
+        id,
+        title: `Timestamps ${id}`,
+        // Stash's schema declares both; the batch still guards a missing one
+        created_at: untrusted<string>(createdAt),
+        updated_at: untrusted<string>(updatedAt),
+      });
+
+    await ENTITY_SYNC.scene.processBatch(
+      [
+        scene("1", "2021-10-12T18:02:42-05:00", "2021-10-12T18:02:42-05:00"),
+        // Missing, and text that is no time
+        scene("2", null, "not a time"),
+      ],
+      "inst-1",
+      {
+        signal: new AbortController().signal,
+        changes: {} as never,
+        holdUsers: new Map([["inst-1", []]]),
+      }
+    );
+
+    const upsert = must(
+      mockPrisma.$executeRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .find((sql) => sql.includes("INSERT INTO StashScene")),
+      "the scene upsert"
+    );
+    // A scene's created_at and updated_at come right before its syncedAt
+    const timestamps = (id: string) =>
+      must(
+        new RegExp(
+          `'${id}',[^)]*?\\s(\\S+),\\s+(\\S+),\\s+datetime\\('now'\\)`
+        ).exec(upsert),
+        `scene ${id}'s values`
+      ).slice(1);
+    expect(timestamps("1")).toEqual(["1634079762000", "1634079762000"]);
+    expect(timestamps("2")).toEqual(["NULL", "NULL"]);
   });
 });
