@@ -111,6 +111,7 @@ describe("filter contract", () => {
         "gallery.scenes",
         "performer.tags",
         "studio.tags",
+        "studio.parents",
         "group.tags",
         "group.studios",
       ].sort()

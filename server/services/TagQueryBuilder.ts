@@ -13,6 +13,7 @@ import type { NormalizedTag } from "../types/index.js";
 import type { TagQueryRow } from "../types/internal/queryRows.js";
 import type {
   FilterRef,
+  NumberCriterion,
   ParsedFilter,
   RefCriterion,
 } from "../types/parsedFilters.js";
@@ -22,16 +23,20 @@ import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type FilterClause,
   type JunctionTarget,
-  type SqlFragment,
-  type SqlParam,
   type ViaSceneSpec,
+  allOf,
+  buildCountFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
+  instanceColumnClause,
+  noClause,
   refClause,
+  refSetMatch,
   searchAll,
   viaSceneClause,
+  visibleGuard,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
@@ -39,6 +44,7 @@ import {
   parseJsonArray,
   searchTerms,
 } from "../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
@@ -154,20 +160,91 @@ const TAGS_BY_GROUP: ViaSceneSpec = {
   },
 };
 
+/** The viewer whose exclusions apply, or null */
+const viewerOf = (ctx: QueryContext): number | null =>
+  ctx.applyExclusions ? ctx.userId : null;
+
 /**
- * One parent ref on the tag's `parentIds` JSON list. A tag's parents are on
- * the tag's own instance, so a ref with an instance matches tags on that
- * instance only; a bare ref matches the id on every instance.
+ * The tag's live parents the viewer can see (`tpp`), read from its
+ * `parentIds` (`tpj`) on its own instance: the FROM after `SELECT ...`, the
+ * WHERE, and the parameters the FROM binds
  */
-function parentCondition(ref: FilterRef): { sql: string; params: SqlParam[] } {
-  const pattern = `%"${ref.id}"%`;
-  return ref.instanceId === undefined || ref.instanceId === ""
-    ? { sql: "t.parentIds LIKE ?", params: [pattern] }
-    : {
-        sql: "(t.stashInstanceId = ? AND t.parentIds LIKE ?)",
-        params: [ref.instanceId, pattern],
-      };
+function visibleParents(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("tpp", "tag", viewerOf(ctx));
+  return {
+    sql: `FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp ON tpp.id = tpj.value AND tpp.stashInstanceId = t.stashInstanceId${guard.join} WHERE ${guard.where}`,
+    params: guard.params,
+  };
 }
+
+/**
+ * Every live tag the viewer can see (`tcc`) with each of its parents' ids
+ * (`tcj.value`): the parent-child links whose child shows
+ */
+function visibleChildLinks(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("tcc", "tag", viewerOf(ctx));
+  return {
+    sql: `FROM StashTag tcc CROSS JOIN json_each(${jsonListOrEmpty("tcc.parentIds")}) tcj${guard.join} WHERE ${guard.where}`,
+    params: guard.params,
+  };
+}
+
+/** The tag's visible parents, each once */
+function parentCount(ctx: QueryContext): FilterClause {
+  const parents = visibleParents(ctx);
+  return {
+    sql: `(SELECT COUNT(DISTINCT tpp.id) ${parents.sql})`,
+    params: parents.params,
+  };
+}
+
+/**
+ * The tag's visible children: one grouped pass over the live tags' parent
+ * lists (`<name>_children`, on the allowed instances), looked up by the
+ * tag's key. `parentIds` has no index, so a per-row count would read every
+ * tag's list for every tag.
+ */
+function childCount(ctx: LeafContext): FilterClause {
+  const links = visibleChildLinks(ctx);
+  const instances = instanceColumnClause(
+    "tcc.stashInstanceId",
+    ctx.allowedInstanceIds
+  );
+  const name = `${ctx.name}_children`;
+  return {
+    sql: `COALESCE((SELECT k.n FROM ${name} k WHERE k.pid = t.id AND k.inst = t.stashInstanceId), 0)`,
+    params: [],
+    ctes: [
+      {
+        name,
+        sql: `${name}(pid, inst, n) AS MATERIALIZED (SELECT tcj.value, tcc.stashInstanceId, COUNT(DISTINCT tcc.id) ${links.sql} AND ${instances.sql} GROUP BY tcj.value, tcc.stashInstanceId)`,
+        params: [...links.params, ...instances.params],
+      },
+    ],
+  };
+}
+
+/**
+ * The live clips (Stash's markers) the viewer can see in live scenes they
+ * can see, with the tag as the primary tag or in the clip's tags, each
+ * clip once
+ */
+function markerCount(ctx: QueryContext): FilterClause {
+  const clip = visibleGuard("mc", "clip", viewerOf(ctx));
+  const scene = visibleGuard("ms", "scene", viewerOf(ctx));
+  const tagged =
+    "SELECT mk.id AS cid, mk.stashInstanceId AS cinst FROM StashClip mk WHERE mk.primaryTagId = t.id AND mk.primaryTagInstanceId = t.stashInstanceId UNION SELECT ct.clipId, ct.clipInstanceId FROM ClipTag ct WHERE ct.tagId = t.id AND ct.tagInstanceId = t.stashInstanceId";
+  return {
+    sql: `(SELECT COUNT(*) FROM (${tagged}) mt JOIN StashClip mc ON mc.id = mt.cid AND mc.stashInstanceId = mt.cinst${clip.join} JOIN StashScene ms ON ms.id = mc.sceneId AND ms.stashInstanceId = mc.sceneInstanceId${scene.join} WHERE ${clip.where} AND ${scene.where})`,
+    params: [...clip.params, ...scene.params],
+  };
+}
+
+/** A stored count column as the viewer sees it, as a number filter */
+const storedCount =
+  (column: string, relation: Parameters<typeof visibleCount>[2]) =>
+  (c: NumberCriterion, ctx: QueryContext) =>
+    buildNumericFilter(c, visibleCount(ctx, column, relation));
 
 /**
  * Builds and executes SQL queries for tag filtering
@@ -232,6 +309,7 @@ class TagQueryBuilder extends EntityQueryBuilder<
 
     // Related entities
     parents: (c, ctx) => this.parentClause(c, ctx),
+    children: (c, ctx) => this.childClause(c, ctx),
     performers: (c, ctx) => this.junction(PERFORMER_TAGS, c, ctx),
     studios: (c, ctx) => this.junction(STUDIO_TAGS, c, ctx),
     scenes: (c, ctx) => viaSceneClause(TAGS_BY_SCENE, c.refs, c.modifier, ctx),
@@ -239,6 +317,14 @@ class TagQueryBuilder extends EntityQueryBuilder<
 
     // Counts, as the viewer sees them
     scene_count: (c, ctx) => buildNumericFilter(c, sceneCount(ctx)),
+    parent_count: (c, ctx) => buildCountFilter(c, parentCount(ctx)),
+    child_count: (c, ctx) => buildCountFilter(c, childCount(ctx)),
+    image_count: storedCount("t.imageCount", "images"),
+    gallery_count: storedCount("t.galleryCount", "galleries"),
+    performer_count: storedCount("t.performerCount", "performers"),
+    studio_count: storedCount("t.studioCount", "studios"),
+    group_count: storedCount("t.groupCount", "groups"),
+    marker_count: (c, ctx) => buildCountFilter(c, markerCount(ctx)),
 
     // Text
     name: (c) => buildTextFilter(c, "t.name"),
@@ -264,60 +350,117 @@ class TagQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The parents filter on the `parentIds` JSON list, with the parents'
-   * descendants to the depth: INCLUDES any of them, INCLUDES_ALL one of
-   * each chosen parent's own group, EXCLUDES none (a tag with no parents
-   * included)
+   * The parents filter: a visible parent in the tag's `parentIds` (read
+   * through json_each, on the tag's own instance) among the refs with their
+   * descendants to the depth, so the tags under a ref within depth + 1
+   * levels (Stash's rule). INCLUDES any, INCLUDES_ALL one of each chosen
+   * parent's own group, EXCLUDES none (a tag with no parents kept). The
+   * refs match as pairs, above PAIR_INLINE_LIMIT a refs CTE (`refSetMatch`).
    */
   private async parentClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
-    /** The OR chain of the refs' conditions, unwrapped */
-    const anyOf = (refs: readonly FilterRef[]): SqlFragment => {
-      const conditions = refs.map(parentCondition);
+    if (criterion.refs.length === 0) return noClause();
+    const parents = visibleParents(ctx);
+    const holds = (refs: readonly FilterRef[], name: string): FilterClause => {
+      const match = refSetMatch(["tpp.id", "tpp.stashInstanceId"], refs, {
+        name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      });
       return {
-        sql: conditions.map((c) => c.sql).join(" OR "),
-        params: conditions.flatMap((c) => c.params),
+        sql: `EXISTS (SELECT 1 ${parents.sql} AND ${match.sql})`,
+        params: [...parents.params, ...match.params],
+        ...(match.ctes ? { ctes: match.ctes } : {}),
       };
     };
     // Each ref keeps its instance through the expansion, and a bare ref
     // expands on every allowed instance (utils/hierarchyUtils.ts)
     if (criterion.modifier === "INCLUDES_ALL") {
-      // One group per chosen parent, each with its own descendants: under
-      // any descendant of each (QUERIES-08)
       const groups = await expandRefsEach(
         "tag",
         criterion.refs,
         criterion.depth,
         ctx.allowedInstanceIds
       );
-      const each = groups.map((group) => {
-        const c = anyOf(group);
-        return group.length > 1 ? { ...c, sql: `(${c.sql})` } : c;
-      });
-      return {
-        sql: `(${each.map((c) => c.sql).join(" AND ")})`,
-        params: each.flatMap((c) => c.params),
-      };
+      return allOf(groups.map((group, i) => holds(group, `${ctx.name}_${i}`)));
     }
-    const any = anyOf(
+    const any = holds(
       await expandRefs(
         "tag",
         criterion.refs,
         criterion.depth,
         ctx.allowedInstanceIds
-      )
+      ),
+      ctx.name
     );
-    switch (criterion.modifier) {
-      case "INCLUDES":
-        return { sql: `(${any.sql})`, params: any.params };
-      case "EXCLUDES":
-        return {
-          sql: `(t.parentIds IS NULL OR NOT (${any.sql}))`,
-          params: any.params,
-        };
+    return criterion.modifier === "INCLUDES"
+      ? any
+      : { ...any, sql: `NOT ${any.sql}` };
+  }
+
+  /**
+   * The children filter: the refs with their ancestors to the depth (F3's
+   * "up"), then the tags holding one of them as a visible child, so the
+   * tags having a ref as a child within depth + 1 levels. INCLUDES is a
+   * row-value IN on the tag's key, read once; EXCLUDES a NOT IN over one
+   * text key per link (never a row-value NOT IN), with no NULL in the set;
+   * INCLUDES_ALL one IN per chosen child, each with its own ancestors.
+   */
+  private async childClause(
+    criterion: RefCriterion,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    if (criterion.refs.length === 0) return noClause();
+    const links = visibleChildLinks(ctx);
+    const parentsOf = (
+      refs: readonly FilterRef[],
+      name: string,
+      modifier: "INCLUDES" | "EXCLUDES"
+    ): FilterClause => {
+      const match = refSetMatch(["tcc.id", "tcc.stashInstanceId"], refs, {
+        name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      });
+      const ctes = match.ctes ? { ctes: match.ctes } : {};
+      const params = [...links.params, ...match.params];
+      return modifier === "INCLUDES"
+        ? {
+            sql: `(t.id, t.stashInstanceId) IN (SELECT tcj.value, tcc.stashInstanceId ${links.sql} AND ${match.sql})`,
+            params,
+            ...ctes,
+          }
+        : {
+            sql: `(t.id || ':' || t.stashInstanceId) NOT IN (SELECT tcj.value || ':' || tcc.stashInstanceId ${links.sql} AND tcj.value IS NOT NULL AND ${match.sql})`,
+            params,
+            ...ctes,
+          };
+    };
+    if (criterion.modifier === "INCLUDES_ALL") {
+      const groups = await expandRefsEach(
+        "tag",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds,
+        "up"
+      );
+      return allOf(
+        groups.map((group, i) =>
+          parentsOf(group, `${ctx.name}_${i}`, "INCLUDES")
+        )
+      );
     }
+    return parentsOf(
+      await expandRefs(
+        "tag",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds,
+        "up"
+      ),
+      ctx.name,
+      criterion.modifier
+    );
   }
 
   /**

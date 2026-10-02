@@ -1702,3 +1702,81 @@ export function orientationClause(
   );
   return { sql: `(${conditions.join(" OR ")})`, params: [] };
 }
+
+// =============================================================================
+// VISIBLE RELATED ROWS, REF SETS AND COUNTS (tag and studio hierarchy, F12)
+// =============================================================================
+
+/**
+ * What keeps a related row (a tag's parent or child, a studio's parent, a
+ * clip) only while it is live and, for a viewer, has no exclusion row on
+ * its own instance or on every one: the `exclusionJoin` under
+ * `<alias>_x` (never `e`, the list's own) to append after the row's table,
+ * the WHERE terms, and the parameters the join binds. No viewer (their
+ * exclusions do not apply): no join, the row live.
+ */
+export interface VisibleGuard {
+  readonly join: string;
+  readonly where: string;
+  readonly params: SqlParam[];
+}
+
+export function visibleGuard(
+  alias: string,
+  entityType: string,
+  viewer: number | null
+): VisibleGuard {
+  if (viewer === null) {
+    return { join: "", where: `${alias}.deletedAt IS NULL`, params: [] };
+  }
+  const x = `${alias}_x`;
+  return {
+    join: ` ${exclusionJoin(x, entityType, `${alias}.id`, `${alias}.stashInstanceId`)}`,
+    where: `${alias}.deletedAt IS NULL AND ${x}.id IS NULL`,
+    params: [viewer],
+  };
+}
+
+/**
+ * A key (an id and an instance expression) matched against refs: up to the
+ * inline limit as OR-ed pairs, above it as a row-value IN over a
+ * materialized refs CTE (`<name>_refs`, a bare ref one pair per allowed
+ * instance), so no statement holds an OR term per ref of a large
+ * expansion. No refs matches nothing.
+ */
+export function refSetMatch(
+  key: ParentKey,
+  refs: readonly FilterRef[],
+  opts: RefClauseOptions
+): FilterClause {
+  if (refs.length === 0) return { sql: "0", params: [] };
+  if (refs.length > (opts.inlineLimit ?? PAIR_INLINE_LIMIT)) {
+    const refsName = `${opts.name}_refs`;
+    return {
+      sql: `(${key[0]}, ${key[1]}) IN (SELECT id, inst FROM ${refsName})`,
+      params: [],
+      ctes: [refsCte(refsName, refs, opts.allowedInstanceIds)],
+    };
+  }
+  const p = pairs(key[0], key[1], refs);
+  return { sql: `(${p.sql})`, params: p.params };
+}
+
+/**
+ * A number criterion on a count over related rows (a scalar subquery): the
+ * count's own parameters first, since it appears once, before the
+ * criterion's values, in every form `buildNumericFilter` writes; its CTEs
+ * kept
+ */
+export function buildCountFilter(
+  criterion: NumberCriterion,
+  count: FilterClause
+): FilterClause {
+  const clause = buildNumericFilter(criterion, count.sql);
+  if (!clause.sql) return clause;
+  return {
+    sql: clause.sql,
+    params: [...count.params, ...clause.params],
+    ...(count.ctes ? { ctes: count.ctes } : {}),
+  };
+}

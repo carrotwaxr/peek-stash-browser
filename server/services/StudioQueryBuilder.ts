@@ -12,19 +12,26 @@ import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { NormalizedStudio, TagRef } from "../types/index.js";
 import type { StudioQueryRow } from "../types/internal/queryRows.js";
 import type {
+  NumberCriterion,
   ParsedFilter,
   RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
+  type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  allOf,
+  anyOf,
+  buildCountFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
+  noClause,
   searchAll,
+  visibleGuard,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
@@ -96,6 +103,52 @@ const STUDIO_TAGS: JunctionTarget = {
   refInstanceCol: "tagInstanceId",
 };
 
+/** A studio's parent: its `parentId`, on the studio's own instance */
+const STUDIO_PARENT: ColumnTarget = {
+  kind: "column",
+  parentTable: "StashStudio",
+  parentAlias: "s",
+  idCol: "parentId",
+  instanceCol: "stashInstanceId",
+};
+
+/** The viewer whose exclusions apply, or null */
+const viewerOf = (ctx: QueryContext): number | null =>
+  ctx.applyExclusions ? ctx.userId : null;
+
+/** The studio has a parent that is live and the viewer can see */
+function visibleParent(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("spv", "studio", viewerOf(ctx));
+  return {
+    sql: `EXISTS (SELECT 1 FROM StashStudio spv${guard.join} WHERE spv.id = s.parentId AND spv.stashInstanceId = s.stashInstanceId AND ${guard.where})`,
+    params: guard.params,
+  };
+}
+
+/** The studio's live children the viewer can see (StashStudio_parentId_idx) */
+function childCount(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("scc", "studio", viewerOf(ctx));
+  return {
+    sql: `(SELECT COUNT(*) FROM StashStudio scc${guard.join} WHERE scc.parentId = s.id AND scc.stashInstanceId = s.stashInstanceId AND ${guard.where})`,
+    params: guard.params,
+  };
+}
+
+/** The studio's live tags the viewer can see */
+function tagCount(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("stct", "tag", viewerOf(ctx));
+  return {
+    sql: `(SELECT COUNT(*) FROM StudioTag stc JOIN StashTag stct ON stct.id = stc.tagId AND stct.stashInstanceId = stc.tagInstanceId${guard.join} WHERE stc.studioId = s.id AND stc.studioInstanceId = s.stashInstanceId AND ${guard.where})`,
+    params: guard.params,
+  };
+}
+
+/** A stored count column as the viewer sees it, as a number filter */
+const storedCount =
+  (column: string, relation: Parameters<typeof visibleCount>[2]) =>
+  (c: NumberCriterion, ctx: QueryContext) =>
+    buildNumericFilter(c, visibleCount(ctx, column, relation));
+
 /**
  * A studio's children: the studios on its instance whose `parentId` names
  * it (StashStudio_parentId_idx), each read as itself
@@ -166,10 +219,17 @@ class StudioQueryBuilder extends EntityQueryBuilder<
 
     // Related entities
     tags: (c, ctx) => this.tagClause(c, ctx),
+    parents: (c, ctx) => this.parentClause(c, ctx),
 
     // Counts, as the viewer sees them
     scene_count: (c, ctx) =>
       buildNumericFilter(c, visibleCount(ctx, "s.sceneCount", "scenes")),
+    child_count: (c, ctx) => buildCountFilter(c, childCount(ctx)),
+    tag_count: (c, ctx) => buildCountFilter(c, tagCount(ctx)),
+    image_count: storedCount("s.imageCount", "images"),
+    gallery_count: storedCount("s.galleryCount", "galleries"),
+    performer_count: storedCount("s.performerCount", "performers"),
+    group_count: storedCount("s.groupCount", "groups"),
 
     // Text
     name: (c) => buildTextFilter(c, "s.name"),
@@ -192,6 +252,41 @@ class StudioQueryBuilder extends EntityQueryBuilder<
       name: ctx.name,
       related: { table: "StashTag", entityType: "tag" },
     });
+  }
+
+  /**
+   * The parents filter on `parentId`, with the refs' descendants to the
+   * depth (the studios under a ref within depth + 1 levels). The parent
+   * counts only while live and visible to the viewer: INCLUDES and
+   * INCLUDES_ALL also need it, EXCLUDES keeps a studio whose parent is
+   * hidden, and "has none" and "has any" read it alone.
+   */
+  private async parentClause(
+    criterion: RefFieldCriterion,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const visible = visibleParent(ctx);
+    switch (criterion.modifier) {
+      case "NOT_NULL":
+        return visible;
+      case "IS_NULL":
+        return { sql: `NOT ${visible.sql}`, params: visible.params };
+      case "INCLUDES":
+      case "INCLUDES_ALL":
+      case "EXCLUDES": {
+        if (criterion.refs.length === 0) return noClause();
+        const refs = await hierarchicalRefClause(
+          "studio",
+          STUDIO_PARENT,
+          criterion,
+          ctx,
+          { name: ctx.name }
+        );
+        return criterion.modifier === "EXCLUDES"
+          ? anyOf([refs, { sql: `NOT ${visible.sql}`, params: visible.params }])
+          : allOf([refs, visible]);
+      }
+    }
   }
 
   /**
