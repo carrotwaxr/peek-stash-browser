@@ -118,6 +118,11 @@ export const SCENE_FIELDS = {
   groups: ref("group", { hierarchical: true, presence: true }),
   galleries: ref("gallery", { presence: true }),
   /**
+   * Scenes with a performer holding these tags (with a depth, their
+   * descendants too); only live performers and tags the viewer can see count
+   */
+  performer_tags: ref("tag", { hierarchical: true, excludable: true }),
+  /**
    * Scenes in these Peek playlists: the viewer's own and those shared with
    * them (owner answer 6). Any other id holds no scenes for the viewer.
    */

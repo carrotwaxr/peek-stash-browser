@@ -34,6 +34,7 @@ import {
   instanceColumnClause,
   pairs,
   performerAgeExists,
+  performerTagsClause,
   randomOrder,
   refClause,
   refPresenceClause,
@@ -1893,6 +1894,140 @@ describe("performerAgeExists", () => {
         1
       ).sql
     ).toBe("");
+  });
+});
+
+describe("performerTagsClause", () => {
+  const SCENE_PERFORMERS: JunctionTarget = {
+    kind: "junction",
+    table: "ScenePerformer",
+    alias: "sp",
+    parentAlias: "s",
+    parentIdCol: "sceneId",
+    parentInstanceCol: "sceneInstanceId",
+    refIdCol: "performerId",
+    refInstanceCol: "performerInstanceId",
+  };
+  const opts = {
+    name: "performer_tags",
+    allowedInstanceIds: ["a", "b"],
+    viewerId: 7,
+  };
+  const tag = { id: "5", instanceId: "a" };
+
+  it("no refs is no filter", () => {
+    expect(
+      performerTagsClause(SCENE_PERFORMERS, [], "INCLUDES", opts).sql
+    ).toBe("");
+  });
+
+  it("INCLUDES read in no order is an IN list driven from the tags, live and visible performers and tags only", () => {
+    const clause = performerTagsClause(
+      SCENE_PERFORMERS,
+      [tag, { id: "6", instanceId: undefined }],
+      "INCLUDES",
+      opts
+    );
+    expect(clause.sql).toMatch(
+      /^\(s\.id, s\.stashInstanceId\) IN \(SELECT sp\.sceneId, sp\.sceneInstanceId FROM PerformerTag pt CROSS JOIN StashPerformer p /
+    );
+    expect(clause.sql).toContain("pte.entityType = 'performer'");
+    expect(clause.sql).toContain("ptte.entityType = 'tag'");
+    expect(clause.sql).toContain(
+      "p.deletedAt IS NULL AND pte.id IS NULL AND ptte.id IS NULL"
+    );
+    expect(clause.sql).toContain(
+      "((pt.tagId = ? AND pt.tagInstanceId = ?) OR (pt.tagId = ?))"
+    );
+    // The viewer twice (both anti-joins), then the pairs
+    expect(clause.params).toEqual([7, 7, "5", "a", "6"]);
+    expect(clause.count).toBeUndefined();
+  });
+
+  it("without a viewer reads every live performer and tag", () => {
+    const clause = performerTagsClause(SCENE_PERFORMERS, [tag], "INCLUDES", {
+      ...opts,
+      viewerId: null,
+    });
+    expect(clause.sql).not.toContain("UserExcludedEntity");
+    expect(clause.sql).toContain("p.deletedAt IS NULL");
+    expect(clause.params).toEqual(["5", "a"]);
+  });
+
+  it("a page walking a sort index takes the keyed EXISTS, its count the IN list", () => {
+    const clause = performerTagsClause(SCENE_PERFORMERS, [tag], "INCLUDES", {
+      ...opts,
+      sortedByIndex: true,
+    });
+    expect(clause.sql).toMatch(
+      /^EXISTS \(SELECT 1 FROM ScenePerformer sp CROSS JOIN PerformerTag pt ON pt\.performerId = sp\.performerId /
+    );
+    expect(clause.sql).toContain(
+      "sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId"
+    );
+    expect(clause.params).toEqual([7, 7, "5", "a"]);
+    expect(clause.count?.sql).toMatch(/^\(s\.id, s\.stashInstanceId\) IN /);
+  });
+
+  it("EXCLUDES reads a matched set, and a page walking an index the keyed NOT EXISTS", () => {
+    const set = performerTagsClause(SCENE_PERFORMERS, [tag], "EXCLUDES", opts);
+    expect(set.sql).toBe(
+      "(s.id || ':' || s.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM performer_tags_matched)"
+    );
+    expect(set.params).toEqual([]);
+    expect(set.ctes?.map((c) => c.name)).toEqual(["performer_tags_matched"]);
+    expect(set.ctes?.[0]?.sql).toContain("SELECT DISTINCT sp.sceneId");
+    expect(set.ctes?.[0]?.params).toEqual([7, 7, "5", "a"]);
+
+    const walk = performerTagsClause(SCENE_PERFORMERS, [tag], "EXCLUDES", {
+      ...opts,
+      sortedByIndex: true,
+    });
+    expect(walk.sql).toMatch(/^NOT EXISTS \(SELECT 1 FROM ScenePerformer sp /);
+    expect(walk.count).toEqual(set);
+  });
+
+  it("above the inline limit the refs travel as one JSON parameter, a bare ref once per allowed instance", () => {
+    const refs: FilterRef[] = [
+      { id: "1", instanceId: undefined },
+      ...Array.from({ length: PAIR_INLINE_LIMIT }, (_, i) => ({
+        id: String(100 + i),
+        instanceId: "a",
+      })),
+    ];
+    const includes = performerTagsClause(
+      SCENE_PERFORMERS,
+      refs,
+      "INCLUDES",
+      opts
+    );
+    expect(includes.sql).toContain(
+      "FROM performer_tags_refs r CROSS JOIN PerformerTag pt ON pt.tagId = r.id AND pt.tagInstanceId = r.inst"
+    );
+    expect(includes.params).toEqual([7, 7]);
+    const refsCte = must(includes.ctes?.[0]);
+    expect(refsCte.name).toBe("performer_tags_refs");
+    const pairs: unknown = JSON.parse(String(must(refsCte.params[0])));
+    expect(pairs).toEqual([
+      ["1", "a"],
+      ["1", "b"],
+      ...refs.slice(1).map((r) => [r.id, "a"]),
+    ]);
+
+    const walk = performerTagsClause(SCENE_PERFORMERS, refs, "EXCLUDES", {
+      ...opts,
+      sortedByIndex: true,
+    });
+    // Each of the item's performers' tags checked against the list, not
+    // the key probed once per ref
+    expect(walk.sql).toContain(
+      "(+pt.tagId, pt.tagInstanceId) IN (SELECT id, inst FROM performer_tags_refs)"
+    );
+    expect(walk.ctes?.map((c) => c.name)).toEqual(["performer_tags_refs"]);
+    expect(walk.count?.ctes?.map((c) => c.name)).toEqual([
+      "performer_tags_refs",
+      "performer_tags_matched",
+    ]);
   });
 });
 
