@@ -2136,7 +2136,7 @@ The detail page's tab counts, as the viewer sees them
 
 ### POST /api/library/galleries
 
-Update ratings and favorites
+Gallery list: filter, sort and page
 
 **Authentication:** Session
 

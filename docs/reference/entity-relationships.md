@@ -21,8 +21,10 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 | Group | Yes | `StashGroup` | Has parent/child hierarchy (containing_groups/sub_groups) |
 | Gallery | Yes | `StashGallery` | Contains Images |
 | Image | Yes | `StashImage` | |
-| Playlist | Peek-only | `Playlist` | User-created scene collections |
-| SceneMarker | Yes | Not cached | Clips from Scenes (future feature) |
+| Clip | Yes (scene markers) | `StashClip` | A timed section of a scene; Stash calls it a scene marker |
+| Playlist | Peek-only | `Playlist` | User-created scene collections, shareable with groups |
+
+Every cached entity is keyed by its id and its Stash server (instance): the entity tables use the primary key `(id, stashInstanceId)`, and the junction tables carry the instance of both ends, so two Stash servers can hold the same id without mixing. Peek's own per-user tables call the instance `instanceId`.
 
 ---
 
@@ -35,6 +37,8 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 | Tag | Many-to-Many | `SceneTag` | |
 | Group | Many-to-Many | `SceneGroup` | Includes `sceneIndex` for ordering |
 | Gallery | Many-to-Many | `SceneGallery` | |
+| Clip | One-to-Many | None | `StashClip.sceneId` (with `sceneInstanceId`); a scene's clips go with it |
+| Inherited Tag | Many-to-Many | `SceneInheritedTag` | Tags the scene gets from its performers, studio and groups; see [Scene Tag Inheritance](#scene-tag-inheritance) |
 
 ---
 
@@ -74,11 +78,28 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 | Group | Many-to-Many | `GroupTag` | Inverse of Group→Tag |
 | Gallery | Many-to-Many | `GalleryTag` | Inverse of Gallery→Tag |
 | Image | Many-to-Many | `ImageTag` | Inverse of Image→Tag |
+| Clip | Many-to-Many | `ClipTag` | Inverse of Clip→Tag |
+| Clip (primary tag) | One-to-Many | None | `StashClip.primaryTagId` (with `primaryTagInstanceId`) |
+| Scene (inherited) | Many-to-Many | `SceneInheritedTag` | Scenes that inherit the tag from a performer, studio or group |
 | Parent Tags | Many-to-Many | — | `StashTag.parentIds` (JSON array) |
 | Child Tags | Many-to-Many | — | Inverse, resolved at runtime |
 
 !!! note "Tag Hierarchies"
     Tag hierarchies form a DAG (directed acyclic graph), not a tree. Tags can have multiple parents.
+
+---
+
+## Clip Relationships
+
+A clip is a Stash scene marker, cached as `StashClip`.
+
+| Related Entity | Cardinality | Junction Table | Notes |
+|----------------|-------------|----------------|-------|
+| Scene | Many-to-One | None | `StashClip.sceneId` and `sceneInstanceId`; the clip is deleted with its scene |
+| Primary Tag | Many-to-One | None | `StashClip.primaryTagId` and `primaryTagInstanceId` |
+| Tag | Many-to-Many | `ClipTag` | The marker's other tags |
+
+Clips carry the start (`seconds`) and an optional end (`endSeconds`), and the paths of the preview, screenshot and stream. A clip's scene filters read the scene's tags and its inherited tags.
 
 ---
 
@@ -126,6 +147,7 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 |----------------|-------------|----------------|-------|
 | Scene | Many-to-Many | `PlaylistItem` | Includes `position` for ordering |
 | User | Many-to-One | — | `Playlist.userId` |
+| Group | Many-to-Many | `PlaylistShare` | One row per group the playlist is shared with; recipients see only what their own exclusions allow |
 
 ---
 
@@ -149,7 +171,7 @@ Scenes inherit tags from their associated performers, studio, and groups. This e
 
 - **No duplication**: Tags already directly on the scene are not added to inherited tags
 - **Deduplicated**: Same tag from multiple sources (e.g., two performers) appears once
-- **Stored separately**: Inherited tags stored in `inheritedTagIds` field, not mixed with direct tags
+- **Stored separately**: Inherited tags are stored apart from direct tags: as the `inheritedTagIds` JSON column on `StashScene` and as `SceneInheritedTag` rows (one per scene and tag, indexed by tag). The tag filters and counts read the rows
 - **When computed**: After every full sync, and after an incremental or smart sync in which a scene changed or a performer's, studio's or group's tag set changed
 
 **Query behavior:**
@@ -181,7 +203,7 @@ Images inherit metadata from their parent gallery when the image's own field is 
 
 - **Never overwrites**: Only copies when image field is NULL/empty
 - **All-or-nothing for relationships**: Performers and tags only inherit if image has NONE
-- **Multi-gallery handling**: If image is in multiple galleries, uses first gallery (by ID)
+- **Multi-gallery handling**: Studio, date, photographer and details come from the first gallery, in gallery ID order, that has a value. Performers and tags come from every gallery the image is in, added together
 - **When computed**: After every full sync, and after any sync that wrote images (even unchanged ones, whose junction rows sync rewrites) or changed galleries
 
 !!! note

@@ -16,7 +16,7 @@ const router = express.Router();
 // All rating routes require authentication
 router.use(authenticate);
 
-// Update ratings and favorites
+// Gallery list: filter, sort and page
 router.post(
   "/galleries",
   authenticate,
