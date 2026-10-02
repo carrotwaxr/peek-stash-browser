@@ -24,9 +24,17 @@ import type {
 } from "../../types/parsedFilters.js";
 import { entityKey } from "../../utils/entityRef.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
+import {
+  alternatesOf,
+  filterOf,
+  firstMissingBound,
+  samplesOf,
+  whereOf,
+} from "../helpers/fieldSamples.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -528,4 +536,93 @@ describe("the studio field table", () => {
       fields.sort()
     );
   });
+});
+
+/** What each studio field's clause adds to the WHERE, as the shared spec's sample binds it */
+const STUDIO_CLAUSES: Record<
+  Exclude<keyof typeof STUDIO_FIELDS, "instance_id">,
+  string
+> = {
+  ids: "(s.id = ? AND s.stashInstanceId = ?)",
+  name: "s.name LIKE ?",
+  details: "s.details LIKE ?",
+  aliases: "json_valid(s.aliases)",
+  url: "s.url LIKE ?",
+  stash_id: "= LOWER(?)",
+  tags: "FROM StudioTag stt WHERE stt.studioId = s.id",
+  parents: "(s.parentId = ? AND s.stashInstanceId = ?)",
+  rating100: "r.rating > ?",
+  o_counter: "COALESCE(us.oCounter, 0) > ?",
+  play_count: "COALESCE(us.playCount, 0) > ?",
+  scene_count: "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
+  child_count: "(SELECT COUNT(*) FROM StashStudio scc",
+  tag_count: "(SELECT COUNT(*) FROM StudioTag stc",
+  image_count: "MAX(s.imageCount - COALESCE(d.images, 0), 0) > ?",
+  gallery_count: "MAX(s.galleryCount - COALESCE(d.galleries, 0), 0) > ?",
+  performer_count: "MAX(s.performerCount - COALESCE(d.performers, 0), 0) > ?",
+  group_count: "MAX(s.groupCount - COALESCE(d.groups, 0), 0) > ?",
+  created_at: "s.stashCreatedAt >= ?",
+  updated_at: "s.stashUpdatedAt >= ?",
+  favorite: "r.favorite = 1",
+};
+
+describe("every studio field clause", () => {
+  const BOUND = {};
+
+  const SAMPLES = new Map(samplesOf(STUDIO_FIELDS, BOUND));
+
+  /** The page statement for a filter alone, with nothing else answered */
+  async function statementFor(
+    filter: Record<string, unknown>,
+    applyExclusions = true
+  ): Promise<{ sql: string; params: unknown[] }> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    await run(
+      { filter: untrusted<ParsedListRequest<"studio">["filter"]>(filter) },
+      { applyExclusions }
+    );
+    return pageStatement();
+  }
+
+  it("has a sample for every field the table carries", () => {
+    expect([...SAMPLES.keys()].sort()).toEqual(
+      Object.keys(STUDIO_CLAUSES).sort()
+    );
+  });
+
+  it.each(Object.entries(STUDIO_CLAUSES))(
+    "%s adds its clause to the WHERE and binds its sample in order",
+    async (field, fragment) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).toContain(fragment);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(alternatesOf(STUDIO_FIELDS, BOUND))(
+    "%s builds a clause of its own and binds its values in order",
+    async (_label, sample) => {
+      const baseline = whereOf((await statementFor({})).sql);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).not.toBe(baseline);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(Object.keys(STUDIO_CLAUSES))(
+    "%s takes no exclusion join when the viewer's exclusions do not apply",
+    async (field) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql } = await statementFor(filterOf(sample), false);
+
+      expect(whereOf(sql)).not.toContain("UserExcludedEntity");
+    }
+  );
 });

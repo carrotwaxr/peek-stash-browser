@@ -20,10 +20,18 @@ import type {
 import { entityKey, pairsJson } from "../../utils/entityRef.js";
 import { expandRefs } from "../../utils/hierarchyUtils.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
+import {
+  alternatesOf,
+  filterOf,
+  firstMissingBound,
+  samplesOf,
+  whereOf,
+} from "../helpers/fieldSamples.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -580,4 +588,114 @@ describe("the group field table", () => {
       fields.sort()
     );
   });
+});
+
+/** What each group field's clause adds to the WHERE, as the shared spec's sample binds it */
+const GROUP_CLAUSES: Record<
+  Exclude<keyof typeof GROUP_FIELDS, "instance_id">,
+  string
+> = {
+  ids: "(g.id = ? AND g.stashInstanceId = ?)",
+  name: "g.name LIKE ?",
+  synopsis: "g.synopsis LIKE ?",
+  director: "g.director LIKE ?",
+  aliases: "g.aliases LIKE ?",
+  url: "json_valid(g.urls)",
+  tags: "FROM GroupTag gt WHERE gt.groupId = g.id",
+  studios: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  scenes: "FROM SceneGroup sg JOIN StashScene lsc",
+  performers: "FROM ScenePerformer sp JOIN SceneGroup sg",
+  containing_groups: "FROM GroupRelation gcr JOIN StashGroup gcp",
+  sub_groups: "FROM GroupRelation gsr JOIN StashGroup gsc",
+  performer_favorite: "FROM SceneGroup gfg JOIN StashScene gfs",
+  rating100: "r.rating > ?",
+  o_counter: "SUM(gw.oCount)",
+  play_count: "SUM(gw.playCount)",
+  scene_count: "MAX(g.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
+  sub_group_count: "(SELECT COUNT(*) FROM GroupRelation gsr",
+  containing_group_count: "(SELECT COUNT(*) FROM GroupRelation gcr",
+  tag_count: "(SELECT COUNT(*) FROM GroupTag gtc",
+  duration: "g.duration > ?",
+  date: "END, 1, 10) > ?",
+  created_at: "g.stashCreatedAt >= ?",
+  updated_at: "g.stashUpdatedAt >= ?",
+  favorite: "r.favorite = 1",
+};
+
+describe("every group field clause", () => {
+  /** The viewer's one favourite of each kind, on the instance the samples allow */
+  function seedFavourites(): void {
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow({ tagId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([
+      partialRow({ studioId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([
+      partialRow({ performerId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+  }
+
+  const BOUND = {
+    performer_favorite: ["8", "inst-a"],
+  };
+
+  const SAMPLES = new Map(samplesOf(GROUP_FIELDS, BOUND));
+
+  /** The page statement for a filter alone, with nothing else answered */
+  async function statementFor(
+    filter: Record<string, unknown>,
+    applyExclusions = true
+  ): Promise<{ sql: string; params: unknown[] }> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    seedFavourites();
+    await run(
+      { filter: untrusted<ParsedListRequest<"group">["filter"]>(filter) },
+      { applyExclusions }
+    );
+    return pageStatement();
+  }
+
+  it("has a sample for every field the table carries", () => {
+    expect([...SAMPLES.keys()].sort()).toEqual(
+      Object.keys(GROUP_CLAUSES).sort()
+    );
+  });
+
+  it.each(Object.entries(GROUP_CLAUSES))(
+    "%s adds its clause to the WHERE and binds its sample in order",
+    async (field, fragment) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).toContain(fragment);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(alternatesOf(GROUP_FIELDS, BOUND))(
+    "%s builds a clause of its own and binds its values in order",
+    async (_label, sample) => {
+      const baseline = whereOf((await statementFor({})).sql);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).not.toBe(baseline);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(Object.keys(GROUP_CLAUSES))(
+    "%s takes no exclusion join when the viewer's exclusions do not apply",
+    async (field) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql } = await statementFor(filterOf(sample), false);
+
+      expect(whereOf(sql)).not.toContain("UserExcludedEntity");
+    }
+  );
 });

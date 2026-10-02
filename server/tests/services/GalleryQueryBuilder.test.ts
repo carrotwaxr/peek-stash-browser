@@ -17,10 +17,18 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { fullDateSql, galleryNameSql } from "../../utils/sqlClauses.js";
+import {
+  alternatesOf,
+  filterOf,
+  firstMissingBound,
+  samplesOf,
+  whereOf,
+} from "../helpers/fieldSamples.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { prismaImpl } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -689,4 +697,132 @@ describe("the gallery field table", () => {
       fields.sort()
     );
   });
+});
+
+/** What each gallery field's clause adds to the WHERE, as the shared spec's sample binds it */
+const GALLERY_CLAUSES: Record<
+  Exclude<keyof typeof GALLERY_FIELDS, "instance_id">,
+  string
+> = {
+  ids: "(g.id = ? AND g.stashInstanceId = ?)",
+  title: "LIKE ? ESCAPE",
+  details: "g.details LIKE ?",
+  code: "g.code LIKE ?",
+  photographer: "g.photographer LIKE ?",
+  path: "COALESCE(NULLIF(g.folderPath, ''), NULLIF(g.filePath, '')) LIKE ?",
+  url: "json_valid(g.urls)",
+  organized: "g.organized = ?",
+  is_zip: "NULLIF(g.filePath, '') IS NOT NULL",
+  tags: "FROM GalleryTag gt WHERE gt.galleryId = g.id",
+  studios: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  performers: "FROM GalleryPerformer gp WHERE gp.galleryId = g.id",
+  scenes: "FROM SceneGallery sg JOIN StashScene lsc",
+  rating100: "r.rating > ?",
+  image_count: "MAX(g.imageCount - COALESCE(d.images, 0), 0) > ?",
+  tag_count: "(SELECT COUNT(*) FROM GalleryTag gt WHERE gt.galleryId = g.id",
+  date: "END, 1, 10) > ?",
+  created_at: "g.stashCreatedAt >= ?",
+  updated_at: "g.stashUpdatedAt >= ?",
+  favorite: "r.favorite = 1",
+  hasFavoriteImage: "FROM ImageGallery ig",
+  performer_favorite: "FROM GalleryPerformer gp WHERE gp.galleryId = g.id",
+  studio_favorite: "(g.studioId = ? AND g.stashInstanceId = ?)",
+  tag_favorite: "FROM GalleryTag gt WHERE gt.galleryId = g.id",
+  performer_tags: "FROM PerformerTag pt",
+  performer_count: "(SELECT COUNT(*) FROM GalleryPerformer pc",
+  performer_age:
+    "sp.galleryId = g.id AND sp.galleryInstanceId = g.stashInstanceId AND p.deletedAt IS NULL AND p.birthdate IS NOT NULL",
+};
+
+describe("every gallery field clause", () => {
+  /** The viewer's one favourite of each kind, on the instance the samples allow */
+  function seedFavourites(): void {
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow({ tagId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([
+      partialRow({ studioId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([
+      partialRow({ performerId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+  }
+
+  const BOUND = {
+    performer_favorite: ["8", "inst-a"],
+    studio_favorite: ["8", "inst-a"],
+    tag_favorite: ["8", "inst-a"],
+  };
+
+  const SAMPLES = new Map(samplesOf(GALLERY_FIELDS, BOUND));
+
+  /** The page statement for a filter alone, with nothing else answered */
+  async function statementFor(
+    filter: Record<string, unknown>,
+    applyExclusions = true
+  ): Promise<{ sql: string; params: unknown[] }> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    seedFavourites();
+    await run(
+      { filter: untrusted<ParsedListRequest<"gallery">["filter"]>(filter) },
+      { applyExclusions }
+    );
+    return pageStatement();
+  }
+
+  it("has a sample for every field the table carries", () => {
+    expect([...SAMPLES.keys()].sort()).toEqual(
+      Object.keys(GALLERY_CLAUSES).sort()
+    );
+  });
+
+  it.each(Object.entries(GALLERY_CLAUSES))(
+    "%s adds its clause to the WHERE and binds its sample in order",
+    async (field, fragment) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).toContain(fragment);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(
+    // `hasFavoriteImage: false` is no filter, which the next test pins
+    alternatesOf(GALLERY_FIELDS, BOUND).filter(
+      ([label]) => label !== "hasFavoriteImage false"
+    )
+  )(
+    "%s builds a clause of its own and binds its values in order",
+    async (_label, sample) => {
+      const baseline = whereOf((await statementFor({})).sql);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).not.toBe(baseline);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it("hasFavoriteImage false adds no clause", async () => {
+    const baseline = whereOf((await statementFor({})).sql);
+
+    const { sql } = await statementFor({ hasFavoriteImage: false });
+
+    expect(whereOf(sql)).toBe(baseline);
+  });
+
+  it.each(Object.keys(GALLERY_CLAUSES))(
+    "%s takes no exclusion join when the viewer's exclusions do not apply",
+    async (field) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql } = await statementFor(filterOf(sample), false);
+
+      expect(whereOf(sql)).not.toContain("UserExcludedEntity");
+    }
+  );
 });
