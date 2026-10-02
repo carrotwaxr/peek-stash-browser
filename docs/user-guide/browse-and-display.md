@@ -204,6 +204,8 @@ Every word you type must match, in any order and anywhere the search looks: a sc
 
 Click **Filters** in the search toolbar to open the filter panel, set the filters, and click **Apply Filters**.
 
+Each active filter shows as a chip under the toolbar that names its picks and its condition, such as "Tags: none of Anal, with sub-tags" or "Rating: 40 to 80"; a pick that is no longer visible to you reads as "unavailable". Click a chip, or press Enter on it, to open its filter; the **x** on a chip removes it. The count on the **Filters** button is the number of chips.
+
 ### Modifier Dropdowns
 
 A filter that picks performers, tags, studios, collections or galleries has a dropdown above it that says how the picks combine:

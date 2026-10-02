@@ -81,6 +81,11 @@ const storedValueIs = (stored: string, optionId: string): boolean =>
   stored === optionId || stored === parseCompositeKey(optionId).id;
 
 interface Props {
+  /**
+   * The trigger's id, where a filter chip moves focus. The trigger takes
+   * focus from a script (it is no tab stop until it becomes a button).
+   */
+  id?: string | undefined;
   entityType: EntityType;
   value: string | string[];
   onChange: (value: string | string[]) => void;
@@ -98,6 +103,7 @@ interface Props {
 }
 
 const SearchableSelect = ({
+  id,
   entityType,
   value,
   onChange,
@@ -363,6 +369,8 @@ const SearchableSelect = ({
     <div ref={dropdownRef} className="relative w-full">
       {/* Selected items display / Trigger button */}
       <div
+        id={id}
+        tabIndex={id === undefined ? undefined : -1}
         onClick={() => setIsOpen(!isOpen)}
         className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex items-center justify-between gap-2"
         style={{

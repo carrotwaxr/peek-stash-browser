@@ -63,6 +63,17 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
   }),
 }));
 
+// The chips name their picks through the entity's /minimal endpoint
+vi.mock("../../../src/api/library", () => ({
+  libraryApi: {
+    findPerformersMinimal: vi.fn().mockResolvedValue([]),
+    findStudiosMinimal: vi.fn().mockResolvedValue([]),
+    findTagsMinimal: vi.fn().mockResolvedValue([]),
+    findGroupsMinimal: vi.fn().mockResolvedValue([]),
+    findGalleriesMinimal: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 vi.mock("../../../src/api", () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn().mockResolvedValue({}),
@@ -496,6 +507,50 @@ describe("SearchControls", () => {
 
       await waitFor(() => expect(list.lastQuery().scene_filter).toEqual({}));
       expect(list.params().has("favorite")).toBe(false);
+    });
+
+    it("the badge counts one per filter, as the chips do", async () => {
+      const list = renderSearchControls(
+        {},
+        {
+          url: "/scenes?tagIds=1:a,2:a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1&favorite=true",
+        }
+      );
+      await firstQuery(list.onQueryChange);
+
+      expect(
+        screen.getAllByRole("button", { name: /^Remove filter:/ })
+      ).toHaveLength(2);
+      const filters = must(screen.getByText("Filters").closest("button"));
+      expect(within(filters).getByText("2")).toBeInTheDocument();
+    });
+
+    it("activating a chip opens its field and moves focus to the field's first control", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        {},
+        { url: "/scenes?tagIds=1:a&tagIdsModifier=INCLUDES&favorite=true" }
+      );
+      await firstQuery(list.onQueryChange);
+
+      await user.click(
+        screen.getByRole("button", { name: /^Edit filter: Fav/ })
+      );
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          document.getElementById("filter-favorite")
+        )
+      );
+      expect(document.activeElement).toHaveAttribute("type", "checkbox");
+
+      await user.click(
+        screen.getByRole("button", { name: /^Edit filter: Tags/ })
+      );
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          document.getElementById("filter-tagIds")
+        )
+      );
     });
 
     it("Apply keeps a folder's permanent tag", async () => {

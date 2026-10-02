@@ -109,6 +109,8 @@ interface FilterControlProps {
   hierarchyValue?: number | undefined;
   onHierarchyChange?: (value: number | undefined) => void;
   isHighlighted?: boolean;
+  /** The id of the field's first control, where a chip moves focus */
+  controlId?: string;
 }
 
 export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
@@ -135,6 +137,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
       hierarchyValue,
       onHierarchyChange,
       isHighlighted = false,
+      controlId,
     },
     ref
   ) => {
@@ -154,6 +157,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
           return (
             <label className="flex items-center cursor-pointer">
               <input
+                id={controlId}
                 type="checkbox"
                 checked={value === true || value === "TRUE"}
                 onChange={(e) => onChange(e.target.checked)}
@@ -176,6 +180,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               {/* Modifier dropdown (if provided) */}
               {modifierOptions && modifierOptions.length > 0 && (
                 <select
+                  id={controlId}
                   value={modifierValue}
                   onChange={(e) => onModifierChange?.(e.target.value)}
                   className={inputClasses}
@@ -190,6 +195,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               )}
               {/* Main select */}
               <select
+                id={modifierOptions?.length ? undefined : controlId}
                 value={value as string}
                 onChange={(e) => onChange(e.target.value)}
                 className={inputClasses}
@@ -216,6 +222,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               {/* Modifier dropdown (if provided) */}
               {modifierOptions && modifierOptions.length > 0 && (
                 <select
+                  id={controlId}
                   value={effectiveModifierValue}
                   onChange={(e) => onModifierChange?.(e.target.value)}
                   className={inputClasses}
@@ -241,6 +248,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
               )}
               {/* Main select */}
               <SearchableSelect
+                id={modifierOptions?.length ? undefined : controlId}
                 entityType={
                   entityType as
                     | "performers"
@@ -299,6 +307,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
         case "number":
           return (
             <input
+              id={controlId}
               type="number"
               value={value as string | number | undefined}
               onChange={(e) => onChange(e.target.value)}
@@ -312,6 +321,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
         case "text":
           return (
             <input
+              id={controlId}
               type="text"
               value={value as string | undefined}
               onChange={(e) => onChange(e.target.value)}
@@ -324,6 +334,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
         case "date":
           return (
             <input
+              id={controlId}
               type="date"
               value={value as string | undefined}
               onChange={(e) => onChange(e.target.value)}
@@ -335,6 +346,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
           if (measure === "weight") {
             return (
               <ImperialWeightRange
+                id={controlId}
                 value={value}
                 onChange={onChange}
                 label={label}
@@ -346,6 +358,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
           if (measure === "length") {
             return (
               <ImperialLengthRange
+                id={controlId}
                 value={value}
                 onChange={onChange}
                 label={label}
@@ -358,6 +371,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
           return (
             <div className="flex space-x-2">
               <input
+                id={controlId}
                 type="number"
                 value={rangeVal.min || ""}
                 onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
@@ -383,6 +397,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
         case "imperial-height-range":
           return (
             <ImperialHeightRange
+              id={controlId}
               value={value}
               onChange={onChange}
               inputClasses={inputClasses}
@@ -401,6 +416,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
                   From:
                 </div>
                 <input
+                  id={controlId}
                   type="date"
                   value={dateRangeVal.start || ""}
                   onChange={(e) =>
@@ -435,6 +451,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
           return (
             <div className="flex space-x-2">
               <input
+                id={controlId}
                 type="time"
                 value={timeRangeVal.start || ""}
                 onChange={(e) =>
