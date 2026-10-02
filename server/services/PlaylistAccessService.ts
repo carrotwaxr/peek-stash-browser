@@ -12,6 +12,10 @@ export type PlaylistAccessLevel =
  * A share counts only while its owner may share (Can Share, from a group or
  * an override; an admin has no bypass). The shares stay stored, so the
  * permission coming back brings them back.
+ *
+ * `viewablePlaylistSql` (utils/playlistAccessSql.ts) is this rule as one SQL
+ * condition: the two must change together, and
+ * integration/services/PlaylistAccessSql.integration.test.ts holds them equal.
  */
 export async function getPlaylistAccess(
   playlistId: number,
