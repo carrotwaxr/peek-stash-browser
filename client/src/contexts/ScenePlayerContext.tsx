@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import type { FindScenesResponse } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../api";
@@ -164,6 +164,16 @@ interface ScenePlayerProviderProps {
   initialShouldAutoplay?: boolean;
 }
 
+/** Where an entry state holds the mark of the provider write that made it */
+const OWN_WRITE_KEY = "queueWrite";
+
+/** The write mark an entry state holds, or "" */
+function ownWriteMark(state: unknown): string {
+  if (typeof state !== "object" || state === null) return "";
+  const mark: unknown = (state as Record<string, unknown>)[OWN_WRITE_KEY];
+  return typeof mark === "string" ? mark : "";
+}
+
 /**
  * The player's state, and its queue. The reducer owns the queue's position;
  * the router follows it: after each step (and each control toggle) the
@@ -198,6 +208,7 @@ export function ScenePlayerProvider({
   const queryClient = useQueryClient();
   const { ready } = useLibraryReady();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const navigate = useNavigate();
 
   // The latest render's state, for callbacks and effects that must read it
@@ -377,6 +388,20 @@ export function ScenePlayerProvider({
   // The last history state that held the active queue: what a tab click's
   // entry (no state) gets back, so its fromPageTitle and shouldResume stay
   const queueStateRef = useRef<unknown>(playlist ? location.state : null);
+  // The marks of the entries this provider wrote. The router shows a
+  // replace in a transition, so on a busy page a write can show after a
+  // step the user took meanwhile; the replace carrying one of these marks
+  // is that write showing, not a navigation to follow. (A Back or Forward
+  // to such an entry is a POP, and is followed.)
+  const ownWritesRef = useRef<{
+    prefix: string;
+    count: number;
+    marks: Set<string>;
+  }>({
+    prefix: Math.random().toString(36).slice(2),
+    count: 0,
+    marks: new Set(),
+  });
 
   /**
    * Replaces the history entry with `url` and the queue as it is now: the
@@ -404,6 +429,10 @@ export function ScenePlayerProvider({
     const last = lastWriteRef.current;
     if (last && last.write === write && last.onKey === onKey) return;
     lastWriteRef.current = { write, onKey };
+    const own = ownWritesRef.current;
+    own.count += 1;
+    const mark = `${own.prefix}-${String(own.count)}`;
+    own.marks.add(mark);
     const entryState = {
       ...base,
       playlist: {
@@ -414,6 +443,7 @@ export function ScenePlayerProvider({
         controls,
       },
       keepScroll: true,
+      [OWN_WRITE_KEY]: mark,
     };
     queueStateRef.current = entryState;
     void navigateRef.current(url, { replace: true, state: entryState });
@@ -447,6 +477,14 @@ export function ScenePlayerProvider({
     const routeScene = `${route.sceneId}@${route.instanceId ?? ""}`;
     const sceneChanged = routeScene !== seenRouteSceneRef.current;
     seenRouteSceneRef.current = routeScene;
+
+    // The provider's own write showing: the state already holds it
+    if (
+      navigationType === "REPLACE" &&
+      ownWritesRef.current.marks.has(ownWriteMark(location.state))
+    ) {
+      return;
+    }
 
     const current = stateRef.current;
     const queue = current.playlist;
@@ -515,7 +553,7 @@ export function ScenePlayerProvider({
         payload: { shouldAutoplay: shouldAutoplay ?? false },
       });
     }
-  }, [location, writeEntry, entryPath]);
+  }, [location, navigationType, writeEntry, entryPath]);
 
   // Keep the history entry on the queue: after a step, once the entry's
   // scene has loaded, its URL and index; after a control toggle, the
