@@ -191,17 +191,27 @@ export function ScenePlayerProvider({
   initialShouldAutoplay = false,
 }: ScenePlayerProviderProps) {
   // The first render starts from the route's entry: the queue a navigation
-  // handed over, or the one a reload or Back finds in the entry's state
-  const [state, dispatch] = useReducer(scenePlayerReducer, undefined, () =>
-    scenePlayerReducer(initialState, {
+  // handed over, or the one a reload or Back finds in the entry's state.
+  // With a scene to load it is loading from that first render: the Scene
+  // page's initial focus records where focus was when the load began, and a
+  // render between mount and the load's start must not move that point
+  // past a control the user focuses meanwhile.
+  const [state, dispatch] = useReducer(scenePlayerReducer, undefined, () => {
+    const initialized = scenePlayerReducer(initialState, {
       type: "INITIALIZE",
       payload: {
         playlist,
         currentIndex: playlist?.currentIndex ?? 0,
         initialShouldAutoplay,
       },
-    })
-  );
+    });
+    const entry = initialized.playlist?.scenes?.[initialized.currentIndex];
+    return {
+      ...initialized,
+      sceneLoading:
+        Boolean(entry?.sceneId as string | undefined) || Boolean(sceneId),
+    };
+  });
   const { hasMultipleInstances } = useConfig();
   const { user } = useAuth();
   const userId = user?.id;
