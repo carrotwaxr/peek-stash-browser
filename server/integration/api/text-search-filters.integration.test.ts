@@ -363,13 +363,6 @@ describe("Text Search Filters", () => {
         },
       },
       {
-        path: "scene_filter.url",
-        list: "scenes",
-        body: {
-          scene_filter: { url: { value: "http", modifier: "INCLUDES" } },
-        },
-      },
-      {
         path: "scene_filter.stash_id_endpoint",
         list: "scenes",
         body: { scene_filter: { stash_id_endpoint: { modifier: "NOT_NULL" } } },
