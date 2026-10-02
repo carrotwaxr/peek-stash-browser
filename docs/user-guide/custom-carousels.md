@@ -27,32 +27,43 @@ Each rule consists of a filter type, comparison operator, and value. All rules m
 | Tags | Scenes with specific tags |
 | Studio | Scenes from a specific studio |
 | Collections | Scenes in specific groups/collections |
-| Rating | Scenes within a rating range (0-100) |
-| Duration | Scene length in minutes |
-| Resolution | Video quality (480p, 720p, 1080p, etc.) |
+| Rating (0-100) | Scenes within a rating range |
+| Duration (minutes) | Scene length in minutes |
+| Resolution | Video quality, from 144p to 8K and Huge |
+| Bitrate (Mbps) | Video bitrate in Mbps; decimals such as 2.5 are kept |
+| Framerate (fps) | Frames per second |
+| Orientation | Landscape, portrait or square |
+| Video Codec | Text search in the video codec (h264, hevc) |
+| Audio Codec | Text search in the audio codec (aac, mp3) |
 | Play Count | Number of times you've watched |
+| Play Duration (minutes) | How long you've watched the scene |
 | O Count | Your O count for the scene |
 | Favorite Scenes | Only your favorited scenes |
 | Favorite Performers | Scenes with your favorite performers |
 | Favorite Studios | Scenes from your favorite studios and their sub-studios |
 | Favorite Tags | Scenes with your favorite tags, their sub-tags, or a favorite tag inherited from a performer, studio or collection |
 | Created Date | When the scene was added |
+| Updated Date | When the scene was last changed |
 | Scene Date | The scene's release date |
 | Last Played Date | When you last watched |
 | Performer Age | Performer age at time of scene |
 | Performer Count | Number of performers in scene |
-| Bitrate | Video bitrate in Mbps |
-| Title Contains | Text search in scene title |
-| Details Contains | Text search in scene description |
+| Tag Count | Number of tags on the scene |
+| Title Search | Text search in scene title |
+| Details Search | Text search in scene description |
+| Director Search | Text search in the scene's director |
+
+The rules are the Scenes page's filters, with the same names, choices and conditions.
 
 ### Comparison Operators
 
 Different filter types support different operators:
 
-- **Entity filters** (Performers, Tags, etc.): includes any of, includes all of, excludes
-- **Numeric filters** (Rating, Duration, etc.): between, greater than, less than
-- **Date filters** (Created Date, Scene Date, Last Played Date): pick a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between. Date rules are saved with the carousel and shown again when you edit it.
-- **Boolean filters** (Favorites): is true / is false
+- **Entity filters** (Performers, Tags): Has ANY of these, Has ALL of these, Has NONE of these. Collections: In ANY of these, NOT in these.
+- **Numeric filters** (Rating, Duration, etc.): a minimum, a maximum, or both
+- **Resolution**: Equals, Not Equals, Greater Than, Less Than. A new Resolution rule starts at Equals, as on the Scenes page; a saved rule keeps its condition.
+- **Date filters** (Created Date, Updated Date, Scene Date, Last Played Date): pick a start date, an end date, or both. A start alone matches later dates, an end alone earlier dates, and both the dates in between. Date rules are saved with the carousel and shown again when you edit it.
+- **Boolean filters** (Favorites): is true
 - **Text filters**: contains
 
 ## Managing Carousels
@@ -67,7 +78,7 @@ Click the eye icon to show/hide individual carousels. Hidden carousels remain sa
 
 ### Editing
 
-Click the pencil icon on any custom carousel to modify its rules, title, or icon.
+Click the pencil icon on any custom carousel to modify its rules, title, or icon. A saved rule the editor cannot show is kept as it is when you save.
 
 ### Deleting
 

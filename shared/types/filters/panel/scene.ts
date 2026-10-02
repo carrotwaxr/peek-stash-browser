@@ -185,7 +185,6 @@ export const SCENE_PANEL = [
     label: "Updated Date",
     group: "dates",
     editor: "date",
-    carousel: false,
   },
   {
     key: "lastPlayedAt",
@@ -226,7 +225,6 @@ export const SCENE_PANEL = [
     editor: "number",
     bounds: { min: 0, max: 120 },
     unit: "fps",
-    carousel: false,
   },
   {
     key: "orientation",
@@ -240,7 +238,6 @@ export const SCENE_PANEL = [
       { value: "PORTRAIT", label: "Portrait" },
       { value: "SQUARE", label: "Square" },
     ],
-    carousel: false,
   },
   {
     key: "videoCodec",
@@ -249,7 +246,6 @@ export const SCENE_PANEL = [
     group: "video",
     editor: "text",
     placeholder: "e.g. h264, hevc",
-    carousel: false,
   },
   {
     key: "audioCodec",
@@ -258,7 +254,6 @@ export const SCENE_PANEL = [
     group: "video",
     editor: "text",
     placeholder: "e.g. aac, mp3",
-    carousel: false,
   },
 
   // Other
@@ -269,7 +264,6 @@ export const SCENE_PANEL = [
     group: "other",
     editor: "text",
     placeholder: "Search director...",
-    carousel: false,
   },
   {
     key: "playDuration",
@@ -312,7 +306,6 @@ export const SCENE_PANEL = [
     group: "other",
     editor: "number",
     bounds: { min: 0, max: 50 },
-    carousel: false,
   },
 ] as const satisfies readonly PanelField<
   Extract<keyof typeof SCENE_FIELDS, string>

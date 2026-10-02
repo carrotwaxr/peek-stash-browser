@@ -17,7 +17,10 @@ export {
 export {
   type PanelFilters,
   type PanelTable,
+  type ReadPanelFilter,
   buildPanelFilter,
   normalizePanelState,
+  panelTableOf,
+  readPanelFilter,
 } from "./build";
 export { type FilterOption, filterOptionsOf } from "./options";

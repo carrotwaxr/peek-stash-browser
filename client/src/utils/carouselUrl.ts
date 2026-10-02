@@ -20,8 +20,8 @@ export const buildCustomCarouselUrl = (
     return "/scenes";
   }
 
-  // Convert API rules format to UI filter state
-  const filterState = carouselRulesToFilterState(rules);
+  // The rules the scene panel can show; a rule it cannot is left out
+  const { state } = carouselRulesToFilterState(rules);
 
   // Build URL params using existing utility
   const params = buildSearchParams({
@@ -31,7 +31,7 @@ export const buildCustomCarouselUrl = (
       direction === undefined || direction === "" ? "DESC" : direction,
     currentPage: 1,
     perPage: 24,
-    filters: filterState as Record<string, unknown>,
+    filters: state,
     filterOptions: SCENE_FILTER_OPTIONS,
     viewMode: "grid",
     zoomLevel: "medium",

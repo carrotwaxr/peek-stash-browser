@@ -77,6 +77,24 @@ describe("RuleEditor", () => {
     });
   });
 
+  it("a decimal bound is kept", () => {
+    const onChange = vi.fn();
+
+    render(
+      <RuleEditor
+        rule={{ id: "rule-1", filterKey: "bitrate", value: {} }}
+        usedFilterKeys={new Set(["bitrate"])}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Min"), {
+      target: { value: "2.5" },
+    });
+    expect(must(onChange.mock.calls[0])[0]).toEqual({ value: { min: 2.5 } });
+  });
+
   it("a Last Played date rule round-trips rules, state, rules", () => {
     const stored = {
       last_played_at: {
@@ -85,7 +103,7 @@ describe("RuleEditor", () => {
         value2: "2024-06-30",
       },
     };
-    const state = carouselRulesToFilterState(stored);
+    const { state } = carouselRulesToFilterState(stored);
     const onChange = vi.fn();
 
     render(
@@ -119,7 +137,7 @@ describe("RuleEditor", () => {
       buildSceneFilter(
         carouselRulesToFilterState({
           last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },
-        })
+        }).state
       )
     ).toEqual({
       last_played_at: { modifier: "LESS_THAN", value: "2024-06-30" },

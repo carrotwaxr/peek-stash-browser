@@ -24,11 +24,6 @@
       "count": 1
     }
   },
-  "src/components/carousel-builder/CarouselBuilder.tsx": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
-    }
-  },
   "src/components/carousel-builder/CarouselPreview.tsx": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 2
@@ -957,20 +952,6 @@
   "src/utils/entityLinks.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
-    }
-  },
-  "src/utils/filterConfig.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 28
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 64
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
     }
   },
   "src/utils/format.ts": {
