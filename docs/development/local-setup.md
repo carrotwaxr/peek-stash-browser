@@ -313,4 +313,4 @@ cd ../server && npm install
 
 - [Technical Overview](technical-overview.md) - Understand the architecture
 - [Sync Architecture](sync-architecture.md) - How Stash sync works
-- [API Reference](api-reference.md) - Backend API documentation
+- [API Reference](../reference/api-reference.md) - Backend API documentation
