@@ -21,9 +21,18 @@ import {
   fullDateSql,
 } from "../../utils/sqlClauses.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
+import {
+  alternatesOf,
+  filterOf,
+  firstMissingBound,
+  samplesOf,
+  whereOf,
+} from "../helpers/fieldSamples.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -588,4 +597,132 @@ describe("the performer field table", () => {
       fields.sort()
     );
   });
+});
+
+/** What each performer field's clause adds to the WHERE, as the shared spec's sample binds it */
+const PERFORMER_CLAUSES: Record<
+  Exclude<keyof typeof PERFORMER_FIELDS, "instance_id">,
+  string
+> = {
+  ids: "(p.id = ? AND p.stashInstanceId = ?)",
+  name: "p.name LIKE ?",
+  details: "p.details LIKE ?",
+  tattoos: "p.tattoos LIKE ?",
+  piercings: "p.piercings LIKE ?",
+  measurements: "p.measurements LIKE ?",
+  gender: "UPPER(p.gender) = UPPER(?)",
+  ethnicity: "UPPER(p.ethnicity) = UPPER(?)",
+  hair_color: "UPPER(p.hairColor) = UPPER(?)",
+  eye_color: "UPPER(p.eyeColor) = UPPER(?)",
+  fake_tits: "UPPER(p.fakeTits) = UPPER(?)",
+  disambiguation: "p.disambiguation LIKE ?",
+  country: "p.country LIKE ?",
+  circumcised: "p.circumcised IN (?)",
+  aliases: "json_valid(p.aliasList)",
+  url: "json_valid(p.urls)",
+  stash_id: "= LOWER(?)",
+  tags: "FROM PerformerTag pt WHERE pt.performerId = p.id",
+  studios: "FROM StashScene sc JOIN ScenePerformer sp",
+  scenes: "FROM ScenePerformer sp JOIN StashScene lsc",
+  groups: "FROM SceneGroup sg JOIN ScenePerformer sp",
+  performers: "FROM ScenePerformer spw JOIN ScenePerformer sp",
+  rating100: "r.rating > ?",
+  o_counter: "COALESCE(s.oCounter, 0) > ?",
+  play_count: "COALESCE(s.playCount, 0) > ?",
+  scene_count: "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
+  tag_count: "(SELECT COUNT(*) FROM PerformerTag ptc",
+  image_count: "MAX(p.imageCount - COALESCE(d.images, 0), 0) > ?",
+  gallery_count: "MAX(p.galleryCount - COALESCE(d.galleries, 0), 0) > ?",
+  marker_count: "(SELECT COUNT(*) FROM ScenePerformer mcp",
+  height: "p.heightCm > ?",
+  weight: "p.weightKg > ?",
+  penis_length: "p.penisLength > ?",
+  career_length: "CASE WHEN career_start NOT GLOB",
+  age: "strftime('%Y.%m%d'",
+  birth_year: "CAST(SUBSTR(CASE length(p.birthdate)",
+  death_year: "CAST(SUBSTR(CASE length(p.deathDate)",
+  birthdate: "p.birthdate END, 1, 10) > ?",
+  death_date: "p.deathDate END, 1, 10) > ?",
+  created_at: "p.stashCreatedAt >= ?",
+  updated_at: "p.stashUpdatedAt >= ?",
+  favorite: "r.favorite = 1",
+  tag_favorite: "FROM PerformerTag pt WHERE pt.performerId = p.id",
+};
+
+describe("every performer field clause", () => {
+  /** The viewer's one favourite of each kind, on the instance the samples allow */
+  function seedFavourites(): void {
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow({ tagId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([
+      partialRow({ studioId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([
+      partialRow({ performerId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+  }
+
+  const BOUND = {
+    tag_favorite: ["8", "inst-a"],
+  };
+
+  const SAMPLES = new Map(samplesOf(PERFORMER_FIELDS, BOUND));
+
+  /** The page statement for a filter alone, with nothing else answered */
+  async function statementFor(
+    filter: Record<string, unknown>,
+    applyExclusions = true
+  ): Promise<{ sql: string; params: unknown[] }> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    seedFavourites();
+    await run(
+      { filter: untrusted<ParsedListRequest<"performer">["filter"]>(filter) },
+      { applyExclusions }
+    );
+    return pageStatement();
+  }
+
+  it("has a sample for every field the table carries", () => {
+    expect([...SAMPLES.keys()].sort()).toEqual(
+      Object.keys(PERFORMER_CLAUSES).sort()
+    );
+  });
+
+  it.each(Object.entries(PERFORMER_CLAUSES))(
+    "%s adds its clause to the WHERE and binds its sample in order",
+    async (field, fragment) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).toContain(fragment);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(alternatesOf(PERFORMER_FIELDS, BOUND))(
+    "%s builds a clause of its own and binds its values in order",
+    async (_label, sample) => {
+      const baseline = whereOf((await statementFor({})).sql);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).not.toBe(baseline);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(Object.keys(PERFORMER_CLAUSES))(
+    "%s takes no exclusion join when the viewer's exclusions do not apply",
+    async (field) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql } = await statementFor(filterOf(sample), false);
+
+      expect(whereOf(sql)).not.toContain("UserExcludedEntity");
+    }
+  );
 });

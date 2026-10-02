@@ -21,10 +21,18 @@ import {
   IN_PROGRESS_SQL,
   watchStateClause,
 } from "../../utils/watchStateSql.js";
+import {
+  alternatesOf,
+  filterOf,
+  firstMissingBound,
+  samplesOf,
+  whereOf,
+} from "../helpers/fieldSamples.js";
 import { expandRefsEach } from "../helpers/hierarchyMock.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Mock prisma
 vi.mock(
@@ -1566,4 +1574,140 @@ describe("the path, URL, code, caption, marker and duplicate filters", () => {
     );
     expect(some.sql).toContain("SceneGroup");
   });
+});
+
+/** What each scene field's clause adds to the WHERE, as the shared spec's sample binds it */
+const SCENE_CLAUSES: Record<
+  Exclude<keyof typeof SCENE_FIELDS, "instance_id">,
+  string
+> = {
+  ids: "(s.id = ? AND s.stashInstanceId = ?)",
+  title: "s.title LIKE ?",
+  details: "s.details LIKE ?",
+  director: "s.director LIKE ?",
+  video_codec: "s.fileVideoCodec LIKE ?",
+  audio_codec: "s.fileAudioCodec LIKE ?",
+  path: "s.filePath LIKE ?",
+  url: "json_valid(s.urls)",
+  code: "s.code LIKE ?",
+  captions: "json_extract(j.value, '$.language_code') END = ?",
+  has_markers: "FROM StashClip c LEFT JOIN UserExcludedEntity ce",
+  duplicated: "s.phash IS NOT NULL AND s.phash != ''",
+  performers: "FROM ScenePerformer sp WHERE sp.sceneId = s.id",
+  tags: "FROM SceneInheritedTag sit",
+  studios: "(s.studioId = ? AND s.stashInstanceId = ?)",
+  groups: "FROM SceneGroup sg WHERE sg.sceneId = s.id",
+  galleries: "FROM SceneGallery sg WHERE sg.sceneId = s.id",
+  performer_tags: "FROM ScenePerformer sp CROSS JOIN PerformerTag pt",
+  playlists:
+    "FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE pi.playlistId IN (?)",
+  in_any_playlist:
+    "FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE p.userId = ?",
+  rating100: "r.rating > ?",
+  o_counter: "COALESCE(w.oCount, 0) > ?",
+  play_count: "COALESCE(w.playCount, 0) > ?",
+  play_duration: "COALESCE(w.playDuration, 0) > ?",
+  watched: "w.playCount > 0 AND (COALESCE(w.resumeTime, 0) = 0",
+  in_progress: "w.resumeTime > 0 AND (s.duration IS NULL",
+  duration: "s.duration > ?",
+  bitrate: "s.fileBitRate > ?",
+  framerate: "s.fileFrameRate > ?",
+  performer_count: "s.performerCount > ?",
+  tag_count: "s.tagCount > ?",
+  tagged: "NOT (s.tagCount = 0 AND NOT EXISTS",
+  performer_age:
+    "p.birthdate IS NOT NULL AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity x",
+  resolution: "MIN(s.fileWidth, s.fileHeight) BETWEEN 144 AND 239",
+  orientation: "s.fileWidth > s.fileHeight",
+  date: "END, 1, 10) > ?",
+  created_at: "s.stashCreatedAt >= ?",
+  updated_at: "s.stashUpdatedAt >= ?",
+  last_played_at: "w.lastPlayedAt >= ?",
+  favorite: "r.favorite = 1",
+  performer_favorite: "FROM ScenePerformer sp WHERE sp.sceneId = s.id",
+  studio_favorite: "(s.studioId = ? AND s.stashInstanceId = ?)",
+  tag_favorite: "FROM SceneInheritedTag sit",
+  organized: "s.organized = ?",
+};
+
+describe("every scene field clause", () => {
+  /** The viewer's one favourite of each kind, on the instance the samples allow */
+  function seedFavourites(): void {
+    mockPrisma.tagRating.findMany.mockResolvedValue([
+      partialRow({ tagId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([
+      partialRow({ studioId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([
+      partialRow({ performerId: "8", instanceId: "inst-a" }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+  }
+
+  const BOUND = {
+    performer_favorite: ["8", "inst-a"],
+    studio_favorite: ["8", "inst-a"],
+    tag_favorite: ["8", "inst-a"],
+    resolution: [],
+    orientation: [],
+  };
+
+  const SAMPLES = new Map(samplesOf(SCENE_FIELDS, BOUND));
+
+  /** The page statement for a filter alone, with nothing else answered */
+  async function statementFor(
+    filter: Record<string, unknown>,
+    applyExclusions = true
+  ): Promise<{ sql: string; params: unknown[] }> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    seedFavourites();
+    await run(
+      { filter: untrusted<ParsedListRequest<"scene">["filter"]>(filter) },
+      { applyExclusions }
+    );
+    return pageStatement();
+  }
+
+  it("has a sample for every field the table carries", () => {
+    expect([...SAMPLES.keys()].sort()).toEqual(
+      Object.keys(SCENE_CLAUSES).sort()
+    );
+  });
+
+  it.each(Object.entries(SCENE_CLAUSES))(
+    "%s adds its clause to the WHERE and binds its sample in order",
+    async (field, fragment) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).toContain(fragment);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(alternatesOf(SCENE_FIELDS, BOUND))(
+    "%s builds a clause of its own and binds its values in order",
+    async (_label, sample) => {
+      const baseline = whereOf((await statementFor({})).sql);
+
+      const { sql, params } = await statementFor(filterOf(sample));
+
+      expect(whereOf(sql)).not.toBe(baseline);
+      expect(firstMissingBound(params, sample.bound)).toBeNull();
+    }
+  );
+
+  it.each(Object.keys(SCENE_CLAUSES))(
+    "%s takes no exclusion join when the viewer's exclusions do not apply",
+    async (field) => {
+      const sample = must(SAMPLES.get(field), `a sample for ${field}`);
+
+      const { sql } = await statementFor(filterOf(sample), false);
+
+      expect(whereOf(sql)).not.toContain("UserExcludedEntity");
+    }
+  );
 });
