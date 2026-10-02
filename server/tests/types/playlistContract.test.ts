@@ -22,13 +22,16 @@ import type {
 } from "../../types/api/index.js";
 
 describe("playlist item sorts", () => {
-  it("PLAYLIST_ITEM_SORTS is position, added_at, then every scene sort except scene_index", () => {
+  it("PLAYLIST_ITEM_SORTS is position, added_at, then every scene sort except scene_index and playlist_position", () => {
     expect(PLAYLIST_ITEM_SORTS).toEqual([
       "position",
       "added_at",
-      ...SORTS.scene.filter((s) => s !== "scene_index"),
+      ...SORTS.scene.filter(
+        (s) => s !== "scene_index" && s !== "playlist_position"
+      ),
     ]);
     expect(PLAYLIST_ITEM_SORTS).not.toContain("scene_index");
+    expect(PLAYLIST_ITEM_SORTS).not.toContain("playlist_position");
   });
 
   it("the default playlist item sort is position ASC", () => {

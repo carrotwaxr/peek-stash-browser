@@ -25,6 +25,7 @@ import {
   enumOf,
   instance,
   num,
+  playlistRef,
   ref,
   text,
 } from "./criteria.js";
@@ -93,6 +94,16 @@ export const SCENE_FIELDS = {
   }),
   groups: ref("group", { presence: true }),
   galleries: ref("gallery", { presence: true }),
+  /**
+   * Scenes in these Peek playlists: the viewer's own and those shared with
+   * them (owner answer 6). Any other id holds no scenes for the viewer.
+   */
+  playlists: playlistRef(),
+  /**
+   * Scenes in (true) or in none of (false) the viewer's own playlists;
+   * playlists shared with them do not count (owner answer 13)
+   */
+  in_any_playlist: bool(),
   rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
@@ -403,6 +414,8 @@ export const SORTS = {
     "last_o_at",
     /** Order within the one group the `groups` filter names */
     "scene_index",
+    /** Order within the one playlist the `playlists` filter names */
+    "playlist_position",
     "random",
   ],
   performer: [
@@ -516,12 +529,15 @@ export type RandomSortKey = `random_${number}`;
 /**
  * The sorts a playlist's item page offers: the playlist's own order, when the
  * item was added, then every scene sort except `scene_index` (a playlist has
- * no group). `random` also arrives as `random_<seed>`.
+ * no group) and `playlist_position` (the page's own order is `position`).
+ * `random` also arrives as `random_<seed>`.
  */
 export const PLAYLIST_ITEM_SORTS = [
   "position",
   "added_at",
-  ...SORTS.scene.filter((s) => s !== "scene_index"),
+  ...SORTS.scene.filter(
+    (s) => s !== "scene_index" && s !== "playlist_position"
+  ),
 ] as const;
 export type PlaylistItemSort = (typeof PLAYLIST_ITEM_SORTS)[number];
 

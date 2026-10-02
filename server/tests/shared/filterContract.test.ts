@@ -15,7 +15,9 @@ import {
   LIST_KINDS,
   type ListKind,
   PANEL_FIELDS,
+  PLAYLIST_ITEM_SORTS,
   type PanelField,
+  SCENE_FIELDS,
   SORTS,
   UI_KEYS,
 } from "@peek/shared-types/filters/index.js";
@@ -111,6 +113,29 @@ describe("filter contract", () => {
         "group.studios",
       ].sort()
     );
+  });
+
+  it("scene.playlists is the one playlist field: ref modifiers, no presence, at most 100 ids", () => {
+    const playlistFields = allFields().flatMap(([name, spec]) =>
+      spec.kind === "playlist" ? [name] : []
+    );
+
+    expect(playlistFields).toEqual(["scene.playlists"]);
+    expect(SCENE_FIELDS.playlists).toEqual({
+      kind: "playlist",
+      modifiers: ["INCLUDES", "INCLUDES_ALL", "EXCLUDES"],
+      defaultModifier: "INCLUDES",
+      maxValues: 100,
+    });
+    expect(SCENE_FIELDS.in_any_playlist).toEqual({ kind: "boolean" });
+  });
+
+  it("Playlist order is a scene sort the playlist items page leaves out", () => {
+    const scene: readonly string[] = SORTS.scene;
+    const items: readonly string[] = PLAYLIST_ITEM_SORTS;
+
+    expect(scene).toContain("playlist_position");
+    expect(items).not.toContain("playlist_position");
   });
 
   it("each sort list has no duplicates and holds its default sort", () => {

@@ -18,6 +18,7 @@ import { ValidationError } from "../../middleware/errorHandler.js";
 import type { ApiErrorIssue } from "../../types/api/index.js";
 import type {
   ParsedFilter,
+  PlaylistCriterion,
   RefCriterion,
   RefPresenceCriterion,
 } from "../../types/parsedFilters.js";
@@ -1416,6 +1417,125 @@ describe("parseListRequest: ref presence and excludes", () => {
   });
 });
 
+describe("parseListRequest: playlists", () => {
+  const scene = (body: Record<string, unknown>) =>
+    parseListRequest("scene", body, opts());
+  const sceneIssues = (body: Record<string, unknown>) =>
+    paths(issuesOf(() => scene(body)));
+
+  it("playlists take Peek playlist ids with a ref modifier, INCLUDES when missing", () => {
+    expect(
+      scene({
+        scene_filter: { playlists: { value: [12, 15], modifier: "INCLUDES" } },
+      }).filter
+    ).toEqual({ playlists: { ids: [12, 15], modifier: "INCLUDES" } });
+    expect(
+      scene({ scene_filter: { playlists: { value: [12] } } }).filter
+    ).toEqual({ playlists: { ids: [12], modifier: "INCLUDES" } });
+    for (const modifier of ["INCLUDES_ALL", "EXCLUDES"]) {
+      expect(
+        scene({ scene_filter: { playlists: { value: [3, 3, 4], modifier } } })
+          .filter
+      ).toEqual({ playlists: { ids: [3, 4], modifier } });
+    }
+  });
+
+  it("a non-positive, non-integer or text id is a 400 at its value", () => {
+    for (const value of [[0], [-2], [1.5], ["12"], ["12:inst"]]) {
+      expect(sceneIssues({ scene_filter: { playlists: { value } } })).toEqual([
+        "scene_filter.playlists.value.0",
+      ]);
+    }
+  });
+
+  it("more than 100 ids is a 400; 100 parse", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+    expect(
+      sceneIssues({ scene_filter: { playlists: { value: ids(101) } } })
+    ).toEqual(["scene_filter.playlists.value"]);
+    expect(
+      scene({ scene_filter: { playlists: { value: ids(100) } } }).filter
+        .playlists?.ids
+    ).toHaveLength(100);
+  });
+
+  it("has none and has any are not offered: a 400 at the modifier", () => {
+    for (const modifier of ["IS_NULL", "NOT_NULL"]) {
+      expect(
+        sceneIssues({ scene_filter: { playlists: { value: [1], modifier } } })
+      ).toEqual(["scene_filter.playlists.modifier"]);
+      expect(
+        sceneIssues({ scene_filter: { playlists: { modifier } } })
+      ).toEqual(["scene_filter.playlists.modifier"]);
+    }
+  });
+
+  it("an empty value is omitted, as on every field", () => {
+    expect(
+      scene({
+        scene_filter: { playlists: { value: [], modifier: "INCLUDES" } },
+      }).filter
+    ).toEqual({});
+  });
+
+  it("in_any_playlist is true or false", () => {
+    expect(scene({ scene_filter: { in_any_playlist: true } }).filter).toEqual({
+      in_any_playlist: true,
+    });
+    expect(scene({ scene_filter: { in_any_playlist: false } }).filter).toEqual({
+      in_any_playlist: false,
+    });
+    expect(sceneIssues({ scene_filter: { in_any_playlist: "yes" } })).toEqual([
+      "scene_filter.in_any_playlist",
+    ]);
+  });
+
+  it("Playlist order needs exactly one included playlist: a 400 at filter.sort", () => {
+    const body = (playlists?: Record<string, unknown>) => ({
+      filter: { sort: "playlist_position" },
+      scene_filter: playlists === undefined ? {} : { playlists },
+    });
+    for (const playlists of [
+      undefined,
+      { value: [12], modifier: "EXCLUDES" },
+      { value: [12, 15], modifier: "INCLUDES" },
+      { value: [12, 15], modifier: "INCLUDES_ALL" },
+    ]) {
+      expect(issuesOf(() => scene(body(playlists)))).toEqual([
+        { path: "filter.sort", message: "Playlist order needs one playlist" },
+      ]);
+    }
+    for (const modifier of ["INCLUDES", "INCLUDES_ALL"]) {
+      expect(scene(body({ value: [12], modifier })).sort.field).toBe(
+        "playlist_position"
+      );
+    }
+  });
+
+  it("a carousel's Playlist order needs one playlist rule too", () => {
+    expect(
+      paths(
+        issuesOf(() =>
+          parseCarouselRequest(
+            { rules: {}, sort: "playlist_position", direction: "ASC" },
+            opts()
+          )
+        )
+      )
+    ).toEqual(["sort"]);
+    expect(
+      parseCarouselRequest(
+        {
+          rules: { playlists: { value: [4] } },
+          sort: "playlist_position",
+          direction: "ASC",
+        },
+        opts()
+      ).sort.field
+    ).toBe("playlist_position");
+  });
+});
+
 describe("parseSceneClipsRequest", () => {
   it("reads the scene id, includeUngenerated and instanceId", () => {
     expect(
@@ -1852,6 +1972,12 @@ describe("parsePlaylistItemsRequest", () => {
     expect(
       issuesOf(() => parsePlaylistItemsRequest({ sort: "scene_index" }, opts()))
     ).toEqual([{ path: "sort", message: "Unknown sort" }]);
+    // The playlist's own order is `position`
+    expect(
+      issuesOf(() =>
+        parsePlaylistItemsRequest({ sort: "playlist_position" }, opts())
+      )
+    ).toEqual([{ path: "sort", message: "Unknown sort" }]);
     expect(
       paths(
         issuesOf(() =>
@@ -1997,5 +2123,8 @@ describe("parsed types", () => {
     >();
     expectTypeOf<ParsedFilter<"tag">>().toHaveProperty("scenes");
     expectTypeOf<ParsedFilter<"scene">>().not.toHaveProperty("instance_id");
+    expectTypeOf<ParsedFilter<"scene">["playlists"]>().toEqualTypeOf<
+      PlaylistCriterion | undefined
+    >();
   });
 });

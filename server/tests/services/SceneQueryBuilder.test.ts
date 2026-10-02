@@ -15,6 +15,7 @@ import type {
   ParsedFilter,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { viewablePlaylistSql } from "../../utils/playlistAccessSql.js";
 import { expandRefsEach } from "../helpers/hierarchyMock.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -1212,5 +1213,164 @@ describe("the scene field table", () => {
       "EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND ((st.tagId = ? AND st.tagInstanceId = ?)))"
     );
     expect(own.sql).not.toContain("IN (SELECT");
+  });
+});
+
+describe("the playlist filters and Playlist order", () => {
+  const ctx = (name: string): LeafContext => ({
+    userId: 9,
+    applyExclusions: true,
+    allowedInstanceIds: ALLOWED,
+    specificInstanceId: undefined,
+    sortField: "created_at",
+    timeZone: "UTC",
+    name,
+    underAny: false,
+  });
+  /** The viewable-playlist check on `p`, as `viewablePlaylistSql` writes it */
+  const VIEWABLE = "(p.userId = ? OR (EXISTS (SELECT 1 FROM PlaylistShare ps";
+  const INCLUDES_ONE =
+    "(s.id, s.stashInstanceId) IN (SELECT pi.sceneId, pi.instanceId FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE pi.playlistId IN (?) AND ";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  it("INCLUDES reads the playlists' items by PlaylistItem's key, viewable playlists only", async () => {
+    const clause = await sceneQueryBuilder.clauseFor(
+      {
+        field: "playlists",
+        criterion: { ids: [12, 15], modifier: "INCLUDES" },
+      },
+      ctx("playlists")
+    );
+
+    expect(clause.sql).toBe(
+      `(s.id, s.stashInstanceId) IN (SELECT pi.sceneId, pi.instanceId FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE pi.playlistId IN (?, ?) AND ${viewablePlaylistSql("p", 9).sql})`
+    );
+    expect(clause.sql).toContain(VIEWABLE);
+    expect(clause.params).toEqual([12, 15, 9, 9]);
+    expect(clause.ctes ?? []).toEqual([]);
+  });
+
+  it("INCLUDES_ALL is one INCLUDES per playlist, AND-ed", async () => {
+    const clause = await sceneQueryBuilder.clauseFor(
+      {
+        field: "playlists",
+        criterion: { ids: [12, 15], modifier: "INCLUDES_ALL" },
+      },
+      ctx("playlists")
+    );
+
+    expect(clause.sql.split(INCLUDES_ONE)).toHaveLength(3);
+    expect(clause.sql).toContain(") AND (");
+    expect(clause.params).toEqual([12, 9, 9, 15, 9, 9]);
+  });
+
+  it("EXCLUDES and in_any_playlist false take the matched-set shape: a materialized CTE and a keyed anti-join", async () => {
+    const excludes = await sceneQueryBuilder.clauseFor(
+      { field: "playlists", criterion: { ids: [12], modifier: "EXCLUDES" } },
+      ctx("playlists")
+    );
+    const none = await sceneQueryBuilder.clauseFor(
+      { field: "in_any_playlist", criterion: false },
+      ctx("in_any_playlist")
+    );
+
+    for (const [clause, name] of [
+      [excludes, "playlists_set"],
+      [none, "in_any_playlist_set"],
+    ] as const) {
+      const cte = must(clause.ctes?.[0], `${name} CTE`);
+      expect(cte.name).toBe(name);
+      expect(cte.sql).toMatch(
+        new RegExp(
+          `^${name}\\(id, inst\\) AS MATERIALIZED \\(SELECT DISTINCT pi\\.sceneId, pi\\.instanceId FROM PlaylistItem pi JOIN Playlist p ON p\\.id = pi\\.playlistId WHERE `
+        )
+      );
+      expect(clause.sql).toBe(
+        `(s.id || ':' || s.stashInstanceId) NOT IN (SELECT id || ':' || inst FROM ${name})`
+      );
+      expect(clause.sql).not.toContain("NOT EXISTS");
+      expect(clause.sql).not.toContain("(s.id, s.stashInstanceId) NOT IN");
+      expect(cte.sql).not.toContain("s.id");
+    }
+    // The playlists the viewer may read; "any of my playlists" their own only
+    expect(must(excludes.ctes?.[0], "set").sql).toContain(VIEWABLE);
+    expect(must(excludes.ctes?.[0], "set").params).toEqual([12, 9, 9]);
+    expect(must(none.ctes?.[0], "set").sql).toContain("WHERE p.userId = ?)");
+    expect(must(none.ctes?.[0], "set").sql).not.toContain("PlaylistShare");
+    expect(must(none.ctes?.[0], "set").params).toEqual([9]);
+  });
+
+  it("in_any_playlist true lists the scenes of the viewer's own playlists only", async () => {
+    const clause = await sceneQueryBuilder.clauseFor(
+      { field: "in_any_playlist", criterion: true },
+      ctx("in_any_playlist")
+    );
+
+    expect(clause.sql).toBe(
+      "(s.id, s.stashInstanceId) IN (SELECT pi.sceneId, pi.instanceId FROM PlaylistItem pi JOIN Playlist p ON p.id = pi.playlistId WHERE p.userId = ?)"
+    );
+    expect(clause.params).toEqual([9]);
+  });
+
+  it("the EXCLUDES set reaches the statement's WITH, its parameters first", async () => {
+    await sceneQueryBuilder.execute({
+      userId: 9,
+      allowedInstanceIds: ALLOWED,
+      request: request({
+        filter: { playlists: { ids: [12], modifier: "EXCLUDES" } },
+      }),
+    });
+
+    const { sql, params } = pageStatement();
+    expect(sql).toMatch(
+      /^WITH playlists_set\(id, inst\) AS MATERIALIZED \(SELECT DISTINCT pi\.sceneId/
+    );
+    expect(params.slice(0, 3)).toEqual([12, 9, 9]);
+  });
+
+  it("Playlist order joins the one playlist's item and orders by its position, then the key", async () => {
+    await sceneQueryBuilder.execute({
+      userId: 9,
+      allowedInstanceIds: ALLOWED,
+      request: request({
+        sort: {
+          field: "playlist_position",
+          direction: "DESC",
+          seed: undefined,
+        },
+        filter: { playlists: { ids: [12], modifier: "INCLUDES" } },
+      }),
+    });
+
+    const { sql, params } = pageStatement();
+    expect(sql).toContain(
+      "JOIN PlaylistItem pip ON pip.playlistId = ? AND pip.sceneId = s.id AND pip.instanceId = s.stashInstanceId"
+    );
+    expect(sql).not.toContain("LEFT JOIN PlaylistItem pip");
+    expect(sql).toContain(
+      "ORDER BY pip.position DESC, s.id DESC, s.stashInstanceId DESC"
+    );
+    expect(params).toContain(12);
+  });
+
+  it("without one included playlist Playlist order has no expression and the default sort applies", async () => {
+    await sceneQueryBuilder.execute({
+      userId: 9,
+      allowedInstanceIds: ALLOWED,
+      request: request({
+        sort: {
+          field: "playlist_position",
+          direction: "ASC",
+          seed: undefined,
+        },
+        filter: { playlists: { ids: [12], modifier: "EXCLUDES" } },
+      }),
+    });
+
+    expect(pageStatement().sql).not.toContain("pip.");
   });
 });

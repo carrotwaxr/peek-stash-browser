@@ -34,6 +34,8 @@ const panelOf = (kind: ListKind): readonly PanelField[] => PANEL_FIELDS[kind];
 /** The editors each contract kind may be offered with */
 const EDITORS_FOR: Readonly<Record<FieldKind, readonly EditorKind[]>> = {
   ref: ["ref"],
+  // No panel row offers playlists yet (F18, F22)
+  playlist: [],
   number: ["number"],
   date: ["date"],
   // A performer attribute Stash stores as free text is picked from a list

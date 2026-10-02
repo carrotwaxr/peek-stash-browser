@@ -14,8 +14,10 @@ import type {
   InstanceSpec,
   NumberModifier,
   NumberSpec,
+  PlaylistSpec,
   PresenceModifier,
   RefFieldModifier,
+  RefModifier,
   RefSpec,
   TextModifier,
   TextSpec,
@@ -59,6 +61,15 @@ export interface HierarchicalRefInput<
   M extends RefFieldModifier = RefFieldModifier,
 > extends RefInput<M> {
   depth?: number | null;
+}
+
+/**
+ * Peek playlist ids (positive integers, at most MAX_PLAYLIST_VALUES); a
+ * playlist the viewer may not read holds no scenes for them
+ */
+export interface PlaylistInput {
+  value: number[];
+  modifier?: RefModifier | null;
 }
 
 /** T when the field offers IS_NULL or NOT_NULL, else never */
@@ -147,21 +158,23 @@ export type CriterionInput<S extends FieldSpec> =
     ? H extends true
       ? HierarchicalRefInput<M>
       : RefInput<M>
-    : S extends NumberSpec<infer M>
-      ? NumberInput<M>
-      : S extends DateSpec<infer M>
-        ? DateInput<M>
-        : S extends TextSpec<infer M>
-          ? TextInput<M>
-          : S extends EnumSpec<infer V, infer M, infer Multi>
-            ? Multi extends true
-              ? MultiEnumInput<V, M>
-              : EnumInput<V, M>
-            : S extends BooleanSpec
-              ? boolean
-              : S extends InstanceSpec
-                ? string
-                : never;
+    : S extends PlaylistSpec
+      ? PlaylistInput
+      : S extends NumberSpec<infer M>
+        ? NumberInput<M>
+        : S extends DateSpec<infer M>
+          ? DateInput<M>
+          : S extends TextSpec<infer M>
+            ? TextInput<M>
+            : S extends EnumSpec<infer V, infer M, infer Multi>
+              ? Multi extends true
+                ? MultiEnumInput<V, M>
+                : EnumInput<V, M>
+              : S extends BooleanSpec
+                ? boolean
+                : S extends InstanceSpec
+                  ? string
+                  : never;
 
 /** The parent key of a field carried inside a nested object, else never */
 type ParentOf<S> = S extends {

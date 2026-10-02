@@ -30,6 +30,7 @@ import {
   PLAYLIST_ITEM_SORTS,
   PRESENCE_MODIFIERS,
   type PlaylistItemSort,
+  type PlaylistSpec,
   type PresenceModifier,
   Q_MAX_LENGTH,
   RANGE_MODIFIERS,
@@ -68,6 +69,7 @@ import type {
   ParsedSceneClipsQuery,
   ParsedSimilarScenesQuery,
   ParsedSort,
+  PlaylistCriterion,
   RefCriterion,
   RefFieldCriterion,
   TextCriterion,
@@ -356,6 +358,46 @@ function requireCollectionForSceneIndex(
   return undefined;
 }
 
+/**
+ * Playlist order is a scene's position in one playlist, so the sort needs a
+ * `playlists` criterion including exactly one. Without one the sort is a
+ * problem at the sort's path (a 400 in reject mode) and the list keeps its
+ * default.
+ */
+function requirePlaylistForPosition(
+  field: SortField<"scene"> | undefined,
+  criteria: ParsedFieldsResult["criteria"],
+  path: string,
+  problems: Problems
+): SortField<"scene"> | undefined {
+  if (field?.field !== "playlist_position") return field;
+  const playlists = criteria.playlists as PlaylistCriterion | undefined;
+  if (
+    (playlists?.modifier === "INCLUDES" ||
+      playlists?.modifier === "INCLUDES_ALL") &&
+    playlists.ids.length === 1
+  ) {
+    return field;
+  }
+  problems.add(path, "Playlist order needs one playlist");
+  return undefined;
+}
+
+/** A scene sort that reads a criterion (Scene Number, Playlist order), checked against it */
+function requireSortContext(
+  field: SortField<"scene"> | undefined,
+  criteria: ParsedFieldsResult["criteria"],
+  path: string,
+  problems: Problems
+): SortField<"scene"> | undefined {
+  return requirePlaylistForPosition(
+    requireCollectionForSceneIndex(field, criteria, path, problems),
+    criteria,
+    path,
+    problems
+  );
+}
+
 function parseInstanceId(
   raw: unknown,
   path: string,
@@ -460,6 +502,29 @@ function refSchema(spec: RefSpec): z.ZodType<RefFieldCriterion> {
         return { refs: [...value, ...excludes], modifier, depth };
       }
       return { refs: value, modifier, depth, ...withExcludes };
+    });
+}
+
+/**
+ * Peek playlist ids: positive integers, at most the field's maxValues,
+ * duplicates dropped. Takes no presence check.
+ */
+function playlistSchema(spec: PlaylistSpec): z.ZodType<PlaylistCriterion> {
+  return z
+    .strictObject({
+      value: z
+        .array(z.number().int().positive())
+        .max(spec.maxValues, `At most ${spec.maxValues} values`)
+        .nullish(),
+      modifier: z.enum(spec.modifiers).nullish(),
+    })
+    .transform((c, ctx): PlaylistCriterion => {
+      const ids = [...new Set(c.value ?? [])];
+      if (ids.length === 0) {
+        ctx.addIssue({ code: "custom", path: ["value"], message: "Required" });
+        return z.NEVER;
+      }
+      return { ids, modifier: c.modifier ?? spec.defaultModifier };
     });
 }
 
@@ -608,6 +673,8 @@ function buildSchema(spec: FieldSpec): z.ZodType {
   switch (spec.kind) {
     case "ref":
       return refSchema(spec);
+    case "playlist":
+      return playlistSchema(spec);
     case "number":
       return rangeSchema(spec, z.number());
     case "date":
@@ -905,7 +972,7 @@ export function parseListRequest<E extends EntityKind>(
   walk(input, "", handlers, problems, "Unknown request field");
   mergeIds(fields.criteria, ids, filterKey, problems);
   if (entity === "scene") {
-    sortField = requireCollectionForSceneIndex(
+    sortField = requireSortContext(
       sortField as SortField<"scene"> | undefined,
       fields.criteria,
       "filter.sort",
@@ -963,7 +1030,7 @@ function parseCarouselParts(
     : { criteria: {}, specificInstanceId: undefined };
   return {
     fields,
-    sortField: requireCollectionForSceneIndex(
+    sortField: requireSortContext(
       parseSortField("scene", sort, "sort", problems),
       fields.criteria,
       "sort",
@@ -1328,7 +1395,8 @@ const PLAYLIST_OWN_SORTS: ReadonlySet<PlaylistItemSort> = new Set([
 /**
  * A playlist item sort: a member of `PLAYLIST_ITEM_SORTS`, or
  * `random_<n>` (seed n % 1e8, as the lists read it); absent when missing or
- * invalid. `scene_index` is not one: a playlist has no collection.
+ * invalid. `scene_index` is not one (a playlist has no collection), nor
+ * `playlist_position` (the playlist's own order is `position`).
  */
 function parsePlaylistSort(
   raw: unknown,
