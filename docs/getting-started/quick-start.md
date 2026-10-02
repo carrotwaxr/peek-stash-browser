@@ -10,15 +10,11 @@ Get Peek up and running in 5 minutes!
     # Pull the latest image
     docker pull carrotwaxr/peek-stash-browser:latest
 
-    # Generate JWT secret
-    export JWT_SECRET=$(openssl rand -base64 32)
-
     # Run Peek
     docker run -d \
       --name peek-stash-browser \
       -p 6969:80 \
       -v peek-data:/app/data \
-      -e JWT_SECRET="${JWT_SECRET}" \
       --restart unless-stopped \
       carrotwaxr/peek-stash-browser:latest
     ```
@@ -28,8 +24,7 @@ Get Peek up and running in 5 minutes!
     1. Download the [unRAID template](https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml)
     2. Copy to `/boot/config/plugins/dockerMan/templates-user/`
     3. Go to Docker → Add Container → Select "Peek" from User Templates
-    4. Generate JWT secret: `openssl rand -hex 32`
-    5. Click Apply
+    4. Click Apply
 
 !!! tip "For Developers"
     Want to contribute or run with hot reloading? See [Local Development Setup](../development/local-setup.md).
@@ -73,7 +68,7 @@ Setup is finished. Click **Start Browsing** to enter Peek. Your first library sy
 
 1. Click any scene to view details
 2. Click Play to start video
-3. Quality automatically adjusts based on network
+3. Peek plays Stash's Direct stream when your browser can decode the file, and a Stash transcode when it cannot
 4. Use timeline to seek through video
 
 ## Step 5: Create Playlists
@@ -86,9 +81,8 @@ Organize your favorite scenes into custom playlists:
 4. Click **Create**
 
 **Adding Scenes:**
-- Click the **+** icon on any scene card
-- Select your playlist from the menu
-- Scene is added instantly!
+- Open a scene and click **Add to Playlist**, then pick your playlist
+- Or select several scenes and click **Add to Playlist** on the bar that appears
 
 **Playing Playlists:**
 - Click a playlist to view its scenes
@@ -103,31 +97,29 @@ Organize your favorite scenes into custom playlists:
 
 ### Update Admin Password
 
-1. Click user icon (top right)
-2. Select **Settings**
-3. Enter new password
-4. Click **Save**
+1. Open **Settings → User Preferences → Account**
+2. Under **Change Password**, enter your current password, then the new one twice
+3. Click **Change Password**
 
 ### Create Additional Users
 
-1. Go to **Users** (admin only)
+1. Open **Settings → Server Settings → User Management** (admin only)
 2. Click **Create User**
-3. Enter username, email, password
-4. Select role (Admin or User)
-5. Click **Create**
+3. Enter a username and a password
+4. Select the role (Admin or User)
+5. Click **Create User**
 
 ### Configure Theme
 
 1. Open **Settings → User Preferences → Theme**
-2. Choose a built-in theme or create a custom one
+2. Choose Peek, Light, Midnight Blue, Deep Purple or The Hub, or create a custom theme
 3. The theme is saved to your account at once and follows you to every browser
 
 ## Video Playback Tips
 
-- **Direct Play**: If browser supports the format, plays directly (no transcoding)
-- **Transcoded**: HLS streaming with adaptive quality when needed
-- **Seeking**: Full timeline scrubbing works in both modes
-- **Quality**: Click quality button to manually select resolution
+- **Direct stream**: When your browser can decode the file, Peek plays Stash's Direct stream, the file as it is
+- **Transcode**: When it cannot, Peek plays one of Stash's transcodes instead
+- **Source menu**: The source menu in the player controls lets you pick another source
 
 ## Keyboard Shortcuts
 
@@ -154,7 +146,7 @@ Organize your favorite scenes into custom playlists:
 
 ### No Scenes Showing
 
-- Check your Stash connection in Settings → Server Settings
+- Check your Stash connection in Settings → Server Settings → Server Configuration → Stash Instances
 - Verify your Stash API key is valid in Stash → Settings → Security
 - Test Stash connectivity from container:
   ```bash
@@ -175,5 +167,5 @@ Organize your favorite scenes into custom playlists:
 ## Need Help?
 
 - [Troubleshooting Guide](troubleshooting.md)
-- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel
+- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues) for bugs
+- [Peek on the Stash community forum](https://discourse.stashapp.cc/t/peek-stash-browser/4018) for questions
