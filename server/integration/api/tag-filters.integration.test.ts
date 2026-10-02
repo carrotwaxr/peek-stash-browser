@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
-import { expectRefused } from "../helpers/refused.js";
 import { adminClient, findTestInstanceId } from "../helpers/testClient.js";
 
 /**
@@ -304,18 +303,22 @@ describe("Tag Filters", () => {
     });
   });
 
-  describe("Stash tag filters Peek does not apply", () => {
-    // The request parser refuses them rather than ignore them: no builder
-    // counts a tag's parents or children
+  describe("parent and child counts", () => {
+    // Applied as the viewer sees them (tag-hierarchy-filters has the seeded
+    // cases)
     it.each(["child_count", "parent_count"])(
-      "%s answers 400 naming it",
+      "%s filters the list",
       async (field) => {
-        const response = await adminClient.post("/api/library/tags", {
-          filter: { per_page: 100 },
-          tag_filter: { [field]: { value: 0, modifier: "GREATER_THAN" } },
-        });
+        const response = await adminClient.post<FindTagsResponse>(
+          "/api/library/tags",
+          {
+            filter: { per_page: 100 },
+            tag_filter: { [field]: { value: 0, modifier: "GREATER_THAN" } },
+          }
+        );
 
-        expectRefused(response, [`tag_filter.${field}`]);
+        expect(response.ok).toBe(true);
+        expect(response.data.findTags).toBeDefined();
       }
     );
   });

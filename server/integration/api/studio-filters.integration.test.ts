@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -18,7 +21,11 @@ import {
  * - scene_count filter
  * - name text search
  * - parent/child studio relationships
+ * - parents with depth, child and tag counts, stored counts (seeded)
  */
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 interface FindStudiosResponse {
   findStudios: {
@@ -465,5 +472,273 @@ describe("Studio Filters", () => {
       );
       expect(matchingStudio).toBeDefined();
     });
+  });
+});
+
+/**
+ * Studio parents with depth and the studio counts, on seeded studios under
+ * two made-up instances reusing the same ids (invariant 7). The viewer hid
+ * some studios and a tag (invariant 3, lead decision 4); another user hid
+ * nothing (invariant 6).
+ *
+ * sh-a: S0 (7897001) > S1 (7897002) > S2 (7897003) > S3 (7897004); S0's
+ *   other children SH (7897005, hidden) and SD (7897006, deleted); SX
+ *   (7897007), whose parent SHP (7897008) is hidden. S0 holds tags T1
+ *   (7897101), T2 (7897102, hidden) and T3 (7897103, deleted); S1 holds T2.
+ * sh-b: S0 (7897001) > S1 (7897002), S1 holding T1.
+ * Every seeded row is deleted before the file ends.
+ */
+describeWithDb("Studio parents and counts (seeded)", () => {
+  const A = "sh-a";
+  const B = "sh-b";
+  const VIEWER = "sh-viewer";
+  const OTHER = "sh-other";
+  let viewerId = 0;
+  let otherId = 0;
+
+  const [S0, S1, S2, S3, SH, SD, SX, SHP] = [
+    "7897001",
+    "7897002",
+    "7897003",
+    "7897004",
+    "7897005",
+    "7897006",
+    "7897007",
+    "7897008",
+  ];
+  const [T1, T2, T3] = ["7897101", "7897102", "7897103"];
+  const key = (id: string, instance: string) => `${id}:${instance}`;
+  /** Every studio the viewer can see */
+  const VISIBLE = [
+    key(S0, A),
+    key(S1, A),
+    key(S2, A),
+    key(S3, A),
+    key(SX, A),
+    key(S0, B),
+    key(S1, B),
+  ].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((k) => !keys.includes(k));
+
+  async function removeRows(): Promise<void> {
+    const where = { stashInstanceId: { in: [A, B] } };
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+    await prisma.user.deleteMany({
+      where: { username: { in: [VIEWER, OTHER] } },
+    });
+  }
+
+  /** The studios a wire `studio_filter` lists, as sorted keys */
+  async function listed(
+    filter: Record<string, unknown>,
+    userId = viewerId
+  ): Promise<string[]> {
+    const request = parseListRequest(
+      "studio",
+      { filter: { per_page: 100 }, studio_filter: filter },
+      { userId }
+    );
+    const { items, total } = await studioQueryBuilder.execute({
+      userId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((s) => key(s.id, s.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    const user = async (username: string) =>
+      (
+        await prisma.user.create({
+          data: { username, password: "not-a-real-hash", role: "USER" },
+        })
+      ).id;
+    viewerId = await user(VIEWER);
+    otherId = await user(OTHER);
+
+    const studio = (
+      id: string,
+      instance: string,
+      parentId: string | null = null,
+      extra: { deletedAt?: Date; imageCount?: number; groupCount?: number } = {}
+    ) => ({
+      id,
+      stashInstanceId: instance,
+      name: `SH studio ${id} ${instance}`,
+      parentId,
+      ...extra,
+    });
+    await prisma.stashStudio.createMany({
+      data: [
+        studio(S0, A, null, { imageCount: 4, groupCount: 1 }),
+        studio(S1, A, S0),
+        studio(S2, A, S1),
+        studio(S3, A, S2),
+        studio(SH, A, S0),
+        studio(SD, A, S0, { deletedAt: new Date() }),
+        studio(SX, A, SHP),
+        studio(SHP, A),
+        studio(S0, B),
+        studio(S1, B, S0, { imageCount: 4 }),
+      ],
+    });
+    await prisma.stashTag.createMany({
+      data: [
+        { id: T1, stashInstanceId: A, name: "SH tag 1" },
+        { id: T2, stashInstanceId: A, name: "SH tag 2" },
+        { id: T3, stashInstanceId: A, name: "SH tag 3", deletedAt: new Date() },
+        { id: T1, stashInstanceId: B, name: "SH tag 1 b" },
+      ],
+    });
+    const studioTag = (studioId: string, tagId: string, inst = A) => ({
+      studioId,
+      studioInstanceId: inst,
+      tagId,
+      tagInstanceId: inst,
+    });
+    await prisma.studioTag.createMany({
+      data: [
+        studioTag(S0, T1),
+        studioTag(S0, T2),
+        studioTag(S0, T3),
+        studioTag(S1, T2),
+        studioTag(S1, T1, B),
+      ],
+    });
+    const hidden = (entityType: string, entityId: string) => ({
+      userId: viewerId,
+      entityType,
+      entityId,
+      instanceId: A,
+      reason: "hidden",
+    });
+    await prisma.userExcludedEntity.createMany({
+      data: [hidden("studio", SH), hidden("studio", SHP), hidden("tag", T2)],
+    });
+    await prisma.userExcludedContentCount.create({
+      data: {
+        userId: viewerId,
+        entityType: "studio",
+        entityId: S0,
+        instanceId: A,
+        images: 1,
+      },
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("parents X at depth -1 lists every studio under X; a parent on one instance never matches the other's", async () => {
+    const s0 = `${S0}:${A}`;
+    expect(
+      await listed({
+        parents: { value: [s0], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([key(S1, A), key(S2, A), key(S3, A)].sort());
+    expect(
+      await listed({ parents: { value: [s0], modifier: "INCLUDES" } })
+    ).toEqual([key(S1, A)]);
+    expect(
+      await listed({ parents: { value: [`${S0}:${B}`], modifier: "INCLUDES" } })
+    ).toEqual([key(S1, B)]);
+    expect(
+      await listed({ parents: { value: [S0], modifier: "INCLUDES" } })
+    ).toEqual([key(S1, A), key(S1, B)].sort());
+    // EXCLUDES keeps the studios with no parent
+    expect(
+      await listed({
+        parents: { value: [s0], modifier: "EXCLUDES", depth: -1 },
+      })
+    ).toEqual(without(key(S1, A), key(S2, A), key(S3, A)));
+    expect(
+      await listed({
+        parents: {
+          value: [`${S1}:${A}`, `${S2}:${A}`],
+          modifier: "INCLUDES_ALL",
+          depth: -1,
+        },
+      })
+    ).toEqual([key(S3, A)]);
+  });
+
+  it("a hidden parent links nothing, in every form", async () => {
+    expect(
+      await listed({
+        parents: { value: [`${SHP}:${A}`], modifier: "INCLUDES" },
+      })
+    ).toEqual([]);
+    expect(
+      await listed({
+        parents: { value: [`${SHP}:${A}`], modifier: "EXCLUDES" },
+      })
+    ).toEqual(VISIBLE);
+    expect(await listed({ parents: { modifier: "IS_NULL" } })).toEqual(
+      [key(S0, A), key(SX, A), key(S0, B)].sort()
+    );
+    expect(await listed({ parents: { modifier: "NOT_NULL" } })).toEqual(
+      [key(S1, A), key(S2, A), key(S3, A), key(S1, B)].sort()
+    );
+    // Another user hid nothing: SX has a parent for them
+    expect(
+      await listed({ parents: { modifier: "NOT_NULL" } }, otherId)
+    ).toEqual(
+      [
+        key(S1, A),
+        key(S2, A),
+        key(S3, A),
+        key(SH, A),
+        key(SX, A),
+        key(S1, B),
+      ].sort()
+    );
+  });
+
+  it("child_count 0 lists the studios with no visible children", async () => {
+    expect(
+      await listed({ child_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual([key(S3, A), key(SX, A), key(S1, B)].sort());
+    // S0 on sh-a: S1 (SH hidden, SD deleted)
+    expect(
+      await listed({ child_count: { value: 1, modifier: "EQUALS" } })
+    ).toEqual([key(S0, A), key(S1, A), key(S2, A), key(S0, B)].sort());
+    expect(
+      await listed({ child_count: { value: 2, modifier: "EQUALS" } }, otherId)
+    ).toEqual([key(S0, A)]);
+  });
+
+  it("tag_count counts the live tags the viewer can see", async () => {
+    expect(
+      await listed({ tag_count: { value: 1, modifier: "EQUALS" } })
+    ).toEqual([key(S0, A), key(S1, B)].sort());
+    expect(
+      await listed({ tag_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual(without(key(S0, A), key(S1, B)));
+    expect(
+      await listed({ tag_count: { value: 2, modifier: "EQUALS" } }, otherId)
+    ).toEqual([key(S0, A)]);
+  });
+
+  it("count filters read the visible counts the sorts use", async () => {
+    expect(
+      await listed({ image_count: { value: 3, modifier: "EQUALS" } })
+    ).toEqual([key(S0, A)]);
+    expect(
+      await listed({ image_count: { value: 4, modifier: "EQUALS" } })
+    ).toEqual([key(S1, B)]);
+    expect(
+      await listed({ image_count: { value: 4, modifier: "EQUALS" } }, otherId)
+    ).toEqual([key(S0, A), key(S1, B)].sort());
+    expect(
+      await listed({ group_count: { value: 1, modifier: "EQUALS" } })
+    ).toEqual([key(S0, A)]);
+    for (const field of ["gallery_count", "performer_count"] as const) {
+      expect(
+        await listed({ [field]: { value: 0, modifier: "EQUALS" } })
+      ).toEqual(VISIBLE);
+    }
   });
 });

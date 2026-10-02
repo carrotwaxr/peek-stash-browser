@@ -23,7 +23,9 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { expandRefs } from "../../utils/hierarchyUtils.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../../utils/sqlJson.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -259,7 +261,7 @@ describe("TagQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
     });
 
-    it("the parents filter on tags keeps the instance of each ref through expansion; a bare ref expands on every allowed instance", async () => {
+    it("parents match the tag's visible parents through json_each as pairs, each ref keeping its instance through the expansion", async () => {
       await run({
         filter: {
           parents: {
@@ -271,28 +273,31 @@ describe("TagQueryBuilder", () => {
       });
 
       const { sql, params } = pageStatement();
+      // The parent is live and the viewer's exclusions (with the
+      // every-instance arm) apply to it under its own alias, never `e`
+      expect(sql).toContain(
+        `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp ON tpp.id = tpj.value AND tpp.stashInstanceId = t.stashInstanceId LEFT JOIN UserExcludedEntity tpp_x ON tpp_x.userId = ? AND tpp_x.entityType = 'tag' AND tpp_x.entityId = tpp.id AND (tpp_x.instanceId = '' OR tpp_x.instanceId = tpp.stashInstanceId) WHERE tpp.deletedAt IS NULL AND tpp_x.id IS NULL AND ((tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?) OR (tpp.id = ? AND tpp.stashInstanceId = ?)))`
+      );
+      expect(sql).not.toContain("LIKE");
       // 10 and its descendant on inst-a; 20 and its descendant on each
       // allowed instance
-      expect(sql).toContain(
-        "((t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?) OR (t.stashInstanceId = ? AND t.parentIds LIKE ?))"
-      );
-      expect(sql).not.toContain("OR t.parentIds LIKE ?");
-      const first = params.indexOf('%"10"%') - 1;
-      expect(params.slice(first, first + 10)).toEqual([
+      const first = params.indexOf("10") - 1;
+      expect(params.slice(first, first + 11)).toEqual([
+        1,
+        "10",
         "inst-a",
-        '%"10"%',
+        "99",
         "inst-a",
-        '%"99"%',
+        "20",
         "inst-a",
-        '%"20"%',
+        "20",
         "inst-b",
-        '%"20"%',
+        "99",
         "inst-b",
-        '%"99"%',
       ]);
     });
 
-    it("parents INCLUDES_ALL needs every ref, and EXCLUDES keeps tags with no parents", async () => {
+    it("parents INCLUDES_ALL is one EXISTS per chosen parent; EXCLUDES is NOT EXISTS, so a tag with no parents stays", async () => {
       await run({
         filter: {
           parents: {
@@ -311,12 +316,117 @@ describe("TagQueryBuilder", () => {
       const [all, excludes] = mockPrisma.$queryRawUnsafe.mock.calls
         .map(([sql]) => sql)
         .filter((sql) => sql.includes("ORDER BY"));
+      expect(must(all).match(/EXISTS \(SELECT 1 FROM json_each/g)).toHaveLength(
+        2
+      );
       expect(all).toContain(
-        "((t.stashInstanceId = ? AND t.parentIds LIKE ?) AND (t.stashInstanceId = ? AND t.parentIds LIKE ?))"
+        "AND ((tpp.id = ? AND tpp.stashInstanceId = ?))) AND EXISTS (SELECT 1 FROM json_each"
       );
+      expect(excludes).toContain("NOT EXISTS (SELECT 1 FROM json_each");
+    });
+
+    it("above 64 refs the parents and children match a refs CTE, never an OR term per ref", async () => {
+      const many = Array.from({ length: 65 }, (_, i) => ref(String(1000 + i)));
+      await run({
+        filter: {
+          parents: { refs: many, modifier: "INCLUDES", depth: 0 },
+          children: { refs: many, modifier: "EXCLUDES", depth: 0 },
+        },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain("parents_refs(id, inst) AS MATERIALIZED");
+      expect(sql).toContain(
+        "(tpp.id, tpp.stashInstanceId) IN (SELECT id, inst FROM parents_refs)"
+      );
+      expect(sql).toContain("children_refs(id, inst) AS MATERIALIZED");
+      expect(sql).toContain(
+        "(tcc.id, tcc.stashInstanceId) IN (SELECT id, inst FROM children_refs)"
+      );
+      expect(sql).not.toContain("tpp.id = ?");
+      expect(sql).not.toContain("tcc.id = ?");
+      expect(params).not.toContain("1000");
+    });
+
+    it("children expand upwards and list the parents of the visible children, as pairs", async () => {
+      await run({
+        filter: {
+          children: { refs: [ref("30")], modifier: "INCLUDES", depth: 2 },
+        },
+      });
+      await run({
+        filter: {
+          children: { refs: [ref("30")], modifier: "EXCLUDES", depth: 0 },
+        },
+      });
+
+      expect(expandRefs).toHaveBeenCalledWith(
+        "tag",
+        [ref("30")],
+        2,
+        ALLOWED,
+        "up"
+      );
+      const [includes, excludes] = mockPrisma.$queryRawUnsafe.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("ORDER BY"));
+      const children = `FROM StashTag tcc CROSS JOIN json_each(${jsonListOrEmpty("tcc.parentIds")}) tcj LEFT JOIN UserExcludedEntity tcc_x ON tcc_x.userId = ? AND tcc_x.entityType = 'tag' AND tcc_x.entityId = tcc.id AND (tcc_x.instanceId = '' OR tcc_x.instanceId = tcc.stashInstanceId) WHERE tcc.deletedAt IS NULL AND tcc_x.id IS NULL`;
+      expect(includes).toContain(
+        `(t.id, t.stashInstanceId) IN (SELECT tcj.value, tcc.stashInstanceId ${children} AND ((tcc.id = ? AND tcc.stashInstanceId = ?) OR (tcc.id = ? AND tcc.stashInstanceId = ?)))`
+      );
+      // One text key each, never a row-value NOT IN; no NULL in the set
       expect(excludes).toContain(
-        "(t.parentIds IS NULL OR NOT ((t.stashInstanceId = ? AND t.parentIds LIKE ?)))"
+        `(t.id || ':' || t.stashInstanceId) NOT IN (SELECT tcj.value || ':' || tcc.stashInstanceId ${children} AND tcj.value IS NOT NULL AND ((tcc.id = ? AND tcc.stashInstanceId = ?)))`
       );
+    });
+
+    it("the counts are the viewer's: visible parents, children and clips, the stored counts minus the viewer's excluded links", async () => {
+      await run({
+        filter: {
+          parent_count: { modifier: "EQUALS", value: 1 },
+          child_count: { modifier: "GREATER_THAN", value: 2 },
+          image_count: { modifier: "EQUALS", value: 3 },
+          gallery_count: { modifier: "EQUALS", value: 4 },
+          performer_count: { modifier: "EQUALS", value: 5 },
+          studio_count: { modifier: "EQUALS", value: 6 },
+          group_count: { modifier: "EQUALS", value: 7 },
+          marker_count: { modifier: "LESS_THAN", value: 8 },
+        },
+      });
+
+      const { sql } = pageStatement();
+      for (const fragment of [
+        `(SELECT COUNT(DISTINCT tpp.id) FROM json_each(${jsonListOrEmpty("t.parentIds")}) tpj JOIN StashTag tpp`,
+        "child_count_children(pid, inst, n) AS MATERIALIZED (SELECT tcj.value, tcc.stashInstanceId, COUNT(DISTINCT tcc.id) FROM StashTag tcc",
+        "GROUP BY tcj.value, tcc.stashInstanceId)",
+        "COALESCE((SELECT k.n FROM child_count_children k WHERE k.pid = t.id AND k.inst = t.stashInstanceId), 0) > ?",
+        "MAX(t.imageCount - COALESCE(d.images, 0), 0) = ?",
+        "MAX(t.galleryCount - COALESCE(d.galleries, 0), 0) = ?",
+        "MAX(t.performerCount - COALESCE(d.performers, 0), 0) = ?",
+        "MAX(t.studioCount - COALESCE(d.studios, 0), 0) = ?",
+        "MAX(t.groupCount - COALESCE(d.groups, 0), 0) = ?",
+        "SELECT mk.id AS cid, mk.stashInstanceId AS cinst FROM StashClip mk WHERE mk.primaryTagId = t.id AND mk.primaryTagInstanceId = t.stashInstanceId UNION SELECT ct.clipId, ct.clipInstanceId FROM ClipTag ct WHERE ct.tagId = t.id AND ct.tagInstanceId = t.stashInstanceId",
+        "WHERE mc.deletedAt IS NULL AND mc_x.id IS NULL AND ms.deletedAt IS NULL AND ms_x.id IS NULL) < ?",
+      ]) {
+        expect(sql).toContain(fragment);
+      }
+    });
+
+    it("without the viewer's exclusions the counts and relations read live rows only", async () => {
+      await run(
+        {
+          filter: {
+            parent_count: { modifier: "EQUALS", value: 1 },
+            children: { refs: [ref("30")], modifier: "INCLUDES", depth: 0 },
+          },
+        },
+        { applyExclusions: false }
+      );
+
+      const { sql } = pageStatement();
+      expect(sql).not.toContain("UserExcludedEntity");
+      expect(sql).toContain("WHERE tpp.deletedAt IS NULL)");
+      expect(sql).toContain("WHERE tcc.deletedAt IS NULL AND ((tcc.id = ?");
     });
 
     it("performers and studios match their junctions as pairs", async () => {

@@ -250,10 +250,22 @@ export const STUDIO_FIELDS = {
   name: text(),
   details: text(),
   tags: ref("tag", { hierarchical: true, presence: true, excludable: true }),
+  /**
+   * Studios under these (depth: further down), the parent live and visible;
+   * "has none" and "has any" a visible parent
+   */
+  parents: ref("studio", { hierarchical: true, presence: true }),
   rating100: nullableNum(),
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
+  /** Counts as the viewer sees them: live, visible children and tags */
+  child_count: num(),
+  tag_count: num(),
+  image_count: num(),
+  gallery_count: num(),
+  performer_count: num(),
+  group_count: num(),
   created_at: date(),
   updated_at: date(),
   favorite: bool(),
@@ -264,7 +276,10 @@ export const TAG_FIELDS = {
   instance_id: instance(),
   name: text(),
   description: text(),
+  /** Tags under these within depth + 1 levels, through a visible parent */
   parents: ref("tag", { hierarchical: true }),
+  /** Tags having these as a visible child within depth + 1 levels */
+  children: ref("tag", { hierarchical: true }),
   /** Tags on these performers */
   performers: ref("performer", { excludable: true }),
   /** Tags on these studios */
@@ -277,6 +292,16 @@ export const TAG_FIELDS = {
   o_counter: num(),
   play_count: num(),
   scene_count: num(),
+  /** Counts as the viewer sees them: live, visible parents and children */
+  parent_count: num(),
+  child_count: num(),
+  image_count: num(),
+  gallery_count: num(),
+  performer_count: num(),
+  studio_count: num(),
+  group_count: num(),
+  /** The live clips the viewer can see with the tag, primary or not */
+  marker_count: num(),
   created_at: date(),
   updated_at: date(),
   favorite: bool(),
