@@ -96,9 +96,9 @@ const OPTIONS: Record<ListKind, readonly FilterOption[]> = {
 
 type State = Record<string, unknown>;
 
-const BUILDERS: Record<ListKind, (state: State, unit?: string) => unknown> = {
+const BUILDERS: Record<ListKind, (state: State) => unknown> = {
   scene: buildSceneFilter,
-  performer: (state, unit) => buildPerformerFilter(state, unit),
+  performer: buildPerformerFilter,
   studio: buildStudioFilter,
   tag: buildTagFilter,
   group: buildGroupFilter,
@@ -202,17 +202,12 @@ function samplesOf(
       break;
     }
     case "imperial-height-range":
+      // The editor shows feet and inches and holds whole cm: 5'6" to 6'2"
+      // is 167 to 189 cm
       values = [
-        plain("min only", { feetMin: "5", inchesMin: "6" }),
-        plain("max only", { feetMax: "6", inchesMax: "2" }),
-        plain("min and max", {
-          feetMin: "5",
-          inchesMin: "6",
-          feetMax: "6",
-          inchesMax: "2",
-        }),
-        plain("feet only", { feetMin: "5", feetMax: "6" }),
-        plain("inches only", { inchesMin: "10", inchesMax: "11" }),
+        plain("min only", { min: "167" }),
+        plain("max only", { max: "189" }),
+        plain("min and max", { min: "167", max: "189" }),
       ];
       break;
     case "date-range":
@@ -366,7 +361,7 @@ describe.each(LISTS)("%s", (list) => {
       .flatMap((option) => samplesOf(option))
       .map((sample) => ({
         ...sample,
-        request: build(sample.state, "imperial"),
+        request: build(sample.state),
       }));
     // The metric samples of the same body measures, through the imperial build
     const imperialKeys = new Set(
@@ -376,7 +371,7 @@ describe.each(LISTS)("%s", (list) => {
       OPTIONS[list].filter((option) => imperialKeys.has(option.key))
     ).map((sample) => ({
       ...sample,
-      request: build(sample.state, "imperial"),
+      request: build(sample.state),
     }));
     await expect(
       golden({
@@ -698,8 +693,7 @@ function prodPresetResults(list: ListKind) {
       perPage: 24,
       q: "",
     },
-    {},
-    "metric"
+    {}
   );
   return [
     {

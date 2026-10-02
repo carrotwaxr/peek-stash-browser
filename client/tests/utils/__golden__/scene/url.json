@@ -796,451 +796,507 @@
     },
     {
       "label": "resolution: EQUALS VERY_LOW",
-      "params": "resolution=VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS LOW",
-      "params": "resolution=LOW",
+      "params": "resolution=LOW&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS R360P",
-      "params": "resolution=R360P",
+      "params": "resolution=R360P&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS STANDARD",
-      "params": "resolution=STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS WEB_HD",
-      "params": "resolution=WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS STANDARD_HD",
-      "params": "resolution=STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS FULL_HD",
-      "params": "resolution=FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS QUAD_HD",
-      "params": "resolution=QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS FOUR_K",
-      "params": "resolution=FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS FIVE_K",
-      "params": "resolution=FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS SIX_K",
-      "params": "resolution=SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS SEVEN_K",
-      "params": "resolution=SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS EIGHT_K",
-      "params": "resolution=EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: EQUALS HUGE",
-      "params": "resolution=HUGE",
+      "params": "resolution=HUGE&resolutionModifier=EQUALS",
       "parsed": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS VERY_LOW",
-      "params": "resolution=VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS LOW",
-      "params": "resolution=LOW",
+      "params": "resolution=LOW&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS R360P",
-      "params": "resolution=R360P",
+      "params": "resolution=R360P&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS STANDARD",
-      "params": "resolution=STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS WEB_HD",
-      "params": "resolution=WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS STANDARD_HD",
-      "params": "resolution=STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS FULL_HD",
-      "params": "resolution=FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS QUAD_HD",
-      "params": "resolution=QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS FOUR_K",
-      "params": "resolution=FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS FIVE_K",
-      "params": "resolution=FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS SIX_K",
-      "params": "resolution=SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS SEVEN_K",
-      "params": "resolution=SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS EIGHT_K",
-      "params": "resolution=EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: NOT_EQUALS HUGE",
-      "params": "resolution=HUGE",
+      "params": "resolution=HUGE&resolutionModifier=NOT_EQUALS",
       "parsed": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN VERY_LOW",
-      "params": "resolution=VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN LOW",
-      "params": "resolution=LOW",
+      "params": "resolution=LOW&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN R360P",
-      "params": "resolution=R360P",
+      "params": "resolution=R360P&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN STANDARD",
-      "params": "resolution=STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN WEB_HD",
-      "params": "resolution=WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN STANDARD_HD",
-      "params": "resolution=STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN FULL_HD",
-      "params": "resolution=FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN QUAD_HD",
-      "params": "resolution=QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN FOUR_K",
-      "params": "resolution=FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN FIVE_K",
-      "params": "resolution=FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN SIX_K",
-      "params": "resolution=SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN SEVEN_K",
-      "params": "resolution=SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN EIGHT_K",
-      "params": "resolution=EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: GREATER_THAN HUGE",
-      "params": "resolution=HUGE",
+      "params": "resolution=HUGE&resolutionModifier=GREATER_THAN",
       "parsed": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN VERY_LOW",
-      "params": "resolution=VERY_LOW",
+      "params": "resolution=VERY_LOW&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN LOW",
-      "params": "resolution=LOW",
+      "params": "resolution=LOW&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN R360P",
-      "params": "resolution=R360P",
+      "params": "resolution=R360P&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN STANDARD",
-      "params": "resolution=STANDARD",
+      "params": "resolution=STANDARD&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN WEB_HD",
-      "params": "resolution=WEB_HD",
+      "params": "resolution=WEB_HD&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN STANDARD_HD",
-      "params": "resolution=STANDARD_HD",
+      "params": "resolution=STANDARD_HD&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN FULL_HD",
-      "params": "resolution=FULL_HD",
+      "params": "resolution=FULL_HD&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN QUAD_HD",
-      "params": "resolution=QUAD_HD",
+      "params": "resolution=QUAD_HD&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN FOUR_K",
-      "params": "resolution=FOUR_K",
+      "params": "resolution=FOUR_K&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN FIVE_K",
-      "params": "resolution=FIVE_K",
+      "params": "resolution=FIVE_K&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN SIX_K",
-      "params": "resolution=SIX_K",
+      "params": "resolution=SIX_K&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN SEVEN_K",
-      "params": "resolution=SEVEN_K",
+      "params": "resolution=SEVEN_K&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN EIGHT_K",
-      "params": "resolution=EIGHT_K",
+      "params": "resolution=EIGHT_K&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: LESS_THAN HUGE",
-      "params": "resolution=HUGE",
+      "params": "resolution=HUGE&resolutionModifier=LESS_THAN",
       "parsed": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
       },
-      "lossless": false
+      "lossless": true
     },
     {
       "label": "resolution: VERY_LOW",
@@ -2251,449 +2307,505 @@
     },
     {
       "label": "resolution: EQUALS VERY_LOW",
-      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS LOW",
-      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS R360P",
-      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS STANDARD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS WEB_HD",
-      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS STANDARD_HD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS FULL_HD",
-      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS QUAD_HD",
-      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS FOUR_K",
-      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS FIVE_K",
-      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS SIX_K",
-      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS SEVEN_K",
-      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS EIGHT_K",
-      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: EQUALS HUGE",
-      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=EQUALS",
       "filters": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS VERY_LOW",
-      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS LOW",
-      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS R360P",
-      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS STANDARD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS WEB_HD",
-      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS STANDARD_HD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS FULL_HD",
-      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS QUAD_HD",
-      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS FOUR_K",
-      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS FIVE_K",
-      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS SIX_K",
-      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS SEVEN_K",
-      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS EIGHT_K",
-      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: NOT_EQUALS HUGE",
-      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=NOT_EQUALS",
       "filters": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "NOT_EQUALS"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN VERY_LOW",
-      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN LOW",
-      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN R360P",
-      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN STANDARD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN WEB_HD",
-      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN STANDARD_HD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN FULL_HD",
-      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN QUAD_HD",
-      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN FOUR_K",
-      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN FIVE_K",
-      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN SIX_K",
-      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN SEVEN_K",
-      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN EIGHT_K",
-      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: GREATER_THAN HUGE",
-      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=GREATER_THAN",
       "filters": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "GREATER_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN VERY_LOW",
-      "written": "instance=inst-a&tab=x&resolution=VERY_LOW",
+      "written": "instance=inst-a&tab=x&resolution=VERY_LOW&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "VERY_LOW"
+        "resolution": "VERY_LOW",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN LOW",
-      "written": "instance=inst-a&tab=x&resolution=LOW",
+      "written": "instance=inst-a&tab=x&resolution=LOW&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "LOW"
+        "resolution": "LOW",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN R360P",
-      "written": "instance=inst-a&tab=x&resolution=R360P",
+      "written": "instance=inst-a&tab=x&resolution=R360P&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "R360P"
+        "resolution": "R360P",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN STANDARD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "STANDARD"
+        "resolution": "STANDARD",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN WEB_HD",
-      "written": "instance=inst-a&tab=x&resolution=WEB_HD",
+      "written": "instance=inst-a&tab=x&resolution=WEB_HD&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "WEB_HD"
+        "resolution": "WEB_HD",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN STANDARD_HD",
-      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD",
+      "written": "instance=inst-a&tab=x&resolution=STANDARD_HD&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "STANDARD_HD"
+        "resolution": "STANDARD_HD",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN FULL_HD",
-      "written": "instance=inst-a&tab=x&resolution=FULL_HD",
+      "written": "instance=inst-a&tab=x&resolution=FULL_HD&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "FULL_HD"
+        "resolution": "FULL_HD",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN QUAD_HD",
-      "written": "instance=inst-a&tab=x&resolution=QUAD_HD",
+      "written": "instance=inst-a&tab=x&resolution=QUAD_HD&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "QUAD_HD"
+        "resolution": "QUAD_HD",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN FOUR_K",
-      "written": "instance=inst-a&tab=x&resolution=FOUR_K",
+      "written": "instance=inst-a&tab=x&resolution=FOUR_K&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "FOUR_K"
+        "resolution": "FOUR_K",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN FIVE_K",
-      "written": "instance=inst-a&tab=x&resolution=FIVE_K",
+      "written": "instance=inst-a&tab=x&resolution=FIVE_K&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "FIVE_K"
+        "resolution": "FIVE_K",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN SIX_K",
-      "written": "instance=inst-a&tab=x&resolution=SIX_K",
+      "written": "instance=inst-a&tab=x&resolution=SIX_K&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "SIX_K"
+        "resolution": "SIX_K",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN SEVEN_K",
-      "written": "instance=inst-a&tab=x&resolution=SEVEN_K",
+      "written": "instance=inst-a&tab=x&resolution=SEVEN_K&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "SEVEN_K"
+        "resolution": "SEVEN_K",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN EIGHT_K",
-      "written": "instance=inst-a&tab=x&resolution=EIGHT_K",
+      "written": "instance=inst-a&tab=x&resolution=EIGHT_K&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "EIGHT_K"
+        "resolution": "EIGHT_K",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },
     {
       "label": "resolution: LESS_THAN HUGE",
-      "written": "instance=inst-a&tab=x&resolution=HUGE",
+      "written": "instance=inst-a&tab=x&resolution=HUGE&resolutionModifier=LESS_THAN",
       "filters": {
-        "resolution": "HUGE"
+        "resolution": "HUGE",
+        "resolutionModifier": "LESS_THAN"
       },
       "hasFilters": true
     },

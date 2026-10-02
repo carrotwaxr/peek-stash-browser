@@ -106,19 +106,24 @@ describe("filterOptionsOf", () => {
       label: "Height (ft/in)",
       min: 100,
       max: 250,
+      measure: "height",
     });
     expect(byKey.get("weight")).toMatchObject({
       type: "range",
       label: "Weight (lbs)",
       min: 50,
       max: 500,
+      measure: "weight",
     });
     expect(byKey.get("penisLength")).toMatchObject({
       type: "range",
       label: "Penis Length (inches)",
       min: 1,
       max: 15,
+      measure: "length",
     });
+    // The metric editors carry none: the state is metric either way
+    expect(metric.filter((option) => option.measure !== undefined)).toEqual([]);
     const measures = new Set(["height", "weight", "penisLength"]);
     expect(imperial.filter((option) => !measures.has(option.key))).toEqual(
       metric.filter((option) => !measures.has(option.key))

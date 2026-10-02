@@ -44,6 +44,12 @@ export interface FilterOption {
   /** A text option's most characters: its contract field's limit */
   maxLength?: number;
   valueUnit?: string;
+  /**
+   * An imperial viewer's body measure: the editor shows feet and inches,
+   * lbs or inches and converts on input and display only. The state, URL,
+   * presets and requests hold metric either way.
+   */
+  measure?: NonNullable<NumberField["measure"]>;
   collapsible?: boolean;
   defaultOpen?: boolean;
 }
@@ -102,8 +108,8 @@ const ENUM_MODIFIER_LABELS: Readonly<Record<string, string>> = {
 
 /**
  * How an imperial viewer's editor shows a body measure: its unit in the
- * label and, but for Height (drawn as feet and inches over the cm bounds),
- * its own bounds
+ * label and, but for Height (drawn as feet and inches), its display bounds.
+ * What it holds is metric: the editor converts on input and display.
  */
 const IMPERIAL_EDITORS: Readonly<
   Record<
@@ -199,6 +205,7 @@ function numberOption(row: NumberField, unitPreference: string): FilterOption {
     ...(row.bounds.step === undefined || imperial?.bounds
       ? {}
       : { step: row.bounds.step }),
+    ...(imperial === undefined ? {} : { measure: row.measure }),
   };
 }
 

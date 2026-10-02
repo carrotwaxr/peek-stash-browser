@@ -24,8 +24,8 @@ import {
   useDefaultPresets,
   useFilterPresets,
 } from "../api/hooks/usePresets";
-import { useUnitPreference } from "../contexts/UnitPreferenceContext";
 import type { FilterOption } from "../utils/filterConfig";
+import { normalizePanelState } from "../utils/filterFields";
 import {
   buildListQuery,
   freshSeed,
@@ -182,7 +182,6 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   const [searchParams, setSearchParams] = useSearchParams();
   const presetsQuery = useFilterPresets();
   const defaultPresetsQuery = useDefaultPresets();
-  const { unitPreference } = useUnitPreference();
 
   const presetContext = context ?? entityType;
   const presetsResolved =
@@ -258,7 +257,10 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   const derived = useMemo(() => {
     const filters = withoutLockedFilters(
       entityType,
-      url.hasFilters ? url.filters : (activePreset?.filters ?? NO_FILTERS),
+      url.hasFilters
+        ? url.filters
+        : // A default preset becomes state without the URL's reader
+          normalizePanelState(entityType, activePreset?.filters ?? NO_FILTERS),
       lockedFields
     );
 
@@ -453,14 +455,8 @@ export function useListUrlState(options: UseListUrlStateOptions): ListUrlState {
   );
 
   const query = useMemo(
-    () =>
-      buildListQuery(
-        entityType,
-        { ...derived, ready },
-        permanentFilters,
-        unitPreference
-      ),
-    [entityType, derived, ready, permanentFilters, unitPreference]
+    () => buildListQuery(entityType, { ...derived, ready }, permanentFilters),
+    [entityType, derived, ready, permanentFilters]
   );
 
   return {

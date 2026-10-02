@@ -1104,33 +1104,34 @@
   "imperialRoundTrip": [
     {
       "label": "height: min only",
-      "params": "",
-      "parsed": {},
-      "lossless": false
+      "params": "height_min=167",
+      "parsed": {
+        "height": {
+          "min": "167"
+        }
+      },
+      "lossless": true
     },
     {
       "label": "height: max only",
-      "params": "",
-      "parsed": {},
-      "lossless": false
+      "params": "height_max=189",
+      "parsed": {
+        "height": {
+          "max": "189"
+        }
+      },
+      "lossless": true
     },
     {
       "label": "height: min and max",
-      "params": "",
-      "parsed": {},
-      "lossless": false
-    },
-    {
-      "label": "height: feet only",
-      "params": "",
-      "parsed": {},
-      "lossless": false
-    },
-    {
-      "label": "height: inches only",
-      "params": "",
-      "parsed": {},
-      "lossless": false
+      "params": "height_min=167&height_max=189",
+      "parsed": {
+        "height": {
+          "min": "167",
+          "max": "189"
+        }
+      },
+      "lossless": true
     },
     {
       "label": "weight: min only",
@@ -2149,32 +2150,33 @@
   "imperialListParams": [
     {
       "label": "height: min only",
-      "written": "instance=inst-a&tab=x&filters=none",
-      "filters": {},
+      "written": "instance=inst-a&tab=x&height_min=167",
+      "filters": {
+        "height": {
+          "min": "167"
+        }
+      },
       "hasFilters": true
     },
     {
       "label": "height: max only",
-      "written": "instance=inst-a&tab=x&filters=none",
-      "filters": {},
+      "written": "instance=inst-a&tab=x&height_max=189",
+      "filters": {
+        "height": {
+          "max": "189"
+        }
+      },
       "hasFilters": true
     },
     {
       "label": "height: min and max",
-      "written": "instance=inst-a&tab=x&filters=none",
-      "filters": {},
-      "hasFilters": true
-    },
-    {
-      "label": "height: feet only",
-      "written": "instance=inst-a&tab=x&filters=none",
-      "filters": {},
-      "hasFilters": true
-    },
-    {
-      "label": "height: inches only",
-      "written": "instance=inst-a&tab=x&filters=none",
-      "filters": {},
+      "written": "instance=inst-a&tab=x&height_min=167&height_max=189",
+      "filters": {
+        "height": {
+          "min": "167",
+          "max": "189"
+        }
+      },
       "hasFilters": true
     },
     {

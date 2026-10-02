@@ -861,38 +861,30 @@ describe("buildPerformerFilter", () => {
     });
   });
 
-  describe("Imperial Unit Conversion", () => {
-    it("should convert imperial height (feet/inches) to cm", () => {
-      const uiFilters = {
-        height: { feetMin: "5", inchesMin: "10", feetMax: "6", inchesMax: "2" },
-      };
-      const result = buildPerformerFilter(uiFilters, "imperial");
-      // 5'10" = 178cm, 6'2" = 188cm
+  describe("Body measures are metric", () => {
+    it("sends Height as the centimetres the state holds", () => {
+      // An imperial viewer's editor stored 5'10" to 6'2" as 177 to 189 cm
+      const result = buildPerformerFilter({
+        height: { min: "177", max: "189" },
+      });
       expect(result.height).toEqual({
         modifier: "BETWEEN",
-        value: 178,
-        value2: 188,
+        value: 177,
+        value2: 189,
       });
     });
 
-    it("should convert imperial height min only", () => {
-      const uiFilters = {
-        height: { feetMin: "5", inchesMin: "6" },
-      };
-      const result = buildPerformerFilter(uiFilters, "imperial");
-      // 5'6" = 168cm, min - 1 = 167
+    it("sends Height min only as the centimetres the state holds", () => {
+      const result = buildPerformerFilter({ height: { min: "167" } });
       expect(result.height).toEqual({
         modifier: "GREATER_THAN",
-        value: 167, // min - 1
+        value: 166, // min - 1
       });
     });
 
-    it("should convert imperial weight (lbs) to kg", () => {
-      const uiFilters = {
-        weight: { min: "110", max: "180" },
-      };
-      const result = buildPerformerFilter(uiFilters, "imperial");
-      // 110 lbs = 50 kg, 180 lbs = 82 kg
+    it("sends Weight as the kilograms the state holds", () => {
+      // An imperial viewer's 110 to 180 lbs, stored as 50 to 82 kg
+      const result = buildPerformerFilter({ weight: { min: "50", max: "82" } });
       expect(result.weight).toEqual({
         modifier: "BETWEEN",
         value: 50,
@@ -900,12 +892,11 @@ describe("buildPerformerFilter", () => {
       });
     });
 
-    it("should convert imperial penis length (inches) to cm", () => {
-      const uiFilters = {
-        penisLength: { min: "5", max: "8" },
-      };
-      const result = buildPerformerFilter(uiFilters, "imperial");
-      // 5 in = 12.7cm -> 12 (parseInt), 8 in = 20.3cm -> 20 (parseInt)
+    it("sends Penis Length as the centimetres the state holds", () => {
+      // 5 in to 8 in stored as 12.7 and 20.32 cm; the request carries the whole part
+      const result = buildPerformerFilter({
+        penisLength: { min: "12.7", max: "20.32" },
+      });
       expect(result.penis_length).toEqual({
         modifier: "BETWEEN",
         value: 12,
@@ -913,33 +904,16 @@ describe("buildPerformerFilter", () => {
       });
     });
 
-    it("should not convert when unit preference is metric", () => {
-      const uiFilters = {
-        height: { min: "170", max: "180" },
-        weight: { min: "60", max: "80" },
-      };
-      const result = buildPerformerFilter(uiFilters, "metric");
+    it("reads the old feet-and-inches height shape as centimetres", () => {
+      // A preset saved by an imperial viewer before the state went metric
+      const result = buildPerformerFilter({
+        height: { feetMin: "5", inchesMin: "10", feetMax: "6", inchesMax: "2" },
+      });
+      // 5'10" = 177.8 cm and 6'2" = 187.96 cm; the request carries the whole part
       expect(result.height).toEqual({
         modifier: "BETWEEN",
-        value: 170,
-        value2: 180,
-      });
-      expect(result.weight).toEqual({
-        modifier: "BETWEEN",
-        value: 60,
-        value2: 80,
-      });
-    });
-
-    it("should default to metric when no unit preference provided", () => {
-      const uiFilters = {
-        height: { min: "170", max: "180" },
-      };
-      const result = buildPerformerFilter(uiFilters);
-      expect(result.height).toEqual({
-        modifier: "BETWEEN",
-        value: 170,
-        value2: 180,
+        value: 177,
+        value2: 187,
       });
     });
   });

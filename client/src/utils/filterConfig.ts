@@ -17,7 +17,6 @@ import {
   buildPanelFilter,
   filterOptionsOf,
 } from "./filterFields";
-import { UNITS } from "./unitConversions";
 
 export type { FilterOption };
 
@@ -174,12 +173,9 @@ type FilterState = Readonly<Record<string, unknown>>;
 export const buildSceneFilter = (filters: FilterState): SceneFilterInput =>
   buildPanelFilter("scene", filters);
 
-/** An imperial viewer's Height, Weight and Penis Length convert to metric */
 export const buildPerformerFilter = (
-  filters: FilterState,
-  unitPreference: string = UNITS.METRIC
-): PerformerFilterInput =>
-  buildPanelFilter("performer", filters, { unitPreference });
+  filters: FilterState
+): PerformerFilterInput => buildPanelFilter("performer", filters);
 
 export const buildStudioFilter = (filters: FilterState): StudioFilterInput =>
   buildPanelFilter("studio", filters);

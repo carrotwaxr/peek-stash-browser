@@ -3,13 +3,46 @@
  * Focuses on the singular-to-plural param mapping with instance support
  * for card indicator click navigation.
  */
+import { type ReactNode, createElement } from "react";
+import { MemoryRouter } from "react-router-dom";
+import {
+  DEFAULT_SORT,
+  type GetFilterPresetsResponse,
+  LIST_KINDS,
+  type ListKind,
+  PANEL_FIELDS,
+  type PanelField,
+} from "@peek/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  type SavedPreset,
+  defaultPresetsQueryOptions,
+  presetsQueryOptions,
+} from "@/api/hooks/usePresets";
+import { useListUrlState } from "@/hooks/useListUrlState";
+import {
   IMAGE_FILTER_OPTIONS,
+  PERFORMER_FILTER_OPTIONS,
   SCENE_FILTER_OPTIONS,
   buildImageFilter,
+  buildPerformerFilter,
   buildSceneFilter,
 } from "@/utils/filterConfig";
+import {
+  CODECS,
+  codecOf,
+  filterOptionsOf,
+  urlKeysOf,
+} from "@/utils/filterFields";
+import { sortOptionsFor, withoutLockedFilters } from "@/utils/listQuery";
+import {
+  heightBoundToCm,
+  kgToLbs,
+  lengthInchesToCm,
+  weightBoundToKg,
+} from "@/utils/unitConversions";
 import {
   LIST_OWNED_KEYS,
   buildSearchParams as _buildSearchParams,
@@ -18,6 +51,7 @@ import {
   readListParams,
   writeListParams,
 } from "@/utils/urlParams";
+import { untrusted } from "../helpers/untrusted";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
 const buildSearchParams = (params: Record<string, any>) =>
@@ -776,5 +810,371 @@ describe("list-owned keys (useListUrlState)", () => {
     expect(
       read("instance=abc&tab=scenes&sort=title&view=wall&per_page=12&page=2")
     ).toBe(false);
+  });
+});
+
+// ── The URL from the field table (C5) ─────────────────────────────────────
+
+const writeCtx = (entity: ListKind) => ({
+  entity,
+  filterOptions: filterOptionsOf(entity),
+  shown: {
+    perPage: 24,
+    viewMode: "grid",
+    zoomLevel: "medium",
+    gridDensity: "medium",
+  },
+});
+
+/** A list's state through the URL: written, then read back */
+function viaUrl(
+  entity: ListKind,
+  filters: Record<string, unknown>,
+  unitPreference = "metric"
+) {
+  const options = filterOptionsOf(entity, unitPreference);
+  const written = writeListParams(
+    new URLSearchParams(),
+    { filters },
+    { ...writeCtx(entity), filterOptions: options }
+  );
+  return {
+    query: written.toString(),
+    read: readListParams(written, entity, options).filters,
+  };
+}
+
+describe("a Resolution condition (FILTERS-23)", () => {
+  it("a Resolution condition reaches the URL and back", () => {
+    const state = { resolution: "FULL_HD", resolutionModifier: "GREATER_THAN" };
+
+    const { query, read } = viaUrl("scene", state);
+
+    expect(query).toBe("resolution=FULL_HD&resolutionModifier=GREATER_THAN");
+    expect(read).toEqual(state);
+    expect(buildSceneFilter(read).resolution).toEqual({
+      value: "FULL_HD",
+      modifier: "GREATER_THAN",
+    });
+  });
+
+  it("no resolution writes no condition", () => {
+    expect(viaUrl("scene", { resolutionModifier: "GREATER_THAN" }).query).toBe(
+      "filters=none"
+    );
+  });
+});
+
+describe("body measures are metric in the URL (owner answer 12)", () => {
+  it("an imperial Height reaches the URL in centimetres", () => {
+    // An imperial viewer enters 5 ft 10 in to 6 ft 2 in: the whole cm range
+    // that displays as that
+    const min = heightBoundToCm(5, 10, "min");
+    const max = heightBoundToCm(6, 2, "max");
+    const state = { height: { min: String(min), max: String(max) } };
+
+    const imperial = viaUrl("performer", state, "imperial");
+
+    expect([min, max]).toEqual([177, 189]);
+    expect(imperial.query).toBe("height_min=177&height_max=189");
+    expect(imperial.read).toEqual(state);
+    expect(buildPerformerFilter(imperial.read).height).toEqual({
+      modifier: "BETWEEN",
+      value: 177,
+      value2: 189,
+    });
+    // A metric viewer opening the link sees 177 to 189 cm
+    expect(viaUrl("performer", state, "metric").read).toEqual(state);
+  });
+
+  it("an imperial Weight and Penis Length are stored metric", () => {
+    // At least 150 lbs: the lowest whole kg that shows as 150
+    const kg = weightBoundToKg(150, "min");
+    // 6 in, with two decimals
+    const cm = lengthInchesToCm(6);
+
+    const weight = viaUrl(
+      "performer",
+      { weight: { min: String(kg) } },
+      "imperial"
+    );
+    const length = viaUrl(
+      "performer",
+      { penisLength: { min: String(cm) } },
+      "imperial"
+    );
+
+    expect(weight.query).toBe("weight_min=68");
+    // ...and shows 150 lbs again
+    expect(kgToLbs(kg ?? 0)).toBe(150);
+    expect(length.query).toBe("penisLength_min=15.24");
+    // The request sends the URL's values, unconverted
+    expect(buildPerformerFilter(weight.read).weight).toEqual({
+      modifier: "GREATER_THAN",
+      value: 67,
+    });
+  });
+
+  it("the measure reader is lenient through the URL", () => {
+    const read = (query: string) =>
+      readListParams(
+        new URLSearchParams(query),
+        "performer",
+        PERFORMER_FILTER_OPTIONS
+      ).filters;
+
+    expect(read("weight_min=abc")).toEqual({});
+    expect(read("weight_min=abc&weight_max=80")).toEqual({
+      weight: { max: "80" },
+    });
+    // Above the editor's bounds: kept, never clamped
+    expect(read("height_min=250")).toEqual({ height: { min: "250" } });
+    expect(read("height_max=9999")).toEqual({ height: { max: "9999" } });
+    // Decimals are kept
+    expect(read("height_min=177.8")).toEqual({ height: { min: "177.8" } });
+    expect(read("penisLength_max=20.32")).toEqual({
+      penisLength: { max: "20.32" },
+    });
+  });
+
+  it("reads the old feet-and-inches height as centimetres", () => {
+    const height = PANEL_FIELDS.performer.find((row) => row.key === "height");
+    if (height?.editor !== "number") throw new Error("no height row");
+
+    expect(
+      CODECS.number.normalize(height, { feetMin: "5", inchesMin: "10" })
+    ).toEqual({ min: 177.8 });
+    expect(
+      CODECS.number.normalize(height, {
+        feetMin: "5",
+        inchesMin: "10",
+        feetMax: "6",
+        inchesMax: "2",
+      })
+    ).toEqual({ min: 177.8, max: 187.96 });
+    // A bound the state holds wins over a stale legacy one
+    expect(
+      CODECS.number.normalize(height, { min: "170", feetMin: "5" })
+    ).toEqual({ min: "170" });
+    expect(CODECS.number.normalize(height, { feetMin: "x" })).toBeUndefined();
+    // The legacy shape written by a later change reaches the URL as centimetres
+    expect(
+      viaUrl("performer", { height: { feetMin: "5", inchesMin: "10" } }).query
+    ).toBe("height_min=177.8");
+    // The same row is active, and builds
+    expect(CODECS.number.isActive(height, { height: { feetMin: "5" } })).toBe(
+      true
+    );
+    expect(CODECS.number.isActive(height, { height: { feetMin: "x" } })).toBe(
+      false
+    );
+  });
+
+  /** A list's request through `useListUrlState`, the preset as the default or loaded */
+  function renderPerformers(preset: SavedPreset, mode: "default" | "load") {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(
+      presetsQueryOptions.queryKey,
+      untrusted<GetFilterPresetsResponse>({
+        presets: { performer: [preset] },
+      })
+    );
+    queryClient.setQueryData(defaultPresetsQueryOptions.queryKey, {
+      defaults: mode === "default" ? { performer: preset.id } : {},
+    });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          MemoryRouter,
+          { initialEntries: ["/performers"] },
+          children
+        )
+      );
+    const view = renderHook(
+      () =>
+        useListUrlState({
+          entityType: "performer",
+          filterOptions: PERFORMER_FILTER_OPTIONS,
+          sortOptions: (filters) => sortOptionsFor("performer", filters),
+          viewModes: ["grid"],
+          defaults: {
+            sort: DEFAULT_SORT.performer.field,
+            direction: "DESC",
+            perPage: 24,
+            viewMode: "grid",
+            zoomLevel: "medium",
+            gridDensity: "medium",
+          },
+        }),
+      { wrapper }
+    );
+    if (mode === "load") {
+      act(() => {
+        view.result.current.loadPreset(preset);
+      });
+    }
+    return view.result.current;
+  }
+
+  it.each(["default", "load"] as const)(
+    "a preset holding the old height shape reads as centimetres, as a %s preset",
+    (mode) => {
+      const state = renderPerformers(
+        untrusted<SavedPreset>({
+          id: "p1",
+          name: "Tall",
+          filters: {
+            height: { feetMin: "5", inchesMin: "10" },
+            weight: { min: "abc", max: "9999" },
+          },
+          sort: "name",
+          direction: "ASC",
+        }),
+        mode
+      );
+
+      expect(state.filters.height).toEqual(
+        mode === "default" ? { min: 177.8 } : { min: "177.8" }
+      );
+      // Not a number: dropped; far outside the editor's bounds: kept
+      expect(state.filters.weight).toEqual({ max: "9999" });
+      expect(
+        untrusted<{ performer_filter: unknown }>(JSON.parse(state.listKey))
+          .performer_filter
+      ).toMatchObject({
+        height: { modifier: "GREATER_THAN", value: 176 },
+        weight: { modifier: "LESS_THAN", value: 10000 },
+      });
+    }
+  );
+});
+
+describe("a list owns what its codecs name", () => {
+  /** A row's own keys, the singular and the range forms (C5) */
+  const expectedKeys = (row: PanelField) => [
+    ...new Set([
+      ...codecOf(row).keys(row),
+      row.key.endsWith("Ids") ? row.key.slice(0, -1) : row.key,
+      ...["_min", "_max", "_start", "_end"].map((suffix) => row.key + suffix),
+    ]),
+  ];
+
+  it.each(LIST_KINDS)(
+    "a list owns every companion its codecs name: %s",
+    (entity) => {
+      const owned = listOwnedKeys(entity);
+      for (const row of PANEL_FIELDS[entity] as readonly PanelField[]) {
+        expect([...urlKeysOf(row)].sort(), row.key).toEqual(
+          expectedKeys(row).sort()
+        );
+        for (const key of urlKeysOf(row)) {
+          expect(owned, `${row.key}: ${key}`).toContain(key);
+        }
+      }
+    }
+  );
+
+  it.each(LIST_KINDS)(
+    "a locked field drops every key its codec names: %s",
+    (entity) => {
+      for (const row of PANEL_FIELDS[entity] as readonly PanelField[]) {
+        const state = Object.fromEntries(
+          codecOf(row)
+            .keys(row)
+            .map((key) => [key, "x"])
+        );
+        expect(
+          withoutLockedFilters(entity, { ...state, kept: 1 }, [row.field]),
+          row.key
+        ).toEqual({ kept: 1 });
+      }
+    }
+  );
+});
+
+describe("a zero bound survives", () => {
+  it("rating: { max: 0 } writes rating_max=0 and reads back", () => {
+    const { query, read } = viaUrl("scene", { rating: { max: 0 } });
+
+    expect(query).toBe("rating_max=0");
+    expect(read).toEqual({ rating: { max: "0" } });
+    expect(buildSceneFilter(read).rating100).toEqual({
+      modifier: "LESS_THAN",
+      value: 1,
+    });
+  });
+
+  it("a minimum of 0 writes, a blank or NaN does not", () => {
+    expect(viaUrl("scene", { rating: { min: 0, max: "" } }).query).toBe(
+      "rating_min=0"
+    );
+    expect(viaUrl("scene", { rating: { min: Number.NaN } }).query).toBe(
+      "filters=none"
+    );
+  });
+});
+
+describe("every companion of a field is written and read, whatever its editor", () => {
+  /** A value and a companion sample for a row */
+  function sampleOf(row: PanelField): Record<string, unknown> | undefined {
+    const companions = {
+      ...(row.modifierKey === undefined
+        ? {}
+        : { [row.modifierKey]: "EXCLUDES" }),
+      ...(row.hierarchyKey === undefined ? {} : { [row.hierarchyKey]: -1 }),
+    };
+    switch (row.editor) {
+      case "ref":
+        return {
+          [row.key]: row.multi ? ["1:inst-a", "2:inst-b"] : "1:inst-a",
+          ...companions,
+        };
+      case "enum": {
+        const choice = row.choices[0];
+        return choice === undefined
+          ? undefined
+          : { [row.key]: choice.value, ...companions };
+      }
+      case "text":
+        return { [row.key]: "text", ...companions };
+      case "toggle":
+        return { [row.key]: true, ...companions };
+      case "number":
+      case "date":
+      case "choice":
+        return undefined;
+    }
+  }
+
+  it.each(LIST_KINDS)("%s", (entity) => {
+    const options = filterOptionsOf(entity);
+    for (const row of PANEL_FIELDS[entity] as readonly PanelField[]) {
+      if (row.modifierKey === undefined && row.hierarchyKey === undefined) {
+        continue;
+      }
+      const sample = sampleOf(row);
+      if (sample === undefined) continue;
+      const written = writeListParams(
+        new URLSearchParams(),
+        { filters: sample },
+        { ...writeCtx(entity), filterOptions: options }
+      );
+      expect(
+        readListParams(written, entity, options).filters,
+        `${row.key}: ${written.toString()}`
+      ).toEqual(sample);
+    }
+  });
+
+  it("the scene list has companions to check", () => {
+    const rows = PANEL_FIELDS.scene as readonly PanelField[];
+    expect(
+      rows.filter((row) => row.modifierKey !== undefined && sampleOf(row))
+        .length
+    ).toBeGreaterThan(3);
   });
 });

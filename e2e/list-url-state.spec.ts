@@ -76,6 +76,47 @@ test.describe("List state in the URL", () => {
     await expect(titleOf(cards.first())).toHaveText(unfilteredTitle);
   });
 
+  test("a Resolution 'Greater Than' filter survives Apply and a reload", async ({
+    page,
+  }) => {
+    const { list } = await openScenes(page, "/scenes?per_page=12");
+    const resolution = page
+      .locator("label", { hasText: /^Resolution$/ })
+      .locator("..");
+    const sceneRequest = () =>
+      page.waitForRequest(
+        (request) =>
+          new URL(request.url()).pathname.endsWith("/api/library/scenes") &&
+          request.method() === "POST"
+      );
+    const modifierOf = (request: Awaited<ReturnType<typeof sceneRequest>>) =>
+      (
+        request.postDataJSON() as {
+          scene_filter?: { resolution?: { modifier?: string } };
+        }
+      ).scene_filter?.resolution?.modifier;
+
+    await list.openFilters();
+    await page.getByRole("heading", { name: "Video Properties" }).click();
+    await resolution.locator("select").nth(0).selectOption("GREATER_THAN");
+    await resolution.locator("select").nth(1).selectOption("FULL_HD");
+    const applied = sceneRequest();
+    await page.getByRole("button", { name: "Apply Filters" }).click();
+    await expect(page).toHaveURL(/[?&]resolution=FULL_HD(&|$)/);
+    await expect(page).toHaveURL(/[?&]resolutionModifier=GREATER_THAN(&|$)/);
+    expect(modifierOf(await applied)).toBe("GREATER_THAN");
+
+    const reloaded = sceneRequest();
+    await page.reload();
+    expect(modifierOf(await reloaded)).toBe("GREATER_THAN");
+    await list.openFilters();
+    await page.getByRole("heading", { name: "Video Properties" }).click();
+    await expect(resolution.locator("select").nth(0)).toHaveValue(
+      "GREATER_THAN"
+    );
+    await expect(resolution.locator("select").nth(1)).toHaveValue("FULL_HD");
+  });
+
   test("density, view and per-page changes add no history entry: one Back leaves the list", async ({
     page,
   }) => {

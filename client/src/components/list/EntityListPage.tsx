@@ -2,7 +2,6 @@ import { Fragment, type Ref, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
 import { getGridClasses } from "../../constants/grids";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 import {
   useFilterOptions,
@@ -164,7 +163,6 @@ const EntityListPage = ({
     () => scopeOf(pagePermanentFilters),
     [pagePermanentFilters]
   );
-  const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
   const emptyMessage = embed?.emptyMessage ?? config.emptyMessage;
   const entityDefaults = useListDefaults(
@@ -263,8 +261,7 @@ const EntityListPage = ({
         ? buildListQuery(
             entityType,
             { ready, filters, sort, page, perPage, q },
-            permanentFilters,
-            unitPreference
+            permanentFilters
           )
         : null;
     // The list hook's own request shape (the clips' flat options)
@@ -283,7 +280,6 @@ const EntityListPage = ({
     perPage,
     q,
     permanentFilters,
-    unitPreference,
   ]);
 
   const { data, error, isPending, isPlaceholderData } = source.useList(request);
