@@ -1374,3 +1374,166 @@ describe("the playlist filters and Playlist order", () => {
     expect(pageStatement().sql).not.toContain("pip.");
   });
 });
+
+describe("the path, URL, code, caption, marker and duplicate filters", () => {
+  const ctx = (name: string, applyExclusions = true): LeafContext => ({
+    userId: 9,
+    applyExclusions,
+    allowedInstanceIds: ALLOWED,
+    specificInstanceId: undefined,
+    sortField: "created_at",
+    timeZone: "UTC",
+    name,
+    underAny: false,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  it("path reads the primary file's path; STARTS_WITH is an escaped prefix", async () => {
+    const starts = await sceneQueryBuilder.clauseFor(
+      { field: "path", criterion: { modifier: "STARTS_WITH", value: "/a_b/" } },
+      ctx("path")
+    );
+    expect(starts.sql).toBe("(s.filePath LIKE ? ESCAPE '\\')");
+    expect(starts.params).toEqual(["/a\\_b/%"]);
+
+    const includes = await sceneQueryBuilder.clauseFor(
+      { field: "path", criterion: { modifier: "INCLUDES", value: "50%" } },
+      ctx("path")
+    );
+    expect(includes.params).toEqual(["%50\\%%"]);
+  });
+
+  it("url reads the elements of the URL list, never its JSON text", async () => {
+    const clause = await sceneQueryBuilder.clauseFor(
+      { field: "url", criterion: { modifier: "INCLUDES", value: '"' } },
+      ctx("url")
+    );
+    expect(clause.sql).toBe(
+      "(EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(s.urls) THEN s.urls ELSE '[]' END) a WHERE a.value LIKE ? ESCAPE '\\'))"
+    );
+    expect(clause.params).toEqual(['%"%']);
+    expect(clause.sql).not.toContain("LOWER");
+
+    const none = await sceneQueryBuilder.clauseFor(
+      { field: "url", criterion: { modifier: "IS_NULL" } },
+      ctx("url")
+    );
+    expect(none.sql).toBe("((s.urls IS NULL OR s.urls = '' OR s.urls = '[]'))");
+  });
+
+  it("code reads the code column", async () => {
+    const clause = await sceneQueryBuilder.clauseFor(
+      { field: "code", criterion: { modifier: "EQUALS", value: "AB-1" } },
+      ctx("code")
+    );
+    expect(clause.sql).toBe("LOWER(s.code) = LOWER(?)");
+    expect(clause.params).toEqual(["AB-1"]);
+  });
+
+  it("captions compare each caption's language code, through a list that cannot fail the statement", async () => {
+    const equals = await sceneQueryBuilder.clauseFor(
+      { field: "captions", criterion: { modifier: "EQUALS", value: "en" } },
+      ctx("captions")
+    );
+    expect(equals.sql).toBe(
+      "EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(s.captions) THEN s.captions ELSE '[]' END) j WHERE CASE WHEN j.type = 'object' THEN json_extract(j.value, '$.language_code') END = ?)"
+    );
+    expect(equals.params).toEqual(["en"]);
+
+    const not = await sceneQueryBuilder.clauseFor(
+      { field: "captions", criterion: { modifier: "NOT_EQUALS", value: "en" } },
+      ctx("captions")
+    );
+    expect(not.sql).toMatch(/^NOT EXISTS \(SELECT 1 FROM json_each\(/);
+
+    const isNull = await sceneQueryBuilder.clauseFor(
+      { field: "captions", criterion: { modifier: "IS_NULL" } },
+      ctx("captions")
+    );
+    const notNull = await sceneQueryBuilder.clauseFor(
+      { field: "captions", criterion: { modifier: "NOT_NULL" } },
+      ctx("captions")
+    );
+    expect(isNull.sql).toMatch(/^NOT EXISTS \(SELECT 1 FROM json_each\(/);
+    expect(notNull.sql).toMatch(/^EXISTS \(SELECT 1 FROM json_each\(/);
+    expect(isNull.params).toEqual([]);
+  });
+
+  it("has_markers anti-joins the viewer's clip exclusions with the instance and its every-instance arm", async () => {
+    const yes = await sceneQueryBuilder.clauseFor(
+      { field: "has_markers", criterion: true },
+      ctx("has_markers")
+    );
+    expect(yes.sql).toBe(
+      "EXISTS (SELECT 1 FROM StashClip c LEFT JOIN UserExcludedEntity ce ON ce.userId = ? AND ce.entityType = 'clip' AND ce.entityId = c.id AND (ce.instanceId = '' OR ce.instanceId = c.stashInstanceId) WHERE c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId AND c.deletedAt IS NULL AND ce.id IS NULL)"
+    );
+    expect(yes.params).toEqual([9]);
+
+    const no = await sceneQueryBuilder.clauseFor(
+      { field: "has_markers", criterion: false },
+      ctx("has_markers")
+    );
+    expect(no.sql).toBe(`NOT ${yes.sql}`);
+
+    const bypassed = await sceneQueryBuilder.clauseFor(
+      { field: "has_markers", criterion: true },
+      ctx("has_markers", false)
+    );
+    expect(bypassed.sql).not.toContain("UserExcludedEntity");
+    expect(bypassed.params).toEqual([]);
+  });
+
+  it("duplicated needs a visible live twin on the scene's own instance with the same non-empty phash", async () => {
+    const yes = await sceneQueryBuilder.clauseFor(
+      { field: "duplicated", criterion: true },
+      ctx("duplicated")
+    );
+    expect(yes.sql).toBe(
+      "(s.phash IS NOT NULL AND s.phash != '' AND EXISTS (SELECT 1 FROM StashScene d LEFT JOIN UserExcludedEntity de ON de.userId = ? AND de.entityType = 'scene' AND de.entityId = d.id AND (de.instanceId = '' OR de.instanceId = d.stashInstanceId) WHERE d.phash = s.phash AND d.deletedAt IS NULL AND d.stashInstanceId IN (?, ?) AND d.stashInstanceId = s.stashInstanceId AND NOT (d.id = s.id AND d.stashInstanceId = s.stashInstanceId) AND de.id IS NULL))"
+    );
+    expect(yes.params).toEqual([9, "inst-a", "inst-b"]);
+
+    // false is the negation: a scene without a phash is listed
+    const no = await sceneQueryBuilder.clauseFor(
+      { field: "duplicated", criterion: false },
+      ctx("duplicated")
+    );
+    expect(no.sql).toBe(`NOT ${yes.sql}`);
+    expect(no.params).toEqual(yes.params);
+  });
+
+  it("groups take a depth: sub-collections through the group hierarchy, presence unchanged", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    await sceneQueryBuilder.clauseFor(
+      {
+        field: "groups",
+        criterion: {
+          refs: [{ id: "10", instanceId: "inst-a" }],
+          modifier: "INCLUDES",
+          depth: -1,
+        },
+      },
+      ctx("groups")
+    );
+    expect(expandRefsEach).toHaveBeenCalledWith(
+      "group",
+      [{ id: "10", instanceId: "inst-a" }],
+      -1,
+      ALLOWED,
+      "down"
+    );
+
+    const some = await sceneQueryBuilder.clauseFor(
+      {
+        field: "groups",
+        criterion: { modifier: "NOT_NULL", refs: [], depth: 0 },
+      },
+      ctx("groups")
+    );
+    expect(some.sql).toContain("SceneGroup");
+  });
+});

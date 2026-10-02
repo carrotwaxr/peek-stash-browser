@@ -130,7 +130,12 @@ export type DateCriterion =
 /** The value is trimmed, 1 to the field's maxLength characters */
 export type TextCriterion =
   | {
-      readonly modifier: "INCLUDES" | "EXCLUDES" | "EQUALS" | "NOT_EQUALS";
+      readonly modifier:
+        | "INCLUDES"
+        | "EXCLUDES"
+        | "EQUALS"
+        | "NOT_EQUALS"
+        | "STARTS_WITH";
       readonly value: string;
     }
   | { readonly modifier: "IS_NULL" | "NOT_NULL" };

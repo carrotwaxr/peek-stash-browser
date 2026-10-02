@@ -303,7 +303,7 @@ describe("Scene Video Filters", () => {
 
   describe("Stash scene filters Peek does not apply", () => {
     // The request parser refuses them rather than ignore them: no builder
-    // has a clause for interactive, interactive_speed, path or captions
+    // has a clause for interactive or interactive_speed
     it.each([
       { path: "scene_filter.interactive", criterion: { interactive: true } },
       {
@@ -311,14 +311,6 @@ describe("Scene Video Filters", () => {
         criterion: {
           interactive_speed: { value: 50, modifier: "GREATER_THAN" },
         },
-      },
-      {
-        path: "scene_filter.path",
-        criterion: { path: { value: "/", modifier: "INCLUDES" } },
-      },
-      {
-        path: "scene_filter.captions",
-        criterion: { captions: { value: "", modifier: "NOT_NULL" } },
       },
     ])("$path answers 400 naming it", async ({ path, criterion }) => {
       const response = await adminClient.post("/api/library/scenes", {

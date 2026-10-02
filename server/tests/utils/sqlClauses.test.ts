@@ -1968,3 +1968,37 @@ describe("galleryNameSql", () => {
     expect(galleryNameSql("x")).toContain("NULLIF(x.title, '')");
   });
 });
+
+describe("buildTextFilter STARTS_WITH", () => {
+  it("matches the start of the column, the text's % and _ literal", () => {
+    expect(
+      buildTextFilter({ modifier: "STARTS_WITH", value: "/a_b/" }, "s.filePath")
+    ).toEqual({
+      sql: "(s.filePath LIKE ? ESCAPE '\\')",
+      params: ["/a\\_b/%"],
+    });
+    expect(
+      buildTextFilter({ modifier: "STARTS_WITH", value: "50%\\" }, "s.filePath")
+        .params
+    ).toEqual(["50\\%\\\\%"]);
+  });
+
+  it("without a value it filters nothing", () => {
+    expect(buildTextFilter({ modifier: "STARTS_WITH" }, "s.filePath")).toEqual({
+      sql: "",
+      params: [],
+    });
+  });
+
+  it("reads each extra column and list too", () => {
+    const result = buildTextFilter(
+      { modifier: "STARTS_WITH", value: "ab" },
+      "p.name",
+      { also: ["p.details"], lists: ["p.aliasList"] }
+    );
+    expect(result.sql).toBe(
+      "(p.name LIKE ? ESCAPE '\\' OR p.details LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(p.aliasList) THEN p.aliasList ELSE '[]' END) a WHERE a.value LIKE ? ESCAPE '\\'))"
+    );
+    expect(result.params).toEqual(["ab%", "ab%", "ab%"]);
+  });
+});

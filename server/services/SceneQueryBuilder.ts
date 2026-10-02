@@ -27,6 +27,7 @@ import type {
   PlaylistCriterion,
   RefCriterion,
   RefFieldCriterion,
+  TextCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import {
@@ -47,6 +48,8 @@ import {
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
+  exclusionJoin,
+  instanceClause,
   matchedSetClause,
   noClause,
   performerAgeExists,
@@ -60,6 +63,7 @@ import {
   parseJsonArray,
   searchTerms,
 } from "../utils/sqlHelpers.js";
+import { jsonListOrEmpty } from "../utils/sqlJson.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import {
   EntityQueryBuilder,
@@ -463,10 +467,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       }),
     tags: (c, ctx) => this.tagClause(c, ctx),
     studios: (c, ctx) => this.studioClause(c, ctx),
+    // With a depth, a collection's sub-collections too
     groups: (c, ctx) =>
-      refFieldClause(SCENE_GROUPS, c, ctx, {
-        table: "StashGroup",
-        entityType: "group",
+      hierarchicalRefClause("group", SCENE_GROUPS, c, ctx, {
+        name: ctx.name,
+        related: { table: "StashGroup", entityType: "group" },
       }),
     galleries: (c, ctx) =>
       refFieldClause(SCENE_GALLERIES, c, ctx, {
@@ -491,6 +496,14 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     title: (c) => buildTextFilter(c, "s.title"),
     details: (c) => buildTextFilter(c, "s.details"),
     director: (c) => buildTextFilter(c, "s.director"),
+    // The primary file's path only, as Peek stores it
+    path: (c) => buildTextFilter(c, "s.filePath"),
+    // Each URL on its own text, not the JSON list's
+    url: (c) => buildTextFilter(c, null, { lists: ["s.urls"] }),
+    code: (c) => buildTextFilter(c, "s.code"),
+    captions: (c) => this.captionsClause(c),
+    has_markers: (on, ctx) => this.markersClause(on, ctx),
+    duplicated: (on, ctx) => this.duplicatedClause(on, ctx),
 
     // Dates
     date: (c) => buildDayFilter(c, "s.date"),
@@ -551,6 +564,65 @@ class SceneQueryBuilder extends EntityQueryBuilder<
       case "EXCLUDES":
         return notInPlaylists(playlistItems(viewable, criterion.ids), ctx.name);
     }
+  }
+
+  /**
+   * Captions: each element's `language_code`, compared whole (a language code
+   * is lowercase as Stash stores it). A NULL or damaged list, or an element
+   * that is not an object, holds no code, so IS_NULL lists it and NOT_EQUALS
+   * keeps it.
+   */
+  private captionsClause(criterion: TextCriterion): FilterClause {
+    const code =
+      "CASE WHEN j.type = 'object' THEN json_extract(j.value, '$.language_code') END";
+    const codes = `SELECT 1 FROM json_each(${jsonListOrEmpty("s.captions")}) j WHERE ${code}`;
+    switch (criterion.modifier) {
+      case "EQUALS":
+        return { sql: `EXISTS (${codes} = ?)`, params: [criterion.value] };
+      case "NOT_EQUALS":
+        return { sql: `NOT EXISTS (${codes} = ?)`, params: [criterion.value] };
+      case "IS_NULL":
+        return { sql: `NOT EXISTS (${codes} IS NOT NULL)`, params: [] };
+      case "NOT_NULL":
+        return { sql: `EXISTS (${codes} IS NOT NULL)`, params: [] };
+      // Not offered: the parser refuses them
+      case "INCLUDES":
+      case "EXCLUDES":
+      case "STARTS_WITH":
+        return noClause();
+    }
+  }
+
+  /**
+   * Scenes with (true) or without (false) a live clip the viewer can see: not
+   * deleted and, when exclusions apply, not hidden as a clip (the scene's own
+   * exclusion is the statement's). The clip is on the scene's instance, and
+   * the anti-join carries its every-instance arm.
+   */
+  private markersClause(on: boolean, ctx: LeafContext): FilterClause {
+    const viewer = ctx.applyExclusions;
+    const clause: FilterClause = {
+      sql: `EXISTS (SELECT 1 FROM StashClip c${viewer ? ` ${exclusionJoin("ce", "clip", "c.id", "c.stashInstanceId")}` : ""} WHERE c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId AND c.deletedAt IS NULL${viewer ? " AND ce.id IS NULL" : ""})`,
+      params: viewer ? [ctx.userId] : [],
+    };
+    return on ? clause : { sql: `NOT ${clause.sql}`, params: clause.params };
+  }
+
+  /**
+   * Scenes with (true) or without (false) another live scene the viewer can
+   * see with the same primary phash, on the scene's own instance (a hash
+   * shared with another server's scene is no duplicate: owner answer 15). A
+   * scene without a hash, or with an empty one, has no duplicate, so false
+   * lists it.
+   */
+  private duplicatedClause(on: boolean, ctx: LeafContext): FilterClause {
+    const viewer = ctx.applyExclusions;
+    const allowed = instanceClause("d", ctx.allowedInstanceIds);
+    const twin: FilterClause = {
+      sql: `(s.phash IS NOT NULL AND s.phash != '' AND EXISTS (SELECT 1 FROM StashScene d${viewer ? ` ${exclusionJoin("de", "scene", "d.id", "d.stashInstanceId")}` : ""} WHERE d.phash = s.phash AND d.deletedAt IS NULL AND ${allowed.sql} AND d.stashInstanceId = s.stashInstanceId AND NOT (d.id = s.id AND d.stashInstanceId = s.stashInstanceId)${viewer ? " AND de.id IS NULL" : ""}))`,
+      params: [...(viewer ? [ctx.userId] : []), ...allowed.params],
+    };
+    return on ? twin : { sql: `NOT ${twin.sql}`, params: twin.params };
   }
 
   /** A ref filter on one of the scene's junctions, its CTEs named from the leaf */

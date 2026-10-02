@@ -34,7 +34,7 @@ import type {
   NumberCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
-import { jsonListArm, likeContains } from "./sqlHelpers.js";
+import { jsonListArm, likeContains, likeStartsWith } from "./sqlHelpers.js";
 import { jsonListOrEmpty } from "./sqlJson.js";
 import { instantSpan } from "./zonedTime.js";
 
@@ -1222,7 +1222,8 @@ export function galleryNameSql(alias: string): string {
 
 /**
  * Build a text comparison filter clause.
- * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, IS_NULL, NOT_NULL.
+ * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, STARTS_WITH, IS_NULL,
+ * NOT_NULL.
  *
  * INCLUDES and EXCLUDES are one phrase (no word split) matched with
  * `LIKE ? ESCAPE '\'` on a `likeContains` pattern, so `%`, `_` and `\` in
@@ -1230,7 +1231,8 @@ export function galleryNameSql(alias: string): string {
  * non-ASCII letter matches itself exactly. They read the column, each `also`
  * column (plain text) and each of `lists` (a JSON list column, matched per
  * element through `jsonListArm`): any one matching for INCLUDES, none for
- * EXCLUDES (a NULL column still passes).
+ * EXCLUDES (a NULL column still passes). STARTS_WITH is the same one phrase
+ * as a prefix of the column, an `also` column or a list element.
  * EQUALS, NOT_EQUALS, IS_NULL and NOT_NULL read only the column; with a null
  * column ("only the lists") they read the lists: EQUALS an element equal to
  * the text, IS_NULL every list NULL, '' or '[]', and NOT_NULL the rest.
@@ -1297,6 +1299,18 @@ export function buildTextFilter(
       return {
         sql: `(${arms.join(" OR ")})`,
         params: arms.map(() => pattern),
+      };
+    }
+    case "STARTS_WITH": {
+      const arms = [
+        ...columns.map((col) => `${col} LIKE ? ESCAPE '\\'`),
+        ...lists.map((list) => jsonListArm(list)),
+      ];
+      if (arms.length === 0) return none;
+      const prefix = likeStartsWith(value);
+      return {
+        sql: `(${arms.join(" OR ")})`,
+        params: arms.map(() => prefix),
       };
     }
     case "EXCLUDES": {
