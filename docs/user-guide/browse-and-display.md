@@ -214,6 +214,10 @@ A filter that picks performers, tags, studios, collections or galleries has a dr
 - A gallery or an image has one studio, so its Studios filter offers only **Has ANY** and **Has NONE**.
 - Ticking **Include sub-tags** or **Include sub-studios** sets the dropdown to **Has ANY**.
 
+### Favorite Performers, Studios and Tags
+
+On the Scenes list, **Favorite Tags** lists the scenes that have one of your favorite tags: tagged with it, tagged with one of its sub-tags, or carrying it by inheritance from a performer, studio or collection, as the Tags filter does. **Favorite Studios** includes the scenes of a favorite studio's sub-studios. Only your own favorites count.
+
 ### Number Ranges
 
 A number range (rating, height, weight, duration and the like) never matches an item with no value: "rating at most 40" lists only items you rated 40 or less, not the ones you have not rated, and "weight at most 60 kg" only performers with a weight.

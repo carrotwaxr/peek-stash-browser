@@ -58,6 +58,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import {
@@ -394,13 +395,10 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     video_codec: (c) => buildTextFilter(c, "s.fileVideoCodec"),
     audio_codec: (c) => buildTextFilter(c, "s.fileAudioCodec"),
 
-    // The viewer's favorite entities; false is no filter
-    performer_favorite: (on, ctx) =>
-      on ? this.buildPerformerFavoriteFilter(ctx.userId) : noClause(),
-    studio_favorite: (on, ctx) =>
-      on ? this.buildStudioFavoriteFilter(ctx.userId) : noClause(),
-    tag_favorite: (on, ctx) =>
-      on ? this.buildTagFavoriteFilter(ctx.userId) : noClause(),
+    // The viewer's favorite entities; false is the negation of true
+    performer_favorite: (on, ctx) => this.favoriteClause("performer", on, ctx),
+    studio_favorite: (on, ctx) => this.favoriteClause("studio", on, ctx),
+    tag_favorite: (on, ctx) => this.favoriteClause("tag", on, ctx),
   };
 
   /** A ref filter on one of the scene's junctions, its CTEs named from the leaf */
@@ -446,6 +444,33 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     return hierarchicalRefClause("studio", SCENE_STUDIO, criterion, ctx, {
       name: ctx.name,
     });
+  }
+
+  /**
+   * `tag_favorite`, `studio_favorite` and `performer_favorite`: the scene
+   * has (`true`) or lacks (`false`) one of the viewer's favourites, through
+   * the same shapes as the tag, studio and performer filters. Tags count
+   * the scene's own and inherited tags and every sub-tag, studios their
+   * sub-studios (depth -1, as the Tags and Studios filters take it). With
+   * no favourites `true` matches nothing and `false` is no filter.
+   */
+  private async favoriteClause(
+    kind: "tag" | "studio" | "performer",
+    on: boolean,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const refs = await favoriteRefs(kind, ctx);
+    if (refs.length === 0) {
+      return on ? { sql: "1 = 0", params: [] } : noClause();
+    }
+    const criterion: RefCriterion = {
+      refs,
+      modifier: on ? "INCLUDES" : "EXCLUDES",
+      depth: -1,
+    };
+    if (kind === "tag") return this.tagClause(criterion, ctx);
+    if (kind === "studio") return this.studioClause(criterion, ctx);
+    return this.refs(SCENE_PERFORMERS, { ...criterion, depth: 0 }, ctx);
   }
 
   private orientationClause(
@@ -527,50 +552,6 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         ...visibleParams,
         pattern,
       ],
-    };
-  }
-
-  /**
-   * Build performer favorite filter clause
-   * Returns scenes that have at least one favorite performer
-   */
-  private buildPerformerFavoriteFilter(userId: number): FilterClause {
-    return {
-      sql: `EXISTS (
-        SELECT 1 FROM ScenePerformer sp
-        JOIN PerformerRating pr ON sp.performerId = pr.performerId AND sp.performerInstanceId = pr.instanceId AND pr.userId = ?
-        WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND pr.favorite = 1
-      )`,
-      params: [userId],
-    };
-  }
-
-  /**
-   * Build studio favorite filter clause
-   * Returns scenes that have a favorite studio
-   */
-  private buildStudioFavoriteFilter(userId: number): FilterClause {
-    return {
-      sql: `EXISTS (
-        SELECT 1 FROM StudioRating sr
-        WHERE sr.studioId = s.studioId AND sr.instanceId = s.stashInstanceId AND sr.userId = ? AND sr.favorite = 1
-      )`,
-      params: [userId],
-    };
-  }
-
-  /**
-   * Build tag favorite filter clause
-   * Returns scenes that have at least one favorite tag
-   */
-  private buildTagFavoriteFilter(userId: number): FilterClause {
-    return {
-      sql: `EXISTS (
-        SELECT 1 FROM SceneTag st
-        JOIN TagRating tr ON st.tagId = tr.tagId AND st.tagInstanceId = tr.instanceId AND tr.userId = ?
-        WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND tr.favorite = 1
-      )`,
-      params: [userId],
     };
   }
 

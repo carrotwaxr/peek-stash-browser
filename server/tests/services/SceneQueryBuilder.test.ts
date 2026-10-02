@@ -15,8 +15,10 @@ import type {
   ParsedFilter,
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
+import { expandRefsEach } from "../helpers/hierarchyMock.js";
+import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
-import { prismaImpl } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -159,6 +161,10 @@ describe("SceneQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    // The viewer has no favorites unless a test gives some
+    mockPrisma.tagRating.findMany.mockResolvedValue([]);
+    mockPrisma.studioRating.findMany.mockResolvedValue([]);
+    mockPrisma.performerRating.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query
@@ -584,6 +590,15 @@ describe("SceneQueryBuilder", () => {
     );
 
     it("the viewer's favorites, ratings and history filters read the per-user joins", async () => {
+      mockPrisma.performerRating.findMany.mockResolvedValue([
+        partialRow({ performerId: "7", instanceId: "inst-a" }),
+      ]);
+      mockPrisma.studioRating.findMany.mockResolvedValue([
+        partialRow({ studioId: "8", instanceId: "inst-b" }),
+      ]);
+      mockPrisma.tagRating.findMany.mockResolvedValue([
+        partialRow({ tagId: "9", instanceId: "inst-a" }),
+      ]);
       await run({
         filter: {
           favorite: false,
@@ -604,15 +619,96 @@ describe("SceneQueryBuilder", () => {
       expect(sql).toContain("COALESCE(w.playCount, 0) = ?");
       expect(sql).toContain("COALESCE(w.oCount, 0) BETWEEN ? AND ?");
       expect(sql).toContain("w.lastPlayedAt IS NULL");
-      expect(sql).toContain("PerformerRating pr");
-      expect(sql).toContain("StudioRating sr");
-      expect(sql).toContain("TagRating tr");
+      // The favorites are read as the viewer's own rows, then matched as
+      // (id, instance) pairs through the filters' own junctions and column
+      for (const model of [
+        mockPrisma.performerRating,
+        mockPrisma.studioRating,
+        mockPrisma.tagRating,
+      ]) {
+        expect(model.findMany).toHaveBeenCalledWith(
+          objectContaining({
+            where: {
+              userId: 1,
+              favorite: true,
+              instanceId: { in: ALLOWED },
+            },
+          })
+        );
+      }
+      expect(sql).not.toContain("Rating pr");
+      expect(sql).toContain("FROM ScenePerformer");
+      expect(sql).toContain("FROM SceneTag");
+      expect(sql).toContain("FROM SceneInheritedTag");
+      expect(sql).toContain("s.studioId = ?");
       expect(sql).toContain("strftime('%Y.%m%d', ");
       expect(sql).not.toContain("julianday");
       expect(sql).toContain("s.date IS NOT NULL AND EXISTS");
-      // The three favorite clauses bind the viewer, and so does the age
-      // clause's exclusion arm
-      expect(params.filter((p) => p === 1)).toHaveLength(7);
+      // The favorites are read once each, the clauses bind pairs, and the
+      // age clause's exclusion arm binds the viewer
+      expect(params).toEqual(
+        arrayContaining(["7", "inst-a", "8", "inst-b", "9", "inst-a"])
+      );
+    });
+
+    it("tag_favorite and studio_favorite expand to sub-tags and sub-studios, and false is the negation", async () => {
+      mockPrisma.tagRating.findMany.mockResolvedValue([
+        partialRow({ tagId: "9", instanceId: "inst-a" }),
+      ]);
+      mockPrisma.studioRating.findMany.mockResolvedValue([
+        partialRow({ studioId: "8", instanceId: "inst-a" }),
+      ]);
+      mockPrisma.performerRating.findMany.mockResolvedValue([
+        partialRow({ performerId: "7", instanceId: "inst-a" }),
+      ]);
+      expandRefsEach.mockClear();
+      await run({
+        filter: {
+          tag_favorite: false,
+          studio_favorite: false,
+          performer_favorite: false,
+        },
+      });
+
+      expect(expandRefsEach).toHaveBeenCalledWith(
+        "tag",
+        [{ id: "9", instanceId: "inst-a" }],
+        -1,
+        ALLOWED
+      );
+      expect(expandRefsEach).toHaveBeenCalledWith(
+        "studio",
+        [{ id: "8", instanceId: "inst-a" }],
+        -1,
+        ALLOWED
+      );
+      const { sql } = pageStatement();
+      expect(sql).toContain("NOT EXISTS");
+      expect(sql).toContain("s.studioId IS NULL OR NOT");
+    });
+
+    it("with no favorites, true matches nothing and false adds no clause", async () => {
+      for (const model of [
+        mockPrisma.performerRating,
+        mockPrisma.studioRating,
+        mockPrisma.tagRating,
+      ]) {
+        model.findMany.mockResolvedValue([]);
+      }
+      await run({ filter: { tag_favorite: true } });
+      expect(pageStatement().sql).toContain("1 = 0");
+
+      mockPrisma.$queryRawUnsafe.mockClear();
+      await run({
+        filter: {
+          tag_favorite: false,
+          studio_favorite: false,
+          performer_favorite: false,
+        },
+      });
+      expect(pageStatement().sql).toContain(
+        "WHERE s.deletedAt IS NULL AND e.id IS NULL AND s.stashInstanceId IN (?, ?)\nORDER BY"
+      );
     });
 
     it("a filter with nothing in it adds no clause", async () => {

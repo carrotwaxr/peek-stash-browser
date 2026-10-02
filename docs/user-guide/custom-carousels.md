@@ -34,8 +34,8 @@ Each rule consists of a filter type, comparison operator, and value. All rules m
 | O Count | Your O count for the scene |
 | Favorite Scenes | Only your favorited scenes |
 | Favorite Performers | Scenes with your favorite performers |
-| Favorite Studios | Scenes from your favorite studios |
-| Favorite Tags | Scenes with your favorite tags |
+| Favorite Studios | Scenes from your favorite studios and their sub-studios |
+| Favorite Tags | Scenes with your favorite tags, their sub-tags, or a favorite tag inherited from a performer, studio or collection |
 | Created Date | When the scene was added |
 | Scene Date | The scene's release date |
 | Last Played Date | When you last watched |
