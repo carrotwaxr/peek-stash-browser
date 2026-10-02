@@ -45,6 +45,8 @@ import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -211,73 +213,41 @@ class GroupQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The group filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"group">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-    const via = (spec: ViaSceneSpec, criterion: RefCriterion) =>
-      viaSceneClause(spec, criterion.refs, criterion.modifier);
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The group filter's clauses, one per field, in the order the statement
+   * ANDs them. A ref field's CTEs are named from the leaf (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"group"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
+    favorite: (favorite) => buildFavoriteFilter(favorite),
 
     // Related entities
-    if (filter.studios) push(await this.studioClause(filter.studios, ctx));
-    if (filter.scenes) push(via(GROUPS_BY_SCENE, filter.scenes));
-    if (filter.performers) push(via(GROUPS_BY_PERFORMER, filter.performers));
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
-    if (filter.containing_groups) {
-      push(
-        refClause(
-          GROUP_CONTAINING,
-          filter.containing_groups.refs,
-          filter.containing_groups.modifier,
-          {
-            name: "containing_groups",
-            allowedInstanceIds: ctx.allowedInstanceIds,
-          }
-        )
-      );
-    }
+    studios: (c, ctx) => this.studioClause(c, ctx),
+    scenes: (c) => viaSceneClause(GROUPS_BY_SCENE, c.refs, c.modifier),
+    performers: (c) => viaSceneClause(GROUPS_BY_PERFORMER, c.refs, c.modifier),
+    tags: (c, ctx) => this.tagClause(c, ctx),
+    containing_groups: (c, ctx) =>
+      refClause(GROUP_CONTAINING, c.refs, c.modifier, {
+        name: ctx.name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      }),
 
     // The viewer's rating and the counts
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.scene_count) {
-      push(
-        buildNumericFilter(
-          filter.scene_count,
-          visibleCount(ctx, "g.sceneCount", "scenes")
-        )
-      );
-    }
-    if (filter.duration) {
-      push(buildNumericFilter(filter.duration, "COALESCE(g.duration, 0)"));
-    }
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    scene_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "g.sceneCount", "scenes")),
+    duration: (c) => buildNumericFilter(c, "COALESCE(g.duration, 0)"),
 
     // Text
-    if (filter.name) push(buildTextFilter(filter.name, "g.name"));
-    if (filter.synopsis) push(buildTextFilter(filter.synopsis, "g.synopsis"));
-    if (filter.director) push(buildTextFilter(filter.director, "g.director"));
+    name: (c) => buildTextFilter(c, "g.name"),
+    synopsis: (c) => buildTextFilter(c, "g.synopsis"),
+    director: (c) => buildTextFilter(c, "g.director"),
 
     // Dates
-    if (filter.date) push(buildDateFilter(filter.date, "g.date"));
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "g.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "g.stashUpdatedAt"));
-    }
-
-    return clauses;
-  }
+    date: (c) => buildDateFilter(c, "g.date"),
+    created_at: (c) => buildDateFilter(c, "g.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "g.stashUpdatedAt"),
+  };
 
   /**
    * The studio filter, with the studios' descendants to the depth. A group
@@ -285,20 +255,20 @@ class GroupQueryBuilder extends EntityQueryBuilder<
    */
   private async studioClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", GROUP_STUDIO, criterion, ctx, {
-      name: "studios",
+      name: ctx.name,
     });
   }
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", GROUP_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
     });
   }
 

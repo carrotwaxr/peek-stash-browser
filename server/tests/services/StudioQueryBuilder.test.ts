@@ -6,6 +6,7 @@
  * joins, sort map and tiebreak, filter clauses, search, parent and
  * children) and that the base's clauses reach its statements.
  */
+import { STUDIO_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
@@ -329,6 +330,17 @@ describe("StudioQueryBuilder", () => {
       );
       expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(2);
     });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({
+        q: "sea",
+        filter: { scene_count: { modifier: "EQUALS", value: 4242 } },
+      });
+
+      const { params } = pageStatement();
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
   });
 
   describe("rows", () => {
@@ -470,5 +482,17 @@ describe("StudioQueryBuilder", () => {
       expect(mockLoadRefsByKey).not.toHaveBeenCalled();
       expect(mockLoadNestedRefs).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("the studio field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(STUDIO_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    expect(Object.keys(studioQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });

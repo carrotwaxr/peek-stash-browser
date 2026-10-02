@@ -31,6 +31,8 @@ import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -146,64 +148,40 @@ class StudioQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The studio filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"studio">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The studio filter's clauses, one per field, in the order the statement
+   * ANDs them. A ref field's CTEs are named from the leaf (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"studio"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.o_counter) {
-      push(buildNumericFilter(filter.o_counter, "COALESCE(us.oCounter, 0)"));
-    }
-    if (filter.play_count) {
-      push(buildNumericFilter(filter.play_count, "COALESCE(us.playCount, 0)"));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    o_counter: (c) => buildNumericFilter(c, "COALESCE(us.oCounter, 0)"),
+    play_count: (c) => buildNumericFilter(c, "COALESCE(us.playCount, 0)"),
 
     // Related entities
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
+    tags: (c, ctx) => this.tagClause(c, ctx),
 
     // Counts, as the viewer sees them
-    if (filter.scene_count) {
-      push(
-        buildNumericFilter(
-          filter.scene_count,
-          visibleCount(ctx, "s.sceneCount", "scenes")
-        )
-      );
-    }
+    scene_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "s.sceneCount", "scenes")),
 
     // Text
-    if (filter.name) push(buildTextFilter(filter.name, "s.name"));
-    if (filter.details) push(buildTextFilter(filter.details, "s.details"));
+    name: (c) => buildTextFilter(c, "s.name"),
+    details: (c) => buildTextFilter(c, "s.details"),
 
     // Dates
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "s.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "s.stashUpdatedAt"));
-    }
-
-    return clauses;
-  }
+    created_at: (c) => buildDateFilter(c, "s.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "s.stashUpdatedAt"),
+  };
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", STUDIO_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
     });
   }
 

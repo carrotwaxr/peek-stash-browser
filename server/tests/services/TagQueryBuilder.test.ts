@@ -6,6 +6,7 @@
  * sort map and tiebreak, filter clauses, search, parents and children) and
  * that the base's clauses reach its statements.
  */
+import { TAG_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
@@ -394,6 +395,17 @@ describe("TagQueryBuilder", () => {
       );
       expect(params.filter((p) => p === "%sea\\_side%")).toHaveLength(3);
     });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({
+        q: "sea",
+        filter: { scene_count: { modifier: "EQUALS", value: 4242 } },
+      });
+
+      const { params } = pageStatement();
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
   });
 
   describe("rows", () => {
@@ -490,5 +502,19 @@ describe("TagQueryBuilder", () => {
       expect(mockLoadRefsByKey).not.toHaveBeenCalled();
       expect(mockLoadTagChildren).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("the tag field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(TAG_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    // The nested `scenes` and `groups` fields (path scenes_filter) are keyed by
+    // their field names, as the parser hands them
+    expect(Object.keys(tagQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });

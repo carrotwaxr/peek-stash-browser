@@ -41,6 +41,8 @@ import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
 } from "./query/EntityQueryBuilder.js";
@@ -214,71 +216,47 @@ class TagQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The tag filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"tag">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-    const junction = (
-      name: string,
-      target: JunctionTarget,
-      criterion: RefCriterion
-    ) =>
-      refClause(target, criterion.refs, criterion.modifier, {
-        name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
-      });
-    const via = (spec: ViaSceneSpec, criterion: RefCriterion) =>
-      viaSceneClause(spec, criterion.refs, criterion.modifier);
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The tag filter's clauses, one per field, in the order the statement ANDs
+   * them. A ref field's CTEs are named from the leaf (`ctx.name`); the nested
+   * `scenes` and `groups` fields are keyed by those names.
+   */
+  protected override readonly fieldClauses: FieldClauses<"tag"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.o_counter) {
-      push(buildNumericFilter(filter.o_counter, "COALESCE(us.oCounter, 0)"));
-    }
-    if (filter.play_count) {
-      push(buildNumericFilter(filter.play_count, "COALESCE(us.playCount, 0)"));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    o_counter: (c) => buildNumericFilter(c, "COALESCE(us.oCounter, 0)"),
+    play_count: (c) => buildNumericFilter(c, "COALESCE(us.playCount, 0)"),
 
     // Related entities
-    if (filter.parents) push(await this.parentClause(filter.parents, ctx));
-    if (filter.performers) {
-      push(junction("performers", PERFORMER_TAGS, filter.performers));
-    }
-    if (filter.studios) {
-      push(junction("studios", STUDIO_TAGS, filter.studios));
-    }
-    if (filter.scenes) push(via(TAGS_BY_SCENE, filter.scenes));
-    if (filter.groups) push(via(TAGS_BY_GROUP, filter.groups));
+    parents: (c, ctx) => this.parentClause(c, ctx),
+    performers: (c, ctx) => this.junction(PERFORMER_TAGS, c, ctx),
+    studios: (c, ctx) => this.junction(STUDIO_TAGS, c, ctx),
+    scenes: (c) => viaSceneClause(TAGS_BY_SCENE, c.refs, c.modifier),
+    groups: (c) => viaSceneClause(TAGS_BY_GROUP, c.refs, c.modifier),
 
     // Counts, as the viewer sees them
-    if (filter.scene_count) {
-      push(buildNumericFilter(filter.scene_count, sceneCount(ctx)));
-    }
+    scene_count: (c, ctx) => buildNumericFilter(c, sceneCount(ctx)),
 
     // Text
-    if (filter.name) push(buildTextFilter(filter.name, "t.name"));
-    if (filter.description) {
-      push(buildTextFilter(filter.description, "t.description"));
-    }
+    name: (c) => buildTextFilter(c, "t.name"),
+    description: (c) => buildTextFilter(c, "t.description"),
 
     // Dates
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "t.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "t.stashUpdatedAt"));
-    }
+    created_at: (c) => buildDateFilter(c, "t.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "t.stashUpdatedAt"),
+  };
 
-    return clauses;
+  /** A ref filter on a junction, its CTEs named from the leaf */
+  private junction(
+    target: JunctionTarget,
+    criterion: RefCriterion,
+    ctx: LeafContext
+  ): FilterClause {
+    return refClause(target, criterion.refs, criterion.modifier, {
+      name: ctx.name,
+      allowedInstanceIds: ctx.allowedInstanceIds,
+    });
   }
 
   /**
