@@ -1,4 +1,4 @@
-import { act } from "react";
+import { StrictMode, act } from "react";
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Clip } from "../../../src/components/cards/ClipCard";
@@ -145,5 +145,26 @@ describe("ClipCardPreview", () => {
     await act(() => Promise.resolve());
 
     expect(container.querySelector("video")).toBeNull();
+  });
+
+  it("under StrictMode, the video still holds its src while it shows", async () => {
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    mediaSpies.push(pause, load);
+    const { container } = render(
+      <StrictMode>
+        <ClipCardPreview clip={baseClip} autoplayOnScroll />
+      </StrictMode>
+    );
+    await act(() => Promise.resolve());
+
+    expect(container.querySelector("video")).toHaveAttribute(
+      "src",
+      "/api/proxy/clip/1/preview"
+    );
   });
 });

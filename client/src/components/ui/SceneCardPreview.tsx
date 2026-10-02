@@ -3,11 +3,11 @@ import type { NormalizedScene } from "@peek/shared-types";
 import { useUserSettings } from "../../api/hooks/useUserSettings";
 import { useHoverCapable } from "../../hooks/useHoverCapable";
 import { useInView } from "../../hooks/useInView";
+import { usePreviewVideoRef } from "../../hooks/usePreviewVideoRef";
 import {
   getPreviewProbe,
   setPreviewProbe,
 } from "../../utils/previewProbeCache";
-import { releaseVideoOnUnmount } from "../../utils/releaseVideo";
 import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
@@ -301,6 +301,8 @@ const SceneCardPreview = ({
     }
     return null;
   };
+  // The mp4 overlay's ref loads the preview and releases it on leave
+  const previewVideoRef = usePreviewVideoRef(getPreviewUrl());
 
   // Use explicit class names for Tailwind JIT detection (dynamic interpolation doesn't work)
   const objectFitClass =
@@ -335,8 +337,7 @@ const SceneCardPreview = ({
         shouldShowAnimation &&
         previewDataLoaded && (
           <video
-            ref={releaseVideoOnUnmount}
-            src={getPreviewUrl() ?? undefined}
+            ref={previewVideoRef}
             className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}
             autoPlay

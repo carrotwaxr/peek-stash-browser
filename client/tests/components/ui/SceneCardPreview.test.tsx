@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
@@ -9,37 +10,38 @@ import SceneCardPreview from "@/components/ui/SceneCardPreview";
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { clearPreviewProbeCache } from "@/utils/previewProbeCache";
 
-/** A preview whose user's settings (already loaded) prefer `quality`. */
+/**
+ * A preview whose user's settings (already loaded) prefer `quality`. `strict`
+ * renders it under StrictMode, as the app's dev build does.
+ */
 const renderPreview = (
   quality: string,
   scene: NormalizedScene,
-  active = true
+  active = true,
+  strict = false
 ) => {
   const queryClient = new QueryClient();
   queryClient.setQueryData(
     queryKeys.user.settings(),
     userSettingsResponse({ preferredPreviewQuality: quality })
   );
-  const rendered = render(
-    <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={createAuthValue({ isAuthenticated: true })}>
-        <SceneCardPreview scene={scene} active={active} />
-      </AuthContext.Provider>
-    </QueryClientProvider>
-  );
+  const tree = (isActive: boolean) => {
+    const preview = (
+      <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider
+          value={createAuthValue({ isAuthenticated: true })}
+        >
+          <SceneCardPreview scene={scene} active={isActive} />
+        </AuthContext.Provider>
+      </QueryClientProvider>
+    );
+    return strict ? <StrictMode>{preview}</StrictMode> : preview;
+  };
+  const rendered = render(tree(active));
   return {
     ...rendered,
     /** The same preview, with a new active state */
-    setActive: (next: boolean) =>
-      rendered.rerender(
-        <QueryClientProvider client={queryClient}>
-          <AuthContext.Provider
-            value={createAuthValue({ isAuthenticated: true })}
-          >
-            <SceneCardPreview scene={scene} active={next} />
-          </AuthContext.Provider>
-        </QueryClientProvider>
-      ),
+    setActive: (next: boolean) => rendered.rerender(tree(next)),
   };
 };
 
@@ -155,5 +157,43 @@ describe("SceneCardPreview", () => {
     expect(video?.hasAttribute("src")).toBe(false);
     expect(pause).toHaveBeenCalled();
     expect(load).toHaveBeenCalled();
+  });
+
+  it("the video holds its src every time the preview shows, under StrictMode too", async () => {
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    mediaSpies.push(pause, load);
+    const view = renderPreview("mp4", scene("inst-a"), true, true);
+    const shownVideo = () =>
+      waitFor(() => {
+        const el = view.container.querySelector("video");
+        expect(el).not.toBeNull();
+        return must(el, "the preview video");
+      });
+
+    // First hover
+    expect((await shownVideo()).getAttribute("src")).toBe(
+      "/api/proxy/scene/42/preview?instanceId=inst-a"
+    );
+
+    // A re-render while still hovered keeps it
+    view.setActive(true);
+    expect((await shownVideo()).getAttribute("src")).toBe(
+      "/api/proxy/scene/42/preview?instanceId=inst-a"
+    );
+
+    // Leave releases it; a second hover loads it again
+    const first = await shownVideo();
+    view.setActive(false);
+    expect(view.container.querySelector("video")).toBeNull();
+    expect(first.hasAttribute("src")).toBe(false);
+    view.setActive(true);
+    expect((await shownVideo()).getAttribute("src")).toBe(
+      "/api/proxy/scene/42/preview?instanceId=inst-a"
+    );
   });
 });
