@@ -367,24 +367,24 @@ test.describe("TV mode", () => {
     await page.keyboard.press("Enter");
     await expect(tagCondition).toBeVisible();
 
-    // Down walks the panel to its first column's last field; Up from there
-    // reaches the Tags picker, whose right neighbour is the Collections
-    // picker (the arrows move by position)
-    const lastOfColumn = page.locator("#filter-tagFavorite");
-    const reachedColumnEnd = await pressUntil(
+    // Down reaches the panel's first section header; Down from there walks
+    // the first column: Title, the Tags condition, then the Tags picker,
+    // whose right neighbour is the Collections picker (the arrows move by
+    // position)
+    const sectionHeader = page.getByRole("button", { name: "Common Filters" });
+    const reachedHeader = await pressUntil(
       page,
       "ArrowDown",
-      () => lastOfColumn.evaluate((el) => el === document.activeElement),
-      20
-    );
-    expect(reachedColumnEnd, "Down reaches the first column's end").toBe(true);
-    const reachedTags = await pressUntil(
-      page,
-      "ArrowUp",
-      () => tagPicker.evaluate((el) => el === document.activeElement),
+      () => sectionHeader.evaluate((el) => el === document.activeElement),
       10
     );
-    expect(reachedTags, "Up reaches the Tags picker").toBe(true);
+    expect(reachedHeader, "Down reaches the panel's section header").toBe(true);
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator("#filter-title")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(tagCondition).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(tagPicker).toBeFocused();
     await page.keyboard.press("ArrowRight");
     await expect(
       page.getByRole("button", { name: /^Collections/ })
