@@ -7,6 +7,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import { must } from "../../tests/helpers/must.js";
 import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { recordStatements } from "../helpers/statementRecorder.js";
 import {
   adminClient,
   restoreInstanceSelection,
@@ -1766,6 +1767,38 @@ describeWithDb("Image favourites, performer count and age (seeded)", () => {
     expect(await listed(user.B, count("performer_count", "EQUALS", 0))).toEqual(
       { x: [4, 6, 7], y: [] }
     );
+  });
+
+  it("performer_count anti-joins the viewer's performer exclusions only when they have some", async () => {
+    /** The page and count statements of a performer_count filter, and its images */
+    const run = async (viewer: number) => {
+      const recorder = recordStatements();
+      try {
+        const images = await listed(
+          viewer,
+          count("performer_count", "EQUALS", 0)
+        );
+        const sql = recorder.statements
+          .map((s) => s.sql)
+          .filter((q) => q.includes("FROM ImagePerformer pc "));
+        return { images, sql };
+      } finally {
+        recorder.restore();
+      }
+    };
+    const pce = "LEFT JOIN UserExcludedEntity pce";
+
+    // A has no performer exclusion row: no anti-join, the same answer
+    const a = await run(user.A);
+    expect(a.sql).toHaveLength(2);
+    for (const sql of a.sql) expect(sql).not.toContain(pce);
+    expect(a.images).toEqual({ x: [4, 6], y: [] });
+
+    // B hid performer 5, image 7's only one: it is not counted
+    const b = await run(user.B);
+    expect(b.sql).toHaveLength(2);
+    for (const sql of b.sql) expect(sql).toContain(pce);
+    expect(b.images).toEqual({ x: [4, 6, 7], y: [] });
   });
 
   it("performer_age is a performer's age on the image's date, partial dates included", async () => {

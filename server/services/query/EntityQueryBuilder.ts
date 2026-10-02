@@ -128,6 +128,57 @@ export interface QueryContext {
    * (`X-Peek-Time-Zone`), "UTC" for a caller that passes none
    */
   readonly timeZone: string;
+  /**
+   * Whether the viewer has any exclusion row of the type, on any instance:
+   * asked of the database at most once per request and type, on first use
+   * (`exclusionLookup`); false without a query when the viewer's
+   * exclusions do not apply. A clause leaves out an anti-join it would
+   * find empty (`exclusionViewer`).
+   */
+  readonly hasExclusionsOf: (
+    entityType: ExclusionEntityType
+  ) => Promise<boolean>;
+}
+
+/**
+ * A request's `hasExclusionsOf`: one indexed lookup per type on
+ * `UserExcludedEntity (userId, entityType)`, kept for the request (every
+ * leaf's context shares it), none at all when the viewer's exclusions do
+ * not apply
+ */
+export function exclusionLookup(
+  userId: number,
+  applyExclusions: boolean
+): QueryContext["hasExclusionsOf"] {
+  if (!applyExclusions) return () => Promise.resolve(false);
+  const asked = new Map<ExclusionEntityType, Promise<boolean>>();
+  return (entityType) => {
+    let answer = asked.get(entityType);
+    if (answer === undefined) {
+      answer = (async () =>
+        (await prisma.userExcludedEntity.findFirst({
+          where: { userId, entityType },
+          select: { id: true },
+        })) !== null)();
+      asked.set(entityType, answer);
+    }
+    return answer;
+  };
+}
+
+/**
+ * The viewer whose exclusions of the type a clause anti-joins, or null when
+ * none apply: the viewer's exclusions are off, or they have no row of the
+ * type, so the anti-join would keep every row (an image's Performer Count
+ * at 142k images: 151 to 247 ms with the join, F11b). The answer is exact
+ * either way.
+ */
+export async function exclusionViewer(
+  ctx: QueryContext,
+  entityType: ExclusionEntityType
+): Promise<number | null> {
+  if (!ctx.applyExclusions) return null;
+  return (await ctx.hasExclusionsOf(entityType)) ? ctx.userId : null;
 }
 
 /** The fields a builder's own table covers: the parsed filter without the base's `ids` */
@@ -796,6 +847,10 @@ ORDER BY period`;
       specificInstanceId: request.specificInstanceId,
       sortField: this.spec.defaultSort,
       timeZone: options.timeZone ?? "UTC",
+      hasExclusionsOf: exclusionLookup(
+        options.userId,
+        options.applyExclusions ?? true
+      ),
     };
     return { ...ctx, sortField: this.sortKey(request, ctx) };
   }

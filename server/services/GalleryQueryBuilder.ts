@@ -61,6 +61,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  exclusionViewer,
   favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
@@ -261,11 +262,11 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
 
     // The gallery's performers the viewer can see: how many, and their age
     // on the gallery's date
-    performer_count: (c, ctx) =>
+    performer_count: async (c, ctx) =>
       performerCountClause(
         c,
         GALLERY_PERFORMERS,
-        ctx.applyExclusions ? ctx.userId : null
+        await exclusionViewer(ctx, "performer")
       ),
     performer_age: (c, ctx) =>
       performerAgeExists(

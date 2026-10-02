@@ -171,3 +171,74 @@ describe("every image field clause", () => {
     }
   );
 });
+
+describe("performer_count and the viewer's performer exclusions", () => {
+  const PCE = "LEFT JOIN UserExcludedEntity pce";
+
+  /** The page and count statements of a filter, the lookup answering `excluded` */
+  async function statementsFor(
+    filter: Record<string, unknown>,
+    excluded: boolean,
+    applyExclusions = true
+  ): Promise<string[]> {
+    mockPrisma.$queryRawUnsafe.mockReset();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.findFirst.mockResolvedValue(
+      excluded ? partialRow({ id: 1 }) : null
+    );
+    await imageQueryBuilder.execute({
+      userId: 1,
+      allowedInstanceIds: ALLOWED,
+      applyExclusions,
+      request: parsedListRequest("image", {
+        filter: untrusted<ParsedListRequest<"image">["filter"]>(filter),
+      }),
+    });
+    return mockPrisma.$queryRawUnsafe.mock.calls
+      .slice(0, 2)
+      .map(([sql]) => sql);
+  }
+
+  const COUNT_ZERO = { performer_count: { modifier: "EQUALS", value: 0 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("with no performer exclusion row the count takes no anti-join, asked once per request", async () => {
+    const statements = await statementsFor(COUNT_ZERO, false);
+
+    expect(statements).toHaveLength(2);
+    for (const sql of statements) {
+      expect(sql).toContain("(SELECT COUNT(*) FROM ImagePerformer pc");
+      expect(sql).not.toContain(PCE);
+    }
+    expect(mockPrisma.userExcludedEntity.findFirst).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.userExcludedEntity.findFirst).toHaveBeenCalledWith({
+      where: { userId: 1, entityType: "performer" },
+      select: { id: true },
+    });
+  });
+
+  it("with one the count anti-joins them, the viewer bound before the value", async () => {
+    const statements = await statementsFor(COUNT_ZERO, true);
+
+    expect(statements).toHaveLength(2);
+    for (const sql of statements) {
+      expect(sql).toContain(
+        `${PCE} ON pce.userId = ? AND pce.entityType = 'performer'`
+      );
+      expect(sql).toContain("AND pce.id IS NULL) = ?");
+    }
+    // The count statement's last two: the viewer, then the value
+    const [, ...params] = must(mockPrisma.$queryRawUnsafe.mock.calls[1]);
+    expect(params.slice(-2)).toEqual([1, 0]);
+  });
+
+  it("asks nothing when the viewer's exclusions do not apply, or no field needs it", async () => {
+    await statementsFor(COUNT_ZERO, true, false);
+    await statementsFor({ tag_count: { modifier: "EQUALS", value: 0 } }, true);
+
+    expect(mockPrisma.userExcludedEntity.findFirst).not.toHaveBeenCalled();
+  });
+});

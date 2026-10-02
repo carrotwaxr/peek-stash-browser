@@ -1213,7 +1213,9 @@ export async function performerTagsFieldClause(
  * item's key, the performer by its own. A deleted performer is not
  * counted, nor, with the viewer's exclusions applied (`viewerId`), one
  * excluded for them (`exclusionJoin` under `pce`, its every-instance arm
- * included). The performer is on the item's own instance.
+ * included). The builders pass null for a viewer with no performer
+ * exclusion row (`exclusionViewer`): the anti-join would keep every row.
+ * The performer is on the item's own instance.
  */
 export function performerCountClause(
   criterion: NumberCriterion,

@@ -1122,6 +1122,7 @@ describe("the field clause table", () => {
       specificInstanceId: undefined,
       sortField: "rating",
       timeZone: "UTC",
+      hasExclusionsOf: () => Promise.resolve(false),
       name,
       underAny: false,
     });
