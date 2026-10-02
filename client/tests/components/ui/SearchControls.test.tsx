@@ -326,6 +326,81 @@ describe("SearchControls", () => {
     });
   });
 
+  describe("Toggles and Cancel", () => {
+    const filtersButton = () =>
+      screen.getByRole("button", { name: /^Filters/ });
+
+    it("a collapsed section is a button with aria-expanded inside its heading", async () => {
+      const user = userEvent.setup();
+      renderSearchControls();
+      await user.click(filtersButton());
+
+      const toggle = await screen.findByRole("button", {
+        name: "Date Ranges",
+        expanded: false,
+      });
+      expect(toggle.closest("h3")).not.toBeNull();
+
+      toggle.focus();
+      await user.keyboard("{Enter}");
+      expect(
+        screen.getByRole("button", { name: "Date Ranges", expanded: true })
+      ).toBeInTheDocument();
+    });
+
+    it("the Search & Filter header is a button with aria-expanded", async () => {
+      const user = userEvent.setup();
+      renderSearchControls();
+
+      const header = screen.getByRole("button", {
+        name: "Search & Filter",
+        expanded: true,
+      });
+      expect(header.closest("h3")).not.toBeNull();
+      expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+
+      header.focus();
+      await user.keyboard("{Enter}");
+      expect(
+        screen.getByRole("button", { name: "Search & Filter", expanded: false })
+      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
+    });
+
+    it("Cancel discards the edits: reopened, the panel shows the applied filters", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?favorite=true" });
+      await firstQuery(list.onQueryChange);
+
+      await user.click(filtersButton());
+      const favorite = () =>
+        document.getElementById("filter-favorite") as HTMLInputElement;
+      expect(favorite().checked).toBe(true);
+      await user.click(favorite());
+      expect(favorite().checked).toBe(false);
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByText("Apply Filters")).not.toBeInTheDocument();
+      await user.click(filtersButton());
+
+      expect(favorite().checked).toBe(true);
+      expect(list.params().get("favorite")).toBe("true");
+    });
+
+    it("after Apply or Cancel, focus is on the Filters button", async () => {
+      const user = userEvent.setup();
+      renderSearchControls();
+
+      await user.click(filtersButton());
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(filtersButton()).toHaveFocus();
+
+      await user.click(filtersButton());
+      await user.click(screen.getByRole("button", { name: "Apply Filters" }));
+      expect(filtersButton()).toHaveFocus();
+    });
+  });
+
   describe("Modifier dropdowns", () => {
     it("an untouched Performers modifier reads Has ANY, the modifier the request carries", async () => {
       const user = userEvent.setup();

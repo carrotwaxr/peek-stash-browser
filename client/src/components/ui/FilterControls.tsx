@@ -512,7 +512,8 @@ interface FilterPanelProps {
   onClear: () => void;
   hasActiveFilters: boolean;
   isOpen: boolean;
-  onToggle: () => void;
+  /** Drops the edits not yet applied and closes the panel */
+  onCancel: () => void;
   onSubmit: () => void;
   highlightedFilterKey?: string | null;
   filterRefs?: RefObject<Record<string, HTMLElement | null>>;
@@ -523,7 +524,7 @@ export const FilterPanel = ({
   onClear,
   hasActiveFilters,
   isOpen,
-  onToggle,
+  onCancel,
   onSubmit,
   highlightedFilterKey,
   filterRefs,
@@ -604,7 +605,7 @@ export const FilterPanel = ({
           className="flex items-center justify-end space-x-3 pt-4 border-t"
           style={{ borderColor: "var(--border-color)" }}
         >
-          <Button onClick={onToggle} variant="secondary" size="sm">
+          <Button onClick={onCancel} variant="secondary" size="sm">
             Cancel
           </Button>
           <Button

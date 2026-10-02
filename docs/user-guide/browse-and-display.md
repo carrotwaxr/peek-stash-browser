@@ -106,6 +106,7 @@ A tree view showing parent/child tag relationships (Tags page only).
 - **Expand All** / **Collapse All** buttons for quick navigation
 - With several Stash servers, each server's tags stay in their own branches
 - A tag whose parent tags are all hidden from you shows at the top level
+- Filters don't apply to the tree; the Filters button is hidden there
 
 **Navigation:**
 

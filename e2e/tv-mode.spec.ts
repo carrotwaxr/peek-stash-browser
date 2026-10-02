@@ -367,20 +367,28 @@ test.describe("TV mode", () => {
     await page.keyboard.press("Enter");
     await expect(tagCondition).toBeVisible();
 
-    // Down walks the panel to the Collections picker; Left from it is the
-    // Tags picker, the control the arrows reach by position
-    const collectionsPicker = page.getByRole("button", {
-      name: /^Collections/,
-    });
-    const reachedCollections = await pressUntil(
+    // Down walks the panel to its first column's last field; Up from there
+    // reaches the Tags picker, whose right neighbour is the Collections
+    // picker (the arrows move by position)
+    const lastOfColumn = page.locator("#filter-tagFavorite");
+    const reachedColumnEnd = await pressUntil(
       page,
       "ArrowDown",
-      () => collectionsPicker.evaluate((el) => el === document.activeElement),
+      () => lastOfColumn.evaluate((el) => el === document.activeElement),
       20
     );
-    expect(reachedCollections, "arrows reach the Collections picker").toBe(
-      true
+    expect(reachedColumnEnd, "Down reaches the first column's end").toBe(true);
+    const reachedTags = await pressUntil(
+      page,
+      "ArrowUp",
+      () => tagPicker.evaluate((el) => el === document.activeElement),
+      10
     );
+    expect(reachedTags, "Up reaches the Tags picker").toBe(true);
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      page.getByRole("button", { name: /^Collections/ })
+    ).toBeFocused();
     await page.keyboard.press("ArrowLeft");
     await expect(tagPicker).toBeFocused();
 

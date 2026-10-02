@@ -514,6 +514,7 @@ const EntityListPage = ({
           {...(context ? { context } : {})}
           listState={listState}
           isRefreshing={isPlaceholderData}
+          filterable={extraView?.filterable ?? true}
           totalPages={totalPages}
           totalCount={listed ? count : 0}
           permanentFilters={permanentFilters}

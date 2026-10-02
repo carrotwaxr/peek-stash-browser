@@ -25,6 +25,7 @@ import {
   Pagination,
   SearchInput,
   SortControl,
+  StatusMessage,
   ViewModeToggle,
   ZoomSlider,
 } from "./index";
@@ -61,6 +62,12 @@ interface SearchControlsProps {
   contextSettings?: SettingConfig[];
   /** The list query is showing the previous results while the next ones load */
   isRefreshing?: boolean;
+  /**
+   * The current view takes the list's filters (false for the Tags hierarchy):
+   * the Filters button, the panel and the chips are hidden, and a note says so
+   * while filters are set
+   */
+  filterable?: boolean;
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -87,6 +94,7 @@ const SearchControls = ({
   onPresetColumns,
   contextSettings = NO_SETTINGS,
   isRefreshing = false,
+  filterable = true,
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
@@ -100,6 +108,7 @@ const SearchControls = ({
   );
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
+  const filtersButtonRef = useRef<HTMLDivElement>(null); // The Filters button's wrapper
   const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
 
   const { isTVMode } = useTVMode();
@@ -163,6 +172,21 @@ const SearchControls = ({
   const draftIsCurrent = draft !== null && deepEqual(draft.base, filters);
   const panelFilters = draft && draftIsCurrent ? draft.values : filters;
 
+  // The controls each collapsible section holds: its toggle's aria-controls
+  const sectionControlIds = useMemo(() => {
+    const ids: Record<string, string> = {};
+    let current: string | null = null;
+    for (const opt of filterOptions) {
+      if (opt.type === "section-header") {
+        current = opt.key;
+        ids[current] = "";
+      } else if (current) {
+        ids[current] = `${ids[current]} filter-${opt.key}`.trim();
+      }
+    }
+    return ids;
+  }, [filterOptions]);
+
   // Clear all filters
   const handleClearFilters = useCallback(() => {
     clearFilters();
@@ -184,12 +208,26 @@ const SearchControls = ({
     [filters]
   );
 
+  // Closing the panel unmounts the button that had focus: it goes back to the
+  // Filters button that opened the panel
+  const focusFiltersButton = useCallback(() => {
+    filtersButtonRef.current?.querySelector("button")?.focus();
+  }, []);
+
   // Apply the draft and close the panel
   const handleFilterSubmit = useCallback(() => {
     applyFilters(panelFilters);
     setDraft(null);
     setIsFilterPanelOpen(false);
-  }, [applyFilters, panelFilters]);
+    focusFiltersButton();
+  }, [applyFilters, panelFilters, focusFiltersButton]);
+
+  // Cancel drops the draft and closes the panel
+  const handleFilterCancel = useCallback(() => {
+    setDraft(null);
+    setIsFilterPanelOpen(false);
+    focusFiltersButton();
+  }, [focusFiltersButton]);
 
   // Handle clicking on a filter chip to highlight that filter
   const handleFilterChipClick = useCallback(
@@ -329,29 +367,32 @@ const SearchControls = ({
         }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+        <h3
+          className="font-semibold text-sm uppercase tracking-wide"
           style={{
+            color: "var(--text-primary)",
             borderBottom: isControlsCollapsed
               ? "none"
               : "1px solid var(--border-color)",
           }}
-          onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
         >
-          <h3
-            className="font-semibold text-sm uppercase tracking-wide"
-            style={{ color: "var(--text-primary)" }}
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-3 py-2 text-left uppercase tracking-wide hover:opacity-80 transition-opacity"
+            aria-expanded={!isControlsCollapsed}
+            aria-controls="search-controls-content"
+            onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
           >
-            Search &amp; Filter
-          </h3>
-          <span style={{ color: "var(--text-secondary)" }}>
-            {isControlsCollapsed ? "▶" : "▼"}
-          </span>
-        </div>
+            <span>Search &amp; Filter</span>
+            <span aria-hidden="true" style={{ color: "var(--text-secondary)" }}>
+              {isControlsCollapsed ? "▶" : "▼"}
+            </span>
+          </button>
+        </h3>
 
         {/* Collapsible controls content */}
         {!isControlsCollapsed && (
-          <div className="p-3">
+          <div id="search-controls-content" className="p-3">
             {/* Row 1: Search, Sort, Filters - "What to show" */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
               {/* Search Input - Flexible width with min-width */}
@@ -397,40 +438,45 @@ const SearchControls = ({
                 </div>
 
                 {/* Filters Toggle Button */}
-                <div data-tv-search-item="filters-button">
-                  <Button
-                    onClick={handleToggleFilterPanel}
-                    variant={isFilterPanelOpen ? "primary" : "secondary"}
-                    size="sm"
-                    className="flex items-center space-x-2 font-medium"
-                    icon={
-                      <svg
-                        className="w-4 h-4"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    }
+                {filterable && (
+                  <div
+                    ref={filtersButtonRef}
+                    data-tv-search-item="filters-button"
                   >
-                    <span>Filters</span>
-                    {hasActiveFilters && !isFilterPanelOpen && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full ml-1"
-                        style={{
-                          backgroundColor: "var(--accent-secondary)",
-                          color: "white",
-                        }}
-                      >
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </Button>
-                </div>
+                    <Button
+                      onClick={handleToggleFilterPanel}
+                      variant={isFilterPanelOpen ? "primary" : "secondary"}
+                      size="sm"
+                      className="flex items-center space-x-2 font-medium"
+                      icon={
+                        <svg
+                          className="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      }
+                    >
+                      <span>Filters</span>
+                      {hasActiveFilters && !isFilterPanelOpen && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full ml-1"
+                          style={{
+                            backgroundColor: "var(--accent-secondary)",
+                            color: "white",
+                          }}
+                        >
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -497,15 +543,25 @@ const SearchControls = ({
             </div>
 
             {/* Active Filter Chips */}
-            <ActiveFilterChips
-              kind={artifactType as ListEntity}
-              filters={filters}
-              filterOptions={filterOptions}
-              onRemoveFilter={removeFilter}
-              onChipClick={handleFilterChipClick}
-              permanentFilters={permanentFilters}
-              permanentFiltersMetadata={permanentFiltersMetadata}
-            />
+            {filterable ? (
+              <ActiveFilterChips
+                kind={artifactType as ListEntity}
+                filters={filters}
+                filterOptions={filterOptions}
+                onRemoveFilter={removeFilter}
+                onChipClick={handleFilterChipClick}
+                permanentFilters={permanentFilters}
+                permanentFiltersMetadata={permanentFiltersMetadata}
+              />
+            ) : (
+              hasActiveFilters && (
+                <StatusMessage
+                  variant="info"
+                  title={null}
+                  message="Filters don't apply to the hierarchy view. Switch to Grid or Table to use them."
+                />
+              )
+            )}
           </div>
         )}
       </div>
@@ -527,8 +583,8 @@ const SearchControls = ({
 
       {/* Filter Panel */}
       <FilterPanel
-        isOpen={isFilterPanelOpen}
-        onToggle={handleToggleFilterPanel}
+        isOpen={filterable && isFilterPanelOpen}
+        onCancel={handleFilterCancel}
         onClear={handleClearFilters}
         onSubmit={handleFilterSubmit}
         hasActiveFilters={hasActiveFilters}
@@ -548,47 +604,59 @@ const SearchControls = ({
               }));
             };
 
+            const headerStyle = {
+              backgroundColor: "var(--bg-secondary)",
+              borderBottom: isCollapsed
+                ? "none"
+                : "2px solid var(--accent-primary)",
+            };
+            const headerClass =
+              "font-semibold text-sm uppercase tracking-wide mb-3 rounded-md";
+
             return (
               <div
                 key={`section-${key}`}
                 className="col-span-full"
                 style={{ gridColumn: "1 / -1" }}
               >
-                <div
-                  className="flex items-center justify-between py-2 px-3 mb-3 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--bg-secondary)",
-                    borderBottom: isCollapsed
-                      ? "none"
-                      : "2px solid var(--accent-primary)",
-                  }}
-                  onClick={opt.collapsible ? toggleSection : undefined}
-                >
+                {opt.collapsible ? (
+                  <h3 className={headerClass} style={headerStyle}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between py-2 px-3 rounded-md text-left uppercase tracking-wide hover:opacity-80 transition-opacity"
+                      style={{ color: "var(--text-primary)" }}
+                      aria-expanded={!isCollapsed}
+                      aria-controls={sectionControlIds[key]}
+                      onClick={toggleSection}
+                    >
+                      <span>{opt.label}</span>
+                      <svg
+                        aria-hidden="true"
+                        className={`w-4 h-4 transition-transform ${
+                          isCollapsed ? "" : "rotate-180"
+                        }`}
+                        style={{ color: "var(--text-muted)" }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  </h3>
+                ) : (
                   <h3
-                    className="font-semibold text-sm uppercase tracking-wide"
-                    style={{ color: "var(--text-primary)" }}
+                    className={`${headerClass} py-2 px-3`}
+                    style={{ ...headerStyle, color: "var(--text-primary)" }}
                   >
                     {opt.label}
                   </h3>
-                  {opt.collapsible && (
-                    <svg
-                      className={`w-4 h-4 transition-transform ${
-                        isCollapsed ? "" : "rotate-180"
-                      }`}
-                      style={{ color: "var(--text-muted)" }}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  )}
-                </div>
+                )}
               </div>
             );
           }
