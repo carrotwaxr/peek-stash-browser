@@ -599,13 +599,23 @@ function escapeSqlNullable(value: string | null | undefined): string {
 // ==================== Change detection helpers ====================
 
 /**
+ * Stash's RFC 3339 time (any offset) as epoch milliseconds, as Prisma stores
+ * a DateTime: what every type stores in `stashCreatedAt` and
+ * `stashUpdatedAt` and compares in the change diff. NULL for a missing time
+ * or text that is no time.
+ */
+const epochMs = (t: string | null | undefined): number | null => {
+  const ms = t ? Date.parse(t) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+};
+
+/**
  * What a batch's rows looked like before it wrote them, by id, for the
- * change diff (SyncChangeSet): one statement over the batch's ids. Sync
- * stores `stashUpdatedAt` as the text Stash sent, in a column declared
- * DateTime, which Prisma's raw reads would parse into a Date; the CAST
- * returns the text, so it compares equal to what Stash sends again. Not for
- * clips, whose `stashUpdatedAt` is stored as epoch milliseconds, as Prisma
- * stores a DateTime (processClipsBatch reads them through Prisma).
+ * change diff (SyncChangeSet): one statement over the batch's ids.
+ * `stashUpdatedAt` holds epoch milliseconds in a column declared DateTime,
+ * which Prisma's raw reads would turn into a Date; the CAST returns the
+ * number, which compares equal to `epochMs` of what Stash sends again.
+ * Not for clips, which processClipsBatch reads through Prisma.
  */
 async function readStored(
   db: Pick<PrismaClient, "$queryRawUnsafe">,
@@ -617,12 +627,12 @@ async function readStored(
   const rows = await db.$queryRawUnsafe<
     Array<{
       id: string;
-      stashUpdatedAt: string | null;
+      stashUpdatedAt: bigint | number | null;
       deleted: bigint | number;
       studioId?: string | null;
     }>
   >(
-    `SELECT "id", CAST("stashUpdatedAt" AS TEXT) AS stashUpdatedAt,
+    `SELECT "id", CAST("stashUpdatedAt" AS INTEGER) AS stashUpdatedAt,
             "deletedAt" IS NOT NULL AS deleted${withStudio ? `, "studioId"` : ""}
      FROM "${table}"
      WHERE "stashInstanceId" = ? AND "id" IN (SELECT value FROM json_each(?))`,
@@ -633,7 +643,9 @@ async function readStored(
     rows.map((row) => [
       row.id,
       {
-        updatedAt: row.stashUpdatedAt,
+        // Number(null) is 0, which would read as changed on every sync
+        updatedAt:
+          row.stashUpdatedAt === null ? null : Number(row.stashUpdatedAt),
         deleted: Number(row.deleted) === 1,
         ...(withStudio ? { studioId: row.studioId ?? null } : {}),
       },
@@ -1553,8 +1565,8 @@ async function processScenesBatch(
     ${scene.o_counter ?? 0},
     ${scene.play_count ?? 0},
     ${scene.play_duration ?? 0},
-    ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
-    ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
+    ${epochMs(scene.created_at) ?? "NULL"},
+    ${epochMs(scene.updated_at) ?? "NULL"},
     datetime('now'),
     NULL,
     ${escapeSqlNullable(phash)},
@@ -1655,7 +1667,7 @@ async function processScenesBatch(
     }
     incoming.push({
       id: scene.id,
-      updatedAt: scene.updated_at,
+      updatedAt: epochMs(scene.updated_at),
       studioId: scene.studio?.id ?? null,
       links,
     });
@@ -1749,8 +1761,8 @@ async function processPerformersBatch(
     ${performer.image_count},
     ${performer.gallery_count},
     ${performer.group_count},
-    ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
-    ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
+    ${epochMs(performer.created_at) ?? "NULL"},
+    ${epochMs(performer.updated_at) ?? "NULL"},
     datetime('now'),
     NULL
   )`;
@@ -1823,7 +1835,7 @@ async function processPerformersBatch(
     }
     incoming.push({
       id: performer.id,
-      updatedAt: performer.updated_at,
+      updatedAt: epochMs(performer.updated_at),
       links: { PerformerTag: tagIds },
     });
   }
@@ -1895,8 +1907,8 @@ async function processStudiosBatch(
     ${escapeSqlNullable(studio.details)},
     ${escapeSqlNullable(studio.url)},
     ${escapeSqlNullable(studio.image_path)},
-    ${studio.created_at ? `'${studio.created_at}'` : "NULL"},
-    ${studio.updated_at ? `'${studio.updated_at}'` : "NULL"},
+    ${epochMs(studio.created_at) ?? "NULL"},
+    ${epochMs(studio.updated_at) ?? "NULL"},
     datetime('now'),
     NULL
   )`;
@@ -1940,7 +1952,7 @@ async function processStudiosBatch(
     for (const tagId of tagIds) tagRows.push([studio.id, tagId]);
     incoming.push({
       id: studio.id,
-      updatedAt: studio.updated_at,
+      updatedAt: epochMs(studio.updated_at),
       links: { StudioTag: tagIds },
     });
   }
@@ -2017,8 +2029,8 @@ async function processTagsBatch(
     ${escapeSqlNullable(JSON.stringify(parentIds))},
     ${escapeSqlNullable(tag.image_path)},
     ${escapeSqlNullable(tagRecord.color as string | undefined)},
-    ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
-    ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
+    ${epochMs(tag.created_at) ?? "NULL"},
+    ${epochMs(tag.updated_at) ?? "NULL"},
     datetime('now'),
     NULL
   )`;
@@ -2069,7 +2081,7 @@ async function processTagsBatch(
         markChanged: run.markChanged,
         incoming: validTags.map((tag) => ({
           id: tag.id,
-          updatedAt: tag.updated_at,
+          updatedAt: epochMs(tag.updated_at),
         })),
       }),
   });
@@ -2109,8 +2121,8 @@ async function processGroupsBatch(
     ${escapeSqlNullable(JSON.stringify(urls))},
     ${escapeSqlNullable(group.front_image_path)},
     ${escapeSqlNullable(group.back_image_path)},
-    ${group.created_at ? `'${group.created_at}'` : "NULL"},
-    ${group.updated_at ? `'${group.updated_at}'` : "NULL"},
+    ${epochMs(group.created_at) ?? "NULL"},
+    ${epochMs(group.updated_at) ?? "NULL"},
     datetime('now'),
     NULL
   )`;
@@ -2155,7 +2167,7 @@ async function processGroupsBatch(
     for (const tagId of tagIds) tagRows.push([group.id, tagId]);
     incoming.push({
       id: group.id,
-      updatedAt: group.updated_at,
+      updatedAt: epochMs(group.updated_at),
       // Its old and new studio join the change set's studios, whose
       // collection counts it moves (a studio change moves updated_at)
       studioId: group.studio?.id ?? null,
@@ -2226,8 +2238,8 @@ async function processGalleriesBatch(
     ${escapeSqlNullable(folder?.path)},
     ${escapeSqlNullable(fileBasename)},
     ${escapeSqlNullable(gallery.paths.cover)},
-    ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
-    ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
+    ${epochMs(gallery.created_at) ?? "NULL"},
+    ${epochMs(gallery.updated_at) ?? "NULL"},
     datetime('now'),
     NULL
   )`;
@@ -2313,7 +2325,7 @@ async function processGalleriesBatch(
         markChanged: run.markChanged,
         incoming: validGalleries.map((gallery) => ({
           id: gallery.id,
-          updatedAt: gallery.updated_at,
+          updatedAt: epochMs(gallery.updated_at),
           studioId: gallery.studio?.id ?? null,
           links: linksOf.get(gallery.id),
         })),
@@ -2398,8 +2410,8 @@ async function processImagesBatch(
       ${escapeSqlNullable(paths.thumbnail)},
       ${escapeSqlNullable(paths.preview)},
       ${escapeSqlNullable(paths.image)},
-      ${image.created_at ? `'${image.created_at}'` : "NULL"},
-      ${image.updated_at ? `'${image.updated_at}'` : "NULL"},
+      ${epochMs(image.created_at) ?? "NULL"},
+      ${epochMs(image.updated_at) ?? "NULL"},
       datetime('now'),
       NULL
     )`;
@@ -2470,7 +2482,7 @@ async function processImagesBatch(
     }
     incoming.push({
       id: image.id,
-      updatedAt: image.updated_at,
+      updatedAt: epochMs(image.updated_at),
       studioId: image.studio?.id ?? null,
       links,
     });
@@ -2542,8 +2554,6 @@ async function processClipsBatch(
 
   const markerIds = markers.map((m) => m.id);
 
-  const epochMs = (timestamp: string | null | undefined): number | null =>
-    timestamp ? new Date(timestamp).getTime() : null;
   const now = Date.now();
   const clips = markers.map((marker, i) => ({
     id: marker.id,

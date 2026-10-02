@@ -6,7 +6,8 @@
  * `performerCount` / `tagCount`, the scene's `ScenePerformer` and `SceneTag`
  * rows. The list sorts and filters on them through indexes instead of
  * computing them per scene on every request. Images store the same
- * `titleSort` (routed C7): their title, else `getImageFallbackTitle`.
+ * `titleSort` (routed C7): their title, else `getImageFallbackTitle`. Every
+ * type stores Stash's created_at and updated_at as epoch milliseconds.
  *
  * The first case of each block reads every row the startup sync wrote. The
  * others write through the batch writers under a made-up instance,
@@ -390,5 +391,47 @@ describeWithDb("Image sort key (integration)", () => {
     expect(before.map((i) => i.titleSort)).toEqual(["before"]);
     expect(renamed.map((i) => i.titleSort)).toEqual(["after"]);
     expect(untitled.map((i) => i.titleSort)).toEqual(["moved"]);
+  });
+});
+
+/** The seven types whose batches write Stash's created_at and updated_at */
+const TIMESTAMP_TABLES = [
+  "StashScene",
+  "StashPerformer",
+  "StashStudio",
+  "StashTag",
+  "StashGroup",
+  "StashGallery",
+  "StashImage",
+] as const;
+
+describeWithDb("Stash timestamps (integration)", () => {
+  it("every synced type stores its Stash timestamps as integers", async () => {
+    const instanceIds = (
+      await prisma.stashInstance.findMany({ select: { id: true } })
+    ).map((i) => i.id);
+
+    // Each table's storage classes of the two columns, NULL aside
+    const storage: Record<string, string[]> = {};
+    for (const table of TIMESTAMP_TABLES) {
+      const rows = await prisma.$queryRawUnsafe<Array<{ kind: string }>>(
+        `SELECT typeof("stashCreatedAt") AS kind FROM "${table}"
+         WHERE "stashInstanceId" IN (SELECT value FROM json_each(?))
+         UNION
+         SELECT typeof("stashUpdatedAt") FROM "${table}"
+         WHERE "stashInstanceId" IN (SELECT value FROM json_each(?))`,
+        JSON.stringify(instanceIds),
+        JSON.stringify(instanceIds)
+      );
+      storage[table] = rows
+        .map((r) => r.kind)
+        .filter((kind) => kind !== "null")
+        .sort();
+    }
+
+    // Epoch milliseconds, as Prisma stores a DateTime: never Stash's text
+    expect(storage).toEqual(
+      Object.fromEntries(TIMESTAMP_TABLES.map((table) => [table, ["integer"]]))
+    );
   });
 });
