@@ -18,9 +18,9 @@ const CAROUSEL_SIZE = 12;
 
 /**
  * Continue Watching carousel component
- * Shows the scenes the viewer left part-way (the server's "in progress" view:
- * a resume point before the last 10% and at least 2% watched), most recently
- * played first. While the library is initializing it shows its loading state.
+ * Shows the scenes the viewer left part-way (the server's "in progress" view,
+ * the same rule as the History page's In Progress tab and the In progress
+ * filter: a resume point before the last 10%), most recently played first. While the library is initializing it shows its loading state.
  */
 interface Props {
   selectedScenes?: NormalizedScene[];
