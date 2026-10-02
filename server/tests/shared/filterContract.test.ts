@@ -14,6 +14,8 @@ import {
   type FieldSpec,
   LIST_KINDS,
   type ListKind,
+  PANEL_FIELDS,
+  type PanelField,
   SORTS,
   UI_KEYS,
 } from "@peek/shared-types/filters/index.js";
@@ -81,5 +83,212 @@ describe("filter contract", () => {
     });
 
     expect(wrong).toEqual([]);
+  });
+});
+
+/**
+ * Today's (v3.4.0-beta.7) panel keys with their companions: links, presets
+ * and stored carousels name them, so every one must stay in the projection
+ * of the panel table (new entries and companions may be added; a field may
+ * be renamed)
+ */
+const BETA7_UI_KEYS: Record<
+  ListKind,
+  readonly { key: string; modifierKey?: string; hierarchyKey?: string }[]
+> = {
+  scene: [
+    { key: "title" },
+    { key: "details" },
+    { key: "performerIds", modifierKey: "performerIdsModifier" },
+    { key: "studioId", hierarchyKey: "studioIdDepth" },
+    {
+      key: "tagIds",
+      modifierKey: "tagIdsModifier",
+      hierarchyKey: "tagIdsDepth",
+    },
+    { key: "groupIds", modifierKey: "groupIdsModifier" },
+    { key: "rating" },
+    { key: "oCount" },
+    { key: "duration" },
+    { key: "favorite" },
+    { key: "performerFavorite" },
+    { key: "studioFavorite" },
+    { key: "tagFavorite" },
+    { key: "date" },
+    { key: "createdAt" },
+    { key: "updatedAt" },
+    { key: "lastPlayedAt" },
+    { key: "resolution", modifierKey: "resolutionModifier" },
+    { key: "bitrate" },
+    { key: "framerate" },
+    { key: "orientation" },
+    { key: "videoCodec" },
+    { key: "audioCodec" },
+    { key: "director" },
+    { key: "playDuration" },
+    { key: "playCount" },
+    { key: "performerCount" },
+    { key: "performerAge" },
+    { key: "tagCount" },
+  ],
+  performer: [
+    { key: "name" },
+    {
+      key: "tagIds",
+      modifierKey: "tagIdsModifier",
+      hierarchyKey: "tagIdsDepth",
+    },
+    { key: "gender" },
+    { key: "rating" },
+    { key: "oCounter" },
+    { key: "sceneCount" },
+    { key: "favorite" },
+    { key: "age" },
+    { key: "birthYear" },
+    { key: "deathYear" },
+    { key: "careerLength" },
+    { key: "birthdate" },
+    { key: "deathDate" },
+    { key: "createdAt" },
+    { key: "updatedAt" },
+    { key: "hairColor" },
+    { key: "eyeColor" },
+    { key: "ethnicity" },
+    { key: "fakeTits" },
+    { key: "measurements" },
+    { key: "tattoos" },
+    { key: "piercings" },
+    { key: "height" },
+    { key: "weight" },
+    { key: "penisLength" },
+    { key: "playCount" },
+    { key: "details" },
+  ],
+  studio: [
+    { key: "name" },
+    { key: "details" },
+    {
+      key: "tagIds",
+      modifierKey: "tagIdsModifier",
+      hierarchyKey: "tagIdsDepth",
+    },
+    { key: "rating" },
+    { key: "sceneCount" },
+    { key: "oCounter" },
+    { key: "playCount" },
+    { key: "favorite" },
+    { key: "createdAt" },
+    { key: "updatedAt" },
+  ],
+  tag: [
+    { key: "name" },
+    { key: "description" },
+    { key: "rating" },
+    { key: "sceneCount" },
+    { key: "oCounter" },
+    { key: "playCount" },
+    { key: "favorite" },
+    { key: "performerIds" },
+    { key: "studioId" },
+    { key: "groupIds" },
+    { key: "createdAt" },
+    { key: "updatedAt" },
+  ],
+  group: [
+    { key: "name" },
+    { key: "synopsis" },
+    { key: "director" },
+    { key: "performerIds", modifierKey: "performerIdsModifier" },
+    { key: "studioId" },
+    { key: "tagIds", modifierKey: "tagIdsModifier" },
+    { key: "rating" },
+    { key: "sceneCount" },
+    { key: "duration" },
+    { key: "favorite" },
+    { key: "date" },
+    { key: "createdAt" },
+    { key: "updatedAt" },
+    { key: "groupIds" },
+  ],
+  gallery: [
+    { key: "title" },
+    { key: "performerIds", modifierKey: "performerIdsModifier" },
+    {
+      key: "studioIds",
+      modifierKey: "studioIdsModifier",
+      hierarchyKey: "studioIdsDepth",
+    },
+    {
+      key: "tagIds",
+      modifierKey: "tagIdsModifier",
+      hierarchyKey: "tagIdsDepth",
+    },
+    { key: "rating" },
+    { key: "imageCount" },
+    { key: "tagCount" },
+    { key: "favorite" },
+    { key: "hasFavoriteImage" },
+  ],
+  image: [
+    { key: "performerIds", modifierKey: "performerIdsModifier" },
+    {
+      key: "studioIds",
+      modifierKey: "studioIdsModifier",
+      hierarchyKey: "studioIdsDepth",
+    },
+    {
+      key: "tagIds",
+      modifierKey: "tagIdsModifier",
+      hierarchyKey: "tagIdsDepth",
+    },
+    { key: "galleryIds", modifierKey: "galleryIdsModifier" },
+    { key: "rating" },
+    { key: "favorite" },
+    { key: "oCounter" },
+    { key: "tagCount" },
+  ],
+  clip: [
+    { key: "tagIds", modifierKey: "tagIdsModifier" },
+    { key: "sceneTagIds", modifierKey: "sceneTagIdsModifier" },
+    { key: "performerIds", modifierKey: "performerIdsModifier" },
+    { key: "studioId" },
+    { key: "isGenerated" },
+  ],
+};
+
+/** A key with its companions, as a comparable line */
+const describeKey = (uiKey: {
+  key: string;
+  modifierKey?: string;
+  hierarchyKey?: string;
+}) =>
+  `${uiKey.key} modifier=${uiKey.modifierKey ?? "-"} hierarchy=${uiKey.hierarchyKey ?? "-"}`;
+
+/** A list's panel rows, widened to the row type */
+const panelOf = (kind: ListKind): readonly PanelField[] => PANEL_FIELDS[kind];
+
+describe("filter panel keys", () => {
+  it("UI_KEYS is the panel table's projection", () => {
+    for (const kind of LIST_KINDS) {
+      const projected = panelOf(kind).map((field) => ({
+        key: field.key,
+        field: field.field,
+        ...(field.modifierKey ? { modifierKey: field.modifierKey } : {}),
+        ...(field.hierarchyKey ? { hierarchyKey: field.hierarchyKey } : {}),
+      }));
+      expect(UI_KEYS[kind]).toEqual(projected);
+    }
+  });
+
+  it("every v3.4.0-beta.7 UI key is still in the panel table's projection", () => {
+    const missing = LIST_KINDS.flatMap((kind) => {
+      const now = new Set(panelOf(kind).map((field) => describeKey(field)));
+      return BETA7_UI_KEYS[kind]
+        .map(describeKey)
+        .filter((line) => !now.has(line))
+        .map((line) => `${kind}.${line}`);
+    });
+
+    expect(missing).toEqual([]);
   });
 });
