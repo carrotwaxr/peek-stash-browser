@@ -349,6 +349,66 @@ describe("SearchControls", () => {
       expect(modifier).toHaveValue("INCLUDES");
       expect(modifier).toHaveDisplayValue("Has ANY of these");
     });
+
+    const tagsControl = () =>
+      must(
+        screen.getByText("Tags", { selector: "label" }).parentElement,
+        "the Tags control"
+      );
+
+    it("ticking Include sub-tags keeps the condition", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls({}, { url: "/scenes?tagIds=1:a" });
+      await firstQuery(list.onQueryChange);
+
+      await user.click(
+        must(screen.getByText("Filters").closest("button"), "Filters button")
+      );
+      const modifier = must(
+        within(tagsControl()).getAllByRole("combobox")[0],
+        "the modifier"
+      );
+      await user.selectOptions(modifier, "EXCLUDES");
+      await user.click(
+        within(tagsControl()).getByRole("checkbox", {
+          name: /Include sub-tags/,
+        })
+      );
+
+      const after = within(tagsControl()).getAllByRole("combobox")[0];
+      expect(after).toBeEnabled();
+      expect(after).toHaveValue("EXCLUDES");
+      expect(after).toHaveDisplayValue("Has NONE of these");
+
+      await user.click(
+        must(screen.getByText("Apply Filters").closest("button"))
+      );
+      await waitFor(() =>
+        expect(list.lastQuery().scene_filter).toEqual({
+          tags: { value: ["1:a"], modifier: "EXCLUDES", depth: -1 },
+        })
+      );
+    });
+
+    it("a URL with depth -1 and Has ALL shows Has ALL", async () => {
+      const user = userEvent.setup();
+      const list = renderSearchControls(
+        {},
+        {
+          url: "/scenes?tagIds=1:a&tagIdsModifier=INCLUDES_ALL&tagIdsDepth=-1",
+        }
+      );
+      expect((await firstQuery(list.onQueryChange)).scene_filter).toEqual({
+        tags: { value: ["1:a"], modifier: "INCLUDES_ALL", depth: -1 },
+      });
+
+      await user.click(
+        must(screen.getByText("Filters").closest("button"), "Filters button")
+      );
+      const modifier = within(tagsControl()).getAllByRole("combobox")[0];
+      expect(modifier).toHaveValue("INCLUDES_ALL");
+      expect(modifier).toHaveDisplayValue("Has ALL of these");
+    });
   });
 
   describe("Fields the page fixes", () => {
