@@ -59,7 +59,8 @@ A table remembers your columns for each type: a change on the Scenes table is sa
 
 Browse content chronologically, organized by date.
 
-- Content grouped by year, month, or day
+- Content grouped by year, month, week, or day; a week runs Monday to Sunday and belongs to the year of its Thursday (ISO weeks), so 30 December 2024 is in week 1 of 2025
+- The bars count what the list shows: on a tag's page the items that carry the tag or inherit it, and with the filters and search you have set, without your hidden items
 - Expandable date sections with item counts
 - Visual timeline with thumbnails
 - Three density levels: Small, Medium, Large

@@ -1,258 +1,99 @@
-import prisma from "../prisma/singleton.js";
-import type { FilterRef } from "../types/parsedFilters.js";
-import { type SqlParam, instanceClause } from "../utils/sqlClauses.js";
-
-export type Granularity = "years" | "months" | "weeks" | "days";
-export type TimelineEntityType = "scene" | "gallery" | "image";
-
-export interface DistributionItem {
-  period: string;
-  count: number;
-}
-
-interface QueryClause {
-  sql: string;
-  params: SqlParam[];
-}
-
 /**
- * One entity to filter by per field, as the detail pages send it and the
- * controller parsed it: a ref with its instance, or a bare id
- * (`instanceId` undefined), which matches that id on every instance
+ * The timeline's bars (C12, UD-09): one per period, the count of what the
+ * list shows dated in it. Each list's builder counts its own request
+ * (`periodCounts`), so the page's tag with inherited tags, the panel's
+ * filters, the search, the viewer's exclusions and instances and the zone
+ * date filters read in are the grid's by construction.
  */
-export interface TimelineFilters {
-  performerId?: FilterRef;
-  tagId?: FilterRef;
-  studioId?: FilterRef;
-  groupId?: FilterRef;
-  /** A gallery's scenes or images (a gallery page's tabs) */
-  galleryId?: FilterRef;
+import type {
+  TimelineEntityType,
+  TimelineGranularity,
+} from "@peek/shared-types/api/timeline.js";
+import type { ParsedListRequest } from "../types/parsedFilters.js";
+import { galleryQueryBuilder } from "./GalleryQueryBuilder.js";
+import { imageQueryBuilder } from "./ImageQueryBuilder.js";
+import { sceneQueryBuilder } from "./SceneQueryBuilder.js";
+import type { PeriodCount } from "./query/EntityQueryBuilder.js";
+
+export type Granularity = TimelineGranularity;
+export type { TimelineEntityType };
+export type DistributionItem = PeriodCount;
+
+export interface DistributionOptions {
+  readonly userId: number;
+  readonly allowedInstanceIds: readonly string[];
+  /** The viewer's IANA zone (`req.timeZone`), which date filters read days in */
+  readonly timeZone: string;
+  readonly granularity: Granularity;
 }
 
-type TimelineFilter = keyof TimelineFilters;
-
-/**
- * How a filter reaches an entity: through a junction row, which holds both
- * sides' (id, instance), or through the entity's own `studioId`, whose studio
- * is on the entity's instance
- */
-type FilterPath =
-  | {
-      kind: "junction";
-      table: string;
-      alias: string;
-      ref: "performer" | "tag" | "group" | "gallery";
-    }
-  | { kind: "studio" };
-
-interface EntityConfig {
-  table: string;
-  alias: string;
-  /** The entity's column prefix in its junction tables (`sceneId`, ...) */
-  junctionKey: TimelineEntityType;
-  /** The filters the entity type has; any other is ignored */
-  filters: Partial<Record<TimelineFilter, FilterPath>>;
+/** A list builder's `periodCounts` options, as the bars pass them */
+interface CountOptions<E extends TimelineEntityType> {
+  readonly userId: number;
+  readonly allowedInstanceIds: readonly string[];
+  readonly request: ParsedListRequest<E>;
+  readonly applyExclusions: boolean;
+  readonly timeZone: string;
 }
 
-const ENTITY_CONFIG: Record<TimelineEntityType, EntityConfig> = {
-  scene: {
-    table: "StashScene",
-    alias: "s",
-    junctionKey: "scene",
-    filters: {
-      performerId: {
-        kind: "junction",
-        table: "ScenePerformer",
-        alias: "sp",
-        ref: "performer",
-      },
-      tagId: { kind: "junction", table: "SceneTag", alias: "st", ref: "tag" },
-      studioId: { kind: "studio" },
-      groupId: {
-        kind: "junction",
-        table: "SceneGroup",
-        alias: "sg",
-        ref: "group",
-      },
-      galleryId: {
-        kind: "junction",
-        table: "SceneGallery",
-        alias: "sga",
-        ref: "gallery",
-      },
-    },
-  },
-  gallery: {
-    table: "StashGallery",
-    alias: "g",
-    junctionKey: "gallery",
-    filters: {
-      performerId: {
-        kind: "junction",
-        table: "GalleryPerformer",
-        alias: "gp",
-        ref: "performer",
-      },
-      tagId: { kind: "junction", table: "GalleryTag", alias: "gt", ref: "tag" },
-      studioId: { kind: "studio" },
-    },
-  },
-  image: {
-    table: "StashImage",
-    alias: "i",
-    junctionKey: "image",
-    filters: {
-      performerId: {
-        kind: "junction",
-        table: "ImagePerformer",
-        alias: "ip",
-        ref: "performer",
-      },
-      tagId: { kind: "junction", table: "ImageTag", alias: "it", ref: "tag" },
-      studioId: { kind: "studio" },
-      galleryId: {
-        kind: "junction",
-        table: "ImageGallery",
-        alias: "ig",
-        ref: "gallery",
-      },
-    },
-  },
+/** Each list's builder, as far as the bars need it, and the date it counts by */
+const LISTS: {
+  readonly [E in TimelineEntityType]: {
+    readonly builder: {
+      periodCounts(
+        options: CountOptions<E>,
+        periodSql: string,
+        dateColumn: string
+      ): Promise<PeriodCount[]>;
+    };
+    readonly dateColumn: string;
+  };
+} = {
+  scene: { builder: sceneQueryBuilder, dateColumn: "s.date" },
+  gallery: { builder: galleryQueryBuilder, dateColumn: "g.date" },
+  image: { builder: imageQueryBuilder, dateColumn: "i.date" },
 };
 
-/** The order the filters' conditions, and so their parameters, appear in */
-const FILTER_ORDER: readonly TimelineFilter[] = [
-  "performerId",
-  "tagId",
-  "studioId",
-  "groupId",
-  "galleryId",
-];
+/**
+ * The period of a `YYYY-MM-DD` column, in the forms URLs carry
+ * (`period=2024`, `2024-03`, `2024-W12`, `2024-03-09`). A week is the ISO
+ * week: Monday to Sunday, numbered in the year of its Thursday, so
+ * 2024-12-30 is in 2025-W01 and 2021-01-03 in 2020-W53. The Thursday of a
+ * date's week is the first Thursday on or after the date less three days.
+ */
+export function periodSql(granularity: Granularity, column: string): string {
+  switch (granularity) {
+    case "years":
+      return `strftime('%Y', ${column})`;
+    case "months":
+      return `strftime('%Y-%m', ${column})`;
+    case "days":
+      return column;
+    case "weeks": {
+      const thursday = `date(${column}, '-3 days', 'weekday 4')`;
+      return `printf('%s-W%02d', strftime('%Y', ${thursday}), (CAST(strftime('%j', ${thursday}) AS INTEGER) - 1) / 7 + 1)`;
+    }
+  }
+}
 
 export class TimelineService {
-  getStrftimeFormat(granularity: Granularity): string {
-    switch (granularity) {
-      case "years":
-        return "%Y";
-      case "months":
-        return "%Y-%m";
-      case "weeks":
-        return "%Y-W%W";
-      case "days":
-        return "%Y-%m-%d";
-      default:
-        return "%Y-%m";
-    }
-  }
-
   /**
-   * One bar per period: the count of the user's visible entities dated in it.
-   *
-   * The inner query lists each matching entity by (id, instance), since two
-   * Stash servers reuse small ids; the outer one counts them per period. A
-   * junction ref that names its instance matches at most one junction row per
-   * entity (the row's key is both pairs), so the rows are the entities. A
-   * bare ref leaves the ref's instance open, so the inner query keeps each
-   * entity once with DISTINCT.
+   * One bar per period: the request's list, as the viewer sees it, counted
+   * by the period of its date. The viewer's exclusions always apply (an
+   * admin's rows hold only their own hides).
    */
-  buildDistributionQuery(
-    entityType: TimelineEntityType,
-    userId: number,
-    allowedInstanceIds: readonly string[],
-    granularity: Granularity,
-    filters?: TimelineFilters
-  ): QueryClause {
-    const config = ENTITY_CONFIG[entityType];
-    const { alias } = config;
-    const format = this.getStrftimeFormat(granularity);
-    const dateField = `${alias}.date`;
-    const instances = instanceClause(alias, allowedInstanceIds);
-
-    const joins: string[] = [];
-    const conditions: string[] = [];
-    const filterParams: string[] = [];
-    let distinct = false;
-
-    for (const name of FILTER_ORDER) {
-      const value = filters?.[name];
-      const path = config.filters[name];
-      if (!value || !path) continue;
-
-      let idColumn: string;
-      let instanceColumn: string;
-      if (path.kind === "junction") {
-        const j = path.alias;
-        const key = config.junctionKey;
-        joins.push(
-          `INNER JOIN ${path.table} ${j} ON ${j}.${key}Id = ${alias}.id AND ${j}.${key}InstanceId = ${alias}.stashInstanceId`
-        );
-        idColumn = `${j}.${path.ref}Id`;
-        instanceColumn = `${j}.${path.ref}InstanceId`;
-      } else {
-        idColumn = `${alias}.studioId`;
-        instanceColumn = `${alias}.stashInstanceId`;
-      }
-
-      if (value.instanceId) {
-        conditions.push(`${idColumn} = ? AND ${instanceColumn} = ?`);
-        filterParams.push(value.id, value.instanceId);
-      } else {
-        conditions.push(`${idColumn} = ?`);
-        filterParams.push(value.id);
-        if (path.kind === "junction") distinct = true;
-      }
-    }
-
-    const joinClause = joins.join("\n        ");
-    const extraWhere = conditions.map((c) => `AND ${c}`).join("\n          ");
-
-    const sql = `
-      SELECT period, COUNT(*) AS count
-      FROM (
-        SELECT ${distinct ? "DISTINCT " : ""}${alias}.id, ${alias}.stashInstanceId,
-          strftime('${format}', ${dateField}) AS period
-        FROM ${config.table} ${alias}
-        ${joinClause}
-        LEFT JOIN UserExcludedEntity e
-          ON e.userId = ? AND e.entityType = '${entityType}' AND e.entityId = ${alias}.id AND (e.instanceId = '' OR e.instanceId = ${alias}.stashInstanceId)
-        WHERE ${alias}.deletedAt IS NULL
-          AND e.id IS NULL
-          AND ${instances.sql}
-          AND ${dateField} IS NOT NULL
-          AND ${dateField} LIKE '____-__-__'
-          ${extraWhere}
-      )
-      GROUP BY period
-      HAVING period IS NOT NULL AND period NOT LIKE '-%'
-      ORDER BY period ASC
-    `.trim();
-
-    return { sql, params: [userId, ...instances.params, ...filterParams] };
-  }
-
-  async getDistribution(
-    entityType: TimelineEntityType,
-    userId: number,
-    allowedInstanceIds: readonly string[],
-    granularity: Granularity,
-    filters?: TimelineFilters
+  async getDistribution<E extends TimelineEntityType>(
+    entityType: E,
+    request: ParsedListRequest<E>,
+    options: DistributionOptions
   ): Promise<DistributionItem[]> {
-    const { sql, params } = this.buildDistributionQuery(
-      entityType,
-      userId,
-      allowedInstanceIds,
-      granularity,
-      filters
+    const { builder, dateColumn } = LISTS[entityType];
+    const { granularity, ...viewer } = options;
+    return builder.periodCounts(
+      { ...viewer, request, applyExclusions: true },
+      periodSql(granularity, dateColumn),
+      dateColumn
     );
-
-    const results = await prisma.$queryRawUnsafe<
-      Array<{ period: string; count: bigint }>
-    >(sql, ...params);
-
-    return results.map((row) => ({
-      period: row.period,
-      count: Number(row.count),
-    }));
   }
 }
 
