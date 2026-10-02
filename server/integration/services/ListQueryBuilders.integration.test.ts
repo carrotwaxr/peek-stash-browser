@@ -33,6 +33,7 @@ import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { refreshImageDerivedColumns } from "../../services/StashSyncService.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { parsedListRequest } from "../../tests/helpers/fixtures.js";
@@ -149,6 +150,11 @@ async function seed(): Promise<void> {
       { id: PCT, stashInstanceId: B, title: "Image B" },
     ],
   });
+  // A sync batch stores each image's name as the card shows it (titleSort);
+  // the search reads it
+  for (const instance of [A, B]) {
+    await refreshImageDerivedColumns(prisma, [PCT, NO_PCT], instance);
+  }
   await prisma.imageTag.createMany({
     data: [A, B].map((instance) => ({
       imageId: PCT,
