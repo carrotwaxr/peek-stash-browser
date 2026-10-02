@@ -28,7 +28,7 @@ import type {
 } from "../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../utils/entityInstanceId.js";
 import { instanceColumnClause, pairs } from "../utils/sqlClauses.js";
-import { emptyToNull, likeContains } from "../utils/sqlHelpers.js";
+import { emptyToNull, jsonListArm, likeContains } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 type SqlParam = string | number | boolean;
@@ -53,6 +53,8 @@ interface MinimalConfig {
   readonly extraColumns?: string;
   /** The columns `q` is matched against */
   readonly search: readonly string[];
+  /** The JSON list columns `q` is matched against, element by element */
+  readonly searchLists?: readonly string[];
   /** The column each count minimum compares; a minimum the type lacks is ignored */
   readonly counts: readonly (readonly [keyof MinimalCountFilter, string])[];
 }
@@ -80,7 +82,8 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
     table: "StashPerformer",
     entityType: "performer",
     name: "x.name",
-    search: ["x.name", "x.aliasList"],
+    search: ["x.name"],
+    searchLists: ["x.aliasList"],
     counts: [
       ["min_scene_count", "x.sceneCount"],
       ["min_gallery_count", "x.galleryCount"],
@@ -105,7 +108,8 @@ const CONFIGS: Record<MinimalKind, MinimalConfig> = {
     table: "StashTag",
     entityType: "tag",
     name: "x.name",
-    search: ["x.name", "x.aliases"],
+    search: ["x.name"],
+    searchLists: ["x.aliases"],
     counts: [
       ["min_scene_count", "x.sceneCount"],
       ["min_gallery_count", "x.galleryCount"],
@@ -163,10 +167,17 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
 
   if (request.q !== undefined) {
     const pattern = likeContains(request.q);
+    const lists = config.searchLists ?? [];
     where.push(
-      `(${config.search.map((col) => `${col} LIKE ? ESCAPE '\\'`).join(" OR ")})`
+      `(${[
+        ...config.search.map((col) => `${col} LIKE ? ESCAPE '\\'`),
+        ...lists.map((list) => jsonListArm(list)),
+      ].join(" OR ")})`
     );
-    params.push(...config.search.map(() => pattern));
+    params.push(
+      ...config.search.map(() => pattern),
+      ...lists.map(() => pattern)
+    );
   }
 
   // Any one of the minimums the type has (OR); none of them filters nothing

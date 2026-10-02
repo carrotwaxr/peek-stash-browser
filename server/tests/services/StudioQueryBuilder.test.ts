@@ -313,7 +313,7 @@ describe("StudioQueryBuilder", () => {
         "COALESCE(us.playCount, 0) = ?",
         "MAX(s.sceneCount - COALESCE(d.scenes, 0), 0) != ?",
         "LOWER(s.name) = LOWER(?)",
-        "(LOWER(s.details) LIKE LOWER(?))",
+        "(s.details LIKE ? ESCAPE '\\')",
         "s.stashCreatedAt BETWEEN ? AND ?",
         "s.stashUpdatedAt IS NULL",
       ]) {

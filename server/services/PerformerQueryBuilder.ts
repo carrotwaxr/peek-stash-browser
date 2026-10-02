@@ -272,7 +272,7 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
       buildNumericFilter(c, visibleCount(ctx, "p.sceneCount", "scenes")),
 
     // Text; the name also matches the aliases
-    name: (c) => buildTextFilter(c, "p.name", ["p.aliasList"]),
+    name: (c) => buildTextFilter(c, "p.name", { lists: ["p.aliasList"] }),
     details: (c) => buildTextFilter(c, "p.details"),
     tattoos: (c) => buildTextFilter(c, "p.tattoos"),
     piercings: (c) => buildTextFilter(c, "p.piercings"),

@@ -359,7 +359,7 @@ describe("GroupQueryBuilder", () => {
         "MAX(g.sceneCount - COALESCE(d.scenes, 0), 0) > ?",
         "g.duration < ?",
         "LOWER(g.name) = LOWER(?)",
-        "(LOWER(g.synopsis) LIKE LOWER(?))",
+        "(g.synopsis LIKE ? ESCAPE '\\')",
         "(g.director IS NOT NULL AND g.director != '')",
         "g.date IS NULL",
         "g.stashCreatedAt",

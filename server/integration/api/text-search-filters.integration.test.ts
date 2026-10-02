@@ -204,6 +204,70 @@ describe("Text Search Filters", () => {
     });
   });
 
+  describe("name and title filters take % _ [ literally and read aliases one by one", () => {
+    const performerNames = async (name: {
+      value: string;
+      modifier: string;
+    }): Promise<FindPerformersResponse["findPerformers"]> => {
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        { filter: { per_page: 500 }, performer_filter: { name } }
+      );
+      expect(response.ok).toBe(true);
+      return response.data.findPerformers;
+    };
+
+    it("name `[` matches no performer whose name lacks it", async () => {
+      // No name or alias in the synthetic library holds a bracket: the
+      // alias lists' JSON punctuation (`["..."]`) is not text to match
+      const { performers, count } = await performerNames({
+        value: "[",
+        modifier: "INCLUDES",
+      });
+
+      expect(count).toBe(0);
+      expect(performers).toEqual([]);
+    });
+
+    it("name matches an alias", async () => {
+      // The synthetic aliases read "<name> alias <n>"; no name has the word
+      const { performers, count } = await performerNames({
+        value: "alias",
+        modifier: "INCLUDES",
+      });
+
+      expect(count).toBeGreaterThan(0);
+      for (const performer of performers) {
+        expect(performer.name).not.toContain("alias");
+      }
+    });
+
+    it("name `_` and `%` match only names holding them", async () => {
+      for (const value of ["_", "%"]) {
+        const { count } = await performerNames({ value, modifier: "INCLUDES" });
+        expect(count).toBe(0);
+      }
+    });
+
+    it("title `_` matches only titles with an underscore", async () => {
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { title: { value: "_", modifier: "INCLUDES" } },
+        }
+      );
+
+      expect(response.ok).toBe(true);
+      for (const scene of response.data.findScenes.scenes) {
+        expect(scene.title).toContain("_");
+      }
+      expect(response.data.findScenes.count).toBe(
+        response.data.findScenes.scenes.length
+      );
+    });
+  });
+
   describe("studio name filter", () => {
     it("filters by name INCLUDES", async () => {
       const response = await adminClient.post<FindStudiosResponse>(

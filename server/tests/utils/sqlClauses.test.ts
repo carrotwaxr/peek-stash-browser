@@ -9,7 +9,8 @@
  */
 import type { Resolution } from "@peek/shared-types/filters/index.js";
 import { RESOLUTIONS } from "@peek/shared-types/filters/index.js";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import type { FilterRef } from "../../types/parsedFilters.js";
 import {
   type JunctionTarget,
@@ -38,6 +39,7 @@ import {
   specificInstanceClause,
   viaSceneClause,
 } from "../../utils/sqlClauses.js";
+import { jsonListOrEmpty } from "../../utils/sqlJson.js";
 import { must } from "../helpers/must.js";
 
 /** Groups holding one of the scenes: SceneGroup, keyed by the group */
@@ -1097,8 +1099,27 @@ describe("buildTextFilter", () => {
       { value: "test", modifier: "INCLUDES" },
       col
     );
-    expect(result.sql).toBe("(LOWER(p.name) LIKE LOWER(?))");
+    expect(result.sql).toBe("(p.name LIKE ? ESCAPE '\\')");
     expect(result.params).toEqual(["%test%"]);
+  });
+
+  it("INCLUDES of `50%` matches the text 50%, not 50 followed by anything", () => {
+    const result = buildTextFilter({ value: "50%", modifier: "INCLUDES" }, col);
+    expect(result.sql).toBe("(p.name LIKE ? ESCAPE '\\')");
+    expect(result.params).toEqual(["%50\\%%"]);
+  });
+
+  it("escapes _ and the backslash too", () => {
+    const result = buildTextFilter({ value: "a_b\\c" }, col);
+    expect(result.params).toEqual(["%a\\_b\\\\c%"]);
+  });
+
+  it("does not wrap the column or the pattern in LOWER()", () => {
+    const result = buildTextFilter({ value: "Test" }, col, {
+      also: ["p.details"],
+      lists: ["p.aliasList"],
+    });
+    expect(result.sql).not.toContain("LOWER");
   });
 
   it("handles EXCLUDES (single column)", () => {
@@ -1107,9 +1128,17 @@ describe("buildTextFilter", () => {
       col
     );
     expect(result.sql).toBe(
-      "((p.name IS NULL OR LOWER(p.name) NOT LIKE LOWER(?)))"
+      "((p.name IS NULL OR p.name NOT LIKE ? ESCAPE '\\'))"
     );
     expect(result.params).toEqual(["%test%"]);
+  });
+
+  it("EXCLUDES escapes too", () => {
+    const result = buildTextFilter(
+      { value: "50%_", modifier: "EXCLUDES" },
+      col
+    );
+    expect(result.params).toEqual(["%50\\%\\_%"]);
   });
 
   it("handles EQUALS", () => {
@@ -1129,7 +1158,7 @@ describe("buildTextFilter", () => {
 
   it("defaults to INCLUDES when no modifier", () => {
     const result = buildTextFilter({ value: "test" }, col);
-    expect(result.sql).toBe("(LOWER(p.name) LIKE LOWER(?))");
+    expect(result.sql).toBe("(p.name LIKE ? ESCAPE '\\')");
     expect(result.params).toEqual(["%test%"]);
   });
 
@@ -1138,47 +1167,231 @@ describe("buildTextFilter", () => {
     expect(result).toEqual({ sql: "", params: [] });
   });
 
-  // Multi-column tests (additionalColumns parameter)
-  it("handles INCLUDES with additionalColumns", () => {
+  // Further plain columns (also)
+  it("handles INCLUDES with also columns", () => {
     const result = buildTextFilter(
       { value: "test", modifier: "INCLUDES" },
       "p.name",
-      ["p.disambiguation", "p.aliasList"]
+      { also: ["p.disambiguation", "p.details"] }
     );
     expect(result.sql).toBe(
-      "(LOWER(p.name) LIKE LOWER(?) OR LOWER(p.disambiguation) LIKE LOWER(?) OR LOWER(p.aliasList) LIKE LOWER(?))"
+      "(p.name LIKE ? ESCAPE '\\' OR p.disambiguation LIKE ? ESCAPE '\\' OR p.details LIKE ? ESCAPE '\\')"
     );
     expect(result.params).toEqual(["%test%", "%test%", "%test%"]);
   });
 
-  it("handles EXCLUDES with additionalColumns", () => {
+  it("handles EXCLUDES with also columns, keeping NULL", () => {
     const result = buildTextFilter(
       { value: "test", modifier: "EXCLUDES" },
       "p.name",
-      ["p.aliasList"]
+      { also: ["p.details"] }
     );
     expect(result.sql).toBe(
-      "((p.name IS NULL OR LOWER(p.name) NOT LIKE LOWER(?)) AND (p.aliasList IS NULL OR LOWER(p.aliasList) NOT LIKE LOWER(?)))"
+      "((p.name IS NULL OR p.name NOT LIKE ? ESCAPE '\\') AND (p.details IS NULL OR p.details NOT LIKE ? ESCAPE '\\'))"
     );
     expect(result.params).toEqual(["%test%", "%test%"]);
   });
 
-  it("EQUALS only uses primary column even with additionalColumns", () => {
+  // JSON list columns (lists)
+  const ARM = (column: string) =>
+    `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty(column)}) a WHERE a.value LIKE ? ESCAPE '\\')`;
+
+  it("an alias list column matches per alias", () => {
+    const result = buildTextFilter({ value: "zed" }, "p.name", {
+      lists: ["p.aliasList"],
+    });
+    expect(result.sql).toBe(
+      `(p.name LIKE ? ESCAPE '\\' OR ${ARM("p.aliasList")})`
+    );
+    expect(result.params).toEqual(["%zed%", "%zed%"]);
+  });
+
+  it("EXCLUDES of an alias list column is no alias matching", () => {
+    const result = buildTextFilter(
+      { value: "zed", modifier: "EXCLUDES" },
+      "p.name",
+      {
+        lists: ["p.aliasList"],
+      }
+    );
+    expect(result.sql).toBe(
+      `((p.name IS NULL OR p.name NOT LIKE ? ESCAPE '\\') AND NOT ${ARM("p.aliasList")})`
+    );
+    expect(result.params).toEqual(["%zed%", "%zed%"]);
+  });
+
+  it("EQUALS only uses the primary column even with also and lists", () => {
     const result = buildTextFilter(
       { value: "exact", modifier: "EQUALS" },
       "p.name",
-      ["p.aliasList"]
+      { also: ["p.details"], lists: ["p.aliasList"] }
     );
     expect(result.sql).toBe("LOWER(p.name) = LOWER(?)");
     expect(result.params).toEqual(["exact"]);
   });
 
-  it("IS_NULL only checks primary column", () => {
-    const result = buildTextFilter({ modifier: "IS_NULL" }, "p.name", [
-      "p.aliasList",
-    ]);
+  it("IS_NULL only checks the primary column when there is one", () => {
+    const result = buildTextFilter({ modifier: "IS_NULL" }, "p.name", {
+      lists: ["p.aliasList"],
+    });
     expect(result.sql).toBe("(p.name IS NULL OR p.name = '')");
     expect(result.params).toEqual([]);
+  });
+
+  it("a list-only filter has no column arm and returns empty without lists", () => {
+    expect(buildTextFilter({ value: "x" }, null)).toEqual({
+      sql: "",
+      params: [],
+    });
+    expect(buildTextFilter({ modifier: "IS_NULL" }, null)).toEqual({
+      sql: "",
+      params: [],
+    });
+  });
+
+  it("a list-only filter binds one pattern per list", () => {
+    const result = buildTextFilter({ value: "a_b" }, null, {
+      lists: ["s.urls", "s.other"],
+    });
+    expect(result.sql).toBe(`(${ARM("s.urls")} OR ${ARM("s.other")})`);
+    expect(result.params).toEqual(["%a\\_b%", "%a\\_b%"]);
+  });
+});
+
+/** SQLite's answer to a text filter over one row of { name, list } */
+async function textFilterMatches(
+  filter: { value?: string; modifier?: string },
+  options: { column: boolean },
+  row: { name: string | null; list: string | null }
+): Promise<boolean> {
+  const clause = buildTextFilter(filter, options.column ? "x.name" : null, {
+    lists: ["x.list"],
+  });
+  const rows = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+    `SELECT count(*) AS n FROM (SELECT ? AS name, ? AS list) x WHERE ${clause.sql}`,
+    row.name,
+    row.list,
+    ...clause.params
+  );
+  return Number(must(rows[0]).n) === 1;
+}
+
+describe("buildTextFilter over JSON lists, run on SQLite", () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it("a list-only filter matches any element", async () => {
+    const list = JSON.stringify(["https://a.example/x", "https://b.example/y"]);
+    const run = (value: string, row = list) =>
+      textFilterMatches(
+        { value },
+        { column: false },
+        { name: null, list: row }
+      );
+    expect(await run("b.example")).toBe(true);
+    expect(await run("A.EXAMPLE")).toBe(true);
+    expect(await run("c.example")).toBe(false);
+    // An element's text, not the list's JSON, is what is matched
+    expect(await run('a.example/x",')).toBe(false);
+    // A damaged or missing list holds no element
+    expect(await run("a", "not json")).toBe(false);
+    expect(
+      await textFilterMatches(
+        { value: "a" },
+        { column: false },
+        { name: null, list: null }
+      )
+    ).toBe(false);
+    // EXCLUDES keeps a row with no list
+    expect(
+      await textFilterMatches(
+        { value: "b.example", modifier: "EXCLUDES" },
+        { column: false },
+        { name: null, list }
+      )
+    ).toBe(false);
+    expect(
+      await textFilterMatches(
+        { value: "b.example", modifier: "EXCLUDES" },
+        { column: false },
+        { name: null, list: null }
+      )
+    ).toBe(true);
+  });
+
+  it("IS_NULL on a list-only filter matches NULL, empty text and an empty list", async () => {
+    const isNull = (list: string | null) =>
+      textFilterMatches(
+        { modifier: "IS_NULL" },
+        { column: false },
+        { name: null, list }
+      );
+    const notNull = (list: string | null) =>
+      textFilterMatches(
+        { modifier: "NOT_NULL" },
+        { column: false },
+        { name: null, list }
+      );
+    for (const empty of [null, "", "[]"]) {
+      expect(await isNull(empty)).toBe(true);
+      expect(await notNull(empty)).toBe(false);
+    }
+    expect(await isNull('["a"]')).toBe(false);
+    expect(await notNull('["a"]')).toBe(true);
+  });
+
+  it("a list-only EQUALS and NOT_EQUALS read an element, case folded", async () => {
+    const list = '["Alpha","Beta"]';
+    const run = (modifier: string, value: string, row: string | null = list) =>
+      textFilterMatches(
+        { value, modifier },
+        { column: false },
+        { name: null, list: row }
+      );
+    expect(await run("EQUALS", "beta")).toBe(true);
+    expect(await run("EQUALS", "bet")).toBe(false);
+    expect(await run("NOT_EQUALS", "beta")).toBe(false);
+    expect(await run("NOT_EQUALS", "gamma")).toBe(true);
+    expect(await run("NOT_EQUALS", "gamma", null)).toBe(true);
+  });
+
+  it("INCLUDES of a double quote matches no list's JSON punctuation", async () => {
+    for (const value of ['"', "[", "]", ","]) {
+      expect(
+        await textFilterMatches(
+          { value },
+          { column: true },
+          { name: "plain", list: '["one","two"]' }
+        )
+      ).toBe(false);
+    }
+    // ... and still finds the character inside an element
+    expect(
+      await textFilterMatches(
+        { value: "[" },
+        { column: true },
+        { name: "plain", list: '["a [b]"]' }
+      )
+    ).toBe(true);
+  });
+
+  it("% and _ are literal in the name and in an element", async () => {
+    const row = { name: "100% real", list: '["snakeXcase"]' };
+    const run = (value: string) =>
+      textFilterMatches({ value }, { column: true }, row);
+    expect(await run("100%")).toBe(true);
+    expect(await run("0% r")).toBe(true);
+    expect(await run("%")).toBe(true);
+    expect(await run("snake_case")).toBe(false);
+    expect(await run("%real%x")).toBe(false);
+    expect(
+      await textFilterMatches(
+        { value: "e_c" },
+        { column: true },
+        { name: "plain", list: '["snake_case"]' }
+      )
+    ).toBe(true);
   });
 });
 

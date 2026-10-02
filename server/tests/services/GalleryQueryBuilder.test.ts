@@ -421,7 +421,7 @@ describe("GalleryQueryBuilder", () => {
         "r.favorite = 1",
         "r.rating > ?",
         "MAX(g.imageCount - COALESCE(d.images, 0), 0) BETWEEN ? AND ?",
-        "(LOWER(g.title) LIKE LOWER(?))",
+        "(g.title LIKE ? ESCAPE '\\')",
         "g.date < ?",
         "g.stashCreatedAt > ?",
         "g.stashUpdatedAt IS NOT NULL",

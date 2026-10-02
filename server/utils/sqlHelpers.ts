@@ -7,6 +7,7 @@
  * booleans (see types/internal/queryRows.ts).
  */
 import type { StashId } from "@peek/shared-types";
+import { jsonListOrEmpty } from "./sqlJson.js";
 
 /**
  * Parse a JSON-encoded array column from SQLite.
@@ -51,4 +52,15 @@ export function emptyToNull(value: string | null | undefined): string | null {
  */
 export function likeContains(text: string): string {
   return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/**
+ * SQL true when any element of the JSON list in `column` matches the pattern
+ * bound to `param` (a `likeContains` pattern, `?` unless the caller binds it
+ * by name): `LIKE ... ESCAPE '\'` on each element's own text, so the list's
+ * JSON punctuation (`["`, `","`, `"]`) is never matched, and a NULL or
+ * damaged column holds no element. `column` is a code constant.
+ */
+export function jsonListArm(column: string, param = "?"): string {
+  return `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty(column)}) a WHERE a.value LIKE ${param} ESCAPE '\\')`;
 }
