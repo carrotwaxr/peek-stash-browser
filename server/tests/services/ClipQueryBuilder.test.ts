@@ -9,6 +9,7 @@
  * the page (only those the viewer may see), and the scene's clips and the
  * clip by id.
  */
+import { CLIP_PARAMS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
@@ -266,6 +267,14 @@ describe("ClipQueryBuilder", () => {
       const { sql, params } = statement(0);
       expect(sql).toContain("c.title LIKE ? ESCAPE '\\'");
       expect(params).toContain("%50\\%\\_off\\\\%");
+    });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({ q: "sea", filter: { isGenerated: true } });
+
+      const { sql, params } = statement(0);
+      positions(sql, ["c.isGenerated = ?", "c.title LIKE ? ESCAPE"]);
+      expect(params.indexOf(1)).toBeLessThan(params.indexOf("%sea%"));
     });
 
     it("the scene matches its (id, instance) pair, and a bare id every instance", async () => {
@@ -697,5 +706,17 @@ describe("ClipQueryBuilder", () => {
         objectContaining({ id: "101", instanceId: "inst-a", tags: [] }),
       ]);
     });
+  });
+});
+
+describe("the clip field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(CLIP_PARAMS).filter(
+      (field) => field !== "instanceId"
+    );
+
+    expect(Object.keys(clipQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });

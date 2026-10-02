@@ -17,7 +17,7 @@
 import type { SortDirection } from "@peek/shared-types/filters/index.js";
 import type { ImageListItem } from "../types/index.js";
 import type { ImageQueryRow } from "../types/internal/queryRows.js";
-import type { ParsedFilter, RefCriterion } from "../types/parsedFilters.js";
+import type { RefCriterion } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
@@ -38,6 +38,8 @@ import { getImageFallbackTitle } from "../utils/titleUtils.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -151,55 +153,34 @@ class ImageQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The image filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"image">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-    const opts = (name: string) => ({
-      name,
-      allowedInstanceIds: ctx.allowedInstanceIds,
-    });
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The image filter's clauses, one per field, in the order the statement
+   * ANDs them. A ref field's CTEs are named from the leaf (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"image"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, USER_RATING));
-    }
-    if (filter.o_counter) {
-      push(buildNumericFilter(filter.o_counter, USER_O_COUNT));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    rating100: (c) => buildNumericFilter(c, USER_RATING),
+    o_counter: (c) => buildNumericFilter(c, USER_O_COUNT),
 
     // The image's tag rows; EQUALS 0 is the folder view's Untagged
-    if (filter.tag_count) {
-      push(buildNumericFilter(filter.tag_count, IMAGE_TAG_COUNT));
-    }
+    tag_count: (c) => buildNumericFilter(c, IMAGE_TAG_COUNT),
 
     // Related entities
-    if (filter.performers) {
-      const { refs, modifier } = filter.performers;
-      push(refClause(IMAGE_PERFORMERS, refs, modifier, opts("performers")));
-    }
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
-    if (filter.studios) push(await this.studioClause(filter.studios, ctx));
-    if (filter.galleries) push(this.galleryClause(filter.galleries, ctx));
+    performers: (c, ctx) =>
+      refClause(IMAGE_PERFORMERS, c.refs, c.modifier, {
+        name: ctx.name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      }),
+    tags: (c, ctx) => this.tagClause(c, ctx),
+    studios: (c, ctx) => this.studioClause(c, ctx),
+    galleries: (c, ctx) => this.galleryClause(c, ctx),
 
     // Dates
-    if (filter.date) push(buildDateFilter(filter.date, "i.date"));
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "i.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "i.stashUpdatedAt"));
-    }
-
-    return clauses;
-  }
+    date: (c) => buildDateFilter(c, "i.date"),
+    created_at: (c) => buildDateFilter(c, "i.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "i.stashUpdatedAt"),
+  };
 
   /**
    * The tag filter, with the tags' descendants to the depth, as the scene
@@ -208,10 +189,10 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", IMAGE_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
     });
   }
 
@@ -222,10 +203,10 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    */
   private async studioClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", IMAGE_STUDIO, criterion, ctx, {
-      name: "studios",
+      name: ctx.name,
     });
   }
 
@@ -244,10 +225,10 @@ class ImageQueryBuilder extends EntityQueryBuilder<
    */
   private galleryClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): FilterClause {
     return refClause(IMAGE_GALLERIES, criterion.refs, criterion.modifier, {
-      name: "galleries",
+      name: ctx.name,
       allowedInstanceIds: ctx.allowedInstanceIds,
       sortedByIndex: false,
     });

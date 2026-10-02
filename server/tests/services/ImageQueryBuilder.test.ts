@@ -7,6 +7,7 @@
  * and studio filters honour depth, a studio EXCLUDES keeps images with no
  * studio (QUERIES-11), and each image's studio is its own instance's.
  */
+import { IMAGE_FIELDS } from "@peek/shared-types/filters/index.js";
 import {
   afterEach,
   beforeEach,
@@ -660,6 +661,19 @@ describe("ImageQueryBuilder", () => {
       expect(ids(result.items)).toEqual([testImageIds[1]]);
     });
 
+    it("the search clause sits after the field clauses", async () => {
+      const statements = await recording(() =>
+        run({
+          q: "sea",
+          filter: { rating100: { modifier: "EQUALS", value: 4242 } },
+        })
+      );
+
+      const { params } = must(statements[0], "the page statement");
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
+
     it("filters by IDs", async () => {
       const result = await run({
         filter: {
@@ -910,6 +924,18 @@ describe("ImageQueryBuilder", () => {
 
       expect(ids(result.items)).toEqual(["999003", "999002", "999001"]);
     });
+  });
+});
+
+describe("the image field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(IMAGE_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    expect(Object.keys(imageQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });
 

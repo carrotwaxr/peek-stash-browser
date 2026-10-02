@@ -33,6 +33,7 @@ import {
   buildNumericFilter,
   buildTextFilter,
   exclusionJoin,
+  noClause,
   refClause,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -45,6 +46,8 @@ import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -184,77 +187,41 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The gallery filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"gallery">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The gallery filter's clauses, one per field, in the order the statement
+   * ANDs them. A ref field's CTEs are named from the leaf (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"gallery"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.hasFavoriteImage === true) {
-      push(this.hasFavoriteImageClause(ctx));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    hasFavoriteImage: (has, ctx) =>
+      has ? this.hasFavoriteImageClause(ctx) : noClause(),
 
     // Related entities
-    if (filter.studios) push(await this.studioClause(filter.studios, ctx));
-    if (filter.scenes) {
-      push(
-        viaSceneClause(
-          GALLERIES_BY_SCENE,
-          filter.scenes.refs,
-          filter.scenes.modifier
-        )
-      );
-    }
-    if (filter.performers) {
-      push(
-        refClause(
-          GALLERY_PERFORMERS,
-          filter.performers.refs,
-          filter.performers.modifier,
-          { name: "performers", allowedInstanceIds: ctx.allowedInstanceIds }
-        )
-      );
-    }
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
+    studios: (c, ctx) => this.studioClause(c, ctx),
+    scenes: (c) => viaSceneClause(GALLERIES_BY_SCENE, c.refs, c.modifier),
+    performers: (c, ctx) =>
+      refClause(GALLERY_PERFORMERS, c.refs, c.modifier, {
+        name: ctx.name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      }),
+    tags: (c, ctx) => this.tagClause(c, ctx),
 
     // The viewer's rating and the counts
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.image_count) {
-      push(
-        buildNumericFilter(
-          filter.image_count,
-          visibleCount(ctx, "g.imageCount", "images")
-        )
-      );
-    }
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    image_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "g.imageCount", "images")),
     // The gallery's own tag rows; EQUALS 0 is the folder view's Untagged
-    if (filter.tag_count) {
-      push(buildNumericFilter(filter.tag_count, GALLERY_TAG_COUNT));
-    }
+    tag_count: (c) => buildNumericFilter(c, GALLERY_TAG_COUNT),
 
     // Text
-    if (filter.title) push(buildTextFilter(filter.title, "g.title"));
+    title: (c) => buildTextFilter(c, "g.title"),
 
     // Dates
-    if (filter.date) push(buildDateFilter(filter.date, "g.date"));
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "g.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "g.stashUpdatedAt"));
-    }
-
-    return clauses;
-  }
+    date: (c) => buildDateFilter(c, "g.date"),
+    created_at: (c) => buildDateFilter(c, "g.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "g.stashUpdatedAt"),
+  };
 
   /**
    * The studio filter, with the studios' descendants to the depth. A
@@ -262,20 +229,20 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
    */
   private async studioClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("studio", GALLERY_STUDIO, criterion, ctx, {
-      name: "studios",
+      name: ctx.name,
     });
   }
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", GALLERY_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
     });
   }
 

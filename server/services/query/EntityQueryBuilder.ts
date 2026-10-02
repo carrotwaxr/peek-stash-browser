@@ -26,8 +26,7 @@
  * leaves, one criterion of one field each, builds each leaf's clause through
  * `clauseFor` in the table's order, and appends the search last. Every CTE a
  * clause adds is named from its leaf's name, unique in the statement
- * (`combine` refuses two of one name). Until every builder is on the table,
- * one that is not declares `legacyFilterClauses` instead.
+ * (`combine` refuses two of one name).
  */
 import type {
   ListKind,
@@ -136,6 +135,11 @@ export interface LeafContext extends QueryContext {
   readonly name: string;
   /** Under an "any" group (9b): take the read-once shape whatever the sort. Always false in 9a. */
   readonly underAny: boolean;
+  /**
+   * Set by a builder's `leafContextFor` from the whole filter: the clip
+   * list's, when no studio or scene criterion drives the statement
+   */
+  readonly lists?: boolean;
 }
 
 /** One field's clause: the criterion's WHERE fragment, named from the leaf */
@@ -331,21 +335,24 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
 
   /**
    * The entity's own filter clauses, one function per field in the order
-   * the statement ANDs them; `ids` is the base's. Optional until every
-   * builder declares one (PR 9a, S3); a builder without it declares
-   * `legacyFilterClauses`.
+   * the statement ANDs them; `ids` is the base's
    */
-  protected readonly fieldClauses?: FieldClauses<K>;
+  protected abstract readonly fieldClauses: FieldClauses<K>;
 
   /** The search text's clause (`q`), after the field clauses */
-  protected searchClause?(q: string, ctx: QueryContext): FilterClause;
+  protected abstract searchClause(q: string, ctx: QueryContext): FilterClause;
 
-  /** A builder not yet on the table: its filter clauses and search, in one */
-  protected legacyFilterClauses?(
-    filter: ListFilterOf<K>,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]>;
+  /**
+   * The context a leaf's clause reads, for facts of the whole filter a
+   * single field cannot see (the clip list's `lists`); the leaf's own
+   * context by default
+   */
+  protected leafContextFor(
+    _filter: ListFilterOf<K>,
+    ctx: LeafContext
+  ): LeafContext {
+    return ctx;
+  }
 
   protected abstract transformRow(row: Row): Entity;
 
@@ -355,7 +362,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    */
   protected leavesOf(filter: ListFilterOf<K>): Leaf<K>[] {
     const own: OwnFilterOf<K> = filter;
-    const fields = Object.keys(this.table()) as FieldOf<K>[];
+    const fields = Object.keys(this.fieldClauses) as FieldOf<K>[];
     return fields.flatMap((field) => {
       const criterion = own[field];
       // The parser sends no null; a field left undefined carries no leaf
@@ -370,7 +377,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
    * own data, never through the prototype, as `sortExpr` does)
    */
   async clauseFor(leaf: Leaf<K>, ctx: LeafContext): Promise<FilterClause> {
-    const table = this.table();
+    const table = this.fieldClauses;
     if (!Object.prototype.hasOwnProperty.call(table, leaf.field)) {
       throw new Error(`No filter clause for ${leaf.field}`);
     }
@@ -378,14 +385,6 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
     // field's, which TypeScript cannot tie to `table[leaf.field]`
     const clause = table[leaf.field] as FieldClause<Leaf<K>["criterion"]>;
     return clause(leaf.criterion, ctx);
-  }
-
-  /** The field table, which a builder on it declares */
-  private table(): FieldClauses<K> {
-    if (this.fieldClauses === undefined) {
-      throw new Error(`The ${this.spec.entityType} builder has no field table`);
-    }
-    return this.fieldClauses;
   }
 
   /**
@@ -399,34 +398,15 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
   ): Promise<FilterClause[]> {
     const clauses: FilterClause[] = [];
     for (const leaf of this.leavesOf(filter)) {
-      clauses.push(
-        await this.clauseFor(leaf, {
-          ...ctx,
-          name: leaf.field,
-          underAny: false,
-        })
-      );
+      const leafCtx = this.leafContextFor(filter, {
+        ...ctx,
+        name: leaf.field,
+        underAny: false,
+      });
+      clauses.push(await this.clauseFor(leaf, leafCtx));
     }
-    if (q !== undefined) {
-      if (this.searchClause === undefined) {
-        throw new Error(`The ${this.spec.entityType} builder has no search`);
-      }
-      clauses.push(this.searchClause(q, ctx));
-    }
+    if (q !== undefined) clauses.push(this.searchClause(q, ctx));
     return clauses;
-  }
-
-  /** The table's clauses when the builder has one, else its legacy clauses */
-  private async ownClauses(
-    filter: ListFilterOf<K>,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    if (this.fieldClauses !== undefined) return this.clausesOf(filter, q, ctx);
-    if (this.legacyFilterClauses === undefined) {
-      throw new Error(`The ${this.spec.entityType} builder has no clauses`);
-    }
-    return this.legacyFilterClauses(filter, q, ctx);
   }
 
   protected abstract populateRelations(
@@ -653,7 +633,7 @@ export abstract class EntityQueryBuilder<Row, Entity, K extends ListKind> {
             }),
           ]
         : []),
-      ...(await this.ownClauses(request.filter, request.q, ctx)),
+      ...(await this.clausesOf(request.filter, request.q, ctx)),
     ];
 
     const { field, seed } = request.sort;
