@@ -5,19 +5,10 @@
  * card display settings folded in.
  */
 import { useMemo } from "react";
+import { LIST_KINDS, type ListKind } from "@peek/shared-types";
 import { useCardDisplaySettings } from "../contexts/CardDisplaySettingsContext";
 import { useUnitPreference } from "../contexts/UnitPreferenceContext";
-import {
-  CLIP_FILTER_OPTIONS,
-  type FilterOption,
-  GALLERY_FILTER_OPTIONS,
-  GROUP_FILTER_OPTIONS,
-  IMAGE_FILTER_OPTIONS,
-  PERFORMER_FILTER_OPTIONS,
-  SCENE_FILTER_OPTIONS,
-  STUDIO_FILTER_OPTIONS,
-  TAG_FILTER_OPTIONS,
-} from "../utils/filterConfig";
+import { type FilterOption, filterOptionsOf } from "../utils/filterFields";
 import { lockedFieldsOf } from "../utils/listQuery";
 import type { ListEntity } from "../utils/urlParams";
 import type { ListDefaults } from "./useListUrlState";
@@ -40,6 +31,9 @@ export function useFiltersByContent(
   );
 }
 
+const isListKind = (value: string): value is ListKind =>
+  (LIST_KINDS as readonly string[]).includes(value);
+
 /** A card display setting's value, or the fallback when it has none */
 const settingOr = (value: unknown, fallback: string) =>
   typeof value === "string" && value !== "" ? value : fallback;
@@ -47,48 +41,14 @@ const settingOr = (value: unknown, fallback: string) =>
 /** The panel's options for an entity, the body-measure ranges in the user's units */
 export function useFilterOptions(artifactType: string): FilterOption[] {
   const { unitPreference } = useUnitPreference();
-  return useMemo(() => {
-    const transformForUnits = (options: FilterOption[]) => {
-      if (unitPreference !== "imperial") return options;
-      return options.map((opt) => {
-        if (opt.key === "height") {
-          return {
-            ...opt,
-            label: "Height (ft/in)",
-            type: "imperial-height-range",
-            // Separate keys that buildPerformerFilter converts
-          };
-        }
-        if (opt.key === "weight") {
-          return { ...opt, label: "Weight (lbs)", min: 50, max: 500 };
-        }
-        if (opt.key === "penisLength") {
-          return { ...opt, label: "Penis Length (inches)", min: 1, max: 15 };
-        }
-        return opt;
-      });
-    };
-
-    switch (artifactType) {
-      case "performer":
-        return transformForUnits([...PERFORMER_FILTER_OPTIONS]);
-      case "studio":
-        return [...STUDIO_FILTER_OPTIONS];
-      case "tag":
-        return [...TAG_FILTER_OPTIONS];
-      case "group":
-        return [...GROUP_FILTER_OPTIONS];
-      case "gallery":
-        return [...GALLERY_FILTER_OPTIONS];
-      case "image":
-        return [...IMAGE_FILTER_OPTIONS];
-      case "clip":
-        return [...CLIP_FILTER_OPTIONS];
-      case "scene":
-      default:
-        return [...SCENE_FILTER_OPTIONS];
-    }
-  }, [artifactType, unitPreference]);
+  return useMemo(
+    () =>
+      filterOptionsOf(
+        isListKind(artifactType) ? artifactType : "scene",
+        unitPreference
+      ),
+    [artifactType, unitPreference]
+  );
 }
 
 /**

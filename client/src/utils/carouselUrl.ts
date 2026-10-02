@@ -3,7 +3,6 @@
  * carousel's rules as its panel filters
  */
 import {
-  type FilterOption,
   SCENE_FILTER_OPTIONS,
   carouselRulesToFilterState,
 } from "./filterConfig";
@@ -33,7 +32,7 @@ export const buildCustomCarouselUrl = (
     currentPage: 1,
     perPage: 24,
     filters: filterState as Record<string, unknown>,
-    filterOptions: SCENE_FILTER_OPTIONS as FilterOption[],
+    filterOptions: SCENE_FILTER_OPTIONS,
     viewMode: "grid",
     zoomLevel: "medium",
     gridDensity: "medium",
