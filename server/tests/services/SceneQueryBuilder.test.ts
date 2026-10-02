@@ -165,6 +165,7 @@ describe("SceneQueryBuilder", () => {
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
     mockPrisma.studioRating.findMany.mockResolvedValue([]);
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query
@@ -685,6 +686,50 @@ describe("SceneQueryBuilder", () => {
       const { sql } = pageStatement();
       expect(sql).toContain("NOT EXISTS");
       expect(sql).toContain("s.studioId IS NULL OR NOT");
+    });
+
+    it("a favorite the viewer excluded is dropped, with the exclusions applied only", async () => {
+      mockPrisma.tagRating.findMany.mockResolvedValue([
+        partialRow({ tagId: "9", instanceId: "inst-a" }),
+        partialRow({ tagId: "10", instanceId: "inst-a" }),
+        partialRow({ tagId: "11", instanceId: "inst-b" }),
+      ]);
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "9", instanceId: "inst-a" }),
+        partialRow({ entityId: "11", instanceId: "" }),
+        partialRow({ entityId: "10", instanceId: "inst-b" }),
+      ]);
+      expandRefsEach.mockClear();
+      await run({ filter: { tag_favorite: true } });
+
+      expect(mockPrisma.userExcludedEntity.findMany).toHaveBeenCalledWith(
+        objectContaining({
+          where: {
+            userId: 1,
+            entityType: "tag",
+            entityId: { in: ["9", "10", "11"] },
+          },
+        })
+      );
+      // 9 is hidden on its instance and 11 on every instance; 10 is hidden
+      // on the other instance only
+      expect(expandRefsEach).toHaveBeenCalledWith(
+        "tag",
+        [{ id: "10", instanceId: "inst-a" }],
+        -1,
+        ALLOWED
+      );
+
+      mockPrisma.userExcludedEntity.findMany.mockClear();
+      expandRefsEach.mockClear();
+      await run({ filter: { tag_favorite: true } }, { applyExclusions: false });
+      expect(mockPrisma.userExcludedEntity.findMany).not.toHaveBeenCalled();
+      expect(expandRefsEach).toHaveBeenCalledWith(
+        "tag",
+        arrayContaining([{ id: "9", instanceId: "inst-a" }]),
+        -1,
+        ALLOWED
+      );
     });
 
     it("with no favorites, true matches nothing and false adds no clause", async () => {

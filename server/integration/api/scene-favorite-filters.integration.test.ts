@@ -312,6 +312,8 @@ describeWithDb("Scene favourite filters (seeded)", () => {
   const VIEWER = "sf-viewer";
   const OTHER = "sf-other";
   const NONE = "sf-none";
+  const HIDER = "sf-hider";
+  let hiderId = 0;
   let viewerId = 0;
   let otherId = 0;
   let noneId = 0;
@@ -340,7 +342,7 @@ describeWithDb("Scene favourite filters (seeded)", () => {
       where: { stashInstanceId: { in: [A, B] } },
     });
     await prisma.user.deleteMany({
-      where: { username: { in: [VIEWER, OTHER, NONE] } },
+      where: { username: { in: [VIEWER, OTHER, NONE, HIDER] } },
     });
   }
 
@@ -349,11 +351,12 @@ describeWithDb("Scene favourite filters (seeded)", () => {
     userId: number,
     field: "tag_favorite" | "studio_favorite" | "performer_favorite",
     on: boolean,
-    sortField: "created_at" | "rating" = "created_at"
+    sortField: "created_at" | "rating" = "created_at",
+    applyExclusions = true
   ): Promise<string[]> {
     const { items, total } = await sceneQueryBuilder.execute({
       userId,
-      applyExclusions: true,
+      applyExclusions,
       allowedInstanceIds: [A, B],
       request: parsedListRequest("scene", {
         perPage: 50,
@@ -374,6 +377,7 @@ describeWithDb("Scene favourite filters (seeded)", () => {
     viewerId = (await make(VIEWER)).id;
     otherId = (await make(OTHER)).id;
     noneId = (await make(NONE)).id;
+    hiderId = (await make(HIDER)).id;
 
     const tag = (id: string, instance: string, parents: string[] = []) => ({
       id,
@@ -480,6 +484,8 @@ describeWithDb("Scene favourite filters (seeded)", () => {
         { userId: viewerId, instanceId: A, tagId: "7895003", favorite: false },
         { userId: otherId, instanceId: A, tagId: "7895003", favorite: true },
         { userId: otherId, instanceId: B, tagId: "7895001", favorite: true },
+        { userId: hiderId, instanceId: A, tagId: "7895001", favorite: true },
+        { userId: hiderId, instanceId: A, tagId: "7895003", favorite: true },
       ],
     });
     await prisma.studioRating.createMany({
@@ -491,6 +497,8 @@ describeWithDb("Scene favourite filters (seeded)", () => {
           favorite: true,
         },
         { userId: otherId, instanceId: A, studioId: "7895103", favorite: true },
+        { userId: hiderId, instanceId: A, studioId: "7895101", favorite: true },
+        { userId: hiderId, instanceId: A, studioId: "7895103", favorite: true },
       ],
     });
     await prisma.performerRating.createMany({
@@ -507,16 +515,53 @@ describeWithDb("Scene favourite filters (seeded)", () => {
           performerId: "7895202",
           favorite: true,
         },
+        {
+          userId: hiderId,
+          instanceId: A,
+          performerId: "7895201",
+          favorite: true,
+        },
+        {
+          userId: hiderId,
+          instanceId: A,
+          performerId: "7895202",
+          favorite: true,
+        },
       ],
     });
-    await prisma.userExcludedEntity.create({
-      data: {
-        userId: viewerId,
-        entityType: "scene",
-        entityId: "7895306",
-        instanceId: A,
-        reason: "hidden",
-      },
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        {
+          userId: viewerId,
+          entityType: "scene",
+          entityId: "7895306",
+          instanceId: A,
+          reason: "hidden",
+        },
+        // The hider hid the favourite tag and performer on sf-a, and the
+        // favourite studio with no instance (every instance)
+        {
+          userId: hiderId,
+          entityType: "tag",
+          entityId: "7895001",
+          instanceId: A,
+          reason: "hidden",
+        },
+        {
+          userId: hiderId,
+          entityType: "studio",
+          entityId: "7895101",
+          instanceId: "",
+          reason: "restricted",
+        },
+        {
+          userId: hiderId,
+          entityType: "performer",
+          entityId: "7895201",
+          instanceId: A,
+          reason: "hidden",
+        },
+      ],
     });
   });
 
@@ -641,5 +686,48 @@ describeWithDb("Scene favourite filters (seeded)", () => {
         [...VISIBLE, key("7895306", A)].sort()
       );
     }
+  });
+
+  it("a favourite the viewer hid no longer makes a scene match", async () => {
+    // The hider favourited tag 1 and 3, studio 1 and 3, performer 1 and 2,
+    // and hid tag 1, studio 1 and performer 1: only the visible
+    // favourites count
+    expect(await scenesFor(hiderId, "tag_favorite", true)).toEqual([
+      key("7895304", A),
+    ]);
+    expect(await scenesFor(hiderId, "studio_favorite", true)).toEqual([
+      key("7895303", A),
+    ]);
+    expect(await scenesFor(hiderId, "performer_favorite", true)).toEqual(
+      [key("7895302", A), key("7895304", A)].sort()
+    );
+  });
+
+  it.each(["tag_favorite", "studio_favorite", "performer_favorite"] as const)(
+    "%s false stays the complement of true within the hider's library",
+    async (field) => {
+      const on = await scenesFor(hiderId, field, true);
+      const off = await scenesFor(hiderId, field, false);
+      expect([...on, ...off].sort()).toEqual(
+        [...VISIBLE, key("7895306", A)].sort()
+      );
+      expect(on.filter((k) => off.includes(k))).toEqual([]);
+      // The scenes of the hidden favourite are in the complement
+      expect(off).toContain(key("7895301", A));
+    }
+  );
+
+  it("the hides apply only when the viewer's exclusions do", async () => {
+    expect(
+      await scenesFor(hiderId, "tag_favorite", true, "created_at", false)
+    ).toEqual(
+      [
+        key("7895301", A),
+        key("7895302", A),
+        key("7895303", A),
+        key("7895304", A),
+        key("7895306", A),
+      ].sort()
+    );
   });
 });
