@@ -1040,6 +1040,125 @@ export function performerAgeExists(
   };
 }
 
+export interface PerformerTagsOptions {
+  /**
+   * Names the CTEs (`<name>_refs`, `<name>_matched`): unique in the
+   * statement
+   */
+  readonly name: string;
+  /** The instances a bare ref may match in the large shape, one pair each */
+  readonly allowedInstanceIds: readonly string[];
+  /** The viewer whose exclusions apply, or null when none do */
+  readonly viewerId: number | null;
+  /**
+   * The page walks a sort index and stops at the page: it takes the keyed
+   * EXISTS (NOT EXISTS), and the count (`FilterClause.count`) the form read
+   * in no order. Otherwise both take the latter.
+   */
+  readonly sortedByIndex?: boolean;
+  /** Most refs matched inline. Default PAIR_INLINE_LIMIT. */
+  readonly inlineLimit?: number;
+}
+
+/**
+ * Items by their performers' tags (the scene filter `performer_tags`): an
+ * item matches when one of its performers holds one of the tags, the refs
+ * already expanded to their descendants. A performer counts only while it
+ * is live and, with the viewer's exclusions applied, while neither it nor
+ * the tag is excluded for the viewer (`exclusionJoin`, its every-instance
+ * arm included), so a hidden performer or tag neither makes a match nor,
+ * under EXCLUDES, drops an item. The performer is on the item's own
+ * instance (the junction's rows say so). No refs is no filter.
+ *
+ * Up to the inline limit the refs are OR-ed pairs; above it they travel as
+ * one JSON parameter into a materialized CTE (`<name>_refs`). Each
+ * statement takes the shape that suits how it reads its rows, as the scene
+ * tag filter does (`sortedByIndex`). Read in no order (a count, a sort with
+ * no index), the items holding a tag are read once, driven from the tags
+ * (`PerformerTag`'s tag index, the performer by its key, the junction by
+ * its performer index): INCLUDES is a row-value IN on the item's key over
+ * them, EXCLUDES reads them into a matched set (`<name>_matched`,
+ * `matchedSetClause`). A page walking a sort index stops at the page: a
+ * keyed EXISTS (NOT EXISTS) from the item reads its performers' tags by
+ * `PerformerTag`'s primary key and, above the limit, checks each against
+ * the refs list built once (`+pt.tagId`: probing the key once per ref took
+ * 910 ms for 72 refs, against 231).
+ *
+ * At 215k scenes (8 instances): the most used performer tag (33k scenes)
+ * counts in 63 ms and pages by date in under 1 ms (the IN list paged 79);
+ * a tag of 34 descendants with 49k scenes counts in 135. EXCLUDES counts in
+ * 96 to 161 ms (NOT EXISTS 230 to 306) and pages by rating in 108 to 178.
+ * The walk's worst case is a set no visible performer holds: the whole
+ * index, 140 to 230 ms.
+ */
+export function performerTagsClause(
+  junction: JunctionTarget,
+  refs: readonly FilterRef[],
+  modifier: "INCLUDES" | "EXCLUDES",
+  opts: PerformerTagsOptions
+): FilterClause {
+  if (refs.length === 0) return EMPTY;
+  const j = junction.alias;
+  const viewer = opts.viewerId;
+  const guardJoins =
+    viewer === null
+      ? ""
+      : ` ${exclusionJoin("pte", "performer", "p.id", "p.stashInstanceId")} ${exclusionJoin("ptte", "tag", "pt.tagId", "pt.tagInstanceId")}`;
+  const guardWhere = `p.deletedAt IS NULL${viewer === null ? "" : " AND pte.id IS NULL AND ptte.id IS NULL"}`;
+  const guardParams: SqlParam[] = viewer === null ? [] : [viewer, viewer];
+  const performer = `CROSS JOIN StashPerformer p ON p.id = pt.performerId AND p.stashInstanceId = pt.performerInstanceId`;
+
+  const large = refs.length > (opts.inlineLimit ?? PAIR_INLINE_LIMIT);
+  const refsName = `${opts.name}_refs`;
+  const refsCtes = large
+    ? [refsCte(refsName, refs, opts.allowedInstanceIds)]
+    : [];
+  const inline = large
+    ? { sql: "", params: [] }
+    : pairs("pt.tagId", "pt.tagInstanceId", refs);
+  const [id, instance] = parentKeyOf(junction);
+
+  // The items holding any of the tags, driven from the tags
+  const from = large
+    ? `${refsName} r CROSS JOIN PerformerTag pt ON pt.tagId = r.id AND pt.tagInstanceId = r.inst`
+    : "PerformerTag pt";
+  const holding: SqlFragment = {
+    sql: `SELECT ${j}.${junction.parentIdCol}, ${j}.${junction.parentInstanceCol} FROM ${from} ${performer}${guardJoins} CROSS JOIN ${junction.table} ${j} ON ${j}.${junction.refIdCol} = p.id AND ${j}.${junction.refInstanceCol} = p.stashInstanceId WHERE ${guardWhere}${large ? "" : ` AND (${inline.sql})`}`,
+    params: [...guardParams, ...inline.params],
+  };
+
+  // The item's performers' tags by PerformerTag's primary key, checked
+  // against the refs: for a page walking a sort index
+  const held: FilterClause = {
+    sql: `EXISTS (SELECT 1 FROM ${junction.table} ${j} CROSS JOIN PerformerTag pt ON pt.performerId = ${j}.${junction.refIdCol} AND pt.performerInstanceId = ${j}.${junction.refInstanceCol} ${performer}${guardJoins} WHERE ${j}.${junction.parentIdCol} = ${id} AND ${j}.${junction.parentInstanceCol} = ${instance} AND ${large ? `(+pt.tagId, pt.tagInstanceId) IN (SELECT id, inst FROM ${refsName})` : `(${inline.sql})`} AND ${guardWhere})`,
+    params: [...guardParams, ...inline.params],
+    ...(large ? { ctes: refsCtes } : {}),
+  };
+
+  let read: FilterClause;
+  let walk: FilterClause;
+  if (modifier === "INCLUDES") {
+    read = {
+      sql: `(${id}, ${instance}) IN (${holding.sql})`,
+      params: holding.params,
+      ...(large ? { ctes: refsCtes } : {}),
+    };
+    walk = held;
+  } else {
+    const setName = `${opts.name}_matched`;
+    read = matchedSetClause([id, instance], setName, "EXCLUDES", [
+      ...refsCtes,
+      {
+        name: setName,
+        sql: `${setName}(id, inst) AS MATERIALIZED (SELECT DISTINCT ${holding.sql.slice("SELECT ".length)})`,
+        params: holding.params,
+      },
+    ]);
+    walk = { ...held, sql: `NOT ${held.sql}` };
+  }
+  return opts.sortedByIndex === true ? { ...walk, count: read } : read;
+}
+
 /**
  * A date criterion's clause on a text day column Stash keeps (`s.date`,
  * `p.birthdate`): each row's day is `fullDateSql(column)` cut to its first

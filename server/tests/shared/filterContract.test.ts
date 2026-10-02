@@ -60,7 +60,7 @@ describe("filter contract", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("excludable fields are refs: the tags, performers and studios of the seven lists", () => {
+  it("excludable fields are refs: the tags, performers and studios of the seven lists, and the scenes' performer tags", () => {
     const excludable = allFields().flatMap(([name, spec]) =>
       spec.kind === "ref" && spec.excludable ? [name] : []
     );
@@ -72,7 +72,8 @@ describe("filter contract", () => {
     );
     const expected = Object.entries(FIELDS).flatMap(([kind, fields]) =>
       Object.entries(fields).flatMap(([field, spec]: [string, FieldSpec]) =>
-        spec.kind === "ref" && ["tags", "performers", "studios"].includes(field)
+        spec.kind === "ref" &&
+        ["tags", "performers", "studios", "performer_tags"].includes(field)
           ? [`${kind}.${field}`]
           : []
       )
@@ -81,6 +82,7 @@ describe("filter contract", () => {
     expect(notRefs).toEqual([]);
     expect(excludable).toEqual(expected);
     expect(excludable).toContain("tag.performers");
+    expect(excludable).toContain("scene.performer_tags");
   });
 
   it("ref presence (has none, has any) is on the relations a row can lack", () => {
