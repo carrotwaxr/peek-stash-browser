@@ -287,6 +287,41 @@ describe("apiFetch errors and results", () => {
     );
   });
 
+  it("every request sends X-Peek-Time-Zone with the browser's zone", async () => {
+    const fetchMock = stubFetch(200, {});
+    const resolved = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockReturnValue({
+        timeZone: "America/Los_Angeles",
+      } as Intl.ResolvedDateTimeFormatOptions);
+    const { apiFetch } = await import("@/api/client");
+
+    await apiFetch("/library/scenes");
+    await apiFetch("/playlists", { method: "POST", body: "{}" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init?.headers).get("X-Peek-Time-Zone")).toBe(
+        "America/Los_Angeles"
+      );
+    }
+    resolved.mockRestore();
+  });
+
+  it("sends no X-Peek-Time-Zone when the browser names no zone", async () => {
+    const fetchMock = stubFetch(200, {});
+    const resolved = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockReturnValue({} as Intl.ResolvedDateTimeFormatOptions);
+    const { apiFetch } = await import("@/api/client");
+
+    await apiFetch("/library/scenes");
+
+    const [, init] = must(fetchMock.mock.calls[0], "the fetch call");
+    expect(new Headers(init?.headers).has("X-Peek-Time-Zone")).toBe(false);
+    resolved.mockRestore();
+  });
+
   it("a caller's headers keep Content-Type", async () => {
     const fetchMock = stubFetch(200, {});
     const { apiFetch } = await import("@/api/client");

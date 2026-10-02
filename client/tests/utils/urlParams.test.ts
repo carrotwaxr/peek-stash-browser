@@ -910,8 +910,8 @@ describe("body measures are metric in the URL (owner answer 12)", () => {
     expect(length.query).toBe("penisLength_min=15.24");
     // The request sends the URL's values, unconverted
     expect(buildPerformerFilter(weight.read).weight).toEqual({
-      modifier: "GREATER_THAN",
-      value: 67,
+      modifier: "BETWEEN",
+      value: 68,
     });
   });
 
@@ -1046,8 +1046,8 @@ describe("body measures are metric in the URL (owner answer 12)", () => {
         untrusted<{ performer_filter: unknown }>(JSON.parse(state.listKey))
           .performer_filter
       ).toMatchObject({
-        height: { modifier: "GREATER_THAN", value: 176 },
-        weight: { modifier: "LESS_THAN", value: 10000 },
+        height: { modifier: "BETWEEN", value: 177.8 },
+        weight: { modifier: "BETWEEN", value2: 9999 },
       });
     }
   );
@@ -1103,8 +1103,8 @@ describe("a zero bound survives", () => {
     expect(query).toBe("rating_max=0");
     expect(read).toEqual({ rating: { max: "0" } });
     expect(buildSceneFilter(read).rating100).toEqual({
-      modifier: "LESS_THAN",
-      value: 1,
+      modifier: "BETWEEN",
+      value2: 0,
     });
   });
 

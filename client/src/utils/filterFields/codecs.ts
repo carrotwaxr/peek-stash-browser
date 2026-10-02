@@ -189,16 +189,20 @@ const hasBound = (value: unknown): boolean =>
 const rangeOf = (value: unknown): { min?: unknown; max?: unknown } =>
   typeof value === "object" && value !== null ? value : {};
 
-/** A range bound as a whole number (the inputs hold strings), else undefined */
-const wholeOf = (value: unknown): number | undefined => {
+/** A range bound as a number, decimals kept (the inputs hold strings), else undefined */
+const boundOf = (value: unknown): number | undefined => {
   const parsed =
     typeof value === "number"
-      ? Math.trunc(value)
+      ? value
       : typeof value === "string"
-        ? parseInt(value)
+        ? parseFloat(value)
         : NaN;
   return Number.isFinite(parsed) ? parsed : undefined;
 };
+
+/** A bound in the stored unit, without the float noise of the multiplication (1.1 Mbps is 1100000) */
+const scaledBound = (bound: number, scale: number): number =>
+  Number((bound * scale).toPrecision(12));
 
 /** A bound as the URL and the editors hold it: a finite number, or text with something in it */
 const isBound = (value: unknown): value is string | number =>
@@ -282,25 +286,21 @@ function numberRowCriterion(field: NumberField, state: PanelState) {
 }
 
 /**
- * A number range: both bounds BETWEEN them; one bound GREATER_THAN min - 1
- * or LESS_THAN max + 1, so a lone whole bound is inclusive (S13 revisits
- * the encoding); undefined without a bound. `scale` converts the panel's
- * unit to the stored one (minutes to seconds, Mbps to bits per second).
+ * A number range as BETWEEN, inclusive: both bounds as `value` and `value2`,
+ * a lone minimum as `value` alone and a lone maximum as `value2` alone;
+ * decimals kept; undefined without a bound. `scale` converts the panel's unit
+ * to the stored one (minutes to seconds, Mbps to bits per second).
  */
 function numberCriterion(range: unknown, scale: number) {
   const { min: rawMin, max: rawMax } = rangeOf(range);
-  const min = wholeOf(rawMin);
-  const max = wholeOf(rawMax);
-  if (min !== undefined && max !== undefined) {
-    return { modifier: "BETWEEN", value: min * scale, value2: max * scale };
-  }
-  if (min !== undefined) {
-    return { modifier: "GREATER_THAN", value: min * scale - 1 };
-  }
-  if (max !== undefined) {
-    return { modifier: "LESS_THAN", value: max * scale + 1 };
-  }
-  return undefined;
+  const min = boundOf(rawMin);
+  const max = boundOf(rawMax);
+  if (min === undefined && max === undefined) return undefined;
+  return {
+    modifier: "BETWEEN",
+    ...(min === undefined ? {} : { value: scaledBound(min, scale) }),
+    ...(max === undefined ? {} : { value2: scaledBound(max, scale) }),
+  };
 }
 
 /** A date range control's day, or undefined when unset */
@@ -538,11 +538,16 @@ function partsOf(
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
+/** A stored bound in the panel's unit, undefined when it is no finite number */
+const unscaled = (value: unknown, scale: number): number | undefined =>
+  isFiniteNumber(value) ? value / scale : undefined;
+
 /**
  * A stored number criterion as the range control holds it, in the panel's
- * unit: BETWEEN its two values; the old lone bounds back to the bound typed
- * (GREATER_THAN v is a min of v + 1, LESS_THAN v a max of v - 1); undefined
- * for any other shape. S13 adds the one-sided BETWEEN.
+ * unit: BETWEEN its two values, or one of them (`value` alone a min, `value2`
+ * alone a max); the old lone bounds back to the bound typed (GREATER_THAN v
+ * is a min of v + 1, LESS_THAN v a max of v - 1); undefined for any other
+ * shape.
  */
 function rangeFromCriterion(
   criterion: unknown,
@@ -551,36 +556,77 @@ function rangeFromCriterion(
   const parts = partsOf(criterion, ["modifier", "value", "value2"]);
   if (parts === undefined) return undefined;
   const { modifier, value, value2 } = parts;
-  if (!isFiniteNumber(value)) return undefined;
   if (modifier === "BETWEEN") {
-    return isFiniteNumber(value2)
-      ? { min: value / scale, max: value2 / scale }
-      : undefined;
+    const low = value === undefined ? undefined : unscaled(value, scale);
+    const high = value2 === undefined ? undefined : unscaled(value2, scale);
+    if (
+      (value !== undefined && low === undefined) ||
+      (value2 !== undefined && high === undefined)
+    ) {
+      return undefined;
+    }
+    if (low === undefined && high === undefined) return undefined;
+    return {
+      ...(low === undefined ? {} : { min: low }),
+      ...(high === undefined ? {} : { max: high }),
+    };
   }
-  if (value2 !== undefined) return undefined;
+  if (!isFiniteNumber(value) || value2 !== undefined) return undefined;
   if (modifier === "GREATER_THAN") return { min: (value + 1) / scale };
   if (modifier === "LESS_THAN") return { max: (value - 1) / scale };
   return undefined;
 }
 
+/** The timestamp fields; every other date field holds a calendar date */
+const TIMESTAMP_FIELDS: readonly string[] = [
+  "created_at",
+  "updated_at",
+  "last_played_at",
+];
+
+/** The day after a `YYYY-MM-DD` day; anything else as it was */
+function nextDay(day: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 /**
  * A stored date criterion as the date range control holds it: BETWEEN its
- * two days, GREATER_THAN a start, LESS_THAN an end; undefined for any other
- * shape
+ * two days, or one of them (`value` alone a start, `value2` alone an end); the
+ * old lone bounds, GREATER_THAN a start (a calendar date matched from the day
+ * after, so its start is the next day; a timestamp matched most of that day,
+ * so its start is the day itself) and LESS_THAN an end; undefined for any
+ * other shape.
  */
 function dateRangeFromCriterion(
-  criterion: unknown
+  criterion: unknown,
+  contractField: string
 ): { start?: string; end?: string } | undefined {
   const parts = partsOf(criterion, ["modifier", "value", "value2"]);
   if (parts === undefined) return undefined;
-  const from = dayOf(parts.value);
-  if (from === undefined) return undefined;
+  const from = parts.value === undefined ? undefined : dayOf(parts.value);
+  const to = parts.value2 === undefined ? undefined : dayOf(parts.value2);
   if (parts.modifier === "BETWEEN") {
-    const to = dayOf(parts.value2);
-    return to === undefined ? undefined : { start: from, end: to };
+    if (
+      (parts.value !== undefined && from === undefined) ||
+      (parts.value2 !== undefined && to === undefined) ||
+      (from === undefined && to === undefined)
+    ) {
+      return undefined;
+    }
+    return {
+      ...(from === undefined ? {} : { start: from }),
+      ...(to === undefined ? {} : { end: to }),
+    };
   }
-  if (parts.value2 !== undefined) return undefined;
-  if (parts.modifier === "GREATER_THAN") return { start: from };
+  if (from === undefined || parts.value2 !== undefined) return undefined;
+  if (parts.modifier === "GREATER_THAN") {
+    return {
+      start: TIMESTAMP_FIELDS.includes(contractField) ? from : nextDay(from),
+    };
+  }
   if (parts.modifier === "LESS_THAN") return { end: from };
   return undefined;
 }
@@ -942,8 +988,8 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
             },
           };
     },
-    // Both BETWEEN them, a start alone GREATER_THAN it, an end alone
-    // LESS_THAN it (S13 revisits the encoding)
+    // BETWEEN, inclusive: both days, or a start alone as `value` and an end
+    // alone as `value2`
     toCriterion: (field, _spec, state) => {
       const range = state[field.key];
       const { start, end } =
@@ -952,15 +998,15 @@ export const CODECS: { readonly [K in EditorKind]: CodecOf<K> } = {
           : {};
       const from = dayOf(start);
       const to = dayOf(end);
-      if (from !== undefined && to !== undefined) {
-        return { modifier: "BETWEEN", value: from, value2: to };
-      }
-      if (from !== undefined) return { modifier: "GREATER_THAN", value: from };
-      if (to !== undefined) return { modifier: "LESS_THAN", value: to };
-      return undefined;
+      if (from === undefined && to === undefined) return undefined;
+      return {
+        modifier: "BETWEEN",
+        ...(from === undefined ? {} : { value: from }),
+        ...(to === undefined ? {} : { value2: to }),
+      };
     },
     fromCriterion: (field, _spec, criterion) => {
-      const range = dateRangeFromCriterion(criterion);
+      const range = dateRangeFromCriterion(criterion, field.field);
       return range === undefined ? {} : { [field.key]: range };
     },
     chip: (field, _spec, state) => dateChip(field, state),

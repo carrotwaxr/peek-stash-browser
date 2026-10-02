@@ -120,25 +120,25 @@ describe("buildStudioFilter", () => {
       });
     });
 
-    it("should build rating filter with GREATER_THAN modifier (min only)", () => {
+    it("should build rating filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         rating: { min: 70 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.rating100).toEqual({
-        modifier: "GREATER_THAN",
-        value: 69, // min - 1
+        modifier: "BETWEEN",
+        value: 70,
       });
     });
 
-    it("should build rating filter with LESS_THAN modifier (max only)", () => {
+    it("should build rating filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         rating: { max: 50 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.rating100).toEqual({
-        modifier: "LESS_THAN",
-        value: 51, // max + 1
+        modifier: "BETWEEN",
+        value2: 50,
       });
     });
 
@@ -164,25 +164,25 @@ describe("buildStudioFilter", () => {
       });
     });
 
-    it("should build scene_count filter with GREATER_THAN modifier (min only)", () => {
+    it("should build scene_count filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         sceneCount: { min: 100 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.scene_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 99, // min - 1
+        modifier: "BETWEEN",
+        value: 100,
       });
     });
 
-    it("should build scene_count filter with LESS_THAN modifier (max only)", () => {
+    it("should build scene_count filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         sceneCount: { max: 75 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.scene_count).toEqual({
-        modifier: "LESS_THAN",
-        value: 76, // max + 1
+        modifier: "BETWEEN",
+        value2: 75,
       });
     });
   });
@@ -200,25 +200,25 @@ describe("buildStudioFilter", () => {
       });
     });
 
-    it("should build o_counter filter with GREATER_THAN modifier (min only)", () => {
+    it("should build o_counter filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         oCounter: { min: 10 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.o_counter).toEqual({
-        modifier: "GREATER_THAN",
-        value: 9, // min - 1
+        modifier: "BETWEEN",
+        value: 10,
       });
     });
 
-    it("should build o_counter filter with LESS_THAN modifier (max only)", () => {
+    it("should build o_counter filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         oCounter: { max: 15 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.o_counter).toEqual({
-        modifier: "LESS_THAN",
-        value: 16, // max + 1
+        modifier: "BETWEEN",
+        value2: 15,
       });
     });
 
@@ -234,25 +234,25 @@ describe("buildStudioFilter", () => {
       });
     });
 
-    it("should build play_count filter with GREATER_THAN modifier (min only)", () => {
+    it("should build play_count filter with a lone minimum as BETWEEN (min only)", () => {
       const uiFilters = {
         playCount: { min: 20 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.play_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 19, // min - 1
+        modifier: "BETWEEN",
+        value: 20,
       });
     });
 
-    it("should build play_count filter with LESS_THAN modifier (max only)", () => {
+    it("should build play_count filter with a lone maximum as BETWEEN (max only)", () => {
       const uiFilters = {
         playCount: { max: 30 },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.play_count).toEqual({
-        modifier: "LESS_THAN",
-        value: 31, // max + 1
+        modifier: "BETWEEN",
+        value2: 30,
       });
     });
 
@@ -270,14 +270,14 @@ describe("buildStudioFilter", () => {
   });
 
   describe("Date Range Filters", () => {
-    it("should build created_at filter with GREATER_THAN modifier (start only)", () => {
+    it("should build created_at filter with a lone minimum as BETWEEN (start only)", () => {
       const uiFilters = {
         createdAt: { start: "2023-01-01" },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.created_at).toEqual({
         value: "2023-01-01",
-        modifier: "GREATER_THAN",
+        modifier: "BETWEEN",
       });
     });
 
@@ -293,14 +293,14 @@ describe("buildStudioFilter", () => {
       });
     });
 
-    it("should build updated_at filter with GREATER_THAN modifier (start only)", () => {
+    it("should build updated_at filter with a lone minimum as BETWEEN (start only)", () => {
       const uiFilters = {
         updatedAt: { start: "2024-01-01" },
       };
       const result = buildStudioFilter(uiFilters);
       expect(result.updated_at).toEqual({
         value: "2024-01-01",
-        modifier: "GREATER_THAN",
+        modifier: "BETWEEN",
       });
     });
 
@@ -361,8 +361,8 @@ describe("buildStudioFilter", () => {
         value2: 100,
       });
       expect(result.scene_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 49,
+        modifier: "BETWEEN",
+        value: 50,
       });
       expect(result.tags).toEqual({
         value: ["1", "2"],
@@ -389,8 +389,8 @@ describe("buildStudioFilter", () => {
         modifier: "INCLUDES_ALL",
       });
       expect(result.rating100).toEqual({
-        modifier: "GREATER_THAN",
-        value: 79,
+        modifier: "BETWEEN",
+        value: 80,
       });
       expect(result.scene_count).toEqual({
         modifier: "BETWEEN",
@@ -403,8 +403,8 @@ describe("buildStudioFilter", () => {
         value2: 20,
       });
       expect(result.play_count).toEqual({
-        modifier: "GREATER_THAN",
-        value: 9,
+        modifier: "BETWEEN",
+        value: 10,
       });
       expect(result.name).toEqual({ value: "Brazzers", modifier: "INCLUDES" });
       expect(result.created_at).toEqual({
@@ -455,8 +455,8 @@ describe("buildStudioFilter", () => {
         value2: 50,
       });
       expect(result.o_counter).toEqual({
-        modifier: "GREATER_THAN",
-        value: -1, // 0 - 1
+        modifier: "BETWEEN",
+        value: 0, // 0 - 1
       });
     });
   });

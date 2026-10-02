@@ -413,8 +413,8 @@
       },
       "rules": {
         "bitrate": {
-          "modifier": "GREATER_THAN",
-          "value": 24999999
+          "modifier": "BETWEEN",
+          "value": 25000000
         }
       },
       "back": {
@@ -435,8 +435,8 @@
       },
       "rules": {
         "bitrate": {
-          "modifier": "LESS_THAN",
-          "value": 75000001
+          "modifier": "BETWEEN",
+          "value2": 75000000
         }
       },
       "back": {
@@ -645,7 +645,7 @@
       },
       "rules": {
         "created_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       },
@@ -667,8 +667,8 @@
       },
       "rules": {
         "created_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       },
       "back": {
@@ -750,8 +750,8 @@
       },
       "rules": {
         "duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       },
       "back": {
@@ -772,8 +772,8 @@
       },
       "rules": {
         "duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       },
       "back": {
@@ -879,8 +879,8 @@
       },
       "rules": {
         "framerate": {
-          "modifier": "GREATER_THAN",
-          "value": 29
+          "modifier": "BETWEEN",
+          "value": 30
         }
       },
       "back": {
@@ -901,8 +901,8 @@
       },
       "rules": {
         "framerate": {
-          "modifier": "LESS_THAN",
-          "value": 91
+          "modifier": "BETWEEN",
+          "value2": 90
         }
       },
       "back": {
@@ -948,7 +948,7 @@
       },
       "rules": {
         "last_played_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       },
@@ -970,8 +970,8 @@
       },
       "rules": {
         "last_played_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       },
       "back": {
@@ -1017,8 +1017,8 @@
       },
       "rules": {
         "o_counter": {
-          "modifier": "GREATER_THAN",
-          "value": 74
+          "modifier": "BETWEEN",
+          "value": 75
         }
       },
       "back": {
@@ -1039,8 +1039,8 @@
       },
       "rules": {
         "o_counter": {
-          "modifier": "LESS_THAN",
-          "value": 226
+          "modifier": "BETWEEN",
+          "value2": 225
         }
       },
       "back": {
@@ -1143,8 +1143,8 @@
       },
       "rules": {
         "performer_age": {
-          "modifier": "GREATER_THAN",
-          "value": 38
+          "modifier": "BETWEEN",
+          "value": 39
         }
       },
       "back": {
@@ -1165,8 +1165,8 @@
       },
       "rules": {
         "performer_age": {
-          "modifier": "LESS_THAN",
-          "value": 81
+          "modifier": "BETWEEN",
+          "value2": 80
         }
       },
       "back": {
@@ -1212,8 +1212,8 @@
       },
       "rules": {
         "performer_count": {
-          "modifier": "GREATER_THAN",
-          "value": 4
+          "modifier": "BETWEEN",
+          "value": 5
         }
       },
       "back": {
@@ -1234,8 +1234,8 @@
       },
       "rules": {
         "performer_count": {
-          "modifier": "LESS_THAN",
-          "value": 16
+          "modifier": "BETWEEN",
+          "value2": 15
         }
       },
       "back": {
@@ -1499,8 +1499,8 @@
       },
       "rules": {
         "play_count": {
-          "modifier": "GREATER_THAN",
-          "value": 249
+          "modifier": "BETWEEN",
+          "value": 250
         }
       },
       "back": {
@@ -1521,8 +1521,8 @@
       },
       "rules": {
         "play_count": {
-          "modifier": "LESS_THAN",
-          "value": 751
+          "modifier": "BETWEEN",
+          "value2": 750
         }
       },
       "back": {
@@ -1568,8 +1568,8 @@
       },
       "rules": {
         "play_duration": {
-          "modifier": "GREATER_THAN",
-          "value": 4559
+          "modifier": "BETWEEN",
+          "value": 4560
         }
       },
       "back": {
@@ -1590,8 +1590,8 @@
       },
       "rules": {
         "play_duration": {
-          "modifier": "LESS_THAN",
-          "value": 13501
+          "modifier": "BETWEEN",
+          "value2": 13500
         }
       },
       "back": {
@@ -1638,8 +1638,8 @@
       },
       "rules": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       },
       "back": {
@@ -1661,8 +1661,8 @@
       },
       "rules": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       },
       "back": {
@@ -1831,8 +1831,8 @@
       },
       "rules": {
         "rating100": {
-          "modifier": "GREATER_THAN",
-          "value": 24
+          "modifier": "BETWEEN",
+          "value": 25
         }
       },
       "back": {
@@ -1853,8 +1853,8 @@
       },
       "rules": {
         "rating100": {
-          "modifier": "LESS_THAN",
-          "value": 76
+          "modifier": "BETWEEN",
+          "value2": 75
         }
       },
       "back": {
@@ -3286,7 +3286,7 @@
       },
       "rules": {
         "date": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       },
@@ -3308,8 +3308,8 @@
       },
       "rules": {
         "date": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       },
       "back": {
@@ -3398,8 +3398,8 @@
       },
       "rules": {
         "tag_count": {
-          "modifier": "GREATER_THAN",
-          "value": 12
+          "modifier": "BETWEEN",
+          "value": 13
         }
       },
       "back": {
@@ -3420,8 +3420,8 @@
       },
       "rules": {
         "tag_count": {
-          "modifier": "LESS_THAN",
-          "value": 39
+          "modifier": "BETWEEN",
+          "value2": 38
         }
       },
       "back": {
@@ -3945,7 +3945,7 @@
       },
       "rules": {
         "updated_at": {
-          "modifier": "GREATER_THAN",
+          "modifier": "BETWEEN",
           "value": "2020-01-01"
         }
       },
@@ -3967,8 +3967,8 @@
       },
       "rules": {
         "updated_at": {
-          "modifier": "LESS_THAN",
-          "value": "2024-12-31"
+          "modifier": "BETWEEN",
+          "value2": "2024-12-31"
         }
       },
       "back": {
