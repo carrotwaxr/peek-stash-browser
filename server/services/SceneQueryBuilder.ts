@@ -36,6 +36,7 @@ import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type PerformerAgeSource,
   type SqlFragment,
   buildDateFilter,
   buildEpochDateFilter,
@@ -43,6 +44,7 @@ import {
   buildNumericFilter,
   buildTextFilter,
   noClause,
+  performerAgeExists,
   refClause,
   sceneUntaggedSql,
 } from "../utils/sqlClauses.js";
@@ -205,18 +207,17 @@ const RESOLUTION_HEIGHTS: Readonly<Record<Resolution, number>> = {
   HUGE: 6144,
 };
 
-/**
- * The oldest performer's age on the scene's date (today's, without a date):
- * (scene date - birthdate) in years, as SQLite computes it
- */
-const PERFORMER_AGE = `(
-      SELECT MAX(
-        CAST((julianday(COALESCE(s.date, date('now'))) - julianday(p.birthdate)) / 365.25 AS INTEGER)
-      )
-      FROM ScenePerformer sp
-      JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
-      WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND p.birthdate IS NOT NULL
-    )`;
+/** The junction Performer Age reads a scene's performers from */
+const SCENE_PERFORMER_AGE: PerformerAgeSource = {
+  junction: {
+    table: "ScenePerformer",
+    itemId: "sceneId",
+    itemInstance: "sceneInstanceId",
+    performerId: "performerId",
+    performerInstance: "performerInstanceId",
+  },
+  item: { id: "s.id", instance: "s.stashInstanceId", date: "s.date" },
+};
 
 /**
  * Builds and executes SQL queries for scene filtering
@@ -406,7 +407,12 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     // ScenePerformer and SceneTag rows
     performer_count: (c) => buildNumericFilter(c, "s.performerCount"),
     tag_count: (c) => buildNumericFilter(c, "s.tagCount"),
-    performer_age: (c) => buildNumericFilter(c, PERFORMER_AGE),
+    performer_age: (c, ctx) =>
+      performerAgeExists(
+        c,
+        SCENE_PERFORMER_AGE,
+        ctx.applyExclusions ? ctx.userId : null
+      ),
 
     // Enums
     orientation: (c) => this.orientationClause(c),

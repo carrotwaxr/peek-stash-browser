@@ -13,6 +13,7 @@ import {
   type JunctionTarget,
   PAIR_INLINE_LIMIT,
   type ViaSceneSpec,
+  ageYearsSql,
   anyOf,
   buildDateFilter,
   buildEpochDateFilter,
@@ -22,10 +23,12 @@ import {
   combine,
   countForms,
   exclusionJoin,
+  fullDateSql,
   idClause,
   instanceClause,
   instanceColumnClause,
   pairs,
+  performerAgeExists,
   randomOrder,
   refClause,
   specificInstanceClause,
@@ -1372,5 +1375,78 @@ describe("buildEpochDateFilter edge values", () => {
     expect(buildEpochDateFilter({ modifier: "NOT_NULL" }, COL).sql).toBe(
       `${COL} IS NOT NULL`
     );
+  });
+});
+
+describe("fullDateSql", () => {
+  it("reads a year as its 1 January and a year and month as its first day", () => {
+    expect(fullDateSql("p.birthdate")).toBe(
+      "CASE length(p.birthdate) WHEN 4 THEN p.birthdate || '-01-01' WHEN 7 THEN p.birthdate || '-01' ELSE p.birthdate END"
+    );
+  });
+});
+
+describe("ageYearsSql", () => {
+  it("wraps both dates in fullDateSql, with Stash's arithmetic", () => {
+    expect(ageYearsSql("s.date", "p.birthdate")).toBe(
+      `CAST(strftime('%Y.%m%d', ${fullDateSql("s.date")}) - strftime('%Y.%m%d', ${fullDateSql("p.birthdate")}) AS INTEGER)`
+    );
+  });
+});
+
+describe("performerAgeExists", () => {
+  const source = {
+    junction: {
+      table: "ScenePerformer",
+      itemId: "sceneId",
+      itemInstance: "sceneInstanceId",
+      performerId: "performerId",
+      performerInstance: "performerInstanceId",
+    },
+    item: { id: "s.id", instance: "s.stashInstanceId", date: "s.date" },
+  };
+
+  it("needs the item's date and a live, visible performer with a birthdate, on the item's instance", () => {
+    const result = performerAgeExists(
+      { modifier: "LESS_THAN", value: 26 },
+      source,
+      7
+    );
+    expect(result.sql).toContain("s.date IS NOT NULL AND EXISTS");
+    expect(result.sql).toContain(
+      "sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId"
+    );
+    expect(result.sql).toContain("p.deletedAt IS NULL");
+    expect(result.sql).toContain("p.birthdate IS NOT NULL");
+    expect(result.sql).toContain(
+      "x.entityType = 'performer' AND x.entityId = p.id AND (x.instanceId = '' OR x.instanceId = p.stashInstanceId)"
+    );
+    expect(result.sql).toContain(`${ageYearsSql("s.date", "p.birthdate")} < ?`);
+    // The viewer first (the exclusion sits before the comparison)
+    expect(result.params).toEqual([7, 26]);
+  });
+
+  it("without a viewer reads every performer", () => {
+    const result = performerAgeExists(
+      { modifier: "BETWEEN", value: 20, value2: 30 },
+      source,
+      null
+    );
+    expect(result.sql).not.toContain("UserExcludedEntity");
+    expect(result.params).toEqual([20, 30]);
+  });
+
+  it("IS_NULL and NOT_NULL filter nothing, and a criterion without bounds none", () => {
+    expect(performerAgeExists({ modifier: "IS_NULL" }, source, 1).sql).toBe("");
+    expect(performerAgeExists({ modifier: "NOT_NULL" }, source, 1).sql).toBe(
+      ""
+    );
+    expect(
+      performerAgeExists(
+        { modifier: "BETWEEN", value: undefined, value2: undefined },
+        source,
+        1
+      ).sql
+    ).toBe("");
   });
 });
