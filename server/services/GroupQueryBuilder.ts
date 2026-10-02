@@ -21,25 +21,33 @@ import type {
   GroupRelationQueryRow,
 } from "../types/internal/queryRows.js";
 import type {
+  FilterRef,
   ParsedFilter,
+  RefCriterion,
   RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
+import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
 import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type ParentKey,
   type SqlFragment,
   type ViaSceneSpec,
+  allOf,
+  buildCountFilter,
   buildDayFilter,
   buildFavoriteFilter,
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
-  refClause,
+  noClause,
+  refSetMatch,
   searchAll,
   viaSceneClause,
+  visibleGuard,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
@@ -54,6 +62,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
   hierarchicalRefClause,
 } from "./query/EntityQueryBuilder.js";
 import { excludedCountsJoin, visibleCount } from "./query/excludedCounts.js";
@@ -79,24 +88,79 @@ const selectColumns = (ctx: QueryContext) =>
     r.rating AS userRating, r.favorite AS userFavorite
   `.trim();
 
+/** The viewer whose exclusions apply, or null */
+const viewerOf = (ctx: QueryContext): number | null =>
+  ctx.applyExclusions ? ctx.userId : null;
+
+/**
+ * The collection's direct sub-collections that are live and the viewer can
+ * see (`gsc`, through GroupRelation `gsr` by its primary key prefix): the
+ * FROM after `SELECT ...`, the WHERE, and the parameters the FROM binds. A
+ * sub-collection is on the collection's own instance, which the list
+ * already allows.
+ */
+function visibleSubGroups(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("gsc", "group", viewerOf(ctx));
+  return {
+    sql: `FROM GroupRelation gsr JOIN StashGroup gsc ON gsc.id = gsr.subId AND gsc.stashInstanceId = gsr.subInstanceId${guard.join} WHERE gsr.containingId = g.id AND gsr.containingInstanceId = g.stashInstanceId AND gsr.subInstanceId = g.stashInstanceId AND ${guard.where}`,
+    params: guard.params,
+  };
+}
+
+/**
+ * The collections directly containing it, live and visible to the viewer
+ * (`gcp`, through GroupRelation `gcr` by its (subId, subInstanceId) index),
+ * on its own instance: as `visibleSubGroups`
+ */
+function visibleContainingGroups(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("gcp", "group", viewerOf(ctx));
+  return {
+    sql: `FROM GroupRelation gcr JOIN StashGroup gcp ON gcp.id = gcr.containingId AND gcp.stashInstanceId = gcr.containingInstanceId${guard.join} WHERE gcr.subId = g.id AND gcr.subInstanceId = g.stashInstanceId AND gcr.containingInstanceId = g.stashInstanceId AND ${guard.where}`,
+    params: guard.params,
+  };
+}
+
+/** How many rows a `visible...` FROM reads, as a scalar subquery */
+function countOf(from: FilterClause): FilterClause {
+  return { sql: `(SELECT COUNT(*) ${from.sql})`, params: from.params };
+}
+
+/** The collection's live tags the viewer can see */
+function tagCount(ctx: QueryContext): FilterClause {
+  const guard = visibleGuard("gtt", "tag", viewerOf(ctx));
+  return {
+    sql: `(SELECT COUNT(*) FROM GroupTag gtc JOIN StashTag gtt ON gtt.id = gtc.tagId AND gtt.stashInstanceId = gtc.tagInstanceId${guard.join} WHERE gtc.groupId = g.id AND gtc.groupInstanceId = g.stashInstanceId AND ${guard.where})`,
+    params: guard.params,
+  };
+}
+
+/**
+ * The viewer's O count or plays summed over the collection's live scenes
+ * they can see (Stash's group O count and play count, from the viewer's
+ * own WatchHistory rows only): SceneGroup by its group index, each scene
+ * by its key, the history by (user, instance, scene). Never missing: 0.
+ */
+function historySum(
+  column: "oCount" | "playCount",
+  ctx: QueryContext
+): FilterClause {
+  const guard = visibleGuard("gws", "scene", viewerOf(ctx));
+  return {
+    sql: `(SELECT COALESCE(SUM(gw.${column}), 0) FROM SceneGroup gwg JOIN StashScene gws ON gws.id = gwg.sceneId AND gws.stashInstanceId = gwg.sceneInstanceId${guard.join} JOIN WatchHistory gw ON gw.userId = ? AND gw.instanceId = gws.stashInstanceId AND gw.sceneId = gws.id WHERE gwg.groupId = g.id AND gwg.groupInstanceId = g.stashInstanceId AND ${guard.where})`,
+    params: [...guard.params, ctx.userId],
+  };
+}
+
 /**
  * The sub-group count column: the group's direct sub-groups that are live
- * and, with exclusions applied, not excluded for the user. A sub-group is on
- * the group's own instance, which the list already allows. Each row probes
- * GroupRelation's primary key prefix (containingId, containingInstanceId),
- * so a page of 40 groups is 40 lookups.
+ * and, with exclusions applied, not excluded for the user, as the
+ * `sub_group_count` filter counts them. Each row probes GroupRelation's
+ * primary key prefix (containingId, containingInstanceId), so a page of 40
+ * groups is 40 lookups.
  */
 function subGroupCountColumn(ctx: QueryContext): SqlFragment {
-  const exclusion = ctx.applyExclusions
-    ? `LEFT JOIN UserExcludedEntity se ON se.userId = ? AND se.entityType = 'group' AND se.entityId = sub.id AND (se.instanceId = '' OR se.instanceId = sub.stashInstanceId)`
-    : "";
-  return {
-    sql: `(SELECT COUNT(*) FROM GroupRelation gr
-        JOIN StashGroup sub ON sub.id = gr.subId AND sub.stashInstanceId = gr.subInstanceId AND sub.deletedAt IS NULL
-        ${exclusion}
-        WHERE gr.containingId = g.id AND gr.containingInstanceId = g.stashInstanceId AND gr.subInstanceId = g.stashInstanceId${ctx.applyExclusions ? " AND se.id IS NULL" : ""}) AS subGroupCount`,
-    params: ctx.applyExclusions ? [ctx.userId] : [],
-  };
+  const count = countOf(visibleSubGroups(ctx));
+  return { sql: `${count.sql} AS subGroupCount`, params: count.params };
 }
 
 const GROUP_SPEC: EntitySpec = {
@@ -138,22 +202,6 @@ const GROUP_TAGS: JunctionTarget = {
   parentInstanceCol: "groupInstanceId",
   refIdCol: "tagId",
   refInstanceCol: "tagInstanceId",
-};
-
-/**
- * The groups containing a group: GroupRelation with the listed group as the
- * sub-group and the refs on the containing side (a parent collection's
- * direct sub-groups, as the card counts them)
- */
-const GROUP_CONTAINING: JunctionTarget = {
-  kind: "junction",
-  table: "GroupRelation",
-  alias: "grl",
-  parentAlias: "g",
-  parentIdCol: "subId",
-  parentInstanceCol: "subInstanceId",
-  refIdCol: "containingId",
-  refInstanceCol: "containingInstanceId",
 };
 
 /** Groups holding one of the scenes (a scene's Collections tab) */
@@ -225,6 +273,9 @@ class GroupQueryBuilder extends EntityQueryBuilder<
   protected override readonly fieldClauses: FieldClauses<"group"> = {
     // The viewer's own data
     favorite: (favorite) => buildFavoriteFilter(favorite),
+    performer_favorite: (on, ctx) => this.performerFavoriteClause(on, ctx),
+    o_counter: (c, ctx) => buildCountFilter(c, historySum("oCount", ctx)),
+    play_count: (c, ctx) => buildCountFilter(c, historySum("playCount", ctx)),
 
     // Related entities
     studios: (c, ctx) => this.studioClause(c, ctx),
@@ -234,15 +285,31 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       viaSceneClause(GROUPS_BY_PERFORMER, c.refs, c.modifier, ctx),
     tags: (c, ctx) => this.tagClause(c, ctx),
     containing_groups: (c, ctx) =>
-      refClause(GROUP_CONTAINING, c.refs, c.modifier, {
-        name: ctx.name,
-        allowedInstanceIds: ctx.allowedInstanceIds,
-      }),
+      this.hierarchyClause(
+        visibleContainingGroups,
+        ["gcp.id", "gcp.stashInstanceId"],
+        "down",
+        c,
+        ctx
+      ),
+    sub_groups: (c, ctx) =>
+      this.hierarchyClause(
+        visibleSubGroups,
+        ["gsc.id", "gsc.stashInstanceId"],
+        "up",
+        c,
+        ctx
+      ),
 
     // The viewer's rating and the counts
     rating100: (c) => buildNumericFilter(c, "r.rating"),
     scene_count: (c, ctx) =>
       buildNumericFilter(c, visibleCount(ctx, "g.sceneCount", "scenes")),
+    sub_group_count: (c, ctx) =>
+      buildCountFilter(c, countOf(visibleSubGroups(ctx))),
+    containing_group_count: (c, ctx) =>
+      buildCountFilter(c, countOf(visibleContainingGroups(ctx))),
+    tag_count: (c, ctx) => buildCountFilter(c, tagCount(ctx)),
     duration: (c) => buildNumericFilter(c, "g.duration"),
 
     // Text
@@ -281,6 +348,98 @@ class GroupQueryBuilder extends EntityQueryBuilder<
       name: ctx.name,
       related: { table: "StashTag", entityType: "tag" },
     });
+  }
+
+  /**
+   * `containing_groups` and `sub_groups`: a visible linked collection (a
+   * containing one, or a sub-collection) among the refs with their
+   * descendants to the depth (`containing_groups`, "down": the collections
+   * under a ref within depth + 1 levels) or their ancestors
+   * (`sub_groups`, "up": the collections holding a ref within depth + 1
+   * levels). The expansion follows live links (utils/hierarchyUtils.ts)
+   * and ends on a cycle; the link that matches must be to a collection the
+   * viewer can see, so a hidden one links nothing. INCLUDES any,
+   * INCLUDES_ALL one of each chosen ref's own group, EXCLUDES none (a
+   * collection with no links kept). The refs match as pairs, above
+   * PAIR_INLINE_LIMIT a refs CTE (`refSetMatch`).
+   */
+  private async hierarchyClause(
+    links: (ctx: QueryContext) => FilterClause,
+    key: ParentKey,
+    direction: "down" | "up",
+    criterion: RefCriterion,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    if (criterion.refs.length === 0) return noClause();
+    const from = links(ctx);
+    const holds = (refs: readonly FilterRef[], name: string): FilterClause => {
+      const match = refSetMatch(key, refs, {
+        name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+      });
+      return {
+        sql: `EXISTS (SELECT 1 ${from.sql} AND ${match.sql})`,
+        params: [...from.params, ...match.params],
+        ...(match.ctes ? { ctes: match.ctes } : {}),
+      };
+    };
+    if (criterion.modifier === "INCLUDES_ALL") {
+      const groups = await expandRefsEach(
+        "group",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds,
+        direction
+      );
+      return allOf(groups.map((group, i) => holds(group, `${ctx.name}_${i}`)));
+    }
+    const any = holds(
+      await expandRefs(
+        "group",
+        criterion.refs,
+        criterion.depth,
+        ctx.allowedInstanceIds,
+        direction
+      ),
+      ctx.name
+    );
+    return criterion.modifier === "INCLUDES"
+      ? any
+      : { ...any, sql: `NOT ${any.sql}` };
+  }
+
+  /**
+   * `performer_favorite`: a favourite performer of the viewer's (live, and
+   * not one they hid: `favoriteRefs`) in one of the collection's live
+   * scenes they can see (`true`), or none (`false`), as one EXISTS keyed on
+   * the collection: SceneGroup by its group index, each scene's performers
+   * by their key. The favourites match as pairs, above PAIR_INLINE_LIMIT a
+   * refs CTE (`refSetMatch`): the via-scene INCLUDES, driven from the refs,
+   * read every performer row of 267 favourites (0.9 s a count at 215k
+   * scenes, against 4 ms keyed). With no favourites `true` matches nothing
+   * and `false` is no filter.
+   */
+  private async performerFavoriteClause(
+    on: boolean,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const refs = await favoriteRefs("performer", ctx);
+    if (refs.length === 0) {
+      return on ? { sql: "1 = 0", params: [] } : noClause();
+    }
+    const scene = visibleGuard("gfs", "scene", viewerOf(ctx));
+    const performer = visibleGuard("gfp", "performer", viewerOf(ctx));
+    const match = refSetMatch(
+      ["gfsp.performerId", "gfsp.performerInstanceId"],
+      refs,
+      { name: ctx.name, allowedInstanceIds: ctx.allowedInstanceIds }
+    );
+    const exists: FilterClause = {
+      sql: `EXISTS (SELECT 1 FROM SceneGroup gfg JOIN StashScene gfs ON gfs.id = gfg.sceneId AND gfs.stashInstanceId = gfg.sceneInstanceId${scene.join} JOIN ScenePerformer gfsp ON gfsp.sceneId = gfs.id AND gfsp.sceneInstanceId = gfs.stashInstanceId JOIN StashPerformer gfp ON gfp.id = gfsp.performerId AND gfp.stashInstanceId = gfsp.performerInstanceId${performer.join} WHERE gfg.groupId = g.id AND gfg.groupInstanceId = g.stashInstanceId AND ${scene.where} AND ${performer.where} AND ${match.sql})`,
+      params: [...scene.params, ...performer.params, ...match.params],
+      ...(match.ctes ? { ctes: match.ctes } : {}),
+    };
+    return on ? exists : { ...exists, sql: `NOT ${exists.sql}` };
   }
 
   /**

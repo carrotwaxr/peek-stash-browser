@@ -12,12 +12,14 @@
  * The replay cases use the replay's hierarchy around groupWithScenes (G):
  * P contains G ("Box set") and G contains C ("Part 2"), from
  * stash-replay/extend.ts. The test Stash has no sub-groups, so live runs
- * skip them. The last case seeds two made-up instances that reuse the same
- * ids and deletes them before the file ends.
+ * skip them. The last cases seed two made-up instances that reuse the same
+ * ids and delete them before the file ends.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { must } from "../../tests/helpers/must.js";
+import { parseListRequest } from "../../utils/listRequest.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
@@ -29,6 +31,9 @@ import {
 } from "../helpers/testClient.js";
 
 const REPLAY = process.env.STASH_REPLAY === "1";
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 interface GroupRelationRef {
   group: { id: string; name: string; instanceId: string };
@@ -301,5 +306,298 @@ describe("Collection hierarchy (integration)", () => {
       });
       expect(onA.map(key)).toEqual([`${CHILD}@${A}`]);
     });
+  });
+});
+
+/**
+ * Sub-collections with depth, the collections containing them, and their
+ * counts, on seeded collections under two made-up instances reusing the
+ * same ids (invariant 7). The viewer hid GH (invariant 3, lead decision 4);
+ * another user hid nothing (invariant 6).
+ *
+ * gh2-a: G1 (7731001) > G2 (7731002) > G3 (7731003) > G4 (7731004); G1's
+ *   other sub-collections GH (7731005, hidden) and GD (7731007, deleted);
+ *   GH > G6 (7731006). A cycle: GC1 (7731008) > GC2 (7731009) > GC1, and
+ *   GX (7731010) inside both.
+ * gh2-b: G1 (7731001) > G2 (7731002).
+ */
+describeWithDb("Collection hierarchy filters and counts (seeded)", () => {
+  const A = "gh2-a";
+  const B = "gh2-b";
+  const VIEWER = "gh2-viewer";
+  const OTHER = "gh2-other";
+  let viewerId = 0;
+  let otherId = 0;
+
+  const [G1, G2, G3, G4, GH, G6, GD, GC1, GC2, GX] = [
+    "7731001",
+    "7731002",
+    "7731003",
+    "7731004",
+    "7731005",
+    "7731006",
+    "7731007",
+    "7731008",
+    "7731009",
+    "7731010",
+  ];
+  const k = (id: string, instance = A) => `${id}:${instance}`;
+  /** Every collection the viewer can see */
+  const VISIBLE = [
+    k(G1),
+    k(G2),
+    k(G3),
+    k(G4),
+    k(G6),
+    k(GC1),
+    k(GC2),
+    k(GX),
+    k(G1, B),
+    k(G2, B),
+  ].sort();
+  const without = (...keys: string[]) =>
+    VISIBLE.filter((v) => !keys.includes(v));
+
+  async function removeRows(): Promise<void> {
+    // Relations cascade from their groups
+    await prisma.stashGroup.deleteMany({
+      where: { stashInstanceId: { in: [A, B] } },
+    });
+    await prisma.user.deleteMany({
+      where: { username: { in: [VIEWER, OTHER] } },
+    });
+  }
+
+  /** The collections a wire `group_filter` lists, as sorted keys */
+  async function listed(
+    filter: Record<string, unknown>,
+    userId = viewerId
+  ): Promise<string[]> {
+    const request = parseListRequest(
+      "group",
+      { filter: { per_page: 100 }, group_filter: filter },
+      { userId }
+    );
+    const { items, total } = await groupQueryBuilder.execute({
+      userId,
+      allowedInstanceIds: [A, B],
+      request,
+    });
+    expect(total).toBe(items.length);
+    return items.map((g) => k(g.id, g.instanceId)).sort();
+  }
+
+  beforeAll(async () => {
+    await removeRows();
+    const user = async (username: string) =>
+      (
+        await prisma.user.create({
+          data: { username, password: "not-a-real-hash", role: "USER" },
+        })
+      ).id;
+    viewerId = await user(VIEWER);
+    otherId = await user(OTHER);
+
+    const group = (id: string, instance = A, deletedAt?: Date) => ({
+      id,
+      stashInstanceId: instance,
+      name: `GH2 group ${id} ${instance}`,
+      ...(deletedAt ? { deletedAt } : {}),
+    });
+    await prisma.stashGroup.createMany({
+      data: [
+        ...[G1, G2, G3, G4, GH, G6, GC1, GC2, GX].map((id) => group(id)),
+        group(GD, A, new Date()),
+        group(G1, B),
+        group(G2, B),
+      ],
+    });
+    const link = (containing: string, sub: string, instance = A) => ({
+      containingId: containing,
+      containingInstanceId: instance,
+      subId: sub,
+      subInstanceId: instance,
+      orderIndex: 0,
+    });
+    await prisma.groupRelation.createMany({
+      data: [
+        link(G1, G2),
+        link(G2, G3),
+        link(G3, G4),
+        link(G1, GH),
+        link(G1, GD),
+        link(GH, G6),
+        link(GC1, GC2),
+        link(GC2, GC1),
+        link(GC1, GX),
+        link(GC2, GX),
+        link(G1, G2, B),
+      ],
+    });
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: viewerId,
+        entityType: "group",
+        entityId: GH,
+        instanceId: A,
+        reason: "hidden",
+      },
+    });
+  });
+
+  afterAll(removeRows);
+
+  it("containing_groups X at depth -1 lists every sub-collection under X; one instance's X never matches the other's", async () => {
+    const g1 = k(G1);
+    expect(
+      await listed({
+        containing_groups: { value: [g1], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([k(G2), k(G3), k(G4)].sort());
+    expect(
+      await listed({
+        containing_groups: { value: [g1], modifier: "INCLUDES", depth: 1 },
+      })
+    ).toEqual([k(G2), k(G3)].sort());
+    expect(
+      await listed({ containing_groups: { value: [g1], modifier: "INCLUDES" } })
+    ).toEqual([k(G2)]);
+    expect(
+      await listed({
+        containing_groups: { value: [k(G1, B)], modifier: "INCLUDES" },
+      })
+    ).toEqual([k(G2, B)]);
+    expect(
+      await listed({
+        containing_groups: { value: [G1], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([k(G2), k(G3), k(G4), k(G2, B)].sort());
+    // EXCLUDES keeps the collections no collection holds
+    expect(
+      await listed({
+        containing_groups: { value: [g1], modifier: "EXCLUDES", depth: -1 },
+      })
+    ).toEqual(without(k(G2), k(G3), k(G4)));
+    expect(
+      await listed({
+        containing_groups: {
+          value: [k(G2), k(G3)],
+          modifier: "INCLUDES_ALL",
+          depth: -1,
+        },
+      })
+    ).toEqual([k(G4)]);
+  });
+
+  it("sub_groups Y at depth -1 lists every collection holding Y at any depth", async () => {
+    const g4 = k(G4);
+    expect(
+      await listed({
+        sub_groups: { value: [g4], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([k(G1), k(G2), k(G3)].sort());
+    expect(
+      await listed({
+        sub_groups: { value: [g4], modifier: "INCLUDES", depth: 1 },
+      })
+    ).toEqual([k(G2), k(G3)].sort());
+    expect(
+      await listed({ sub_groups: { value: [g4], modifier: "INCLUDES" } })
+    ).toEqual([k(G3)]);
+    expect(
+      await listed({ sub_groups: { value: [k(G2, B)], modifier: "INCLUDES" } })
+    ).toEqual([k(G1, B)]);
+    expect(
+      await listed({ sub_groups: { value: [G2], modifier: "INCLUDES" } })
+    ).toEqual([k(G1), k(G1, B)].sort());
+    expect(
+      await listed({
+        sub_groups: { value: [g4], modifier: "EXCLUDES", depth: -1 },
+      })
+    ).toEqual(without(k(G1), k(G2), k(G3)));
+    expect(
+      await listed({
+        sub_groups: {
+          value: [k(G4), k(G3)],
+          modifier: "INCLUDES_ALL",
+          depth: -1,
+        },
+      })
+    ).toEqual([k(G1), k(G2)].sort());
+  });
+
+  it("a cycle in GroupRelation ends", async () => {
+    expect(
+      await listed({
+        containing_groups: { value: [k(GC1)], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([k(GC1), k(GC2), k(GX)].sort());
+    expect(
+      await listed({
+        sub_groups: { value: [k(GC1)], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([k(GC1), k(GC2)].sort());
+  });
+
+  it("a hidden sub-collection does not make its parent match sub_groups", async () => {
+    expect(
+      await listed({ sub_groups: { value: [k(GH)], modifier: "INCLUDES" } })
+    ).toEqual([]);
+    // G6 is reached only through GH
+    expect(
+      await listed({
+        sub_groups: { value: [k(G6)], modifier: "INCLUDES", depth: -1 },
+      })
+    ).toEqual([]);
+    expect(
+      await listed({
+        containing_groups: { value: [k(G1)], modifier: "INCLUDES", depth: -1 },
+      })
+    ).not.toContain(k(G6));
+    expect(
+      await listed({ sub_groups: { value: [k(GH)], modifier: "EXCLUDES" } })
+    ).toEqual(VISIBLE);
+    // Another user hid nothing: G1 holds GH, and GH holds G6, for them
+    expect(
+      await listed(
+        { sub_groups: { value: [k(G6)], modifier: "INCLUDES", depth: -1 } },
+        otherId
+      )
+    ).toEqual([k(G1), k(GH)].sort());
+  });
+
+  it("sub_group_count and containing_group_count count live, visible collections", async () => {
+    expect(
+      await listed({ sub_group_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual([k(G4), k(G6), k(GX), k(G2, B)].sort());
+    // G1 on gh2-a counts G2 alone for the viewer (GH hidden, GD deleted)
+    expect(
+      await listed({ sub_group_count: { value: 2, modifier: "EQUALS" } })
+    ).toEqual([k(GC1), k(GC2)].sort());
+    expect(
+      await listed(
+        { sub_group_count: { value: 2, modifier: "GREATER_THAN" } },
+        otherId
+      )
+    ).toEqual([]);
+    expect(
+      await listed(
+        { sub_group_count: { value: 2, modifier: "EQUALS" } },
+        otherId
+      )
+    ).toEqual([k(G1), k(GC1), k(GC2)].sort());
+
+    expect(
+      await listed({ containing_group_count: { value: 0, modifier: "EQUALS" } })
+    ).toEqual([k(G1), k(G6), k(G1, B)].sort());
+    expect(
+      await listed({ containing_group_count: { value: 2, modifier: "EQUALS" } })
+    ).toEqual([k(GX)]);
+    expect(
+      await listed(
+        { containing_group_count: { value: 0, modifier: "EQUALS" } },
+        otherId
+      )
+    ).toEqual([k(G1), k(G1, B)].sort());
   });
 });

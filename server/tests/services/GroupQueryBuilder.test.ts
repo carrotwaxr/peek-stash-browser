@@ -18,9 +18,11 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { entityKey, pairsJson } from "../../utils/entityRef.js";
+import { expandRefs } from "../../utils/hierarchyUtils.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -127,10 +129,10 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "LEFT JOIN UserExcludedEntity se ON se.userId = ? AND se.entityType = 'group' AND se.entityId = sub.id AND (se.instanceId = '' OR se.instanceId = sub.stashInstanceId)"
+        "LEFT JOIN UserExcludedEntity gsc_x ON gsc_x.userId = ? AND gsc_x.entityType = 'group' AND gsc_x.entityId = gsc.id AND (gsc_x.instanceId = '' OR gsc_x.instanceId = gsc.stashInstanceId)"
       );
       expect(sql).toContain(
-        "WHERE gr.containingId = g.id AND gr.containingInstanceId = g.stashInstanceId AND gr.subInstanceId = g.stashInstanceId AND se.id IS NULL) AS subGroupCount"
+        "WHERE gsr.containingId = g.id AND gsr.containingInstanceId = g.stashInstanceId AND gsr.subInstanceId = g.stashInstanceId AND gsc.deletedAt IS NULL AND gsc_x.id IS NULL) AS subGroupCount"
       );
       expect(sql.indexOf("AS subGroupCount")).toBeLessThan(
         sql.indexOf("FROM StashGroup g")
@@ -152,7 +154,7 @@ describe("GroupQueryBuilder", () => {
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "JOIN StashGroup sub ON sub.id = gr.subId AND sub.stashInstanceId = gr.subInstanceId AND sub.deletedAt IS NULL"
+        "JOIN StashGroup gsc ON gsc.id = gsr.subId AND gsc.stashInstanceId = gsr.subInstanceId WHERE gsr.containingId = g.id AND gsr.containingInstanceId = g.stashInstanceId AND gsr.subInstanceId = g.stashInstanceId AND gsc.deletedAt IS NULL) AS subGroupCount"
       );
       expect(sql).not.toContain("UserExcludedEntity");
       expect(params).toEqual([1, "inst-a", "inst-b", 10, 0]);
@@ -264,7 +266,7 @@ describe("GroupQueryBuilder", () => {
       expect(params).toEqual(arrayContaining(["5", "inst-a", "6"]));
     });
 
-    it("containing_groups match GroupRelation pairs with the group as the sub-group", async () => {
+    it("containing_groups match a visible containing group's pairs, with the group as the sub-group", async () => {
       await run({
         filter: {
           containing_groups: {
@@ -276,10 +278,66 @@ describe("GroupQueryBuilder", () => {
       });
 
       const { sql, params } = pageStatement();
-      expect(sql).toMatch(
-        /EXISTS \(SELECT 1 FROM GroupRelation (\w+) WHERE \1\.subId = g\.id AND \1\.subInstanceId = g\.stashInstanceId AND \(\(\1\.containingId = \? AND \1\.containingInstanceId = \?\) OR \(\1\.containingId = \?\)\)\)/
+      expect(sql).toContain(
+        "EXISTS (SELECT 1 FROM GroupRelation gcr JOIN StashGroup gcp ON gcp.id = gcr.containingId AND gcp.stashInstanceId = gcr.containingInstanceId LEFT JOIN UserExcludedEntity gcp_x ON gcp_x.userId = ? AND gcp_x.entityType = 'group' AND gcp_x.entityId = gcp.id AND (gcp_x.instanceId = '' OR gcp_x.instanceId = gcp.stashInstanceId) WHERE gcr.subId = g.id AND gcr.subInstanceId = g.stashInstanceId AND gcr.containingInstanceId = g.stashInstanceId AND gcp.deletedAt IS NULL AND gcp_x.id IS NULL AND ((gcp.id = ? AND gcp.stashInstanceId = ?) OR (gcp.id = ?)))"
       );
-      expect(params).toEqual(arrayContaining(["10", "inst-a", "11"]));
+      expect(params).toEqual(arrayContaining([1, "10", "inst-a", "11"]));
+    });
+
+    it("sub_groups expand the refs upwards and match a visible sub-group; EXCLUDES is NOT EXISTS", async () => {
+      await run({
+        filter: {
+          sub_groups: { refs: [ref("10")], modifier: "EXCLUDES", depth: 1 },
+        },
+      });
+
+      const { sql } = pageStatement();
+      expect(sql).toContain(
+        "NOT EXISTS (SELECT 1 FROM GroupRelation gsr JOIN StashGroup gsc ON gsc.id = gsr.subId"
+      );
+      expect(sql).toContain(
+        "((gsc.id = ? AND gsc.stashInstanceId = ?) OR (gsc.id = ? AND gsc.stashInstanceId = ?)))"
+      );
+      expect(must(vi.mocked(expandRefs).mock.calls[0])[4]).toBe("up");
+    });
+
+    it("performer_favorite is one EXISTS keyed on the collection over the viewer's favourites; none matches nothing", async () => {
+      mockPrisma.performerRating.findMany.mockResolvedValue([
+        partialRow({ performerId: "7", instanceId: "inst-a" }),
+      ]);
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+      await run({ filter: { performer_favorite: false } });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "NOT EXISTS (SELECT 1 FROM SceneGroup gfg JOIN StashScene gfs ON gfs.id = gfg.sceneId AND gfs.stashInstanceId = gfg.sceneInstanceId LEFT JOIN UserExcludedEntity gfs_x"
+      );
+      expect(sql).toContain(
+        "WHERE gfg.groupId = g.id AND gfg.groupInstanceId = g.stashInstanceId AND gfs.deletedAt IS NULL AND gfs_x.id IS NULL AND gfp.deletedAt IS NULL AND gfp_x.id IS NULL AND ((gfsp.performerId = ? AND gfsp.performerInstanceId = ?)))"
+      );
+      expect(params).toEqual(arrayContaining(["7", "inst-a"]));
+
+      vi.clearAllMocks();
+      mockPrisma.performerRating.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 0n }]);
+      await run({ filter: { performer_favorite: true } });
+      expect(pageStatement().sql).toContain("1 = 0");
+    });
+
+    it("o_counter and play_count sum the viewer's own history, the count's ids bound before the value", async () => {
+      await run({
+        filter: { o_counter: { modifier: "GREATER_THAN", value: 4 } },
+      });
+
+      const { sql, params } = pageStatement();
+      expect(sql).toContain(
+        "(SELECT COALESCE(SUM(gw.oCount), 0) FROM SceneGroup gwg JOIN StashScene gws ON gws.id = gwg.sceneId AND gws.stashInstanceId = gwg.sceneInstanceId LEFT JOIN UserExcludedEntity gws_x ON gws_x.userId = ? AND gws_x.entityType = 'scene' AND gws_x.entityId = gws.id AND (gws_x.instanceId = '' OR gws_x.instanceId = gws.stashInstanceId) JOIN WatchHistory gw ON gw.userId = ? AND gw.instanceId = gws.stashInstanceId AND gw.sceneId = gws.id WHERE gwg.groupId = g.id AND gwg.groupInstanceId = g.stashInstanceId AND gws.deletedAt IS NULL AND gws_x.id IS NULL) > ?"
+      );
+      const at = sql.indexOf("SUM(gw.oCount)");
+      const before = sql.slice(0, at).split("?").length - 1;
+      expect(params.slice(before, before + 3)).toEqual([1, 1, 4]);
     });
 
     it("studios match the group's studio column, the selected studio and its descendants on its instance", async () => {
