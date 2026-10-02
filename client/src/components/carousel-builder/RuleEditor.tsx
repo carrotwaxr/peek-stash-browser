@@ -342,7 +342,7 @@ const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
   );
 };
 
-/** A date rule, as the filter panel's date range holds it (`dateCriterion` reads it) */
+/** A date rule, as the filter panel's date range holds it (the date codec reads it) */
 interface DateRange {
   start?: string;
   end?: string;

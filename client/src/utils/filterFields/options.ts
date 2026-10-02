@@ -49,7 +49,9 @@ export interface FilterOption {
 }
 
 /** Each list's contract fields (clips: their GET parameters) */
-const SPECS: Readonly<Record<ListKind, Readonly<Record<string, FieldSpec>>>> = {
+export const SPECS: Readonly<
+  Record<ListKind, Readonly<Record<string, FieldSpec>>>
+> = {
   ...FIELDS,
   clip: CLIP_PARAMS,
 };

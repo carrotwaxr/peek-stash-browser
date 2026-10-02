@@ -13,4 +13,5 @@ export {
   codecOf,
   valuesOf,
 } from "./codecs";
+export { type PanelFilters, type PanelTable, buildPanelFilter } from "./build";
 export { type FilterOption, filterOptionsOf } from "./options";
