@@ -1,6 +1,5 @@
 import { type ReactNode, useCallback, useMemo } from "react";
 import { isLibraryInitializing } from "../../api/hooks/useLibraryReady";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import {
   useFilterOptions,
   useFiltersByContent,
@@ -90,7 +89,6 @@ export const SearchableGrid = ({
   // A detail page passes its lock inline: an equal lock on a re-render is
   // the same object, so the list state and the request keep theirs
   const lockedFilters = useFiltersByContent(pageLockedFilters);
-  const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(entityType);
   const lockedFields = useLockedFields(entityType, lockedFilters);
   const defaults = useListDefaults(entityType, defaultSort);
@@ -114,21 +112,10 @@ export const SearchableGrid = ({
     const query = buildListQuery(
       entityType,
       { ready, filters, sort, page, perPage, q },
-      lockedFilters,
-      unitPreference
+      lockedFilters
     );
     return query ? withLockedFilters(query, lockedFilters) : null;
-  }, [
-    entityType,
-    ready,
-    filters,
-    sort,
-    page,
-    perPage,
-    q,
-    lockedFilters,
-    unitPreference,
-  ]);
+  }, [entityType, ready, filters, sort, page, perPage, q, lockedFilters]);
 
   const { data, error, isPending, isPlaceholderData, refetch } =
     list.useList(request);

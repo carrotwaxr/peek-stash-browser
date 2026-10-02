@@ -1409,14 +1409,13 @@
         "label": "height: min only",
         "state": {
           "height": {
-            "feetMin": "5",
-            "inchesMin": "6"
+            "min": "167"
           }
         },
         "request": {
           "height": {
             "modifier": "GREATER_THAN",
-            "value": 167
+            "value": 166
           }
         }
       },
@@ -1424,14 +1423,13 @@
         "label": "height: max only",
         "state": {
           "height": {
-            "feetMax": "6",
-            "inchesMax": "2"
+            "max": "189"
           }
         },
         "request": {
           "height": {
             "modifier": "LESS_THAN",
-            "value": 189
+            "value": 190
           }
         }
       },
@@ -1439,49 +1437,15 @@
         "label": "height: min and max",
         "state": {
           "height": {
-            "feetMin": "5",
-            "inchesMin": "6",
-            "feetMax": "6",
-            "inchesMax": "2"
+            "min": "167",
+            "max": "189"
           }
         },
         "request": {
           "height": {
             "modifier": "BETWEEN",
-            "value": 168,
-            "value2": 188
-          }
-        }
-      },
-      {
-        "label": "height: feet only",
-        "state": {
-          "height": {
-            "feetMin": "5",
-            "feetMax": "6"
-          }
-        },
-        "request": {
-          "height": {
-            "modifier": "BETWEEN",
-            "value": 152,
-            "value2": 183
-          }
-        }
-      },
-      {
-        "label": "height: inches only",
-        "state": {
-          "height": {
-            "inchesMin": "10",
-            "inchesMax": "11"
-          }
-        },
-        "request": {
-          "height": {
-            "modifier": "BETWEEN",
-            "value": 25,
-            "value2": 28
+            "value": 167,
+            "value2": 189
           }
         }
       },
@@ -1495,7 +1459,7 @@
         "request": {
           "weight": {
             "modifier": "GREATER_THAN",
-            "value": 73
+            "value": 162
           }
         }
       },
@@ -1509,7 +1473,7 @@
         "request": {
           "weight": {
             "modifier": "LESS_THAN",
-            "value": 177
+            "value": 389
           }
         }
       },
@@ -1524,8 +1488,8 @@
         "request": {
           "weight": {
             "modifier": "BETWEEN",
-            "value": 74,
-            "value2": 176
+            "value": 163,
+            "value2": 388
           }
         }
       },
@@ -1539,7 +1503,7 @@
         "request": {
           "penis_length": {
             "modifier": "GREATER_THAN",
-            "value": 11
+            "value": 4
           }
         }
       },
@@ -1553,7 +1517,7 @@
         "request": {
           "penis_length": {
             "modifier": "LESS_THAN",
-            "value": 31
+            "value": 13
           }
         }
       },
@@ -1568,8 +1532,8 @@
         "request": {
           "penis_length": {
             "modifier": "BETWEEN",
-            "value": 12,
-            "value2": 30
+            "value": 5,
+            "value2": 12
           }
         }
       }
@@ -1629,7 +1593,7 @@
         "request": {
           "weight": {
             "modifier": "GREATER_THAN",
-            "value": 32
+            "value": 72
           }
         }
       },
@@ -1643,7 +1607,7 @@
         "request": {
           "weight": {
             "modifier": "LESS_THAN",
-            "value": 73
+            "value": 159
           }
         }
       },
@@ -1658,8 +1622,8 @@
         "request": {
           "weight": {
             "modifier": "BETWEEN",
-            "value": 33,
-            "value2": 72
+            "value": 73,
+            "value2": 158
           }
         }
       },
@@ -1673,7 +1637,7 @@
         "request": {
           "penis_length": {
             "modifier": "GREATER_THAN",
-            "value": 24
+            "value": 9
           }
         }
       },
@@ -1687,7 +1651,7 @@
         "request": {
           "penis_length": {
             "modifier": "LESS_THAN",
-            "value": 77
+            "value": 31
           }
         }
       },
@@ -1702,8 +1666,8 @@
         "request": {
           "penis_length": {
             "modifier": "BETWEEN",
-            "value": 25,
-            "value2": 76
+            "value": 10,
+            "value2": 30
           }
         }
       }

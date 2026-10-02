@@ -47,22 +47,15 @@ describe("buildPanelFilter", () => {
     (list) => {
       const golden = goldenOf(list);
       const metric = [...golden.samples, ...golden.permanent];
+      // The imperial editors hold metric too: no viewer's state converts
       const imperial = [
         ...golden.imperial.imperialOptions,
         ...golden.imperial.metricOptions,
       ];
-      for (const entry of metric) {
+      for (const entry of [...metric, ...imperial]) {
         expect(text(buildPanelFilter(list, entry.state)), entry.label).toBe(
           text(entry.request)
         );
-      }
-      for (const entry of imperial) {
-        expect(
-          text(
-            buildPanelFilter(list, entry.state, { unitPreference: "imperial" })
-          ),
-          `${entry.label} (imperial)`
-        ).toBe(text(entry.request));
       }
     }
   );
@@ -167,7 +160,6 @@ describe("buildPanelFilter", () => {
       buildPanelFilter(
         "scene",
         { markerCount: { min: "3", max: "9" }, favorite: true },
-        { unitPreference: "metric" },
         table
       )
     ).toEqual({

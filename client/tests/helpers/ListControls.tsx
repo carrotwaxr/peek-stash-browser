@@ -7,7 +7,6 @@ import {
 } from "react";
 import deepEqual from "fast-deep-equal";
 import SearchControls from "@/components/ui/SearchControls";
-import { useUnitPreference } from "@/contexts/UnitPreferenceContext";
 import {
   useFilterOptions,
   useListDefaults,
@@ -50,7 +49,6 @@ export function ListControls({
     viewModes,
   } = props;
   const entity = artifactType as ListEntity;
-  const { unitPreference } = useUnitPreference();
   const filterOptions = useFilterOptions(artifactType);
   const lockedFields = useLockedFields(artifactType, permanentFilters);
   const defaults = useListDefaults(artifactType, initialSort);
@@ -80,20 +78,9 @@ export function ListControls({
       buildListQuery(
         entity,
         { ready, filters, sort, page, perPage, q },
-        permanentFilters,
-        unitPreference
+        permanentFilters
       ),
-    [
-      entity,
-      ready,
-      filters,
-      sort,
-      page,
-      perPage,
-      q,
-      permanentFilters,
-      unitPreference,
-    ]
+    [entity, ready, filters, sort, page, perPage, q, permanentFilters]
   );
 
   const lastSentRef = useRef<ListQuery | null>(null);

@@ -36,8 +36,7 @@ describe("buildListQuery", () => {
     const query = buildListQuery(
       "scene",
       state({ filters: { date: { start: "2001-01-01" }, favorite: true } }),
-      TIMELINE,
-      "metric"
+      TIMELINE
     );
     const expected = buildSceneFilter({ ...TIMELINE, favorite: true });
     expect(query).toEqual({
@@ -47,12 +46,11 @@ describe("buildListQuery", () => {
   });
 
   it("a timeline period's date survives a sort change", () => {
-    const byDate = buildListQuery("scene", state(), TIMELINE, "metric");
+    const byDate = buildListQuery("scene", state(), TIMELINE);
     const byTitle = buildListQuery(
       "scene",
       state({ sort: { field: "title", direction: "ASC", seed: null } }),
-      TIMELINE,
-      "metric"
+      TIMELINE
     );
     const expected = buildSceneFilter(TIMELINE).date;
     expect(byDate?.filter.sort).toBe("date");
@@ -66,17 +64,14 @@ describe("buildListQuery", () => {
   });
 
   it("no query until presets resolve", () => {
-    expect(
-      buildListQuery("scene", state({ ready: false }), {}, "metric")
-    ).toBeNull();
+    expect(buildListQuery("scene", state({ ready: false }), {})).toBeNull();
   });
 
   it("random with a seed sends random_<seed>", () => {
     const query = buildListQuery(
       "performer",
       state({ sort: { field: "random", direction: "ASC", seed: 12345678 } }),
-      {},
-      "metric"
+      {}
     );
     expect(query?.filter.sort).toBe("random_12345678");
   });
@@ -87,20 +82,17 @@ describe("buildListQuery", () => {
       direction: "ASC" as const,
       seed: null,
     };
-    const bare = buildListQuery("scene", state({ sort }), {}, "metric");
-    const inGroup = buildListQuery(
-      "scene",
-      state({ sort }),
-      { groups: { value: ["3:abc"], modifier: "INCLUDES" } },
-      "metric"
-    );
+    const bare = buildListQuery("scene", state({ sort }), {});
+    const inGroup = buildListQuery("scene", state({ sort }), {
+      groups: { value: ["3:abc"], modifier: "INCLUDES" },
+    });
     expect(bare?.filter.sort).toBe(DEFAULT_SORT.scene.field);
     expect(inGroup?.filter.sort).toBe("scene_index");
   });
 
   it("listKey includes the page and listKeyWithoutPage does not", () => {
-    const one = buildListQuery("scene", state({ page: 1 }), {}, "metric");
-    const two = buildListQuery("scene", state({ page: 2 }), {}, "metric");
+    const one = buildListQuery("scene", state({ page: 1 }), {});
+    const two = buildListQuery("scene", state({ page: 2 }), {});
     expect(listKeyOf(one)).not.toBe(listKeyOf(two));
     expect(listKeyWithoutPageOf(one)).toBe(listKeyWithoutPageOf(two));
     expect(listKeyOf(null)).toBe("");

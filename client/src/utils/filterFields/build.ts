@@ -23,7 +23,6 @@ import {
 } from "@peek/shared-types";
 import type { ClipFilterParams } from "../../api/clips";
 import {
-  type BuildContext,
   CODECS,
   type PanelState,
   type RefCriterion,
@@ -50,8 +49,6 @@ export interface PanelTable {
   readonly specs: Readonly<Record<string, FieldSpec>>;
 }
 
-const METRIC: BuildContext = { unitPreference: "metric" };
-
 const tableOf = (kind: ListKind): PanelTable => ({
   rows: PANEL_FIELDS[kind],
   specs: SPECS[kind],
@@ -74,8 +71,7 @@ function permanentCriterion(
   spec: FieldSpec,
   permanent: unknown,
   table: PanelTable,
-  state: PanelState,
-  ctx: BuildContext
+  state: PanelState
 ): unknown {
   if (spec.kind === "ref") {
     const row = table.rows.find(
@@ -87,8 +83,7 @@ function permanentCriterion(
     return CODECS.date.toCriterion(
       { key: name, field: name, label: name, group: "dates", editor: "date" },
       spec,
-      { [name]: permanent },
-      ctx
+      { [name]: permanent }
     );
   }
   return permanent;
@@ -104,7 +99,6 @@ function permanentCriterion(
 export function buildPanelFilter<K extends ListKind>(
   kind: K,
   state: PanelState,
-  ctx: BuildContext = METRIC,
   table: PanelTable = tableOf(kind)
 ): PanelFilters[K] {
   const specs = new Map(Object.entries(table.specs));
@@ -135,7 +129,7 @@ export function buildPanelFilter<K extends ListKind>(
     if (spec === undefined) {
       throw new Error(`${kind} panel row ${row.key}: no field ${row.field}`);
     }
-    place(row.field, spec, codecOf(row).toCriterion(row, spec, state, ctx));
+    place(row.field, spec, codecOf(row).toCriterion(row, spec, state));
   }
 
   const panelKeys = new Set(
@@ -146,12 +140,35 @@ export function buildPanelFilter<K extends ListKind>(
     if (spec === undefined || panelKeys.has(name) || permanent === undefined) {
       continue;
     }
-    place(
-      name,
-      spec,
-      permanentCriterion(name, spec, permanent, table, state, ctx)
-    );
+    place(name, spec, permanentCriterion(name, spec, permanent, table, state));
   }
 
   return filter as PanelFilters[K];
+}
+
+/**
+ * A list's state as its rows read it: each row's value normalized (a body
+ * measure read leniently, the old feet-and-inches height as centimetres; a
+ * value left with nothing is dropped). A default preset becomes state
+ * without going through the URL, so the list reads it through this. Returns
+ * the same object when nothing changes.
+ */
+export function normalizePanelState(
+  kind: ListKind,
+  state: PanelState
+): PanelState {
+  let next: Record<string, unknown> | undefined;
+  for (const row of PANEL_FIELDS[kind]) {
+    if (!(row.key in state)) continue;
+    const value = state[row.key];
+    const normalized = codecOf(row).normalize(row, value);
+    if (normalized === value) continue;
+    next ??= { ...state };
+    next[row.key] = normalized;
+  }
+  return next === undefined
+    ? state
+    : Object.fromEntries(
+        Object.entries(next).filter(([, value]) => value !== undefined)
+      );
 }

@@ -3,7 +3,7 @@
  * `filter`, the panel's filters with the page's permanent filters in the
  * entity's `<entity>_filter`. Also the sort rules a list reads its state by.
  */
-import { DEFAULT_SORT, UI_KEYS, type UiKey } from "@peek/shared-types";
+import { DEFAULT_SORT, PANEL_FIELDS } from "@peek/shared-types";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import {
   CLIP_SORT_OPTIONS,
@@ -25,6 +25,7 @@ import {
   buildStudioFilter,
   buildTagFilter,
 } from "./filterConfig";
+import { urlKeysOf } from "./filterFields";
 import type { ListEntity } from "./urlParams";
 
 type Filters = Readonly<Record<string, unknown>>;
@@ -69,16 +70,10 @@ export function sortOffered(
 }
 
 /** An entity's `<entity>_filter` from the panel's filters (permanent filters merged in) */
-export const buildFilter = (
-  artifactType: string,
-  filters: Filters,
-  unitPreference: string
-) => {
+export const buildFilter = (artifactType: string, filters: Filters) => {
   switch (artifactType) {
     case "performer":
-      return {
-        performer_filter: buildPerformerFilter(filters, unitPreference),
-      };
+      return { performer_filter: buildPerformerFilter(filters) };
     case "studio":
       return { studio_filter: buildStudioFilter(filters) };
     case "tag":
@@ -183,8 +178,7 @@ export type ListQuery = { filter: ListQueryPage } & ReturnType<
 export const buildListQuery = (
   entity: ListEntity,
   state: ListQueryState,
-  permanentFilters: Filters,
-  unitPreference: string
+  permanentFilters: Filters
 ): ListQuery | null => {
   if (!state.ready) return null;
   const filters = { ...state.filters, ...permanentFilters };
@@ -199,7 +193,7 @@ export const buildListQuery = (
       ),
       direction: state.sort.direction,
     },
-    ...buildFilter(entity, filters, unitPreference),
+    ...buildFilter(entity, filters),
   };
 };
 
@@ -368,19 +362,20 @@ export const lockedFieldsOf = (
   return [...fields].sort();
 };
 
-/** The panel keys, companions included, that fill a locked contract field */
+/**
+ * The panel keys of a locked contract field: each row's key and companions
+ * (what its codec holds), the singular form a card count links with and the
+ * range and date forms
+ */
 const lockedPanelKeys = (
   entity: ListEntity,
   lockedFields: readonly string[]
 ): Set<string> => {
   const keys = new Set<string>();
   if (lockedFields.length === 0) return keys;
-  const uiKeys: readonly UiKey[] = UI_KEYS[entity];
-  for (const uiKey of uiKeys) {
-    if (!lockedFields.includes(uiKey.field)) continue;
-    keys.add(uiKey.key);
-    if (uiKey.modifierKey) keys.add(uiKey.modifierKey);
-    if (uiKey.hierarchyKey) keys.add(uiKey.hierarchyKey);
+  for (const row of PANEL_FIELDS[entity]) {
+    if (!lockedFields.includes(row.field)) continue;
+    for (const key of urlKeysOf(row)) keys.add(key);
   }
   return keys;
 };

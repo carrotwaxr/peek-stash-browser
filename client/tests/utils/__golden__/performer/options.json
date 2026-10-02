@@ -731,7 +731,8 @@
       "type": "imperial-height-range",
       "defaultValue": {},
       "min": 100,
-      "max": 250
+      "max": 250,
+      "measure": "height"
     },
     {
       "key": "weight",
@@ -739,7 +740,8 @@
       "type": "range",
       "defaultValue": {},
       "min": 50,
-      "max": 500
+      "max": 500,
+      "measure": "weight"
     },
     {
       "key": "penisLength",
@@ -747,7 +749,8 @@
       "type": "range",
       "defaultValue": {},
       "min": 1,
-      "max": 15
+      "max": 15,
+      "measure": "length"
     },
     {
       "type": "section-header",

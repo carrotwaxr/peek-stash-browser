@@ -119,16 +119,126 @@ describe("codecs", () => {
     );
   });
 
-  it("the members later tasks fill say so", () => {
+  it("the members the chips and carousels fill say so", () => {
     const tags = rowOf("scene", "tagIds", "ref");
 
-    expect(() => CODECS.ref.writeUrl(tags, {}, new URLSearchParams())).toThrow(
-      "writeUrl: not yet"
+    expect(() => CODECS.ref.chip(tags, { kind: "ref" } as never, {})).toThrow(
+      "chip: not yet"
     );
     expect(() =>
-      CODECS.ref.readUrl(tags, new URLSearchParams(), {
-        unitPreference: "metric",
+      CODECS.ref.fromCriterion(tags, { kind: "ref" } as never, {})
+    ).toThrow("fromCriterion: not yet");
+  });
+});
+
+describe("the URL members", () => {
+  const write = (row: PanelField, state: Record<string, unknown>): string => {
+    const params = new URLSearchParams();
+    codecOf(row).writeUrl(row, state, params);
+    return params.toString();
+  };
+  const read = (row: PanelField, query: string) =>
+    codecOf(row).readUrl(row, new URLSearchParams(query));
+
+  it("a multi ref writes a comma list and reads it back; a lone string is a list of one", () => {
+    const tags = field("scene", "tagIds");
+
+    expect(
+      write(tags, { tagIds: ["1:a", "2:b"], tagIdsModifier: "EXCLUDES" })
+    ).toBe("tagIds=1%3Aa%2C2%3Ab&tagIdsModifier=EXCLUDES");
+    expect(write(tags, { tagIds: "1:a" })).toBe("tagIds=1%3Aa");
+    expect(read(tags, "tagIds=1:a,2:b&tagIdsDepth=-1")).toEqual({
+      tagIds: ["1:a", "2:b"],
+      tagIdsDepth: -1,
+    });
+  });
+
+  it("a card's singular param joins the page's instance", () => {
+    expect(read(field("scene", "tagIds"), "tagId=5&instance=abc")).toEqual({
+      tagIds: ["5:abc"],
+    });
+    expect(read(field("scene", "studioId"), "studioId=3&instance=abc")).toEqual(
+      { studioId: "3:abc" }
+    );
+    // A value that names its instance keeps it
+    expect(
+      read(field("scene", "studioId"), "studioId=3:other&instance=abc")
+    ).toEqual({ studioId: "3:other" });
+  });
+
+  it("a select with a condition writes both and reads both", () => {
+    const resolution = field("scene", "resolution");
+
+    expect(
+      write(resolution, {
+        resolution: "FULL_HD",
+        resolutionModifier: "NOT_EQUALS",
       })
-    ).toThrow("readUrl: not yet");
+    ).toBe("resolution=FULL_HD&resolutionModifier=NOT_EQUALS");
+    expect(
+      read(resolution, "resolution=FULL_HD&resolutionModifier=NOT_EQUALS")
+    ).toEqual({ resolution: "FULL_HD", resolutionModifier: "NOT_EQUALS" });
+    expect(write(resolution, { resolutionModifier: "NOT_EQUALS" })).toBe("");
+  });
+
+  it("a range writes a bound that is a number or text, zero included", () => {
+    const rating = field("scene", "rating");
+
+    expect(write(rating, { rating: { min: 0, max: "" } })).toBe("rating_min=0");
+    expect(write(rating, { rating: { max: "0" } })).toBe("rating_max=0");
+    expect(write(rating, { rating: {} })).toBe("");
+    expect(read(rating, "rating_min=60")).toEqual({ rating: { min: "60" } });
+    expect(read(rating, "")).toEqual({});
+  });
+
+  it("a date range, a text, a toggle and a choice go through their own keys", () => {
+    expect(
+      write(field("scene", "date"), { date: { start: "2024-01-01" } })
+    ).toBe("date_start=2024-01-01");
+    expect(read(field("scene", "date"), "date_end=2024-02-01")).toEqual({
+      date: { end: "2024-02-01" },
+    });
+    expect(write(field("scene", "title"), { title: "beach" })).toBe(
+      "title=beach"
+    );
+    expect(read(field("scene", "title"), "title=beach")).toEqual({
+      title: "beach",
+    });
+    expect(write(field("scene", "favorite"), { favorite: true })).toBe(
+      "favorite=true"
+    );
+    expect(write(field("scene", "favorite"), { favorite: false })).toBe("");
+    expect(read(field("scene", "favorite"), "favorite=true")).toEqual({
+      favorite: true,
+    });
+    expect(write(field("clip", "isGenerated"), { isGenerated: "false" })).toBe(
+      "isGenerated=false"
+    );
+  });
+
+  it("a body measure reads leniently: a non-number is dropped, decimals and far values kept", () => {
+    const weight = field("performer", "weight");
+
+    expect(read(weight, "weight_min=abc")).toEqual({});
+    expect(read(weight, "weight_min=abc&weight_max=80")).toEqual({
+      weight: { max: "80" },
+    });
+    expect(read(weight, "weight_min=1e9")).toEqual({
+      weight: { min: "1e9" },
+    });
+    expect(read(weight, "weight_min=68.5")).toEqual({
+      weight: { min: "68.5" },
+    });
+    expect(write(weight, { weight: { min: "abc", max: 90 } })).toBe(
+      "weight_max=90"
+    );
+  });
+
+  it("only a body measure normalizes", () => {
+    const rating = field("scene", "rating");
+    const state = { min: "abc" };
+
+    expect(codecOf(rating).normalize(rating, state)).toBe(state);
+    expect(CODECS.text.normalize(rowOf("scene", "title", "text"), 5)).toBe(5);
   });
 });

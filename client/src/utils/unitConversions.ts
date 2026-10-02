@@ -115,3 +115,74 @@ export const formatLength = (cm: number, unit: string) => {
   }
   return `${cm} cm`;
 };
+
+// ── Body measures in the filter editors ───────────────────────────────────
+//
+// The panel's state, the URL, presets and requests hold metric; an imperial
+// viewer's editors convert what is typed into the whole-unit metric range
+// whose values display as the typed bound, and back for display. Height and
+// Weight are stored by Stash as whole cm and kg, so a bound is the lowest
+// (minimum) or highest (maximum) whole value that still shows as typed.
+
+/** Which end of a range a typed bound is */
+export type RangeSide = "min" | "max";
+
+/** The whole cm range a typed height covers: the values that display as it */
+const cmShowing = (feet: number, inches: number) => {
+  const total = Math.round(feet * 12 + inches);
+  const shown = { feet: Math.floor(total / 12), inches: total % 12 };
+  const near = Math.round(total * 2.54);
+  const cms: number[] = [];
+  for (let cm = near - 3; cm <= near + 3; cm++) {
+    const each = cmToFeetInches(cm);
+    if (each.feet === shown.feet && each.inches === shown.inches) cms.push(cm);
+  }
+  return cms.length > 0 ? cms : [near];
+};
+
+/**
+ * A typed height as whole cm: a minimum is the lowest cm that displays as
+ * it (5'10" is 177 cm), a maximum the highest (6'2" is 189 cm). Nothing
+ * typed (zero feet and inches) is no bound.
+ */
+export const heightBoundToCm = (
+  feet: number,
+  inches: number,
+  side: RangeSide
+): number | undefined => {
+  if (!Number.isFinite(feet) || !Number.isFinite(inches)) return undefined;
+  if (Math.round(feet * 12 + inches) <= 0) return undefined;
+  const cms = cmShowing(feet, inches);
+  return side === "min" ? Math.min(...cms) : Math.max(...cms);
+};
+
+/**
+ * A typed weight as whole kg: a minimum is the lowest kg that displays as
+ * that many lbs or more, a maximum the highest that displays as that many
+ * or fewer (150 lbs at least is 68 kg). Zero is no bound.
+ */
+export const weightBoundToKg = (
+  lbs: number,
+  side: RangeSide
+): number | undefined => {
+  if (!Number.isFinite(lbs) || lbs <= 0) return undefined;
+  const near = Math.round(lbs / 2.205);
+  for (let kg = near - 3; kg <= near + 3; kg++) {
+    if (side === "min" && kgToLbs(kg) >= lbs) return kg;
+  }
+  if (side === "min") return near;
+  for (let kg = near + 3; kg >= near - 3; kg--) {
+    if (kgToLbs(kg) <= lbs) return kg;
+  }
+  return near;
+};
+
+/** A typed length in inches as cm, two decimals (6 in is 15.24 cm); nothing typed or zero is no bound */
+export const lengthInchesToCm = (inches: number): number | undefined =>
+  Number.isFinite(inches) && inches > 0
+    ? Math.round(inches * 2.54 * 100) / 100
+    : undefined;
+
+/** A length in cm as inches, two decimals (15.24 cm is 6 in) */
+export const cmToLengthInches = (cm: number): number =>
+  Math.round((cm / 2.54) * 100) / 100;
