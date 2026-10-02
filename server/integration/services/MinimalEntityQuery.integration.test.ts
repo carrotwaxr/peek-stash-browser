@@ -275,6 +275,21 @@ describeWithDb("findMinimalEntities (integration)", () => {
     );
   });
 
+  it("the performer picker does not match the alias list's JSON punctuation", async () => {
+    // Mx 07 has the aliases ["Zed Alias","Other"] and Mx 05 (a tag) ["Tag Alias"]
+    for (const q of ['"', "[", "]", ",", '"]']) {
+      expect(await find(onlyA, "performer", { filter: { q } })).toEqual([]);
+      expect(await find(onlyA, "tag", { filter: { q } })).toEqual([]);
+    }
+    // An alias is still found whole or in part
+    expect(
+      names(await find(onlyA, "performer", { filter: { q: "ther" } }))
+    ).toEqual(["Mx 07"]);
+    expect(names(await find(onlyA, "tag", { filter: { q: "g ali" } }))).toEqual(
+      ["Mx 05"]
+    );
+  });
+
   it("leaves out hidden and restricted entities", async () => {
     // SAME@B and HIDDEN_A@A are hidden; SAME@A and VISIBLE_A@A are not
     expect(

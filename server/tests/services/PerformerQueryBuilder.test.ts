@@ -20,6 +20,7 @@ import {
   careerYearsSql,
   fullDateSql,
 } from "../../utils/sqlClauses.js";
+import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -444,9 +445,9 @@ describe("PerformerQueryBuilder", () => {
         "MAX(p.sceneCount - COALESCE(d.scenes, 0), 0) BETWEEN ? AND ?",
         "p.heightCm > ?",
         "p.weightKg < ?",
-        "(LOWER(p.name) LIKE LOWER(?) OR LOWER(p.aliasList) LIKE LOWER(?))",
+        `(p.name LIKE ? ESCAPE '\\' OR ${jsonListArm("p.aliasList")})`,
         "(p.details IS NULL OR p.details = '')",
-        "(p.tattoos IS NULL OR LOWER(p.tattoos) NOT LIKE LOWER(?))",
+        "(p.tattoos IS NULL OR p.tattoos NOT LIKE ? ESCAPE '\\')",
         "(p.piercings IS NOT NULL AND p.piercings != '')",
         "LOWER(p.measurements) = LOWER(?)",
         `${careerYearsSql("p.careerLength")} BETWEEN ? AND ?`,

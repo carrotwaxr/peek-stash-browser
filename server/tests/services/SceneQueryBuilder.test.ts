@@ -542,9 +542,9 @@ describe("SceneQueryBuilder", () => {
       const { sql, params } = pageStatement();
       expect(sql).toContain("(s.title IS NULL OR s.title = '')");
       expect(sql).toContain("(s.details IS NOT NULL AND s.details != '')");
-      expect(sql).toContain("LOWER(s.fileVideoCodec) LIKE LOWER(?)");
+      expect(sql).toContain("s.fileVideoCodec LIKE ? ESCAPE '\\'");
       expect(sql).toContain("LOWER(s.fileAudioCodec) = LOWER(?)");
-      expect(sql).toContain("(LOWER(s.director) LIKE LOWER(?))");
+      expect(sql).toContain("(s.director LIKE ? ESCAPE '\\')");
       expect(params).toContain("%h264%");
       expect(params).toContain("aac");
       expect(params).toContain("%Smith%");

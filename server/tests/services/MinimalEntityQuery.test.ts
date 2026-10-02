@@ -11,6 +11,7 @@ import type { MinimalEntityQueryRow } from "../../types/internal/queryRows.js";
 import type { MinimalKind } from "../../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { parseMinimalRequest } from "../../utils/listRequest.js";
+import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { must } from "../helpers/must.js";
 
 vi.mock(
@@ -103,23 +104,26 @@ describe("findMinimalEntities", () => {
   });
 
   it.each([
-    ["performer", ["x.name", "x.aliasList"]],
-    ["studio", ["x.name"]],
-    ["tag", ["x.name", "x.aliases"]],
-    ["group", ["x.name"]],
+    ["performer", ["x.name"], ["x.aliasList"]],
+    ["studio", ["x.name"], []],
+    ["tag", ["x.name"], ["x.aliases"]],
+    ["group", ["x.name"], []],
   ] as const)(
-    "q matches the %s's name and aliases only, escaped",
-    async (entity, columns) => {
+    "q matches the %s's name and aliases only, escaped, an alias list one alias at a time",
+    async (entity, columns, lists) => {
       await find(entity, { filter: { q: "50%_off" } });
 
       const { sql, params } = statement();
       expect(sql).toContain(
-        `(${columns.map((c) => `${c} LIKE ? ESCAPE '\\'`).join(" OR ")})`
+        `(${[
+          ...columns.map((c) => `${c} LIKE ? ESCAPE '\\'`),
+          ...lists.map((l) => jsonListArm(l)),
+        ].join(" OR ")})`
       );
       expect(sql).not.toContain("details");
       expect(sql).not.toContain("description");
       expect(params.filter((p) => p === "%50\\%\\_off%")).toHaveLength(
-        columns.length
+        columns.length + lists.length
       );
       expect(placeholders(sql)).toBe(params.length);
     }

@@ -33,6 +33,8 @@ import type {
   NumberCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, distinctRefs, pairsJson } from "./entityRef.js";
+import { jsonListArm, likeContains } from "./sqlHelpers.js";
+import { jsonListOrEmpty } from "./sqlJson.js";
 
 export type SqlParam = string | number | boolean;
 
@@ -1030,74 +1032,121 @@ export function buildEpochDateFilter(
 /**
  * Build a text comparison filter clause.
  * Handles INCLUDES, EXCLUDES, EQUALS, NOT_EQUALS, IS_NULL, NOT_NULL.
- * Uses LOWER() for case-insensitive matching.
  *
- * For INCLUDES/EXCLUDES with additionalColumns, searches across all columns
- * (OR for INCLUDES, AND for EXCLUDES).
- * EQUALS/NOT_EQUALS/IS_NULL/NOT_NULL only apply to the primary column.
+ * INCLUDES and EXCLUDES are one phrase (no word split) matched with
+ * `LIKE ? ESCAPE '\'` on a `likeContains` pattern, so `%`, `_` and `\` in
+ * the text match themselves; SQLite's LIKE ignores ASCII case and a
+ * non-ASCII letter matches itself exactly. They read the column, each `also`
+ * column (plain text) and each of `lists` (a JSON list column, matched per
+ * element through `jsonListArm`): any one matching for INCLUDES, none for
+ * EXCLUDES (a NULL column still passes).
+ * EQUALS, NOT_EQUALS, IS_NULL and NOT_NULL read only the column; with a null
+ * column ("only the lists") they read the lists: EQUALS an element equal to
+ * the text, IS_NULL every list NULL, '' or '[]', and NOT_NULL the rest.
  *
  * @param filter - Filter with value and modifier
- * @param column - Primary SQL column name (e.g. "p.name")
- * @param additionalColumns - Optional extra columns to search (for INCLUDES/EXCLUDES)
+ * @param column - Primary SQL column name (e.g. "p.name"), or null for a
+ *   filter on the lists alone
+ * @param columns - `also`: extra plain columns; `lists`: JSON list columns
  */
 export function buildTextFilter(
   filter:
     | { value?: string | null; modifier?: string | null }
     | undefined
     | null,
-  column: string,
-  additionalColumns: string[] = []
+  column: string | null,
+  { also = [], lists = [] }: { also?: string[]; lists?: string[] } = {}
 ): FilterClause {
-  if (!filter) {
-    return { sql: "", params: [] };
-  }
+  const none: FilterClause = { sql: "", params: [] };
+  if (!filter) return none;
 
   const { value, modifier = "INCLUDES" } = filter;
+  const listsOnly = column === null;
+  const emptyList = (list: string) =>
+    `${list} IS NULL OR ${list} = '' OR ${list} = '[]'`;
 
   // IS_NULL and NOT_NULL don't require a value
   if (modifier === "IS_NULL") {
-    return { sql: `(${column} IS NULL OR ${column} = '')`, params: [] };
+    if (!listsOnly) {
+      return { sql: `(${column} IS NULL OR ${column} = '')`, params: [] };
+    }
+    if (lists.length === 0) return none;
+    return {
+      sql: `(${lists.map((list) => `(${emptyList(list)})`).join(" AND ")})`,
+      params: [],
+    };
   }
   if (modifier === "NOT_NULL") {
-    return { sql: `(${column} IS NOT NULL AND ${column} != '')`, params: [] };
+    if (!listsOnly) {
+      return {
+        sql: `(${column} IS NOT NULL AND ${column} != '')`,
+        params: [],
+      };
+    }
+    if (lists.length === 0) return none;
+    return {
+      sql: `(${lists.map((list) => `NOT (${emptyList(list)})`).join(" OR ")})`,
+      params: [],
+    };
   }
 
   // All other modifiers require a value
-  if (!value) {
-    return { sql: "", params: [] };
-  }
+  if (!value) return none;
 
-  const allColumns = [column, ...additionalColumns];
+  const columns = listsOnly ? also : [column, ...also];
+  const pattern = likeContains(value);
 
   switch (modifier) {
     case "INCLUDES": {
-      const conditions = allColumns
-        .map((col) => `LOWER(${col}) LIKE LOWER(?)`)
-        .join(" OR ");
+      const arms = [
+        ...columns.map((col) => `${col} LIKE ? ESCAPE '\\'`),
+        ...lists.map((list) => jsonListArm(list)),
+      ];
+      if (arms.length === 0) return none;
       return {
-        sql: `(${conditions})`,
-        params: allColumns.map(() => `%${value}%`),
+        sql: `(${arms.join(" OR ")})`,
+        params: arms.map(() => pattern),
       };
     }
     case "EXCLUDES": {
-      const conditions = allColumns
-        .map((col) => `(${col} IS NULL OR LOWER(${col}) NOT LIKE LOWER(?))`)
-        .join(" AND ");
+      const arms = [
+        ...columns.map(
+          (col) => `(${col} IS NULL OR ${col} NOT LIKE ? ESCAPE '\\')`
+        ),
+        ...lists.map((list) => `NOT ${jsonListArm(list)}`),
+      ];
+      if (arms.length === 0) return none;
       return {
-        sql: `(${conditions})`,
-        params: allColumns.map(() => `%${value}%`),
+        sql: `(${arms.join(" AND ")})`,
+        params: arms.map(() => pattern),
       };
     }
     case "EQUALS":
-      return { sql: `LOWER(${column}) = LOWER(?)`, params: [value] };
-    case "NOT_EQUALS":
+    case "NOT_EQUALS": {
+      const equals = modifier === "EQUALS";
+      if (!listsOnly) {
+        return equals
+          ? { sql: `LOWER(${column}) = LOWER(?)`, params: [value] }
+          : {
+              sql: `(${column} IS NULL OR LOWER(${column}) != LOWER(?))`,
+              params: [value],
+            };
+      }
+      if (lists.length === 0) return none;
+      const arms = lists.map(
+        (list) =>
+          `EXISTS (SELECT 1 FROM json_each(${jsonListOrEmpty(list)}) a WHERE LOWER(a.value) = LOWER(?))`
+      );
       return {
-        sql: `(${column} IS NULL OR LOWER(${column}) != LOWER(?))`,
-        params: [value],
+        sql: equals
+          ? `(${arms.join(" OR ")})`
+          : `(${arms.map((arm) => `NOT ${arm}`).join(" AND ")})`,
+        params: arms.map(() => value),
       };
+    }
     case null:
     default:
-      return { sql: "", params: [] };
+      return none;
   }
 }
 
