@@ -1,4 +1,4 @@
-A modern mobile-friendly web application for browsing and streaming your [Stash](https://github.com/stashapp/stash) media library with support for multiple users, playlists, recommendations, and custom per-user theme and browsing preferences.
+A self-hosted, multi-user front end for one or more [Stash](https://github.com/stashapp/stash) servers. Stash stays your library manager; Peek gives each person their own account, ratings, history and limits on what they can see. [Read more about what Peek is](what-peek-is.md).
 
 **Get started quickly:**
 
@@ -6,15 +6,21 @@ A modern mobile-friendly web application for browsing and streaming your [Stash]
 - [**Configuration**](getting-started/configuration.md) - Connect Peek to your Stash server
 - [**Troubleshooting**](getting-started/troubleshooting.md) - Common issues and solutions
 
-### Key Features
+### What Peek Adds to Stash
 
-- **Multiple Users** - Create multiple users with different roles, filter what content and capabilities each user has, and securely allow external access if desired
-- **Video Streaming** - Uses Stash's video streams directly, eliminating the need to duplicate Stash's excellent transcoding support
-- **Watch History Tracking** - Automatic progress tracking and resume playback ([Learn more](user-guide/watch-history.md))
-- **Playlist Management** - Create, organize, and play custom playlists ([Learn more](user-guide/playlists.md))
-- **Modern Interface** - Responsive React UI with theme support and user customizability
-- **Mobile Ready** - Optimized for all devices
-- **Scalable Library** - Should scale easily with any library size - looking at you, data hoarders
+- **Accounts and Access** - Admin and user roles, [groups that grant sharing and download permissions](user-guide/user-management.md#user-groups) (denied by default), recovery keys, sign-in through an SSO proxy, and a setup wizard
+- **Your Own Data** - Ratings, favorites, watch history, resume points, O counts and hidden items belong to each user, on all seven kinds of item; the ratings and counts you see are yours, not Stash's ([Watch History](user-guide/watch-history.md))
+- **Content Restrictions** - Admins give a user show-only or always-hide lists of collections, tags, studios and galleries, applied everywhere ([Learn more](user-guide/content-restrictions.md))
+- **Hidden Items** - Hide anything for yourself ([Learn more](user-guide/hidden-items.md))
+- **Several Stash Servers** - One Peek in front of several Stash servers; each user chooses which they see ([Learn more](getting-started/configuration.md#multi-instance-support))
+- **Media Through Peek** - Streams, captions and images are proxied through Peek, so users never get Stash's address or API key. Stash's own transcodes mean no duplicate transcoding. External players get a personal signed link ([Learn more](user-guide/external-player.md))
+- **Playlists and Sharing** - Create, organize and play named playlists, and share them with groups ([Learn more](user-guide/playlists.md))
+- **Browsing** - TV mode, timeline and folder views, recommendations and similar scenes from your own history ([Learn more](user-guide/recommendations.md))
+- **Downloads** - Scene files and playlist zips with NFO files, for the users and groups you allow ([Learn more](user-guide/downloads.md))
+- **Modern Interface** - Responsive React UI, optimized for all devices, with themes and per-user customization
+- **Scalable Library** - Built for libraries of 100,000 scenes and more
+
+Peek never edits your Stash metadata. To reach Peek from outside your network, put it behind a [reverse proxy](getting-started/configuration.md#behind-a-reverse-proxy).
 
 ## Requirements
 
@@ -29,13 +35,12 @@ Peek uses a **single-container architecture**:
 - **Frontend**: React 19 app served by nginx
 - **Backend**: Node.js/Express API server (proxied through nginx)
 - **Database**: SQLite (embedded, no separate container)
-- **Streaming**: Proxied through Stash (no local transcoding)
+- **Streaming**: Proxied through Peek from Stash, using Stash's own transcodes (no local transcoding)
 
 ## Community & Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- **Feature Requests**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- **Stash Community**: [Discord](https://discord.com/channels/559159668438728723/1188915766288990238) - #community-projects channel
+- **Questions and community**: [Peek thread on the Stash forum](https://discourse.stashapp.cc/t/peek-stash-browser/4018)
+- **Bug Reports and Feature Requests**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 
 ## License
 
@@ -43,4 +48,4 @@ This project is licensed under the MIT License.
 
 ## Acknowledgments
 
-Built with [Stash](https://github.com/stashapp/stash), React, Express, FFmpeg, and other amazing open source projects.
+Built with [Stash](https://github.com/stashapp/stash), React, Express, and other amazing open source projects.
