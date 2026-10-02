@@ -286,6 +286,45 @@ export async function hierarchicalRefClause(
     : { ...page, count };
 }
 
+/**
+ * The viewer's favourites of one kind on the allowed instances, as refs with
+ * their instance (a favourite on one instance never stands for the same id
+ * on another). Only the viewer's own rows are read. Empty when the viewer
+ * has none: the caller settles that case, since `refClause` reads no refs
+ * as no filter.
+ */
+export async function favoriteRefs(
+  kind: "tag" | "studio" | "performer",
+  ctx: Pick<QueryContext, "userId" | "allowedInstanceIds">
+): Promise<FilterRef[]> {
+  if (ctx.allowedInstanceIds.length === 0) return [];
+  const where = {
+    userId: ctx.userId,
+    favorite: true,
+    instanceId: { in: [...ctx.allowedInstanceIds] },
+  };
+  const select = { instanceId: true } as const;
+  if (kind === "tag") {
+    const rows = await prisma.tagRating.findMany({
+      where,
+      select: { ...select, tagId: true },
+    });
+    return rows.map((r) => ({ id: r.tagId, instanceId: r.instanceId }));
+  }
+  if (kind === "studio") {
+    const rows = await prisma.studioRating.findMany({
+      where,
+      select: { ...select, studioId: true },
+    });
+    return rows.map((r) => ({ id: r.studioId, instanceId: r.instanceId }));
+  }
+  const rows = await prisma.performerRating.findMany({
+    where,
+    select: { ...select, performerId: true },
+  });
+  return rows.map((r) => ({ id: r.performerId, instanceId: r.instanceId }));
+}
+
 /** A statement's WITH, FROM and WHERE, with their parameters */
 interface StatementParts {
   /** The WITH block with its trailing newline, or "" */
