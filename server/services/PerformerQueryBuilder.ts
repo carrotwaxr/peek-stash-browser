@@ -14,7 +14,6 @@ import type {
   NumberCriterion,
   ParsedFilter,
   RefCriterion,
-  TextCriterion,
 } from "../types/parsedFilters.js";
 import { entityKey } from "../utils/entityRef.js";
 import { toProxyUrl } from "../utils/proxyUrl.js";
@@ -40,6 +39,8 @@ import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
   EntityQueryBuilder,
   type EntitySpec,
+  type FieldClauses,
+  type LeafContext,
   type QueryContext,
   type SortExpr,
   hierarchicalRefClause,
@@ -256,134 +257,80 @@ class PerformerQueryBuilder extends EntityQueryBuilder<
     };
   }
 
-  /** The performer filter's clauses, one per criterion the request carried */
-  protected override async legacyFilterClauses(
-    filter: ParsedFilter<"performer">,
-    q: string | undefined,
-    ctx: QueryContext
-  ): Promise<FilterClause[]> {
-    const clauses: FilterClause[] = [];
-    const push = (clause: FilterClause) => clauses.push(clause);
-    const via = (spec: ViaSceneSpec, criterion: RefCriterion) =>
-      viaSceneClause(spec, criterion.refs, criterion.modifier);
-
-    if (q !== undefined) push(this.searchClause(q));
-
+  /**
+   * The performer filter's clauses, one per field, in the order the
+   * statement ANDs them. A ref field's CTEs are named from the leaf
+   * (`ctx.name`).
+   */
+  protected override readonly fieldClauses: FieldClauses<"performer"> = {
     // The viewer's own data
-    push(buildFavoriteFilter(filter.favorite));
-    if (filter.rating100) {
-      push(buildNumericFilter(filter.rating100, "COALESCE(r.rating, 0)"));
-    }
-    if (filter.o_counter) {
-      push(buildNumericFilter(filter.o_counter, "COALESCE(s.oCounter, 0)"));
-    }
-    if (filter.play_count) {
-      push(buildNumericFilter(filter.play_count, "COALESCE(s.playCount, 0)"));
-    }
+    favorite: (favorite) => buildFavoriteFilter(favorite),
+    rating100: (c) => buildNumericFilter(c, "COALESCE(r.rating, 0)"),
+    o_counter: (c) => buildNumericFilter(c, "COALESCE(s.oCounter, 0)"),
+    play_count: (c) => buildNumericFilter(c, "COALESCE(s.playCount, 0)"),
 
     // Related entities
-    if (filter.tags) push(await this.tagClause(filter.tags, ctx));
-    if (filter.studios) push(via(PERFORMERS_BY_STUDIO, filter.studios));
-    if (filter.scenes) push(via(PERFORMERS_BY_SCENE, filter.scenes));
-    if (filter.groups) push(via(PERFORMERS_BY_GROUP, filter.groups));
+    tags: (c, ctx) => this.tagClause(c, ctx),
+    studios: (c) => viaSceneClause(PERFORMERS_BY_STUDIO, c.refs, c.modifier),
+    scenes: (c) => viaSceneClause(PERFORMERS_BY_SCENE, c.refs, c.modifier),
+    groups: (c) => viaSceneClause(PERFORMERS_BY_GROUP, c.refs, c.modifier),
 
     // Counts, as the viewer sees them
-    if (filter.scene_count) {
-      push(
-        buildNumericFilter(
-          filter.scene_count,
-          visibleCount(ctx, "p.sceneCount", "scenes")
-        )
-      );
-    }
+    scene_count: (c, ctx) =>
+      buildNumericFilter(c, visibleCount(ctx, "p.sceneCount", "scenes")),
 
     // Text; the name also matches the aliases
-    if (filter.name) {
-      push(buildTextFilter(filter.name, "p.name", ["p.aliasList"]));
-    }
-    if (filter.details) push(buildTextFilter(filter.details, "p.details"));
-    if (filter.tattoos) push(buildTextFilter(filter.tattoos, "p.tattoos"));
-    if (filter.piercings) {
-      push(buildTextFilter(filter.piercings, "p.piercings"));
-    }
-    if (filter.measurements) {
-      push(buildTextFilter(filter.measurements, "p.measurements"));
-    }
+    name: (c) => buildTextFilter(c, "p.name", ["p.aliasList"]),
+    details: (c) => buildTextFilter(c, "p.details"),
+    tattoos: (c) => buildTextFilter(c, "p.tattoos"),
+    piercings: (c) => buildTextFilter(c, "p.piercings"),
+    measurements: (c) => buildTextFilter(c, "p.measurements"),
 
     // Body
-    if (filter.height) {
-      push(buildNumericFilter(filter.height, "COALESCE(p.heightCm, 0)"));
-    }
-    if (filter.weight) {
-      push(buildNumericFilter(filter.weight, "COALESCE(p.weightKg, 0)"));
-    }
-    if (filter.penis_length) {
-      // No COALESCE: a performer without a length never matches, as in Stash
-      push(buildNumericFilter(filter.penis_length, "p.penisLength"));
-    }
+    height: (c) => buildNumericFilter(c, "COALESCE(p.heightCm, 0)"),
+    weight: (c) => buildNumericFilter(c, "COALESCE(p.weightKg, 0)"),
+    // No COALESCE: a performer without a length never matches, as in Stash
+    penis_length: (c) => buildNumericFilter(c, "p.penisLength"),
 
     // Career: a performer without a value never matches
-    if (filter.career_length) {
-      push(buildNumericFilter(filter.career_length, CAREER_YEARS));
-    }
+    career_length: (c) => buildNumericFilter(c, CAREER_YEARS),
 
     // Compared whole, ignoring case
-    if (filter.gender) push(wholeTextClause(filter.gender, "p.gender"));
-    const wholeText: [TextCriterion | undefined, string][] = [
-      [filter.ethnicity, "p.ethnicity"],
-      [filter.hair_color, "p.hairColor"],
-      [filter.eye_color, "p.eyeColor"],
-      [filter.fake_tits, "p.fakeTits"],
-    ];
-    for (const [criterion, column] of wholeText) {
-      if (criterion) push(wholeTextClause(criterion, column));
-    }
+    gender: (c) => wholeTextClause(c, "p.gender"),
+    ethnicity: (c) => wholeTextClause(c, "p.ethnicity"),
+    hair_color: (c) => wholeTextClause(c, "p.hairColor"),
+    eye_color: (c) => wholeTextClause(c, "p.eyeColor"),
+    fake_tits: (c) => wholeTextClause(c, "p.fakeTits"),
 
     // Years and age, from the dates
-    if (filter.birth_year) {
-      push(
-        datedNumberClause(
-          filter.birth_year,
-          "p.birthdate",
-          "CAST(SUBSTR(p.birthdate, 1, 4) AS INTEGER)"
-        )
-      );
-    }
-    if (filter.death_year) {
-      push(
-        datedNumberClause(
-          filter.death_year,
-          "p.deathDate",
-          "CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER)"
-        )
-      );
-    }
-    if (filter.age) push(datedNumberClause(filter.age, "p.birthdate", AGE));
+    birth_year: (c) =>
+      datedNumberClause(
+        c,
+        "p.birthdate",
+        "CAST(SUBSTR(p.birthdate, 1, 4) AS INTEGER)"
+      ),
+    death_year: (c) =>
+      datedNumberClause(
+        c,
+        "p.deathDate",
+        "CAST(SUBSTR(p.deathDate, 1, 4) AS INTEGER)"
+      ),
+    age: (c) => datedNumberClause(c, "p.birthdate", AGE),
 
     // Dates
-    if (filter.birthdate) {
-      push(buildDateFilter(filter.birthdate, "p.birthdate"));
-    }
-    if (filter.death_date) {
-      push(buildDateFilter(filter.death_date, "p.deathDate"));
-    }
-    if (filter.created_at) {
-      push(buildDateFilter(filter.created_at, "p.stashCreatedAt"));
-    }
-    if (filter.updated_at) {
-      push(buildDateFilter(filter.updated_at, "p.stashUpdatedAt"));
-    }
-
-    return clauses;
-  }
+    birthdate: (c) => buildDateFilter(c, "p.birthdate"),
+    death_date: (c) => buildDateFilter(c, "p.deathDate"),
+    created_at: (c) => buildDateFilter(c, "p.stashCreatedAt"),
+    updated_at: (c) => buildDateFilter(c, "p.stashUpdatedAt"),
+  };
 
   /** The tag filter, with the tags' descendants to the depth */
   private async tagClause(
     criterion: RefCriterion,
-    ctx: QueryContext
+    ctx: LeafContext
   ): Promise<FilterClause> {
     return hierarchicalRefClause("tag", PERFORMER_TAGS, criterion, ctx, {
-      name: "tags",
+      name: ctx.name,
     });
   }
 

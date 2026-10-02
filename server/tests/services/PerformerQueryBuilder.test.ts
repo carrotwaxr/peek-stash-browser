@@ -6,6 +6,7 @@
  * joins, sort map and tiebreak, filter clauses and search) and that the
  * base's clauses reach its statements.
  */
+import { PERFORMER_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
@@ -434,6 +435,17 @@ describe("PerformerQueryBuilder", () => {
       );
       expect(params.filter((p) => p === "%100\\%\\_ann%")).toHaveLength(2);
     });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({
+        q: "sea",
+        filter: { scene_count: { modifier: "EQUALS", value: 4242 } },
+      });
+
+      const { params } = pageStatement();
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
   });
 
   describe("rows", () => {
@@ -494,5 +506,17 @@ describe("PerformerQueryBuilder", () => {
         image_path: stringContaining("instanceId=inst-a"),
       });
     });
+  });
+});
+
+describe("the performer field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(PERFORMER_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    expect(Object.keys(performerQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });

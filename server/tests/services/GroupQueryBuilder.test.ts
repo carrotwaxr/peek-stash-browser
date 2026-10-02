@@ -7,6 +7,7 @@
  * tiebreak, filter clauses and search), that the base's clauses reach its
  * statements, and the card's relations.
  */
+import { GROUP_FIELDS } from "@peek/shared-types/filters/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
@@ -377,6 +378,17 @@ describe("GroupQueryBuilder", () => {
       );
       expect(params.filter((p) => p === "%100\\% real%")).toHaveLength(2);
     });
+
+    it("the search clause sits after the field clauses", async () => {
+      await run({
+        q: "sea",
+        filter: { scene_count: { modifier: "EQUALS", value: 4242 } },
+      });
+
+      const { params } = pageStatement();
+      expect(params.indexOf(4242)).toBeGreaterThan(-1);
+      expect(params.indexOf(4242)).toBeLessThan(params.indexOf("%sea%"));
+    });
   });
 
   describe("rows and relations", () => {
@@ -462,5 +474,17 @@ describe("GroupQueryBuilder", () => {
 
       expect(must(items[0])).toMatchObject({ studioId: "41", studio: null });
     });
+  });
+});
+
+describe("the group field table", () => {
+  it("has a clause for every field but the base's", () => {
+    const fields = Object.keys(GROUP_FIELDS).filter(
+      (field) => field !== "ids" && field !== "instance_id"
+    );
+
+    expect(Object.keys(groupQueryBuilder["fieldClauses"]).sort()).toEqual(
+      fields.sort()
+    );
   });
 });
