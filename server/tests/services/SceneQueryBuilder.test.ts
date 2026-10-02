@@ -707,13 +707,15 @@ describe("SceneQueryBuilder", () => {
         "tag",
         [{ id: "9", instanceId: "inst-a" }],
         -1,
-        ALLOWED
+        ALLOWED,
+        "down"
       );
       expect(expandRefsEach).toHaveBeenCalledWith(
         "studio",
         [{ id: "8", instanceId: "inst-a" }],
         -1,
-        ALLOWED
+        ALLOWED,
+        "down"
       );
       const { sql } = pageStatement();
       expect(sql).toContain("NOT EXISTS");
@@ -749,7 +751,8 @@ describe("SceneQueryBuilder", () => {
         "tag",
         [{ id: "10", instanceId: "inst-a" }],
         -1,
-        ALLOWED
+        ALLOWED,
+        "down"
       );
 
       mockPrisma.userExcludedEntity.findMany.mockClear();
@@ -760,7 +763,8 @@ describe("SceneQueryBuilder", () => {
         "tag",
         arrayContaining([{ id: "9", instanceId: "inst-a" }]),
         -1,
-        ALLOWED
+        ALLOWED,
+        "down"
       );
     });
 
