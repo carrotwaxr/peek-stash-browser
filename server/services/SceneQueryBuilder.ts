@@ -44,11 +44,12 @@ import {
   refClause,
   resolutionClause,
   sceneUntaggedSql,
+  searchAll,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
   parseJsonArray,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import {
@@ -489,19 +490,15 @@ class SceneQueryBuilder extends EntityQueryBuilder<
 
   /**
    * The search across the title, details, path, performers, studio and
-   * tags: `likeContains(q)` with `ESCAPE '\'`, so a `%`, `_` or `\` in the
-   * text matches itself. LOWER() on both sides folds ASCII case only, as
-   * SQLite's LIKE does.
+   * tags: every word must match (`searchAll`), a word found in any of the
+   * six places, each as `likeContains` with `ESCAPE '\'`, so a `%`, `_` or
+   * `\` in the text matches itself. No `LOWER()`: SQLite's LIKE folds ASCII
+   * case, and a non-ASCII letter matches as typed.
    */
   protected override searchClause(
     searchQuery: string,
     ctx: QueryContext
   ): FilterClause {
-    const query = searchQuery.trim();
-    if (query === "") return noClause();
-    const like = "LIKE LOWER(?) ESCAPE '\\'";
-    const pattern = likeContains(query);
-
     // A name matches only through a live entity the viewer can see, on its
     // own instance, as the lists show it
     const visible = (excl: string, entityType: string, alias: string) =>
@@ -509,25 +506,26 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         ? `AND NOT EXISTS (SELECT 1 FROM UserExcludedEntity ${excl} WHERE ${excl}.userId = ? AND ${excl}.entityType = '${entityType}' AND ${excl}.entityId = ${alias}.id AND (${excl}.instanceId = '' OR ${excl}.instanceId = ${alias}.stashInstanceId))`
         : "";
     const visibleParams = ctx.applyExclusions ? [ctx.userId] : [];
+    const like = "LIKE ? ESCAPE '\\'";
 
     const sql = `(
-      LOWER(s.title) ${like} OR
-      LOWER(s.details) ${like} OR
-      LOWER(s.filePath) ${like} OR
+      s.title ${like} OR
+      s.details ${like} OR
+      s.filePath ${like} OR
       EXISTS (
         SELECT 1 FROM ScenePerformer sp
         INNER JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
         WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
         AND p.deletedAt IS NULL
         ${visible("xp", "performer", "p")}
-        AND LOWER(p.name) ${like}
+        AND p.name ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM StashStudio st
         WHERE st.id = s.studioId AND st.stashInstanceId = s.stashInstanceId
         AND st.deletedAt IS NULL
         ${visible("xs", "studio", "st")}
-        AND LOWER(st.name) ${like}
+        AND st.name ${like}
       ) OR
       EXISTS (
         SELECT 1 FROM SceneTag stag
@@ -535,11 +533,11 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         WHERE stag.sceneId = s.id AND stag.sceneInstanceId = s.stashInstanceId
         AND t.deletedAt IS NULL
         ${visible("xt", "tag", "t")}
-        AND LOWER(t.name) ${like}
+        AND t.name ${like}
       )
     )`;
 
-    return {
+    return searchAll(searchTerms(searchQuery), (pattern) => ({
       sql,
       params: [
         pattern,
@@ -552,7 +550,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
         ...visibleParams,
         pattern,
       ],
-    };
+    }));
   }
 
   /**

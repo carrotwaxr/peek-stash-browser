@@ -27,8 +27,13 @@ import type {
   ParsedMinimalRequest,
 } from "../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../utils/entityInstanceId.js";
-import { instanceColumnClause, pairs } from "../utils/sqlClauses.js";
-import { emptyToNull, jsonListArm, likeContains } from "../utils/sqlHelpers.js";
+import {
+  galleryNameSql,
+  instanceColumnClause,
+  pairs,
+  searchAll,
+} from "../utils/sqlClauses.js";
+import { emptyToNull, jsonListArm, searchTerms } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 type SqlParam = string | number | boolean;
@@ -59,23 +64,8 @@ interface MinimalConfig {
   readonly counts: readonly (readonly [keyof MinimalCountFilter, string])[];
 }
 
-/** SQL: the text after the last `/` or `\` in `col`, else all of it (`extractBasename`) */
-function basenameSql(col: string): string {
-  const upToSeparator = `rtrim(${col}, replace(replace(${col}, '/', ''), '\\', ''))`;
-  return `COALESCE(NULLIF(substr(${col}, length(${upToSeparator}) + 1), ''), ${col})`;
-}
-
-/** SQL: `col` without its extension (`stripExtension`) */
-function stemSql(col: string): string {
-  const upToDot = `length(rtrim(${col}, replace(${col}, '.', '')))`;
-  return `CASE WHEN ${upToDot} BETWEEN 1 AND length(${col}) - 1 THEN substr(${col}, 1, ${upToDot} - 1) ELSE ${col} END`;
-}
-
-/**
- * A gallery's name as it is shown: its title, else its file's name without
- * the extension, else its folder's own name (`getGalleryFallbackTitle`)
- */
-const GALLERY_NAME = `COALESCE(NULLIF(x.title, ''), ${stemSql("NULLIF(x.fileBasename, '')")}, ${basenameSql("NULLIF(x.folderPath, '')")})`;
+/** A gallery's name as it is shown (`galleryNameSql`) */
+const GALLERY_NAME = galleryNameSql("x");
 
 const CONFIGS: Record<MinimalKind, MinimalConfig> = {
   performer: {
@@ -166,18 +156,18 @@ LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = ? AND e.entity
   params.push(...instances.params);
 
   if (request.q !== undefined) {
-    const pattern = likeContains(request.q);
     const lists = config.searchLists ?? [];
-    where.push(
-      `(${[
+    const search = searchAll(searchTerms(request.q), (pattern) => ({
+      sql: `(${[
         ...config.search.map((col) => `${col} LIKE ? ESCAPE '\\'`),
         ...lists.map((list) => jsonListArm(list)),
-      ].join(" OR ")})`
-    );
-    params.push(
-      ...config.search.map(() => pattern),
-      ...lists.map(() => pattern)
-    );
+      ].join(" OR ")})`,
+      params: [...config.search, ...lists].map(() => pattern),
+    }));
+    if (search.sql !== "") {
+      where.push(search.sql);
+      params.push(...search.params);
+    }
   }
 
   // Any one of the minimums the type has (OR); none of them filters nothing

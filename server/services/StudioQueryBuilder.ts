@@ -21,11 +21,12 @@ import {
   buildFavoriteFilter,
   buildNumericFilter,
   buildTextFilter,
+  searchAll,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
   parseStashIds,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
@@ -186,15 +187,14 @@ class StudioQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name and details: `likeContains` with
-   * `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
+   * The search across the name and details: every word must match
+   * (`searchAll`), each as `likeContains` with `ESCAPE '\'`; no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q.toLowerCase());
-    return {
-      sql: "(LOWER(s.name) LIKE ? ESCAPE '\\' OR LOWER(s.details) LIKE ? ESCAPE '\\')",
+    return searchAll(searchTerms(q), (pattern) => ({
+      sql: "(s.name LIKE ? ESCAPE '\\' OR s.details LIKE ? ESCAPE '\\')",
       params: [pattern, pattern],
-    };
+    }));
   }
 
   /**

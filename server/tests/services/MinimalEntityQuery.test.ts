@@ -11,6 +11,7 @@ import type { MinimalEntityQueryRow } from "../../types/internal/queryRows.js";
 import type { MinimalKind } from "../../types/parsedFilters.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { parseMinimalRequest } from "../../utils/listRequest.js";
+import { galleryNameSql } from "../../utils/sqlClauses.js";
 import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { must } from "../helpers/must.js";
 
@@ -135,7 +136,27 @@ describe("findMinimalEntities", () => {
     const { sql } = statement();
     expect(sql).toContain("COALESCE(NULLIF(x.title, ''),");
     expect(sql).toContain("x.title, x.fileBasename, x.folderPath");
-    expect(sql).toMatch(/COALESCE\(NULLIF\(x\.title, ''\),.* LIKE \? ESCAPE/);
+    expect(sql).toContain(`${galleryNameSql("x")} LIKE ? ESCAPE '\\'`);
+  });
+
+  it("every word of q must match: one group per word, a quoted phrase one group", async () => {
+    await find("performer", { filter: { q: '"anna b" pov' } });
+
+    const { sql, params } = statement();
+    expect(sql.match(/x\.name LIKE \? ESCAPE/g)).toHaveLength(2);
+    expect(sql).toContain(") AND (x.name LIKE ?");
+    expect(params.filter((p) => p === "%anna b%")).toHaveLength(2);
+    expect(params.filter((p) => p === "%pov%")).toHaveLength(2);
+    expect(sql).not.toContain("LOWER(");
+    expect(placeholders(sql)).toBe(params.length);
+  });
+
+  it("blank q adds no search", async () => {
+    await find("tag", { filter: { q: "  " } });
+
+    const { sql } = statement();
+    expect(sql).not.toContain("LIKE");
+    expect(placeholders(sql)).toBe(statement().params.length);
   });
 
   it("count minimums are OR-ed over the type's own counts; one the type lacks filters nothing", async () => {

@@ -269,6 +269,15 @@ describe("ClipQueryBuilder", () => {
       expect(params).toContain("%50\\%\\_off\\\\%");
     });
 
+    it("two words are two AND-ed title matches", async () => {
+      await run({ q: "sea side" });
+
+      const { sql, params } = statement(0);
+      expect(sql.match(/c\.title LIKE \? ESCAPE/g)).toHaveLength(2);
+      expect(params).toContain("%sea%");
+      expect(params).toContain("%side%");
+    });
+
     it("the search clause sits after the field clauses", async () => {
       await run({ q: "sea", filter: { isGenerated: true } });
 

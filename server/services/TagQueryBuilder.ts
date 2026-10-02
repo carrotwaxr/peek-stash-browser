@@ -30,12 +30,14 @@ import {
   buildNumericFilter,
   buildTextFilter,
   refClause,
+  searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
 import {
   emptyToNull,
-  likeContains,
+  jsonListArm,
   parseJsonArray,
+  searchTerms,
 } from "../utils/sqlHelpers.js";
 import { loadTooltipRelations } from "./TooltipRelations.js";
 import {
@@ -317,15 +319,15 @@ class TagQueryBuilder extends EntityQueryBuilder<
   }
 
   /**
-   * The search across the name, description and aliases: `likeContains`
-   * with `ESCAPE '\'`, so a `%`, `_` or `\` in the text matches itself
+   * The search across the name, description and aliases: every word must
+   * match (`searchAll`), each as `likeContains` with `ESCAPE '\'`, an alias
+   * read one at a time; no `LOWER()`
    */
   protected override searchClause(q: string): FilterClause {
-    const pattern = likeContains(q.toLowerCase());
-    return {
-      sql: "(LOWER(t.name) LIKE ? ESCAPE '\\' OR LOWER(t.description) LIKE ? ESCAPE '\\' OR LOWER(t.aliases) LIKE ? ESCAPE '\\')",
+    return searchAll(searchTerms(q), (pattern) => ({
+      sql: `(t.name LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\' OR ${jsonListArm("t.aliases")})`,
       params: [pattern, pattern, pattern],
-    };
+    }));
   }
 
   /**

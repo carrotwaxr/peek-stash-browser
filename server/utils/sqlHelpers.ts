@@ -54,6 +54,27 @@ export function likeContains(text: string): string {
   return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
+/** The most words one search matches (the rest are dropped) */
+export const SEARCH_TERM_LIMIT = 10;
+
+/**
+ * The words of a search box's text: split on whitespace, a `"quoted phrase"`
+ * kept whole (without its quotes), a quote with no partner a literal
+ * character, duplicates collapsed (case as typed: SQLite folds ASCII case
+ * only, so the SQL decides what matches) and at most `SEARCH_TERM_LIMIT`
+ * terms kept, the first ones. Blank text has no terms. A term is raw text:
+ * `likeContains` escapes it.
+ */
+export function searchTerms(q: string): string[] {
+  const terms = new Set<string>();
+  for (const match of q.matchAll(/"([^"]*)"|\S+/g)) {
+    const term = (match[1] ?? match[0]).trim();
+    if (term !== "") terms.add(term);
+    if (terms.size === SEARCH_TERM_LIMIT) break;
+  }
+  return [...terms];
+}
+
 /**
  * SQL true when any element of the JSON list in `column` matches the pattern
  * bound to `param` (a `likeContains` pattern, `?` unless the caller binds it

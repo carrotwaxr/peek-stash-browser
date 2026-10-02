@@ -23,6 +23,7 @@ import type {
   ParsedListRequest,
 } from "../../types/parsedFilters.js";
 import { entityKey } from "../../utils/entityRef.js";
+import { jsonListArm } from "../../utils/sqlHelpers.js";
 import { parsedListRequest } from "../helpers/fixtures.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
@@ -386,14 +387,23 @@ describe("TagQueryBuilder", () => {
       }
     });
 
-    it("the search matches the name, description and aliases, a _ in it matching itself", async () => {
+    it("the search matches the name, description and each alias on its own, a _ in it matching itself", async () => {
       await run({ q: "Sea_Side" });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(LOWER(t.name) LIKE ? ESCAPE '\\' OR LOWER(t.description) LIKE ? ESCAPE '\\' OR LOWER(t.aliases) LIKE ? ESCAPE '\\')"
+        `(t.name LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\' OR ${jsonListArm("t.aliases")})`
       );
-      expect(params.filter((p) => p === "%sea\\_side%")).toHaveLength(3);
+      expect(sql).not.toContain("LOWER(");
+      expect(params.filter((p) => p === "%Sea\\_Side%")).toHaveLength(3);
+    });
+
+    it("two words are two AND-ed groups", async () => {
+      await run({ q: "sea side" });
+
+      const { params } = pageStatement();
+      expect(params.filter((p) => p === "%sea%")).toHaveLength(3);
+      expect(params.filter((p) => p === "%side%")).toHaveLength(3);
     });
 
     it("the search clause sits after the field clauses", async () => {

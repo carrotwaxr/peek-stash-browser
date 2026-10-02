@@ -258,21 +258,41 @@ describeWithDb("findMinimalEntities (integration)", () => {
     expect(
       names(await find(onlyA, "performer", { filter: { q: "e_c" } }))
     ).toEqual(["snake_case"]);
-    // A name part matches anywhere in the name
-    expect(names(await find(onlyA, "group", { filter: { q: "x 1" } }))).toEqual(
-      [
-        "Mx 10",
-        "Mx 11",
-        "Mx 12",
-        "Mx 13",
-        "Mx 14",
-        "Mx 15",
-        "Mx 16",
-        "Mx 17",
-        "Mx 18",
-        "Mx 19",
-      ]
-    );
+    // A quoted name part matches anywhere in the name
+    expect(
+      names(await find(onlyA, "group", { filter: { q: '"x 1"' } }))
+    ).toEqual([
+      "Mx 10",
+      "Mx 11",
+      "Mx 12",
+      "Mx 13",
+      "Mx 14",
+      "Mx 15",
+      "Mx 16",
+      "Mx 17",
+      "Mx 18",
+      "Mx 19",
+    ]);
+  });
+
+  it("q splits into words that must all match, a quoted phrase staying whole", async () => {
+    // Words match in any order, an alias counted one element at a time
+    expect(
+      names(await find(onlyA, "performer", { filter: { q: "alias zed" } }))
+    ).toEqual(["Mx 07"]);
+    expect(
+      await find(onlyA, "performer", { filter: { q: "zed nope" } })
+    ).toEqual([]);
+    expect(
+      await find(onlyA, "performer", { filter: { q: '"alias zed"' } })
+    ).toEqual([]);
+    // "Alpha" and "Folder" in the shown name of an untitled gallery
+    expect(
+      names(await find(onlyA, "gallery", { filter: { q: "folder alpha" } }))
+    ).toEqual(["Alpha Folder"]);
+    expect(
+      await find(onlyA, "gallery", { filter: { q: "alpha beta" } })
+    ).toEqual([]);
   });
 
   it("the performer picker does not match the alias list's JSON punctuation", async () => {
@@ -297,7 +317,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
     ).toEqual([`${FX_ID.SAME}:${FX.A}`, `${FX_ID.VISIBLE_A}:${FX.A}`]);
     // "Mx 03" is restricted
     expect(
-      names(await find(viewer, "performer", { filter: { q: "Mx 0" } }))
+      names(await find(viewer, "performer", { filter: { q: '"Mx 0"' } }))
     ).toEqual([
       "Mx 01",
       "Mx 02",
@@ -388,7 +408,7 @@ describeWithDb("findMinimalEntities (integration)", () => {
 
   it("count_filter keeps its OR semantics", async () => {
     const mx = (body: object) =>
-      find(onlyA, "performer", { filter: { q: "Mx 1" }, ...body });
+      find(onlyA, "performer", { filter: { q: '"Mx 1"' }, ...body });
 
     expect(names(await mx({ count_filter: { min_scene_count: 1 } }))).toEqual([
       "Mx 11",

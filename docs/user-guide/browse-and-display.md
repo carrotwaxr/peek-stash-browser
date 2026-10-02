@@ -194,6 +194,10 @@ Each entity type (Scene, Performer, Studio, etc.) has independent settings. Conf
 
 When nothing matches the search and filters, a list says so ("No performers found") instead of showing a blank page.
 
+### The search box
+
+Every word you type must match, in any order and anywhere the search looks: a scene's title, details, path, performers, studio and tags, so "anna blonde" finds a scene with a performer named Anna and a tag named Blonde. Put words in "quotes" to keep them together as one phrase. A quote with no partner is an ordinary character, a repeated word counts once, and only the first 10 words are used. A performer's or tag's aliases are searched one at a time, `%` and `_` match themselves, and a capital letter with an accent matches when you type it exactly. A gallery without a title is found by the name its card shows (its zip file's name without the extension, or its folder's name); the gallery **Title** filter matches the same name. The filters' text fields (Title contains and the like) are not split: they match the text as one phrase.
+
 ---
 
 ## Filters

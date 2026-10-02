@@ -28,6 +28,7 @@ import {
   countForms,
   exclusionJoin,
   fullDateSql,
+  galleryNameSql,
   idClause,
   instanceClause,
   instanceColumnClause,
@@ -36,6 +37,7 @@ import {
   randomOrder,
   refClause,
   resolutionClause,
+  searchAll,
   specificInstanceClause,
   viaSceneClause,
 } from "../../utils/sqlClauses.js";
@@ -1703,5 +1705,40 @@ describe("resolutionClause", () => {
     for (const modifier of ["EQUALS", "NOT_EQUALS"] as const) {
       expect(clause(modifier, "LOW").sql).not.toContain("COALESCE");
     }
+  });
+});
+
+describe("searchAll", () => {
+  const termClause = (pattern: string) => ({
+    sql: "(a LIKE ? ESCAPE '\\' OR b LIKE ? ESCAPE '\\')",
+    params: [pattern, pattern],
+  });
+
+  it("is no clause without terms", () => {
+    expect(searchAll([], termClause)).toEqual({ sql: "", params: [] });
+  });
+
+  it("ANDs one clause per term, each bound to the term's likeContains pattern", () => {
+    const clause = searchAll(["anna", "100%"], termClause);
+
+    expect(clause.sql).toBe(
+      "((a LIKE ? ESCAPE '\\' OR b LIKE ? ESCAPE '\\') AND (a LIKE ? ESCAPE '\\' OR b LIKE ? ESCAPE '\\'))"
+    );
+    expect(clause.params).toEqual(["%anna%", "%anna%", "%100\\%%", "%100\\%%"]);
+  });
+});
+
+describe("galleryNameSql", () => {
+  it("is the title, else the file's name without its extension, else the folder's own name", () => {
+    const sql = galleryNameSql("g");
+
+    expect(sql.startsWith("COALESCE(NULLIF(g.title, ''),")).toBe(true);
+    expect(sql).toContain("g.fileBasename");
+    expect(sql).toContain("g.folderPath");
+    expect(sql).not.toContain("x.");
+  });
+
+  it("reads the alias it is given", () => {
+    expect(galleryNameSql("x")).toContain("NULLIF(x.title, '')");
   });
 });

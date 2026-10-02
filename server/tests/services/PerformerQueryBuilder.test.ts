@@ -460,14 +460,32 @@ describe("PerformerQueryBuilder", () => {
       }
     });
 
-    it("the search matches the name and aliases, a % in it matching itself", async () => {
+    it("the search matches the name and each alias on its own, a % in it matching itself", async () => {
       await run({ q: "100%_Ann" });
 
       const { sql, params } = pageStatement();
       expect(sql).toContain(
-        "(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(p.aliasList) LIKE ? ESCAPE '\\')"
+        `(p.name LIKE ? ESCAPE '\\' OR ${jsonListArm("p.aliasList")})`
       );
-      expect(params.filter((p) => p === "%100\\%\\_ann%")).toHaveLength(2);
+      expect(sql).not.toContain("LOWER(");
+      expect(params.filter((p) => p === "%100\\%\\_Ann%")).toHaveLength(2);
+    });
+
+    it("the search keeps a non-ASCII capital as typed", async () => {
+      await run({ q: "Élodie" });
+
+      expect(pageStatement().params).toContain("%Élodie%");
+      expect(pageStatement().params).not.toContain("%élodie%");
+    });
+
+    it("two words are two AND-ed groups", async () => {
+      await run({ q: "anna blonde" });
+
+      const { sql, params } = pageStatement();
+      expect(sql.match(/p\.name LIKE \? ESCAPE/g)).toHaveLength(2);
+      expect(sql).toContain(") AND (p.name LIKE ?");
+      expect(params.filter((p) => p === "%anna%")).toHaveLength(2);
+      expect(params.filter((p) => p === "%blonde%")).toHaveLength(2);
     });
 
     it("the search clause sits after the field clauses", async () => {

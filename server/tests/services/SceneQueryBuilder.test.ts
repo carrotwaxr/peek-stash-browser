@@ -242,33 +242,65 @@ describe("SceneQueryBuilder", () => {
 
   describe("search query", () => {
     it("searches across title, details, path, performers, studio, and tags", async () => {
-      await run({ q: "test search" });
+      await run({ q: "test" });
 
       const { sql, params } = pageStatement();
       // Should search across multiple fields
-      expect(sql).toContain("LOWER(s.title) LIKE LOWER(?)");
-      expect(sql).toContain("LOWER(s.details) LIKE LOWER(?)");
-      expect(sql).toContain("LOWER(s.filePath) LIKE LOWER(?)");
+      expect(sql).toContain("s.title LIKE ? ESCAPE '\\'");
+      expect(sql).toContain("s.details LIKE ? ESCAPE '\\'");
+      expect(sql).toContain("s.filePath LIKE ? ESCAPE '\\'");
       // Should have performer subquery
       expect(sql).toContain("StashPerformer");
-      expect(sql).toContain("LOWER(p.name) LIKE LOWER(?)");
+      expect(sql).toContain("p.name LIKE ? ESCAPE '\\'");
       // Should have studio subquery
       expect(sql).toContain("StashStudio");
       // Should have tag subquery
       expect(sql).toContain("StashTag");
 
       // Search param should be wrapped in wildcards
-      expect(params).toContain("%test search%");
+      expect(params).toContain("%test%");
+    });
+
+    it("never lower-cases in SQL or in JavaScript: a non-ASCII capital matches as typed", async () => {
+      await run({ q: "Élodie" });
+
+      const { sql, params } = pageStatement();
+      expect(sql).not.toContain("LOWER(");
+      expect(params).toContain("%Élodie%");
+      expect(params).not.toContain("%élodie%");
     });
 
     it("binds likeContains(q) with ESCAPE, so a % or _ in the search matches itself", async () => {
       await run({ q: "100%_x" });
 
       const { sql, params } = pageStatement();
-      expect(sql).toContain("LOWER(s.title) LIKE LOWER(?) ESCAPE '\\'");
-      expect(sql).toContain("LOWER(t.name) LIKE LOWER(?) ESCAPE '\\'");
-      expect(sql).not.toMatch(/LIKE LOWER\(\?\)(?! ESCAPE)/);
+      expect(sql).toContain("s.title LIKE ? ESCAPE '\\'");
+      expect(sql).toContain("t.name LIKE ? ESCAPE '\\'");
+      expect(sql).not.toMatch(/LIKE \?(?! ESCAPE)/);
       expect(params.filter((p) => p === "%100\\%\\_x%")).toHaveLength(6);
+    });
+
+    it("two words are two AND-ed groups of the six arms", async () => {
+      await run({ q: "anna blonde" }, { applyExclusions: false });
+
+      const { sql, params } = pageStatement();
+      expect(sql.match(/s\.title LIKE \? ESCAPE/g)).toHaveLength(2);
+      expect(sql.match(/\bt\.name LIKE \? ESCAPE/g)).toHaveLength(2);
+      const at = params.indexOf("%anna%");
+      expect(params.slice(at, at + 12)).toEqual([
+        ...Array<string>(6).fill("%anna%"),
+        ...Array<string>(6).fill("%blonde%"),
+      ]);
+      // The groups sit side by side: the first group closes, AND, the next opens
+      expect(sql).toMatch(/\) AND \(\s*s\.title LIKE/);
+    });
+
+    it("a quoted phrase is one group", async () => {
+      await run({ q: '"anna blonde" pov' }, { applyExclusions: false });
+
+      const { params } = pageStatement();
+      expect(params.filter((p) => p === "%anna blonde%")).toHaveLength(6);
+      expect(params.filter((p) => p === "%pov%")).toHaveLength(6);
     });
 
     it("matches performer, studio and tag names only for live entities the viewer can see", async () => {
