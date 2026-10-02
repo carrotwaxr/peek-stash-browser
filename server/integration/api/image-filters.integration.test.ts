@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { refreshImageDerivedColumns } from "../../services/StashSyncService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
@@ -1304,6 +1305,538 @@ describeWithDb("Image own fields (seeded)", () => {
       expect(await ns(user.B, filter), JSON.stringify(filter)).not.toContain(
         60
       );
+    }
+  });
+});
+
+/**
+ * Image favourites, performer tags' neighbours, performer count and
+ * performer age (item 65), from the wire through the parser into the image
+ * builder, on seeded rows.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do: ipf-x
+ * and ipf-y, passed to the builder as the viewer's allowed instances. Ids
+ * are 7896000 + n for tags, 7896100 + n studios, 7896200 + n performers,
+ * 7896300 + n images, 7896400 + n galleries.
+ * - Tags: 1, 2 (child of 1), 3 on ipf-x; 1 on ipf-y. Studios the same.
+ * - Performers on ipf-x: 1 born `1995` (a year alone), 2 born 1990-06-15,
+ *   3 with no birthdate, 4 deleted (born 2000-01-01), 5 born 1980-01-01;
+ *   1 born `1995` on ipf-y.
+ * - Images on ipf-x (tags, studio, performers, date): 1 tag 1, studio 1,
+ *   performer 1, 2020-05-01; 2 tag 2, studio 2, performer 2, 2020-05-01;
+ *   3 tag 3, studio 3, performers 1 and 2, no date; 4 nothing, 2020-05-01;
+ *   5 performers 3 and 4, 2010-01-01; 6 in gallery 1, which has tag 3, and
+ *   nothing of its own (sync's gallery inheritance writes the tag into
+ *   ImageTag); 7 tag 1, studio 1, performer 5, 2020-01-01; 8 tag 3, studio
+ *   3, performer 1, 2020-05-01; 9 performer 1, dated `2021`. On ipf-y: 1
+ *   tag 1, studio 1, performer 1, 2020-05-01.
+ * - Favourites: A tag 1@x, studio 1@x, performers 2@x and 1@y. B tag 3@x,
+ *   studio 3@x, performers 1@x and 5@x. C none. D performer 2@x and 70
+ *   performers no image holds (the large shape).
+ * - B hid image 8@x and performer 5@x (no cascade is seeded, so the
+ *   clauses themselves must keep the hidden performer out).
+ * Every seeded row is deleted before the describe ends.
+ */
+const PX = "ipf-x";
+const PY = "ipf-y";
+const PF_INSTANCES = [PX, PY];
+const PF_PREFIX = "ipf-it";
+const pfTag = (n: number) => String(7896000 + n);
+const pfStudio = (n: number) => String(7896100 + n);
+const pfPerformer = (n: number) => String(7896200 + n);
+const pfImage = (n: number) => String(7896300 + n);
+const pfGallery = (n: number) => String(7896400 + n);
+
+describeWithDb("Image favourites, performer count and age (seeded)", () => {
+  const user = { A: 0, B: 0, C: 0, D: 0 };
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { username: { startsWith: PF_PREFIX } },
+    });
+    // Junctions cascade with their image, gallery, performer or tag; the
+    // images go before the studios they name
+    const where = { stashInstanceId: { in: PF_INSTANCES } };
+    await prisma.stashImage.deleteMany({ where });
+    await prisma.stashGallery.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+  }
+
+  /** The images a wire `image_filter` lists, as numbers per instance; the count is checked */
+  async function listed(
+    viewer: number,
+    imageFilter: Record<string, unknown>,
+    sort: "created_at" | "title" | "rating" = "created_at"
+  ): Promise<{ x: number[]; y: number[] }> {
+    const request = parseListRequest(
+      "image",
+      { filter: { per_page: 250, sort }, image_filter: imageFilter },
+      { userId: viewer }
+    );
+    const { items, total } = await imageQueryBuilder.execute({
+      userId: viewer,
+      allowedInstanceIds: PF_INSTANCES,
+      request,
+    });
+    expect(total).toBe(items.length);
+    const of = (instance: string) =>
+      items
+        .filter((image) => image.instanceId === instance)
+        .map((image) => Number(image.id) - 7896300)
+        .sort((a, b) => a - b);
+    return { x: of(PX), y: of(PY) };
+  }
+
+  const count = (field: string, modifier: string, value: number) => ({
+    [field]: { modifier, value },
+  });
+
+  beforeAll(async () => {
+    await removeRows();
+
+    const makeUser = async (name: string) =>
+      (
+        await prisma.user.create({
+          data: {
+            username: `${PF_PREFIX}-${name}`,
+            password: "not-a-real-hash",
+            role: "USER",
+          },
+        })
+      ).id;
+    user.A = await makeUser("a");
+    user.B = await makeUser("b");
+    user.C = await makeUser("c");
+    user.D = await makeUser("d");
+
+    await prisma.stashTag.createMany({
+      data: [
+        { n: 1, instance: PX },
+        { n: 2, instance: PX, parent: 1 },
+        { n: 3, instance: PX },
+        { n: 1, instance: PY },
+      ].map(({ n, instance, parent }) => ({
+        id: pfTag(n),
+        stashInstanceId: instance,
+        name: `IPF tag ${n} ${instance}`,
+        parentIds: JSON.stringify(parent === undefined ? [] : [pfTag(parent)]),
+      })),
+    });
+    await prisma.stashStudio.createMany({
+      data: [
+        { n: 1, instance: PX },
+        { n: 2, instance: PX, parent: 1 },
+        { n: 3, instance: PX },
+        { n: 1, instance: PY },
+      ].map(({ n, instance, parent }) => ({
+        id: pfStudio(n),
+        stashInstanceId: instance,
+        name: `IPF studio ${n} ${instance}`,
+        parentId: parent === undefined ? null : pfStudio(parent),
+      })),
+    });
+    await prisma.stashPerformer.createMany({
+      data: [
+        { n: 1, instance: PX, birthdate: "1995" },
+        { n: 2, instance: PX, birthdate: "1990-06-15" },
+        { n: 3, instance: PX, birthdate: null },
+        { n: 4, instance: PX, birthdate: "2000-01-01", deleted: true },
+        { n: 5, instance: PX, birthdate: "1980-01-01" },
+        { n: 1, instance: PY, birthdate: "1995" },
+      ].map(({ n, instance, birthdate, deleted }) => ({
+        id: pfPerformer(n),
+        stashInstanceId: instance,
+        name: `IPF performer ${n} ${instance}`,
+        birthdate,
+        ...(deleted === true ? { deletedAt: new Date() } : {}),
+      })),
+    });
+    await prisma.stashGallery.create({
+      data: { id: pfGallery(1), stashInstanceId: PX, title: "IPF gallery 1" },
+    });
+    await prisma.galleryTag.create({
+      data: {
+        galleryId: pfGallery(1),
+        galleryInstanceId: PX,
+        tagId: pfTag(3),
+        tagInstanceId: PX,
+      },
+    });
+
+    const images: Array<{
+      n: number;
+      instance: string;
+      tag?: number;
+      studio?: number;
+      performers?: number[];
+      date?: string;
+    }> = [
+      {
+        n: 1,
+        instance: PX,
+        tag: 1,
+        studio: 1,
+        performers: [1],
+        date: "2020-05-01",
+      },
+      {
+        n: 2,
+        instance: PX,
+        tag: 2,
+        studio: 2,
+        performers: [2],
+        date: "2020-05-01",
+      },
+      { n: 3, instance: PX, tag: 3, studio: 3, performers: [1, 2] },
+      { n: 4, instance: PX, date: "2020-05-01" },
+      { n: 5, instance: PX, performers: [3, 4], date: "2010-01-01" },
+      { n: 6, instance: PX },
+      {
+        n: 7,
+        instance: PX,
+        tag: 1,
+        studio: 1,
+        performers: [5],
+        date: "2020-01-01",
+      },
+      {
+        n: 8,
+        instance: PX,
+        tag: 3,
+        studio: 3,
+        performers: [1],
+        date: "2020-05-01",
+      },
+      { n: 9, instance: PX, performers: [1], date: "2021" },
+      {
+        n: 1,
+        instance: PY,
+        tag: 1,
+        studio: 1,
+        performers: [1],
+        date: "2020-05-01",
+      },
+    ];
+    await prisma.stashImage.createMany({
+      data: images.map(({ n, instance, studio, date }) => ({
+        id: pfImage(n),
+        stashInstanceId: instance,
+        title: `IPF ${n} ${instance}`,
+        date: date ?? null,
+        studioId: studio === undefined ? null : pfStudio(studio),
+        studioInstanceId: studio === undefined ? null : instance,
+      })),
+    });
+    await prisma.imageTag.createMany({
+      data: images.flatMap(({ n, instance, tag }) =>
+        tag === undefined
+          ? []
+          : [
+              {
+                imageId: pfImage(n),
+                imageInstanceId: instance,
+                tagId: pfTag(tag),
+                tagInstanceId: instance,
+              },
+            ]
+      ),
+    });
+    await prisma.imagePerformer.createMany({
+      data: images.flatMap(({ n, instance, performers }) =>
+        (performers ?? []).map((p) => ({
+          imageId: pfImage(n),
+          imageInstanceId: instance,
+          performerId: pfPerformer(p),
+          performerInstanceId: instance,
+        }))
+      ),
+    });
+    await prisma.imageGallery.create({
+      data: {
+        imageId: pfImage(6),
+        imageInstanceId: PX,
+        galleryId: pfGallery(1),
+        galleryInstanceId: PX,
+      },
+    });
+    // As sync does after every batch: image 6 takes its gallery's tag
+    await imageGalleryInheritanceService.applyGalleryInheritance([
+      { id: pfImage(6), instanceId: PX },
+    ]);
+
+    const favourite = { favorite: true };
+    await prisma.tagRating.createMany({
+      data: [
+        { userId: user.A, instanceId: PX, tagId: pfTag(1), ...favourite },
+        { userId: user.B, instanceId: PX, tagId: pfTag(3), ...favourite },
+      ],
+    });
+    await prisma.studioRating.createMany({
+      data: [
+        { userId: user.A, instanceId: PX, studioId: pfStudio(1), ...favourite },
+        { userId: user.B, instanceId: PX, studioId: pfStudio(3), ...favourite },
+      ],
+    });
+    await prisma.performerRating.createMany({
+      data: [
+        { userId: user.A, instanceId: PX, performerId: pfPerformer(2) },
+        { userId: user.A, instanceId: PY, performerId: pfPerformer(1) },
+        { userId: user.B, instanceId: PX, performerId: pfPerformer(1) },
+        { userId: user.B, instanceId: PX, performerId: pfPerformer(5) },
+        { userId: user.D, instanceId: PX, performerId: pfPerformer(2) },
+        ...Array.from({ length: 70 }, (_, i) => ({
+          userId: user.D,
+          instanceId: PX,
+          performerId: pfPerformer(900 + i),
+        })),
+      ].map((row) => ({ ...row, ...favourite })),
+    });
+    // A rating that is not a favourite never counts
+    await prisma.performerRating.create({
+      data: {
+        userId: user.C,
+        instanceId: PX,
+        performerId: pfPerformer(1),
+        rating: 80,
+      },
+    });
+
+    // B's exclusions, without the cascades a recompute would add
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        { entityType: "image", entityId: pfImage(8), instanceId: PX },
+        { entityType: "performer", entityId: pfPerformer(5), instanceId: PX },
+      ].map((row) => ({ ...row, userId: user.B, reason: "hidden" })),
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("tag_favorite: an image with a favourite tag or a sub-tag of one, its galleries' tags included", async () => {
+    expect(await listed(user.A, { tag_favorite: true })).toEqual({
+      x: [1, 2, 7],
+      y: [],
+    });
+    expect(await listed(user.A, { tag_favorite: false })).toEqual({
+      x: [3, 4, 5, 6, 8, 9],
+      y: [1],
+    });
+    // Image 6 has no tag of its own: its gallery's tag 3 is in ImageTag
+    expect(await listed(user.B, { tag_favorite: true })).toEqual({
+      x: [3, 6],
+      y: [],
+    });
+    expect(await listed(user.B, { tag_favorite: false })).toEqual({
+      x: [1, 2, 4, 5, 7, 9],
+      y: [1],
+    });
+  });
+
+  it("studio_favorite: an image whose studio or a parent of it is a favourite", async () => {
+    expect(await listed(user.A, { studio_favorite: true })).toEqual({
+      x: [1, 2, 7],
+      y: [],
+    });
+    // Images with no studio lack a favourite one
+    expect(await listed(user.A, { studio_favorite: false })).toEqual({
+      x: [3, 4, 5, 6, 8, 9],
+      y: [1],
+    });
+    expect(await listed(user.B, { studio_favorite: true })).toEqual({
+      x: [3],
+      y: [],
+    });
+  });
+
+  it("performer_favorite: an image with a favourite performer the viewer can see", async () => {
+    expect(await listed(user.A, { performer_favorite: true })).toEqual({
+      x: [2, 3],
+      y: [1],
+    });
+    expect(await listed(user.A, { performer_favorite: false })).toEqual({
+      x: [1, 4, 5, 6, 7, 8, 9],
+      y: [],
+    });
+    // B's favourite performer 5 is hidden: image 7 does not match by it
+    expect(await listed(user.B, { performer_favorite: true })).toEqual({
+      x: [1, 3, 9],
+      y: [],
+    });
+    expect(await listed(user.B, { performer_favorite: false })).toEqual({
+      x: [2, 4, 5, 6, 7],
+      y: [1],
+    });
+  });
+
+  it("a favourite on one instance never matches the same id on another", async () => {
+    // A's performer 1 favourite is on ipf-y; image 1@x has performer 1@x
+    expect(
+      (await listed(user.A, { performer_favorite: true })).x
+    ).not.toContain(1);
+    // A's tag and studio 1 favourites are on ipf-x; image 1@y has tag and
+    // studio 1@y
+    expect((await listed(user.A, { tag_favorite: true })).y).toEqual([]);
+    expect((await listed(user.A, { studio_favorite: true })).y).toEqual([]);
+  });
+
+  it("another user's favourites never count", async () => {
+    // B's favourites (tag 3, studio 3, performer 1@x) are not A's
+    expect((await listed(user.A, { tag_favorite: true })).x).not.toContain(3);
+    expect((await listed(user.A, { studio_favorite: true })).x).not.toContain(
+      3
+    );
+    expect(
+      (await listed(user.A, { performer_favorite: true })).x
+    ).not.toContain(9);
+    // C has none (a rating alone is no favourite): true is nothing, false
+    // is every image
+    for (const field of [
+      "tag_favorite",
+      "studio_favorite",
+      "performer_favorite",
+    ]) {
+      expect(await listed(user.C, { [field]: true }), field).toEqual({
+        x: [],
+        y: [],
+      });
+      expect(await listed(user.C, { [field]: false }), field).toEqual({
+        x: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        y: [1],
+      });
+    }
+  });
+
+  it("true and false split the visible library under every sort", async () => {
+    for (const viewer of [user.A, user.B]) {
+      const all = await listed(viewer, {});
+      for (const field of [
+        "tag_favorite",
+        "studio_favorite",
+        "performer_favorite",
+      ]) {
+        for (const sort of ["created_at", "title", "rating"] as const) {
+          const yes = await listed(viewer, { [field]: true }, sort);
+          const no = await listed(viewer, { [field]: false }, sort);
+          expect(
+            [...yes.x, ...no.x].sort((a, b) => a - b),
+            field
+          ).toEqual(all.x);
+          expect(
+            [...yes.y, ...no.y].sort((a, b) => a - b),
+            field
+          ).toEqual(all.y);
+        }
+      }
+    }
+  });
+
+  it("more than 64 favourite performers take the large shape with the same answers", async () => {
+    for (const sort of ["created_at", "rating"] as const) {
+      expect(await listed(user.D, { performer_favorite: true }, sort)).toEqual({
+        x: [2, 3],
+        y: [],
+      });
+      expect(await listed(user.D, { performer_favorite: false }, sort)).toEqual(
+        { x: [1, 4, 5, 6, 7, 8, 9], y: [1] }
+      );
+    }
+  });
+
+  it("performer_count counts the live performers the viewer can see", async () => {
+    expect(await listed(user.A, count("performer_count", "EQUALS", 1))).toEqual(
+      { x: [1, 2, 5, 7, 8, 9], y: [1] }
+    );
+    // Image 5's second performer is deleted
+    expect(await listed(user.A, count("performer_count", "EQUALS", 0))).toEqual(
+      { x: [4, 6], y: [] }
+    );
+    expect(
+      await listed(user.A, count("performer_count", "GREATER_THAN", 1))
+    ).toEqual({ x: [3], y: [] });
+    expect(
+      await listed(user.A, {
+        performer_count: { modifier: "BETWEEN", value: 1, value2: 2 },
+      })
+    ).toEqual({ x: [1, 2, 3, 5, 7, 8, 9], y: [1] });
+    // B hid performer 5, image 7's only one
+    expect(await listed(user.B, count("performer_count", "EQUALS", 0))).toEqual(
+      { x: [4, 6, 7], y: [] }
+    );
+  });
+
+  it("performer_age is a performer's age on the image's date, partial dates included", async () => {
+    // Born `1995` on an image dated 2020-05-01 is 25
+    expect(await listed(user.A, count("performer_age", "EQUALS", 25))).toEqual({
+      x: [1, 8],
+      y: [1],
+    });
+    // Born 1990-06-15, 29 on 2020-05-01
+    expect(await listed(user.A, count("performer_age", "EQUALS", 29))).toEqual({
+      x: [2],
+      y: [],
+    });
+    // An image dated `2021` is read as 2021-01-01
+    expect(await listed(user.A, count("performer_age", "EQUALS", 26))).toEqual({
+      x: [9],
+      y: [],
+    });
+    expect(
+      await listed(user.A, {
+        performer_age: { modifier: "BETWEEN", value: 25, value2: 30 },
+      })
+    ).toEqual({ x: [1, 2, 8, 9], y: [1] });
+    // A deleted performer never matches, nor does an image without a date
+    expect(await listed(user.A, count("performer_age", "EQUALS", 10))).toEqual({
+      x: [],
+      y: [],
+    });
+    // Performer 5, hidden by B, makes no match for B
+    expect(await listed(user.A, count("performer_age", "EQUALS", 40))).toEqual({
+      x: [7],
+      y: [],
+    });
+    expect(await listed(user.B, count("performer_age", "EQUALS", 40))).toEqual({
+      x: [],
+      y: [],
+    });
+  });
+
+  it("an image the viewer hid is never listed under a new field, in any form", async () => {
+    // A sees image 8 under these
+    for (const filter of [
+      { tag_favorite: false },
+      { studio_favorite: false },
+      { performer_favorite: false },
+      count("performer_count", "EQUALS", 1),
+      count("performer_age", "EQUALS", 25),
+    ]) {
+      expect(
+        (await listed(user.A, filter)).x,
+        JSON.stringify(filter)
+      ).toContain(8);
+    }
+    for (const filter of [
+      { tag_favorite: true },
+      { tag_favorite: false },
+      { studio_favorite: true },
+      { studio_favorite: false },
+      { performer_favorite: true },
+      { performer_favorite: false },
+      count("performer_count", "EQUALS", 1),
+      count("performer_count", "NOT_EQUALS", 5),
+      count("performer_count", "GREATER_THAN", 0),
+      count("performer_count", "LESS_THAN", 5),
+      count("performer_age", "EQUALS", 25),
+      count("performer_age", "GREATER_THAN", 0),
+    ]) {
+      expect(
+        (await listed(user.B, filter)).x,
+        JSON.stringify(filter)
+      ).not.toContain(8);
     }
   });
 });

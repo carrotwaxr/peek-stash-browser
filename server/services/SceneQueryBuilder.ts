@@ -29,7 +29,6 @@ import type {
   TextCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey } from "../utils/entityRef.js";
-import { expandRefs, expandRefsEach } from "../utils/hierarchyUtils.js";
 import {
   ownPlaylistSql,
   viewablePlaylistSql,
@@ -48,14 +47,13 @@ import {
   buildInstantFilter,
   buildNumericFilter,
   buildTextFilter,
-  countForms,
   exclusionJoin,
   instanceClause,
   matchedSetClause,
   noClause,
   orientationClause,
   performerAgeExists,
-  performerTagsClause,
+  performerTagsFieldClause,
   refClause,
   resolutionClause,
   sceneUntaggedSql,
@@ -688,7 +686,7 @@ class SceneQueryBuilder extends EntityQueryBuilder<
   /**
    * Performer tags: the scene has a live performer the viewer can see that
    * holds one of the tags, expanded to their descendants to the depth
-   * (`performerTagsClause`). INCLUDES_ALL is one clause per chosen tag, each
+   * (`performerTagsFieldClause`). INCLUDES_ALL is one clause per chosen tag, each
    * with its own descendants, AND-ed: each on some performer of the scene.
    * A page under a sort with an index walks it (`sortedByIndex`).
    */
@@ -696,44 +694,12 @@ class SceneQueryBuilder extends EntityQueryBuilder<
     criterion: RefCriterion,
     ctx: LeafContext
   ): Promise<FilterClause> {
-    const opts = {
+    return performerTagsFieldClause(SCENE_PERFORMERS, criterion, {
       name: ctx.name,
       allowedInstanceIds: ctx.allowedInstanceIds,
       viewerId: ctx.applyExclusions ? ctx.userId : null,
       sortedByIndex: INDEXED_SORTS.has(ctx.sortField) && !ctx.underAny,
-    };
-    if (criterion.modifier === "INCLUDES_ALL") {
-      const groups = await expandRefsEach(
-        "tag",
-        criterion.refs,
-        criterion.depth,
-        ctx.allowedInstanceIds
-      );
-      if (groups.length === 0) return noClause();
-      const each = groups.map((group, i) =>
-        performerTagsClause(SCENE_PERFORMERS, group, "INCLUDES", {
-          ...opts,
-          name: `${ctx.name}_${i}`,
-        })
-      );
-      // allOf keeps no count form: the count ANDs each clause's own
-      const page = allOf(each);
-      return opts.sortedByIndex
-        ? { ...page, count: allOf(countForms(each)) }
-        : page;
-    }
-    const refs = await expandRefs(
-      "tag",
-      criterion.refs,
-      criterion.depth,
-      ctx.allowedInstanceIds
-    );
-    return performerTagsClause(
-      SCENE_PERFORMERS,
-      refs,
-      criterion.modifier,
-      opts
-    );
+    });
   }
 
   /** The studio filter, with the studios' descendants to the depth */

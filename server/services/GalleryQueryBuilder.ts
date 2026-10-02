@@ -22,6 +22,7 @@ import type {
 } from "../types/internal/queryRows.js";
 import type {
   ParsedFilter,
+  RefCriterion,
   RefFieldCriterion,
 } from "../types/parsedFilters.js";
 import { type EntityRef, entityKey, pairsJson } from "../utils/entityRef.js";
@@ -30,6 +31,7 @@ import {
   type ColumnTarget,
   type FilterClause,
   type JunctionTarget,
+  type PerformerAgeSource,
   type ViaSceneSpec,
   buildDayFilter,
   buildFavoriteFilter,
@@ -39,6 +41,10 @@ import {
   exclusionJoin,
   galleryNameSql,
   noClause,
+  performerAgeExists,
+  performerCountClause,
+  performerTagsFieldClause,
+  refClause,
   searchAll,
   viaSceneClause,
 } from "../utils/sqlClauses.js";
@@ -55,6 +61,7 @@ import {
   type LeafContext,
   type QueryContext,
   type SortExpr,
+  favoriteRefs,
   hierarchicalRefClause,
   refFieldClause,
   refPresence,
@@ -144,6 +151,18 @@ const GALLERY_PERFORMERS: JunctionTarget = {
   refInstanceCol: "performerInstanceId",
 };
 
+/** The junction Performer Age reads a gallery's performers from */
+const GALLERY_PERFORMER_AGE: PerformerAgeSource = {
+  junction: {
+    table: "GalleryPerformer",
+    itemId: "galleryId",
+    itemInstance: "galleryInstanceId",
+    performerId: "performerId",
+    performerInstance: "performerInstanceId",
+  },
+  item: { id: "g.id", instance: "g.stashInstanceId", date: "g.date" },
+};
+
 /** A gallery's scenes, for "has any" and "has none" */
 const GALLERY_SCENES: JunctionTarget = {
   kind: "junction",
@@ -231,6 +250,34 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
         entityType: "performer",
       }),
     tags: (c, ctx) => this.tagClause(c, ctx),
+    // Through the tags of the gallery's performers. No gallery sort has an
+    // index to walk, so every statement reads the matches in no order.
+    performer_tags: (c, ctx) =>
+      performerTagsFieldClause(GALLERY_PERFORMERS, c, {
+        name: ctx.name,
+        allowedInstanceIds: ctx.allowedInstanceIds,
+        viewerId: ctx.applyExclusions ? ctx.userId : null,
+      }),
+
+    // The gallery's performers the viewer can see: how many, and their age
+    // on the gallery's date
+    performer_count: (c, ctx) =>
+      performerCountClause(
+        c,
+        GALLERY_PERFORMERS,
+        ctx.applyExclusions ? ctx.userId : null
+      ),
+    performer_age: (c, ctx) =>
+      performerAgeExists(
+        c,
+        GALLERY_PERFORMER_AGE,
+        ctx.applyExclusions ? ctx.userId : null
+      ),
+
+    // The viewer's favorite entities; false is the negation of true
+    performer_favorite: (on, ctx) => this.favoriteClause("performer", on, ctx),
+    studio_favorite: (on, ctx) => this.favoriteClause("studio", on, ctx),
+    tag_favorite: (on, ctx) => this.favoriteClause("tag", on, ctx),
 
     // The viewer's rating and the counts
     rating100: (c) => buildNumericFilter(c, "r.rating"),
@@ -292,6 +339,37 @@ class GalleryQueryBuilder extends EntityQueryBuilder<
     return hierarchicalRefClause("tag", GALLERY_TAGS, criterion, ctx, {
       name: ctx.name,
       related: { table: "StashTag", entityType: "tag" },
+    });
+  }
+
+  /**
+   * `tag_favorite`, `studio_favorite` and `performer_favorite`: the gallery
+   * has (`true`) or lacks (`false`) one of the viewer's favourites, through
+   * the same shapes as the tag, studio and performer filters. Tags and
+   * studios count every descendant (depth -1, as the Tags and Studios
+   * filters take it). A favourite the viewer hid is dropped
+   * (`favoriteRefs`). With no favourites `true` matches nothing and `false`
+   * is no filter.
+   */
+  private async favoriteClause(
+    kind: "tag" | "studio" | "performer",
+    on: boolean,
+    ctx: LeafContext
+  ): Promise<FilterClause> {
+    const refs = await favoriteRefs(kind, ctx);
+    if (refs.length === 0) {
+      return on ? { sql: "1 = 0", params: [] } : noClause();
+    }
+    const criterion: RefCriterion = {
+      refs,
+      modifier: on ? "INCLUDES" : "EXCLUDES",
+      depth: -1,
+    };
+    if (kind === "tag") return this.tagClause(criterion, ctx);
+    if (kind === "studio") return this.studioClause(criterion, ctx);
+    return refClause(GALLERY_PERFORMERS, refs, criterion.modifier, {
+      name: ctx.name,
+      allowedInstanceIds: ctx.allowedInstanceIds,
     });
   }
 

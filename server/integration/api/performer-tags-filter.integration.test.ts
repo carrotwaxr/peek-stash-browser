@@ -1,7 +1,7 @@
 /**
- * The scene filter for performer tags (`performer_tags`, item 65), from the
- * wire through the parser into the scene builder, on seeded rows: a scene
- * matches through the tags of its performers.
+ * The scene, image and gallery filter for performer tags (`performer_tags`,
+ * item 65), from the wire through the parser into each builder, on seeded
+ * rows: an item matches through the tags of its performers.
  *
  * Two made-up instances reuse the same ids, as two Stash servers do.
  * - Tags: 1, 2 (child of 1), 3 (child of 2), 4, 5, 6 on ptf-x; 1 and 4 on
@@ -13,13 +13,17 @@
  *   3; 4 performer 4; 5 performers 1 and 8; 6 only the deleted performer
  *   5; 7 no performer; 8 performer 6; 9 performer 7; 10 performer 1;
  *   11 performer 9. ptf-y scenes: 1 performer 1, 4 performer 4.
+ * - Images (7895400 + n) and galleries (7895500 + n) hold the same
+ *   performers as the scene of the same n, on the same instance.
  * - Viewer A hides nothing. Viewer B hid performer 6 (every instance),
- *   tag 5 and scene 10 on ptf-x; no cascade is seeded, so the clause itself
- *   must keep a hidden performer or tag from matching.
+ *   tag 5, and scene, image and gallery 10 on ptf-x; no cascade is seeded,
+ *   so the clause itself must keep a hidden performer or tag from matching.
  * Every seeded row is deleted before the file ends.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { parseListRequest } from "../../utils/listRequest.js";
 
@@ -33,6 +37,8 @@ const PREFIX = "ptf-it";
 const tid = (n: number) => String(7895000 + n);
 const pid = (n: number) => String(7895200 + n);
 const sid = (n: number) => String(7895300 + n);
+const iid = (n: number) => String(7895400 + n);
+const gid = (n: number) => String(7895500 + n);
 const tagRef = (n: number, instance?: string) =>
   instance === undefined ? tid(n) : `${tid(n)}:${instance}`;
 
@@ -50,6 +56,8 @@ describeWithDb("Performer tags filter (seeded)", () => {
     // Junctions cascade with their scene, performer or tag
     const where = { stashInstanceId: { in: INSTANCES } };
     await prisma.stashScene.deleteMany({ where });
+    await prisma.stashImage.deleteMany({ where });
+    await prisma.stashGallery.deleteMany({ where });
     await prisma.stashPerformer.deleteMany({ where });
     await prisma.stashTag.deleteMany({ where });
   }
@@ -75,6 +83,44 @@ describeWithDb("Performer tags filter (seeded)", () => {
       items
         .filter((s) => s.instanceId === instance)
         .map((s) => Number(s.id) - 7895300)
+        .sort((a, b) => a - b);
+    return { x: of(X), y: of(Y) };
+  }
+
+  /** The images or galleries a wire filter lists, as numbers per instance */
+  async function listedOf(
+    kind: "image" | "gallery",
+    viewer: number,
+    filter: Record<string, unknown>,
+    sort: "created_at" | "title" | "rating" = "created_at"
+  ): Promise<{ x: number[]; y: number[] }> {
+    const body = { filter: { per_page: 250, sort } };
+    const { items, total } =
+      kind === "image"
+        ? await imageQueryBuilder.execute({
+            userId: viewer,
+            allowedInstanceIds: INSTANCES,
+            request: parseListRequest(
+              "image",
+              { ...body, image_filter: filter },
+              { userId: viewer }
+            ),
+          })
+        : await galleryQueryBuilder.execute({
+            userId: viewer,
+            allowedInstanceIds: INSTANCES,
+            request: parseListRequest(
+              "gallery",
+              { ...body, gallery_filter: filter },
+              { userId: viewer }
+            ),
+          });
+    expect(total).toBe(items.length);
+    const base = kind === "image" ? 7895400 : 7895500;
+    const of = (instance: string) =>
+      items
+        .filter((item) => item.instanceId === instance)
+        .map((item) => Number(item.id) - base)
         .sort((a, b) => a - b);
     return { x: of(X), y: of(Y) };
   }
@@ -194,12 +240,47 @@ describeWithDb("Performer tags filter (seeded)", () => {
       ],
     });
 
+    // Images and galleries with the scenes' performers
+    const items = (instance: string, ns: number[], id: (n: number) => string) =>
+      ns.map((n) => ({
+        id: id(n),
+        stashInstanceId: instance,
+        title: `PTF ${n} ${instance}`,
+      }));
+    await prisma.stashImage.createMany({
+      data: [...items(X, ALL_X, iid), ...items(Y, ALL_Y, iid)],
+    });
+    await prisma.stashGallery.createMany({
+      data: [...items(X, ALL_X, gid), ...items(Y, ALL_Y, gid)],
+    });
+    const sceneLinks = await prisma.scenePerformer.findMany({
+      where: { sceneInstanceId: { in: INSTANCES } },
+    });
+    await prisma.imagePerformer.createMany({
+      data: sceneLinks.map((l) => ({
+        imageId: iid(Number(l.sceneId) - 7895300),
+        imageInstanceId: l.sceneInstanceId,
+        performerId: l.performerId,
+        performerInstanceId: l.performerInstanceId,
+      })),
+    });
+    await prisma.galleryPerformer.createMany({
+      data: sceneLinks.map((l) => ({
+        galleryId: gid(Number(l.sceneId) - 7895300),
+        galleryInstanceId: l.sceneInstanceId,
+        performerId: l.performerId,
+        performerInstanceId: l.performerInstanceId,
+      })),
+    });
+
     // B's exclusions, without the cascades a recompute would add
     await prisma.userExcludedEntity.createMany({
       data: [
         { entityType: "performer", entityId: pid(6), instanceId: "" },
         { entityType: "tag", entityId: tid(5), instanceId: X },
         { entityType: "scene", entityId: sid(10), instanceId: X },
+        { entityType: "image", entityId: iid(10), instanceId: X },
+        { entityType: "gallery", entityId: gid(10), instanceId: X },
       ].map((row) => ({ ...row, userId: user.B, reason: "hidden" })),
     });
   });
@@ -387,5 +468,132 @@ describeWithDb("Performer tags filter (seeded)", () => {
         ).x
       ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 11]);
     }
+  });
+  describe.each(["image", "gallery"] as const)("on the %s list", (kind) => {
+    const listed = (
+      viewer: number,
+      filter: Record<string, unknown>,
+      sort: "created_at" | "title" | "rating" = "created_at"
+    ) => listedOf(kind, viewer, filter, sort);
+    // An index sort (images walk theirs) and one without
+    const SORTS = ["created_at", "rating"] as const;
+
+    it("an item matches when one of its performers has the tag, to the depth", async () => {
+      for (const sort of SORTS) {
+        expect(await listed(user.A, tags([tagRef(1, X)]), sort)).toEqual({
+          x: [1, 4, 5, 10],
+          y: [],
+        });
+        expect(
+          await listed(
+            user.A,
+            tags([tagRef(1, X)], "INCLUDES", { depth: -1 }),
+            sort
+          )
+        ).toEqual({ x: [1, 2, 3, 4, 5, 10], y: [] });
+      }
+    });
+
+    it("INCLUDES_ALL needs each tag on some performer of the item", async () => {
+      for (const sort of SORTS) {
+        expect(
+          await listed(
+            user.A,
+            tags([tagRef(1, X), tagRef(4, X)], "INCLUDES_ALL"),
+            sort
+          )
+        ).toEqual({ x: [4, 5], y: [] });
+      }
+    });
+
+    it("EXCLUDES and excludes drop items with any such performer", async () => {
+      for (const sort of SORTS) {
+        expect(
+          await listed(user.A, tags([tagRef(4, X)], "EXCLUDES"), sort)
+        ).toEqual({ x: [1, 2, 3, 6, 7, 8, 9, 10, 11], y: ALL_Y });
+        expect(
+          await listed(
+            user.A,
+            tags([tagRef(1, X)], "INCLUDES", { excludes: [tagRef(4, X)] }),
+            sort
+          )
+        ).toEqual({ x: [1, 10], y: [] });
+      }
+    });
+
+    it("a deleted or hidden performer's tags, and a hidden tag, do not count", async () => {
+      expect(await listed(user.A, tags([tagRef(4, X)]))).toEqual({
+        x: [4, 5],
+        y: [],
+      });
+      expect(await listed(user.A, tags([tagRef(6, X)]))).toEqual({
+        x: [8],
+        y: [],
+      });
+      expect(await listed(user.B, tags([tagRef(6, X)]))).toEqual({
+        x: [],
+        y: [],
+      });
+      expect(
+        (await listed(user.B, tags([tagRef(6, X)], "EXCLUDES"))).x
+      ).toContain(8);
+      expect(await listed(user.B, tags([tagRef(5, X)]))).toEqual({
+        x: [],
+        y: [],
+      });
+      expect(
+        (await listed(user.B, tags([tagRef(5, X)], "EXCLUDES"))).x
+      ).toContain(9);
+    });
+
+    it("an item the viewer hid is never listed, in any form", async () => {
+      for (const filter of [
+        tags([tagRef(1, X)]),
+        tags([tagRef(4, X)], "EXCLUDES"),
+        tags([tagRef(1, X), tagRef(4, X)], "INCLUDES_ALL"),
+        tags([], "INCLUDES", { excludes: [tagRef(4, X)] }),
+      ]) {
+        expect((await listed(user.A, filter)).x.length).toBeGreaterThan(0);
+        expect((await listed(user.B, filter)).x).not.toContain(10);
+      }
+    });
+
+    it("two instances reusing ids stay apart", async () => {
+      expect(await listed(user.A, tags([tagRef(4, Y)]))).toEqual({
+        x: [],
+        y: [1],
+      });
+      expect(await listed(user.A, tags([tagRef(1)]))).toEqual({
+        x: [1, 4, 5, 10],
+        y: [4],
+      });
+      expect(await listed(user.A, tags([tagRef(4)], "EXCLUDES"))).toEqual({
+        x: [1, 2, 3, 6, 7, 8, 9, 10, 11],
+        y: [4],
+      });
+    });
+
+    it("more than 64 tags take the large shape with the same answers", async () => {
+      const unknown = Array.from({ length: 70 }, (_, i) => tagRef(900 + i, X));
+      for (const sort of SORTS) {
+        expect(
+          await listed(user.A, tags([tagRef(1, X), ...unknown]), sort)
+        ).toEqual({ x: [1, 4, 5, 10], y: [] });
+        expect(
+          await listed(
+            user.A,
+            tags([tagRef(4, X), ...unknown], "EXCLUDES"),
+            sort
+          )
+        ).toEqual({ x: [1, 2, 3, 6, 7, 8, 9, 10, 11], y: ALL_Y });
+        expect(
+          await listed(
+            user.B,
+            tags([tagRef(5, X), tagRef(6, X), ...unknown]),
+            sort
+          )
+        ).toEqual({ x: [], y: [] });
+      }
+    });
   });
 });

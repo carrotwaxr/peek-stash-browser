@@ -958,3 +958,396 @@ describeWithDb("Gallery own fields (seeded)", () => {
     }
   });
 });
+
+/**
+ * Gallery favourites, performer count and performer age (item 65), from
+ * the wire through the parser into the gallery builder, on seeded rows.
+ *
+ * Two made-up instances reuse the same ids, as two Stash servers do: gpf-x
+ * and gpf-y, passed to the builder as the viewer's allowed instances. Ids
+ * are 7897000 + n for tags, 7897100 + n studios, 7897200 + n performers,
+ * 7897300 + n galleries.
+ * - Tags: 1, 2 (child of 1), 3 on gpf-x; 1 on gpf-y. Studios the same.
+ * - Performers on gpf-x: 1 born `1995` (a year alone), 2 born 1990-06-15,
+ *   3 deleted (born 2000-01-01); 1 born `1995` on gpf-y.
+ * - Galleries on gpf-x (tags, studio, performers, date): 1 tag 1, studio 1,
+ *   performer 1, 2020-05-01; 2 tag 2, studio 2, performer 2, dated `2020`;
+ *   3 tag 3, studio 3, performers 1 and 2, no date; 4 nothing, 2020-05-01;
+ *   5 performer 3, 2010-01-01; 6 tag 1, studio 1, performer 2, 2020-05-01.
+ *   On gpf-y: 1 tag 1, studio 1, performer 1, 2020-05-01.
+ * - Favourites: A tag 1@x, studio 1@x, performers 2@x and 1@y. B tag 3@x,
+ *   studio 3@x, performers 1@x and 2@x.
+ * - B hid gallery 6@x and performer 2@x (no cascade is seeded).
+ * Every seeded row is deleted before the describe ends.
+ */
+const QX = "gpf-x";
+const QY = "gpf-y";
+const QF_INSTANCES = [QX, QY];
+const QF_PREFIX = "gpf-it";
+const qfTag = (n: number) => String(7897000 + n);
+const qfStudio = (n: number) => String(7897100 + n);
+const qfPerformer = (n: number) => String(7897200 + n);
+const qfGallery = (n: number) => String(7897300 + n);
+
+describeWithDb("Gallery favourites, performer count and age (seeded)", () => {
+  const user = { A: 0, B: 0 };
+
+  async function removeRows(): Promise<void> {
+    await prisma.user.deleteMany({
+      where: { username: { startsWith: QF_PREFIX } },
+    });
+    // Junctions cascade; the galleries go before the studios they name
+    const where = { stashInstanceId: { in: QF_INSTANCES } };
+    await prisma.stashGallery.deleteMany({ where });
+    await prisma.stashPerformer.deleteMany({ where });
+    await prisma.stashStudio.deleteMany({ where });
+    await prisma.stashTag.deleteMany({ where });
+  }
+
+  /** The galleries a wire `gallery_filter` lists, as numbers per instance; the count is checked */
+  async function listed(
+    viewer: number,
+    galleryFilter: Record<string, unknown>,
+    sort: "title" | "created_at" | "rating" = "title"
+  ): Promise<{ x: number[]; y: number[] }> {
+    const request = parseListRequest(
+      "gallery",
+      { filter: { per_page: 250, sort }, gallery_filter: galleryFilter },
+      { userId: viewer }
+    );
+    const { items, total } = await galleryQueryBuilder.execute({
+      userId: viewer,
+      allowedInstanceIds: QF_INSTANCES,
+      request,
+    });
+    expect(total).toBe(items.length);
+    const of = (instance: string) =>
+      items
+        .filter((gallery) => gallery.instanceId === instance)
+        .map((gallery) => Number(gallery.id) - 7897300)
+        .sort((a, b) => a - b);
+    return { x: of(QX), y: of(QY) };
+  }
+
+  const count = (field: string, modifier: string, value: number) => ({
+    [field]: { modifier, value },
+  });
+
+  beforeAll(async () => {
+    await removeRows();
+
+    const makeUser = async (name: string) =>
+      (
+        await prisma.user.create({
+          data: {
+            username: `${QF_PREFIX}-${name}`,
+            password: "not-a-real-hash",
+            role: "USER",
+          },
+        })
+      ).id;
+    user.A = await makeUser("a");
+    user.B = await makeUser("b");
+
+    await prisma.stashTag.createMany({
+      data: [
+        { n: 1, instance: QX },
+        { n: 2, instance: QX, parent: 1 },
+        { n: 3, instance: QX },
+        { n: 1, instance: QY },
+      ].map(({ n, instance, parent }) => ({
+        id: qfTag(n),
+        stashInstanceId: instance,
+        name: `GPF tag ${n} ${instance}`,
+        parentIds: JSON.stringify(parent === undefined ? [] : [qfTag(parent)]),
+      })),
+    });
+    await prisma.stashStudio.createMany({
+      data: [
+        { n: 1, instance: QX },
+        { n: 2, instance: QX, parent: 1 },
+        { n: 3, instance: QX },
+        { n: 1, instance: QY },
+      ].map(({ n, instance, parent }) => ({
+        id: qfStudio(n),
+        stashInstanceId: instance,
+        name: `GPF studio ${n} ${instance}`,
+        parentId: parent === undefined ? null : qfStudio(parent),
+      })),
+    });
+    await prisma.stashPerformer.createMany({
+      data: [
+        { n: 1, instance: QX, birthdate: "1995" },
+        { n: 2, instance: QX, birthdate: "1990-06-15" },
+        { n: 3, instance: QX, birthdate: "2000-01-01", deleted: true },
+        { n: 1, instance: QY, birthdate: "1995" },
+      ].map(({ n, instance, birthdate, deleted }) => ({
+        id: qfPerformer(n),
+        stashInstanceId: instance,
+        name: `GPF performer ${n} ${instance}`,
+        birthdate,
+        ...(deleted === true ? { deletedAt: new Date() } : {}),
+      })),
+    });
+
+    const galleries: Array<{
+      n: number;
+      instance: string;
+      tag?: number;
+      studio?: number;
+      performers?: number[];
+      date?: string;
+    }> = [
+      {
+        n: 1,
+        instance: QX,
+        tag: 1,
+        studio: 1,
+        performers: [1],
+        date: "2020-05-01",
+      },
+      { n: 2, instance: QX, tag: 2, studio: 2, performers: [2], date: "2020" },
+      { n: 3, instance: QX, tag: 3, studio: 3, performers: [1, 2] },
+      { n: 4, instance: QX, date: "2020-05-01" },
+      { n: 5, instance: QX, performers: [3], date: "2010-01-01" },
+      {
+        n: 6,
+        instance: QX,
+        tag: 1,
+        studio: 1,
+        performers: [2],
+        date: "2020-05-01",
+      },
+      {
+        n: 1,
+        instance: QY,
+        tag: 1,
+        studio: 1,
+        performers: [1],
+        date: "2020-05-01",
+      },
+    ];
+    await prisma.stashGallery.createMany({
+      data: galleries.map(({ n, instance, studio, date }) => ({
+        id: qfGallery(n),
+        stashInstanceId: instance,
+        title: `GPF ${n} ${instance}`,
+        date: date ?? null,
+        studioId: studio === undefined ? null : qfStudio(studio),
+        studioInstanceId: studio === undefined ? null : instance,
+      })),
+    });
+    await prisma.galleryTag.createMany({
+      data: galleries.flatMap(({ n, instance, tag }) =>
+        tag === undefined
+          ? []
+          : [
+              {
+                galleryId: qfGallery(n),
+                galleryInstanceId: instance,
+                tagId: qfTag(tag),
+                tagInstanceId: instance,
+              },
+            ]
+      ),
+    });
+    await prisma.galleryPerformer.createMany({
+      data: galleries.flatMap(({ n, instance, performers }) =>
+        (performers ?? []).map((p) => ({
+          galleryId: qfGallery(n),
+          galleryInstanceId: instance,
+          performerId: qfPerformer(p),
+          performerInstanceId: instance,
+        }))
+      ),
+    });
+
+    const favourite = { favorite: true };
+    await prisma.tagRating.createMany({
+      data: [
+        { userId: user.A, instanceId: QX, tagId: qfTag(1), ...favourite },
+        { userId: user.B, instanceId: QX, tagId: qfTag(3), ...favourite },
+      ],
+    });
+    await prisma.studioRating.createMany({
+      data: [
+        { userId: user.A, instanceId: QX, studioId: qfStudio(1), ...favourite },
+        { userId: user.B, instanceId: QX, studioId: qfStudio(3), ...favourite },
+      ],
+    });
+    await prisma.performerRating.createMany({
+      data: [
+        { userId: user.A, instanceId: QX, performerId: qfPerformer(2) },
+        { userId: user.A, instanceId: QY, performerId: qfPerformer(1) },
+        { userId: user.B, instanceId: QX, performerId: qfPerformer(1) },
+        { userId: user.B, instanceId: QX, performerId: qfPerformer(2) },
+      ].map((row) => ({ ...row, ...favourite })),
+    });
+
+    // B's exclusions, without the cascades a recompute would add
+    await prisma.userExcludedEntity.createMany({
+      data: [
+        { entityType: "gallery", entityId: qfGallery(6), instanceId: QX },
+        { entityType: "performer", entityId: qfPerformer(2), instanceId: QX },
+      ].map((row) => ({ ...row, userId: user.B, reason: "hidden" })),
+    });
+  });
+
+  afterAll(async () => {
+    await removeRows();
+  });
+
+  it("tag_favorite and studio_favorite: a favourite or a descendant of one", async () => {
+    for (const field of ["tag_favorite", "studio_favorite"]) {
+      expect(await listed(user.A, { [field]: true }), field).toEqual({
+        x: [1, 2, 6],
+        y: [],
+      });
+      expect(await listed(user.A, { [field]: false }), field).toEqual({
+        x: [3, 4, 5],
+        y: [1],
+      });
+      expect(await listed(user.B, { [field]: true }), field).toEqual({
+        x: [3],
+        y: [],
+      });
+      expect(await listed(user.B, { [field]: false }), field).toEqual({
+        x: [1, 2, 4, 5],
+        y: [1],
+      });
+    }
+  });
+
+  it("performer_favorite: a favourite performer the viewer can see", async () => {
+    expect(await listed(user.A, { performer_favorite: true })).toEqual({
+      x: [2, 3, 6],
+      y: [1],
+    });
+    expect(await listed(user.A, { performer_favorite: false })).toEqual({
+      x: [1, 4, 5],
+      y: [],
+    });
+    // B's favourite performer 2 is hidden: gallery 2 does not match by it
+    expect(await listed(user.B, { performer_favorite: true })).toEqual({
+      x: [1, 3],
+      y: [],
+    });
+    expect(await listed(user.B, { performer_favorite: false })).toEqual({
+      x: [2, 4, 5],
+      y: [1],
+    });
+  });
+
+  it("a favourite on one instance never matches the same id on another, nor another user's", async () => {
+    // A's performer 1 favourite is on gpf-y; gallery 1@x has performer 1@x
+    expect(
+      (await listed(user.A, { performer_favorite: true })).x
+    ).not.toContain(1);
+    expect((await listed(user.A, { tag_favorite: true })).y).toEqual([]);
+    // B's tag 3 and studio 3 are not A's
+    expect((await listed(user.A, { tag_favorite: true })).x).not.toContain(3);
+    expect((await listed(user.A, { studio_favorite: true })).x).not.toContain(
+      3
+    );
+  });
+
+  it("true and false split the visible library under every sort", async () => {
+    for (const viewer of [user.A, user.B]) {
+      const all = await listed(viewer, {});
+      for (const field of [
+        "tag_favorite",
+        "studio_favorite",
+        "performer_favorite",
+      ]) {
+        for (const sort of ["title", "created_at", "rating"] as const) {
+          const yes = await listed(viewer, { [field]: true }, sort);
+          const no = await listed(viewer, { [field]: false }, sort);
+          expect(
+            [...yes.x, ...no.x].sort((a, b) => a - b),
+            field
+          ).toEqual(all.x);
+          expect(
+            [...yes.y, ...no.y].sort((a, b) => a - b),
+            field
+          ).toEqual(all.y);
+        }
+      }
+    }
+  });
+
+  it("performer_count counts the live performers the viewer can see", async () => {
+    expect(await listed(user.A, count("performer_count", "EQUALS", 1))).toEqual(
+      { x: [1, 2, 6], y: [1] }
+    );
+    expect(await listed(user.A, count("performer_count", "EQUALS", 2))).toEqual(
+      { x: [3], y: [] }
+    );
+    // Gallery 5's only performer is deleted
+    expect(await listed(user.A, count("performer_count", "EQUALS", 0))).toEqual(
+      { x: [4, 5], y: [] }
+    );
+    // B hid performer 2
+    expect(await listed(user.B, count("performer_count", "EQUALS", 0))).toEqual(
+      { x: [2, 4, 5], y: [] }
+    );
+    expect(await listed(user.B, count("performer_count", "EQUALS", 1))).toEqual(
+      { x: [1, 3], y: [1] }
+    );
+  });
+
+  it("performer_age is a performer's age on the gallery's date, partial dates included", async () => {
+    // Born `1995` on a gallery dated 2020-05-01 is 25
+    expect(await listed(user.A, count("performer_age", "EQUALS", 25))).toEqual({
+      x: [1],
+      y: [1],
+    });
+    // Born 1990-06-15: 29 on 2020-05-01, and on `2020` read as 2020-01-01
+    expect(await listed(user.A, count("performer_age", "EQUALS", 29))).toEqual({
+      x: [2, 6],
+      y: [],
+    });
+    // A deleted performer never matches
+    expect(await listed(user.A, count("performer_age", "EQUALS", 10))).toEqual({
+      x: [],
+      y: [],
+    });
+    // Performer 2, hidden by B, makes no match for B
+    expect(await listed(user.B, count("performer_age", "EQUALS", 29))).toEqual({
+      x: [],
+      y: [],
+    });
+  });
+
+  it("a gallery the viewer hid is never listed under a new field, in any form", async () => {
+    // A sees gallery 6 under these
+    for (const filter of [
+      { tag_favorite: true },
+      { studio_favorite: true },
+      { performer_favorite: true },
+      count("performer_count", "EQUALS", 1),
+      count("performer_age", "EQUALS", 29),
+    ]) {
+      expect(
+        (await listed(user.A, filter)).x,
+        JSON.stringify(filter)
+      ).toContain(6);
+    }
+    for (const filter of [
+      { tag_favorite: true },
+      { tag_favorite: false },
+      { studio_favorite: true },
+      { studio_favorite: false },
+      { performer_favorite: true },
+      { performer_favorite: false },
+      count("performer_count", "EQUALS", 0),
+      count("performer_count", "NOT_EQUALS", 5),
+      count("performer_count", "LESS_THAN", 5),
+      count("performer_age", "GREATER_THAN", 0),
+    ]) {
+      expect(
+        (await listed(user.B, filter)).x,
+        JSON.stringify(filter)
+      ).not.toContain(6);
+    }
+  });
+});
